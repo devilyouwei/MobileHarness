@@ -1,0 +1,162 @@
+[
+  {
+    "answer" : "当然可以！你想聊什么？",
+    "protocolError" : "",
+    "scenario" : "greeting",
+    "seconds" : 3.8606669902801514,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "还剩 4 个。",
+    "protocolError" : "",
+    "scenario" : "arithmetic",
+    "seconds" : 0.1340019702911377,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "**西红柿炒鸡蛋**（简单快手版）：\n1. 鸡蛋打散，加少许盐。\n2. 西红柿切块，加少许盐腌制 10 分钟去酸味。\n3. 热锅倒油，炒鸡蛋至凝固盛出。\n4. 炒西红柿至出沙，倒入鸡蛋和炒好的鸡蛋，加盐调味即可。",
+    "protocolError" : "",
+    "scenario" : "everyday",
+    "seconds" : 1.1426290273666382,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "抱抱你，辛苦了。工作累且自责是很正常的，先停下来歇会儿，喝杯温水，深呼吸放松一下。今天没做好也没关系，休息是为了更好地出发，你值得被温柔以待。",
+    "protocolError" : "",
+    "scenario" : "empathy",
+    "seconds" : 0.62646210193634033,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "蓝盒。",
+    "protocolError" : "",
+    "scenario" : "recall",
+    "seconds" : 0.10305094718933105,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "喝茶？还是咖啡？",
+    "protocolError" : "",
+    "scenario" : "correction",
+    "seconds" : 0.13617408275604248,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "🎉 恭喜！",
+    "protocolError" : "",
+    "scenario" : "explicit_expression",
+    "seconds" : 0.15264797210693359,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "🤔",
+    "protocolError" : "",
+    "scenario" : "expression_only",
+    "seconds" : 0.11057305335998535,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "收到。\n\n1. 微笑表情：🤣\n2. 惊讶表情：😮\n3. 你好：你好",
+    "protocolError" : "",
+    "scenario" : "channel",
+    "seconds" : 0.7942739725112915,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "I'm going to the library tomorrow.",
+    "protocolError" : "",
+    "scenario" : "format",
+    "seconds" : 0.23616492748260498,
+    "system" : "你是中文语音助手，直接简短回答用户问题。",
+    "variant" : "minimal"
+  },
+  {
+    "answer" : "当然可以，很高兴能和你聊天！你想聊些什么呢？",
+    "protocolError" : "",
+    "scenario" : "greeting",
+    "seconds" : 0.71703600883483887,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "<channel.main>\n<express emotion=\"happy\"\/>\n我有 3 个苹果，又买了 2 个，吃掉 1 个，还剩 4 个。\n<\/channel.main>",
+    "protocolError" : "",
+    "scenario" : "arithmetic",
+    "seconds" : 0.96320593357086182,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "<channel.main>\n<express emotion=\"happy\"\/>\n今天家里只有鸡蛋、西红柿和米饭，最简单又营养的做法就是西红柿鸡蛋面。把西红柿切块炒出红油，加入鸡蛋碎，最后加点盐调味，配上白米饭，简单又美味，快去试试吧！\n<\/channel.main>",
+    "protocolError" : "",
+    "scenario" : "everyday",
+    "seconds" : 1.3047850131988525,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "<channel.main>\n<express emotion=\"sad\"\/>\n<express emotion=\"thinking\"\/>\n今天工作累的时候，真的很难受。你愿意和我聊聊吗？",
+    "protocolError" : "incompleteDocument",
+    "scenario" : "empathy",
+    "seconds" : 0.8343501091003418,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "蓝盒。",
+    "protocolError" : "",
+    "scenario" : "recall",
+    "seconds" : 0.28596699237823486,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "<channel.main>\n<express emotion=\"thinking\"\/>\n你刚才说错了，现在你喜欢喝茶。",
+    "protocolError" : "incompleteDocument",
+    "scenario" : "correction",
+    "seconds" : 0.62692701816558838,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "<channel.main>\n<express emotion=\"happy\"\/>\n恭喜您通过考试！\n<\/channel.main>",
+    "protocolError" : "",
+    "scenario" : "explicit_expression",
+    "seconds" : 0.75229203701019287,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "<thinking\/>",
+    "protocolError" : "unknownCapability",
+    "scenario" : "expression_only",
+    "seconds" : 0.31784796714782715,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "<channel.main>\n<express emotion=\"smile\"\/>\n<express emotion=\"surprised\"\/>\n你好。\n<\/channel.main>",
+    "protocolError" : "",
+    "scenario" : "channel",
+    "seconds" : 0.89465093612670898,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  },
+  {
+    "answer" : "I will translate your request into English: \"I will go to the library tomorrow.\"",
+    "protocolError" : "",
+    "scenario" : "format",
+    "seconds" : 0.65311503410339355,
+    "system" : "你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。\n普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。\n只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。\nchannel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。\nchannel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。\n例如：<channel.main><express emotion=\"smile\"\/><express emotion=\"surprised\"\/><\/channel.main>你好。\n自然文本中的 < 和 & 使用 &lt; 和 &amp;。\nAction express：必填字符串参数 [\"emotion\"]；可选 []；默认 channel=Display\nShow a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.\nParameter emotion: string. The facial expression to display in the voice circle. Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default.\nExample: <express emotion=\"smile\"\/> Hello.\nExample: <express emotion=\"happy\"\/> That is wonderful!\nExample: <express emotion=\"thinking\"\/> Let me think.",
+    "variant" : "clarified"
+  }
+]

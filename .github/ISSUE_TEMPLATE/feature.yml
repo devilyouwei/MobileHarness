@@ -1,0 +1,18 @@
+name: 功能或能力接入
+description: 描述用户场景及验收条件
+title: "feat: "
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 输入来自哪里，哪个 Agent 处理，预期输出是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 包括成功、权限拒绝、取消和设备断开等情况。
+    validations:
+      required: true

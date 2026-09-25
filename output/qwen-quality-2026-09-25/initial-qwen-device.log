@@ -1,0 +1,4 @@
+Launched application with dev.mobileharness.app bundle identifier.
+Waiting for the application to terminate…
+PROBE_FATAL invalidState("Failed to find an extend function with the max context length of 40960")
+App terminated due to signal 9.

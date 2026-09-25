@@ -1,0 +1,27 @@
+{
+  "directory": "Audio8",
+  "source": "https://huggingface.co/Edge0/Audio8-ASR-0.1B-iOS-ANE",
+  "revision": "6a3f52c400cd436e1bd32c0514758345ddf14bfa",
+  "files": [
+    "dist/ASRModels.bundle/asr_manifest.json",
+    "dist/ASRModels.bundle/hann_window.bin",
+    "dist/ASRModels.bundle/lm_decode.onnx",
+    "dist/ASRModels.bundle/lm_prefill.onnx",
+    "dist/ASRModels.bundle/lm_shared_int4.data",
+    "dist/ASRModels.bundle/manifest.json",
+    "dist/ASRModels.bundle/mask_gen.onnx",
+    "dist/ASRModels.bundle/mel_filters.bin",
+    "dist/ASRModels.bundle/projector_lin_b.bin",
+    "dist/ASRModels.bundle/projector_lin_w.bin",
+    "dist/ASRModels.bundle/projector_norm_b.bin",
+    "dist/ASRModels.bundle/projector_norm_w.bin",
+    "dist/ASRModels.bundle/token_embedding_fp16.bin",
+    "dist/ASRModels.bundle/tower.mlmodelc/analytics/coremldata.bin",
+    "dist/ASRModels.bundle/tower.mlmodelc/coremldata.bin",
+    "dist/ASRModels.bundle/tower.mlmodelc/metadata.json",
+    "dist/ASRModels.bundle/tower.mlmodelc/model.mil",
+    "dist/ASRModels.bundle/tower.mlmodelc/weights/weight.bin",
+    "dist/ASRModels.bundle/vocab_bytes.bin",
+    "dist/ASRModels.bundle/vocab_offsets.bin"
+  ]
+}

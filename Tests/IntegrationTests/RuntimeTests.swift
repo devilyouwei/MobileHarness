@@ -1,0 +1,159 @@
+import ActionRuntime
+import Actions
+import AgentCore
+import Agents
+import Foundation
+import Gateway
+import Testing
+import ToolRuntime
+
+@Test func lifecycleAndBoundedQueue() async throws {
+    let agent = try AssistantAgent(capacity: 1, chat: FixedTextChat())
+    let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
+    await #expect(throws: HarnessError.notRunning) { try await agent.receive(input) }
+    try await agent.start()
+    try await agent.pause()
+    try await agent.receive(input)
+    await #expect(throws: HarnessError.queueFull) { try await agent.receive(input) }
+    #expect(await agent.status().queuedInputs == 1)
+    try await agent.resume()
+    #expect(await agent.status().processedInputs == 1)
+    await agent.stop()
+    await #expect(throws: HarnessError.invalidTransition) { try await agent.start() }
+}
+
+@Test func outputOverflowFailsAgent() async throws {
+    let agent = try AssistantAgent(chat: FixedTextChat())
+    try await agent.start()
+    for _ in 0..<129 {
+        if await agent.status().lifecycle == .failed { break }
+        try await agent.receive(AgentInput(sessionID: UUID(), payload: .event("test")))
+    }
+    #expect(await agent.status().lifecycle == .failed)
+    await #expect(throws: HarnessError.notRunning) {
+        try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("rejected")))
+    }
+}
+
+@Test func capabilitiesRejectUndeclaredActions() throws {
+    let descriptor = try AssistantAgent(chat: FixedTextChat()).descriptor
+    #expect(throws: HarnessError.forbiddenFunction) {
+        try OutputValidator.validate(.actionCall(expectedActionCall(name: "move")), descriptor: descriptor)
+    }
+    #expect(throws: HarnessError.forbiddenTool) {
+        try OutputValidator.validate(.toolCall(ToolCall(toolPath: "deletePhotos")), descriptor: descriptor)
+    }
+    let restricted = AgentDescriptor(id: .assistant, name: "restricted", inputs: [.text], outputs: [.text])
+    #expect(throws: HarnessError.forbiddenOutput) {
+        try OutputValidator.validate(.control("start"), descriptor: restricted)
+    }
+}
+
+private struct FanOutRouter: SignalRouter {
+    func destinations(for input: AgentInput) async throws -> [AgentID] {
+        [AgentID(rawValue: "missing"), .assistant, .assistant]
+    }
+}
+
+@Test func routingIsolatesFailuresAndDeduplicates() async throws {
+    let manager = AgentManager()
+    let agent = try AssistantAgent(chat: FixedTextChat())
+    try await manager.register(agent)
+    await #expect(throws: HarnessError.duplicateAgent) { try await manager.register(agent) }
+    try await manager.start(.assistant)
+    let gateway = InputGateway(manager: manager, router: FanOutRouter())
+    let report = try await gateway.submit(AgentInput(sessionID: UUID(), payload: .text("hello")))
+    #expect(report.delivered == [.assistant])
+    #expect(report.rejected.count == 1)
+    #expect(await agent.status().processedInputs == 1)
+    await manager.stopAll()
+}
+
+private actor Recorder {
+    var outputs: [OutputEnvelope] = []
+    var actions = 0
+    func record(_ output: OutputEnvelope) { outputs.append(output) }
+    func act() { actions += 1 }
+}
+
+@Test func toolRoundTripPreservesSessionAndCallID() async throws {
+    let manager = AgentManager()
+    let agent = try AssistantAgent(chat: FixedTextChat())
+    try await manager.register(agent)
+    try await manager.start(.assistant)
+    let requests = InputGateway(manager: manager)
+    let tools = ToolRegistry()
+    try await tools.register("System.runtimeInfo") { _ in "runtime healthy" }
+    let recorder = Recorder()
+    let actions = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            ActionPath(module: "Speech", function: "speak"): { _ in },
+            ActionPath(module: "UI", function: "print"): { _ in },
+        ]))
+    let responses = OutputGateway(manager: manager, requests: requests, tools: tools, actions: actions) {
+        await recorder.record($0)
+    }
+    let session = UUID()
+    let input = AgentInput(sessionID: session, payload: .text("/status"))
+    _ = try await requests.submit(input)
+    // Finish after dispatch to make this integration test finite even if no reply is produced.
+    var iterator = agent.outputs.makeAsyncIterator()
+    let first = try #require(await iterator.next())
+    guard case .toolCall(let call) = first.output else {
+        Issue.record("Expected tool call")
+        return
+    }
+    #expect(first.inputID == input.id)
+    let directResult = await ToolExecutor(registry: tools).execute(call)
+    #expect(directResult.callID == call.id)
+    try await responses.dispatch(first)
+    await agent.stop()
+    let reply = try #require(await iterator.next())
+    #expect(reply.sessionID == session)
+    #expect(reply.output == .actionCall(expectedActionCall(name: "say", parameters: ["text": "runtime healthy"])))
+    try await responses.dispatch(reply)
+    #expect(await recorder.outputs.count == 2)
+    await responses.shutdown()
+}
+
+@Test func functionDispatchResolvesAgentTagThroughRegisteredPath() async throws {
+    let manager = AgentManager()
+    try await manager.register(AssistantAgent(chat: FixedTextChat()))
+    let requests = InputGateway(manager: manager)
+    let recorder = Recorder()
+    let missing = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry()) { _ in }
+    let input = AgentInput(sessionID: UUID(), payload: .event("test"))
+    let envelope = OutputEnvelope(
+        source: .assistant, input: input,
+        output: .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
+    await #expect(throws: (any Error).self) { try await missing.dispatch(envelope) }
+    let actions = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            ActionPath(module: "UI", function: "express"): { _ in await recorder.act() }
+        ]))
+    let responses = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry(), actions: actions) {
+        _ in
+    }
+    try await responses.dispatch(envelope)
+    try await responses.dispatch(
+        OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished")))
+    #expect(await recorder.actions == 1)
+    // The path is not a public tag: callers must use the agent's declared alias.
+    await #expect(throws: HarnessError.forbiddenFunction) {
+        try await responses.dispatch(
+            OutputEnvelope(
+                source: .assistant, input: input,
+                output: .actionCall(expectedActionCall(name: "Display.express"))))
+    }
+    await responses.shutdown()
+}
+
+@Test func unknownAndFailingToolsReturnCorrelatedErrors() async throws {
+    let registry = ToolRegistry()
+    let unknown = ToolCall(toolPath: "unknown")
+    let result = await ToolExecutor(registry: registry).execute(unknown)
+    #expect(result.isError && result.callID == unknown.id)
+    try await registry.register("broken") { _ in throw HarnessError.notRunning }
+    let failure = await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "broken"))
+    #expect(failure.isError)
+}

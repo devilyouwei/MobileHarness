@@ -1,0 +1,26 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 4]
+[2 / 5] Qwen35Tests-product
+[4 / 7] Qwen35Tests-product
+[5 / 8] Qwen35Tests-product
+[11 / 13] Qwen35Tests-product
+[13 / 13] Qwen35Tests-product
+[13 / 30] MiniCPM5Tests-product
+warning: missing creator for mutated node: ('/Users/devil/Pro/MobileHarness/MobileHarness/ModelKit/.build/out/Products/Debug/mlx-swift_Cmlx.bundle/Contents/MacOS')
+Build complete! (3.40 sec)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite Qwen35ProviderTests started.
+➜ Test evaluateQwenPromptVariants() skipped.
+◇ Test qwenRejectsInvalidRequestsBeforeLoading() started.
+✔ Test qwenRejectsInvalidRequestsBeforeLoading() passed after 0.001 seconds.
+◇ Test qwenRealSmoke() started.
+QWEN_SMOKE: 你好！我是 Qwen3.5，阿里巴巴最新推出的通义千问大语言模型，具备强大的逻辑推理、代码生成及长文本分析能力，致力于为您提供精准、高效且多场景适用的智能支持。
+✔ Test qwenRealSmoke() passed after 10.228 seconds.
+◇ Test qwenTokenizerMatchesPython() started.
+✔ Test qwenTokenizerMatchesPython() passed after 2.668 seconds.
+✔ Suite Qwen35ProviderTests passed after 12.898 seconds.
+✔ Test run with 4 tests in 1 suite passed after 12.898 seconds.

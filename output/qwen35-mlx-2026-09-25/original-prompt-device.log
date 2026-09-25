@@ -1,0 +1,331 @@
+Launched application with dev.mobileharness.app bundle identifier.
+Waiting for the application to terminate…
+PROBE_LOADED Qwen35 2.941707968711853
+PROBE_RESULT Qwen35/0/greeting 3.387151002883911s error= 当然可以，你想聊什么？
+PROBE_RESULT Qwen35/0/arithmetic 1.143676996231079s error= <channel.main>
+<express emotion="happy"/>
+你原来有 3 个，又买了 2 个，现在共有 5 个，吃掉 1 个后还剩 4 个。
+</channel.main>
+PROBE_RESULT Qwen35/0/everyday 0.6421530246734619s error=incompleteDocument <channel.main>
+<express emotion="happy"/>
+鸡蛋炒西红柿配米饭，简单又美味。
+PROBE_RESULT Qwen35/0/empathy 4.719729065895081s error=limitExceeded <channel.main>
+<express emotion="sad"/>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+PROBE_RESULT Qwen35/0/recall 0.4691019058227539s error= 刚才说的测试盒叫蓝盒。
+PROBE_RESULT Qwen35/0/correction 5.078252911567688s error=limitExceeded <channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+PROBE_RESULT Qwen35/0/explicit_expression 0.731734037399292s error= <channel.main>
+<express emotion="happy"/>
+恭喜！你通过了考试！
+</channel.main>
+PROBE_RESULT Qwen35/0/expression_only 0.4764961004257202s error=unknownCapability <thinking/>
+PROBE_RESULT Qwen35/0/channel 0.8377200365066528s error= <channel.main>
+<express emotion="smile"/>
+<express emotion="surprised"/>
+</channel.main>
+你好！
+PROBE_RESULT Qwen35/0/format 0.6136709451675415s error= I will translate your sentence into English: "I will go to the library tomorrow."
+PROBE_RESULT Qwen35/1/greeting 1.163267970085144s error= 当然可以，我很乐意与你聊天。
+PROBE_RESULT Qwen35/1/arithmetic 0.3449070453643799s error=incompleteDocument <channel.main>
+PROBE_RESULT Qwen35/1/everyday 0.8142919540405273s error= <channel.main>
+  简单做法：煮鸡蛋、炒西红柿炒蛋、白米饭搭配即可。
+</channel.main>
+PROBE_RESULT Qwen35/1/empathy 5.944549083709717s error=limitExceeded <channel.main>
+<express emotion="sad"/>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+<channel.main>
+PROBE_RESULT Qwen35/1/recall 0.49922609329223633s error= 刚才测试盒叫蓝盒。
+PROBE_RESULT Qwen35/1/correction 0.6566140651702881s error= 我记不住，你刚才说的是喝茶，现在你喝什么？
+PROBE_RESULT Qwen35/1/explicit_expression 0.5256859064102173s error= <express emotion="happy"/> 恭喜你通过考试！
+PROBE_RESULT Qwen35/1/expression_only 0.3811229467391968s error=unknownCapability <thinking/>
+PROBE_RESULT Qwen35/1/channel 15.863832950592041s error=incompleteDocument <channel.main>
+<express emotion="smile"/>
+<channel.main>
+<express emotion="surprised"/>
+</channel.main>
+<channel.main>
+你好
+</channel.main>
+<channel.main>
+<express emotion="smile"/>
+<channel.main>
+<express emotion="happy"/>
+</channel.main>
+<channel.main>
+<express emotion="thinking"/>
+</channel.main>
+<channel.main>
+<express emotion="sad"/>
+</channel.main>
+<channel.main>
+<express emotion="love"/>
+</channel.main>
+<channel.main>
+<express emotion="happy"/>
+</channel.main>
+<channel.main>
+<express emotion="thinking"/>
+</channel.main>
+<channel.main>
+<express emotion="happy"/>
+</channel.main>
+<channel.main>
+<express emotion="happy"/>
+</channel.main>
+<channel.main>
+<express emotion="happy"/>
+</channel.main>
+<channel.main>
+<express emotion="happy"/>
+</channel.main>
+<channel.main>
+<express emotion="happy"/>
+</channel.main>
+<channel.main>
+<express emotion="happy"/>
+
+PROBE_RESULT Qwen35/1/format 0.45126307010650635s error= Tomorrow I will go to the library.
+PROBE_RESULT Qwen35/2/greeting 0.418362021446228s error= 当然可以，你想聊什么？
+PROBE_RESULT Qwen35/2/arithmetic 0.37366294860839844s error=incompleteDocument <channel.main>
+PROBE_RESULT Qwen35/2/everyday 1.059696078300476s error=malformedMarkup <think>
+
+</think>
+
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="happy"/>
+做西红柿炒鸡蛋或米饭拌鸡蛋汤最合适。
+PROBE_RESULT Qwen35/2/empathy 6.080904960632324s error=limitExceeded <channel.main>
+<express emotion="sad"/>
+<channel.main>
+抱歉，听到你这么说，我深感难过。工作很累时，你觉得自己做得不够好，这种压力确实让人难受。能和我说说，是什么让你这么觉得吗？
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+<express emotion="sad"/>
+<channel.main>
+
+PROBE_RESULT Qwen35/2/recall 0.42750704288482666s error= 蓝盒。
+PROBE_RESULT Qwen35/2/correction 1.0812931060791016s error=incompleteDocument <channel.main>
+<express emotion="happy"/>
+茶比咖啡更温暖，我推荐你试试绿茶，清爽提神，味道超棒！
+PROBE_RESULT Qwen35/2/explicit_expression 0.8224290609359741s error=incompleteDocument <channel.main>
+<express emotion="happy"/>
+太棒了！恭喜你！
+PROBE_RESULT Qwen35/2/expression_only 0.4781229496002197s error=unknownCapability <thinking/>
+PROBE_RESULT Qwen35/2/channel 1.0807439088821411s error= <channel.main>
+<express emotion="smile"/>
+<express emotion="surprised"/>
+Hello.
+</channel.main>
+PROBE_RESULT Qwen35/2/format 6.877893090248108s error=limitExceeded <channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+<express emotion="thinking"/>
+<channel.main>
+PROBE_COMPLETE Qwen35 count=30

@@ -1,0 +1,29 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.ipa
+*.dSYM/
+*.xcresult/
+Config/Local.xcconfig
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+*.pem
+*.key
+# Model weights are provisioned separately; download profiles and licenses are tracked.
+*.mlmodel
+*.mlmodelc/
+*.mlpackage/
+*.safetensors
+*.gguf
+
+# Flat local model directories; download JSON files remain tracked.
+MobileHarness/Resources/Models/*/
+*.aimodel/
+*.aimodelc/

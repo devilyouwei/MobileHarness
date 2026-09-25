@@ -1,0 +1,27 @@
+name: Swift checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: swift-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test-and-build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27
+        run: |
+          if [ ! -d /Applications/Xcode_27.0.app ]; then
+            echo 'This runner needs Xcode 27.0. Update the runner image or use a provisioned macOS runner.' >&2
+            exit 1
+          fi
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+      - name: Format and package tests
+        run: ./scripts/check.sh
+      - name: iOS Simulator build
+        run: ./scripts/build-ios.sh

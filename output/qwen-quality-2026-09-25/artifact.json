@@ -1,0 +1,91 @@
+{
+  "repository": "mlboydaisuke/qwen3-1.7b-CoreAI-official",
+  "revision": "ebf5486333ffc59130a6f37c7d208e03ebd3169c",
+  "files": [
+    {
+      "path": "ios-gpu/metadata.json",
+      "bytes": 565,
+      "sha256": "6a33d6865e3d5de1ac43af459d221782cdaf77d166c49e3ad93872ba1c784a31"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist",
+      "bytes": 361298,
+      "sha256": "e2897678193e45541cf243b78521c2eb26460b5929c1e4f03d555e90880d4f26"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph",
+      "bytes": 258615,
+      "sha256": "2785d70783383e19ea2086e215c60c11048423f50055e3db11cbe3f560174b31"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/reflection.fb",
+      "bytes": 428,
+      "sha256": "0d233067d3878dba5ab40b136d5f6e8045d9e972e4c8c589cdd6be56b8620bd9"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin",
+      "bytes": 705452340,
+      "sha256": "926dbfd187a0b48743ca6433fb637b032c0a74b752794d87260cb8a049d51e17"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_0.mpsgraph",
+      "bytes": 65744185,
+      "sha256": "e7c68d2aa5bf3ea5366c215a1c6c6af0e9f3e0e22b2ec470ff94672036e1402a"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/main-h18p.mlirb",
+      "bytes": 332171168,
+      "sha256": "e62de13b81bcbc15c894a287b0b2b0553ebe45e6d563403f02b89bd368d44ea3"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/main.hash",
+      "bytes": 32,
+      "sha256": "5ef176d7d723f46fcc487ed0c8132e709130ab8e150f9391e26478fa000c607c"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/metadata.json",
+      "bytes": 193,
+      "sha256": "5ae9af23d53039debc43f70ebfea2ef7a993594a223bc3094e1fdeb967357e2b"
+    },
+    {
+      "path": "ios-gpu/qwen3_1_7b_dynamic.h18p.aimodelc/stats.json",
+      "bytes": 1800,
+      "sha256": "4feb27ef60eb82a0a7e5996ef6457e483294beb4246a1c87ce8243b96d6f1673"
+    },
+    {
+      "path": "ios-gpu/tokenizer/added_tokens.json",
+      "bytes": 707,
+      "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+    },
+    {
+      "path": "ios-gpu/tokenizer/chat_template.jinja",
+      "bytes": 4168,
+      "sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+    },
+    {
+      "path": "ios-gpu/tokenizer/merges.txt",
+      "bytes": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    {
+      "path": "ios-gpu/tokenizer/special_tokens_map.json",
+      "bytes": 613,
+      "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+    },
+    {
+      "path": "ios-gpu/tokenizer/tokenizer.json",
+      "bytes": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+    },
+    {
+      "path": "ios-gpu/tokenizer/tokenizer_config.json",
+      "bytes": 5404,
+      "sha256": "443bfa629eb16387a12edbf92a76f6a6f10b2af3b53d87ba1550adfcf45f7fa0"
+    },
+    {
+      "path": "ios-gpu/tokenizer/vocab.json",
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  ]
+}
