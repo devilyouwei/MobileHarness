@@ -45,7 +45,7 @@ private func positions(in frame: [UInt8]) -> [Int] {
 
 @Test func provisionalHomeFrameWritesSixMidpoints() throws {
     let frame = try NexArmJointCommand.frame(positions: Array(repeating: 2048, count: 6))
-    #expect(frame.count == 19)
+    #expect(frame.count == 18)
     #expect(frame.starts(with: [UInt8(0xFF), 0xFF, 0xFF, 14, 97]))
     #expect(positions(in: frame) == Array(repeating: 2048, count: 6))
     let sum = frame.dropFirst(2).dropLast().reduce(0) { $0 + Int($1) }
