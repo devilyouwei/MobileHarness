@@ -104,7 +104,7 @@ private actor Recorder {
         return
     }
     #expect(first.inputID == input.id)
-    let directResult = await ToolExecutor(registry: tools).execute(call)
+    let directResult = try #require(try await ToolExecutor(registry: tools).execute(call, envelope: first))
     #expect(directResult.callID == call.id)
     try await responses.dispatch(first)
     await agent.stop()
@@ -151,9 +151,46 @@ private actor Recorder {
 @Test func unknownAndFailingToolsReturnCorrelatedErrors() async throws {
     let registry = ToolRegistry()
     let unknown = ToolCall(toolPath: "unknown")
-    let result = await ToolExecutor(registry: registry).execute(unknown)
+    let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
+    let result = try #require(
+        try await ToolExecutor(registry: registry).execute(
+            unknown, envelope: OutputEnvelope(source: .assistant, input: input, output: .toolCall(unknown))))
     #expect(result.isError && result.callID == unknown.id)
     try await registry.register("broken") { _ in throw HarnessError.notRunning }
-    let failure = await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "broken"))
+    let broken = ToolCall(toolPath: "broken")
+    let failure = try #require(
+        try await ToolExecutor(registry: registry).execute(
+            broken, envelope: OutputEnvelope(source: .assistant, input: input, output: .toolCall(broken))))
     #expect(failure.isError)
+}
+
+@Test func completionToolsHaveNoFeedbackAndPropagateFailures() async throws {
+    let registry = ToolRegistry()
+    let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
+    let call = ToolCall(toolPath: "UI.showPose")
+    let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
+    try await registry.registerCompletion("UI.showPose") { received, origin in
+        #expect(received == call)
+        #expect(origin.sessionID == input.sessionID)
+        #expect(origin.source == .visionPerception)
+    }
+    #expect(try await ToolExecutor(registry: registry).execute(call, envelope: envelope) == nil)
+    await #expect(throws: HarnessError.duplicateHandler) {
+        try await registry.register("UI.showPose") { _ in "unexpected" }
+    }
+    try await registry.register("value") { _ in "" }
+    await #expect(throws: HarnessError.duplicateHandler) {
+        try await registry.registerCompletion("value") { _, _ in }
+    }
+    let value = ToolCall(toolPath: "value")
+    let result = try #require(try await ToolExecutor(registry: registry).execute(value, envelope: envelope))
+    #expect(result.value.isEmpty)  // Empty data is still a result, unlike Void completion.
+    try await registry.registerCompletion("failure") { _, _ in throw HarnessError.notRunning }
+    await #expect(throws: HarnessError.notRunning) {
+        try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "failure"), envelope: envelope)
+    }
+    try await registry.registerCompletion("cancel") { _, _ in throw CancellationError() }
+    await #expect(throws: CancellationError.self) {
+        try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "cancel"), envelope: envelope)
+    }
 }

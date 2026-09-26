@@ -1,5 +1,3 @@
-import ActionRuntime
-import Actions
 import AgentCore
 import Agents
 import Foundation
@@ -9,35 +7,30 @@ import ModelKitDefaults
 import PlatformKit
 import ToolRuntime
 
-/// Composition only: external frames always traverse InputGateway and UI data always an Action.
+/// Composition only: external frames always traverse InputGateway and UI data always a resolved Tool call.
 @MainActor
 enum PhotographySession {
     static func run(
         frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: UUID,
         configuration: FrameChangeConfiguration,
-        present: @escaping @Sendable (PoseOverlay, ActionInvocation) async throws -> Void
+        present: @escaping @Sendable (PoseOverlay, OutputEnvelope) async throws -> Void
     ) async throws {
         let models = try await ModelKitDefaults.manager(
             resources: Bundle.main.bundleURL.appendingPathComponent("Models"))
         let pose = try await models.get(.pose, load: false)
         let runtime = try ApplicationRuntime.shared()
+        try await runtime.prepareTools()
         let manager = runtime.manager
         let input = runtime.input
         let responses = runtime.output
-        let agent = try PhotographerAgent(sessionID: sessionID)
         let vision = try VisionPerceptionAgent(
             pose: pose, sessionID: sessionID, sampling: configuration,
             resolveImage: CameraImageAttachment.resolve)
-        try await manager.register(agent, sessionID: sessionID)
-        do { try await manager.register(vision, sessionID: sessionID) } catch {
-            try? await manager.remove(.photographer)
-            throw error
-        }
+        try await manager.register(vision, sessionID: sessionID)
         runtime.presentation.pose = present
         do {
             try await runtime.bus.openSession(sessionID)
             try await vision.bind(responses.messaging(for: .visionPerception))
-            try await manager.start(.photographer)
             try await manager.start(.visionPerception)
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -57,16 +50,6 @@ enum PhotographySession {
                     }
                 }
                 group.addTask {
-                    for await envelope in agent.outputs {
-                        try Task.checkCancellation()
-                        try await responses.dispatch(envelope)
-                        if case .control(let state) = envelope.output, state.hasPrefix("agent.error:") {
-                            throw HarnessError.notRunning
-                        }
-                    }
-                    if await agent.status().lifecycle == .failed { throw HarnessError.queueFull }
-                }
-                group.addTask {
                     for await envelope in vision.outputs {
                         try Task.checkCancellation()
                         try await responses.dispatch(envelope)
@@ -81,14 +64,12 @@ enum PhotographySession {
             }
             try? await manager.remove(.visionPerception)
             await runtime.bus.closeSession(sessionID)
-            try? await manager.remove(.photographer)
             await responses.cancel(sessionID: sessionID)
             runtime.presentation.pose = nil
             try Task.checkCancellation()
         } catch {
             try? await manager.remove(.visionPerception)
             await runtime.bus.closeSession(sessionID)
-            try? await manager.remove(.photographer)
             await responses.cancel(sessionID: sessionID)
             runtime.presentation.pose = nil
             throw error

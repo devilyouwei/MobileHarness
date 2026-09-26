@@ -13,6 +13,7 @@ extension UIActions {
         try Task.checkCancellation()
         let emoji: String
         switch invocation.call.parameters["emotion"] {
+        case "clear": emoji = ""
         case "smile": emoji = "🙂"
         case "happy": emoji = "😊"
         case "laugh": emoji = "😄"

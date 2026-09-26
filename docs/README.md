@@ -40,3 +40,15 @@ Current layer ownership is defined in the [ModelKit / PlatformKit comparison](..
 
 
 ✅ ADR 0040 documents model-independent Gateway, JSON v4 static event communication and shared perception. ❌ Device acceptance and request/reply remain pending.
+
+✅ ADR 0040 补充识别字幕 Action 决策：感知 Signal 与 UI.setTranscript 行为分离，App 不再通过转写观察修改字幕。
+
+✅ [Skeleton visualization ownership](adr/0041-vision-perception-skeleton-action.md) moves UI.showPose into VisionPerception while retaining shared pose publications.
+
+✅ ADR 0040 补充严格 UI Action 边界与 Assistant 清理归属，Signal 观察不得修改界面。
+
+✅ [ShowPose completion Tool](adr/0042-show-pose-completion-tool.md) supersedes the Action execution path while preserving VisionPerception ownership.
+
+✅ ADR 0043 records turn-scoped captions, atomic reply reset and actual-playback presentation.
+
+✅ [Visual freshness](adr/0044-visual-freshness.md) records Agent-local latency isolation without Gateway protocol changes.

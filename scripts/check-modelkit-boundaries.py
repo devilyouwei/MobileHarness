@@ -58,6 +58,23 @@ for module, forbidden in {
         name = next(iter(dependency.values()))[0]
         if name in forbidden or name.startswith('ModelKit'):
             errors.append(f'Forbidden {module} dependency: {name}')
+# Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
+agent_allowed = {'AgentCore', 'ModelKit', 'Foundation'}
+for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
+    for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+        if imported not in agent_allowed:
+            errors.append(f'Forbidden Agents import {imported}: {source.relative_to(ROOT)}')
+agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
+for dependency in agent_target.get('dependencies', []):
+    name = next(iter(dependency.values()))[0]
+    if name not in {'AgentCore', 'ModelKit'}:
+        errors.append(f'Forbidden Agents dependency: {name}')
+# Speech signal observation is runtime admission/logging, never a UI-command side channel.
+coordinator = (ROOT / 'MobileHarness/App/AppLifecycleCoordinator.swift').read_text()
+observer = coordinator.split('private func observeSpeech(', 1)[1].split('private func resumeListening(', 1)[0]
+for field in ('voicePhase', 'presentationPhase', 'voiceStatus', 'audioLevel', 'expression', 'expressionID', 'assistantReply', 'liveTranscript'):
+    if re.search(r'\b' + field + r'\s*=', observer):
+        errors.append(f'Signal observer modifies UI field: {field}')
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')

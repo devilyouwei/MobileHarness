@@ -13,7 +13,7 @@ The system is organized around three major functional domains:
 
 - **Input Gateway** — validates protocol envelopes and routes multimodal inputs by static subscription or explicit destination.
 - **Agent Core / Agents** — independent, stateful cognitive units that process signals and generate executable outputs.
-- **Output Gateway** — schedules and dispatches fully resolved Action Calls and Tool Calls.
+- **Output Gateway** — validates Agent event publication and directed sending, exposes validated runtime observations, and schedules fully resolved Action Calls and Tool Calls.
 
 Two capability layers support this loop: **PlatformKit handles data input/output through devices and operating-system services; ModelKit processes data through models.** Gateway coordinates signals, Agents decide what to do, and Actions/Tools execute the requested behavior. These responsibilities are compared in section 39.
 
@@ -36,14 +36,12 @@ flowchart LR
     IG --> SP[SpeechPerception]
     IG --> VP[VisionPerception]
     IG --> A[Assistant]
-    IG --> P[Photographer]
     SP --> M[ModelKit capabilities]
     VP --> M
     A --> M
     SP --> OG[OutputGateway]
     VP --> OG
     A --> OG
-    P --> OG
     OG --> BUS[AgentCore InternalSignalBus]
     BUS --> IG
     OG --> EX[Action / Tool runtimes]
@@ -51,7 +49,8 @@ flowchart LR
     ACTIONS --> M
     ACTIONS --> PLATFORM
     EX -->|ToolResult| IG
-    OG --> UI[App observation / Experience]
+    ACTIONS --> UI[App-injected UI handlers / Experience]
+    OG --> Runtime[Runtime admission / completion / failure supervision]
 ```
 
 Other sensor adapters, task Agents and robot control remain planned. ModelKit and PlatformKit are independent; App supplies conversion and service bindings. AgentCore declares transport/runtime contracts and does not depend on concrete Agents.
@@ -59,13 +58,13 @@ Other sensor adapters, task Agents and robot control remain planned. ModelKit an
 
 ---
 
-The diagram describes logical coordination, not module imports or a requirement that every input use a device adapter. PlatformKit acquires device data and performs device output; App connects those services to the gateways and executable handlers. ModelKit supplies processing capabilities to Gateway, Agents and Actions. ModelKit and PlatformKit do not depend on each other. Text/UI input and internal results also enter InputGateway through their own producers.
+The diagram describes logical coordination, not module imports or a requirement that every input use a device adapter. PlatformKit acquires device data and performs device output; App connects those services to the gateways and executable handlers. ModelKit supplies processing capabilities to Agents and Actions; Gateway neither holds model capabilities nor invokes inference. ModelKit and PlatformKit do not depend on each other. Text/UI input and internal results also enter InputGateway through their own producers.
 
 # 3. Core Information Model
 
 ## 3.1 Signal
 
-`Signal` is the unified input abstraction of MobileHarness.
+`Signal` is the conceptual unified input abstraction of MobileHarness, implemented by `AgentInput`; there is no separate parallel Signal type.
 
 Everything entering the cognitive system is represented as a Signal regardless of modality or source.
 
@@ -100,6 +99,22 @@ Implemented payloads are text, runtime event, toolResult, image, audio and typed
 
 Signals may be discrete or continuous streams.
 
+## 3.2 In-process Payloads and Media Streams
+
+`InputGateway.publish` accepts a native Swift `AgentInput`, not a JSON document. Its `Sendable` payload enum carries typed values or bounded media attachments across actors. JSON v4 describes Agent configuration; it is not the media transport format.
+
+| Implemented payload | Representation and current use |
+|---|---|
+| Text / runtime event | Swift `String`; user text or a runtime event such as `assistant.cancel` |
+| Tool result | Typed `ToolResult`, including the originating call identity |
+| Audio | `AudioInput.samples: Data`, containing Float32 PCM; the App capture path supplies mono 16 kHz audio in ordered packets with sequence and capture time |
+| Image | `ImageInput`: bounded RGB `Data`, or a 64 × 64 grayscale sample plus an opaque `ImageAttachment`; the current camera attachment retains the native frame through an App-owned adapter |
+| Perception observation | Typed transcription, speech phase or pose; results carry no original audio/image media |
+
+Audio streams are successive `.audio` publications. Each packet is limited to 64,000 bytes (16,000 Float32 samples); the speech inbox separately allows at most 128 pending packets and 64,000 samples in total, rejecting overflow rather than dropping old audio. Camera streams are successive `.image` publications, with one frame processing and one latest pending frame. This is frame transport, not an implemented compressed-video or remote streaming protocol. Neither path serializes media into JSON or Base64. Attachment lifetime is bounded by the receiving pipeline; AgentCore does not import camera or model framework types.
+
+Structured observations are JSON-encoded during size validation to enforce the 16 KiB default / 256 KiB pose budget, but the in-process bus still passes typed `AgentInput` values. VisionPerception also creates JSON for the existing `UI.showPose` Tool payload; that display format is separate from shared perception transport. Remote serialization and media transport remain unimplemented.
+
 ---
 
 # 4. Input Gateway
@@ -118,7 +133,7 @@ flowchart LR
     OutputGateway --> Bus[InternalSignalBus]
     Bus --> InputGateway
     InputGateway --> Assistant
-    InputGateway --> Photographer
+    OutputGateway --> Skeleton[UI.showPose Tool / Experience]
 ```
 
 # 5. Signal Routing
@@ -130,6 +145,27 @@ flowchart LR
 One publication can reach at most 16 Agents; each receives an admission result independently. Receiving does not imply processing or physical completion. Latest observations use explicitly coalescible channels; ordinary text/events, Actions and Tool results cannot be silently replaced.
 
 The existing SignalRouter/LogicRouter is only a policy-free compatibility seam. Production always installs CommunicationPolicy; missing subscriptions do not fall back to Assistant. Future JEV or model-assisted routing belongs in a separate Agent whose validated choice is executed by Gateway, not in a model-bearing Gateway router.
+
+## 5.1 Current Production Routes
+
+Gateway executes the routing policy; it is not a subscribing Agent. The four production JSON v4 files declare the following exact subscriptions (each topic equals its contract):
+
+| Producer / source | Contract or runtime input | Receiver | Delivery |
+|---|---|---|---|
+| App microphone adapter / `phone.microphone` | `media.audio` | SpeechPerception | `InputGateway.publish`, static subscription |
+| App camera adapter / `phone.camera` | `media.image` | VisionPerception | `InputGateway.publish`, static subscription |
+| User text producer / `user` | `user.text` | Assistant | Static subscription configured; the current voice UI has no text-entry producer |
+| SpeechPerception / `speechPerception` | `speech.final` | Assistant | Bound publish → OutputGateway → InternalSignalBus → InputGateway, static subscription |
+| VisionPerception / `visionPerception` | `vision.pose` | Future business subscribers | Same Agent event publication path, static subscription |
+| Tool runtime / `runtime` | `tool.result` | Original calling Agent/session | Directed InputGateway submission, bypassing subscriptions |
+| App voice-stop coordination / `runtime` | `runtime.event`, value `assistant.cancel` | Assistant in the closing voice session | `InputGateway.send(to:)`, bypassing subscriptions |
+
+SpeechPerception also publishes `speech.partial` and `speech.phase`. Partial has no Agent subscribers. Assistant subscribes to phase for onset Actions and to final for chat; partial never triggers chat. OutputGateway also validates and delivers these observations to the registered runtime observer. The observer handles capture admission and final logging only; it never edits presentation. Assistant subscribes to speech.phase and emits UI.beginReplyTurn on speech onset. SpeechPerception emits UI.setVoiceState for recognition presentation. SpeechPerception separately emits JSON-declared `UI.setTranscript` Actions for previews and UI.finishTranscript after recognition completes. This observation endpoint is neither an Agent subscription nor a directed Agent message.
+
+All three production `communication.sends` lists are empty. Bound Agent-to-Agent `send(to:)` is implemented, but no current production Agent uses it. Tool-result return and App cancellation are runtime-directed delivery, not Agent publication permissions. Directed delivery bypasses subscription matching only; it does not bypass validation or guarantee that a full/stopped receiver accepts an input.
+
+AgentManager start/pause/resume/stop and speech listening resumption are runtime lifecycle operations outside business inbox routing. ActionCall, ToolCall and output control notifications use their existing OutputGateway execution/observation path; they are not automatically broadcast as input events.
+
 
 ---
 
@@ -170,8 +206,13 @@ flowchart LR
 
     OUTPUT --> GATEWAY["Output Gateway"]
 
+    PROCESS --> EVENT["Typed perception event<br/>Bound AgentMessaging port"]
+    EVENT --> GATEWAY
+
     RESULT["Execution Result Signal"] --> INPUT
 ```
+
+Typed perception events use the bound communication port directly; they do not pass through FunctionTokenParser or become Action/Tool calls. The parser branch applies to generated executable outputs.
 
 An Agent may:
 
@@ -1051,23 +1092,21 @@ Agents may expose compact local aliases for these paths.
 
 # 31. Tool Runtime
 
-Tool Runtime executes resolved Tool Calls directly.
+Tool Runtime executes resolved Tool Calls directly, without Channel scheduling. App registers either a data-returning handler or a completion-only Void handler; the caller cannot change this behavior through ToolCall arguments.
 
-```text
-ToolCall
-   ↓
-Tool Runtime
-   ↓
-Tool Implementation
-   ↓
-Tool Result
-   ↓
-Signal
-   ↓
-Input Gateway
+```mermaid
+flowchart LR
+    Call[Validated ToolCall] --> Runtime[ToolRuntime]
+    Runtime --> Kind{Registered handler kind}
+    Kind -->|Data-returning| Data[Await value / correlated error]
+    Data --> Result[ToolResult with callID]
+    Result --> Input[InputGateway to original Agent]
+    Kind -->|Void completion| Execute[Await execution]
+    Execute --> Done[Complete without ToolResult]
+    Execute -->|Failure / cancellation| Error[Propagate to dispatch caller]
 ```
 
-Tool Calls bypass Channel scheduling.
+UI.showPose uses Void completion: validate the bounded pose payload and await an injected MainActor overlay update. An empty String from a data tool is still a result; Void success produces no feedback event. No per-call detached task, Tool queue or replay is added. A sequential consumer awaits each execution; it can still wait for actor/MainActor access. Native drawing completes through the system rendering pipeline after UI state is accepted.
 
 ---
 
@@ -1077,7 +1116,7 @@ Tool Calls bypass Channel scheduling.
 
 JSON v4 declares inputs, exact static subscriptions, publishable contracts and direct-send permissions. App validates all declarations and provides one shared communication assembly with independently scoped voice/camera sessions. Source and receiver incarnations are checked; old instances are not retargeted.
 
-Discrete events use FIFO admission and a bounded 60-second duplicate window. Partial speech and pose states use per-source/incarnation/session/contract sequence records and latest pending slots. Limits are 128 live operations, 256 branches, 8 MiB retained payloads, 64 workers, 256 state channels and 16 recipients. Pose payloads allow 256 KiB/300 people, other observations 16 KiB. Photographer separately selects six people for display.
+Discrete events use FIFO admission and a bounded 60-second duplicate window. Partial speech and pose states use per-source/incarnation/session/contract sequence records and latest pending slots. Limits are 128 live operations, 256 branches, 8 MiB retained payloads, 64 workers, 256 state channels and 16 recipients. Pose payloads allow 256 KiB/300 people, other observations 16 KiB. VisionPerception separately selects six people for display.
 
 Default admission deadlines are 10 seconds for discrete events, one second for pose and two seconds for partial speech; children cannot extend their parent deadline and no input lives beyond 60 seconds. Expiry prevents starting stale work; it does not truncate an already-started normal conversation reply. Cancellation closes admission and joins only the affected session.
 
@@ -1091,7 +1130,7 @@ Detailed algorithms, bounds and diagrams: [AgentCore/Bus](AgentCore/Bus/README.m
 
 `ModelKit` is the model-driven **data processing layer**. It accepts data through capability interfaces and returns transformed data or inference results: audio → text, text → PCM, image → pose, or messages → generated text. Processing includes model-specific preprocessing, inference and postprocessing.
 
-It does not capture microphone/camera data, play PCM through a speaker, or command external hardware. Those input/output operations belong to PlatformKit. Gateway, Agents and Actions choose when to request processing; ModelKit does not own their business policy.
+It does not capture microphone/camera data, play PCM through a speaker, or command external hardware. Those input/output operations belong to PlatformKit. Agents and Actions choose when to request processing; ModelKit does not own their business policy. Gateway has no ModelKit dependency and performs no ASR, VAD, visual inference or content-change filtering.
 
 ```text
 ModelKit/
@@ -1203,7 +1242,7 @@ User says:
 “Look here and take a photo.”
 ```
 
-This is a target behavior example. The current Photographer displays shared pose observations; photo capture and the voice-driven photography sequence below are not implemented.
+This is a target behavior example. Photographer is reserved for future camera-motion policy; photo capture and the voice-driven photography sequence below are not implemented.
 
 ```mermaid
 sequenceDiagram
@@ -1551,13 +1590,13 @@ struct ToolCall {
 | Organization | Audio / Vision / Connectivity, with Core shared contracts | Speech / Language / Vision, with Core and model assembly/runtime/backend support |
 | Excludes | Model inference, routing policy and Agent business decisions | Device capture/playback/control, routing policy and Agent business decisions |
 
-“Data processing” here means **model capability processing**, not every computation in the app. For example, PlatformKit samples camera luminance, VisionPerception compares gray samples and calls ModelKit pose inference, then publishes an observation through both gateways; Photographer decides how to display it. These are separate responsibilities even when each step touches the same image.
+“Data processing” here means **model capability processing**, not every computation in the app. For example, PlatformKit samples camera luminance, VisionPerception compares gray samples and calls ModelKit pose inference, then publishes an observation through both gateways; VisionPerception emits the skeleton display Tool. These are separate responsibilities even when each step touches the same image.
 
 ## 39.2 Composition and ownership
 
 App connects the layers through data adapters and injected services. ModelKit and PlatformKit remain independent; AgentCore depends on neither. A model result does not directly cause a hardware action: Agent output passes through OutputGateway and the registered Action/Tool handler before a device service is invoked. ModelKit can also process existing in-memory data without any live hardware input.
 
-✅ The current camera flow follows PlatformKit acquisition → App adaptation → InputGateway → VisionPerception filtering/inference → OutputGateway/Bus/InputGateway → Photographer → UI Action → Experience overlay. Current speech similarly separates TTS synthesis from device playback.
+✅ The current camera flow follows PlatformKit acquisition → App adaptation → InputGateway → VisionPerception filtering/inference → UI Action → OutputGateway → Experience overlay. Current speech similarly separates TTS synthesis from device playback.
 ❌ Concrete robot/device transports and the planned photo-capture Action are not implemented.
 
 ---
@@ -1665,17 +1704,56 @@ Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [s
 ✅ Root Package.swift declares all targets. ModelKit stays inside this project with no nested package and no dependency on business targets. Management and Backends separate lifecycle control from engine execution. All tests live under root Tests; application prompt evaluations are isolated in AgentModelEvaluationTests. scripts/check.sh enforces import/target boundaries and directory READMEs. See ADR 0033 for the contract.
 ❌ Independent SDK distribution and physical-device acceptance are outside this migration.
 
-Core owns shared media data contracts: AudioFormat/AudioFrame are implemented; image/video values will be added when required by a concrete capability. Device I/O, model-specific tensors and business routing stay outside these value types.
+ModelKit Core owns capability media contracts: AudioFormat/AudioFrame and ImageFrame are implemented; general video values remain deferred. These are separate from AgentCore transport payloads and connected through App/perception adapters. Device I/O, model-specific tensors and business routing stay outside these value types.
 
 ✅ ModelKitDefaults.manager(resources:) returns the process-wide manager. Concurrent calls share assembly and provider instances; conflicting resource roots fail. Construction/registration are assembly SPI. Each model admits one active operation, rejects overlap with inputBusy, and releases admission only after cleanup. Cross-model scheduling is not implemented.
 
-✅ ModelKit/Vision now implements PoseCapability and the independent YOLO adapter. Core/ImageFrame carries bounded upright RGB8 data or a retained read-only native image buffer; `.pose` is a default manager binding. ✅ Photographer integrates the camera and pose capability through both gateways.
+✅ ModelKit/Vision now implements PoseCapability and the independent YOLO adapter. Core/ImageFrame carries bounded upright RGB8 data or a retained read-only native image buffer; `.pose` is a default manager binding. ✅ VisionPerception owns pose inference and publishes shared observations through both gateways; VisionPerception also produces display Tool calls; Photographer motion policy remains unimplemented.
 
-✅ PlatformKit/Vision and Experience/Camera provide foreground camera capture and preview: normal launch defaults to front camera, mirrored on the front and natural on the back, with on/off and switch controls above a dimmed full-screen feed. App/CameraCoordinator owns scene intent independently of voice readiness. ✅ Changed camera frames now enter InputGateway and Photographer pose inference.
+✅ PlatformKit/Vision and Experience/Camera provide foreground camera capture and preview: normal launch defaults to front camera, mirrored on the front and natural on the back, with on/off and switch controls above a dimmed full-screen feed. App/CameraCoordinator owns scene intent independently of voice readiness. ✅ Camera frames enter InputGateway before VisionPerception performs change filtering and pose inference.
 
-✅ Current camera pipeline: PlatformKit → InputGateway → VisionPerception → OutputGateway/Bus/InputGateway → Photographer → UI.showPose. ADR 0040 supersedes the original ADR 0036 ownership split.
+✅ Current camera pipeline: PlatformKit → InputGateway → VisionPerception → UI.showPose Tool → OutputGateway → ToolRuntime → Experience. ADR 0040 supersedes the original ADR 0036 ownership split.
 
 
 ## Current perception migration
 
 ✅ ADR 0040 replaces Gateway-owned model adaptation with two shared perception Agents. JSON v4 and event-only transport are implemented. ❌ Request/reply, ReflexAgent and physical-device acceptance remain deferred.
+
+✅ Recognition captions follow SpeechPerception → resolved UI.setTranscript Action → OutputGateway → Action runtime → App UI handler. Shared speech signals retain their perception meaning; their observers do not modify caption text. See ADR 0040 caption-action amendment.
+
+✅ Skeleton Tool ownership: VisionPerception declares and emits UI.showPose itself. Typed vision.pose publication remains available for business subscribers; noRecipients does not prevent visualization. Photographer has no active runtime until camera-motion policy is implemented. See ADR 0041.
+
+## Strict presentation boundary
+
+✅ Agent-originated presentation changes require JSON-declared, resolved ActionCalls or ToolCalls through OutputGateway and the corresponding runtime. SpeechPerception owns UI.setTranscript (with UI.finishTranscript to close and clear) and UI.setVoiceState. Assistant owns UI.express and UI.beginReplyTurn, triggered by its speech.phase subscription on speech onset. UI.print appends Assistant reply captions; UI.showPose renders vision output. Signal observers cannot mutate captions, expressions, hints or orb phase.
+
+Runtime session admission, completion barriers, cancellation and failure supervision are not business UI commands. App may initialize/reset its local view on user/OS lifecycle changes and render device audio-level telemetry; these paths do not grant Agents an alternate UI command mechanism. ModelKit inference and pure input adaptation remain computation, not Actions. No arbitrary signal/control payload is interpreted as a UI operation.
+
+✅ UI.showPose is now a Void Tool owned by VisionPerception. OutputGateway validates and directly awaits ToolRuntime; successful execution updates the overlay without Channel scheduling or ToolResult feedback. Returning tools still re-enter InputGateway; completion-tool errors propagate to dispatch. App selects these semantics through explicit handler registration, not model arguments. ADR 0042 supersedes the Action path in ADR 0041.
+
+## Conversation turn presentation
+
+✅ ConversationTurn (UUID + session-local ordinal) accompanies AgentInput and is preserved through shared observations, OutputEnvelope and ToolResult return. It is runtime context, never a model-supplied Action parameter. Source-monotonic output sequence numbers reject old updates. SpeechPerception allocates one turn per utterance, not per VAD segment. Assistant emits one atomic UI.beginReplyTurn per turn; it clears reply/expression only. UI.finishTranscript prevents late partial resurrection. Presentation state retains one turn and bounded per-component sequence records.
+
+| Conversation boundary | Recognition caption | Reply / expression |
+|---|---|---|
+| New confirmed utterance | Latest partial replaces preview | Assistant beginReplyTurn clears both once |
+| VAD endpoint, ASR pending | Preserve last preview | Remain empty |
+| Final or empty recognition completed | finishTranscript clears and seals | Await reply or return to listening |
+| Assistant response | Remains closed | Append captions / explicit expressions |
+| Reply and playback completed | Empty | Retain until next utterance |
+| Stop / background / failure | Clear and invalidate session | Clear and invalidate session |
+
+```mermaid
+stateDiagram-v2
+    Listening --> Recognizing: first onset / new turn
+    Recognizing --> Recognizing: partial or long-utterance segment / same turn
+    Recognizing --> Finalizing: VAD endpoint / keep preview
+    Finalizing --> Replying: final / close transcript
+    Finalizing --> Listening: empty recognition / close transcript
+    Replying --> Listening: generation and playback completed / retain reply
+```
+
+Speaking visuals follow actual player activity, not UI.print arrival. All Agent-selected presentation remains protocol-validated UI Actions; Signal observers perform no presentation mutation. See ADR 0043.
+
+✅ VisionPerception freshness: inference does not await subscriber delivery; an Agent-local publisher keeps one active and one latest pending observation. UI.showPose output keeps one latest pending state, while terminal errors remain observable. App enables 100 ms maximum refresh admission in addition to its change threshold, without replaying frames. Gateway/Tool protocols are unchanged. See ADR 0044.

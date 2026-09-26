@@ -19,12 +19,27 @@ public enum InputPayload: Sendable {
     }
 }
 
+/// Session-local utterance identity, assigned once at first confirmed speech onset.
+public struct ConversationTurn: Sendable, Equatable {
+    public let id: UUID
+    public let ordinal: UInt64
+    public init(id: UUID = UUID(), ordinal: UInt64) {
+        self.id = id
+        self.ordinal = ordinal
+    }
+}
+
 public struct AgentInput: Sendable {
     public let id: UUID
     public let sessionID: UUID
     public let metadata: InputMetadata
     public let payload: InputPayload
-    public init(id: UUID = UUID(), sessionID: UUID, payload: InputPayload, metadata: InputMetadata? = nil) {
+    public let turn: ConversationTurn?
+    public init(
+        id: UUID = UUID(), sessionID: UUID, payload: InputPayload, metadata: InputMetadata? = nil,
+        turn: ConversationTurn? = nil
+    ) {
+        self.turn = turn
         self.id = id
         self.sessionID = sessionID
         self.payload = payload

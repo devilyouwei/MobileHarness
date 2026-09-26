@@ -11,7 +11,7 @@ flowchart LR
     Tools -->|Result value or thrown error| ToolRuntime
 ```
 
-The current System tool has no model, network, storage, or device dependency. Future tools may use capability interfaces or platform primitives when implemented; they must still return through ToolRuntime and InputGateway rather than directly messaging an Agent.
+The current System tool has no model, network, storage, or device dependency. Tools may use injected model/platform/presentation services. Data-returning tools return through ToolRuntime and InputGateway; explicitly registered Void tools complete without feedback. Neither directly messages an Agent.
 
 ## Implementation status
 
@@ -25,3 +25,5 @@ The current System tool has no model, network, storage, or device dependency. Fu
 ## Maintenance
 
 Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+
+✅ [UI](UI/README.md) contains showPose: immediate bounded skeleton replacement through an injected presentation service, registered as a Void completion tool. No Channel scheduling or ToolResult feedback.

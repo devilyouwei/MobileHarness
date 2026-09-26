@@ -243,3 +243,21 @@ Validation (2026-09-26): root scripts/check.sh passed, including 69 IntegrationT
 ❌ Device continuous voice/camera behavior and latency/thermal acceptance remain pending. Future face/depth/tracking/ReflexAgent work requires separate sampling and control-arbitration design; no robot safety or motion behavior was added.
 
 Validation (2026-09-26): final scripts/check.sh passed, including 79 IntegrationTests, configuration and module-boundary checks. All four scripts/build-ios.sh simulator schemes passed; MobileHarnessSimulator was rebuilt after the final capture-gating fix. The unsigned MobileHarness device target built successfully. All four packaged Agent JSON resources are v4 and byte-identical to source. Original Technical_Design.docx is unchanged. Optional real-model evaluations were not enabled; no phone installation or continuous physical audio/camera/thermal acceptance was performed.
+
+✅ 识别字幕行为统一：SpeechPerception 配置 UI.setTranscript，partial 更新和 final/空识别后的清空通过 Action 执行；保留共享转写 Signal。❌ 真机连续识别字幕时序及压力验收待完成。
+
+✅ Skeleton visualization now belongs to VisionPerception: JSON Action registration, bounded projection and Action/control output. Shared pose publication remains available without requiring a subscriber. ❌ Photographer camera-motion policy is not implemented; its former display-only runtime was removed. See ADR 0041.
+
+Validation (2026-09-26): final root checks passed, including 80 IntegrationTests and the no-subscriber/two-subscriber camera cases. All four simulator schemes and the unsigned physical Release target built successfully. Packaged VisionPerception JSON matches source; no Photographer JSON remains in the device App. No installation or physical-device acceptance was performed for this change.
+
+✅ UI 行为统一：SpeechPerception 通过 Action 更新字幕/识别阶段；Assistant 通过 Action 清除表情/回复；移除 speech.phase 的 UI 旁路，补充 Agent 依赖检查。❌ 真机交互时序验收待完成。
+
+✅ UI.showPose moved from Action to an explicitly registered Void Tool. No Channel scheduling or ToolResult feedback; bounded output, session/sequence validation and propagated failures remain. ❌ Physical-device latency acceptance is pending. See ADR 0042.
+
+Validation: root scripts/check.sh passed (82 IntegrationTests), all four simulator schemes passed, and the unsigned physical Release target built. The bundled VisionPerception JSON matches the Tool-only source declaration. No phone installation or device latency measurement was performed.
+
+✅ 对话展示按轮次管理：新轮一次清理、final 封闭识别、旧轮/旧序号拒绝、回复保留、停止清空。❌ 真机字幕/播放时序和动画验收待完成。
+
+✅ High-priority visual freshness fixes: bounded independent publication, latest-only skeleton output and optional maximum refresh interval (App 100 ms). ❌ Device latency/thermal measurement and actual Photographer motion control remain pending. See ADR 0044.
+
+Validation (2026-09-26): root checks passed, including 86 IntegrationTests; all four simulator schemes and the unsigned physical Release build passed. No phone installation or physical-device performance measurement was performed.

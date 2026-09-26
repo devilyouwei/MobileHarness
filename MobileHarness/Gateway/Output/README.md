@@ -32,7 +32,7 @@ flowchart LR
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
-✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. Photographer skeletons remain validated ActionCalls; no UI payload bypass exists.
+✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. VisionPerception skeletons use validated ToolCalls through ToolRuntime; no UI payload bypass exists.
 
 
 ## Typed event path
@@ -48,3 +48,7 @@ flowchart LR
 ```
 
 The configured observer consumes only current speech state and has no unbounded queue. No recipients is an error unless a matching observer is registered. Event receipts report recipient admission, not Action or handler completion. ❌ Requests/replies and model-assisted routing are deferred.
+
+✅ Tool dispatch supports explicitly registered Void completion handlers. UI.showPose executes directly without Channel admission or ToolResult feedback; normal data tools continue returning through InputGateway.
+
+✅ Typed event publication preserves the parent ConversationTurn; Gateway does not interpret presentation policy.

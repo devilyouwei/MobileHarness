@@ -4,10 +4,20 @@ import Foundation
 public struct FrameChangeConfiguration: Sendable {
     public let minimumChange: Double
     public let minimumInterval: TimeInterval
-    public init(minimumChange: Double = 0.03, minimumInterval: TimeInterval = 0) throws {
+    public let maximumRefreshInterval: TimeInterval?
+    public init(
+        minimumChange: Double = 0.03, minimumInterval: TimeInterval = 0,
+        maximumRefreshInterval: TimeInterval? = nil
+    ) throws {
         guard minimumChange.isFinite, (0...1).contains(minimumChange),
             minimumInterval.isFinite, (0...1).contains(minimumInterval)
         else { throw ImageInputError.invalidFrame }
+        if let maximumRefreshInterval {
+            guard maximumRefreshInterval.isFinite, maximumRefreshInterval > 0,
+                maximumRefreshInterval >= minimumInterval, maximumRefreshInterval <= 1
+            else { throw ImageInputError.invalidFrame }
+        }
+        self.maximumRefreshInterval = maximumRefreshInterval
         self.minimumChange = minimumChange
         self.minimumInterval = minimumInterval
     }
@@ -22,6 +32,7 @@ public struct FrameChangeFilter: Sendable {
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var examinedAt: TimeInterval?
+    private var acceptedAt: TimeInterval?
     public init(configuration: FrameChangeConfiguration) { self.configuration = configuration }
     public mutating func accepts(_ frame: ImageInput) throws -> Bool {
         guard lastSequence.map({ frame.sequence > $0 }) ?? true,
@@ -56,9 +67,18 @@ public struct FrameChangeFilter: Sendable {
             geometry = shape
             examinedAt = frame.timestamp
         }
-        guard !changedGeometry, let previous else { return true }
+        guard !changedGeometry, let previous else {
+            acceptedAt = frame.timestamp
+            return true
+        }
         let difference = zip(gray, previous).reduce(0) { $0 + abs(Int($1.0) - Int($1.1)) }
-        // Even a zero threshold never repeatedly infers an identical image.
-        return difference > 0 && Double(difference) / (255 * 4096) >= configuration.minimumChange
+        let refreshDue =
+            configuration.maximumRefreshInterval.map {
+                frame.timestamp - (acceptedAt ?? frame.timestamp) >= $0
+            } ?? false
+        let changed = difference > 0 && Double(difference) / (255 * 4096) >= configuration.minimumChange
+        if changed || refreshDue { acceptedAt = frame.timestamp }
+        // Refresh admits only a newly captured sequence; it never replays a stored image.
+        return changed || refreshDue
     }
 }

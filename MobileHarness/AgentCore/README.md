@@ -46,3 +46,5 @@ Keep this README synchronized with changes to responsibilities, files, interface
 
 
 ✅ AudioInput provides bounded Float32 16 kHz mono PCM independently of ModelKit; PerceptionObservation carries speech and up to 300-person pose results. No raw media is included in derived observations.
+
+✅ ConversationTurn is optional, runtime-assigned context on AgentInput (UUID plus session ordinal); it contains no UI/platform dependency.

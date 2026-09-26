@@ -70,7 +70,7 @@ Camera 与共享视觉感知已实现；Character、完整请求/回复、模型
 | Gateway/Input | ✅ InputGateway、Routing/SignalRouter 协议及 LogicRouter 归位。✅ 统一使用 AgentCore.AgentInput；模型路由判断移至未来独立 Agent，不新增重复 Signal 或 Gateway 模型路由器 |
 | Gateway/Output | ✅ Validation、Routing、Dispatch、Scheduling/Channel 与 ChannelScheduler 归位。❌ 独立 GhostShellScheduler 未建，当前调度直接消费结构化调用 |
 | AgentCore | ✅ 根契约、Runtime、Capability、Generation、Output 归位；ActionPath、AgentLifecycle 名称一致；ChannelParser 已拆分。✅ Bus 事件通信已实现；❌ 通用 AgentContext、AgentRuntime、State、请求/回复与独立 CapabilityAlias 未实现 |
-| Agents | ✅ Assistant、Photographer、SpeechPerception、VisionPerception 与独立 JSON v4；❌ 其他业务 Agent 尚未实现 |
+| Agents | ✅ Assistant、SpeechPerception、VisionPerception 与独立 JSON v4；Photographer 仅保留运镜设计文档；❌ 其他业务 Agent 尚未实现 |
 | Actions / ActionRuntime | ✅ Display → UI、Say → Speak、Actions/Runtime → ActionRuntime、ActionCatalog → ActionRegistry，并提取 ActionExecutor。❌ ActionResult、其余行为模块未实现 |
 | Tools / ToolRuntime | ✅ System/RuntimeInfo 实现归位，ToolRegistry 与 ToolExecutor 分离。❌ 其他工具模块尚未实现 |
 | ModelKit | ✅ Core、Speech、Language、Vision、Defaults、Management 与 Backends；YOLO、Qwen35 等为独立 adapter target。❌ 其他视觉模型与 Embedding 未实现 |
@@ -102,11 +102,11 @@ See ADR 0021: PlatformKit/Audio now contains MicrophoneFrame and StreamingMonoPC
 
 ✅ ModelKit/Core owns AudioFrame/AudioFormat and ImageFrame with RGB or retained read-only native storage. ❌ Model-level video session contracts remain unimplemented.
 
-✅ ModelKit/Vision/PoseCapability.swift belongs to base ModelKit; Vision/YOLO compiles separately as ModelKitYOLOPose. Core owns ImageFrame. Tests/YOLOPoseTests owns tests. ❌ Other Vision models remain unimplemented; camera/Photographer integration exists outside ModelKit.
+✅ ModelKit/Vision/PoseCapability.swift belongs to base ModelKit; Vision/YOLO compiles separately as ModelKitYOLOPose. Core owns ImageFrame. Tests/YOLOPoseTests owns tests. ❌ Other Vision models remain unimplemented; camera/VisionPerception integration exists outside ModelKit.
 
-✅ PlatformKit/Vision owns AVFoundation hardware; Experience/Camera owns the native preview bridge and controls; App/CameraCoordinator owns scene intent and lifecycle. App/PhotographySession adapts native frames for shared InputGateway → VisionPerception → Photographer delivery.
+✅ PlatformKit/Vision owns AVFoundation hardware; Experience/Camera owns the native preview bridge and controls; App/CameraCoordinator owns scene intent and lifecycle. App/PhotographySession adapts native frames for shared InputGateway → VisionPerception delivery and direct UI Action output.
 
-✅ Agents/Photographer owns 摄像师 phase-one policy and v3 JSON; Gateway/Input/FrameChangeFilter owns sampling; Actions/UI/ShowPose owns side effects. AgentCore ImageInput/PoseOverlay are dependency-free transport contracts; App adapts PlatformKit CameraFrame into a native ModelKit ImageFrame carried by an opaque AgentCore attachment; AgentCore imports neither Kit.
+✅ Agents/VisionPerception owns grayscale filtering, pose requests, typed observations and the v4 showPose Tool declaration; Actions/UI/ShowPose owns presentation side effects. Photographer has no runtime implementation until camera-motion policy is introduced. AgentCore ImageInput/PoseOverlay are dependency-free transport contracts; App adapts PlatformKit CameraFrame into a native ModelKit ImageFrame carried by an opaque AgentCore attachment; AgentCore imports neither Kit.
 
 ## Platform capability domains (2026-09-26)
 

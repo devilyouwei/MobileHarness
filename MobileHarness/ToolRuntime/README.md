@@ -1,30 +1,23 @@
-# ToolRuntime — Tool Registration and Execution
+# ToolRuntime — Direct Tool Execution
 
-ToolRuntime executes resolved Tool Calls directly, following architecture section 31. It does not parse model output, resolve Agent-local aliases, or schedule GhostShell Channels.
-
-## Direct relationships
+Purpose: register and execute resolved ToolCalls without Channel scheduling. Design goals: trusted handler selection, awaited completion, cancellation and explicit feedback semantics. Dependencies remain AgentCore only.
 
 ```mermaid
 flowchart LR
-    App -->|Explicit path-to-handler registration| ToolRuntime
-    Gateway -->|Resolved ToolCall| ToolRuntime
-    ToolRuntime -->|Registered handler invocation| Tools
-    Tools -->|String result or thrown error| ToolRuntime
-    ToolRuntime -->|ToolResult with callID| Gateway
+    App[App explicit registration] --> Registry[ToolRegistry]
+    Gateway[OutputGateway validated ToolCall and envelope] --> Executor[ToolExecutor]
+    Registry --> Executor
+    Executor --> Kind{Registered handler kind}
+    Kind -->|Returning String| Value[Execute and create correlated ToolResult]
+    Value --> Input[InputGateway to caller]
+    Kind -->|Completion Void| UI[Await execution]
+    UI --> End[Return nil: no ToolResult or input submission]
+    UI -->|Error / cancellation| Fail[Throw to dispatch caller]
 ```
 
-Gateway's ToolDispatcher submits the result through InputGateway to the originating Agent and session. ToolRuntime uses injected handlers and has no compile-time dependency on concrete Tools.
+✅ register registers data-returning handlers; registerCompletion registers Void handlers with the trusted OutputEnvelope for session/source checks. Names share one registry and duplicates fail across both kinds. Call arguments cannot select no-feedback behavior. Agent JSON still declares the tool path/parameters; its doc states completion semantics. App chooses the explicit implementation.
 
-## Implementation status
+✅ ToolExecutor.execute(call,envelope:) returns optional ToolResult. A returned empty String is still a normal result; nil means completion-only success. Ordinary data-tool errors retain callID in ToolResult. Unknown paths return an error result. Completion-tool errors propagate; cancellation propagates for both kinds. No error is silently converted to successful completion.
 
-- ✅ `ToolRegistry.swift`: actor-isolated handler registration and lookup; duplicate registration fails.
-- ✅ `ToolExecutor.swift`: executes a handler and wraps success, unknown-tool failure, or thrown error as ToolResult while preserving callID.
-- ✅ Gateway feedback through InputGateway using the existing AgentInput contract.
-- ❌ Dedicated execution timeouts, resource budgets, and unified result Signals.
-- ❌ End-to-end model-native tool argument streaming and full JSON Schema support; these also require changes in ModelKit and AgentCore.
-
-`ToolResult` is declared in AgentCore/Output because Agent inputs use it too. Moving its declaration here would introduce a dependency cycle. This runtime reuses that contract instead of defining a duplicate type.
-
-## Maintenance
-
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+✅ ToolDispatcher submits only non-nil results through InputGateway. No feedback is constructed for successful completion tools. No Channel queue, detached work, separate waiting queue or automatic replay is introduced. The caller awaits actual handler completion; a sequential output consumer serializes its Tool calls.
+❌ Dedicated timeouts, resource budgets, latest-pending replacement and native model tool-argument streaming remain outstanding.

@@ -32,3 +32,13 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 
 
 ✅ Navigation includes SpeechPerception/VisionPerception and communication contracts; actual Agent sources and JSON resources compile through the single root Swift package. No duplicate App resource copies.
+
+✅ SetTranscript.swift is referenced for navigation; the Actions SwiftPM target owns its compilation.
+
+✅ Removed the display-only Photographer source/configuration from navigation and packaging. VisionPerception owns the existing showPose registration; App handlers remain explicit.
+
+✅ UI ClearReply / SetVoiceState references are navigator-only; shared compilation remains in Actions.
+
+✅ Tool navigation includes Tools/UI/ShowPose.swift and its README. SwiftPM compiles it in Tools; App keeps the explicit completion handler.
+
+✅ BeginReplyTurn, FinishTranscript and ConversationPresentation are Actions package sources referenced by the navigator; ClearReply is replaced by atomic beginReplyTurn.

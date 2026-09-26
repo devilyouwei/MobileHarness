@@ -2,7 +2,7 @@
 
 MobileHarness is an Apple-native Agent harness with the iPhone as its interaction and inference host. Stateful Agent actors receive user input, Tool results and device events through shared gateways. The [technical architecture](MobileHarness/README.md) defines module responsibilities; [repository structure](docs/Repository-Structure.md) records implemented modules and outstanding scope.
 
-The physical-device composition is Nemotron streaming ASR + Silero VAD → AssistantAgent using Qwen3.5-2B MLX ChatCapability → sentence-level say/print ActionCalls → speech and captions. It requires iOS 27 and matching h18p artifacts, with no automatic model fallback. MobileHarnessSimulator is for UI debugging and reports unavailable chat. Models load and warm up before recording. The [Qwen adapter](MobileHarness/ModelKit/Language/LLM/Qwen35/README.md) exposes capabilities independently of business Agents. Camera runs local pose perception through Photographer; robot control is not implemented.
+The physical-device composition is Nemotron streaming ASR + Silero VAD → AssistantAgent using Qwen3.5-2B MLX ChatCapability → sentence-level say/print ActionCalls → speech and captions. It requires iOS 27 and matching h18p artifacts, with no automatic model fallback. MobileHarnessSimulator is for UI debugging and reports unavailable chat. Models load and warm up before recording. The [Qwen adapter](MobileHarness/ModelKit/Language/LLM/Qwen35/README.md) exposes capabilities independently of business Agents. Camera runs local pose perception and skeleton Tools through VisionPerception; robot control is not implemented.
 
 ## Development environment
 
@@ -89,9 +89,9 @@ The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#int
 
 ✅ Normal startup requests front-camera preview behind a translucent black overlay, voice orb and captions. Camera controls switch front/back or stop capture; off is black. Camera preview and perception are independent of microphone activation and voice model readiness.
 
-✅ Camera frames now pass a configurable VisionPerception grayscale-change filter (default 3%) to Photographer. It runs shared YOLO Pose once per accepted latest frame and emits UI.showPose through the action pipeline; green skeletons overlay the preview. ❌ Robot-arm control, composition/tracking behavior and device quality acceptance remain outstanding.
+✅ Camera frames now pass a configurable VisionPerception grayscale-change filter (default 3%). VisionPerception runs shared YOLO Pose once per accepted latest frame and emits UI.showPose through direct Tool execution; green skeletons overlay the preview. ❌ Robot-arm control, composition/tracking behavior and device quality acceptance remain outstanding.
 
 
 
 
-✅ Shared perception migration: SpeechPerception owns VAD/ASR and VisionPerception owns camera selection/pose inference. JSON v4 routes observations through OutputGateway → InternalSignalBus → InputGateway; Photographer consumes poses and Assistant consumes final speech. Gateway has no ModelKit dependency. Voice and camera share the App communication assembly with independent sessions. See [ADR 0040](docs/adr/0040-shared-perception-and-event-routing.md). ❌ Physical-device continuous operation acceptance remains pending.
+✅ Shared perception migration: SpeechPerception owns VAD/ASR and VisionPerception owns camera selection/pose inference. JSON v4 routes observations through OutputGateway → InternalSignalBus → InputGateway; VisionPerception emits skeleton UI Tools directly and Assistant consumes final speech. Photographer is reserved for future camera-motion policy. Gateway has no ModelKit dependency. Voice and camera share the App communication assembly with independent sessions. See [ADR 0040](docs/adr/0040-shared-perception-and-event-routing.md). ❌ Physical-device continuous operation acceptance remains pending.

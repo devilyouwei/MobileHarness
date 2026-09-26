@@ -16,6 +16,9 @@ public actor AssistantAgent: Agent {
     private var worker: Task<Void, Never>?
     private var activeInput: AgentInput?
     private var historySession: UUID?
+    private var begunSession: UUID?
+    private var begunTurn: ConversationTurn?
+    private var outputSequence: UInt64 = 0
     private var history: [ChatMessage] = []
 
     public init(
@@ -65,7 +68,10 @@ public actor AssistantAgent: Agent {
         guard descriptor.inputs.contains(input.payload.kind) else { throw HarnessError.unsupportedInput }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if case .observation(let observation) = input.payload {
-            guard case .transcript(_, final: true) = observation else { throw HarnessError.unsupportedInput }
+            switch observation {
+            case .transcript(_, final: true), .speechPhase: break
+            default: throw HarnessError.unsupportedInput
+            }
             _ = try observation.validatedSize()
         }
         // Control admission bypasses the ordinary queue, including when it is full or paused.
@@ -108,11 +114,25 @@ public actor AssistantAgent: Agent {
                     worker = Task { await self.generate(text, input: input, using: chat) }
                     return
                 }
+            case .observation(.speechPhase(.speaking)):
+                do {
+                    try beginReplyTurn(input)
+                    emit(.control("agent.finished"), for: input)
+                } catch { emit(.control("assistant.error: \(error)"), for: input) }
             case .image, .audio, .observation: break  // Rejected by the descriptor before admission.
             case .event(let event): emitImmediate("事件：\(event)", for: input)
             case .toolResult(let result): emitImmediate(result.value, for: input)
             }
         }
+    }
+    private func beginReplyTurn(_ input: AgentInput) throws {
+        guard let turn = input.turn else { return }
+        if begunSession == input.sessionID, let begunTurn, turn.ordinal <= begunTurn.ordinal { return }
+        if begunTurn == turn { return }
+        let call = try descriptor.capabilities.resolveAction("beginReplyTurn", parameters: [:])
+        guard emit(.actionCall(call), for: input) else { throw HarnessError.queueFull }
+        begunSession = input.sessionID
+        begunTurn = turn
     }
     private func generate(_ text: String, input: AgentInput, using chat: any ChatCapability) async {
         defer {
@@ -121,6 +141,7 @@ public actor AssistantAgent: Agent {
             drain()
         }
         do {
+            try beginReplyTurn(input)
             if historySession != input.sessionID {
                 history.removeAll()
                 historySession = input.sessionID
@@ -212,7 +233,10 @@ public actor AssistantAgent: Agent {
     }
     @discardableResult
     private func emit(_ output: AgentOutput, for input: AgentInput) -> Bool {
-        switch continuation.yield(OutputEnvelope(source: descriptor.id, input: input, output: output)) {
+        outputSequence += 1
+        switch continuation.yield(
+            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: outputSequence))
+        {
         case .enqueued: return true
         case .dropped, .terminated:
             lifecycle = .failed

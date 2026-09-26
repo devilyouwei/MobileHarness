@@ -418,28 +418,66 @@ private actor EndpointVADSession: VoiceActivitySession {
     }
     try await bus.openSession(session)
     let observed = AsyncStream<AgentInput>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let captions = VoiceProbe()
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            ActionPath(module: "UI", function: "setVoiceState"): { invocation in
+                try await UIActions.setVoiceState(invocation: invocation) { _, _ in }
+            },
+            ActionPath(module: "UI", function: "finishTranscript"): { invocation in
+                try await UIActions.finishTranscript(invocation: invocation) { _ in
+                    await captions.displayed("")
+                }
+            },
+            ActionPath(module: "UI", function: "setTranscript"): { invocation in
+                #expect(invocation.envelope.source == .speechPerception)
+                #expect(invocation.envelope.sessionID == session)
+                try await UIActions.setTranscript(invocation: invocation) { text, _ in
+                    await captions.displayed(text)
+                }
+            },
+        ]))
     let output = OutputGateway(
-        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, bus: bus,
+        manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, bus: bus,
         observedContracts: ["speech.partial", "speech.phase"],
         observeEvent: { value in observed.continuation.yield(value) }, sink: { _ in })
     try await speech.bind(output.messaging(for: .speechPerception))
     try await speech.start()
+    let outputTask = Task {
+        for await envelope in speech.outputs { try await output.dispatch(envelope) }
+    }
     let first = try AudioInput(samples: Data(repeating: 0, count: 1536 * 4), sequence: 0, timestamp: 0)
     let second = try AudioInput(samples: Data(repeating: 0, count: 12800 * 4), sequence: 1, timestamp: 0.096)
     _ = try await input.publish(AgentInput(sessionID: session, payload: .audio(first)))
     _ = try await input.publish(AgentInput(sessionID: session, payload: .audio(second)))
     for _ in 0..<10000 {
-        if await assistant.inputs.count == 1 { break }
+        if await assistant.inputs.contains(where: {
+            if case .observation(.transcript(_, final: true)) = $0.payload { return true }
+            return false
+        }) {
+            break
+        }
         try await Task.sleep(for: .milliseconds(1))
     }
-    #expect(await assistant.inputs.count == 1)
-    if let value = await assistant.inputs.first, case .observation(let event) = value.payload {
+    let finals = await assistant.inputs.filter {
+        if case .observation(.transcript(_, final: true)) = $0.payload { return true }
+        return false
+    }
+    #expect(finals.count == 1)
+    if let value = finals.first, case .observation(let event) = value.payload {
         #expect(event == .transcript("你好", final: true))
+        #expect(value.turn?.ordinal == 1)
     } else {
         Issue.record("Missing final observation")
     }
     try await speech.resumeListening()
     await speech.stop()
+    try await outputTask.value
+    let displayed = await captions.displayedText
+    #expect(displayed.contains("partial"))
+    #expect(displayed.last == "")
+    #expect(displayed.filter { $0.isEmpty }.count == 1)
+    await scheduler.shutdown()
     await #expect(throws: HarnessError.notRunning) {
         try await speech.receive(AgentInput(sessionID: session, payload: .audio(first)))
     }
@@ -470,4 +508,133 @@ private actor EndpointVADSession: VoiceActivitySession {
     #expect(await speech.status().queuedInputs == 4)
     await speech.stop()
     #expect(await speech.status().queuedInputs == 0)
+}
+
+@Test func transcriptActionAllowsClearAndRejectsInvalidPayloads() async throws {
+    let probe = VoiceProbe()
+    let config = try AgentConfigurations.load(named: "SpeechPerception")
+    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
+    let call = try config.capabilities.resolveAction("setTranscript", parameters: ["text": ""])
+    let invocation = ActionInvocation(
+        envelope: OutputEnvelope(source: .speechPerception, input: input, output: .actionCall(call)), call: call)
+    try await UIActions.setTranscript(invocation: invocation) { value, _ in await probe.displayed(value) }
+    #expect(await probe.displayedText == [""])
+    await #expect(throws: CancellationError.self) {
+        try await UIActions.setTranscript(invocation: invocation) { _, _ in throw CancellationError() }
+    }
+    for parameters in [[:], ["text": String(repeating: "a", count: 4097)]] {
+        let invalid = ActionCall(actionPath: call.actionPath, channel: call.channel, parameters: parameters)
+        await #expect(throws: ActionExecutionError.invalidText) {
+            try await UIActions.setTranscript(
+                invocation: ActionInvocation(envelope: invocation.envelope, call: invalid)
+            ) { _, _ in Issue.record("Invalid caption reached presentation") }
+        }
+    }
+}
+
+@Test(.timeLimit(.minutes(1))) func speechOnsetClearsAssistantPresentationOnlyThroughActions() async throws {
+    let session = UUID()
+    let manager = AgentManager()
+    let assistant = try AssistantAgent(chat: FixedTextChat(text: "must not generate"))
+    let source = ObservationRecorder(id: "speechPerception")
+    try await manager.register(assistant, sessionID: session)
+    try await manager.register(source, sessionID: session)
+    try await assistant.start()
+    await source.start()
+    let policy = try CommunicationPolicy(configurations: [
+        AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
+    ])
+    let input = InputGateway(manager: manager, policy: policy)
+    let bus = InternalSignalBus { value, target, incarnation in
+        try await input.receiveInternal(value, target: target, incarnation: incarnation)
+    }
+    try await bus.openSession(session)
+    let probe = VoiceProbe()
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            ActionPath(module: "UI", function: "beginReplyTurn"): { invocation in
+                try await UIActions.beginReplyTurn(invocation: invocation) { _ in
+                    await probe.displayed("reply and expression cleared atomically")
+                }
+            }
+        ]))
+    let output = OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(),
+        actions: scheduler, policy: policy, bus: bus, sink: { _ in })
+    let port = try await output.messaging(for: .speechPerception)
+    let parent = AgentInput(
+        sessionID: session,
+        payload: .audio(
+            try AudioInput(samples: Data(repeating: 0, count: 4), sequence: 0, timestamp: 0)),
+        turn: ConversationTurn(ordinal: 1))
+    let report = try await port.publish(.speechPhase(.speaking), parent: parent)
+    #expect(report.delivered == [.assistant])
+    // Signal delivery alone cannot mutate the presentation handler's state.
+    #expect(await probe.displayedText.isEmpty)
+    var functions: [String] = []
+    for await envelope in assistant.outputs {
+        if case .actionCall(let call) = envelope.output { functions.append(call.actionPath.function) }
+        try await output.dispatch(envelope)
+        if envelope.output == .control("agent.finished") { break }
+    }
+    #expect(functions == ["beginReplyTurn"])
+    #expect(await probe.displayedText == ["reply and expression cleared atomically"])
+    // A second VAD onset in the same long utterance must not issue another reset.
+    _ = try await port.publish(.speechPhase(.speaking), parent: parent)
+    for await envelope in assistant.outputs {
+        #expect(envelope.turn == parent.turn)
+        #expect(envelope.output == .control("agent.finished"))
+        try await output.dispatch(envelope)
+        break
+    }
+    #expect(await probe.displayedText.count == 1)
+    await assistant.stop()
+    await scheduler.shutdown()
+    await bus.shutdown()
+    await manager.stopAll()
+}
+
+@Test func conversationPresentationRejectsLateClosedAndRepeatedUpdates() throws {
+    let session = UUID()
+    let first = ConversationTurn(ordinal: 1)
+    let second = ConversationTurn(ordinal: 2)
+    func envelope(_ turn: ConversationTurn, _ sequence: UInt64, _ source: AgentID) -> OutputEnvelope {
+        OutputEnvelope(
+            source: source,
+            input: AgentInput(sessionID: session, payload: .text("fixture"), turn: turn),
+            output: .control("fixture"), sequence: sequence)
+    }
+    var state = ConversationPresentation()
+    // A preview may beat Assistant's reset without being erased by that reset.
+    let accepted1 = state.accept(envelope(first, 1, .speechPerception), update: .transcript)
+    #expect(accepted1)
+    let accepted2 = state.accept(envelope(first, 1, .assistant), update: .beginReply)
+    #expect(accepted2)
+    let accepted3 = state.accept(envelope(first, 2, .assistant), update: .beginReply)
+    #expect(!accepted3)
+    let accepted4 = state.accept(envelope(first, 3, .speechPerception), update: .finishTranscript)
+    #expect(accepted4)
+    let accepted5 = state.accept(envelope(first, 4, .speechPerception), update: .transcript)
+    #expect(!accepted5)
+    let accepted6 = state.accept(envelope(first, 3, .assistant), update: .reply)
+    #expect(accepted6)
+    let accepted7 = state.accept(envelope(first, 2, .assistant), update: .reply)
+    #expect(!accepted7)
+    let accepted8 = state.accept(envelope(first, 4, .assistant), update: .expression)
+    #expect(accepted8)
+    let accepted9 = state.accept(envelope(second, 5, .speechPerception), update: .transcript)
+    #expect(accepted9)
+    let accepted10 = state.accept(envelope(first, 99, .assistant), update: .expression)
+    #expect(!accepted10)
+    let accepted11 = state.accept(envelope(first, 99, .speechPerception), update: .finishTranscript)
+    #expect(!accepted11)
+    let accepted12 = state.accept(envelope(ConversationTurn(ordinal: 2), 100, .assistant), update: .beginReply)
+    #expect(!accepted12)
+    let accepted13 = state.accept(envelope(second, 6, .assistant), update: .beginReply)
+    #expect(accepted13)
+    #expect(!state.transcriptClosed)
+    let accepted14 = state.accept(envelope(second, 7, .assistant), update: .reply)
+    #expect(accepted14)
+    let accepted15 = state.accept(envelope(second, 8, .speechPerception), update: .expression)
+    #expect(!accepted15)
 }

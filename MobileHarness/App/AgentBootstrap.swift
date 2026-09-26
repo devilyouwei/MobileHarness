@@ -36,7 +36,7 @@ final class ApplicationRuntime {
 
     private init() throws {
         let policy = try CommunicationPolicy(
-            configurations: ["Assistant", "SpeechPerception", "VisionPerception", "Photographer"].map {
+            configurations: ["Assistant", "SpeechPerception", "VisionPerception"].map {
                 try AgentConfigurations.load(named: $0)
             })
         let manager = AgentManager()
@@ -48,9 +48,12 @@ final class ApplicationRuntime {
         let actions = ChannelScheduler(
             registry: ActionRegistry(handlers: [
                 ActionPath(module: "Speech", function: "speak"): { try await presentation.speak($0) },
+                ActionPath(module: "UI", function: "finishTranscript"): { try await presentation.finishTranscript($0) },
+                ActionPath(module: "UI", function: "setTranscript"): { try await presentation.setTranscript($0) },
+                ActionPath(module: "UI", function: "beginReplyTurn"): { try await presentation.beginReplyTurn($0) },
+                ActionPath(module: "UI", function: "setVoiceState"): { try await presentation.setVoiceState($0) },
                 ActionPath(module: "UI", function: "print"): { try await presentation.printText($0) },
                 ActionPath(module: "UI", function: "express"): { try await presentation.express($0) },
-                ActionPath(module: "UI", function: "showPose"): { try await presentation.showPose($0) },
             ]))
         let tools = ToolRegistry()
         self.manager = manager
@@ -65,8 +68,11 @@ final class ApplicationRuntime {
     }
     func prepareTools() async throws {
         if toolSetup == nil {
-            toolSetup = Task { [tools] in
+            toolSetup = Task { [tools, presentation] in
                 try await tools.register("System.runtimeInfo") { try await SystemTools.runtimeInfo($0) }
+                try await tools.registerCompletion("UI.showPose") { call, envelope in
+                    try await presentation.showPose(call, envelope: envelope)
+                }
             }
         }
         try await toolSetup?.value
@@ -79,8 +85,12 @@ final class RuntimePresentation {
     var synthesis: (any SpeechSynthesisCapability)?
     var play: (@Sendable (AudioFrame, ActionInvocation) async throws -> Void)?
     var text: (@Sendable (String, ActionInvocation) async throws -> Void)?
+    var transcript: (@Sendable (String, ActionInvocation) async throws -> Void)?
+    var finishTranscriptHandler: (@Sendable (ActionInvocation) async throws -> Void)?
+    var beginReplyTurnHandler: (@Sendable (ActionInvocation) async throws -> Void)?
+    var voiceState: (@Sendable (UIActions.VoiceState, ActionInvocation) async throws -> Void)?
     var emotion: (@Sendable (String, ActionInvocation) async throws -> Void)?
-    var pose: (@Sendable (PoseOverlay, ActionInvocation) async throws -> Void)?
+    var pose: (@Sendable (PoseOverlay, OutputEnvelope) async throws -> Void)?
     var speech: (@Sendable (AgentInput) async throws -> Void)?
     var control: (@Sendable (OutputEnvelope) async -> Void)?
     func speak(_ invocation: ActionInvocation) async throws {
@@ -91,13 +101,29 @@ final class RuntimePresentation {
         guard let text else { throw CommunicationError.scopeClosed }
         try await UIActions.print(invocation: invocation, present: text)
     }
+    func setTranscript(_ invocation: ActionInvocation) async throws {
+        guard let transcript else { throw CommunicationError.scopeClosed }
+        try await UIActions.setTranscript(invocation: invocation, present: transcript)
+    }
+    func finishTranscript(_ invocation: ActionInvocation) async throws {
+        guard let finishTranscriptHandler else { throw CommunicationError.scopeClosed }
+        try await UIActions.finishTranscript(invocation: invocation, present: finishTranscriptHandler)
+    }
+    func beginReplyTurn(_ invocation: ActionInvocation) async throws {
+        guard let beginReplyTurnHandler else { throw CommunicationError.scopeClosed }
+        try await UIActions.beginReplyTurn(invocation: invocation, present: beginReplyTurnHandler)
+    }
+    func setVoiceState(_ invocation: ActionInvocation) async throws {
+        guard let voiceState else { throw CommunicationError.scopeClosed }
+        try await UIActions.setVoiceState(invocation: invocation, present: voiceState)
+    }
     func express(_ invocation: ActionInvocation) async throws {
         guard let emotion else { throw CommunicationError.scopeClosed }
         try await UIActions.express(invocation: invocation, present: emotion)
     }
-    func showPose(_ invocation: ActionInvocation) async throws {
+    func showPose(_ call: ToolCall, envelope: OutputEnvelope) async throws {
         guard let pose else { throw CommunicationError.scopeClosed }
-        try await UIActions.showPose(invocation: invocation, present: pose)
+        try await UITools.showPose(call: call, envelope: envelope, present: pose)
     }
     func observe(_ input: AgentInput) async throws {
         guard let speech else { throw CommunicationError.scopeClosed }

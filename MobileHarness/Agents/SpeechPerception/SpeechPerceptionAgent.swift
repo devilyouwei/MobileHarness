@@ -22,6 +22,9 @@ public actor SpeechPerceptionAgent: Agent {
     private var processed = 0
     private var awaitingReply = false
     private var activeInput: AgentInput?
+    private var currentTurn: ConversationTurn?
+    private var turnOrdinal: UInt64 = 0
+    private var outputSequence: UInt64 = 0
     private var phase: SpeechPhase = .listening
 
     public init(
@@ -36,8 +39,8 @@ public actor SpeechPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Speech Perception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.control], capabilities: configuration.capabilities)
-        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
+            outputs: [.actionCall, .control], capabilities: configuration.capabilities)
+        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(32))
         outputs = stream.stream
         continuation = stream.continuation
     }
@@ -76,6 +79,7 @@ public actor SpeechPerceptionAgent: Agent {
         makeTurn()
         awaitingReply = false
         phase = .listening
+        if let activeInput { try presentPhase(.listening, input: activeInput) }
     }
     public func stop() async {
         lifecycle = .stopped
@@ -111,6 +115,7 @@ public actor SpeechPerceptionAgent: Agent {
         drain()
     }
     private func makeTurn() {
+        currentTurn = nil
         turn = LiveSpeechInput(recognition: recognition, sessionID: sessionID) { [weak self] text in
             guard let self else { throw CancellationError() }
             try await self.preview(text)
@@ -121,6 +126,33 @@ public actor SpeechPerceptionAgent: Agent {
             throw CancellationError()
         }
         _ = try await port.publish(.transcript(text, final: false), parent: parent)
+        try presentTranscript(text, input: parent)
+    }
+    private func presentTranscript(_ text: String, input: AgentInput) throws {
+        try Task.checkCancellation()
+        guard lifecycle == .running || lifecycle == .paused else { throw CancellationError() }
+        // Presentation is bounded separately from the complete shared transcription.
+        let call = try descriptor.capabilities.resolveAction(
+            "setTranscript", parameters: ["text": String(text.suffix(320))])
+        try emit(.actionCall(call), input: input)
+        // Release scheduler input tracking after this ordered display update completes.
+        try emit(.control("agent.finished"), input: input)
+    }
+    private func presentPhase(_ phase: SpeechPhase, input: AgentInput) throws {
+        let state = phase == .processing ? "processing" : phase == .speaking ? "hearing" : "listening"
+        let call = try descriptor.capabilities.resolveAction("setVoiceState", parameters: ["state": state])
+        try emit(.actionCall(call), input: input)
+        try emit(.control("agent.finished"), input: input)
+    }
+    private func emit(_ output: AgentOutput, input: AgentInput) throws {
+        outputSequence += 1
+        switch continuation.yield(
+            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: outputSequence))
+        {
+        case .enqueued: return
+        case .dropped, .terminated: throw HarnessError.queueFull
+        @unknown default: throw HarnessError.queueFull
+        }
     }
     private func drain() {
         guard lifecycle == .running, !awaitingReply, worker == nil, !queue.isEmpty else { return }
@@ -133,21 +165,43 @@ public actor SpeechPerceptionAgent: Agent {
         }
         do {
             while lifecycle == .running, !queue.isEmpty, !awaitingReply {
-                let input = queue.removeFirst()
+                var input = queue.removeFirst()
                 guard case .audio(let audio) = input.payload, let segmenter, let turn, let port else {
                     throw HarnessError.unsupportedInput
                 }
                 queuedSamples -= audio.sampleCount
                 guard !input.metadata.expired else { throw CommunicationError.expired }
-                activeInput = input
+                activeInput = AgentInput(
+                    id: input.id, sessionID: input.sessionID, payload: input.payload,
+                    metadata: input.metadata, turn: currentTurn)
                 let frame = try AudioFrame(
                     data: audio.samples, format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
                     sequence: audio.sequence, timestamp: audio.timestamp)
                 let result = try await segmenter.process(frame)
                 try Task.checkCancellation()
+                let beganTurn =
+                    currentTurn == nil
+                    && (result.isSpeaking
+                        || result.streamEvents.contains {
+                            if case .audio = $0 { return true }
+                            return false
+                        })
+                if beganTurn {
+                    turnOrdinal += 1
+                    currentTurn = ConversationTurn(ordinal: turnOrdinal)
+                }
+                input = AgentInput(
+                    id: input.id, sessionID: input.sessionID, payload: input.payload,
+                    metadata: input.metadata, turn: currentTurn)
+                activeInput = input
+                if beganTurn && !result.isSpeaking {
+                    try presentPhase(.speaking, input: input)
+                    _ = try await port.publish(.speechPhase(.speaking), parent: input)
+                }
                 let newPhase: SpeechPhase = result.isSpeaking ? .speaking : .listening
                 if phase != newPhase {
                     phase = newPhase
+                    try presentPhase(phase, input: input)
                     _ = try await port.publish(.speechPhase(phase), parent: input)
                 }
                 var events: [VoiceStreamEvent] = []
@@ -165,14 +219,19 @@ public actor SpeechPerceptionAgent: Agent {
                     // Already buffered capture after the endpoint belongs to the suppressed reply interval.
                     queue.removeAll()
                     queuedSamples = 0
+                    try presentPhase(.processing, input: input)
                     _ = try await port.publish(.speechPhase(.processing), parent: input)
                     let text = try await turn.finish()
                     try Task.checkCancellation()
+                    let close = try descriptor.capabilities.resolveAction("finishTranscript", parameters: [:])
+                    try emit(.actionCall(close), input: input)
+                    try emit(.control("agent.finished"), input: input)
                     if text.isEmpty {
                         try await segmenter.reset()
                         makeTurn()
                         awaitingReply = false
                         phase = .listening
+                        try presentPhase(.empty, input: input)
                         _ = try await port.publish(.speechPhase(.empty), parent: input)
                     } else {
                         let report = try await port.publish(.transcript(text, final: true), parent: input)

@@ -51,7 +51,7 @@ let package = Package(
                 "VisionPerception/README.md", "README.md",
             ],
             resources: [
-                .process("Assistant/Assistant.agent.json"), .process("Photographer/Photographer.agent.json"),
+                .process("Assistant/Assistant.agent.json"),
                 .process("SpeechPerception/SpeechPerception.agent.json"),
                 .process("VisionPerception/VisionPerception.agent.json"),
             ]),
@@ -60,7 +60,7 @@ let package = Package(
             exclude: ["README.md"]),
         .target(
             name: "Tools", dependencies: ["AgentCore"], path: "MobileHarness/Tools",
-            exclude: ["README.md", "System/README.md"]),
+            exclude: ["README.md", "System/README.md", "UI/README.md"]),
         .target(
             name: "ToolRuntime", dependencies: ["AgentCore"], path: "MobileHarness/ToolRuntime", exclude: ["README.md"]),
         .target(

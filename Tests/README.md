@@ -15,3 +15,7 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ test_model_download.py contains offline ZIP hash/member/path/symlink and replacement-preservation tests, invoked by scripts/check.sh. YOLOPoseTests use the new end-to-end model/output contract.
 
 ✅ Integration coverage includes shared inference, v4 policy, event bounds, latest-state replacement, deadlines and independent session cleanup. VAD boundary tests import Agents; model adapter tests remain separate.
+
+✅ Skeleton visualization regression coverage belongs to VisionPerception in IntegrationTests; no Photographer runtime is required.
+
+✅ IntegrationTests covers direct no-feedback skeleton Tool calls while preserving normal ToolResult round trips.

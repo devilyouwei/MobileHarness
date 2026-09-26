@@ -114,11 +114,11 @@ final class CameraCoordinator {
         let threshold = changeThreshold
         visionTask = Task { [weak self] in
             do {
-                let configuration = try FrameChangeConfiguration(minimumChange: threshold)
+                let configuration = try FrameChangeConfiguration(minimumChange: threshold, maximumRefreshInterval: 0.1)
                 try await PhotographySession.run(frames: frames, sessionID: id, configuration: configuration) {
                     [weak self] overlay, invocation in
                     guard let self else { throw CancellationError() }
-                    try await self.present(overlay, sessionID: invocation.envelope.sessionID)
+                    try await self.present(overlay, sessionID: invocation.sessionID)
                 }
             } catch is CancellationError {} catch {
                 guard let self, self.visionSession == id else { return }

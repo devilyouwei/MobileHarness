@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 
-/// Shared visual perception: one model operation and one newest pending frame, no display policy.
+/// Shared visual perception: one model operation and one newest pending frame, publishes shared observations and invokes the skeleton visualization Tool.
 public actor VisionPerceptionAgent: Agent {
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
@@ -17,6 +17,14 @@ public actor VisionPerceptionAgent: Agent {
     private var lifecycle: AgentLifecycle = .registered
     private var pending: AgentInput?
     private var worker: Task<Void, Never>?
+    private struct Publication: Sendable {
+        let observation: PoseObservation
+        let parent: AgentInput
+    }
+    private var pendingPublication: Publication?
+    private var publisher: Task<Void, Never>?
+    public private(set) var publicationReplacements = 0
+    public private(set) var overlayReplacements = 0
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var processed = 0
@@ -34,12 +42,12 @@ public actor VisionPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "VisionPerception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.control], capabilities: configuration.capabilities)
+            outputs: [.toolCall, .control], capabilities: configuration.capabilities)
         self.filter = FrameChangeFilter(configuration: try sampling ?? FrameChangeConfiguration())
         self.pose = pose
         self.resolveImage = resolveImage
         self.sessionID = sessionID
-        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
+        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingNewest(1))
         outputs = stream.stream
         continuation = stream.continuation
     }
@@ -59,12 +67,18 @@ public actor VisionPerceptionAgent: Agent {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
         lifecycle = .running
         drain()
+        drainPublication()
     }
     public func stop() async {
         lifecycle = .stopped
         pending = nil
-        worker?.cancel()
-        await worker?.value
+        pendingPublication = nil
+        let inference = worker
+        let publication = publisher
+        inference?.cancel()
+        publication?.cancel()
+        await inference?.value
+        await publication?.value
         continuation.finish()
     }
     public func status() -> AgentStatus {
@@ -85,7 +99,7 @@ public actor VisionPerceptionAgent: Agent {
         lastTimestamp = image.timestamp
         guard try filter.accepts(image) else { return }
         if pending != nil { replacements += 1 }
-        pending = input  // Explicit newest-frame replacement, never applied to Action/Tool outputs.
+        pending = input  // Latest raw frame; display replacement has its own explicit state-only policy.
         drain()
     }
     private func drain() {
@@ -131,29 +145,91 @@ public actor VisionPerceptionAgent: Agent {
             let observation = try PoseObservation(
                 width: image.width, height: image.height, sequence: image.sequence,
                 timestamp: image.timestamp, rotation: image.rotation, people: people)
-            guard let port else { throw CommunicationError.unauthorized }
-            let report = try await port.publish(.pose(observation), parent: input)
-            guard report.rejected.values.allSatisfy({ $0 == "superseded" || $0 == "expired" }) else {
-                throw CommunicationError.unavailableTarget
-            }
+            try emitOverlay(observation, input: input)
+            if pendingPublication != nil { publicationReplacements += 1 }
+            pendingPublication = Publication(observation: observation, parent: input)
+            drainPublication()
             processed += 1
         } catch is CancellationError {} catch {
-            if !Task.isCancelled && lifecycle != .stopped {
-                do { try emit(.control("agent.error: pose inference failed"), input: input) } catch {}
-                lifecycle = .failed
-                pending = nil
-                continuation.finish()
+            fail(input)
+        }
+    }
+    private func drainPublication() {
+        guard lifecycle == .running, publisher == nil, pendingPublication != nil else { return }
+        publisher = Task { await publishLatest() }
+    }
+    private func publishLatest() async {
+        defer { publisher = nil }
+        while lifecycle == .running, let publication = pendingPublication {
+            pendingPublication = nil
+            if publication.parent.metadata.expired { continue }
+            do {
+                try Task.checkCancellation()
+                guard let port else { throw CommunicationError.unauthorized }
+                let report = try await port.publish(.pose(publication.observation), parent: publication.parent)
+                try Task.checkCancellation()
+                guard report.rejected.values.allSatisfy({ $0 == "superseded" || $0 == "expired" }) else {
+                    throw CommunicationError.unavailableTarget
+                }
+            } catch CommunicationError.noRecipients {
+                // Optional business subscribers do not gate local visualization.
+            } catch is CancellationError {
+                return
+            } catch {
+                fail(publication.parent)
+                return
             }
         }
+    }
+    private func fail(_ input: AgentInput) {
+        guard lifecycle != .stopped, lifecycle != .failed else { return }
+        lifecycle = .failed
+        pending = nil
+        pendingPublication = nil
+        worker?.cancel()
+        publisher?.cancel()
+        // Terminal control replaces only an unconsumed display state; no later state is admitted.
+        _ = continuation.yield(
+            OutputEnvelope(
+                source: descriptor.id, input: input, output: .control("agent.error: pose processing failed")))
+        continuation.finish()
+    }
+    private func emitOverlay(_ image: PoseObservation, input: AgentInput) throws {
+        let people = try image.people.prefix(6).map { person in
+            guard person.count == 17 else { throw CommunicationError.invalidPayload }
+            return try person.map { point in
+                guard point.x.isFinite, point.y.isFinite,
+                    point.confidence.isFinite, (0...1).contains(point.confidence)
+                else { throw CommunicationError.invalidPayload }
+                let x = Double(point.x) / Double(image.width)
+                let y = Double(point.y) / Double(image.height)
+                // Bounded off-image transport; invisible points stay low confidence.
+                let visible = (0...1).contains(x) && (0...1).contains(y)
+                return PoseOverlay.Joint(
+                    x: Int((max(-1, min(2, x)) * 10000).rounded()),
+                    y: Int((max(-1, min(2, y)) * 10000).rounded()),
+                    confidence: visible ? Int((point.confidence * 1000).rounded()) : 0)
+            }
+        }
+        let overlay = PoseOverlay(
+            sequence: image.sequence, timestamp: image.timestamp, rotation: image.rotation, people: people)
+        let data = try JSONEncoder().encode(overlay)
+        guard data.count <= 3000, let json = String(data: data, encoding: .utf8) else {
+            throw CommunicationError.invalidPayload
+        }
+        let call = try descriptor.capabilities.resolveTool("showPose", arguments: ["payload": json])
+        try emit(.toolCall(call), input: input)
     }
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
         switch continuation.yield(OutputEnvelope(source: descriptor.id, input: input, output: output)) {
         case .enqueued: return
-        case .dropped, .terminated:
-            lifecycle = .failed
-            pending = nil
-            continuation.finish()
-            throw HarnessError.queueFull
+        case .dropped(let replaced):
+            // Only this Agent's replaceable UI state may be coalesced; never arbitrary device commands.
+            guard case .toolCall(let call) = replaced.output, call.toolPath == "UI.showPose" else {
+                throw HarnessError.queueFull
+            }
+            overlayReplacements += 1
+        case .terminated: throw CancellationError()
         @unknown default: throw HarnessError.queueFull
         }
     }

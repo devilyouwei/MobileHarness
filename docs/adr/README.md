@@ -32,3 +32,15 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 ✅ [ADR 0039](0039-platform-capability-domains.md): PlatformKit capability domains, device I/O versus ModelKit data processing, and unchanged runtime ownership.
 
 - [0040 — Shared perception and event routing](0040-shared-perception-and-event-routing.md): implemented Gateway boundary, JSON v4 and bounded event-only transport; device acceptance pending.
+
+✅ ADR 0040 caption-action amendment routes recognition preview/clear through configured UI Actions; shared speech events remain unchanged.
+
+✅ [ADR 0041](0041-vision-perception-skeleton-action.md): VisionPerception owns skeleton Actions; Photographer is reserved for future camera motion.
+
+✅ ADR 0040 strict UI amendment separates observable speech facts from protocol-validated UI Actions.
+
+✅ [ADR 0042](0042-show-pose-completion-tool.md): direct Void showPose Tool without Channel scheduling or result feedback.
+
+- [0043 — Conversation turn presentation](0043-conversation-turn-presentation.md): runtime turn context, terminal recognition captions and atomic Assistant reset.
+
+✅ [ADR 0044](0044-visual-freshness.md): bounded independent vision publication, latest skeleton state and maximum refresh admission.

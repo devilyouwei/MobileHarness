@@ -14,7 +14,10 @@ import ToolRuntime
 @MainActor @Observable
 final class AppLifecycleCoordinator {
     enum VoicePhase { case idle, loading, listening, processing, speaking, failed }
-    private(set) var voicePhase: VoicePhase = .loading
+    private var presentationPhase: VoicePhase = .loading
+    private var playbackActive = false
+    var voicePhase: VoicePhase { playbackActive ? .speaking : presentationPhase }
+    private var conversationPresentation = ConversationPresentation()
     private(set) var liveTranscript = ""
     private(set) var assistantReply = ""
     private(set) var expression: String?
@@ -40,7 +43,6 @@ final class AppLifecycleCoordinator {
     private var bus: InternalSignalBus?
     private var responseTask: Task<Void, Error>?
     private var responses: OutputGateway?
-    private var displayedInputID: UUID?
     private var interruptionTask: Task<Void, Never>?
     private var routeTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
@@ -67,7 +69,7 @@ final class AppLifecycleCoordinator {
             runtime = try ApplicationRuntime.shared()
             try await runtime.prepareTools()
         } catch {
-            voicePhase = .failed
+            presentationPhase = .failed
             voiceStatus = "通信配置加载失败：\(error)"
             return
         }
@@ -77,7 +79,7 @@ final class AppLifecycleCoordinator {
         do { agent = try AgentBootstrap.makeAssistant(chat: chat) } catch {
             self.manager = nil
 
-            voicePhase = .failed
+            presentationPhase = .failed
             voiceStatus = "Agent 配置加载失败：\(error)"
             record(voiceStatus)
             return
@@ -89,7 +91,7 @@ final class AppLifecycleCoordinator {
         runtime.presentation.synthesis = synthesis
         runtime.presentation.play = { [weak self] frame, invocation in
             guard let self else { throw CancellationError() }
-            try await self.play(frame, generation: invocation.envelope.sessionID)
+            try await self.play(frame, envelope: invocation.envelope)
         }
         runtime.presentation.text = { [weak self] text, invocation in
             guard let self else { throw CancellationError() }
@@ -98,6 +100,22 @@ final class AppLifecycleCoordinator {
         runtime.presentation.emotion = { [weak self] emoji, invocation in
             guard let self else { throw CancellationError() }
             try await self.presentExpression(emoji, invocation: invocation)
+        }
+        runtime.presentation.transcript = { [weak self] text, invocation in
+            guard let self else { throw CancellationError() }
+            try await self.presentTranscript(text, invocation: invocation)
+        }
+        runtime.presentation.finishTranscriptHandler = { [weak self] invocation in
+            guard let self else { throw CancellationError() }
+            try await self.finishTranscript(invocation: invocation)
+        }
+        runtime.presentation.beginReplyTurnHandler = { [weak self] invocation in
+            guard let self else { throw CancellationError() }
+            try await self.beginReplyTurn(invocation: invocation)
+        }
+        runtime.presentation.voiceState = { [weak self] state, invocation in
+            guard let self else { throw CancellationError() }
+            try await self.presentVoiceState(state, invocation: invocation)
         }
         runtime.presentation.speech = { [weak self] input in await self?.observeSpeech(input) }
         runtime.presentation.control = { [weak self] envelope in
@@ -109,7 +127,7 @@ final class AppLifecycleCoordinator {
             try await manager.register(agent)
             try await manager.start(.assistant)
             self.requests = requests
-            voicePhase = .idle
+            presentationPhase = .idle
             isReady = true
 
             for await output in agent.outputs {
@@ -153,6 +171,10 @@ final class AppLifecycleCoordinator {
         runtime.presentation.play = nil
         runtime.presentation.text = nil
         runtime.presentation.emotion = nil
+        runtime.presentation.transcript = nil
+        runtime.presentation.beginReplyTurnHandler = nil
+        runtime.presentation.finishTranscriptHandler = nil
+        runtime.presentation.voiceState = nil
         runtime.presentation.speech = nil
         runtime.presentation.control = nil
         runtime.presentation.synthesis = nil
@@ -164,7 +186,7 @@ final class AppLifecycleCoordinator {
         guard isReady, voiceGeneration == nil else { return }
         let generation = UUID()
         voiceGeneration = generation
-        voicePhase = .loading
+        presentationPhase = .loading
         liveTranscript = ""
         assistantReply = ""
         voiceStatus = "检查本地语音识别…"
@@ -212,10 +234,13 @@ final class AppLifecycleCoordinator {
                     guard let self, self.voiceGeneration == generation else { return }
                     do { try await responses.dispatch(output) } catch { self.stopVoice(message: "语音处理失败：\(error)") }
                 }
+                if await speech.status().lifecycle == .failed, let self, self.voiceGeneration == generation {
+                    self.stopVoice(message: "语音处理失败：输出已关闭")
+                }
             }
             let frames = try audio.startCapture()
             handlingTurn = false
-            voicePhase = .listening
+            presentationPhase = .listening
             voiceStatus = "正在聆听 · 停顿后自动识别"
             captureTask = Task { [weak self] in
                 let resampler = StreamingMonoPCMResampler()
@@ -309,7 +334,11 @@ final class AppLifecycleCoordinator {
         expression = nil
         expressionID = UUID()
         voiceGeneration = nil
-        voicePhase = message == "语音已停止" || message == "已提交，语音已结束" ? .idle : .failed
+        conversationPresentation = ConversationPresentation()
+        playbackActive = false
+        assistantReply = ""
+        liveTranscript = ""
+        presentationPhase = message == "语音已停止" || message == "已提交，语音已结束" ? .idle : .failed
         playbackLevel = 0
         startupTask?.cancel()
         let previousStartup = startupTask
@@ -357,26 +386,11 @@ final class AppLifecycleCoordinator {
         guard input.sessionID == voiceGeneration, case .observation(let observation) = input.payload else { return }
         switch observation {
         case .transcript(let text, let final):
-            if final || voicePhase != .speaking { liveTranscript = text }
             if final { record("你（语音）：\(text)") }
         case .speechPhase(let phase):
-            switch phase {
-            case .processing:
-                handlingTurn = true
-                voicePhase = .processing
-                audioLevel = 0
-                voiceStatus = "正在识别 · 暂停接收新语句"
-            case .speaking:
-                expression = nil
-                expressionID = UUID()
-                assistantReply = ""
-                voiceStatus = "检测到语音 · 等待停顿"
-            case .listening: voiceStatus = "正在聆听 · 停顿后自动识别"
-            case .empty:
-                handlingTurn = false
-                voicePhase = .listening
-                voiceStatus = "正在聆听 · 停顿后自动识别"
-            }
+            // Runtime capture admission only. Signals never mutate presentation state.
+            if phase == .processing { handlingTurn = true }
+            if phase == .empty { handlingTurn = false }
         case .pose: break
         }
     }
@@ -385,14 +399,12 @@ final class AppLifecycleCoordinator {
         try await speech?.resumeListening()
         guard voiceGeneration == generation else { return }
         handlingTurn = false
-        voicePhase = .listening
-        voiceStatus = "正在聆听 · 停顿后自动识别"
     }
-    private func play(_ frame: AudioFrame, generation: UUID) async throws {
+    private func play(_ frame: AudioFrame, envelope: OutputEnvelope) async throws {
+        let generation = envelope.sessionID
+        guard conversationPresentation.isCurrent(envelope) else { throw CancellationError() }
         guard accepts(session: generation) else { throw CancellationError() }
         try Task.checkCancellation()
-        voicePhase = .speaking
-        voiceStatus = "正在回复 · 暂停接收新语句"
         guard frame.format.encoding == .float32, frame.format.channels == 1 else {
             throw CapabilityError.invalidRequest("播放仅支持单声道 Float32 PCM")
         }
@@ -414,26 +426,72 @@ final class AppLifecycleCoordinator {
             envelope.cancel()
             if voiceGeneration == generation { playbackLevel = 0 }
         }
+        playbackActive = true
+        defer { if voiceGeneration == generation { playbackActive = false } }
         try await audio.play(samples: samples, sampleRate: frame.format.sampleRate)
     }
     private func accepts(session: UUID) -> Bool {
         session == voiceGeneration
     }
 
+    private func presentTranscript(_ text: String, invocation: ActionInvocation) throws {
+        try Task.checkCancellation()
+        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.envelope, update: .transcript) else { return }
+        liveTranscript = text
+    }
+
+    private func finishTranscript(invocation: ActionInvocation) throws {
+        try Task.checkCancellation()
+        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.envelope, update: .finishTranscript) else { return }
+        liveTranscript = ""
+    }
+
+    private func beginReplyTurn(invocation: ActionInvocation) throws {
+        try Task.checkCancellation()
+        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.envelope, update: .beginReply) else { return }
+        assistantReply = ""
+        expression = nil
+        expressionID = UUID()
+    }
+
+    private func presentVoiceState(_ state: UIActions.VoiceState, invocation: ActionInvocation) throws {
+        try Task.checkCancellation()
+        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
+        if conversationPresentation.isCurrent(invocation.envelope), conversationPresentation.transcriptClosed,
+            state != .listening
+        {
+            return
+        }
+        guard conversationPresentation.accept(invocation.envelope, update: .voiceState) else { return }
+        switch state {
+        case .processing:
+            presentationPhase = .processing
+            audioLevel = 0
+            voiceStatus = "正在识别 · 暂停接收新语句"
+        case .hearing:
+            presentationPhase = .listening
+            voiceStatus = "检测到语音 · 等待停顿"
+        case .listening:
+            presentationPhase = .listening
+            voiceStatus = "正在聆听 · 停顿后自动识别"
+        }
+    }
+
     private func presentExpression(_ emoji: String, invocation: ActionInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        expression = emoji
+        guard conversationPresentation.accept(invocation.envelope, update: .expression) else { return }
+        expression = emoji.isEmpty ? nil : emoji
         expressionID = UUID()
     }
 
     private func present(_ text: String, invocation: ActionInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        if displayedInputID != invocation.envelope.inputID {
-            assistantReply = ""
-            displayedInputID = invocation.envelope.inputID
-        }
+        guard conversationPresentation.accept(invocation.envelope, update: .reply) else { return }
         assistantReply += text
         record(text)
     }

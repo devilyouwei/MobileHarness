@@ -35,15 +35,14 @@ flowchart LR
     Output --> Bus[InternalSignalBus]
     Bus --> Input
     Input --> Assistant[Assistant: chat]
-    Input --> Photographer[Photographer: display policy]
     Assistant --> Output
-    Photographer --> Output
+    Vision -->|UI.showPose Tool| Output
     Output --> Actions[Actions / Tools and execution runtimes]
 ```
 
 AgentInput 是统一输入契约，区分内容与来源，携带会话、来源实例、时间/序号、因果关联和接纳期限。AgentCore 音频为有界 PCM，图像可携带受控附件，App 提供 ModelKit 转换器；感知结果仅携带结构化观测，不重复携带媒体。
 
-SpeechPerception 管理 VAD/ASR 会话、分段与合并；partial 仅用于经 OutputGateway 的 UI 观察，非空 final 每轮发布一次供 Assistant 订阅。VisionPerception 接纳图像、执行原有灰度筛选并共享一次姿态推理，Photographer 订阅后生成六人以内的 UI.showPose。相机预览独立于推理与语音模型准备。
+SpeechPerception 管理 VAD/ASR 会话、分段与合并；partial 为共享感知事件，字幕由独立 UI.setTranscript Action 更新，非空 final 每轮发布一次供 Assistant 订阅。VisionPerception 接纳图像、执行原有灰度筛选并共享一次姿态推理，VisionPerception 自行生成六人以内的 UI.showPose Tool；Photographer 仅保留运镜业务规划，不参与当前运行。相机预览独立于推理与语音模型准备。
 
 生产语音继续使用 Nemotron + Silero、Qwen3.5-2B MLX 与系统 TTS，视觉继续使用现有 YOLO26n-Pose；没有新增 provider 或回退。模型不可用明确报错。
 
@@ -61,7 +60,7 @@ ApplicationRuntime 在语音模型准备前即可创建共享 manager、policy�
 
 语音原始 inbox 与 ASR 队列分别最多 128 项/64000 样本；每轮 60 秒。识别/回复期间保持原有采集抑制，动作全部完成后等待 350 ms 恢复。停止清空当前会话上下文；模型权重保留由 ModelManager 管理。
 
-视觉原始帧与 Photographer 观测分别最多一项处理中、一项最新等待。过期观测不开始处理。Vision 保留最多 300 人的通用坐标，Photographer 单独限制六人显示，不能将显示筛帧策略当作避碰采样保证。
+VisionPerception 原始帧最多一项处理中、一项最新等待。过期观测不开始处理。Vision 保留最多 300 人的通用坐标，VisionPerception 的显示投影单独限制六人显示，不能将显示筛帧策略当作避碰采样保证。
 
 Bus 最多 128 活动操作、256 分支、8 MiB 载荷、64 目标 worker、256 状态通道、256 会话，每次最多 16 接收者。一般事件 16 KiB、姿态 256 KiB；默认离散接纳期限 10 秒，pose 1 秒、partial 2 秒，硬上限 60 秒。完整队列算法与溢出策略归各目录 README。
 
@@ -76,3 +75,13 @@ OutputGateway 对调用复核并交给 Action/Tool runtime。ChannelScheduler �
 ✅ 编译级模块边界、JSON v4、事件传输、共享感知和 App 接线已实现。测试覆盖两个消费者仅一次推理、语音 final/partial、取消失效、独立会话关闭、慢接收者、超时和最新状态替换。
 
 ❌ 真实 iPhone 持续音视频体验、热状态、时延与精度需单独验收。ReflexAgent、深度/人脸接入、机器人动作、Channel takeover、设备端保护和硬实时保证均不在本次实现范围；物理安全不能依赖 iOS 后台运行。
+
+✅ 识别字幕由 SpeechPerception 声明并发出 UI.setTranscript Action，经 OutputGateway / ActionRuntime 调用 App handler；partial 更新、识别完成置空均走行为通路。speech 信号保留感知语义，App 观察只做阶段协调与 final 日志，不再修改识别字幕。停止仍即时清理界面并拒绝旧会话动作。
+
+✅ 严格 UI 行为边界：SpeechPerception 负责识别字幕与阶段 UI Actions；Assistant 订阅 speech.phase，在本轮首次起音时发出原子的 beginReplyTurn。App 的 Signal 观察仅做采集接纳与日志，不修改 UI。运行时取消/失败监督与用户、系统生命周期清理独立于业务调用。
+
+✅ UI.showPose 使用无回流 Tool：VisionPerception 解析 JSON 中的工具别名，OutputGateway 校验后直接调用 ToolRuntime，等待 MainActor 覆盖画面，不进入 Channel，不生成 ToolResult。Void 执行失败向调用链抛出；普通数据 Tool 仍经 InputGateway 回流。见 ADR 0042。
+
+✅ ADR 0043 引入会话内 ConversationTurn 与输出序号：长句分段不换轮；Assistant 原子 beginReplyTurn；SpeechPerception finishTranscript 封闭识别字幕。UI.print 不再改变播放状态，播放中状态来自真实播放器活动。
+
+✅ VisionPerception 的推理、观测发布和显示消费解耦：一项活动推理 + 一项最新待推理帧；一项活动发布 + 一项最新待发布观测；一项活动显示 Tool + 一项最新待显示骨架。只合并可替换的感知/显示状态，不改变 Gateway 协议或物理命令语义。App 默认最长刷新间隔 100ms，在有新帧时避免灰度阈值饥饿。见 ADR 0044。

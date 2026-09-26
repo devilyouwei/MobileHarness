@@ -84,7 +84,8 @@ public actor OutputGateway {
                     .now.advanced(
                         by: .seconds(
                             observation.contract == "vision.pose"
-                                ? 1 : observation.contract == "speech.partial" ? 2 : 10)))))
+                                ? 1 : observation.contract == "speech.partial" ? 2 : 10)))),
+            turn: parent.turn)
         let destinations = target.map { [$0] } ?? policy.destinations(for: input)
         let observed = target == nil && observedContracts.contains(observation.contract) && observeEvent != nil
         guard !destinations.isEmpty || observed else { throw CommunicationError.noRecipients }

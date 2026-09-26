@@ -66,7 +66,7 @@
           "valueType": "string",
           "required": true,
           "description": "The facial expression to display in the voice circle.",
-          "constraints": "Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default."
+          "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love. clear removes the expression."
         }
       ],
       "examples": [
@@ -74,8 +74,22 @@
         "<express emotion=\"happy\"/> That is wonderful!",
         "<express emotion=\"thinking\"/> Let me think."
       ],
-      "doc": "Show a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.",
+      "doc": "Show or clear the facial expression. clear removes it. Does not modify captions or speech. The Assistant clears its previous expression on new user speech.",
       "hidden": false
+    },
+    {
+      "alias": "beginReplyTurn",
+      "path": {
+        "module": "UI",
+        "function": "beginReplyTurn"
+      },
+      "defaultChannel": "Display",
+      "parameters": [],
+      "examples": [
+        "<beginReplyTurn/>"
+      ],
+      "doc": "Begin the current conversation turn once: atomically clear the previous reply and expression. Preserve recognition text.",
+      "hidden": true
     }
   ],
   "tools": [
@@ -111,6 +125,11 @@
         "contract": "speech.final",
         "version": 1,
         "kind": "observation"
+      },
+      {
+        "contract": "speech.phase",
+        "version": 1,
+        "kind": "observation"
       }
     ],
     "subscriptions": [
@@ -123,6 +142,11 @@
         "contract": "user.text",
         "source": "user",
         "topic": "user.text"
+      },
+      {
+        "contract": "speech.phase",
+        "source": "speechPerception",
+        "topic": "speech.phase"
       }
     ],
     "publications": [],

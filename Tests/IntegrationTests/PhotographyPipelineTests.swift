@@ -7,6 +7,7 @@ import Gateway
 import ModelKit
 import Testing
 import ToolRuntime
+import Tools
 
 private func image(_ value: UInt8, sequence: UInt64, rotation: Int = 1) throws -> ImageInput {
     try ImageInput(
@@ -82,7 +83,7 @@ private actor ControlledPose: PoseCapability {
     try await agent.bind(
         AgentMessaging { value, _, _ in
             observations.continuation.yield(value)
-            return DeliveryReport(delivered: [.photographer])
+            return DeliveryReport()
         })
     try await agent.start()
     var started = model.started.makeAsyncIterator()
@@ -95,10 +96,16 @@ private actor ControlledPose: PoseCapability {
         try await agent.receive(AgentInput(sessionID: session, payload: .image(image(3, sequence: 3))))
     }
     await model.release()
+    var stream = observations.stream.makeAsyncIterator()
+    let first = try #require(await stream.next())
+    guard case .pose(let firstPose) = first else {
+        Issue.record("Missing pose")
+        return
+    }
+    #expect(firstPose.sequence == 1)
     #expect(await started.next() == 3)
     await model.release()
-    var stream = observations.stream.makeAsyncIterator()
-    for sequence: UInt64 in [1, 3] {
+    for sequence: UInt64 in [3] {
         guard case .pose(let pose) = try #require(await stream.next()) else {
             Issue.record("Missing pose")
             return
@@ -152,13 +159,14 @@ private actor OverlayRecorder {
     func record(_ value: UInt64) { sequences.append(value) }
 }
 
-@Test(.timeLimit(.minutes(1))) func sharedPoseFeedsTwoSubscribersWithOneInferenceAndClearsOverlay() async throws {
+@Test(.timeLimit(.minutes(1)), arguments: [false, true])
+func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers: Bool) async throws {
     let session = UUID()
     let manager = AgentManager()
     let model = ControlledPose()
-    let photo = try PhotographerAgent(sessionID: session)
     let vision = try VisionPerceptionAgent(pose: model, sessionID: session)
     let second = ObservationRecorder(id: "second")
+    let third = ObservationRecorder(id: "third")
     let secondConfig = try AgentConfiguration(
         data: JSONSerialization.data(withJSONObject: [
             "schemaVersion": 4, "agentID": "second", "actions": [], "tools": [], "channels": [], "textActions": [],
@@ -168,11 +176,20 @@ private actor OverlayRecorder {
                 "publications": [], "sends": [],
             ],
         ]))
-    let policy = try CommunicationPolicy(configurations: [
-        AgentConfigurations.load(named: "Photographer"),
-        AgentConfigurations.load(named: "VisionPerception"), secondConfig,
-    ])
-    try await manager.register(photo, sessionID: session)
+    let thirdConfig = try AgentConfiguration(
+        data: JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 4, "agentID": "third", "actions": [], "tools": [], "channels": [], "textActions": [],
+            "communication": [
+                "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
+                "subscriptions": [["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]],
+                "publications": [], "sends": [],
+            ],
+        ]))
+    let policy = try CommunicationPolicy(
+        configurations: [AgentConfigurations.load(named: "VisionPerception")]
+            + (withSubscribers ? [secondConfig, thirdConfig] : []))
+    try await manager.register(third, sessionID: session)
+    await third.start()
     try await manager.register(vision, sessionID: session)
     try await manager.register(second, sessionID: session)
     await second.start()
@@ -182,22 +199,20 @@ private actor OverlayRecorder {
     }
     try await bus.openSession(session)
     let recorder = OverlayRecorder()
-    let actions = ChannelScheduler(
-        registry: ActionRegistry(handlers: [
-            ActionPath(module: "UI", function: "showPose"): { invocation in
-                try await UIActions.showPose(invocation: invocation) { overlay, _ in
-                    #expect(overlay.people.isEmpty)
-                    await recorder.record(overlay.sequence)
-                }
-            }
-        ]), maximumTrackedInputs: 1)
+    let actions = ChannelScheduler(registry: ActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
+    let tools = ToolRegistry()
+    try await tools.registerCompletion("UI.showPose") { call, envelope in
+        try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
+            #expect(overlay.people.isEmpty)
+            await recorder.record(overlay.sequence)
+        }
+    }
     let output = OutputGateway(
-        manager: manager, requests: input, tools: ToolRegistry(), actions: actions, policy: policy, bus: bus,
+        manager: manager, requests: input, tools: tools, actions: actions, policy: policy, bus: bus,
         sink: { _ in })
     try await vision.bind(output.messaging(for: .visionPerception))
-    try await photo.start()
     try await vision.start()
-    var envelopes = photo.outputs.makeAsyncIterator()
+    var envelopes = vision.outputs.makeAsyncIterator()
     var started = model.started.makeAsyncIterator()
     for i: UInt64 in 1...3 {
         let report = try await input.publish(
@@ -205,25 +220,41 @@ private actor OverlayRecorder {
         #expect(report.delivered == [.visionPerception])
         #expect(await started.next() == UInt8(i * 40))
         await model.release()
-        for _ in 0..<2 { try await output.dispatch(try #require(await envelopes.next())) }
+        for _ in 0..<1 {
+            let envelope = try #require(await envelopes.next())
+            #expect(envelope.source == .visionPerception)
+            try await output.dispatch(envelope)
+        }
+        if withSubscribers {
+            for _ in 0..<10000 {
+                if await second.inputs.count == Int(i), await third.inputs.count == Int(i) { break }
+                await Task.yield()
+            }
+        }
+    }
+    if withSubscribers {
+        for _ in 0..<10000 {
+            if await second.inputs.count == 3, await third.inputs.count == 3 { break }
+            await Task.yield()
+        }
     }
     #expect(await recorder.sequences == [1, 2, 3])
-    #expect(await second.inputs.count == 3)
+    #expect(await second.inputs.count == (withSubscribers ? 3 : 0))
+    #expect(await third.inputs.count == (withSubscribers ? 3 : 0))
     #expect(await model.calls.count == 3)
     await manager.stopAll()
     await bus.closeSession(session)
     await output.shutdown()
 }
 
-@Test func poseActionRejectsMalformedPayloadBeforePresentation() async throws {
+@Test func poseToolRejectsMalformedPayloadBeforePresentation() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
-    let call = ActionCall(
-        actionPath: ActionPath(module: "UI", function: "showPose"), channel: "Vision",
-        parameters: ["payload": "{\"sequence\":1,\"timestamp\":0,\"rotation\":9,\"people\":[]}"])
-    let invocation = ActionInvocation(
-        envelope: OutputEnvelope(source: .photographer, input: input, output: .actionCall(call)), call: call)
-    await #expect(throws: UIActions.PoseError.invalidPayload) {
-        try await UIActions.showPose(invocation: invocation) { _, _ in Issue.record("Invalid pose reached UI") }
+    let call = ToolCall(
+        toolPath: "UI.showPose", arguments: ["payload": "{\"sequence\":1,\"timestamp\":0,\"rotation\":9,\"people\":[]}"]
+    )
+    let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
+    await #expect(throws: UITools.PoseError.invalidPayload) {
+        try await UITools.showPose(call: call, envelope: envelope) { _, _ in Issue.record("Invalid pose reached UI") }
     }
     let point = PoseOverlay.Joint(x: 2500, y: 7500, confidence: 1000)
     #expect(point.sensorPoint(rotation: 0).x == 0.25)
@@ -233,44 +264,42 @@ private actor OverlayRecorder {
     #expect(point.sensorPoint(rotation: 3).x == 0.25)
 }
 
-@Test func actionOnlyGeneratorUsesConfigurationAndRejectsUnmappedText() throws {
-    let configuration = try AgentConfigurations.load(named: "Photographer")
-    var generator = try AgentGenerator(capabilities: configuration.capabilities, textActions: [])
-    let calls = try generator.append("<showPose payload='{}'/>") + generator.finish()
-    #expect(calls.count == 1)
-    #expect(calls[0].channel == "Vision")
-    var text = try AgentGenerator(capabilities: configuration.capabilities, textActions: [])
-    #expect(throws: GenerationError.unknownCapability) { try text.append("unexpected prose") }
+@Test func visionShowPoseIsOnlyAConfiguredTool() throws {
+    let config = try AgentConfigurations.load(named: "VisionPerception")
+    #expect(config.capabilities.actions.isEmpty)
+    let call = try config.capabilities.resolveTool("showPose", arguments: ["payload": "{}"])
+    #expect(call.toolPath == "UI.showPose")
 }
 
-private func poseInput(session: UUID, sequence: UInt64 = 1, people: Int = 8) throws -> AgentInput {
-    let joints = (0..<17).map { _ in PoseObservation.Joint(x: 2, y: 3, confidence: 0.9) }
-    return AgentInput(
-        sessionID: session,
-        payload: .observation(
-            .pose(
-                try PoseObservation(
-                    width: 4, height: 4,
-                    sequence: sequence, timestamp: Double(sequence), rotation: 1,
-                    people: Array(repeating: joints, count: people)))))
+private struct CrowdPose: PoseCapability {
+    var availability: CapabilityAvailability { .available }
+    func estimatePose(_ request: PoseRequest) async throws -> PoseResult {
+        let points = BodyJoint.allCases.map { PoseKeypoint(joint: $0, x: 2, y: 3, confidence: 0.9) }
+        let person = PersonPose(box: PoseBox(x: 0, y: 0, width: 4, height: 4), confidence: 0.9, keypoints: points)
+        return PoseResult(context: request.context, people: Array(repeating: person, count: 8))
+    }
 }
 
-@Test(.timeLimit(.minutes(1))) func photographerCrowdFitsActionProtocolAndRejectsForeignSession() async throws {
+@Test(.timeLimit(.minutes(1))) func visionCrowdFitsToolProtocolWithoutSubscribersAndRejectsForeignSession()
+    async throws
+{
     let session = UUID()
-    let agent = try PhotographerAgent(sessionID: session)
+    let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in throw CommunicationError.noRecipients })
     try await agent.start()
     await #expect(throws: ImageInputError.wrongSession) {
-        try await agent.receive(poseInput(session: UUID()))
+        try await agent.receive(AgentInput(sessionID: UUID(), payload: .image(image(40, sequence: 1))))
     }
-    try await agent.receive(poseInput(session: session))
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(40, sequence: 1))))
     var stream = agent.outputs.makeAsyncIterator()
     let envelope = try #require(await stream.next())
-    guard case .actionCall(let call) = envelope.output else {
-        Issue.record("Missing skeleton Action")
+    #expect(envelope.source == .visionPerception)
+    guard case .toolCall(let call) = envelope.output else {
+        Issue.record("Missing skeleton Tool")
         return
     }
-    #expect((call.parameters["payload"]?.utf8.count ?? Int.max) <= 3000)
-    try await UIActions.showPose(invocation: ActionInvocation(envelope: envelope, call: call)) { overlay, _ in
+    #expect((call.arguments["payload"]?.utf8.count ?? Int.max) <= 3000)
+    try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
         #expect(overlay.people.count == 6)
         #expect(overlay.people.allSatisfy { $0.count == 17 })
         #expect(overlay.people[0][0] == PoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
@@ -278,20 +307,31 @@ private func poseInput(session: UUID, sequence: UInt64 = 1, people: Int = 8) thr
     await agent.stop()
 }
 
-@Test(.timeLimit(.minutes(1))) func photographerOutputOverflowFailsInsteadOfReplacingActions() async throws {
+@Test(.timeLimit(.minutes(1))) func visionSlowDisplayKeepsOnlyLatestWithoutFailingPerception() async throws {
     let session = UUID()
-    let photo = try PhotographerAgent(sessionID: session)
-    try await photo.start()
-    for i: UInt64 in 1...5 {
-        try await photo.receive(poseInput(session: session, sequence: i))
+    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in throw CommunicationError.noRecipients })
+    try await agent.start()
+    for i: UInt64 in 1...9 {
+        try await agent.receive(AgentInput(sessionID: session, payload: .image(image(UInt8(i * 20), sequence: i))))
         for _ in 0..<1000 {
-            let status = await photo.status()
+            let status = await agent.status()
             if status.processedInputs >= Int(i) || status.lifecycle == .failed { break }
             await Task.yield()
         }
     }
-    #expect(await photo.status().lifecycle == .failed)
-    await photo.stop()
+    #expect(await agent.status().lifecycle == .running)
+    #expect(await agent.overlayReplacements == 8)
+    var output = agent.outputs.makeAsyncIterator()
+    let envelope = try #require(await output.next())
+    guard case .toolCall(let call) = envelope.output else {
+        Issue.record("Missing tool")
+        return
+    }
+    try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
+        #expect(overlay.sequence == 9)
+    }
+    await agent.stop()
 }
 
 private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
@@ -311,7 +351,7 @@ private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
     try await agent.bind(
         AgentMessaging { value, _, _ in
             observed.continuation.yield(value)
-            return DeliveryReport(delivered: [.photographer])
+            return DeliveryReport()
         })
     try await agent.start()
     let frame = try ImageInput(
@@ -328,5 +368,116 @@ private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
         return
     }
     #expect(pose.rotation == 0 && pose.sequence == 1 && pose.people.isEmpty)
+    await agent.stop()
+}
+
+@Test func boundedRefreshAdmitsNewFramesForSlowOrStationaryScenes() throws {
+    var filter = FrameChangeFilter(configuration: try FrameChangeConfiguration(maximumRefreshInterval: 0.1))
+    func frame(_ sequence: UInt64, _ time: Double, _ gray: UInt8) throws -> ImageInput {
+        try ImageInput(
+            width: 1, height: 1, rgb: Data(repeating: gray, count: 3),
+            sequence: sequence, timestamp: time, rotation: 0)
+    }
+    #expect(try filter.accepts(frame(1, 0, 0)))
+    #expect(try !filter.accepts(frame(2, 0.03, 1)))
+    #expect(try !filter.accepts(frame(3, 0.06, 2)))
+    #expect(try filter.accepts(frame(4, 0.11, 3)))
+    #expect(try !filter.accepts(frame(5, 0.14, 3)))
+    #expect(try filter.accepts(frame(6, 0.22, 3)))
+    #expect(throws: ImageInputError.outOfOrder) { try filter.accepts(frame(6, 0.22, 3)) }
+    #expect(throws: ImageInputError.invalidFrame) { try FrameChangeConfiguration(maximumRefreshInterval: .nan) }
+    #expect(throws: ImageInputError.invalidFrame) {
+        try FrameChangeConfiguration(minimumInterval: 0.2, maximumRefreshInterval: 0.1)
+    }
+}
+
+private actor BlockedPosePublication {
+    let started: AsyncStream<UInt64>
+    private let continuation: AsyncStream<UInt64>.Continuation
+    private var waiter: CheckedContinuation<Void, Never>?
+    init() {
+        let pair = AsyncStream<UInt64>.makeStream(bufferingPolicy: .bufferingOldest(8))
+        started = pair.stream
+        continuation = pair.continuation
+    }
+    func publish(_ observation: PerceptionObservation) async throws -> DeliveryReport {
+        guard case .pose(let pose) = observation else { throw CommunicationError.invalidPayload }
+        await withCheckedContinuation { waiter in
+            self.waiter = waiter
+            continuation.yield(pose.sequence)
+        }
+        try Task.checkCancellation()
+        return DeliveryReport()
+    }
+    func release() {
+        waiter?.resume()
+        waiter = nil
+    }
+}
+
+@Test(.timeLimit(.minutes(1))) func slowPublicationDoesNotBlockInferenceOrDisplayAndCoalescesLatest() async throws {
+    let session = UUID()
+    let port = BlockedPosePublication()
+    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    try await agent.bind(AgentMessaging { value, _, _ in try await port.publish(value) })
+    try await agent.start()
+    var receipts = port.started.makeAsyncIterator()
+    var displays = agent.outputs.makeAsyncIterator()
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(30, sequence: 1))))
+    #expect(await receipts.next() == 1)
+    _ = try #require(await displays.next())
+    for i: UInt64 in 2...4 {
+        try await agent.receive(AgentInput(sessionID: session, payload: .image(image(UInt8(i * 30), sequence: i))))
+        let envelope = try #require(await displays.next())
+        guard case .toolCall(let call) = envelope.output else {
+            Issue.record("Missing tool")
+            return
+        }
+        try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in #expect(overlay.sequence == i) }
+    }
+    #expect(await agent.publicationReplacements == 2)
+    await port.release()
+    #expect(await receipts.next() == 4)
+    let stop = Task { await agent.stop() }
+    for _ in 0..<10000 {
+        if await agent.status().lifecycle == .stopped { break }
+        await Task.yield()
+    }
+    await port.release()
+    await stop.value
+    #expect(await displays.next() == nil)
+}
+
+private struct FailingSecondPose: PoseCapability {
+    var availability: CapabilityAvailability { .available }
+    func estimatePose(_ request: PoseRequest) async throws -> PoseResult {
+        if request.image.rgb?.first == 80 { throw CapabilityError.invalidRequest("test failure") }
+        return PoseResult(context: request.context, people: [])
+    }
+}
+
+@Test(.timeLimit(.minutes(1))) func visualTerminalErrorSurvivesPendingSkeletonReplacement() async throws {
+    let session = UUID()
+    let agent = try VisionPerceptionAgent(pose: FailingSecondPose(), sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in throw CommunicationError.noRecipients })
+    try await agent.start()
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(40, sequence: 1))))
+    for _ in 0..<10000 {
+        if await agent.status().processedInputs == 1 { break }
+        await Task.yield()
+    }
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(80, sequence: 2))))
+    for _ in 0..<10000 {
+        if await agent.status().lifecycle == .failed { break }
+        await Task.yield()
+    }
+    #expect(await agent.status().lifecycle == .failed)
+    var output = agent.outputs.makeAsyncIterator()
+    guard case .control(let value) = try #require(await output.next()).output else {
+        Issue.record("Terminal error was lost behind display state")
+        return
+    }
+    #expect(value.hasPrefix("agent.error:"))
+    #expect(await output.next() == nil)
     await agent.stop()
 }

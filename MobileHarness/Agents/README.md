@@ -11,7 +11,8 @@ flowchart LR
     Gateway -->|AgentInput including tool results| Agents
     Agents -->|Resolved ActionCall and ToolCall| Gateway
     Agents -->|Runtime completion and error notifications| Gateway
-    Agents -->|Bound typed events via OutputGateway| Bus[InternalSignalBus]
+    Agents -->|Bound typed events| OutputGateway
+    OutputGateway --> Bus[InternalSignalBus]
     Bus -->|InputGateway admission| Agents
     Agents -->|Capability requests| ModelKit
     ModelKit -->|Generation events| Agents
@@ -164,7 +165,7 @@ Changes require repackaging and a new Agent instance; no hot reload is implement
 - ✅ Shared parsers, parameter/Channel validation, bounded queues, and cancellation/completion regression coverage.
 - ✅ `say` maps to `Speech.speak`; `print`/`express` map to `UI.print`/`UI.express`. Default `Speech`/`Display` Channels remain compatible; Channel and module names need not match.
 - ❌ Configuration hot reload, remote configuration, full JSON Schema, dynamic handler discovery, and configuration-driven lifecycle budgets.
-- ✅ SpeechPerception owns VAD/ASR; VisionPerception owns pose inference; Photographer consumes shared observations for display. ❌ Tracking/Media/Control roles and robot behaviors.
+- ✅ SpeechPerception owns VAD/ASR; VisionPerception owns pose inference; VisionPerception also emits skeleton UI ToolCalls; Photographer camera-motion policy remains planned. ❌ Tracking/Media/Control roles and robot behaviors.
 - ✅ InternalSignalBus event delivery and static v4 communication.
 - ❌ Model-native tool deltas, general StateStore/AgentRuntime, restart and request/reply.
 
@@ -182,8 +183,60 @@ Keep this standard synchronized with configuration validation and Agent changes.
 
 Each Agent README must follow the [concurrency documentation standard](../README.md#concurrency-documentation-standard). Document its inbox producer and drain worker, output consumer, capacities, pause/resume behavior, cancellation admission, failure propagation and completion semantics. A registry bound or actor mailbox is not a substitute for an explicit bounded application inbox. Include a Mermaid diagram and distinguish implemented behavior from planned scheduling features. The Assistant README provides the current concrete example.
 
-✅ Photographer is the phase-one 摄像师 role: injected PoseCapability, one active/one latest pending image, JSON v4 showPose action and shared output parsing. Robot motion, composition and tracking remain unimplemented; see Photographer/README.md.
-
-✅ Photographer accepts an App-injected image resolver for opaque native frame attachments. Capability declarations still come exclusively from Photographer.agent.json; the resolver is data adaptation, not a second Action/Tool registration list.
+✅ VisionPerception uses an App-injected image resolver, one active/one latest frame, and its JSON v4 showPose Tool. It publishes typed observations independently of the display projection. Photographer is reserved for camera-motion business policy and has no active runtime implementation; see Photographer/README.md.
 
 JSON v4 requires communication with inputs (contract/version/kind), subscriptions (contract/source/topic), publications (contract names), and sends (contract/target). Empty arrays grant no communication permission. Sources and topics are exact; no wildcards or request/reply declarations.
+
+✅ Strict UI boundary: no Agent or Signal observer may invoke presentation callbacks or mutate UI. Agent-selected effects must resolve JSON-declared ActionCall/ToolCall and traverse OutputGateway. Facts may trigger another Agent to choose Actions, but App observers are restricted to runtime admission/logging. ModelKit inference remains permitted; lifecycle teardown is runtime supervision, never a business-command escape hatch.
+
+Completion-only tools are explicitly registered by App with a Void handler and documented in their JSON doc. They are awaited without ToolResult feedback; data-returning tools still produce correlated ToolResults through InputGateway. Both paths propagate cancellation, and completion-tool errors fail dispatch. UI.showPose uses this completion-only path.
+
+✅ VisionPerception uses bounded independent inference and publication workers. Its pending skeleton Tool output is explicitly replaceable state (capacity one); terminal controls close the stream and remain observable. This exception does not authorize dropping general Tool calls or device Actions. Details and counters belong to VisionPerception/README.md.
+
+
+## 输入输出文档约定
+
+每个 Agent README 应列出当前 JSON v4 的输入契约、精确订阅来源/topic、非订阅接收方式，以及共享观测、Action、Tool、control 四类输出。以 JSON 和实现为准，不能从允许的 input kind 推导出额外订阅。未实现 Agent 必须标注规划，不写成运行中的生产协议。
+
+| Agent | 已实现输入 | 已实现输出 | 详细契约 |
+| --- | --- | --- | --- |
+| Assistant | user.text、speech.final、speech.phase 订阅；runtime.event 和 tool.result 定向输入 | Speech/UI Actions、runtimeInfo Tool、控制通知；无共享发布 | [Assistant](Assistant/README.md#输入订阅与输出契约) |
+| SpeechPerception | phone.microphone 的 media.audio；运行时 resumeListening | partial/final/phase 观测、识别字幕与状态 Actions、控制通知 | [SpeechPerception](SpeechPerception/README.md#输入订阅与输出契约) |
+| VisionPerception | phone.camera 的 media.image | vision.pose、showPose Void Tool、失败控制通知 | [VisionPerception](VisionPerception/README.md#输入订阅与输出契约) |
+| Photographer | 无运行实例或订阅 | 无；运镜能力待实现 | [Photographer](Photographer/README.md#输入订阅与输出边界) |
+
+以下为字段摘要，不是可执行 Swift 或远程 JSON 协议；当前跨 actor 传递原生 Sendable 值。
+
+```swift
+AgentInput {
+    id: UUID; sessionID: UUID
+    metadata: InputMetadata
+    payload: InputPayload
+    turn: ConversationTurn?       // id: UUID, ordinal: UInt64
+}
+InputMetadata {
+    contract: String; version: Int; topic: String; source: String
+    incarnation: UUID?           // 内部发布源实例身份
+    capturedAt: TimeInterval; sequence: UInt64
+    rootID: UUID; parentID: UUID?; hops: Int
+    deadline: ContinuousClock.Instant
+}
+OutputEnvelope {
+    source: AgentID; inputID: UUID; sessionID: UUID
+    turn: ConversationTurn?; sequence: UInt64
+    output: AgentOutput
+}
+ActionCall { actionPath: ActionPath; channel: String; parameters: [String: String] }
+ToolCall { id: UUID; toolPath: String; arguments: [String: String] }
+ToolResult { callID: UUID; value: String; isError: Bool }
+```
+
+结构源文件：[AgentInput](../AgentCore/AgentInput.swift)、[OutputEnvelope](../AgentCore/Output/OutputEnvelope.swift)、[ActionCall](../AgentCore/Output/ActionCall.swift)、[ToolCall](../AgentCore/Output/ToolCall.swift)、[ToolResult](../AgentCore/Output/ToolResult.swift)。OutputEnvelope 不再持有原始媒体输入；sequence 的具体使用见各 Agent 文档，不应把它与 payload 中的采集帧序号混同。
+
+- 共享感知由绑定的 `AgentMessaging.publish` 经 OutputGateway → Bus → InputGateway 投递；contract 对应 typed PerceptionObservation，source 身份由端口绑定。回执只代表接纳，不代表消费完成。
+- Action/Tool 经 `outputs: AsyncStream<OutputEnvelope>` 交给 App 转发至 OutputGateway。Action 带有效 Channel；Tool 无 Channel。所有调用参数的传输值是 String，包括 showPose 中嵌入的 JSON 字符串。
+- 有返回值 Tool 产生关联 callID 的 ToolResult，经 InputGateway 定向回送原 Agent/session/turn；completion-only Tool 完成不回流数据。两者都不是共享观测订阅。
+- control 是运行时识别的字符串通知，不是模型可调用能力、共享主题或机械指令。信封继承输入关联，业务输出的身份不能从模型文本指定。
+- `start / pause / resume / stop / bind` 等运行时方法不是外部业务输入绕过网关的入口。其他直接方法（如 resumeListening）必须明确写明用途和调用者。
+
+✅ 本目录四个 Agent README 已按当前配置/实现补齐输入输出表、Mermaid 和数据结构；Photographer 单独标明待实现。❌ 动态订阅、远程线协议和 Photographer 实际控制契约未实现。
