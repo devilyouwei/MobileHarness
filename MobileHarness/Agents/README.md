@@ -11,6 +11,8 @@ flowchart LR
     Gateway -->|AgentInput including tool results| Agents
     Agents -->|Resolved ActionCall and ToolCall| Gateway
     Agents -->|Runtime completion and error notifications| Gateway
+    Agents -->|Bound typed events via OutputGateway| Bus[InternalSignalBus]
+    Bus -->|InputGateway admission| Agents
     Agents -->|Capability requests| ModelKit
     ModelKit -->|Generation events| Agents
     App -.->|Injected capabilities and lifecycle setup| Agents
@@ -39,7 +41,7 @@ Agents/
 
 Use UTF-8 `<AgentName>.agent.json`, parsed by Foundation JSONDecoder. JSON comments are not supported: use doc. Version 4 uses doc for usage guidance; the loader accepts JSON v4 only. Repackage configuration and code together.
 
-All fields shown below are required except hidden, which defaults to false. Arrays must be present, and constraints may be empty. Unknown fields, incorrect types and missing fields are rejected. Names are case-sensitive. Changes to field semantics require coordinated validation, tests, documentation and version migration.
+The Action/Tool fields below are retained from v3; the complete document also requires the communication object. All fields shown below are required except hidden, which defaults to false. Arrays must be present, and constraints may be empty. Unknown fields, incorrect types and missing fields are rejected. Names are case-sensitive. Changes to field semantics require coordinated validation, tests, documentation and version migration.
 
 | Top-level field | JSON type | Contract |
 | --- | --- | --- |
@@ -49,6 +51,7 @@ All fields shown below are required except hidden, which defaults to false. Arra
 | textActions | Array of String | Ordered unique aliases for natural-text mapping, at most 8; each must accept string text without other required parameters |
 | actions | Array of Object | Actions this Agent may invoke |
 | tools | Array of Object | Native tools this Agent may invoke |
+| communication | Object | Required inputs, subscriptions, publications and sends arrays; see AgentCore/Bus |
 
 Each Action entry uses this common registration format:
 
@@ -161,8 +164,9 @@ Changes require repackaging and a new Agent instance; no hot reload is implement
 - ✅ Shared parsers, parameter/Channel validation, bounded queues, and cancellation/completion regression coverage.
 - ✅ `say` maps to `Speech.speak`; `print`/`express` map to `UI.print`/`UI.express`. Default `Speech`/`Display` Channels remain compatible; Channel and module names need not match.
 - ❌ Configuration hot reload, remote configuration, full JSON Schema, dynamic handler discovery, and configuration-driven lifecycle budgets.
-- ✅ Photographer implements initial pose perception. ❌ Other Vision/Tracking/Media/Control roles and robot photography behaviors.
-- ❌ Model-native tool deltas, general StateStore/AgentRuntime, restart, and InternalSignalBus.
+- ✅ SpeechPerception owns VAD/ASR; VisionPerception owns pose inference; Photographer consumes shared observations for display. ❌ Tracking/Media/Control roles and robot behaviors.
+- ✅ InternalSignalBus event delivery and static v4 communication.
+- ❌ Model-native tool deltas, general StateStore/AgentRuntime, restart and request/reply.
 
 ## Maintenance
 
@@ -183,7 +187,3 @@ Each Agent README must follow the [concurrency documentation standard](../README
 ✅ Photographer accepts an App-injected image resolver for opaque native frame attachments. Capability declarations still come exclusively from Photographer.agent.json; the resolver is data adaptation, not a second Action/Tool registration list.
 
 JSON v4 requires communication with inputs (contract/version/kind), subscriptions (contract/source/topic), publications (contract names), and sends (contract/target). Empty arrays grant no communication permission. Sources and topics are exact; no wildcards or request/reply declarations.
-
-✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.
-
-✅ Vision migration: VisionPerceptionAgent owns filtering/inference and publishes shared pose observations; Photographer owns only display policy. App now uses one shared manager/bus/Gateway assembly with independent voice and camera sessions. ❌ Device acceptance remains outstanding.

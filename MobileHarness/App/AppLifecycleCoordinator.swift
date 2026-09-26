@@ -195,6 +195,10 @@ final class AppLifecycleCoordinator {
             guard let manager, let requests, let responses, let bus else { throw CapabilityError.sessionClosed }
             let speech = try SpeechPerceptionAgent(recognition: recognition, vad: voiceActivity, sessionID: generation)
             try await manager.register(speech, sessionID: generation)
+            guard voiceGeneration == generation, !Task.isCancelled else {
+                try? await manager.remove(.speechPerception)
+                return
+            }
             self.speech = speech
             try await bus.openSession(generation)
             try await speech.bind(responses.messaging(for: .speechPerception))
@@ -244,7 +248,13 @@ final class AppLifecycleCoordinator {
                             let report = try await requests.publish(
                                 AgentInput(sessionID: generation, payload: .audio(audioInput)))
                             // Endpoint processing can close admission while the last capture packet is in flight.
-                            if !report.rejected.isEmpty, !self.handlingTurn {
+                            guard self.voiceGeneration == generation else { return }
+                            if !report.rejected.isEmpty {
+                                if report.rejected.values.allSatisfy({
+                                    $0 == String(describing: CapabilityError.inputBusy)
+                                }) {
+                                    break
+                                }
                                 throw CommunicationError.unavailableTarget
                             }
                         }
@@ -314,17 +324,18 @@ final class AppLifecycleCoordinator {
         cleanupTask = Task {
             await previousCleanup?.value
             await previousStartup?.value
+            if previousSpeech != nil { try? await previousManager?.stop(.speechPerception) }
+            await previousSpeech?.stop()
+            await previousCapture?.value
+            await previousSpeechTask?.value
+            if let oldGeneration { await previousBus?.closeSession(oldGeneration) }
             if let oldGeneration, let previousRequests {
-                _ = try? await previousRequests.submit(
+                _ = try? await previousRequests.send(
                     AgentInput(sessionID: oldGeneration, payload: .event("assistant.cancel")), to: .assistant)
                 await previousResponses?.cancel(sessionID: oldGeneration)
                 _ = try? await previousResponse?.value
             }
-            await previousSpeech?.stop()
-            await previousCapture?.value
-            await previousSpeechTask?.value
             if previousSpeech != nil { try? await previousManager?.remove(.speechPerception) }
-            if let oldGeneration { await previousBus?.closeSession(oldGeneration) }
         }
         captureTask?.cancel()
         captureTask = nil

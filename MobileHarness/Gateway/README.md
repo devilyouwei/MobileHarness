@@ -1,46 +1,26 @@
-# Gateway — Input and Output Boundaries
+# Gateway — model-independent input and output boundaries
 
-Gateway connects external input, cognitive processing, and execution. Architecture sections 4–5 and 25–27 define two complementary paths: Input Gateway adapts and routes signals; Output Gateway validates and dispatches resolved calls.
+Purpose: connect admitted input, Agent communication and resolved execution without owning models or hardware. Design goals: explicit validation, bounded delivery, failure isolation and observable completion.
 
-## Responsibilities and boundaries
+✅ InputGateway validates AgentInput envelopes and routes static subscriptions or explicit targets. PlatformKit performs device I/O; SpeechPerception and VisionPerception perform model-driven adaptation. No ASR/VAD/image-content processing remains here.
 
-- Input receives user input, audio, images and tool results, owns admission/adaptation policy, and selects Agent destinations. PlatformKit performs device acquisition; ModelKit performs requested ASR/VAD processing. App connects device input to Gateway; no device resource is owned here.
-- Output accepts resolved `ActionCall` and `ToolCall` values. XML parsing, local alias resolution, and Channel selection happen inside Agents using AgentCore.
-- Action Calls enter bounded Channel scheduling. Calls within one Channel are serial; independent Channels may run concurrently, subject to shared module resource exclusion.
-- Tool Calls bypass Channel scheduling. Results re-enter through InputGateway with the originating session and Agent association.
-
-## Direct relationships
-
-Arrows show current logical payload flow. Platform input is connected through App; concrete Actions and Tools are reached through their runtimes.
+✅ OutputGateway validates ActionCall/ToolCall and dispatches through ActionRuntime/ToolRuntime; ToolResult returns through InputGateway. Typed perception events use bound source ports and InternalSignalBus, separate from Action/Tool model protocols.
 
 ```mermaid
 flowchart LR
-    App -->|User input, captured audio and admitted images| Gateway
-    Gateway -->|AgentInput and tool-result feedback| Agents
-    Agents -->|Resolved calls and runtime notifications| Gateway
-    Gateway -->|ASR and VAD requests| ModelKit
-    ModelKit -->|Transcripts and voice-activity scores| Gateway
-    Gateway -->|Scheduled ActionInvocation| ActionRuntime
-    ActionRuntime -->|Completion or error| Gateway
-    Gateway -->|ToolCall| ToolRuntime
-    ToolRuntime -->|ToolResult| Gateway
-    Gateway -->|Observed output and completion| App
+    App -->|Captured inputs| InputGateway
+    InputGateway --> Agents
+    Agents -->|Resolved calls / bound events| OutputGateway
+    OutputGateway --> Bus[AgentCore InternalSignalBus]
+    Bus --> InputGateway
+    OutputGateway --> ActionRuntime
+    OutputGateway --> ToolRuntime
+    ToolRuntime --> InputGateway
+    OutputGateway -->|Validated observations| App
 ```
 
-## Implementation status
+✅ The Gateway target depends only on AgentCore, ActionRuntime and ToolRuntime. Automated checks reject ModelKit/PlatformKit/concrete Agent imports and model target dependencies.
 
-- ✅ [Input](Input/README.md): InputGateway, voice sessions, ASR/VAD adaptation, SignalRouter protocol, and LogicRouter.
-- ✅ [Output](Output/README.md): validation, execution routing, action/tool dispatch, and bounded Channel scheduling.
-- ✅ Per-Channel FIFO, module exclusion, explicit overflow rejection, and input/session cancellation and completion barriers.
-- ✅ Dependencies on ActionRuntime and ToolRuntime; concrete implementation handlers are registered by App.
-- ❌ Unified `Signal`, general context enrichment, JEV/Agentic routing, ActionResult feedback, priorities, preemption, and generic resource declarations.
+✅ Channel scheduling retains per-channel order, shared-module exclusion and explicit overflow; event delivery has independent bounds and latest-state lanes. See Input, Output and AgentCore/Bus READMEs for algorithms and limits.
 
-The current input contract is `AgentInput`. `control` is a temporary runtime completion/error notification, not a third model output protocol. `main` has ordinary Channel semantics; it does not block every other Channel. See [Scheduling](Output/Scheduling/README.md) for limits and cancellation behavior.
-
-## Maintenance
-
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
-
-✅ Voice input uses LiveSpeechInput and stream-only VAD events; final text enters through submit once per turn.
-
-✅ CameraInputSession owns configurable grayscale frame selection and routes only admitted images through InputGateway to Photographer. Generic agent.finished/error controls use existing output barriers.
+❌ General request/reply, dynamic subscriptions, model-assisted routing Agents, preemption and robot control remain future work. No separate Signal implementation or unused model router is created.

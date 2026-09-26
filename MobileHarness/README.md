@@ -11,7 +11,7 @@ Its architecture follows a continuous information-processing loop inspired by bi
 
 The system is organized around three major functional domains:
 
-- **Input Gateway** — receives, adapts, normalizes, enriches, and routes multimodal signals.
+- **Input Gateway** — validates protocol envelopes and routes multimodal inputs by static subscription or explicit destination.
 - **Agent Core / Agents** — independent, stateful cognitive units that process signals and generate executable outputs.
 - **Output Gateway** — schedules and dispatches fully resolved Action Calls and Tool Calls.
 
@@ -30,88 +30,32 @@ The architecture is designed around four core properties:
 
 ```mermaid
 flowchart LR
-
-    WORLD["External World<br/>User · Environment · Device"]
-
-    WORLD --> SIGNALS["Multimodal Signals<br/>Text · Audio · Image · Video · Sensor · System"]
-
-    SIGNALS --> IG
-
-    subgraph IG["Input Gateway"]
-        ACQ["Signal Admission<br/>From App / Platform I/O"]
-        ADAPT["Signal Adaptation<br/>ASR · Sampling · Normalize · Feature Processing"]
-        CTX["Context Enrichment"]
-        ROUTE["Signal Routing<br/>Logic · JEV · Lightweight Agent"]
-
-        ACQ --> ADAPT --> CTX --> ROUTE
-    end
-
-    IG --> CORE
-
-    subgraph CORE["Agent Core / Cognitive System"]
-        MANAGER["Agent Manager"]
-        REGISTRY["Agent Registry"]
-        BUS["Internal Signal Bus"]
-
-        A1["Assistant Agent"]
-        A2["Vision Agent"]
-        A3["Photography Agent"]
-        A4["Tracking Agent"]
-        A5["Media Agent"]
-        A6["Control Agent"]
-        AX["Other Agents"]
-
-        MANAGER -.-> A1
-        MANAGER -.-> A2
-        MANAGER -.-> A3
-        MANAGER -.-> A4
-        MANAGER -.-> A5
-        MANAGER -.-> A6
-
-        BUS <--> A1
-        BUS <--> A2
-        BUS <--> A3
-        BUS <--> A4
-        BUS <--> A5
-        BUS <--> A6
-    end
-
-    CORE --> RESOLVED["Resolved Agent Outputs<br/>ActionCall | ToolCall"]
-
-    RESOLVED --> OG
-
-    subgraph OG["Output Gateway"]
-        VALIDATE["Validate"]
-        ROUTER["Execution Router"]
-        GHOST["Channel Scheduler"]
-        DISPATCH["Dispatch"]
-
-        VALIDATE --> ROUTER
-        ROUTER --> GHOST
-        ROUTER --> DISPATCH
-        GHOST --> DISPATCH
-    end
-
-    OG --> ACTIONS["Actions"]
-    OG --> TOOLS["Tools"]
-
-    ACTIONS --> WORLD
-
-    TOOLS --> RESULT["Execution Result Signal"]
-    ACTIONS --> RESULT
-    RESULT --> IG
-
-    MODELS["ModelKit: Data Processing<br/>ASR · TTS · LLM · VLM · JEV · CV · Embedding"]
-    PLATFORM["PlatformKit: Device / OS Data I/O<br/>Audio · Vision · Connectivity · Core"]
-
-    MODELS -.-> IG
-    MODELS -.-> CORE
-    MODELS -.-> ACTIONS
-
-    PLATFORM -.-> IG
-    PLATFORM -.-> ACTIONS
-    PLATFORM -.-> TOOLS
+    WORLD[External World] --> PLATFORM[PlatformKit device I/O]
+    PLATFORM --> APP[App adapters]
+    APP --> IG[InputGateway: validation / subscription / direct routing]
+    IG --> SP[SpeechPerception]
+    IG --> VP[VisionPerception]
+    IG --> A[Assistant]
+    IG --> P[Photographer]
+    SP --> M[ModelKit capabilities]
+    VP --> M
+    A --> M
+    SP --> OG[OutputGateway]
+    VP --> OG
+    A --> OG
+    P --> OG
+    OG --> BUS[AgentCore InternalSignalBus]
+    BUS --> IG
+    OG --> EX[Action / Tool runtimes]
+    EX --> ACTIONS[Actions / Tools]
+    ACTIONS --> M
+    ACTIONS --> PLATFORM
+    EX -->|ToolResult| IG
+    OG --> UI[App observation / Experience]
 ```
+
+Other sensor adapters, task Agents and robot control remain planned. ModelKit and PlatformKit are independent; App supplies conversion and service bindings. AgentCore declares transport/runtime contracts and does not depend on concrete Agents.
+
 
 ---
 
@@ -143,28 +87,16 @@ Typical signal types include:
 Conceptual Swift structure:
 
 ```swift
-struct Signal {
+// AgentCore owns the implemented unified input, independent of ModelKit.
+struct AgentInput {
     let id: UUID
-    let type: SignalType
-    let source: SignalSource
-    let timestamp: TimeInterval
-    let payload: SignalPayload
-    let metadata: SignalMetadata
+    let sessionID: UUID
+    let payload: InputPayload
+    let metadata: InputMetadata
 }
 ```
 
-```swift
-enum SignalPayload {
-    case text(String)
-    case audio(AudioBuffer)
-    case audioStream(AudioStream)
-    case image(ImageFrame)
-    case videoStream(VideoStream)
-    case sensor(SensorData)
-    case physical(PhysicalSignal)
-    case structured(StructuredData)
-}
-```
+Implemented payloads are text, runtime event, toolResult, image, audio and typed perception observation. Other sensor/physical payloads remain future work.
 
 Signals may be discrete or continuous streams.
 
@@ -172,125 +104,32 @@ Signals may be discrete or continuous streams.
 
 # 4. Input Gateway
 
-The **Input Gateway** is the sensory and input coordination layer of MobileHarness.
+InputGateway is a model-independent admission and routing boundary. It validates protocol envelopes, payload bounds, source/session/incarnation, deadlines and declared input support. PlatformKit owns capture and basic I/O conversion; App bridges frames into AgentCore transport.
 
-Its responsibilities are:
-
-```text
-Input Gateway
-├── Signal Acquisition
-├── Signal Adaptation
-├── Signal Normalization
-├── Modality Transformation
-├── Context Enrichment
-└── Signal Routing
-```
-
-## 4.1 Signal Acquisition
-
-Acquisition here means admission into the signal pipeline. Device capture, permissions and hardware lifecycles belong to PlatformKit, with App adapting the resulting data into Gateway input. InputGateway decides admission, sampling, normalization and routing; it does not own camera or microphone drivers.
-
-Typical sources include:
-
-```text
-Microphone
-Camera
-Keyboard
-File
-Sensors
-System Events
-Network
-External Device
-Internal Agent Signal
-Execution Result
-```
-
-## 4.2 Signal Adaptation
-
-Agents are not required to support every modality directly.
-
-The Input Gateway transforms signals when necessary.
-
-```text
-Audio Stream
-    ↓
-Input Gateway
-    ↓
-ASR
-    ↓
-Text Signal
-    ↓
-Assistant Agent
-```
-
-```text
-Video Stream
-    ↓
-Frame Sampling
-    ↓
-Image Signal
-    ↓
-Vision Agent
-```
-
-```text
-Force Sensor
-    ↓
-Filter / Normalize
-    ↓
-Physical Signal
-    ↓
-Control Agent
-```
-
-ASR, embedding, model-specific image preprocessing, inference and output decoding are provided by `ModelKit`. Gateway invokes these capabilities when its adaptation policy requires them.
-
-Basic I/O adaptation stays with PlatformKit: continuous capture PCM conversion, frame orientation metadata and a compact gray sample are examples. Gateway owns the grayscale comparison threshold and frame admission; ModelKit owns the model’s resize/crop, inference and pose decoding. Ownership follows the operation’s purpose, not whether it happens to calculate or transform bytes.
-
----
-
-# 5. Signal Routing
-
-The Input Gateway uses a hybrid routing mechanism.
-
-```text
-Signal
-  ↓
-Signal Router
-  ├── Logic / State Routing
-  ├── JEV / Judge Routing
-  └── Lightweight Agent / Small LLM Routing
-  ↓
-Agent(s)
-```
-
-Routing may depend on:
-
-- signal type;
-- signal source;
-- application context;
-- current Agent state;
-- Agent accepted input types;
-- deterministic rules;
-- JEV/Judge classification;
-- semantic intent;
-- system priority.
-
-One signal may fan out to multiple Agents.
+Perceptual transformations belong to Agents: SpeechPerception owns VAD/ASR segmentation and transcription; VisionPerception owns content-change selection and pose inference. Both use injected ModelKit capabilities. Gateway imports neither ModelKit nor PlatformKit.
 
 ```mermaid
 flowchart LR
-
-    VS["Video Signal"] --> IG["Input Gateway"]
-
-    IG --> VA["Vision Agent"]
-    IG --> TA["Tracking Agent"]
-    IG --> PA["Photography Agent"]
+    Platform[PlatformKit via App] --> InputGateway
+    InputGateway --> Speech[SpeechPerception: PCM to speech observations]
+    InputGateway --> Vision[VisionPerception: image to pose observations]
+    Speech --> OutputGateway
+    Vision --> OutputGateway
+    OutputGateway --> Bus[InternalSignalBus]
+    Bus --> InputGateway
+    InputGateway --> Assistant
+    InputGateway --> Photographer
 ```
 
-The router determines which Agent receives the signal.
+# 5. Signal Routing
 
-Task planning and execution remain inside the Agent layer.
+`publish` selects static JSON v4 subscribers by exact contract/source/topic. `send(to:)` selects an explicit Agent without a subscription; input support, authority, incarnation, session, capacity and deadline checks still apply. Tool results remain directed to their original Agent/session.
+
+`AgentInput` is the implemented shared Signal envelope, with content kind separated from source. It carries inputID/sessionID, contract/version, sequence, capture time, source incarnation, causal root/parent and a monotonic admission deadline. It supports raw bounded audio/image input and typed speech/pose observations without importing ModelKit.
+
+One publication can reach at most 16 Agents; each receives an admission result independently. Receiving does not imply processing or physical completion. Latest observations use explicitly coalescible channels; ordinary text/events, Actions and Tool results cannot be silently replaced.
+
+The existing SignalRouter/LogicRouter is only a policy-free compatibility seam. Production always installs CommunicationPolicy; missing subscriptions do not fall back to Assistant. Future JEV or model-assisted routing belongs in a separate Agent whose validated choice is executed by Gateway, not in a model-bearing Gateway router.
 
 ---
 
@@ -1234,55 +1073,19 @@ Tool Calls bypass Channel scheduling.
 
 # 32. Internal Agent Communication
 
-Agents communicate through typed internal signals, without references to other Agent implementations or shared mutable business state. The transport is process-local and asynchronous. It supports direct requests with one terminal reply and event publication to an explicit Agent or configured topic subscribers. Agent processing may use deterministic logic, models or tools; receiving a signal does not require model inference.
+✅ Event-only communication is implemented through bound AgentMessaging ports: OutputGateway → InternalSignalBus → InputGateway. Events are not XML, ActionCalls, ToolCalls or free-form control strings. Model text cannot set trusted source identity.
 
-## 32.1 Communication boundary
+JSON v4 declares inputs, exact static subscriptions, publishable contracts and direct-send permissions. App validates all declarations and provides one shared communication assembly with independently scoped voice/camera sessions. Source and receiver incarnations are checked; old instances are not retargeted.
 
-All Agent-originated messages pass through OutputGateway; all deliveries, replies and transport failures enter the receiving runtime through InputGateway. InternalSignalBus owns bounded transport, correlation, deadlines and delivery state. AgentCore declares transport ports; the App injects Gateway implementations to keep module dependencies acyclic.
+Discrete events use FIFO admission and a bounded 60-second duplicate window. Partial speech and pose states use per-source/incarnation/session/contract sequence records and latest pending slots. Limits are 128 live operations, 256 branches, 8 MiB retained payloads, 64 workers, 256 state channels and 16 recipients. Pose payloads allow 256 KiB/300 people, other observations 16 KiB. Photographer separately selects six people for display.
 
-```mermaid
-flowchart LR
-    A[Agent A business logic] --> Port[AgentContext messaging port]
-    Port --> OG[OutputGateway: identity and permission validation]
-    OG --> Bus[InternalSignalBus: bounded transport and request tracking]
-    Bus --> IG[InputGateway: destination and lifecycle validation]
-    IG --> B[Agent B business inbox]
-    B --> Reply[Single-use reply port]
-    Reply --> OG
-    IG --> Completion[Agent A runtime completion endpoint]
-    Completion --> A
-```
+Default admission deadlines are 10 seconds for discrete events, one second for pose and two seconds for partial speech; children cannot extend their parent deadline and no input lives beyond 60 seconds. Expiry prevents starting stale work; it does not truncate an already-started normal conversation reply. Cancellation closes admission and joins only the affected session.
 
-Function Token and native Tool Call remain the two model generation protocols. Internal communication is a typed runtime API, not XML syntax, an ActionCall, a ToolCall or a free-form control string. Models cannot provide trusted source identity or transport permissions. Agent logic may translate validated model intent into an authorized message, but no communication syntax is added to prompts by default.
+Receipts report accepted/rejected destinations, not execution completion. There is no automatic retry, persistence or exactly-once guarantee. Runtime speech observers are registered through OutputGateway and do not form a UI callback bypass from Agents.
 
-## 32.2 Message model and configuration
+Detailed algorithms, bounds and diagrams: [AgentCore/Bus](AgentCore/Bus/README.md). Decision: [ADR 0040](../docs/adr/0040-shared-perception-and-event-routing.md).
 
-An internal signal carries a runtime-issued message ID, trusted source/target Agent identities and incarnation IDs, session scope, causal root/parent IDs, an absolute monotonic deadline, hop count, a versioned event/operation name and a bounded structured payload. Replies correlate with a request ID and are bound to the original callee/caller. Every response has one terminal outcome: success, typed business failure or transport failure.
-
-Each Agent declares outgoing event/request permissions, accepted event/request schemas and static topic subscriptions. App composition validates both ends and creates immutable communication policy. These declarations belong in a future versioned Agent JSON schema; current JSON v3 remains unchanged until implementation. Wildcard addressing, dynamic subscriptions, arbitrary Swift objects and inline media are outside the initial scope.
-
-## 32.3 Routing and execution
-
-Requests require one explicit destination. Events use either one destination or a topic with a bounded immutable recipient snapshot. Topics do not broadcast to every Agent implicitly. SignalRouter resolves authorized recipients deterministically; InternalSignalBus tracks each selected delivery, and InputGateway validates destination capabilities/lifecycle immediately before inbox admission. Fan-out is best-effort with per-recipient acceptance/rejection, not an atomic broadcast.
-
-Sending acknowledges transport admission, not handling or side-effect completion. A request returns a cancellable handle after admission; awaiting its result is separate from sending. Replies enter a reserved runtime completion endpoint, bypassing the ordinary business inbox while still passing through InputGateway. Thus an Agent may await a result without blocking delivery of that result. Causal ancestry rejects cyclic nested requests; replies do not create another business turn automatically.
-
-## 32.4 Bounds, lifecycle and reliability
-
-All queues and tracking tables have explicit count/byte limits and reject new work when full. Delivery is FIFO per source/destination lane; different destinations may progress concurrently. Replies/cancellation/deadline handling have reserved state independent of full business queues. The design does not guarantee global order, reliable publication, persistence or exactly-once side effects.
-
-Within one process incarnation and the documented deduplication window, each delivery key is admitted to the destination inbox at most once. There is no automatic retransmission. Expired, cancelled or stale-incarnation messages are not replayed. Stop/session closure rejects new work, cancels related requests, invalidates reply ports and joins affected work. Cancellation is cooperative and cannot roll back already executed Actions.
-
-## 32.5 Status and implementation ownership
-
-- ✅ AgentManager registration/lifecycle and InputGateway directed/fan-out delivery provide foundations.
-- ✅ Detailed contracts, algorithms, capacities, diagrams and acceptance criteria are specified in [AgentCore/Bus](AgentCore/Bus/README.md#inter-agent-communication-design).
-- ❌ InternalSignalBus, messaging ports, request tracking, reply completion endpoints and communication configuration are not implemented.
-- ❌ Durable messaging, remote transport, dynamic discovery and streaming request replies are outside the initial implementation scope.
-
-The detailed design is authoritative for transport semantics. Create executable files only when implementing their stages; the Bus directory currently contains documentation only.
-
----
+❌ General request/reply, dynamic subscription, remote transport, channel takeover and ReflexAgent remain deferred. Physical safety cannot depend on the phone or this event transport.
 
 # 33. ModelKit
 
@@ -1400,7 +1203,7 @@ User says:
 “Look here and take a photo.”
 ```
 
-This is a target behavior example. The current Photographer supports pose perception; photo capture and the voice-driven photography sequence below are not implemented.
+This is a target behavior example. The current Photographer displays shared pose observations; photo capture and the voice-driven photography sequence below are not implemented.
 
 ```mermaid
 sequenceDiagram
@@ -1409,6 +1212,8 @@ sequenceDiagram
     participant App as App adapters
     participant IG as InputGateway
     participant M as ModelKit processing
+    participant SP as SpeechPerception
+    participant Bus as InternalSignalBus
     participant A as Photography Agent
     participant OG as OutputGateway
     participant ACT as Action Runtime / handlers
@@ -1417,9 +1222,13 @@ sequenceDiagram
     U->>P: Speech at microphone
     P->>App: Captured PCM
     App->>IG: Audio input
-    IG->>M: ASR processing request
-    M-->>IG: Transcript
-    IG->>A: Text signal
+    IG->>SP: Bounded PCM
+    SP->>M: VAD / ASR processing
+    M-->>SP: Transcript
+    SP->>OG: Publish final transcript
+    OG->>Bus: Validated event
+    Bus->>IG: Subscriber delivery
+    IG->>A: Final transcript observation (planned subscription)
     A->>M: Generation request
     M-->>A: Generated output
     A->>A: Parse Function Tokens and resolve capabilities
@@ -1522,15 +1331,9 @@ MobileHarness/
 ├── Gateway/
 │   ├── Input/
 │   │   ├── InputGateway.swift
-│   │   ├── Signal.swift
-│   │   ├── SignalType.swift
-│   │   ├── SignalAdapter.swift
-│   │   ├── ContextBuilder.swift
 │   │   └── Routing/
 │   │       ├── SignalRouter.swift
-│   │       ├── LogicRouter.swift
-│   │       ├── JEVRouter.swift
-│   │       └── AgenticRouter.swift
+│   │       └── LogicRouter.swift
 │   │
 │   └── Output/
 │       ├── OutputGateway.swift
@@ -1584,8 +1387,9 @@ MobileHarness/
 │
 ├── Agents/
 │   ├── Assistant/
-│   ├── Vision/
-│   ├── Photography/
+│   ├── SpeechPerception/
+│   ├── VisionPerception/
+│   ├── Photographer/
 │   ├── Tracking/
 │   ├── Media/
 │   └── Control/
@@ -1655,13 +1459,12 @@ MobileHarness/
 # 38. Core Interfaces
 
 ```swift
-struct Signal {
+// AgentCore owns the implemented unified input, independent of ModelKit.
+struct AgentInput {
     let id: UUID
-    let type: SignalType
-    let source: SignalSource
-    let timestamp: TimeInterval
-    let payload: SignalPayload
-    let metadata: SignalMetadata
+    let sessionID: UUID
+    let payload: InputPayload
+    let metadata: InputMetadata
 }
 ```
 
@@ -1726,7 +1529,7 @@ struct ToolCall {
 
 | Component | Responsibilities |
 |---|---|
-| Input Gateway | Signal admission, sampling/adaptation policy, normalization, context and routing; invokes model capabilities when needed |
+| Input Gateway | Protocol admission/validation, static subscriptions and directed routing; no model dependencies |
 | Agent | Business state and decisions, model capability requests, capability registration, prompt exposure, parsing and alias resolution |
 | Output Gateway | Output validation, Action/Tool routing, Channel scheduling, dispatch, result collection |
 | Actions | Executable behaviors |
@@ -1748,13 +1551,13 @@ struct ToolCall {
 | Organization | Audio / Vision / Connectivity, with Core shared contracts | Speech / Language / Vision, with Core and model assembly/runtime/backend support |
 | Excludes | Model inference, routing policy and Agent business decisions | Device capture/playback/control, routing policy and Agent business decisions |
 
-“Data processing” here means **model capability processing**, not every computation in the app. For example, PlatformKit samples camera luminance, Gateway compares the gray samples and decides whether to admit a frame, ModelKit infers pose, and Photographer decides how to publish that result. These are separate responsibilities even when each step touches the same image.
+“Data processing” here means **model capability processing**, not every computation in the app. For example, PlatformKit samples camera luminance, VisionPerception compares gray samples and calls ModelKit pose inference, then publishes an observation through both gateways; Photographer decides how to display it. These are separate responsibilities even when each step touches the same image.
 
 ## 39.2 Composition and ownership
 
 App connects the layers through data adapters and injected services. ModelKit and PlatformKit remain independent; AgentCore depends on neither. A model result does not directly cause a hardware action: Agent output passes through OutputGateway and the registered Action/Tool handler before a device service is invoked. ModelKit can also process existing in-memory data without any live hardware input.
 
-✅ The current camera flow follows PlatformKit acquisition → App adaptation → Gateway change admission → Photographer’s PoseCapability request → ModelKit pose result → Agent ActionCall → OutputGateway → UI handler → Experience overlay. Current speech similarly separates TTS synthesis from device playback.
+✅ The current camera flow follows PlatformKit acquisition → App adaptation → InputGateway → VisionPerception filtering/inference → OutputGateway/Bus/InputGateway → Photographer → UI Action → Experience overlay. Current speech similarly separates TTS synthesis from device playback.
 ❌ Concrete robot/device transports and the planned photo-capture Action are not implemented.
 
 ---
@@ -1850,7 +1653,7 @@ Every directory implementing queues, asynchronous workers or producer/consumer p
 
 Distinguish work queues, framing buffers, terminal signals and busy-reject admission. Actor isolation alone does not guarantee FIFO completion across suspension points. Document opaque third-party buffering as a limitation. Documentation changes alone do not alter runtime contracts.
 
-Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [voice input](Gateway/Input/README.md), [Action scheduling](Gateway/Output/Scheduling/README.md), [model streams and leases](ModelKit/Core/README.md), [audio capture/playback](PlatformKit/Audio/README.md), and [App task coordination](App/README.md). Model adapters and streaming parsers carry their own local descriptions.
+Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [speech perception](Agents/SpeechPerception/README.md), [Action scheduling](Gateway/Output/Scheduling/README.md), [model streams and leases](ModelKit/Core/README.md), [audio capture/playback](PlatformKit/Audio/README.md), and [App task coordination](App/README.md). Model adapters and streaming parsers carry their own local descriptions.
 
 ## ModelKit resource policy
 
@@ -1870,6 +1673,9 @@ Core owns shared media data contracts: AudioFormat/AudioFrame are implemented; i
 
 ✅ PlatformKit/Vision and Experience/Camera provide foreground camera capture and preview: normal launch defaults to front camera, mirrored on the front and natural on the back, with on/off and switch controls above a dimmed full-screen feed. App/CameraCoordinator owns scene intent independently of voice readiness. ✅ Changed camera frames now enter InputGateway and Photographer pose inference.
 
-✅ First camera pipeline: PlatformKit capture → Gateway grayscale filter → Photographer latest-image inbox → shared PoseCapability → Function Token / ActionCall → OutputGateway → UI.showPose → preview skeletons. See ADR 0036 for bounds and phase-one scope.
+✅ Current camera pipeline: PlatformKit → InputGateway → VisionPerception → OutputGateway/Bus/InputGateway → Photographer → UI.showPose. ADR 0040 supersedes the original ADR 0036 ownership split.
 
-Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.
+
+## Current perception migration
+
+✅ ADR 0040 replaces Gateway-owned model adaptation with two shared perception Agents. JSON v4 and event-only transport are implemented. ❌ Request/reply, ReflexAgent and physical-device acceptance remain deferred.

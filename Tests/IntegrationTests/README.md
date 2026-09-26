@@ -26,8 +26,9 @@ Update this README when adding or changing tests. Preserve ✅/❌ distinctions 
 
 ✅ Native-camera sampling fixtures cover padded rows and all four orientations. Sampled ImageInput tests verify unchanged threshold/baseline admission and malformed sample rejection; previous camera RGB-conversion fixtures were replaced with these current-path tests.
 
-✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.
 
-✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.
 
-✅ Vision migration: VisionPerceptionAgent owns filtering/inference and publishes shared pose observations; Photographer owns only display policy. App now uses one shared manager/bus/Gateway assembly with independent voice and camera sessions. ❌ Device acceptance remains outstanding.
+
+✅ CommunicationTests covers static/direct delivery, stale source ports, schema rejection, high-rate states, pending replacement, slow-target deadlines and independent scope close. VoiceTests exercises PCM → SpeechPerception → final observation; PhotographyPipelineTests verifies two subscribers share one inference and empty pose clears UI.
+
+Validation (2026-09-26): final scripts/check.sh passed, including 79 IntegrationTests, configuration and module-boundary checks. All four scripts/build-ios.sh simulator schemes passed; MobileHarnessSimulator was rebuilt after the final capture-gating fix. The unsigned MobileHarness device target built successfully. All four packaged Agent JSON resources are v4 and byte-identical to source. Original Technical_Design.docx is unchanged. Optional real-model evaluations were not enabled; no phone installation or continuous physical audio/camera/thermal acceptance was performed.

@@ -44,6 +44,20 @@ for target in package['targets']:
         names = [next(iter(d.values()))[0] for d in dependencies]
         if names != ['ModelKit']:
             errors.append('ModelKitRuntime must depend only on ModelKit')
+# Gateway is transport-only; AgentCore remains independent of models/platform/business.
+for module, forbidden in {
+    'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'PlatformKit'},
+    'AgentCore': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Gateway', 'Agents', 'PlatformKit', 'SwiftUI', 'UIKit', 'CoreVideo'},
+}.items():
+    for source in (ROOT / 'MobileHarness' / module).rglob('*.swift'):
+        for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+            if imported in forbidden or imported.startswith('ModelKit'):
+                errors.append(f'Forbidden {module} import {imported}: {source.relative_to(ROOT)}')
+    target = next(t for t in package['targets'] if t['name'] == module)
+    for dependency in target.get('dependencies', []):
+        name = next(iter(dependency.values()))[0]
+        if name in forbidden or name.startswith('ModelKit'):
+            errors.append(f'Forbidden {module} dependency: {name}')
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')

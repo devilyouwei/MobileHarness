@@ -32,7 +32,8 @@ public actor VisionPerceptionAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "VisionPerception")
         guard configuration.agentID == .visionPerception else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
-            id: configuration.agentID, name: "VisionPerception", inputs: [.image],
+            id: configuration.agentID, name: "VisionPerception",
+            inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.control], capabilities: configuration.capabilities)
         self.filter = FrameChangeFilter(configuration: try sampling ?? FrameChangeConfiguration())
         self.pose = pose

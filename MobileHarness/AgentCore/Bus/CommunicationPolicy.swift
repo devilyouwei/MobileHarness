@@ -58,6 +58,7 @@ public struct CommunicationPolicy: Sendable {
         var subscribers: [String: Int] = [:]
         for declaration in agents.values {
             try declaration.validate()
+            topics.formUnion(declaration.publications)
             for sub in declaration.subscriptions {
                 topics.insert(sub.topic)
                 subscribers[sub.topic, default: 0] += 1

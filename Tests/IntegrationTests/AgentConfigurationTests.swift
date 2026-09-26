@@ -5,7 +5,14 @@ import Testing
 
 private func document() -> [String: Any] {
     [
-        "schemaVersion": 4, "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
+        "schemaVersion": 4,
+        "communication": [
+            "inputs": [
+                ["contract": "user.text", "version": 1, "kind": "text"],
+                ["contract": "runtime.event", "version": 1, "kind": "event"],
+                ["contract": "tool.result", "version": 1, "kind": "toolResult"],
+            ], "subscriptions": [], "publications": [], "sends": [],
+        ],
         "agentID": "assistant", "channels": ["main"], "textActions": ["render"],
         "actions": [
             [

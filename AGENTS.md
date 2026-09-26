@@ -18,4 +18,4 @@ Use MobileHarness/README.md as the target technical plan. Migrate in stages; Imp
 
 - Shared Agent output parsers belong in AgentCore/Generation. Resolve aliases inside Agents; Gateway accepts resolved ActionCall/ToolCall. Tooling modules (parsers, schedulers, registries) require Mermaid design diagrams and design descriptions in their README.
 
-- Before adding or editing a business Agent, read MobileHarness/Agents/README.md. Declare actions, tools, channels and text mappings in its versioned <AgentName>.agent.json (JSON v3; see Agents/README.md); never duplicate production registration lists in Swift. Keep explicit implementation handlers in the composition root. Configuration errors must propagate without try! or fallback.
+- Before adding or editing a business Agent, read MobileHarness/Agents/README.md. Declare actions, tools, channels and text mappings in its versioned <AgentName>.agent.json (JSON v4; see Agents/README.md); never duplicate production registration lists in Swift. Keep explicit implementation handlers in the composition root. Configuration errors must propagate without try! or fallback.

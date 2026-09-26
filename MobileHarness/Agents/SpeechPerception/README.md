@@ -17,3 +17,5 @@ flowchart LR
 ✅ Endpoint recognition suppresses queued capture after the endpoint while replies play. This is explicit conversational capture gating, not an audio overflow policy. Overflow fails; no unbounded tasks. Stop cancels and joins ASR/VAD/worker before completing. Models remain resident.
 
 ❌ Barge-in, background listening and physical sustained speech acceptance of this migration.
+
+✅ Accepted input kinds derive from the JSON v4 communication snapshot; Swift retains handlers, not a duplicate production input registry.

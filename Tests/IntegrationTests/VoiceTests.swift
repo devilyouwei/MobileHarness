@@ -447,3 +447,27 @@ private actor EndpointVADSession: VoiceActivitySession {
     await bus.shutdown()
     await manager.stopAll()
 }
+
+@Test func speechRawAudioQueueRejectsOverflowAndExpiredInput() async throws {
+    let session = UUID()
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: session)
+    try await speech.bind(AgentMessaging { _, _, _ in DeliveryReport(delivered: [.assistant]) })
+    try await speech.start()
+    try await speech.pause()
+    for i: UInt64 in 0..<4 {
+        let audio = try AudioInput(samples: Data(repeating: 0, count: 64000), sequence: i, timestamp: Double(i))
+        try await speech.receive(AgentInput(sessionID: session, payload: .audio(audio)))
+    }
+    let payload = InputPayload.audio(try AudioInput(samples: Data(repeating: 0, count: 4), sequence: 4, timestamp: 4))
+    await #expect(throws: HarnessError.queueFull) {
+        try await speech.receive(AgentInput(sessionID: session, payload: payload))
+    }
+    let expired = AgentInput(
+        sessionID: session, payload: payload,
+        metadata: InputMetadata(payload: payload, deadline: .now.advanced(by: .seconds(-1))))
+    await #expect(throws: CommunicationError.expired) { try await speech.receive(expired) }
+    #expect(await speech.status().queuedInputs == 4)
+    await speech.stop()
+    #expect(await speech.status().queuedInputs == 0)
+}

@@ -34,4 +34,17 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. Photographer skeletons remain validated ActionCalls; no UI payload bypass exists.
 
-✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.
+
+## Typed event path
+
+✅ `messaging(for:)` returns a port bound to the current source incarnation. It validates outbound JSON v4 permissions, payload schema/size, session, parent deadline and hop count before bus admission. Limits are 16 concurrent emissions per source; each schema is bounded. Gateway creates source IDs/sequences, and expired ports cannot publish after replacement.
+
+```mermaid
+flowchart LR
+    Agent --> BoundPort --> Validate[Permission / payload / source / deadline]
+    Validate --> Bus[Independent event lanes]
+    Bus --> InputGateway
+    Validate --> Observer[Registered App speech observation endpoint]
+```
+
+The configured observer consumes only current speech state and has no unbounded queue. No recipients is an error unless a matching observer is registered. Event receipts report recipient admission, not Action or handler completion. ❌ Requests/replies and model-assisted routing are deferred.

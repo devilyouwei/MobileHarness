@@ -28,9 +28,10 @@ flowchart LR
 - ✅ [Capability](Capability/README.md): versioned configuration validation, local aliases, ActionPath, parameter rules, default Channels, and model-facing capability context.
 - ✅ [Generation](Generation/README.md): streaming FunctionTokenParser, ChannelParser, text-to-action mapping, sentence buffering, and complete native ToolCall parsing.
 - ✅ [Output](Output/README.md): ActionCall, ToolCall, ToolResult, AgentOutput, and trusted OutputEnvelope association.
-- ✅ [Bus communication design](Bus/README.md#inter-agent-communication-design): typed internal signals, Gateway ports, bounded transport, request/reply and lifecycle semantics; documentation only.
-- ❌ Generic AgentRuntime worker/mailbox container, AgentContext, StateStore, and InternalSignalBus. Assistant currently owns its bounded state and worker.
-- ❌ Unified Signal inputs and incremental native tool-call argument assembly.
+- ✅ [Bus](Bus/README.md): typed perception inputs, JSON v4 policy, bound messaging ports, bounded event delivery, latest states, deadlines and session cleanup.
+- ❌ Generic AgentRuntime worker/mailbox container, AgentContext, StateStore, and request/reply completion endpoints. Assistant currently owns its bounded state and worker.
+- ✅ AgentInput is the unified signal contract, with separate content/source and causal/temporal metadata.
+- ❌ Incremental native tool-call argument assembly.
 
 `AgentInput` and `ToolResult` remain shared contracts here to prevent circular dependencies. Root Package.swift compiles these sources directly; there is no duplicate Contracts/Protocol source tree. Runtime notifications remain separate in meaning from the two model output protocols.
 
@@ -42,6 +43,6 @@ Keep this README synchronized with changes to responsibilities, files, interface
 
 ✅ ImageInput now supports either bounded RGB or a 64×64 gray sample plus opaque Sendable ImageAttachment. AgentCore still imports neither ModelKit nor CoreVideo; App supplies the attachment resolver. Native inputs are bounded to 4 MP / 4096 per side.
 
-✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.
 
-✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.
+
+✅ AudioInput provides bounded Float32 16 kHz mono PCM independently of ModelKit; PerceptionObservation carries speech and up to 300-person pose results. No raw media is included in derived observations.

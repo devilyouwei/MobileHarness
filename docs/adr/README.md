@@ -30,3 +30,5 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 ✅ [ADR 0038](0038-yolo26-pose.md): pinned YOLO26n-Pose INT8 artifact replaces YOLOv8 with end-to-end decoding and no runtime fallback.
 
 ✅ [ADR 0039](0039-platform-capability-domains.md): PlatformKit capability domains, device I/O versus ModelKit data processing, and unchanged runtime ownership.
+
+- [0040 — Shared perception and event routing](0040-shared-perception-and-event-routing.md): implemented Gateway boundary, JSON v4 and bounded event-only transport; device acceptance pending.

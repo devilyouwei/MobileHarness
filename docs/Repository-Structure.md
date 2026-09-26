@@ -12,7 +12,7 @@
 | MobileHarness/Experience/Components | Xcode App target | 纯呈现圆环和字幕组件 |
 | MobileHarness/Experience/Diagnostics | Xcode App target | 显式 Kokoro 验证入口 |
 | MobileHarness/Experience/Conversation | Xcode App target | View 和 MainActor ViewModel；通过协调门面发出意图，不构造具体模型或 Agent |
-| MobileHarness/Gateway/Input | Gateway | InputGateway 输入与 ASR；Routing/LogicRouter 确定性路由 |
+| MobileHarness/Gateway/Input | Gateway | InputGateway 协议校验、静态订阅与定向投递；无 ModelKit 依赖 |
 | MobileHarness/Gateway/Output | Gateway | OutputGateway 协调；Validation 校验、Routing 分类、Dispatch 分发（Agent 内完成绑定） |
 | MobileHarness/AgentCore | AgentCore | 根层 Agent、Descriptor、输入与身份契约 |
 | MobileHarness/AgentCore/Runtime | AgentCore | Manager、Lifecycle 和 Status |
@@ -39,7 +39,7 @@
 
 根目录 Package.swift 直接映射这些路径，不复制源码、不再另建 Packages/HarnessKit 源码树。保留原有编译模块是因为它们已有独立测试价值，并可阻止 ModelKit 引用业务模块；这对应技术方案允许按测试和复用需求保留 Package 的例外。Xcode 的 HarnessKit product 仍作为 App 链接入口，名称不是物理目录。
 
-ModelKit 的物理父目录不等于全部文件属于同一 Swift target：Defaults、Management、Backends 和具体模型子树明确排除在基础 SDK target 外。ModelKitRuntime 只依赖 ModelKit，ModelKitCoreAI 封装 Apple CoreAI；ModelKit 无 AgentCore、Gateway、PlatformKit 或业务依赖。两套 Kit 按能力域组织，分别负责模型加工与设备输入输出；App 适配数据和注入服务，Gateway 与 Agent 分别承担输入策略和业务决策。
+ModelKit 的物理父目录不等于全部文件属于同一 Swift target：Defaults、Management、Backends 和具体模型子树明确排除在基础 SDK target 外。ModelKitRuntime 只依赖 ModelKit，ModelKitCoreAI 封装 Apple CoreAI；ModelKit 无 AgentCore、Gateway、PlatformKit 或业务依赖。两套 Kit 按能力域组织，分别负责模型加工与设备输入输出；App 适配数据和注入服务，Gateway 承担协议接纳和投递；感知 Agent 承担采样/模型加工策略，业务 Agent 承担任务决策。
 
 ## 新增和修改代码
 
@@ -55,7 +55,7 @@ ModelKit 的物理父目录不等于全部文件属于同一 Swift target：Defa
 
 初始目录迁移保留当时运行行为；当前双协议解析与 Channel 执行契约以 [ADR 0018](adr/0018-agent-protocols.md) 为准。AppRuntime 已拆为 AppContainer、AgentBootstrap、AppLifecycleCoordinator 和 ConversationViewModel。当前协调器仍承担前台语音会话编排；页面任务结束会停止当前运行。这些是现有阶段的限制，尚未实现技术方案中的完整长期运行服务与页面订阅分离。
 
-Camera 与 Photographer 初期感知已实现；Character、EventBus、完整 HybridRouter、完整跨模型调度及其他业务 Agent 尚未实现，不通过创建目录宣称完成。macOS 目前只有共享模块测试能力，没有 App target。
+Camera 与共享视觉感知已实现；Character、完整请求/回复、模型路由判断、完整跨模型调度及其他业务 Agent 尚未实现，不通过创建目录宣称完成。macOS 目前只有共享模块测试能力，没有 App target。
 
 模型层目录以 ADR 0006 为最新约定：Core 资源管理，Speech/ASR/Nemotron 模型算法和 capability，Backends/CoreAI 执行后端。Resources/Models/artifacts 为忽略 Git 的下载目录。已通过 AppContainer 的能力注入接入 App pipeline，参见 ADR 0007。
 
@@ -67,10 +67,10 @@ Camera 与 Photographer 初期感知已实现；Character、EventBus、完整 Hy
 | 范围 | 核对结果 |
 | --- | --- |
 | App、Experience | ✅ 现有入口、Conversation、Components 归位；AppBootstrap 等装配辅助文件与 Diagnostics 为现有功能扩展。✅ Camera 预览、控件与骨架覆盖；❌ Character 未实现 |
-| Gateway/Input | ✅ InputGateway、Routing/SignalRouter 协议及 LogicRouter 归位。❌ Signal/SignalType/SignalAdapter/ContextBuilder、JEVRouter/AgenticRouter 尚未实现，不把 AgentInput 冒充完整 Signal |
+| Gateway/Input | ✅ InputGateway、Routing/SignalRouter 协议及 LogicRouter 归位。✅ 统一使用 AgentCore.AgentInput；模型路由判断移至未来独立 Agent，不新增重复 Signal 或 Gateway 模型路由器 |
 | Gateway/Output | ✅ Validation、Routing、Dispatch、Scheduling/Channel 与 ChannelScheduler 归位。❌ 独立 GhostShellScheduler 未建，当前调度直接消费结构化调用 |
-| AgentCore | ✅ 根契约、Runtime、Capability、Generation、Output 归位；ActionPath、AgentLifecycle 名称一致；ChannelParser 已拆分。❌ AgentContext、AgentRuntime、State、Bus、独立 CapabilityAlias 未实现 |
-| Agents | ✅ Assistant、Photographer 与独立 JSON v3；❌ 其他业务 Agent 尚未实现 |
+| AgentCore | ✅ 根契约、Runtime、Capability、Generation、Output 归位；ActionPath、AgentLifecycle 名称一致；ChannelParser 已拆分。✅ Bus 事件通信已实现；❌ 通用 AgentContext、AgentRuntime、State、请求/回复与独立 CapabilityAlias 未实现 |
+| Agents | ✅ Assistant、Photographer、SpeechPerception、VisionPerception 与独立 JSON v4；❌ 其他业务 Agent 尚未实现 |
 | Actions / ActionRuntime | ✅ Display → UI、Say → Speak、Actions/Runtime → ActionRuntime、ActionCatalog → ActionRegistry，并提取 ActionExecutor。❌ ActionResult、其余行为模块未实现 |
 | Tools / ToolRuntime | ✅ System/RuntimeInfo 实现归位，ToolRegistry 与 ToolExecutor 分离。❌ 其他工具模块尚未实现 |
 | ModelKit | ✅ Core、Speech、Language、Vision、Defaults、Management 与 Backends；YOLO、Qwen35 等为独立 adapter target。❌ 其他视觉模型与 Embedding 未实现 |
@@ -91,7 +91,7 @@ See ADR 0021: PlatformKit/Audio now contains MicrophoneFrame and StreamingMonoPC
 
 ## Planned Agent communication directory
 
-`MobileHarness/AgentCore/Bus/README.md` contains the detailed communication design and is excluded from the AgentCore Swift target. This is a documentation-only directory: InternalSignalBus, messaging ports, tracking tables and request completion endpoints are not implemented. Gateway adapters belong in their existing Input/Output directories when implementation begins; AgentCore must not import Gateway. No placeholder Swift sources are added.
+`MobileHarness/AgentCore/Bus/README.md` contains the detailed communication design and is excluded from the AgentCore Swift target. InternalSignalBus, typed ports, policy and bounded event tracking are implemented; request completion endpoints remain deferred. Gateway adapters are in Input/Output; AgentCore never imports Gateway.
 
 ## Fixed local model resources
 
@@ -104,7 +104,7 @@ See ADR 0021: PlatformKit/Audio now contains MicrophoneFrame and StreamingMonoPC
 
 ✅ ModelKit/Vision/PoseCapability.swift belongs to base ModelKit; Vision/YOLO compiles separately as ModelKitYOLOPose. Core owns ImageFrame. Tests/YOLOPoseTests owns tests. ❌ Other Vision models remain unimplemented; camera/Photographer integration exists outside ModelKit.
 
-✅ PlatformKit/Vision owns AVFoundation hardware; Experience/Camera owns the native preview bridge and controls; App/CameraCoordinator owns scene intent and lifecycle. App/PhotographySession separately adapts native frames for CameraInputSession and InputGateway.
+✅ PlatformKit/Vision owns AVFoundation hardware; Experience/Camera owns the native preview bridge and controls; App/CameraCoordinator owns scene intent and lifecycle. App/PhotographySession adapts native frames for shared InputGateway → VisionPerception → Photographer delivery.
 
 ✅ Agents/Photographer owns 摄像师 phase-one policy and v3 JSON; Gateway/Input/FrameChangeFilter owns sampling; Actions/UI/ShowPose owns side effects. AgentCore ImageInput/PoseOverlay are dependency-free transport contracts; App adapts PlatformKit CameraFrame into a native ModelKit ImageFrame carried by an opaque AgentCore attachment; AgentCore imports neither Kit.
 
@@ -112,3 +112,7 @@ See ADR 0021: PlatformKit/Audio now contains MicrophoneFrame and StreamingMonoPC
 
 ✅ PlatformKit/Camera → Vision、Device → Core、ExternalDevice → Connectivity；Audio 保留共享采集/播放实现。一级按能力域组织，Core 为跨域契约例外，域内文件少时平铺。ModelKit 同样按能力组织，负责模型数据处理；PlatformKit 负责设备输入输出，App 负责桥接。类型名、模块依赖和运行契约不变。此条更新覆盖上面的历史迁移阶段描述。见 ADR 0039。
 ❌ 新设备实现和按设备拆分子目录只在实际需要时添加，不创建空实现。
+
+## ADR 0040 additions
+
+✅ AgentCore/Bus now compiles typed communication contracts, policy and bounded event transport. SpeechPerception owns LiveSpeechInput/VoiceActivitySegmenter; VisionPerception owns FrameChangeFilter and pose inference. ApplicationRuntime (in AgentBootstrap.swift) shares manager/bus/gateways before voice readiness. ❌ General request/reply and ReflexAgent are future work.

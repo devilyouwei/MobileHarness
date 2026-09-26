@@ -35,7 +35,7 @@ let package = Package(
                 "Runtime/README.md",
             ]),
         .target(
-            name: "Gateway", dependencies: ["AgentCore", "ActionRuntime", "ToolRuntime", "ModelKit"],
+            name: "Gateway", dependencies: ["AgentCore", "ActionRuntime", "ToolRuntime"],
             path: "MobileHarness/Gateway",
             exclude: [
                 "Input/README.md", "Input/Routing/README.md", "Output/Dispatch/README.md", "Output/README.md",

@@ -148,7 +148,7 @@ Unified-expression validation: root checks passed, including 56 integration test
 
 ✅ High-level architecture and detailed algorithms are specified in section 32 and AgentCore/Bus/README.md.
 
-❌ Implement typed contracts and a versioned communication policy, bounded Gateway-mediated event delivery, then request/reply completion slots, causal limits and lifecycle cancellation. Integrate AgentContext and two business handlers only after deterministic queue/deadline/race tests pass. Current JSON v3 and the running single-Assistant configuration remain unchanged.
+✅ JSON v4, typed event contracts, static subscriptions/direct sends, bounded state/discrete delivery and lifecycle fencing are implemented by ADR 0040. ❌ Request/reply completion slots and generic AgentContext supervision remain deferred.
 
 Acceptance requires no blocked reply behind its waiting requester, no unbounded transport or control queue, explicit partial fan-out failure, stale-incarnation rejection and joined cleanup. Persistence, remote transport, automatic retry and streaming replies are outside initial scope.
 
@@ -233,8 +233,13 @@ Validation (2026-09-26): root scripts/check.sh passed, including 69 IntegrationT
 ✅ Current entry, architecture, repository layout, contribution guidance and App/Gateway/Actions/Experience/model READMEs distinguish PlatformKit device I/O from ModelKit processing. Stale image/camera status and App-owned model registration descriptions were corrected against current code. Historical ADRs, validation evidence and original design sources are preserved.
 ❌ No new runtime behavior or physical-device acceptance is implied by this documentation update.
 
-Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.
 
-✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.
 
-✅ Vision migration: VisionPerceptionAgent owns filtering/inference and publishes shared pose observations; Photographer owns only display policy. App now uses one shared manager/bus/Gateway assembly with independent voice and camera sessions. ❌ Device acceptance remains outstanding.
+
+## Shared perception and pure Gateway (ADR 0040)
+
+✅ SpeechPerception owns ASR/VAD; VisionPerception owns image-content filtering and shared YOLO inference. Photographer consumes poses and applies UI policy. AgentCore defines transport-only audio and typed observations. Gateway imports no model/platform capability module.
+✅ Shared App communication assembly, JSON v4 permissions/subscriptions, directed events, bounded latest-state/discrete lanes, monotonic admission deadlines, per-target receipts and independent voice/camera cleanup.
+❌ Device continuous voice/camera behavior and latency/thermal acceptance remain pending. Future face/depth/tracking/ReflexAgent work requires separate sampling and control-arbitration design; no robot safety or motion behavior was added.
+
+Validation (2026-09-26): final scripts/check.sh passed, including 79 IntegrationTests, configuration and module-boundary checks. All four scripts/build-ios.sh simulator schemes passed; MobileHarnessSimulator was rebuilt after the final capture-gating fix. The unsigned MobileHarness device target built successfully. All four packaged Agent JSON resources are v4 and byte-identical to source. Original Technical_Design.docx is unchanged. Optional real-model evaluations were not enabled; no phone installation or continuous physical audio/camera/thermal acceptance was performed.

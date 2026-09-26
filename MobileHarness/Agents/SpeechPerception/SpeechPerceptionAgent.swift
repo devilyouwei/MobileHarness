@@ -34,7 +34,8 @@ public actor SpeechPerceptionAgent: Agent {
         self.vad = vad
         self.sessionID = sessionID
         descriptor = AgentDescriptor(
-            id: configuration.agentID, name: "Speech Perception", inputs: [.audio],
+            id: configuration.agentID, name: "Speech Perception",
+            inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.control], capabilities: configuration.capabilities)
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
         outputs = stream.stream

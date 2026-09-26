@@ -69,7 +69,8 @@ public actor OutputGateway {
         } else {
             guard declaration.publications.contains(observation.contract) else { throw CommunicationError.unauthorized }
         }
-        guard parent.metadata.hops < 8 else { throw CommunicationError.hopLimitExceeded }
+        guard (0..<8).contains(parent.metadata.hops) else { throw CommunicationError.hopLimitExceeded }
+        guard !parent.metadata.expired else { throw CommunicationError.expired }
         sequences[source, default: 0] += 1
         let payload = InputPayload.observation(observation)
         let input = AgentInput(
@@ -77,7 +78,13 @@ public actor OutputGateway {
             metadata: InputMetadata(
                 payload: payload, source: source.rawValue, incarnation: incarnation,
                 capturedAt: parent.metadata.capturedAt, sequence: sequences[source]!, rootID: parent.metadata.rootID,
-                parentID: parent.id, hops: parent.metadata.hops + 1))
+                parentID: parent.id, hops: parent.metadata.hops + 1,
+                deadline: min(
+                    parent.metadata.deadline,
+                    .now.advanced(
+                        by: .seconds(
+                            observation.contract == "vision.pose"
+                                ? 1 : observation.contract == "speech.partial" ? 2 : 10)))))
         let destinations = target.map { [$0] } ?? policy.destinations(for: input)
         let observed = target == nil && observedContracts.contains(observation.contract) && observeEvent != nil
         guard !destinations.isEmpty || observed else { throw CommunicationError.noRecipients }

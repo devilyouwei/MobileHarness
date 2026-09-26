@@ -26,7 +26,7 @@ public actor AssistantAgent: Agent {
         guard configuration.agentID == .assistant else { throw AgentConfigurationError.identityMismatch }
         guard !configuration.textActions.isEmpty else { throw AgentConfigurationError.invalidField("textActions") }
         descriptor = AgentDescriptor(
-            id: configuration.agentID, name: "Assistant", inputs: [.text, .event, .toolResult, .observation],
+            id: configuration.agentID, name: "Assistant", inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.actionCall, .toolCall, .control], capabilities: configuration.capabilities)
         textActions = configuration.textActions
         precondition(capacity > 0)

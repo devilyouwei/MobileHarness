@@ -15,6 +15,6 @@
 
 当前生产语音由 PlatformKit 采集麦克风 PCM，ModelKit 的 Nemotron/Silero 处理识别与 VAD；系统 TTS adapter 导出 PCM，由 PlatformKit 播放。旧 Apple ASR 联网调试路径不属于当前默认装配。麦克风在用户开始语音交互时申请权限；相机在正常前台启动时独立申请权限并默认使用前置摄像头。App 协调前后台，平台 adapter 处理设备中断与释放。
 
-PlatformKit 的职责是设备/系统数据输入输出及必要格式适配；ModelKit 负责模型前处理、推理与后处理。是否接纳帧由 Gateway 决定，摄影业务决策由 Agent 承担，UI 预览和覆盖层由 Experience 呈现。两套 Kit 不互相依赖，App 提供数据适配与服务注入。Connectivity 目前只有传输契约，尚无真实机器人控制实现。
+PlatformKit 的职责是设备/系统数据输入输出及必要格式适配；ModelKit 负责模型前处理、推理与后处理。协议接纳由 Gateway 决定，内容筛帧和模型调用由感知 Agent 决定，摄影业务决策由 Photographer 承担，UI 预览和覆盖层由 Experience 呈现。两套 Kit 不互相依赖，App 提供数据适配与服务注入。Connectivity 目前只有传输契约，尚无真实机器人控制实现。
 
 依据（2026-09-22 查阅）：[Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)，[Background Tasks](https://developer.apple.com/documentation/backgroundtasks)。具体接入时按对应 SDK 文档核实。

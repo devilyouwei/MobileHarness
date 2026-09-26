@@ -22,7 +22,7 @@ Default channels are registration metadata. When natural text maps to multiple A
 
 ## Versioned configuration algorithm
 
-AgentConfiguration accepts bounded Foundation Data, not Bundle or application dependencies. JSON v3 input is limited to 64 KiB. It rejects missing/unknown fields, invalid types/versions, duplicate arrays, required/optional overlap and invalid text mappings. Resource discovery belongs to Agents/AgentConfigurations. Tests use this same validation path; production Agents must not add hardcoded registration fallbacks.
+AgentConfiguration accepts bounded Foundation Data, not Bundle or application dependencies. JSON v4 input is limited to 64 KiB. It rejects missing/unknown fields, invalid types/versions, duplicate arrays, required/optional overlap and invalid text mappings. Resource discovery belongs to Agents/AgentConfigurations. Tests use this same validation path; production Agents must not add hardcoded registration fallbacks.
 
 The loader parses XML/text Action examples using FunctionTokenParser, then resolves them against the registry. This validates syntax and call structure, not execution-time value constraints. See the canonical [Function Token definition](../Generation/README.md#terminology) and [Agent configuration standard](../../Agents/README.md).
 
@@ -37,7 +37,7 @@ flowchart LR
     Mapping --> Error
 ```
 
-✅ JSON v3 uses doc for usage guidance, XML strings for Action examples, native JSON strings for Tool examples, and hidden with a default of false. Only visible Action declarations/docs/examples enter system context. Hidden registrations and automatic text mappings remain functional.
+✅ JSON v4 uses doc for usage guidance, XML strings for Action examples, native JSON strings for Tool examples, and hidden with a default of false. Only visible Action declarations/docs/examples enter system context. Hidden registrations and automatic text mappings remain functional.
 
 ✅ Tools remain registered and resolvable independently; their aliases, parameter guidance, docs and examples never enter CapabilityContextBuilder output, regardless of hidden.
 
@@ -47,4 +47,5 @@ Update this README when changing files, validation or configuration semantics. �
 
 ✅ resolveAction returns ActionCall; resolved-call validation checks its ActionPath, effective channel and parameter names against the Agent registry.
 
-✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.
+
+✅ JSON v4 requires communication inputs, subscriptions, publications and sends; nested fields are strictly validated. App validates the closed cross-Agent policy before creating runtime consumers. Agent descriptors derive accepted kinds from the configuration. ❌ Request/reply schemas and dynamic policy updates remain deferred.

@@ -8,6 +8,8 @@ public actor PhotographerAgent: Agent {
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let sessionID: UUID
     private var lifecycle: AgentLifecycle = .registered
+    public private(set) var replacements = 0
+    public private(set) var expiredInputs = 0
     private var pending: AgentInput?
     private var worker: Task<Void, Never>?
     private var lastSequence: UInt64?
@@ -20,7 +22,8 @@ public actor PhotographerAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
-            id: configuration.agentID, name: "Photographer", inputs: [.observation],
+            id: configuration.agentID, name: "Photographer",
+            inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.actionCall, .control], capabilities: configuration.capabilities)
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
@@ -61,6 +64,7 @@ public actor PhotographerAgent: Agent {
         guard !input.metadata.expired else { throw CommunicationError.expired }
         lastSequence = image.sequence
         lastTimestamp = image.timestamp
+        if pending != nil { replacements += 1 }
         pending = input  // Explicit newest-frame replacement, never applied to Action/Tool outputs.
         drain()
     }
@@ -76,7 +80,10 @@ public actor PhotographerAgent: Agent {
         }
         do {
             guard case .observation(.pose(let image)) = input.payload else { throw HarnessError.unsupportedInput }
-            guard !input.metadata.expired else { return }
+            guard !input.metadata.expired else {
+                expiredInputs += 1
+                return
+            }
             let people = try image.people.prefix(6).map { person in
                 guard person.count == 17 else { throw CommunicationError.invalidPayload }
                 return try person.enumerated().map { index, point in

@@ -49,6 +49,8 @@ public actor InternalSignalBus {
     private var operations: [UUID: Operation] = [:]
     private var lanes: [AgentID: [Job]] = [:]
     private var workers: [AgentID: Task<Void, Never>] = [:]
+    private var activeJobs: [AgentID: Job] = [:]
+    private var activeDeliveries: [AgentID: Task<Void, Error>] = [:]
     private var stateSequences: [String: UInt64] = [:]
     private var discrete: [UUID: ContinuousClock.Instant] = [:]
     private var sessions = Set<UUID>()
@@ -58,6 +60,19 @@ public actor InternalSignalBus {
     public private(set) var replacements = 0
     public private(set) var expirations = 0
 
+    public struct Snapshot: Sendable {
+        public let operations: Int
+        public let branches: Int
+        public let retainedBytes: Int
+        public let stateChannels: Int
+        public let discreteRecords: Int
+        public let activeSessions: Int
+    }
+    public func snapshot() -> Snapshot {
+        Snapshot(
+            operations: operations.count, branches: branches, retainedBytes: bytes,
+            stateChannels: stateSequences.count, discreteRecords: discrete.count, activeSessions: sessions.count)
+    }
     public init(deliver: @escaping Delivery) { self.deliver = deliver }
     public func openSession(_ id: UUID) throws {
         guard !closed else { throw CommunicationError.scopeClosed }
@@ -81,6 +96,7 @@ public actor InternalSignalBus {
             branches + targets.count <= 256, bytes + size * targets.count <= 8 * 1024 * 1024,
             observation.isState || discrete.count + operations.count < 1024
         else { throw CommunicationError.capacityExceeded }
+        guard Set(workers.keys).union(targets.map(\.0)).count <= 64 else { throw CommunicationError.capacityExceeded }
         var jobs: [Job] = []
         var newKeys = Set<String>()
         for (target, incarnation) in targets {
@@ -134,13 +150,29 @@ public actor InternalSignalBus {
                 guard !closed, sessions.contains(job.input.sessionID), !Task.isCancelled else {
                     throw CommunicationError.scopeClosed
                 }
-                guard !job.input.metadata.expired else {
-                    expirations += 1
-                    throw CommunicationError.expired
+                guard !job.input.metadata.expired else { throw CommunicationError.expired }
+                activeJobs[target] = job
+                let task = Task { [deliver] in
+                    try await withThrowingTaskGroup(of: Void.self) { group in
+                        group.addTask { try await deliver(job.input, target, job.incarnation) }
+                        group.addTask {
+                            try await Task.sleep(until: job.input.metadata.deadline, clock: .continuous)
+                            throw CommunicationError.expired
+                        }
+                        defer { group.cancelAll() }
+                        try await group.next()
+                    }
                 }
-                try await deliver(job.input, target, job.incarnation)
+                activeDeliveries[target] = task
+                try await task.value
+                guard sessions.contains(job.input.sessionID), !closed else { throw CommunicationError.scopeClosed }
                 settle(job, error: nil)
-            } catch { settle(job, error: String(describing: error)) }
+            } catch {
+                if error as? CommunicationError == .expired { expirations += 1 }
+                settle(job, error: String(describing: error))
+            }
+            activeJobs[target] = nil
+            activeDeliveries[target] = nil
         }
         workers[target] = nil
         lanes[target] = nil
@@ -170,17 +202,14 @@ public actor InternalSignalBus {
             for job in removed { settle(job, error: "scopeClosed") }
         }
         stateSequences = stateSequences.filter { !$0.key.contains("|\(session)|") }
-        // Join only branches still executing for this session, without cancelling other sessions.
-        let targets = Set(
-            operations.values.filter { $0.input.sessionID == session }.flatMap { operation in
-                workers.keys.filter { operation.rejected[$0] == nil && !operation.delivered.contains($0) }
-            })
-        let tasks = targets.compactMap { workers[$0] }
-        for task in tasks { await task.value }
+        let tasks = activeJobs.filter { $0.value.input.sessionID == session }.compactMap { activeDeliveries[$0.key] }
+        for task in tasks { task.cancel() }
+        for task in tasks { _ = await task.result }
     }
     public func shutdown() async {
         closed = true
         let tasks = Array(workers.values)
+        for task in activeDeliveries.values { task.cancel() }
         for task in tasks { task.cancel() }
         for task in tasks { await task.value }
         stateSequences.removeAll()

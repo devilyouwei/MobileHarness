@@ -45,7 +45,7 @@ check.sh runs formatting, Swift Testing and configuration validation. build-ios.
 | MobileHarness.xcodeproj | App targets and schemes |
 | MobileHarness/App | Entry, composition, AgentBootstrap and lifecycle coordination |
 | MobileHarness/Experience | Conversation view/model, voice circle/captions and explicit model diagnostics |
-| MobileHarness/Gateway/Input | Unified input, voice adaptation and signal routing |
+| MobileHarness/Gateway/Input | Model-independent input validation, subscriptions and directed routing |
 | MobileHarness/Gateway/Output | Validation, execution routing, dispatch and bounded channel scheduling |
 | MobileHarness/AgentCore | Agent contracts, capabilities, Function Token parsing, runtime and ActionCall/ToolCall/ToolResult |
 | MobileHarness/Agents | Capability-driven business Agents and JSON registrations |
@@ -77,7 +77,7 @@ Queue algorithms, capacities, overflow policies and cancellation flows belong in
 
 See [Architecture](docs/Architecture.md), [ModelKit](MobileHarness/ModelKit/README.md), [Roadmap](docs/Roadmap.md), [Contributing](CONTRIBUTING.md) and [platform boundaries](docs/Platform-Boundaries.md). Preserve docs/Technical_Design.docx as the original design source. Keep documentation aligned with current names and behavior.
 
-The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#inter-agent-communication-design) specifies the planned bounded event/request transport through both gateways. The Bus directory contains documentation only and its README is excluded from SwiftPM compilation.
+The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#inter-agent-communication-design) specifies the planned bounded event/request transport through both gateways. The Bus directory implements event-only transport; its README is excluded from compilation. Request/reply remains deferred.
 
 ✅ ModelKitRuntime provides the shared ModelManager: typed capability get, registration lookup, bounded shared loading, unload barriers and terminal shutdown. See [lifecycle design](MobileHarness/ModelKit/Management/README.md). ❌ Timed idle eviction and physical-device retry acceptance remain outstanding.
 
@@ -89,10 +89,9 @@ The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#int
 
 ✅ Normal startup requests front-camera preview behind a translucent black overlay, voice orb and captions. Camera controls switch front/back or stop capture; off is black. Camera preview and perception are independent of microphone activation and voice model readiness.
 
-✅ Camera frames now pass a configurable Gateway grayscale-change filter (default 3%) to Photographer. It runs shared YOLO Pose once per accepted latest frame and emits UI.showPose through the action pipeline; green skeletons overlay the preview. ❌ Robot-arm control, composition/tracking behavior and device quality acceptance remain outstanding.
+✅ Camera frames now pass a configurable VisionPerception grayscale-change filter (default 3%) to Photographer. It runs shared YOLO Pose once per accepted latest frame and emits UI.showPose through the action pipeline; green skeletons overlay the preview. ❌ Robot-arm control, composition/tracking behavior and device quality acceptance remain outstanding.
 
-Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.
 
-✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.
 
-✅ Vision migration: VisionPerceptionAgent owns filtering/inference and publishes shared pose observations; Photographer owns only display policy. App now uses one shared manager/bus/Gateway assembly with independent voice and camera sessions. ❌ Device acceptance remains outstanding.
+
+✅ Shared perception migration: SpeechPerception owns VAD/ASR and VisionPerception owns camera selection/pose inference. JSON v4 routes observations through OutputGateway → InternalSignalBus → InputGateway; Photographer consumes poses and Assistant consumes final speech. Gateway has no ModelKit dependency. Voice and camera share the App communication assembly with independent sessions. See [ADR 0040](docs/adr/0040-shared-perception-and-event-routing.md). ❌ Physical-device continuous operation acceptance remains pending.

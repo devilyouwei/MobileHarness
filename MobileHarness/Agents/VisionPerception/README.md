@@ -16,3 +16,5 @@ flowchart LR
 ✅ Stop cancels and joins inference; expired results are not published. The result is a bounded typed observation, not UI JSON. Photographer alone selects six people and quantizes display coordinates.
 
 ❌ Face detection, tracking, depth, robot control, collision sampling guarantees and device acceptance of this migration.
+
+✅ Accepted input kinds derive from the JSON v4 communication snapshot; Swift retains handlers, not a duplicate production input registry.

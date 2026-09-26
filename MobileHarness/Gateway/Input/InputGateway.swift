@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 
 public actor InputGateway {
+    private var activeAdmissions = 0
     private let policy: CommunicationPolicy?
     private let manager: AgentManager
     private let router: any SignalRouter
@@ -28,7 +29,23 @@ public actor InputGateway {
             AgentID(rawValue: input.metadata.source), incarnation: sourceIncarnation, sessionID: input.sessionID)
         try await manager.validate(target, incarnation: incarnation, sessionID: input.sessionID)
         let agent = try await manager.agent(target)
+        try await manager.validate(target, incarnation: incarnation, sessionID: input.sessionID)
+        try validatePayload(input)
+        try Task.checkCancellation()
         try await agent.receive(input)
+    }
+    private func validatePayload(_ input: AgentInput) throws {
+        guard !input.metadata.expired else { throw CommunicationError.expired }
+        guard input.metadata.contract == InputMetadata(payload: input.payload).contract,
+            input.metadata.version == 1, input.metadata.hops >= 0, input.metadata.hops <= 8,
+            input.metadata.capturedAt.isFinite, input.metadata.capturedAt >= 0
+        else { throw CommunicationError.invalidPayload }
+        switch input.payload {
+        case .observation(let value): _ = try value.validatedSize()
+        case .text(let value): guard value.utf8.count <= 4096 else { throw CommunicationError.invalidPayload }
+        case .event(let value): guard value.utf8.count <= 16384 else { throw CommunicationError.invalidPayload }
+        default: break
+        }
     }
     public func publish(_ input: AgentInput) async throws -> DeliveryReport {
         guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
@@ -39,7 +56,11 @@ public actor InputGateway {
         return try await deliver(input, targets: [target])
     }
     private func deliver(_ input: AgentInput, targets: [AgentID]) async throws -> DeliveryReport {
-        guard !input.metadata.expired else { throw CommunicationError.expired }
+        try validatePayload(input)
+        guard activeAdmissions < 128 else { throw CommunicationError.capacityExceeded }
+        activeAdmissions += 1
+        defer { activeAdmissions -= 1 }
+        guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
         guard ["user", "phone.microphone", "phone.camera", "runtime"].contains(input.metadata.source) else {
             throw CommunicationError.unauthorized
         }
@@ -73,7 +94,14 @@ public actor InputGateway {
     /// Fan-out is best-effort; one rejected destination does not suppress delivery to others.
     public func submit(_ input: AgentInput, to target: AgentID? = nil) async throws -> DeliveryReport {
         let destinations: [AgentID]
-        if let target { destinations = [target] } else { destinations = try await router.destinations(for: input) }
+        if let target {
+            destinations = [target]
+        } else if let policy {
+            destinations = policy.destinations(for: input)
+        } else {
+            destinations = try await router.destinations(for: input)
+        }
+        guard !destinations.isEmpty else { throw CommunicationError.noRecipients }
         return try await deliver(input, targets: destinations)
     }
 }

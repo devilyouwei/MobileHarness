@@ -22,4 +22,5 @@ stop 仍是现有 Agent 的终态，恢复需新实例；pause 只阻止领取�
 
 ✅ 生命周期枚举与文件名统一为 AgentLifecycle / AgentLifecycle.swift。
 
-✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.
+
+✅ Registration issues an incarnation UUID with optional session binding. Stop invalidates identity before joining the Agent; remove allows a freshly constructed replacement only after cleanup. Speech/camera session instances are isolated; generic restart/factory supervision remains unimplemented.

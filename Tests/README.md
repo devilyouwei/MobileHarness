@@ -13,3 +13,5 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ IntegrationTests/PhotographyPipelineTests exercises the new camera-to-Photographer-to-UI action pipeline with injected model doubles; native camera/device visual quality still requires device acceptance.
 
 ✅ test_model_download.py contains offline ZIP hash/member/path/symlink and replacement-preservation tests, invoked by scripts/check.sh. YOLOPoseTests use the new end-to-end model/output contract.
+
+✅ Integration coverage includes shared inference, v4 policy, event bounds, latest-state replacement, deadlines and independent session cleanup. VAD boundary tests import Agents; model adapter tests remain separate.
