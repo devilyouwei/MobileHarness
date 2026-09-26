@@ -101,3 +101,9 @@ See ADR 0021: PlatformKit/Audio now contains MicrophoneFrame and StreamingMonoPC
 ✅ Root Package.swift owns all project targets. Qwen35Tests and AgentModelEvaluationTests are separate root test targets. ModelKit has no nested package or in-module tests.
 
 ✅ ModelKit/Core owns common media data, including AudioFrame/AudioFormat. ❌ Image/video contracts await concrete capability requirements; no placeholder implementation is present.
+
+✅ ModelKit/Vision/PoseCapability.swift belongs to base ModelKit; Vision/YOLO compiles separately as ModelKitYOLOPose. Core owns ImageFrame. Tests/YOLOPoseTests owns tests. ❌ Other Vision models and camera/Agent modules remain unimplemented.
+
+✅ PlatformKit/Camera owns AVFoundation hardware; Experience/Camera owns the native preview bridge and controls; App/CameraCoordinator owns scene intent and lifecycle. No camera-to-Gateway adapter is added in this preview-only stage.
+
+✅ Agents/Photographer owns 摄像师 phase-one policy and v3 JSON; Gateway/Input/FrameChangeFilter owns sampling; Actions/UI/ShowPose owns side effects. AgentCore ImageInput/PoseOverlay are dependency-free transport contracts; PlatformKit CameraFrame is converted at App boundary.

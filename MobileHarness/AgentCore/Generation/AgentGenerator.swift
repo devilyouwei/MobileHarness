@@ -11,7 +11,7 @@ public struct AgentGenerator: Sendable {
     private var closed = false
 
     public init(capabilities: CapabilityRegistry, textActions: [String]) throws {
-        guard !textActions.isEmpty, textActions.count <= 8, Set(textActions).count == textActions.count,
+        guard textActions.count <= 8, Set(textActions).count == textActions.count,
             textActions.allSatisfy({ alias in capabilities.actions.contains { $0.alias == alias } })
         else { throw GenerationError.unknownCapability }
         self.capabilities = capabilities
@@ -54,6 +54,9 @@ public struct AgentGenerator: Sendable {
         for token in tokens {
             switch token {
             case .text(let text, let channel):
+                guard !textActions.isEmpty || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw GenerationError.unknownCapability
+                }
                 if channel != textChannel {
                     result += try flush()
                     textChannel = channel

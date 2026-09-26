@@ -1809,3 +1809,9 @@ Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [v
 Core owns shared media data contracts: AudioFormat/AudioFrame are implemented; image/video values will be added when required by a concrete capability. Device I/O, model-specific tensors and business routing stay outside these value types.
 
 ✅ ModelKitDefaults.manager(resources:) returns the process-wide manager. Concurrent calls share assembly and provider instances; conflicting resource roots fail. Construction/registration are assembly SPI. Each model admits one active operation, rejects overlap with inputBusy, and releases admission only after cleanup. Cross-model scheduling is not implemented.
+
+✅ ModelKit/Vision now implements PoseCapability and the independent YOLO adapter. Core/ImageFrame carries bounded upright RGB8 data; `.pose` is a default manager binding. ✅ Photographer integrates the camera and pose capability through both gateways.
+
+✅ PlatformKit/Camera and Experience/Camera provide foreground camera capture and preview: normal launch defaults to front camera, mirrored on the front and natural on the back, with on/off and switch controls above a dimmed full-screen feed. App/CameraCoordinator owns scene intent independently of voice readiness. ✅ Changed camera frames now enter InputGateway and Photographer pose inference.
+
+✅ First camera pipeline: PlatformKit capture → Gateway grayscale filter → Photographer latest-image inbox → shared PoseCapability → Function Token / ActionCall → OutputGateway → UI.showPose → preview skeletons. See ADR 0036 for bounds and phase-one scope.

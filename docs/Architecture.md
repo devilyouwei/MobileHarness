@@ -148,3 +148,9 @@ Get/load coalesce bounded construction/loading; unload gates a resource and wait
 ✅ ModelKitDefaults owns fixed provider registration and default capability bindings. App supplies a resource root and retrieves interfaces with get(.chat) and the other capability keys. ModelKitRuntime remains adapter-independent. See [ADR 0034](adr/0034-modelkit-default-assembly.md).
 
 ✅ ModelKitDefaults.manager(resources:) returns the process-wide manager. Concurrent calls share assembly and provider instances; conflicting resource roots fail. Construction/registration are assembly SPI. Each model admits one active operation, rejects overlap with inputBusy, and releases admission only after cleanup. Cross-model scheduling is not implemented.
+
+✅ PoseCapability adds single-image pose inference without business dependencies. ModelKitYOLOPose → ModelKit / ModelKitCoreML; Defaults owns the lazy `.pose` binding. See ADR 0035 and the adapter README. ❌ Camera → InputGateway → Agent integration is not implemented.
+
+✅ Camera preview is a local presentation path: PlatformKit camera actor → native preview layer → Experience, coordinated by App independently of model readiness. No image enters business runtime in this feature; future Agent input must go through InputGateway. Camera and voice retain separate permission/lifecycle control.
+
+✅ Camera frames now enter InputGateway through CameraInputSession. Photographer owns pose inference; UI.showPose executes via OutputGateway/ActionRuntime. No robot commands are implemented. ModelKit and AgentCore remain independent. See ADR 0036.

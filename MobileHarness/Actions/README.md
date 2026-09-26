@@ -137,3 +137,5 @@ Keep this README synchronized with changes to responsibilities, files, interface
 Action documentation must describe the actual function. Combine usage guidance in doc; do not invent a return-value section for Void functions. Use XML/natural-text example strings. Mark automatic text-mapping actions hidden when they should not be shown as explicit LLM commands.
 
 ✅ UI.express adds seven validated facial expressions through one injected presentation callback; smile is an emotion value. Expressions update the orb independently of captions.
+
+✅ UI.showPose validates and presents a bounded skeleton overlay through an App-injected callback. JSON v3 declares this capability only for Photographer.

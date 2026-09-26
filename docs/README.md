@@ -23,3 +23,7 @@ Purpose: distinguish the current architecture and roadmap from historical design
 ✅ ADR 0033 describes ModelKit as a project-internal foundation module; it is not independently packaged. Tests and application evaluations live under root Tests.
 
 ✅ [Internal default model assembly](adr/0034-modelkit-default-assembly.md) defines ModelKit-owned registrations and capability defaults. App supplies resources and handles OS events.
+
+✅ ADR 0035 records YOLOv8 Pose capability and lifecycle integration. ❌ End-to-end camera/Agent acceptance remains outstanding.
+
+✅ ADR 0036 documents camera change sampling, Photographer admission and Action-delivered skeletons.

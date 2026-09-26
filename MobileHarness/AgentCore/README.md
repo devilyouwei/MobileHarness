@@ -37,3 +37,5 @@ flowchart LR
 ## Maintenance
 
 Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+
+✅ ImageInput adds bounded upright RGB8 media transport (640 pixels per side), capture sequence/time and sensor rotation, independent of ModelKit/PlatformKit. PoseOverlay defines compact UI Action data and inverse sensor-coordinate mapping.

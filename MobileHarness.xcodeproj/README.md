@@ -22,3 +22,7 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 ✅ AudioFrame.swift is part of ModelKit/Core. Core is the home for shared audio and future image/video contracts; platform I/O and model-specific processing remain separate. ❌ Image/video types are not implemented until needed.
 
 ✅ App resolves ModelKitDefaults through the root project product; default assembly selects providers internally. No App source directly imports model adapters.
+
+✅ Both App targets compile CameraCoordinator and CameraBackground; PlatformKit compiles AppleCamera from root Package.swift. The shared configuration declares camera usage.
+
+✅ PhotographySession compiles in both App targets; Photographer source and v3 JSON appear in navigation, with the JSON compiled once through the Agents SwiftPM resource declaration.

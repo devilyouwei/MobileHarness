@@ -109,3 +109,7 @@ Failure keeps the container unpublished and offers reload using the same process
 
 - ✅ Staged loading, disabled startup interaction, retry and sequential model preparation.
 - ❌ Numerical download/loading percentages and physical-device startup acceptance.
+
+✅ CameraCoordinator owns scene-local preview intent independently of model startup. Normal launch requests the front camera; permission denial offers Settings. A single reconciliation worker applies the latest enabled/facing/foreground state, checks revision after permissions, masks stale preview immediately, and joins stop on scene exit. Inactive/background pauses capture; foreground resumes only if enabled. Diagnostic launches do not start camera. Camera frames now enter the PhotographySession composition described below.
+
+✅ PhotographySession composes Photographer, InputGateway, OutputGateway and the explicit UI.showPose handler independently of voice model readiness. Both flows acquire models from the same process-wide defaults manager. CameraCoordinator owns one capture/analysis incarnation, cancels and joins it before replacement, stops capture before joining inference, and rejects old-session/old-sequence presentation callbacks. Camera errors and pose errors are separate UI states; pose failure requires explicit retry.

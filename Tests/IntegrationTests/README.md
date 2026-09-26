@@ -19,3 +19,5 @@ Update this README when adding or changing tests. Preserve ✅/❌ distinctions 
 - ✅ Assistant malformed XML, truncated channels, invalid entities and unknown Action recovery: one error terminal, no successful completion or failed-turn history, and a successful next turn on the same Agent/session.
 
 ✅ Adapter fixtures explicitly own ModelContext; managed weight teardown is independent of capability/session consumption. Shared registration/reuse tests live under root Tests/ModelKitRuntimeTests.
+
+✅ PhotographyPipelineTests covers normalized grayscale threshold and previous-examined-frame semantics, duplicate rejection, latest-only delayed model processing, pause/stop, stale result suppression, pose Action validation, projection and Gateway → Agent → output Action completion.

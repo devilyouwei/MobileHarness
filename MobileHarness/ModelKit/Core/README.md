@@ -50,3 +50,5 @@ Core owns model-independent audio, image and video data contracts. These types d
 - ❌ Image and video contracts will be added here when a concrete capability needs them; no placeholder types are created. Their design must specify representation, dimensions, timing where applicable, payload bounds and ownership.
 
 Keep shared media values separate from model-specific tensors, preprocessing and business message types.
+
+✅ ImageFrame validates tightly packed upright RGB8 data, at most 4,194,304 pixels and 4096 per dimension. ❌ Encoded image decoding, orientation conversion and video transport remain outside Core.

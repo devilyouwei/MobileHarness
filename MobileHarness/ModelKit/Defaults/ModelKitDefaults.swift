@@ -5,6 +5,7 @@ import ModelKitKokoro
 import ModelKitNemotron
 @_spi(ModelAssembly) import ModelKitRuntime
 import ModelKitSilero
+import ModelKitYOLOPose
 
 #if !targetEnvironment(simulator)
     import ModelKitQwen35
@@ -69,6 +70,12 @@ public enum ModelKitDefaults {
                         synthesis: try KokoroSpeechSynthesis(
                             context: context, artifacts: resources.appendingPathComponent("Kokoro")))
                 })
+            try await manager.register(
+                ModelRegistration(id: ModelID("yolov8n-pose"), capabilities: [.pose], memoryPolicy: .releaseWhenIdle) {
+                    context in
+                    ProvidedCapabilities(
+                        pose: try YOLOPose(context: context, artifacts: resources.appendingPathComponent("YOLOPose")))
+                }, defaults: [.pose])
             return manager
         } catch {
             await manager.shutdown()

@@ -18,3 +18,7 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 ✅ [ModelKit project boundary](0033-modelkit-project-boundary.md) defines the root-package build, Management/Backends ownership, root test separation and automated boundary checks.
 
 ✅ [Internal default model assembly](0034-modelkit-default-assembly.md) defines ModelKit-owned registrations and capability defaults. App supplies resources and handles OS events.
+
+✅ 0035-yolov8-pose.md records bounded RGB pose inference and the separate Core ML adapter. ❌ Camera and device acceptance remain deferred.
+
+✅ 0036-photographer-pipeline.md records the camera-to-Agent perception loop; physical robot behavior remains deferred.

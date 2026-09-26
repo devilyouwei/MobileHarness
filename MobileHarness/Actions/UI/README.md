@@ -12,3 +12,5 @@ Purpose: present captions and facial expressions using App-injected callbacks. D
 App injects separate expression and caption callbacks. Success means MainActor display state has been updated, not that the decorative animation has completed. One current expression replaces the previous state; no extra queue or timer is created. The circle clears on new user speech or session stop. XML example: `<express emotion="smile"/> Hello.`
 
 Maintain this README alongside implementation, Agent JSON and App handler bindings. Add new supported emotions to express rather than adding a separate Action for each face.
+
+✅ ShowPose.swift / UI.showPose accepts required payload JSON (≤3000 bytes), validates finite nonnegative timestamp, rotation 0...3, ≤6 people × exactly 17 integer joints, x/y in -10000...20000 and confidence 0...1000. Empty people clears the overlay. Cancellation is checked before/after the injected presentation callback; errors propagate with no fallback. Success means presentation state accepted, not native drawing completed. Default Vision Channel, shared UI module exclusion within its scheduler.

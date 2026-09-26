@@ -42,3 +42,5 @@ The current input contract is `AgentInput`. `control` is a temporary runtime com
 Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
 
 ✅ Voice input uses LiveSpeechInput and stream-only VAD events; final text enters through submit once per turn.
+
+✅ CameraInputSession owns configurable grayscale frame selection and routes only admitted images through InputGateway to Photographer. Generic agent.finished/error controls use existing output barriers.

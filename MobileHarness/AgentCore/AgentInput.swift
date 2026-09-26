@@ -4,9 +4,10 @@ public enum InputPayload: Sendable {
     case text(String)
     case event(String)
     case toolResult(ToolResult)
-    // Media adapters will add timestamped frame/chunk payloads in P2.
+    case image(ImageInput)
     public var kind: InputKind {
         switch self {
+        case .image: .image
         case .text: .text
         case .event: .event
         case .toolResult: .toolResult

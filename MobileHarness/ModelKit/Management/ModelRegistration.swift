@@ -7,7 +7,7 @@ public struct ModelID: Hashable, Sendable {
 }
 
 public enum ProvidedCapability: String, CaseIterable, Hashable, Sendable {
-    case chat, recognition, synthesis, judge, voiceActivity
+    case chat, recognition, synthesis, judge, voiceActivity, pose
 }
 
 public enum ModelRegistrationError: Error, Equatable, Sendable {
@@ -27,13 +27,14 @@ public struct ProvidedCapabilities: Sendable {
     public let recognition: (any SpeechRecognitionCapability)?
     public let synthesis: (any SpeechSynthesisCapability)?
     public let judge: (any JudgeCapability)?
+    public let pose: (any PoseCapability)?
     public let voiceActivity: (any VoiceActivityCapability)?
 
     public init(
         warmup: (@Sendable () async throws -> Void)? = nil,
         chat: (any ChatCapability)? = nil, recognition: (any SpeechRecognitionCapability)? = nil,
         synthesis: (any SpeechSynthesisCapability)? = nil, judge: (any JudgeCapability)? = nil,
-        voiceActivity: (any VoiceActivityCapability)? = nil
+        voiceActivity: (any VoiceActivityCapability)? = nil, pose: (any PoseCapability)? = nil
     ) {
         self.warmup = warmup
         self.chat = chat
@@ -41,9 +42,11 @@ public struct ProvidedCapabilities: Sendable {
         self.synthesis = synthesis
         self.judge = judge
         self.voiceActivity = voiceActivity
+        self.pose = pose
     }
     func availability(for kind: ProvidedCapability) async -> CapabilityAvailability {
         switch kind {
+        case .pose: return await pose?.availability ?? .unavailable(reason: "Capability is not registered")
         case .chat: return await chat?.availability ?? .unavailable(reason: "Capability is not registered")
         case .recognition:
             return await recognition?.availability ?? .unavailable(reason: "Capability is not registered")
@@ -55,6 +58,7 @@ public struct ProvidedCapabilities: Sendable {
     }
     public var supported: Set<ProvidedCapability> {
         var result: Set<ProvidedCapability> = []
+        if pose != nil { result.insert(.pose) }
         if chat != nil { result.insert(.chat) }
         if recognition != nil { result.insert(.recognition) }
         if synthesis != nil { result.insert(.synthesis) }

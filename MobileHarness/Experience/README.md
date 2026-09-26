@@ -20,7 +20,7 @@ flowchart LR
 - ✅ [Components](Components/README.md): voice orb and fading captions, shared by the existing interface.
 - ✅ [Diagnostics](Diagnostics/README.md): explicit Kokoro and Debug-only Qwen/ASR validation UI, an implemented extension to the architecture outline.
 - ❌ `Character/`: independent character presentation and expression state.
-- ❌ `Camera/`: camera preview and user interaction.
+- ✅ [Camera](Camera/README.md): camera preview background and controls.
 
 Experience does not bypass InputGateway to send business inputs to Agents. Executable Agent outputs pass through OutputGateway before UI actions are presented. Diagnostics remain clearly separate from normal conversation behavior.
 
@@ -31,3 +31,7 @@ Keep this README synchronized with changes to responsibilities, files, interface
 ✅ ConversationViewModel exposes only controls and state consumed by the current voice UI; obsolete text submission and manual finish forwarding have been removed.
 
 ✅ Conversation displays large expressions inside the voice orb, separate from subtitles, with spring entry, soft glow and reduced-motion support.
+
+✅ Camera/CameraBackground.swift supplies the shared preview background and camera controls during startup and conversation. Camera ownership remains in App/PlatformKit; no business input is forwarded.
+
+✅ Camera renders action-delivered COCO skeletons and offers 1/3/5/10% frame-change threshold selection. Controls remain above preview and voice content.

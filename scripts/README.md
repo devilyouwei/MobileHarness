@@ -22,3 +22,7 @@ flowchart LR
 ✅ Language-model download and test entry points target Qwen3.5 MLX. No CoreAILM language package is required.
 
 ✅ check-modelkit-boundaries.py rejects business imports and target dependencies in ModelKit and checks directory documentation. test-qwen35.sh uses the root project package. Agent evaluations run with HARNESS_EVAL_QWEN35=1 swift test --filter AgentModelEvaluationTests.
+
+✅ download-yolov8-pose.py provisions the fixed YOLOv8n Pose package through the existing four-worker downloader. ✅ The physical App file lists now stage the YOLO package.
+
+✅ update-model-filelists.py includes yolov8-pose in physical-device staging; simulator still has no camera/model acceptance path.

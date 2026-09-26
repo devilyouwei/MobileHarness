@@ -24,7 +24,7 @@ flowchart LR
 - ✅ `Audio/MicrophoneFrame.swift`: shared captured PCM and level measurements. Segmentation is owned by Gateway using VAD probabilities; the obsolete energy segmenter and batch resampler have been removed.
 - ✅ `Device/DeviceCapability.swift`: capability, authorization, and permission interfaces.
 - ✅ `ExternalDevice/ExternalDeviceTransport.swift`: connect, send, emergency-stop, and disconnect contracts.
-- ❌ Concrete Camera, Sensors, Storage, Network, BLE, robot, and IoT adapters.
+- ❌ Concrete Sensors, Storage, Network, BLE, robot, and IoT adapters.
 - ❌ Real robot integration and hardware safety validation; transport protocols alone do not establish either.
 
 External input enters through InputGateway; Agent device actions must pass through OutputGateway and runtime execution. Use public APIs and validate capabilities and permissions. Robot emergency-stop and disconnect protection must be enforced by the device, without relying on iOS background execution.
@@ -32,3 +32,7 @@ External input enters through InputGateway; Agent device actions must pass throu
 ## Maintenance
 
 Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+
+✅ Camera/AppleCamera provides actor-owned video-only preview capture, front/back switching and authorization. It does not configure the shared audio session or request microphone access. ❌ Recording is not implemented.
+
+✅ Camera now exposes bounded upright RGB frames (max 640 per side) in addition to preview. Late native frames and an older queued frame may be replaced; no Agent/model dependencies are introduced.

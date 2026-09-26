@@ -14,8 +14,8 @@ enum ExecutionRouter {
         switch output {
         case .actionCall(let token): .action(token)
         case .toolCall(let call): .tool(call)
-        case .control("assistant.finished"): .finish
-        case .control(let state) where state.hasPrefix("assistant.error:"): .cancel
+        case .control("assistant.finished"), .control("agent.finished"): .finish
+        case .control(let state) where state.hasPrefix("assistant.error:") || state.hasPrefix("agent.error:"): .cancel
         case .control: .observe
         }
     }

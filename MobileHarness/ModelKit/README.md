@@ -38,7 +38,7 @@ Concrete model SDKs and configuration belong to separate adapter targets. ModelK
 | `Core/` | Capability/session contracts, model resource admission, and minimal inference admission |
 | `Defaults/` | Fixed model assembly, capability defaults and backend configuration |
 | `Management/` | Separate ModelKitRuntime target: registration, typed acquisition and lifecycle management |
-| `Core/AudioFrame.swift` | Validated PCM transport; Core also owns future shared image/video data contracts |
+| `Core/AudioFrame.swift` | Validated PCM transport; Core also owns ImageFrame for shared RGB transport; video remains outstanding |
 | `Language/LLM/`, `Language/JEV/` | Chat and judgment protocols |
 | [Qwen3.5](Language/LLM/Qwen35/README.md) | Current text-only MLX ChatCapability adapter |
 | `Speech/ASR/`, `Speech/TTS/`, `Speech/VAD/` | Recognition, synthesis, and voice-activity contracts and adapters |
@@ -274,3 +274,5 @@ All tests live under root Tests. Qwen35Tests checks model/tokenizer contracts wi
 - ✅ scripts/check-modelkit-boundaries.py verifies production imports and target dependencies as part of check.sh.
 - ❌ A separately distributed SDK is outside this project's scope.
 
+
+✅ Vision/PoseCapability and Core/ImageFrame provide single-image COCO-17 pose inference. ModelKitYOLOPose depends only on ModelKit and ModelKitCoreML; Defaults registers yolov8n-pose as `.pose` with releaseWhenIdle. See Vision/YOLO/README.md for artifact, image, NMS and cancellation contracts. ❌ Device quality acceptance remains outstanding; Photographer uses the shared pose capability.

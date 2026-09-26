@@ -102,6 +102,7 @@ public actor AssistantAgent: Agent {
                     worker = Task { await self.generate(text, input: input, using: chat) }
                     return
                 }
+            case .image: break  // Rejected by the descriptor before admission.
             case .event(let event): emitImmediate("事件：\(event)", for: input)
             case .toolResult(let result): emitImmediate(result.value, for: input)
             }

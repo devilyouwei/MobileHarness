@@ -10,3 +10,7 @@ Purpose: own shared Xcode settings, local-signing templates and explicit model r
 ✅ MobileHarness.entitlements requests com.apple.developer.kernel.increased-memory-limit on the physical app target, matching the official MLX LLMBasic example. It is not a guarantee of memory availability, and the simulator target does not request it.
 
 ✅ Run python3 scripts/update-model-filelists.py after editing production download profiles. It generates explicit Xcode sandbox file inputs and outputs; staging copies only those required files and licenses.
+
+✅ Shared.xcconfig includes NSCameraUsageDescription for local preview and on-device pose inference. The camera is optional; denial leaves the background black and does not block voice model preparation.
+
+✅ Device resource file lists now stage the pinned YOLOPose mlpackage and upstream model card. Camera permission text describes local pose inference; no uploads or recording.

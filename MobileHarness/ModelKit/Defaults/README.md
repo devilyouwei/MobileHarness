@@ -49,3 +49,5 @@ flowchart TD
 - ✅ Process-wide manager, bounded concurrent assembly access and terminal shutdown.
 - ✅ One operation per model including system speech; cancellation preserves cleanup ordering.
 - ❌ Global scheduling across different model types and automatic preemption.
+
+✅ `.pose` binds yolov8n-pose through ModelKitYOLOPose with releaseWhenIdle, loading YOLOPose under the supplied resource root. Registration remains lazy; voice startup does not request pose. ✅ Physical App staging includes pose weights for the independent camera pipeline.

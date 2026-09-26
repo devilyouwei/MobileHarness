@@ -10,27 +10,49 @@ struct MobileHarnessApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let container {
-                    content(container)
+                if isDiagnostic {
+                    startupContent
                 } else {
-                    ConversationStartupView(status: startupStatus, error: startupError) {
-                        startupError = nil
-                        startupStatus = "正在准备…"
-                        startupAttempt += 1
-                    }
+                    CameraScene { startupContent }
                 }
             }
             .task(id: startupAttempt) {
-                guard container == nil, startupError == nil else { return }
-                do {
-                    let prepared = try await AppContainer { startupStatus = $0 }
-                    try Task.checkCancellation()
-                    container = prepared
-                } catch is CancellationError {
-                    // A disappearing scene must not publish a partially prepared container.
-                } catch { startupError = String(describing: error) }
+                await prepare()
             }
         }
+    }
+
+    private var isDiagnostic: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        #if DEBUG
+            if arguments.contains("-qwen35-validation") { return true }
+        #endif
+        return arguments.contains("-kokoro-benchmark")
+    }
+
+    private var startupContent: some View {
+        Group {
+            if let container {
+                content(container)
+            } else {
+                ConversationStartupView(status: startupStatus, error: startupError) {
+                    startupError = nil
+                    startupStatus = "正在准备…"
+                    startupAttempt += 1
+                }
+            }
+        }
+    }
+
+    private func prepare() async {
+        guard container == nil, startupError == nil else { return }
+        do {
+            let prepared = try await AppContainer { startupStatus = $0 }
+            try Task.checkCancellation()
+            container = prepared
+        } catch is CancellationError {
+            // A disappearing scene must not publish a partially prepared container.
+        } catch { startupError = String(describing: error) }
     }
     @ViewBuilder
     private func content(_ container: AppContainer) -> some View {

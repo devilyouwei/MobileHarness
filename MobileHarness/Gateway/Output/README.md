@@ -31,3 +31,5 @@ flowchart LR
 ✅ The algorithm above describes the current implementation.
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+
+✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. Photographer skeletons remain validated ActionCalls; no UI payload bypass exists.
