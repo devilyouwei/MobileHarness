@@ -1,6 +1,6 @@
 # Input · 输入网关
 
-用途：让文本、控制事件、语音转换结果和工具结果统一进入 Agent。设计目标：采集适配、归一化、上下文增强和路由，不承担 Agent 决策。
+用途：让文本、控制事件、语音转换结果和工具结果统一进入 Agent。设计目标：输入接纳、适配策略、归一化、上下文增强和路由，不承担 Agent 决策。PlatformKit 负责设备采集与基础格式适配；ModelKit 负责 ASR/VAD 等模型加工；App 桥接输入。灰度样本由平台层提供，比较阈值与是否接纳帧由 Gateway 决定。
 
 - ✅ `InputGateway.swift`：统一接纳入口与 DeliveryReport；ASR capability 注入，仅提供现行流式识别入口。
 - ✅ `LiveSpeechInput.swift`：有界连续语音、partial 预览和 final 合并；预览不触发 Agent。
@@ -76,3 +76,5 @@ flowchart LR
 Gray = (77R + 150G + 29B + 128) >> 8. Change = sum(abs(current - previous)) / (4096 × 255). The baseline updates on every examined frame, including below-threshold frames; interval-skipped frames do not update it. This is a normalized brightness-difference metric, not percentage of changed pixels or comparison with the last inferred image. Slow cumulative motion can remain below a per-frame threshold; lower the configured threshold if needed. Identical frames never pass even at threshold zero. First frame and width/height/rotation changes always pass.
 
 CameraInputSession has one active submit, no queue, and rejects overlapping submits. It owns one filter and capture session ID, checks delivery rejection, and propagates errors. Two 4096-byte grayscale grids bound comparison memory. The producer's RGB frame stream keeps only the newest queued frame; Photographer independently replaces its one pending image. No Action, control command or Tool result is discarded by these media policies.
+
+✅ FrameChangeFilter accepts native pre-sampled 64×64 grayscale alongside the original RGB path. The default 3% mean absolute grayscale difference, baseline updates, minimumInterval and first/geometry-frame behavior are unchanged. Direct raw-image sampling may differ numerically from the old resized-image sample.

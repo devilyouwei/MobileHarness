@@ -50,4 +50,6 @@ flowchart TD
 - ✅ One operation per model including system speech; cancellation preserves cleanup ordering.
 - ❌ Global scheduling across different model types and automatic preemption.
 
-✅ `.pose` binds yolov8n-pose through ModelKitYOLOPose with releaseWhenIdle, loading YOLOPose under the supplied resource root. Registration remains lazy; voice startup does not request pose. ✅ Physical App staging includes pose weights for the independent camera pipeline.
+✅ `.pose` binds yolo26n-pose through ModelKitYOLOPose with releaseWhenIdle, loading YOLOPose under the supplied resource root. Registration remains lazy; voice startup does not request pose. ✅ Physical App staging includes pose weights for the independent camera pipeline.
+
+✅ Default .pose now resolves exclusively to ModelID("yolo26n-pose") and the new official end-to-end artifact. Singleton and releaseWhenIdle ownership remain unchanged; no YOLOv8 registration/fallback remains.

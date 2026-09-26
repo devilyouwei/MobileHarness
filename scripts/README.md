@@ -23,6 +23,8 @@ flowchart LR
 
 ✅ check-modelkit-boundaries.py rejects business imports and target dependencies in ModelKit and checks directory documentation. test-qwen35.sh uses the root project package. Agent evaluations run with HARNESS_EVAL_QWEN35=1 swift test --filter AgentModelEvaluationTests.
 
-✅ download-yolov8-pose.py provisions the fixed YOLOv8n Pose package through the existing four-worker downloader. ✅ The physical App file lists now stage the YOLO package.
+✅ download-yolo26-pose.py provisions the official YOLO26n-Pose INT8 ZIP with archive/member hash verification. ✅ The physical App file lists now stage the YOLO package.
 
-✅ update-model-filelists.py includes yolov8-pose in physical-device staging; simulator still has no camera/model acceptance path.
+✅ update-model-filelists.py includes yolo26-pose in physical-device staging; simulator still has no camera/model acceptance path.
+
+✅ download-yolo26-pose.py provisions the pinned official ZIP through model_download. Archive/member hashes, exact members, path confinement, symlink rejection and size limits are verified before replacing a package; failed verification preserves the prior installation. check.sh now includes the offline ZIP provisioning tests. update-model-filelists.py stages only the YOLO26 package.

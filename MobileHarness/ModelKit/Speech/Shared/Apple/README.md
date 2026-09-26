@@ -13,6 +13,6 @@ Apple 系统 ASR/TTS 的独立 adapter target，只依赖 ModelKit。当前 App 
 
 可用性提示分别区分未授权、不支持语言、不支持离线识别和服务暂不可用，不以“请在真机测试”代替具体诊断。应用在可用性检查通过后才启动麦克风，因此该阶段失败不代表麦克风输入故障；也没有按模拟器平台直接禁用语音的分支。
 
-应用负责调用平台权限入口。当前 App 经用户授权显式选择 allowNetwork，UI 披露录音可能发送至 Apple，并允许切回离线；录音期间不能从 UI 切换，程序化切换会先停止当前语音会话。配置不持久化，当前调试版每次启动默认允许联网。策略属于 adapter 配置，不进入 ModelKit 能力协议。麦克风采集、VAD、音频会话和扬声器播放位于 PlatformKit；网关只注入 SpeechRecognitionCapability/SpeechSynthesisCapability。以后替换自有模型无需改变网关的能力调用。
+应用负责协调所需权限。Apple ASR 的 onDeviceOnly/allowNetwork 属于可选 adapter 策略，不进入通用能力协议；当前生产识别使用 Nemotron，没有 Apple ASR 联网切换 UI。ModelKit 中的 Apple adapter 消费 PCM 或导出合成 PCM，不拥有麦克风和扬声器。麦克风采集、音频会话、采集格式转换与播放位于 PlatformKit/Audio；Silero 在 ModelKit 中生成 VAD 概率，Gateway 决定语音分段。Speech Action 调用合成能力并通过 App 注入的独立播放服务输出声音。
 
 新系统的 SpeechAnalyzer 可以作为后续同协议 adapter，当前没有实现或伪装该路径。真实麦克风识别与扬声器效果需真机验收，自动测试不弹权限、不使用用户录音。

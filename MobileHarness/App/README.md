@@ -24,7 +24,7 @@ flowchart LR
     App -.->|Action handlers| ActionRuntime
     App -.->|Tool handlers| ToolRuntime
     ModelKit -->|Capability interfaces and model sessions| App
-    PlatformKit -->|Audio IO and permission services| App
+    PlatformKit -->|Audio / camera I/O and permission services| App
 ```
 
 ## Implementation status
@@ -86,7 +86,8 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ```mermaid
 flowchart LR
-    App[AppContainer] -->|Register / get / prepare| Models[ModelManager]
+    Defaults[ModelKitDefaults] -->|Internal registration| Models[ModelManager]
+    App[AppContainer] -->|Get / prepare| Models
     Models -->|Managed capabilities| Consumers[Agent / Gateway / Actions]
     Voice[Voice coordinator] -->|Cancel sessions only| Consumers
 ```
@@ -113,3 +114,9 @@ Failure keeps the container unpublished and offers reload using the same process
 ✅ CameraCoordinator owns scene-local preview intent independently of model startup. Normal launch requests the front camera; permission denial offers Settings. A single reconciliation worker applies the latest enabled/facing/foreground state, checks revision after permissions, masks stale preview immediately, and joins stop on scene exit. Inactive/background pauses capture; foreground resumes only if enabled. Diagnostic launches do not start camera. Camera frames now enter the PhotographySession composition described below.
 
 ✅ PhotographySession composes Photographer, InputGateway, OutputGateway and the explicit UI.showPose handler independently of voice model readiness. Both flows acquire models from the same process-wide defaults manager. CameraCoordinator owns one capture/analysis incarnation, cancels and joins it before replacement, stops capture before joining inference, and rejects old-session/old-sequence presentation callbacks. Camera errors and pose errors are separate UI states; pose failure requires explicit retry.
+
+✅ PhotographySession wraps retained native camera images in a composition-only CameraImageAttachment and injects its resolver into PhotographerAgent. Only gray samples and opaque attachments traverse AgentCore/Gateway; resolved ModelKit ImageFrame reaches the capability without a full-frame RGB copy.
+
+## Data I/O and processing composition
+
+PlatformKit owns capture/playback and device lifecycles; ModelKit owns model data processing. App converts platform data into model or Gateway contracts and injects services without either Kit depending on the other. PhotographySession retains a native frame in a ModelKit ImageFrame and supplies an opaque AgentCore attachment/resolver. Speech handlers receive ModelKit synthesis and a separate PlatformKit playback callback. Experience owns presentation; Gateway and Agents retain admission/routing and business policy respectively.

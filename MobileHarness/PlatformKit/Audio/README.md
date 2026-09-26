@@ -35,3 +35,5 @@ flowchart LR
 ✅ The algorithm above describes the current implementation.
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+
+Audio is the platform capability domain for microphone and speaker I/O. AppleAudioIO currently owns both operations and shared AVAudioSession setup; do not create independent session owners solely to match device filenames. Keep domain files flat until actual complexity requires device subdirectories. Recognition, synthesis and neural VAD belong to ModelKit/Speech; conversation policy belongs to Agents.

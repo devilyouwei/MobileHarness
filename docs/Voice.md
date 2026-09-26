@@ -2,7 +2,7 @@
 
 ## 数据与权限
 
-麦克风 → PlatformKit StreamingMonoPCMResampler（16 kHz 单声道 Float32）→ Gateway VoiceActivitySegmenter（抽象 VAD/Silero 概率分段）→ InputGateway → SpeechRecognitionCapability → final 文本 → AssistantAgent 分句 → OutputGateway → Speech.speak / UI.print。Speech.speak 使用 SpeechSynthesisCapability（Apple TTS）并等待实际播放结束；UI.print 追加字幕，两模块可并行。
+麦克风 → PlatformKit StreamingMonoPCMResampler（16 kHz 单声道 Float32）→ Gateway VoiceActivitySegmenter（抽象 VAD/Silero 概率分段）→ InputGateway → SpeechRecognitionCapability → final 文本 → AssistantAgent 分句 → OutputGateway → Speech.speak / UI.print。Speech.speak 通过 ModelKit 的 SpeechSynthesisCapability（Apple TTS）把文本加工为 PCM，再通过 App 注入的 PlatformKit 播放服务输出到扬声器并等待实际播放结束；UI.print 追加字幕，两模块可并行。
 
 AppContainer 是具体实现的装配入口；Gateway 与 Agent 不导入具体模型。录音前检查可用性并校验、加载权重，然后只申请麦克风权限；不申请 Apple Speech 识别授权，不联网识别或自动回退。音频仅在内存处理，不保存用户录音。首次加载较慢时 UI 显示加载状态。
 

@@ -35,15 +35,19 @@ public struct FrameChangeFilter: Sendable {
             return false
         }
         var gray = [UInt8](repeating: 0, count: 64 * 64)
-        frame.rgb.withUnsafeBytes { data in
-            let pixels = data.bindMemory(to: UInt8.self)
-            for y in 0..<64 {
-                let sy = min(frame.height - 1, (2 * y + 1) * frame.height / 128)
-                for x in 0..<64 {
-                    let sx = min(frame.width - 1, (2 * x + 1) * frame.width / 128)
-                    let i = (sy * frame.width + sx) * 3
-                    gray[y * 64 + x] = UInt8(
-                        (77 * Int(pixels[i]) + 150 * Int(pixels[i + 1]) + 29 * Int(pixels[i + 2]) + 128) >> 8)
+        switch frame.content {
+        case .sampled(let sample, _): gray = Array(sample)
+        case .rgb(let rgb):
+            rgb.withUnsafeBytes { data in
+                let pixels = data.bindMemory(to: UInt8.self)
+                for y in 0..<64 {
+                    let sy = min(frame.height - 1, (2 * y + 1) * frame.height / 128)
+                    for x in 0..<64 {
+                        let sx = min(frame.width - 1, (2 * x + 1) * frame.width / 128)
+                        let i = (sy * frame.width + sx) * 3
+                        gray[y * 64 + x] = UInt8(
+                            (77 * Int(pixels[i]) + 150 * Int(pixels[i + 1]) + 29 * Int(pixels[i + 2]) + 128) >> 8)
+                    }
                 }
             }
         }

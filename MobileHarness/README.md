@@ -15,6 +15,8 @@ The system is organized around three major functional domains:
 - **Agent Core / Agents** — independent, stateful cognitive units that process signals and generate executable outputs.
 - **Output Gateway** — schedules and dispatches fully resolved Action Calls and Tool Calls.
 
+Two capability layers support this loop: **PlatformKit handles data input/output through devices and operating-system services; ModelKit processes data through models.** Gateway coordinates signals, Agents decide what to do, and Actions/Tools execute the requested behavior. These responsibilities are compared in section 39.
+
 The architecture is designed around four core properties:
 
 - **Multimodal** — text, audio, image, video, sensor, physical, and system signals.
@@ -36,7 +38,7 @@ flowchart LR
     SIGNALS --> IG
 
     subgraph IG["Input Gateway"]
-        ACQ["Signal Acquisition"]
+        ACQ["Signal Admission<br/>From App / Platform I/O"]
         ADAPT["Signal Adaptation<br/>ASR · Sampling · Normalize · Feature Processing"]
         CTX["Context Enrichment"]
         ROUTE["Signal Routing<br/>Logic · JEV · Lightweight Agent"]
@@ -99,8 +101,8 @@ flowchart LR
     ACTIONS --> RESULT
     RESULT --> IG
 
-    MODELS["ModelKit<br/>ASR · TTS · LLM · VLM · JEV · CV · Embedding"]
-    PLATFORM["PlatformKit<br/>Camera · Audio · Storage · Sensors · Device · Robot · Network"]
+    MODELS["ModelKit: Data Processing<br/>ASR · TTS · LLM · VLM · JEV · CV · Embedding"]
+    PLATFORM["PlatformKit: Device / OS Data I/O<br/>Audio · Vision · Connectivity · Core"]
 
     MODELS -.-> IG
     MODELS -.-> CORE
@@ -112,6 +114,8 @@ flowchart LR
 ```
 
 ---
+
+The diagram describes logical coordination, not module imports or a requirement that every input use a device adapter. PlatformKit acquires device data and performs device output; App connects those services to the gateways and executable handlers. ModelKit supplies processing capabilities to Gateway, Agents and Actions. ModelKit and PlatformKit do not depend on each other. Text/UI input and internal results also enter InputGateway through their own producers.
 
 # 3. Core Information Model
 
@@ -184,6 +188,8 @@ Input Gateway
 
 ## 4.1 Signal Acquisition
 
+Acquisition here means admission into the signal pipeline. Device capture, permissions and hardware lifecycles belong to PlatformKit, with App adapting the resulting data into Gateway input. InputGateway decides admission, sampling, normalization and routing; it does not own camera or microphone drivers.
+
 Typical sources include:
 
 ```text
@@ -237,7 +243,9 @@ Physical Signal
 Control Agent
 ```
 
-ASR, CV preprocessing, embedding, and model-backed transformations are provided by `ModelKit`.
+ASR, embedding, model-specific image preprocessing, inference and output decoding are provided by `ModelKit`. Gateway invokes these capabilities when its adaptation policy requires them.
+
+Basic I/O adaptation stays with PlatformKit: continuous capture PCM conversion, frame orientation metadata and a compact gray sample are examples. Gateway owns the grayscale comparison threshold and frame admission; ModelKit owns the model’s resize/crop, inference and pose decoding. Ownership follows the operation’s purpose, not whether it happens to calculate or transform bytes.
 
 ---
 
@@ -1153,7 +1161,7 @@ Actions.Camera.capturePhoto
       ↓
 CaptureAction
       ↓
-PlatformKit.Camera
+PlatformKit.Vision
       ↓
 Camera Hardware
 ```
@@ -1163,7 +1171,7 @@ Actions.Robot.move
       ↓
 MoveAction
       ↓
-PlatformKit.ExternalDevice
+PlatformKit.Connectivity
       ↓
 Motor Controller
 ```
@@ -1278,13 +1286,16 @@ The detailed design is authoritative for transport semantics. Create executable 
 
 # 33. ModelKit
 
-`ModelKit` provides local model capabilities.
+`ModelKit` is the model-driven **data processing layer**. It accepts data through capability interfaces and returns transformed data or inference results: audio → text, text → PCM, image → pose, or messages → generated text. Processing includes model-specific preprocessing, inference and postprocessing.
+
+It does not capture microphone/camera data, play PCM through a speaker, or command external hardware. Those input/output operations belong to PlatformKit. Gateway, Agents and Actions choose when to request processing; ModelKit does not own their business policy.
 
 ```text
 ModelKit/
 ├── Speech/
 │   ├── ASR
-│   └── TTS
+│   ├── TTS
+│   └── VAD
 ├── Language/
 │   ├── LLM
 │   ├── VLM
@@ -1295,7 +1306,7 @@ ModelKit/
 │   └── MediaPipe
 ├── Embedding/
 ├── Core/
-│   ├── AudioFrame / AudioFormat
+│   ├── AudioFrame / AudioFormat / ImageFrame
 │   ├── ModelResource / ModelContext
 │   └── OperationAdmission
 ├── Defaults/                    # Internal model selection and default bindings
@@ -1308,17 +1319,17 @@ ModelKit/
     └── MLX
 ```
 
+The tree includes target capabilities; VLM, RetinaFace, MediaPipe and Embedding are not implemented merely because they appear here. See each module README for current status.
+
 ModelKit is responsible for:
 
-- model registration;
-- loading/unloading;
-- warmup;
-- caching;
-- memory management;
-- inference;
-- model scheduling.
+- typed processing capabilities and validated model input/output data;
+- model-specific preprocessing, inference, decoding and coordinate restoration;
+- internal provider registration and default capability bindings;
+- shared model loading/unloading, warmup, caching and memory management;
+- bounded inference admission and cancellation/cleanup.
 
-Models are converted before integration into MobileHarness.
+Cross-model scheduling is future work; it is distinct from Gateway Channel scheduling and platform device lifecycle control. Model artifacts are provisioned before runtime, with backend-required local compilation during loading where applicable.
 
 ## 33.1 Shared Model Lifecycle
 
@@ -1331,7 +1342,8 @@ Models are converted before integration into MobileHarness.
 
 ```mermaid
 flowchart LR
-    App -->|Register / get / lifecycle| Manager[ModelManager]
+    Defaults[ModelKitDefaults] -->|Internal registration| Manager[ModelManager]
+    App -->|Get / lifecycle| Manager
     Manager --> Context[ModelContext / ModelResource]
     Manager -->|Shared capabilities| Consumers[Agent / Gateway / Actions]
     Consumers -->|Session operations| Adapter[Model adapter]
@@ -1345,25 +1357,38 @@ flowchart LR
 
 # 34. PlatformKit
 
-`PlatformKit` abstracts OS, device, sensors, and external hardware.
+`PlatformKit` is the device and operating-system **data input/output layer**. It brings external data into the app and applies requested output to devices: microphone → PCM, camera → image frames, PCM → speaker, and communication bytes ↔ external hardware.
+
+It owns public platform APIs, permissions, device availability, acquisition/playback lifecycle, bounded delivery and the basic format adaptation needed for I/O. It does not run ASR, TTS synthesis, pose recognition or business decisions. UI presentation belongs to Experience; not every application input or output requires PlatformKit.
 
 ```text
 PlatformKit/
-├── Camera/
 ├── Audio/
-│   ├── Microphone
-│   └── Speaker
-├── Sensors/
-├── Storage/
-├── Network/
-├── Device/
-└── ExternalDevice/
-    ├── BLE
-    ├── Robot
-    └── IoT
+│   ├── AppleAudioIO.swift
+│   ├── MicrophoneFrame.swift
+│   └── StreamingMonoPCMResampler.swift
+├── Vision/
+│   ├── AppleCamera.swift
+│   ├── CameraFrame.swift
+│   └── CameraGraySampler.swift
+├── Connectivity/
+│   └── ExternalDeviceTransport.swift
+└── Core/
+    └── DeviceCapability.swift
 ```
 
-PlatformKit exposes device primitives without Agent business semantics.
+PlatformKit and ModelKit organize capabilities by domain. PlatformKit owns hardware/OS input, output and lifecycle; ModelKit owns model-driven data processing. Agents combine these capabilities into business decisions. ModelKit remains independent of PlatformKit, with App adapting data and injecting services.
+
+### 34.1 Input/output responsibilities
+
+| Direction | PlatformKit operation | Boundary |
+| --- | --- | --- |
+| Input | Acquire microphone PCM and camera frames with format/time/sequence metadata | App adapts data for InputGateway; Gateway chooses admission and routing |
+| Output | Play supplied PCM and report completion, cancellation or failure | Actions call an injected playback service after OutputGateway dispatch |
+| Bidirectional | Connect to external hardware and exchange command/status bytes | Connectivity currently defines a protocol only; concrete adapters remain outstanding |
+| Lifecycle | Check permissions/availability; start, stop and release hardware | App coordinates scene/session intent; adapters own device resources |
+
+Top-level platform domains contain device implementations, not peer device categories. Core is reserved for cross-domain contracts. Keep small domains flat and introduce device subdirectories only when needed. Audio retains a shared audio-session owner for microphone and speaker. Connectivity currently contains a transport protocol only; concrete transports and other domains are added when implemented.
 
 ---
 
@@ -1375,41 +1400,45 @@ User says:
 “Look here and take a photo.”
 ```
 
+This is a target behavior example. The current Photographer supports pose perception; photo capture and the voice-driven photography sequence below are not implemented.
+
 ```mermaid
 sequenceDiagram
-
-    participant U as User
-    participant IG as Input Gateway
+    participant U as User / World
+    participant P as PlatformKit I/O
+    participant App as App adapters
+    participant IG as InputGateway
+    participant M as ModelKit processing
     participant A as Photography Agent
-    participant OG as Output Gateway
-    participant ACT as Action Runtime
-    participant W as World
+    participant OG as OutputGateway
+    participant ACT as Action Runtime / handlers
+    participant UI as Experience UI
 
-    U->>IG: Audio Stream Signal
-    IG->>IG: ASR
-    IG->>A: Text Signal
-
-    A->>A: Process / LLM generation
-    A->>A: Parse Function Token output
-    A->>A: Resolve capabilities
-
-    A->>OG: ActionCall(express(emotion="smile"), main)
-    A->>OG: ActionCall(speak("Look here"), main)
-    A->>OG: ActionCall(capturePhoto, main)
-
-    OG->>OG: Channel scheduling
-
-    OG->>ACT: Actions.UI.express
-    ACT->>W: Smile
-
-    OG->>ACT: Actions.Speech.speak
-    ACT->>W: "Look here"
-
-    OG->>ACT: Actions.Camera.capturePhoto
-    ACT->>W: Capture
+    U->>P: Speech at microphone
+    P->>App: Captured PCM
+    App->>IG: Audio input
+    IG->>M: ASR processing request
+    M-->>IG: Transcript
+    IG->>A: Text signal
+    A->>M: Generation request
+    M-->>A: Generated output
+    A->>A: Parse Function Tokens and resolve capabilities
+    A->>OG: Resolved UI.express, Speech.speak, Camera.capturePhoto calls (main)
+    OG->>OG: Validate and schedule main sequentially
+    OG->>ACT: UI.express
+    ACT->>UI: Display smile through injected presentation service
+    OG->>ACT: Speech.speak
+    ACT->>M: Synthesize text to PCM
+    M-->>ACT: PCM
+    ACT->>P: Play PCM through injected device service
+    P->>U: Speaker output
+    P-->>ACT: Playback completed
+    OG->>ACT: Camera.capturePhoto (planned)
+    ACT->>P: Request camera capture through injected device service
+    P-->>ACT: Captured image / completion (planned)
 ```
 
-Because all three Action Calls use `main`, they execute sequentially.
+All three Action Calls use `main` in this example, so the scheduler waits for each handler to finish. ModelKit synthesis produces audio data; PlatformKit playback produces audible output. Similarly, camera capture obtains image data, while model image analysis is a separate processing request. Arrows represent logical calls through injected services, not new module dependencies.
 
 ---
 
@@ -1602,13 +1631,10 @@ MobileHarness/
 │       └── MLX/
 │
 ├── PlatformKit/
-│   ├── Camera/
 │   ├── Audio/
-│   ├── Sensors/
-│   ├── Storage/
-│   ├── Network/
-│   ├── Device/
-│   └── ExternalDevice/
+│   ├── Vision/
+│   ├── Connectivity/
+│   └── Core/
 │
 ├── Resources/
 │   ├── Models/
@@ -1700,13 +1726,36 @@ struct ToolCall {
 
 | Component | Responsibilities |
 |---|---|
-| Input Gateway | Signal acquisition, adaptation, normalization, context, routing |
-| Agent | State, reasoning, model execution, capability registration, prompt exposure, parsing, alias resolution |
+| Input Gateway | Signal admission, sampling/adaptation policy, normalization, context and routing; invokes model capabilities when needed |
+| Agent | Business state and decisions, model capability requests, capability registration, prompt exposure, parsing and alias resolution |
 | Output Gateway | Output validation, Action/Tool routing, Channel scheduling, dispatch, result collection |
 | Actions | Executable behaviors |
 | Tools | Model-native callable capabilities |
-| ModelKit | Model lifecycle, inference, scheduling |
-| PlatformKit | OS, sensor, device, hardware APIs |
+| ModelKit | Model-driven data processing: preprocessing, inference, postprocessing; shared model lifecycle and bounded admission |
+| PlatformKit | Device/OS data input and output: capture, playback, communication, permissions and device lifecycle |
+| App / Experience | App adapts data and injects services; Experience presents UI and forwards user intent |
+
+## 39.1 PlatformKit versus ModelKit
+
+| Comparison | PlatformKit — data input/output | ModelKit — data processing |
+| --- | --- | --- |
+| Primary question | How does data enter or leave through a device/system service? | How is supplied data transformed or interpreted by a model? |
+| Audio input | Microphone capture → PCM | PCM → transcript or voice-activity score |
+| Audio output | Supplied PCM → speaker playback | Text → synthesized PCM; synthesis itself does not play audio |
+| Vision | Camera → native image frames and preview source | Image → detections, keypoints or other model results |
+| Necessary adaptation | Capture format conversion, orientation metadata and compact gray sampling | Model input resize/crop/normalization, tensor decoding and coordinate restoration |
+| Owned resources | Capture sessions, audio engines, device connections and bounded I/O buffers | Weights, backend graphs, model instances and inference leases |
+| Organization | Audio / Vision / Connectivity, with Core shared contracts | Speech / Language / Vision, with Core and model assembly/runtime/backend support |
+| Excludes | Model inference, routing policy and Agent business decisions | Device capture/playback/control, routing policy and Agent business decisions |
+
+“Data processing” here means **model capability processing**, not every computation in the app. For example, PlatformKit samples camera luminance, Gateway compares the gray samples and decides whether to admit a frame, ModelKit infers pose, and Photographer decides how to publish that result. These are separate responsibilities even when each step touches the same image.
+
+## 39.2 Composition and ownership
+
+App connects the layers through data adapters and injected services. ModelKit and PlatformKit remain independent; AgentCore depends on neither. A model result does not directly cause a hardware action: Agent output passes through OutputGateway and the registered Action/Tool handler before a device service is invoked. ModelKit can also process existing in-memory data without any live hardware input.
+
+✅ The current camera flow follows PlatformKit acquisition → App adaptation → Gateway change admission → Photographer’s PoseCapability request → ModelKit pose result → Agent ActionCall → OutputGateway → UI handler → Experience overlay. Current speech similarly separates TTS synthesis from device playback.
+❌ Concrete robot/device transports and the planned photo-capture Action are not implemented.
 
 ---
 
@@ -1727,7 +1776,8 @@ struct ToolCall {
 13. Execution results re-enter the cognitive loop through Input Gateway when needed.
 14. Agents do not directly depend on other Agent implementations.
 15. Agents are long-lived, stateful, independently manageable runtime units.
-16. ModelKit and PlatformKit contain infrastructure capabilities without Agent business semantics.
+16. PlatformKit owns device/OS data input and output; ModelKit owns model-driven data processing. Neither owns Agent business decisions, and neither depends on the other.
+17. App adapts data and injects services across these boundaries. Gateway owns signal admission/routing; Actions and Tools own executable behavior. Basic I/O conversion stays with PlatformKit; model-specific preprocessing/postprocessing stays with ModelKit.
 
 ---
 
@@ -1735,6 +1785,10 @@ struct ToolCall {
 
 ```text
 External World
+      ↓
+PlatformKit device / OS input (where applicable)
+      ↓
+App input adaptation
       ↓
 Multimodal Signal
       ↓
@@ -1744,7 +1798,7 @@ Signal Adaptation / Routing
       ↓
 Stateful Agent
       ↓
-Model / Logic
+Agent logic / ModelKit processing request
       ↓
 Agent-side Parsing
       ↓
@@ -1755,6 +1809,8 @@ ActionCall / ToolCall
 Output Gateway
       ├── ActionCall → Channel Scheduler → Actions
       └── ToolCall     → Tool Runtime
+      ↓
+Handlers → ModelKit processing / PlatformKit I/O / Experience UI as needed
       ↓
 Result Signal
       ↓
@@ -1810,8 +1866,8 @@ Core owns shared media data contracts: AudioFormat/AudioFrame are implemented; i
 
 ✅ ModelKitDefaults.manager(resources:) returns the process-wide manager. Concurrent calls share assembly and provider instances; conflicting resource roots fail. Construction/registration are assembly SPI. Each model admits one active operation, rejects overlap with inputBusy, and releases admission only after cleanup. Cross-model scheduling is not implemented.
 
-✅ ModelKit/Vision now implements PoseCapability and the independent YOLO adapter. Core/ImageFrame carries bounded upright RGB8 data; `.pose` is a default manager binding. ✅ Photographer integrates the camera and pose capability through both gateways.
+✅ ModelKit/Vision now implements PoseCapability and the independent YOLO adapter. Core/ImageFrame carries bounded upright RGB8 data or a retained read-only native image buffer; `.pose` is a default manager binding. ✅ Photographer integrates the camera and pose capability through both gateways.
 
-✅ PlatformKit/Camera and Experience/Camera provide foreground camera capture and preview: normal launch defaults to front camera, mirrored on the front and natural on the back, with on/off and switch controls above a dimmed full-screen feed. App/CameraCoordinator owns scene intent independently of voice readiness. ✅ Changed camera frames now enter InputGateway and Photographer pose inference.
+✅ PlatformKit/Vision and Experience/Camera provide foreground camera capture and preview: normal launch defaults to front camera, mirrored on the front and natural on the back, with on/off and switch controls above a dimmed full-screen feed. App/CameraCoordinator owns scene intent independently of voice readiness. ✅ Changed camera frames now enter InputGateway and Photographer pose inference.
 
 ✅ First camera pipeline: PlatformKit capture → Gateway grayscale filter → Photographer latest-image inbox → shared PoseCapability → Function Token / ActionCall → OutputGateway → UI.showPose → preview skeletons. See ADR 0036 for bounds and phase-one scope.

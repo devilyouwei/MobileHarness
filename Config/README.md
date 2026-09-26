@@ -14,3 +14,5 @@ Purpose: own shared Xcode settings, local-signing templates and explicit model r
 ✅ Shared.xcconfig includes NSCameraUsageDescription for local preview and on-device pose inference. The camera is optional; denial leaves the background black and does not block voice model preparation.
 
 ✅ Device resource file lists now stage the pinned YOLOPose mlpackage and upstream model card. Camera permission text describes local pose inference; no uploads or recording.
+
+✅ Physical model file lists now stage yolo26n-pose.mlpackage only. The generated App Models cleanup and declared-file copy prevent the retired YOLOv8 package from shipping.

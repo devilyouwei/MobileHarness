@@ -52,3 +52,5 @@ Core owns model-independent audio, image and video data contracts. These types d
 Keep shared media values separate from model-specific tensors, preprocessing and business message types.
 
 ✅ ImageFrame validates tightly packed upright RGB8 data, at most 4,194,304 pixels and 4096 per dimension. ❌ Encoded image decoding, orientation conversion and video transport remain outside Core.
+
+✅ ImageFrame now accepts either RGB Data or a read-only retained BGRA NativeImageBuffer with clockwise quarter-turn orientation. Native storage validates 4 MP / 4096-per-side bounds and format; producer must not mutate it while retained. CoreVideo is an Apple data-buffer API, not a concrete model engine or business dependency. rgb is optional for native inputs; consumers must select the available storage explicitly.

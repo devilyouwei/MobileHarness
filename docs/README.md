@@ -27,3 +27,13 @@ Purpose: distinguish the current architecture and roadmap from historical design
 ✅ ADR 0035 records YOLOv8 Pose capability and lifecycle integration. ❌ End-to-end camera/Agent acceptance remains outstanding.
 
 ✅ ADR 0036 documents camera change sampling, Photographer admission and Action-delivered skeletons.
+
+✅ ADR 0035 and architecture/roadmap record the native pose preprocessing/postprocessing optimization and outstanding device re-acceptance.
+
+✅ ADR 0037 records native pixel-buffer transport, opaque AgentCore attachments, Vision geometry and CPU+ANE defaults; the Photographer README contains the updated software/hardware Mermaid flow.
+
+✅ ADR 0038 records the YOLO26-only model migration and verified end-to-end output contract.
+
+✅ [Platform capability domains](adr/0039-platform-capability-domains.md) records Audio/Vision/Connectivity and shared Core directory ownership.
+
+Current layer ownership is defined in the [ModelKit / PlatformKit comparison](../MobileHarness/README.md#391-platformkit-versus-modelkit): model-driven data processing versus device/OS data I/O. Dated ADRs and validation reports describe the implementation at that time; current module READMEs and Repository-Structure govern present ownership.

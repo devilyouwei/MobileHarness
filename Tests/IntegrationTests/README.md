@@ -21,3 +21,7 @@ Update this README when adding or changing tests. Preserve ✅/❌ distinctions 
 ✅ Adapter fixtures explicitly own ModelContext; managed weight teardown is independent of capability/session consumption. Shared registration/reuse tests live under root Tests/ModelKitRuntimeTests.
 
 ✅ PhotographyPipelineTests covers normalized grayscale threshold and previous-examined-frame semantics, duplicate rejection, latest-only delayed model processing, pause/stop, stale result suppression, pose Action validation, projection and Gateway → Agent → output Action completion.
+
+✅ Camera conversion regression fixtures cover padded source rows, all four clockwise rotations, RGB channel order and 720p-to-640-long-edge bounds using native vImage.
+
+✅ Native-camera sampling fixtures cover padded rows and all four orientations. Sampled ImageInput tests verify unchanged threshold/baseline admission and malformed sample rejection; previous camera RGB-conversion fixtures were replaced with these current-path tests.

@@ -11,7 +11,7 @@ import Tools
 @MainActor
 enum AgentBootstrap {
     static func makePhotographer(pose: any PoseCapability, sessionID: UUID) throws -> PhotographerAgent {
-        try PhotographerAgent(pose: pose, sessionID: sessionID)
+        try PhotographerAgent(pose: pose, sessionID: sessionID, resolveImage: CameraImageAttachment.resolve)
     }
     static func makePoseActions(
         present: @escaping @Sendable (PoseOverlay, ActionInvocation) async throws -> Void

@@ -179,3 +179,5 @@ Keep this standard synchronized with configuration validation and Agent changes.
 Each Agent README must follow the [concurrency documentation standard](../README.md#concurrency-documentation-standard). Document its inbox producer and drain worker, output consumer, capacities, pause/resume behavior, cancellation admission, failure propagation and completion semantics. A registry bound or actor mailbox is not a substitute for an explicit bounded application inbox. Include a Mermaid diagram and distinguish implemented behavior from planned scheduling features. The Assistant README provides the current concrete example.
 
 ✅ Photographer is the phase-one 摄像师 role: injected PoseCapability, one active/one latest pending image, JSON v3 showPose action and shared output parsing. Robot motion, composition and tracking remain unimplemented; see Photographer/README.md.
+
+✅ Photographer accepts an App-injected image resolver for opaque native frame attachments. Capability declarations still come exclusively from Photographer.agent.json; the resolver is data adaptation, not a second Action/Tool registration list.

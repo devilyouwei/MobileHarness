@@ -1,10 +1,14 @@
+import CoreVideo
 import Foundation
 
-/// Upright, unmirrored RGB8 camera sample. Application maps this into Gateway's input contract.
-public struct CameraFrame: Sendable {
+/// Retained immutable native capture buffer plus an upright grayscale sample.
+/// Producer must not mutate pixels while retained; the app only lends them to read-only model operations.
+public struct CameraFrame: @unchecked Sendable {
     public let width: Int
     public let height: Int
-    public let rgb: Data
+    fileprivate let pixels: CVPixelBuffer
+    public let gray64: Data
+    public func withPixelBuffer<T>(_ body: (CVPixelBuffer) throws -> T) rethrows -> T { try body(pixels) }
     public let sequence: UInt64
     public let timestamp: TimeInterval
     public let rotation: Int
@@ -80,45 +84,25 @@ public struct CameraFrame: Sendable {
                 continuation.finish(throwing: CameraError.configurationFailed)
                 return
             }
-            let scale = min(1, 640.0 / Double(max(sourceWidth, sourceHeight)))
-            let width = max(1, Int(Double(sourceWidth) * scale))
-            let height = max(1, Int(Double(sourceHeight) * scale))
-            let rotatedWidth = rotation % 2 == 0 ? width : height
-            let rotatedHeight = rotation % 2 == 0 ? height : width
-            let row = CVPixelBufferGetBytesPerRow(pixels)
-            let source = base.assumingMemoryBound(to: UInt8.self)
-            var rgb = [UInt8](repeating: 0, count: width * height * 3)
-            for y in 0..<height {
-                let sy = min(sourceHeight - 1, (2 * y + 1) * sourceHeight / (2 * height))
-                for x in 0..<width {
-                    let sx = min(sourceWidth - 1, (2 * x + 1) * sourceWidth / (2 * width))
-                    let dx: Int
-                    let dy: Int
-                    switch rotation {
-                    case 1:
-                        dx = height - 1 - y
-                        dy = x
-                    case 2:
-                        dx = width - 1 - x
-                        dy = height - 1 - y
-                    case 3:
-                        dx = y
-                        dy = width - 1 - x
-                    default:
-                        dx = x
-                        dy = y
-                    }
-                    let i = sy * row + sx * 4
-                    let j = (dy * rotatedWidth + dx) * 3
-                    rgb[j] = source[i + 2]
-                    rgb[j + 1] = source[i + 1]
-                    rgb[j + 2] = source[i]
-                }
+            let width = rotation % 2 == 0 ? sourceWidth : sourceHeight
+            let height = rotation % 2 == 0 ? sourceHeight : sourceWidth
+            guard width <= 4096, height <= 4096, width * height <= 4_194_304 else {
+                continuation.finish(throwing: CameraError.configurationFailed)
+                return
             }
-            // Newest-frame overflow is intentional; no Actions or Tool results use this stream.
+            let gray: Data
+            do {
+                gray = try CameraGraySampler.sample(
+                    base: base, sourceWidth: sourceWidth, sourceHeight: sourceHeight,
+                    stride: CVPixelBufferGetBytesPerRow(pixels), rotation: rotation)
+            } catch {
+                continuation.finish(throwing: error)
+                return
+            }
+            // Retain the immutable capture buffer; AVFoundation cannot recycle it until all owners release it.
             continuation.yield(
                 CameraFrame(
-                    width: rotatedWidth, height: rotatedHeight, rgb: Data(rgb),
+                    width: width, height: height, pixels: pixels, gray64: gray,
                     sequence: sequence, timestamp: timestamp, rotation: rotation))
         }
     }

@@ -113,7 +113,7 @@ let package = Package(
         .testTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
         .target(
             name: "PlatformKit", path: "MobileHarness/PlatformKit",
-            exclude: ["README.md", "Audio/README.md", "Camera/README.md"]),
+            exclude: ["README.md", "Audio/README.md", "Vision/README.md", "Core/README.md", "Connectivity/README.md"]),
         .testTarget(
             name: "IntegrationTests",
             dependencies: [

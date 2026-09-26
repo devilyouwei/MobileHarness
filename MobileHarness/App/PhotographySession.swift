@@ -4,6 +4,7 @@ import AgentCore
 import Agents
 import Foundation
 import Gateway
+import ModelKit
 import ModelKitDefaults
 import PlatformKit
 import ToolRuntime
@@ -35,7 +36,11 @@ enum PhotographySession {
                         try Task.checkCancellation()
                         try await sampled.submit(
                             ImageInput(
-                                width: frame.width, height: frame.height, rgb: frame.rgb,
+                                width: frame.width, height: frame.height, gray64: frame.gray64,
+                                attachment: CameraImageAttachment(
+                                    image: try frame.withPixelBuffer {
+                                        try ImageFrame(pixelBuffer: $0, rotation: frame.rotation)
+                                    }),
                                 sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation))
                     }
                 }
@@ -59,6 +64,22 @@ enum PhotographySession {
             await agent.stop()
             await responses.shutdown()
             throw error
+        }
+    }
+}
+
+/// Composition-only adapter keeps ModelKit and native camera types out of AgentCore.
+nonisolated struct CameraImageAttachment: ImageAttachment {
+    let image: ImageFrame
+    static func resolve(_ input: ImageInput) throws -> ImageFrame {
+        switch input.content {
+        case .rgb(let rgb): return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
+        case .sampled(_, let attachment):
+            guard let value = attachment as? CameraImageAttachment,
+                value.image.width == input.width, value.image.height == input.height,
+                value.image.native?.rotation == input.rotation
+            else { throw ImageInputError.invalidFrame }
+            return value.image
         }
     }
 }

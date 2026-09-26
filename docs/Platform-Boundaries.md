@@ -4,8 +4,8 @@
 
 | 能力 | 接入方向 | 实施约束 |
 | --- | --- | --- |
-| 相机 / 音频 | AVFoundation | 按需权限，处理中断、前后台切换与热状态 |
-| 语音 | Speech / 系统 TTS / 本地模型 | 按系统与设备核实支持；声明实际使用的数据流 |
+| 相机 / 音频输入输出（PlatformKit） | AVFoundation / AVFAudio | 按需权限，处理中断、前后台切换与热状态 |
+| 语音数据加工（ModelKit） | Speech / 系统 TTS / 本地模型 | 按系统与设备核实支持；声明实际使用的数据流 |
 | 照片 / 位置 | Photos / Core Location | 限定授权范围，拒绝后降级 |
 | App 与系统集成 | App Intents / Shortcuts / 已公开 URL 接口 | 只使用系统与目标 App 公开的能力 |
 | 机器人连接 | Core Bluetooth / Network | 配对、授权、协议校验、超时和急停 |
@@ -13,6 +13,8 @@
 
 长期存活 actor 是进程内生命周期概念，不代表 App 被系统挂起后仍可无限执行。物理机器人的低层安全控制、运动限幅和 watchdog 必须落在外部控制器；手机失联时外部设备自行停机。手机不承担硬实时安全控制。
 
-当前语音功能仅在用户点击开始后请求麦克风与语音识别权限，在停止/后台/中断时关闭音频。调试版允许 Apple 联网识别，录音可能由系统发送至 Apple；关闭联网开关后强制端侧识别。App 不自行保存录音、不持久化对话，没有自建接收服务。Info.plist 与 UI 已披露联网数据流。隐私清单当前未声明 App 自行采集的数据；发布前须结合最终服务配置与 Apple 数据处理规则复核清单、隐私政策及商店披露，不能将当前构建描述成“所有音频均不离开设备”。
+当前生产语音由 PlatformKit 采集麦克风 PCM，ModelKit 的 Nemotron/Silero 处理识别与 VAD；系统 TTS adapter 导出 PCM，由 PlatformKit 播放。旧 Apple ASR 联网调试路径不属于当前默认装配。麦克风在用户开始语音交互时申请权限；相机在正常前台启动时独立申请权限并默认使用前置摄像头。App 协调前后台，平台 adapter 处理设备中断与释放。
+
+PlatformKit 的职责是设备/系统数据输入输出及必要格式适配；ModelKit 负责模型前处理、推理与后处理。是否接纳帧由 Gateway 决定，摄影业务决策由 Agent 承担，UI 预览和覆盖层由 Experience 呈现。两套 Kit 不互相依赖，App 提供数据适配与服务注入。Connectivity 目前只有传输契约，尚无真实机器人控制实现。
 
 依据（2026-09-22 查阅）：[Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)，[Background Tasks](https://developer.apple.com/documentation/backgroundtasks)。具体接入时按对应 SDK 文档核实。

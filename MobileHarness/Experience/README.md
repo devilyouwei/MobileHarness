@@ -32,6 +32,6 @@ Keep this README synchronized with changes to responsibilities, files, interface
 
 ✅ Conversation displays large expressions inside the voice orb, separate from subtitles, with spring entry, soft glow and reduced-motion support.
 
-✅ Camera/CameraBackground.swift supplies the shared preview background and camera controls during startup and conversation. Camera ownership remains in App/PlatformKit; no business input is forwarded.
+✅ Camera/CameraBackground.swift supplies the shared preview background and camera controls during startup and conversation. PlatformKit/Vision owns capture; App coordinates scene intent and separately forwards frames through InputGateway. Experience renders the preview and action-delivered results without acquiring model capabilities or routing frames itself.
 
 ✅ Camera renders action-delivered COCO skeletons and offers 1/3/5/10% frame-change threshold selection. Controls remain above preview and voice content.

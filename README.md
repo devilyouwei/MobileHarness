@@ -22,7 +22,7 @@ The physical-device composition is Nemotron streaming ASR + Silero VAD → Assis
 
 2. Open MobileHarness.xcodeproj. Choose MobileHarness for a physical device or MobileHarnessSimulator for UI development.
 3. Copy Config/Local.xcconfig.example to ignored Config/Local.xcconfig and supply your development Team ID and Bundle ID.
-4. Download physical-device artifacts with `python3 scripts/download-nemotron.py`, `python3 scripts/download-qwen35.py` `python3 scripts/download-kokoro.py` and `python3 scripts/download-yolov8-pose.py`. Simulator ASR uses `python3 scripts/download-audio8.py`. Both configurations require `python3 scripts/download-silero.py`.
+4. Download physical-device artifacts with `python3 scripts/download-nemotron.py`, `python3 scripts/download-qwen35.py` `python3 scripts/download-kokoro.py` and `python3 scripts/download-yolo26-pose.py`. Simulator ASR uses `python3 scripts/download-audio8.py`. Both configurations require `python3 scripts/download-silero.py`.
 5. Tap the central circle, grant microphone permission and speak. After approximately 0.8 s of silence, the final transcript enters the Agent. Tap the circle again to stop recording and playback. The interface provides voice effects and captions without a text input field.
 
 Long utterances are segmented approximately every 12 s while capture continues, then merged into one submission after a pause. Each turn is limited to 60 s. Listening pauses during final recognition/reply handling and resumes after generation and all speech Actions complete. Stop discards unsubmitted content, clears conversation context and cancels inference, queued Actions and playback. Shared ModelManager retains model weights across recording turns and failures; explicit lifecycle operations own unloading.
@@ -52,15 +52,17 @@ check.sh runs formatting, Swift Testing and configuration validation. build-ios.
 | MobileHarness/Actions | Cohesive behavior functions: Speech.speak, UI.print and UI.express |
 | MobileHarness/ActionRuntime | Explicit executable handler registration and ActionCall execution |
 | MobileHarness/Tools and ToolRuntime | Tool functions, registration and execution |
-| MobileHarness/ModelKit | Independent model capability SDK and separate provider/runtime targets |
-| MobileHarness/PlatformKit | Platform audio and device primitives |
+| MobileHarness/ModelKit | Model-driven data processing: typed capabilities, preprocessing/inference/postprocessing and shared model lifecycle |
+| MobileHarness/PlatformKit | Device input/output capabilities grouped by Audio, Vision and Connectivity; Core shared contracts |
 | MobileHarness/Resources | Privacy declarations, download profiles and ignored model files |
 | Tests | Root module and integration tests |
 | Config | Shared build configuration and local signing template |
 | docs | Architecture, decisions, roadmap and validation records |
 | scripts | Artifact downloads, checks and builds |
 
-ModelKit includes ASR, TTS, VAD, LLM and JEV interfaces; Management supplies the separate ModelKitRuntime target. Concrete adapters include Apple speech, Nemotron, Silero, Kokoro and Qwen. Backends include CoreAI, CoreML and MLX. SwiftPM compiles the single shared source tree using explicit target paths; tests and dependency boundaries do not require duplicate source directories.
+ModelKit processes supplied data; PlatformKit acquires device data and performs device output. App adapts data and injects services, Gateway controls admission/routing, and Agents own business decisions. For example, TTS produces PCM in ModelKit and a speaker plays it through PlatformKit. See the [responsibility comparison](MobileHarness/README.md#391-platformkit-versus-modelkit).
+
+ModelKit includes ASR, TTS, VAD, LLM, pose and JEV interfaces; Management supplies the separate ModelKitRuntime target. Concrete adapters include Apple speech, Nemotron, Silero, Kokoro, Qwen and YOLO. Backends include CoreAI, CoreML and MLX. SwiftPM compiles the single shared source tree using explicit target paths; tests and dependency boundaries do not require duplicate source directories.
 
 ## Kokoro diagnostics
 
@@ -83,7 +85,7 @@ The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#int
 
 ✅ ModelKitDefaults assembles built-in providers internally; App obtains default capabilities from ModelManager without registering concrete models.
 
-✅ YOLOv8n Pose adds a separate PoseCapability and Core ML adapter; see MobileHarness/ModelKit/Vision/YOLO/README.md. ❌ Physical-device pose accuracy and robot behavior remain outstanding.
+✅ YOLO26n Pose INT8 (end-to-end) provides a separate PoseCapability and Core ML adapter; see MobileHarness/ModelKit/Vision/YOLO/README.md. ❌ Physical-device pose accuracy and robot behavior remain outstanding.
 
 ✅ Normal startup requests front-camera preview behind a translucent black overlay, voice orb and captions. Camera controls switch front/back or stop capture; off is black. Camera preview and perception are independent of microphone activation and voice model readiness.
 

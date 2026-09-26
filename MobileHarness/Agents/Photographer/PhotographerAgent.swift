@@ -8,6 +8,7 @@ public actor PhotographerAgent: Agent {
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let pose: any PoseCapability
+    private let resolveImage: @Sendable (ImageInput) throws -> ImageFrame
     private let sessionID: UUID
     private var lifecycle: AgentLifecycle = .registered
     private var pending: AgentInput?
@@ -16,13 +17,20 @@ public actor PhotographerAgent: Agent {
     private var lastTimestamp: TimeInterval?
     private var processed = 0
 
-    public init(pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil) throws {
+    public init(
+        pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil,
+        resolveImage: @escaping @Sendable (ImageInput) throws -> ImageFrame = { input in
+            guard case .rgb(let rgb) = input.content else { throw ImageInputError.invalidFrame }
+            return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
+        }
+    ) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Photographer", inputs: [.image],
             outputs: [.actionCall, .control], capabilities: configuration.capabilities)
         self.pose = pose
+        self.resolveImage = resolveImage
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
         outputs = stream.stream
@@ -76,9 +84,13 @@ public actor PhotographerAgent: Agent {
         do {
             guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
             let context = InferenceContext(requestID: input.id, conversationID: input.sessionID)
+            let resolved = try resolveImage(image)
+            guard resolved.width == image.width, resolved.height == image.height else {
+                throw ImageInputError.invalidFrame
+            }
             let result = try await pose.estimatePose(
                 PoseRequest(
-                    image: ImageFrame(width: image.width, height: image.height, rgb: image.rgb), context: context))
+                    image: resolved, context: context))
             try Task.checkCancellation()
             guard lifecycle == .running || lifecycle == .paused else { return }
             guard result.context == context else {

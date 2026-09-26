@@ -4,29 +4,32 @@
 
 旧版 [Tech_Design.md](Tech_Design.md) 与原始 `Technical_Design.docx` 保留不改。当前保留可用实现并按正式 README 分阶段迁移；共享行为函数根据用户后续要求统一放入 `Actions/`，增量约定见 [ADR 0015](adr/0015-function-actions.md) 和 [目录说明](Repository-Structure.md)。现有代码只实现方案的一部分，Roadmap 记录实际进度。
 
-AppContainer 创建并注入具体模型、音频和显示实现；AgentBootstrap 注册 Agent、函数路径目录和 Tool；AppLifecycleCoordinator 协调前台语音与输出消费；Experience/Conversation 的 ViewModel 只转发状态和用户意图。尚未实现完整长期任务监督或页面订阅与运行生命周期分离。
+AppContainer 从 ModelKitDefaults 获取共享模型能力，并注入音频和显示服务；AgentBootstrap 注册 Agent、函数路径目录和 Tool；AppLifecycleCoordinator 协调前台语音与输出消费；Experience/Conversation 的 ViewModel 只转发状态和用户意图。尚未实现完整长期任务监督或页面订阅与运行生命周期分离。
 
 ## 依赖方向
 
 ```text
-SwiftUI App → Agents / Gateway / Actions / ActionRuntime / Tools / ToolRuntime / PlatformKit / 模型 adapter
+SwiftUI App → Agents / Gateway / Actions / ActionRuntime / Tools / ToolRuntime / PlatformKit / ModelKit / ModelKitDefaults / ModelKitRuntime
 Gateway → AgentCore / ActionRuntime / ToolRuntime / ModelKit
 Actions → AgentCore / ActionRuntime / ModelKit
 ActionRuntime → AgentCore
 Tools → AgentCore
 Agents → AgentCore / ModelKit
 ToolRuntime → AgentCore
+ModelKitDefaults → ModelKitRuntime / ModelKit / 具体模型 adapter
 ModelKitRuntime → ModelKit
 ModelKitAppleSpeech → ModelKit / Speech / AVFAudio
 ModelKitSilero → ModelKit / ModelKitCoreML → Apple CoreML
 ModelKitNemotron → ModelKit / ModelKitCoreAI → Apple CoreAI
 ModelKitQwen35 → ModelKit / ModelKitMLXLanguage → MLXLLM / MLX / Tokenizers
-ModelKit → Foundation / Synchronization（无项目内依赖）
+ModelKit → Foundation / Synchronization / CoreVideo 数据类型（无项目内依赖）
 PlatformKit → Apple public frameworks
 AgentCore → Foundation
 ```
 
-ModelKit 是独立能力 SDK；provider 注册与绑定属于 composition root。Agent 只使用 ChatCapability，InputGateway 只使用 SpeechRecognitionCapability，Speech 动作只使用 SpeechSynthesisCapability。具体模型、制品与后端对象不穿透这些接口。Actions 通过注入的播放与显示服务完成副作用，不依赖具体 Agent 或 SwiftUI。PlatformKit 管理音频硬件、系统权限与连续重采样。
+ModelKit 是模型数据加工层：通过能力协议完成前处理、推理与后处理，provider 注册和默认绑定归内部 ModelKitDefaults。Agent 使用 ChatCapability、PoseCapability 等协议，Gateway 使用识别与 VAD 能力，Speech 动作使用 SpeechSynthesisCapability。具体模型、制品与后端对象不穿透这些接口。
+
+PlatformKit 是设备/系统数据输入输出层：Audio 负责采集 PCM 与播放，Vision 负责采集图像与预览来源，Connectivity 定义外设通信契约，Core 保存通用权限契约。基础输入格式转换留在平台层；抽帧阈值、VAD 分段与路由属于 Gateway；模型输入缩放、推理和结果解码属于 ModelKit；业务决策属于 Agent。App 适配数据并注入服务，两套 Kit 互不依赖。Actions 通过注入的播放与显示服务完成副作用，Experience 负责 UI 呈现。详见 [职责对比](../MobileHarness/README.md#391-platformkit-versus-modelkit)。
 
 ## 已实现的数据流
 
@@ -143,14 +146,24 @@ Get/load coalesce bounded construction/loading; unload gates a resource and wait
 ✅ Root Package.swift declares all targets. ModelKit stays inside this project with no nested package and no dependency on business targets. Management and Backends separate lifecycle control from engine execution. All tests live under root Tests; application prompt evaluations are isolated in AgentModelEvaluationTests. scripts/check.sh enforces import/target boundaries and directory READMEs. See ADR 0033 for the contract.
 ❌ Independent SDK distribution and physical-device acceptance are outside this migration.
 
-✅ AudioFrame.swift is part of ModelKit/Core. Core is the home for shared audio and future image/video contracts; platform I/O and model-specific processing remain separate. ❌ Image/video types are not implemented until needed.
+✅ ModelKit/Core owns AudioFrame/AudioFormat and ImageFrame (RGB or retained read-only native buffer). PlatformKit owns capture data and device lifecycle; App adapts the data to model contracts. ❌ Model-level video sessions remain unimplemented.
 
 ✅ ModelKitDefaults owns fixed provider registration and default capability bindings. App supplies a resource root and retrieves interfaces with get(.chat) and the other capability keys. ModelKitRuntime remains adapter-independent. See [ADR 0034](adr/0034-modelkit-default-assembly.md).
 
 ✅ ModelKitDefaults.manager(resources:) returns the process-wide manager. Concurrent calls share assembly and provider instances; conflicting resource roots fail. Construction/registration are assembly SPI. Each model admits one active operation, rejects overlap with inputBusy, and releases admission only after cleanup. Cross-model scheduling is not implemented.
 
-✅ PoseCapability adds single-image pose inference without business dependencies. ModelKitYOLOPose → ModelKit / ModelKitCoreML; Defaults owns the lazy `.pose` binding. See ADR 0035 and the adapter README. ❌ Camera → InputGateway → Agent integration is not implemented.
+✅ PoseCapability adds single-image pose inference without business dependencies. ModelKitYOLOPose → ModelKit / ModelKitCoreML; Defaults owns the lazy `.pose` binding. See ADR 0035 and the adapter README. ✅ Camera → InputGateway → Photographer integration uses App-adapted frames and injected PoseCapability.
 
-✅ Camera preview is a local presentation path: PlatformKit camera actor → native preview layer → Experience, coordinated by App independently of model readiness. No image enters business runtime in this feature; future Agent input must go through InputGateway. Camera and voice retain separate permission/lifecycle control.
+✅ Camera preview is a local presentation path: PlatformKit camera actor → native preview layer → Experience, coordinated by App independently of model readiness. The preview bypasses inference; a separate bounded native-frame path enters InputGateway and Photographer. Camera and voice retain separate permission/lifecycle control.
 
-✅ Camera frames now enter InputGateway through CameraInputSession. Photographer owns pose inference; UI.showPose executes via OutputGateway/ActionRuntime. No robot commands are implemented. ModelKit and AgentCore remain independent. See ADR 0036.
+✅ Camera frames now enter InputGateway through CameraInputSession. Photographer owns latest-frame inference scheduling and result publication; ModelKit executes pose inference; UI.showPose executes via OutputGateway/ActionRuntime. No robot commands are implemented. ModelKit and AgentCore remain independent. See ADR 0036.
+
+✅ Pose preprocessing uses Accelerate/vImage with actor-confined reusable buffers; typed bulk tensor extraction replaces NSNumber indexing. Immutable RGB capability and Gateway/Agent/Action contracts remain unchanged (ADR 0035 amendment).
+
+✅ Native camera flow: retained read-only CVPixelBuffer → App opaque ImageAttachment → Gateway grayscale admission → Photographer resolver → ModelKit native ImageFrame → Vision scaleFit → Core ML CPU+ANE → CPU pose decoding → Action UI. AgentCore remains framework-independent; see ADR 0037.
+
+✅ ADR 0038 replaces the pose artifact with pinned official YOLO26n-Pose INT8/end-to-end. The graph selects up to 300 rows; Swift performs score validation/filtering and coordinate restoration, with no second NMS. Vision+CPU/ANE remains the native path.
+
+## 能力域目录（2026-09-26）
+
+PlatformKit 以 Audio、Vision、Connectivity 组织设备/系统输入输出，Core 保存跨域权限契约；ModelKit 以 Speech、Language、Vision 组织模型数据处理。两层均按能力域分类，由 App 适配数据与注入服务，业务策略留在 Agent。相机源码移入 PlatformKit/Vision；共享音频会话仍由现有 AppleAudioIO 管理。此次仅调整目录和文档，不改变依赖、公开 API、队列或生命周期契约。见 [ADR 0039](adr/0039-platform-capability-domains.md)。

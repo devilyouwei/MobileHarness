@@ -1,6 +1,6 @@
 # ModelKit — Independent Model Capability SDK
 
-ModelKit supplies recognition, generation, and judgment capabilities without choosing business goals or directly controlling devices. Architecture section 33 defines the target model-management and inference responsibilities; section 37 describes the logical layout. Consumers receive capability protocols while concrete models and backends remain replaceable.
+ModelKit is the model-driven data processing layer: recognition, generation and judgment include model-specific preprocessing, inference and postprocessing. It accepts supplied data and returns results without choosing business goals, capturing device input or performing device output. Architecture section 33 defines the target model-management and inference responsibilities; section 37 describes the logical layout. Consumers receive capability protocols while concrete models and backends remain replaceable.
 
 The device composition currently uses Nemotron streaming ASR, Silero VAD, Qwen3.5-2B MLX chat, and Apple system TTS. It requires iOS 27 and matching h18p artifacts, with no automatic device fallback. The simulator supports UI debugging; ASR and chat are explicitly unavailable. Models load and warm up before recording. Kokoro is a separate English TTS validation adapter.
 
@@ -14,8 +14,8 @@ flowchart LR
     ModelKit -->|Capability interfaces and availability| App
     Gateway -->|Audio recognition and VAD requests| ModelKit
     ModelKit -->|Transcripts and voice-activity scores| Gateway
-    Agents -->|Chat or judgment requests| ModelKit
-    ModelKit -->|Typed generation events| Agents
+    Agents -->|Chat, pose or judgment requests| ModelKit
+    ModelKit -->|Typed generation or perception results| Agents
     Actions -->|Speech synthesis requests| ModelKit
     ModelKit -->|PCM events| Actions
     Resources -->|Local model directories through App| ModelKit
@@ -25,7 +25,7 @@ flowchart LR
 
 ## Dependencies and API boundary
 
-The base `ModelKit` target has no project-internal dependencies. It uses Foundation, Synchronization, and the Swift standard library. It must not import or reference AgentCore, Agents, Gateway, ToolRuntime, PlatformKit, UI, or their business types.
+The base `ModelKit` target has no project-internal dependencies. It uses Foundation, Synchronization, the Swift standard library and CoreVideo image data types. CoreVideo storage does not confer ownership of camera capture or platform lifecycle. It must not import or reference AgentCore, Agents, Gateway, ToolRuntime, PlatformKit, UI, or their business types.
 
 [ModelKitRuntime](Management/README.md) is a separate target/product for shared model registration, capability binding and lifecycle management. Ordinary consumers import ModelKit and receive capability protocols, never ModelID, managers, weight paths, backend identity, or concrete model configuration. Target dependency declarations must enforce this separation; Swift cannot prevent a developer from importing another module already added as a dependency.
 
@@ -38,7 +38,7 @@ Concrete model SDKs and configuration belong to separate adapter targets. ModelK
 | `Core/` | Capability/session contracts, model resource admission, and minimal inference admission |
 | `Defaults/` | Fixed model assembly, capability defaults and backend configuration |
 | `Management/` | Separate ModelKitRuntime target: registration, typed acquisition and lifecycle management |
-| `Core/AudioFrame.swift` | Validated PCM transport; Core also owns ImageFrame for shared RGB transport; video remains outstanding |
+| `Core/AudioFrame.swift` | Validated PCM transport; ImageFrame supports RGB or retained read-only native image data; video sessions remain outstanding |
 | `Language/LLM/`, `Language/JEV/` | Chat and judgment protocols |
 | [Qwen3.5](Language/LLM/Qwen35/README.md) | Current text-only MLX ChatCapability adapter |
 | `Speech/ASR/`, `Speech/TTS/`, `Speech/VAD/` | Recognition, synthesis, and voice-activity contracts and adapters |
@@ -276,3 +276,9 @@ All tests live under root Tests. Qwen35Tests checks model/tokenizer contracts wi
 
 
 ✅ Vision/PoseCapability and Core/ImageFrame provide single-image COCO-17 pose inference. ModelKitYOLOPose depends only on ModelKit and ModelKitCoreML; Defaults registers yolov8n-pose as `.pose` with releaseWhenIdle. See Vision/YOLO/README.md for artifact, image, NMS and cancellation contracts. ❌ Device quality acceptance remains outstanding; Photographer uses the shared pose capability.
+
+✅ The default pose provider now uses YOLO26n-Pose INT8 with graph-integrated end-to-end selection and [1,300,57] output. Old YOLOv8 files/registration/decoding are removed; capability, lifetime and Agent-facing interfaces remain unchanged.
+
+## Relationship to PlatformKit domains
+
+Both layers group capabilities by domain. ModelKit owns model-driven data processing (Speech, Language, Vision); PlatformKit owns hardware/OS input and output (Audio, Vision, Connectivity). Core holds each layer’s shared contracts. Directory names follow the capability scope rather than requiring identical trees. App adapts data and injects services; neither layer acquires a dependency on the other. Photography, tracking and conversation decisions remain Agent business policy.

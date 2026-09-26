@@ -6,7 +6,7 @@ This README is the development standard for all current and future Action module
 
 ## Direct relationships
 
-The current audio and presentation connections use callbacks supplied by App. These edges describe logical data flow rather than direct imports of PlatformKit or Experience.
+ModelKit transforms data for an Action (for example, text into PCM); PlatformKit performs device I/O (PCM playback). The Action composes these steps and awaits the promised completion. The current audio and presentation connections use callbacks supplied by App. These edges describe logical data flow rather than direct imports of PlatformKit or Experience.
 
 ```mermaid
 flowchart LR

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-profiles = ["nemotron", "qwen3.5-2b", "silero", "kokoro", "yolov8-pose"]
+profiles = ["nemotron", "qwen3.5-2b", "silero", "kokoro", "yolo26-pose"]
 licenses = [
     "Nemotron-OpenMDW-1.1", "CoreAIKit-BSD-3-Clause", "Qwen35-Apache-2.0",
     "MLX-Swift-MIT", "MLX-Swift-LM-MIT", "Silero-MIT", "Hugging-Mac-MIT", "Kokoro-Apache-2.0", "YOLOPose-AGPL-3.0",

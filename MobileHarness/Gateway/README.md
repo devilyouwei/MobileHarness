@@ -4,7 +4,7 @@ Gateway connects external input, cognitive processing, and execution. Architectu
 
 ## Responsibilities and boundaries
 
-- Input receives user input, audio, and tool results, performs supported adaptation, and selects Agent destinations.
+- Input receives user input, audio, images and tool results, owns admission/adaptation policy, and selects Agent destinations. PlatformKit performs device acquisition; ModelKit performs requested ASR/VAD processing. App connects device input to Gateway; no device resource is owned here.
 - Output accepts resolved `ActionCall` and `ToolCall` values. XML parsing, local alias resolution, and Channel selection happen inside Agents using AgentCore.
 - Action Calls enter bounded Channel scheduling. Calls within one Channel are serial; independent Channels may run concurrently, subject to shared module resource exclusion.
 - Tool Calls bypass Channel scheduling. Results re-enter through InputGateway with the originating session and Agent association.
@@ -15,7 +15,7 @@ Arrows show current logical payload flow. Platform input is connected through Ap
 
 ```mermaid
 flowchart LR
-    App -->|User input and captured audio| Gateway
+    App -->|User input, captured audio and admitted images| Gateway
     Gateway -->|AgentInput and tool-result feedback| Agents
     Agents -->|Resolved calls and runtime notifications| Gateway
     Gateway -->|ASR and VAD requests| ModelKit

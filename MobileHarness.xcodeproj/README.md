@@ -19,10 +19,12 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 
 ✅ Both App targets consume the single root Swift package. The physical target explicitly links its ModelKitQwen35 product; ModelKit has no separate package reference. Management and Backends navigation follow the physical source directories.
 
-✅ AudioFrame.swift is part of ModelKit/Core. Core is the home for shared audio and future image/video contracts; platform I/O and model-specific processing remain separate. ❌ Image/video types are not implemented until needed.
+✅ ModelKit/Core owns AudioFrame/AudioFormat and ImageFrame for RGB or retained native image data. PlatformKit owns device I/O; App adapts the data. ❌ Model-level video sessions remain unimplemented.
 
 ✅ App resolves ModelKitDefaults through the root project product; default assembly selects providers internally. No App source directly imports model adapters.
 
 ✅ Both App targets compile CameraCoordinator and CameraBackground; PlatformKit compiles AppleCamera from root Package.swift. The shared configuration declares camera usage.
 
 ✅ PhotographySession compiles in both App targets; Photographer source and v3 JSON appear in navigation, with the JSON compiled once through the Agents SwiftPM resource declaration.
+
+✅ PlatformKit navigation follows Audio, Vision, Connectivity and Core, including all camera sources and domain READMEs. SwiftPM remains the sole compiler of shared platform sources.

@@ -6,7 +6,7 @@ Purpose: provide local English synthesis for explicit diagnostics. Design goals:
 - ✅ ModelKitKokoro depends only on ModelKit/CoreAI. Three CPU-only graphs with host alignment and harmonic STFT; OS 27 Apple Silicon, explicitly unavailable on Simulator.
 - ✅ en/en-US and af_heart only. Unknown English words use letter spelling; non-English input is rejected. Express decimal numbers as English words.
 - ✅ Input ≤2048 UTF-8 bytes, ≤32 segments, ≤60 s PCM. 128-token/512-frame bucket overflow fails without truncation.
-- ✅ App registers the context-bound adapter with ModelManager. The manager owns load/unload; cancellation stops future stages and joins current graph work before releasing the lease.
+- ✅ ModelKitDefaults registers the context-bound adapter with ModelManager; App obtains its diagnostic capability. The manager owns load/unload; cancellation stops future stages and joins current graph work before releasing the lease.
 - ❌ Chinese/Japanese preprocessing, universal device compatibility and production multilingual acceptance.
 
 ## Queue and asynchronous processing contract

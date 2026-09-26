@@ -64,10 +64,9 @@ $(SRCROOT)/MobileHarness/Resources/Models/Kokoro/kokoro_prosody.aimodel/metadata
 $(SRCROOT)/MobileHarness/Resources/Models/Kokoro/kokoro_vocoder.aimodel/main.hash
 $(SRCROOT)/MobileHarness/Resources/Models/Kokoro/kokoro_vocoder.aimodel/main.mlirb
 $(SRCROOT)/MobileHarness/Resources/Models/Kokoro/kokoro_vocoder.aimodel/metadata.json
-$(SRCROOT)/MobileHarness/Resources/Models/YOLOPose/README.md
-$(SRCROOT)/MobileHarness/Resources/Models/YOLOPose/yolov8n-pose.mlpackage/Data/com.apple.CoreML/model.mlmodel
-$(SRCROOT)/MobileHarness/Resources/Models/YOLOPose/yolov8n-pose.mlpackage/Data/com.apple.CoreML/weights/weight.bin
-$(SRCROOT)/MobileHarness/Resources/Models/YOLOPose/yolov8n-pose.mlpackage/Manifest.json
+$(SRCROOT)/MobileHarness/Resources/Models/YOLOPose/yolo26n-pose.mlpackage/Data/com.apple.CoreML/model.mlmodel
+$(SRCROOT)/MobileHarness/Resources/Models/YOLOPose/yolo26n-pose.mlpackage/Data/com.apple.CoreML/weights/weight.bin
+$(SRCROOT)/MobileHarness/Resources/Models/YOLOPose/yolo26n-pose.mlpackage/Manifest.json
 $(SRCROOT)/docs/licenses/Nemotron-OpenMDW-1.1.txt
 $(SRCROOT)/docs/licenses/CoreAIKit-BSD-3-Clause.txt
 $(SRCROOT)/docs/licenses/Qwen35-Apache-2.0.txt

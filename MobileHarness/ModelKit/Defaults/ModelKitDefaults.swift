@@ -71,7 +71,7 @@ public enum ModelKitDefaults {
                             context: context, artifacts: resources.appendingPathComponent("Kokoro")))
                 })
             try await manager.register(
-                ModelRegistration(id: ModelID("yolov8n-pose"), capabilities: [.pose], memoryPolicy: .releaseWhenIdle) {
+                ModelRegistration(id: ModelID("yolo26n-pose"), capabilities: [.pose], memoryPolicy: .releaseWhenIdle) {
                     context in
                     ProvidedCapabilities(
                         pose: try YOLOPose(context: context, artifacts: resources.appendingPathComponent("YOLOPose")))

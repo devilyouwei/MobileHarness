@@ -214,3 +214,21 @@ Validation (2026-09-26): root scripts/check.sh passed; all four scripts/build-io
 ✅ P3 first camera perception flow: configurable grayscale threshold, latest-only Photographer pose inference, shared singleton model provider and Action-delivered skeleton UI. ❌ Robot arm motion, composition policy, tracking IDs and physical-device performance/accuracy acceptance.
 
 Validation (2026-09-26): final root scripts/check.sh passed, including 66 IntegrationTests and shared .pose provider identity. A separate full check with YOLO_POSE_MODEL_ROOT enabled passed real Core ML blank-image inference, unload/reload and shutdown checks. All four simulator schemes and the unsigned physical MobileHarness Debug build passed. Inspected the final device App: Photographer.agent.json matches source, pinned YOLO weight bytes match, and the AGPL license is present. An old generated Agent bundle was invalidated so the new configuration was recopied. No physical camera/phone installation or human-pose alignment/accuracy/thermal acceptance is claimed.
+
+✅ Pose CPU preprocessing/postprocessing optimization implemented with native vImage, shared layout, buffer reuse and bulk tensor reads. ❌ Optimized iPhone FPS, latency, thermal behavior and resampling accuracy require a new physical-device acceptance run.
+
+✅ Native Vision/CPU+ANE YOLO baseline implemented, with bounded native lifetimes, gray-only Gateway admission and retained RGB/vImage comparison path. ❌ iPhone profiling, human-pose alignment/accuracy, pool/thermal stress, model-integrated postprocessing and multi-model sharing remain pending.
+
+✅ YOLO26n-Pose directly replaces YOLOv8, including pinned provisioning, exclusive default binding and end-to-end output decoder. ❌ New-model phone accuracy/latency and thermal validation remain pending; historical benchmarks are not carried over.
+
+## PlatformKit capability domains (2026-09-26)
+
+✅ Audio/Vision/Connectivity domain grouping and Core shared contracts; source paths, SwiftPM README exclusions and Xcode navigation updated. ModelKit handles model data processing; PlatformKit handles device input/output. Runtime APIs and ownership are unchanged.
+❌ Concrete external-device adapters and further domain expansion await actual requirements. See ADR 0039.
+
+Validation (2026-09-26): root scripts/check.sh passed, including 69 IntegrationTests; all four scripts/build-ios.sh simulator schemes passed. Every PlatformKit source and README resolves in Xcode navigation. No new device installation or physical-device acceptance was performed.
+
+## Capability ownership documentation audit (2026-09-26)
+
+✅ Current entry, architecture, repository layout, contribution guidance and App/Gateway/Actions/Experience/model READMEs distinguish PlatformKit device I/O from ModelKit processing. Stale image/camera status and App-owned model registration descriptions were corrected against current code. Historical ADRs, validation evidence and original design sources are preserved.
+❌ No new runtime behavior or physical-device acceptance is implied by this documentation update.

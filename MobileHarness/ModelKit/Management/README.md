@@ -1,6 +1,6 @@
 # ModelKitRuntime — Shared Model Container
 
-Purpose: give App composition one IoC entry point for model registration, capability retrieval and weight lifecycle. Design goals: shared identity, bounded concurrency, explicit errors and safe cleanup. This target depends only on ModelKit; concrete adapters are registered by ModelKitDefaults, never imported here.
+Purpose: provide internal Defaults registration and App-facing capability retrieval/model lifecycle through one shared container. Design goals: shared identity, bounded concurrency, explicit errors and safe cleanup. This target depends only on ModelKit; concrete adapters are registered by ModelKitDefaults, never imported here.
 
 ## Public API and ownership
 

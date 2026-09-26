@@ -59,7 +59,7 @@ private actor ControlledPose: PoseCapability {
         active += 1
         maximumActive = max(maximumActive, active)
         defer { active -= 1 }
-        let value = request.image.rgb.first ?? 0
+        let value = request.image.rgb?.first ?? 0
         calls.append(value)
         await withCheckedContinuation { waiter in
             self.waiter = waiter
@@ -255,5 +255,49 @@ private struct CrowdPose: PoseCapability {
     }
     #expect(await agent.status().lifecycle == .failed)
     #expect(await agent.status().queuedInputs == 0)
+    await agent.stop()
+}
+
+private struct PoseImageAttachment: ImageAttachment {
+    let image: ImageFrame
+}
+@Test(.timeLimit(.minutes(1))) func photographerResolvesOpaqueInputAndPreservesActionProtocol() async throws {
+    let model = ControlledPose()
+    let session = UUID()
+    let agent = try PhotographerAgent(
+        pose: model, sessionID: session,
+        resolveImage: { input in
+            guard case .sampled(_, let attachment) = input.content,
+                let attachment = attachment as? PoseImageAttachment
+            else { throw ImageInputError.invalidFrame }
+            return attachment.image
+        })
+    try await agent.start()
+    let frame = try ImageInput(
+        width: 4, height: 4, gray64: Data(repeating: 22, count: 4096),
+        attachment: PoseImageAttachment(image: ImageFrame(width: 4, height: 4, rgb: Data(repeating: 22, count: 48))),
+        sequence: 1, timestamp: 1, rotation: 0)
+    let manager = AgentManager()
+    try await manager.register(agent)
+    let gateway = CameraInputSession(
+        gateway: InputGateway(manager: manager), sessionID: session, configuration: try FrameChangeConfiguration())
+    #expect(try await gateway.submit(frame))
+    var started = model.started.makeAsyncIterator()
+    #expect(await started.next() == 22)
+    await model.release()
+    var output = agent.outputs.makeAsyncIterator()
+    let first = try #require(await output.next())
+    guard case .actionCall(let call) = first.output else {
+        Issue.record("Expected pose Action")
+        await agent.stop()
+        return
+    }
+    #expect(call.actionPath == ActionPath(module: "UI", function: "showPose"))
+    let second = try #require(await output.next())
+    guard case .control("agent.finished") = second.output else {
+        Issue.record("Expected finish")
+        await agent.stop()
+        return
+    }
     await agent.stop()
 }
