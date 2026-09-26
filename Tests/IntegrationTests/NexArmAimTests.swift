@@ -55,12 +55,18 @@ private func positions(in frame: [UInt8]) -> [Int] {
 @Test func leftAndHighTargetsMoveOnlyPanAndWrist() throws {
     let left = try NexArmJointCommand.positions(base: -0.32, pitch: 0)
     #expect(left[0] < 2048)
+    #expect(left[1] == 2048)
+    #expect(left[2] == 2048)
     #expect(left[3] == 2048)
-    #expect([left[1], left[2], left[4], left[5]] == [2048, 2048, 2048, 2048])
+    #expect(left[4] == 2048)
+    #expect(left[5] == 2048)
     let high = try NexArmJointCommand.positions(base: 0, pitch: -0.32)
     #expect(high[0] == 2048)
+    #expect(high[1] == 2048)
+    #expect(high[2] == 2048)
     #expect(high[3] < 2048)
-    #expect([high[1], high[2], high[4], high[5]] == [2048, 2048, 2048, 2048])
+    #expect(high[4] == 2048)
+    #expect(high[5] == 2048)
     #expect(throws: NexArmControlError.invalidAngle) { try NexArmJointCommand.positions(base: .nan, pitch: 0) }
 }
 
