@@ -2,7 +2,8 @@
 
 Purpose: send a non-blocking reorientation target to the NexArm carrying the phone. Design goals: match the existing `Actions` cohesion rules (module owns its own validation, no shared helper), document a completion contract that means "joint frame accepted by the transport," not "arm settled," and stay closure-injected so this module does not add a `PlatformKit` dependency to the `Actions` target. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md) and the [Actions development standard](../README.md). `PhotographerAgent` will declare `aim` in its JSON and emit it as a Function Token, the same way it already emits `showPose`. This module does not construct calls.
 
-- ❌ Nothing in this directory is implemented.
+- ✅ `Aim.swift` / `RobotActions.aim` parses required finite `base` and `pitch` strings, rejects non-finite values and magnitudes above four turns, then calls the injected `send`. Cancellation is checked before and after `send`. It does not retry.
+- ❌ The App camera session does not register this handler, so a live preview does not move an arm.
 
 ## Why completion means "sent," not "settled"
 

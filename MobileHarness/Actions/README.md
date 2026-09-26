@@ -25,7 +25,8 @@ flowchart LR
 - ✅ Each function owns its parameter validation and output handling; speak and print independently validate text without a shared TextAction helper.
 - ✅ ActionRuntime owns path registration and execution; Gateway owns Channel queues and resource exclusion.
 - ✅ [UI.showPose](UI/README.md) replaces the camera skeleton overlay.
-- ❌ Camera, Media, Device, Robot, `UI.show`, and `Speech.stopSpeak` implementations. [Robot](Robot/README.md) has a design-only contract for `RobotActions.aim`; see [ADR 0037](../../docs/adr/0037-photographer-aim.md).
+- ✅ [Robot.aim](Robot/README.md) parses finite `base` and `pitch` strings and forwards them. It does not open a socket.
+- ❌ Camera, Media, Device, `UI.show`, and `Speech.stopSpeak` implementations. See [ADR 0037](../../docs/adr/0037-photographer-aim.md).
 - ❌ General action metadata for execution policies and resource requirements; the current resource exclusion unit is the action module.
 
 Agent JSON configuration maps the model alias `say` to `Speech.speak`, and `print`/`express` to `UI.print`/`UI.express`. Default Channels remain `Speech` and `Display`; a Channel name need not equal its action module. Handlers must await real completion, propagate errors, and cooperate with cancellation.

@@ -26,7 +26,7 @@ flowchart LR
 - ✅ `ExternalDevice/ExternalDeviceTransport.swift`: connect, send, emergency-stop, and disconnect contracts.
 - ❌ Concrete Sensors, Storage, Network, BLE, robot, and IoT adapters.
 - ❌ Real robot integration and hardware safety validation; transport protocols alone do not establish either.
-- ❌ [`ExternalDevice`](ExternalDevice/README.md) planned `RobotArmControl` for NexArm joint aim (`base` / `pitch` over the arm Wi-Fi hotspot). Camera capture is already implemented. The home table is provisional raw 2048 until a hardware read-back. See [ADR 0037](../../docs/adr/0037-photographer-aim.md).
+- ✅ [`ExternalDevice`](ExternalDevice/README.md) `NexArmJointCommand` and `NexArmController` build and send the six-position aim frame. The home table is provisional raw 2048. ❌ The Wi-Fi socket is not opened. See [ADR 0037](../../docs/adr/0037-photographer-aim.md).
 
 External input enters through InputGateway; Agent device actions must pass through OutputGateway and runtime execution. Use public APIs and validate capabilities and permissions. Robot emergency-stop and disconnect protection must be enforced by the device, without relying on iOS background execution.
 

@@ -17,6 +17,7 @@ flowchart LR
     Registry --> Output[8 output envelopes: fail on overflow]
     Output --> OG[OutputGateway]
     OG --> Action[UI.showPose on Vision Channel]
+    Parser --> Aim[aim on arm Channel, only when arm control is enabled]
     Worker -->|Only if a newer image is waiting| Inbox
 ```
 
@@ -49,8 +50,8 @@ Validation (2026-09-26): final root scripts/check.sh passed, including 66 Integr
 
 记录每阶段耗时、端到端帧龄、实际推理频率、待处理帧替换数量，以及 CPU/GPU/内存和温度表现。比较前后摄像头、不同变化阈值和持续运行场景；先凭测量确认瓶颈，再优化，保留单例模型、单帧串行推理、只处理最新帧、不重复推理和 Action 输出协议约束。
 
-## Phase 2 aim design
+## Phase 2 aim
 
-❌ Not implemented. [ADR 0037](../../../docs/adr/0037-photographer-aim.md) is the contract. This Agent remains the owner; there is no separate Tracking Agent and no second camera or detector.
+✅ When `controlsArm` is true, the same inference appends hidden `<aim base="..." pitch="..."/>` after `showPose`. The highest-confidence person supplies the aim point: the nose when its confidence is at least 0.3 and it lies inside the image, otherwise the box center. `base` and `pitch` are `(point / size - 0.5) * 0.8` radians. The first aim is sent immediately. Later aims wait until both 0.2 seconds and 0.02 radians have passed. An empty pose does not emit `aim`. The live camera session leaves `controlsArm` false, so it still emits only `showPose`.
 
-After the pose result used for `showPose`, the same `AgentGenerator` may also emit hidden `<aim base="..." pitch="..."/>`, resolved to `Actions.Robot.aim` on channel `arm`. `base` and `pitch` are logical radians. The NexArm adapter maps them to `shoulder_pan` and `wrist_flex` over the arm's Wi-Fi hotspot and repeats a provisional raw-2048 home for the other four joints. `showPose` and `agent.finished` stay on every successful inference. `aim` is sent only after its own time and angle-delta throttle. An empty pose clears the skeleton and does not move the arm. Output overflow still fails this Agent. Command completion means the byte transport accepted the six-position frame, not that the joint has settled. Do not assume a fixed inference rate; on-device YOLO delay is already reported and not yet profiled.
+❌ The App does not open the NexArm Wi-Fi socket. Wrist-travel recovery stays off. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md).

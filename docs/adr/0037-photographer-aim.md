@@ -1,6 +1,6 @@
 # 0037 — Photographer Aim Commands
 
-Status: design only. No Swift source is added by this record.
+Status: aim token, joint frame, and recording tests are implemented. The camera session does not open Wi-Fi.
 
 ## Context
 
@@ -49,7 +49,7 @@ Phase 2 is an extension of `PhotographerAgent`, not a new Agent and not a second
 
 ## Consequences
 
-- `Actions/Robot` and `RobotArmControl` stay documentation-only. Wi-Fi AP and the provisional raw-2048 home table are part of this design. The first physical session replaces that table with a read-back. They do not restore the RoArm contract.
+- `RobotActions.aim`, `NexArmJointCommand`, and `NexArmController` implement the token and the six-position frame. Tests record that frame on a stand-in transport. The camera session leaves arm control off, so preview does not send it. The first physical session replaces the raw-2048 table with a read-back before `home()` is allowed to succeed.
 - `Agents/Tracking` is not created. The behavior belongs to Photographer phase 2.
 - Onboard K230 tracking, hand-eye grasp lessons, and controller inverse kinematics are out of this phase. A later one-shot "move to a pose" action may use Cartesian command `0x08`; tracking does not.
 - Implementing the action, JSON entry, throttle, and adapter still requires the tests and README updates in `Agents/README.md` and `Actions/README.md`. This record does not add those sources.

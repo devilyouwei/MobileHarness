@@ -21,3 +21,5 @@ Update this README when adding or changing tests. Preserve ✅/❌ distinctions 
 ✅ Adapter fixtures explicitly own ModelContext; managed weight teardown is independent of capability/session consumption. Shared registration/reuse tests live under root Tests/ModelKitRuntimeTests.
 
 ✅ PhotographyPipelineTests covers normalized grayscale threshold and previous-examined-frame semantics, duplicate rejection, latest-only delayed model processing, pause/stop, stale result suppression, pose Action validation, projection and Gateway → Agent → output Action completion.
+
+✅ NexArmAimTests covers the six-midpoint frame, pan/wrist mapping, a left-of-center person, no aim when the pose is empty, the time-and-movement throttle, and rejection of a non-finite angle before send. The transport double records bytes. No socket is opened.

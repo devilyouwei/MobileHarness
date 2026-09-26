@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 
-/// Photography/motion role, phase one: pose perception and UI actions only; no robot commands.
+/// Photography role. Pose overlay always runs. Arm aim runs only when `controlsArm` is set.
 public actor PhotographerAgent: Agent {
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
@@ -15,8 +15,12 @@ public actor PhotographerAgent: Agent {
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var processed = 0
+    private let controlsArm: Bool
+    private var lastAim: (base: Double, pitch: Double, time: TimeInterval)?
 
-    public init(pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil) throws {
+    public init(
+        pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil, controlsArm: Bool = false
+    ) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
@@ -24,6 +28,7 @@ public actor PhotographerAgent: Agent {
             outputs: [.actionCall, .control], capabilities: configuration.capabilities)
         self.pose = pose
         self.sessionID = sessionID
+        self.controlsArm = controlsArm
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
         outputs = stream.stream
         continuation = stream.continuation
@@ -108,9 +113,12 @@ public actor PhotographerAgent: Agent {
             }
             // Deterministic CV output uses the same shared Function Token parser and JSON alias registry.
             var generator = try AgentGenerator(capabilities: descriptor.capabilities, textActions: [])
-            let calls =
-                try generator.append("<showPose payload='" + AgentGenerator.escapeText(json) + "'/>")
-                + generator.finish()
+            var calls = try generator.append("<showPose payload='" + AgentGenerator.escapeText(json) + "'/>")
+            if let aim = nextAim(people: result.people, image: image) {
+                calls += try generator.append("<aim base=\"\(aim.base)\" pitch=\"\(aim.pitch)\"/>")
+                lastAim = (aim.base, aim.pitch, image.timestamp)
+            }
+            calls += try generator.finish()
             for call in calls { try emit(.actionCall(call), input: input) }
             try emit(.control("agent.finished"), input: input)
             processed += 1
@@ -123,6 +131,32 @@ public actor PhotographerAgent: Agent {
             }
         }
     }
+    /// Image-center error times 0.8 radians. Nose is the aim point when it is visible.
+    private func nextAim(people: [PersonPose], image: ImageInput) -> (base: Double, pitch: Double)? {
+        guard controlsArm, let person = people.max(by: { $0.confidence < $1.confidence }) else { return nil }
+        let width = Double(image.width)
+        let height = Double(image.height)
+        let point = aimPoint(person, width: width, height: height)
+        let base = (point.x / width - 0.5) * 0.8
+        let pitch = (point.y / height - 0.5) * 0.8
+        if let lastAim {
+            let waited = image.timestamp - lastAim.time >= 0.2
+            let moved = hypot(base - lastAim.base, pitch - lastAim.pitch) >= 0.02
+            guard waited, moved else { return nil }
+        }
+        return (base, pitch)
+    }
+
+    private func aimPoint(_ person: PersonPose, width: Double, height: Double) -> (x: Double, y: Double) {
+        if let nose = person.keypoints.first(where: { $0.joint == .nose }),
+            nose.confidence >= 0.3, nose.x.isFinite, nose.y.isFinite,
+            Double(nose.x) >= 0, Double(nose.y) >= 0, Double(nose.x) <= width, Double(nose.y) <= height
+        {
+            return (Double(nose.x), Double(nose.y))
+        }
+        return (Double(person.box.x + person.box.width / 2), Double(person.box.y + person.box.height / 2))
+    }
+
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
         switch continuation.yield(OutputEnvelope(source: descriptor.id, input: input, output: output)) {
         case .enqueued: return

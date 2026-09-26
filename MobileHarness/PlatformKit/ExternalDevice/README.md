@@ -3,14 +3,14 @@
 Purpose: abstract device transports without Agent business semantics, per architecture section 34. Design goals: keep `ExternalDeviceTransport` as the byte pipe, and put NexArm framing plus the logical aim mapping in `RobotArmControl`. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md). Camera capture is already implemented under `PlatformKit/Camera` and is not part of this contract.
 
 - ✅ `ExternalDeviceTransport.swift`: `connect`/`send([UInt8])`/`emergencyStop`/`disconnect` contract for persistent stream transports (serial, BLE). Implemented as a protocol only; no concrete adapter exists yet.
-- ❌ `RobotArmControl` (design only): logical `base` / `pitch` aim for the NexArm. Frames the reference driver's six-position write on top of `ExternalDeviceTransport`.
-- ❌ Concrete Wi-Fi adapter. The phone joins the arm hotspot (`NexArm` / `hiwonder`) and keeps one TCP connection, provisionally `192.168.4.1:8080`. Each aim is one six-position frame on that connection. The port-80 slider page is a separate tutorial sketch.
-- ❌ Provisional home table: raw 2048 on all six joints, replaced by a hardware read-back before any physical homing move. Wrist-travel recovery stays off until joint signs and stops are measured.
+- ✅ `NexArmJointCommand` maps logical `base` / `pitch` to six raw positions and builds the position-write frame (command 97, little-endian, checksum). Provisional home is raw 2048. `base` changes `shoulder_pan`; `pitch` changes `wrist_flex`.
+- ✅ `NexArmController` sends that frame on an injected `ExternalDeviceTransport`. `home()` throws `provisionalHome` and does not move hardware.
+- ❌ Concrete Wi-Fi socket. The intended endpoint is `192.168.4.1:8080` on hotspot `NexArm`. The camera session does not connect. Wrist-travel recovery stays off.
 - ❌ Any other BLE/serial robot adapter or IoT adapter.
 
 ## Why both protocols exist
 
-`ExternalDeviceTransport.send(_ bytes: [UInt8])` is the persistent byte pipe. The NexArm tracking command is one such frame: the reference driver's bridge mode, then a six-position write (command 97 in that driver) that does not wait for a reply. `RobotArmControl` owns that framing, the logical-radian to raw 0–4095 mapping, and the four held joints. `Actions/Robot` sees only the injected `(base, pitch)` closure.
+`ExternalDeviceTransport.send(_ bytes: [UInt8])` is the persistent byte pipe. The NexArm tracking command is one such frame: command 97 writes six little-endian positions and does not wait for a reply. `NexArmJointCommand` owns that framing. `NexArmController` sends it. `Actions/Robot` sees only the injected `(base, pitch)` closure.
 
 Factory Cartesian command `0x08` is a different controller mode. Tracking does not use it.
 

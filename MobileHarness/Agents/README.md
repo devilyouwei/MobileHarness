@@ -161,7 +161,7 @@ Changes require repackaging and a new Agent instance; no hot reload is implement
 - ✅ Shared parsers, parameter/Channel validation, bounded queues, and cancellation/completion regression coverage.
 - ✅ `say` maps to `Speech.speak`; `print`/`express` map to `UI.print`/`UI.express`. Default `Speech`/`Display` Channels remain compatible; Channel and module names need not match.
 - ❌ Configuration hot reload, remote configuration, full JSON Schema, dynamic handler discovery, and configuration-driven lifecycle budgets.
-- ✅ [Photographer](Photographer/README.md) implements pose perception and `UI.showPose`. ❌ Robot aim, composition, temporal tracking, and other Vision/Media/Control roles. The aim-command design is [ADR 0037](../../docs/adr/0037-photographer-aim.md): logical `base` and `pitch` on a NexArm, still unimplemented.
+- ✅ [Photographer](Photographer/README.md) implements pose perception, `UI.showPose`, and optional NexArm `aim` when arm control is enabled. ❌ The live camera session does not enable arm control. Composition, temporal tracking, and other Vision/Media/Control roles remain outstanding. See [ADR 0037](../../docs/adr/0037-photographer-aim.md).
 - ❌ Model-native tool deltas, general StateStore/AgentRuntime, restart, and InternalSignalBus.
 
 ## Maintenance
@@ -178,4 +178,4 @@ Keep this standard synchronized with configuration validation and Agent changes.
 
 Each Agent README must follow the [concurrency documentation standard](../README.md#concurrency-documentation-standard). Document its inbox producer and drain worker, output consumer, capacities, pause/resume behavior, cancellation admission, failure propagation and completion semantics. A registry bound or actor mailbox is not a substitute for an explicit bounded application inbox. Include a Mermaid diagram and distinguish implemented behavior from planned scheduling features. The Assistant README provides the current concrete example.
 
-✅ Photographer is the phase-one 摄像师 role: injected PoseCapability, one active/one latest pending image, JSON v3 showPose action and shared output parsing. Robot motion, composition and tracking remain unimplemented; see Photographer/README.md.
+✅ Photographer is the 摄像师 role: injected PoseCapability, one active/one latest pending image, JSON v3 showPose, and optional aim on channel `arm`. The camera session does not enable aim. Composition and tracking remain unimplemented; see Photographer/README.md.
