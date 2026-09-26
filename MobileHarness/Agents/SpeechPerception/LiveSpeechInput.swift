@@ -3,9 +3,9 @@ import ModelKit
 
 /// Live, VAD-committed PCM -> capability events. Preview never submits an Agent input.
 public actor LiveSpeechInput {
-    private let requests: InputGateway
+    private let recognition: any SpeechRecognitionCapability
     private let sessionID: UUID
-    private let preview: @Sendable (String) async -> Void
+    private let preview: @Sendable (String) async throws -> Void
     private var queue: [VoiceStreamEvent] = []
     private var queuedSamples = 0
     private var totalSamples = 0
@@ -17,8 +17,11 @@ public actor LiveSpeechInput {
     private var sealed = false
     private var cancelled = false
 
-    public init(requests: InputGateway, sessionID: UUID, preview: @escaping @Sendable (String) async -> Void) {
-        self.requests = requests
+    public init(
+        recognition: any SpeechRecognitionCapability, sessionID: UUID,
+        preview: @escaping @Sendable (String) async throws -> Void
+    ) {
+        self.recognition = recognition
         self.sessionID = sessionID
         self.preview = preview
     }
@@ -50,7 +53,10 @@ public actor LiveSpeechInput {
 
     private func open() async throws {
         guard session == nil else { return }
-        let stream = try await requests.openSpeechStream(sessionID: sessionID)
+        let stream = try await recognition.transcribe(
+            SpeechRecognitionRequest(
+                locale: "auto", format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
+                context: InferenceContext(conversationID: sessionID)))
         if cancelled || Task.isCancelled {
             await stream.cancel()
             throw CancellationError()
@@ -73,7 +79,7 @@ public actor LiveSpeechInput {
                 let current = order.compactMap { segments[$0]?.text }.joined(separator: " ")
                 let visible = Self.join(prefix, current)
                 guard visible.utf8.count <= 65536 else { throw CapabilityError.eventTooLarge }
-                await preview(visible)
+                try await preview(visible)
             }
             return order.compactMap { segments[$0].flatMap { $0.isFinal ? $0.text : nil } }.joined(separator: " ")
         }

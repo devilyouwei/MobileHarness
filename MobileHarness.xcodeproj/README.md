@@ -28,3 +28,5 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 ✅ PhotographySession compiles in both App targets; Photographer source and v3 JSON appear in navigation, with the JSON compiled once through the Agents SwiftPM resource declaration.
 
 ✅ PlatformKit navigation follows Audio, Vision, Connectivity and Core, including all camera sources and domain READMEs. SwiftPM remains the sole compiler of shared platform sources.
+
+✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.

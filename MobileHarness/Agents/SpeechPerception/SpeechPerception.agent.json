@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 4,
+  "agentID": "speechPerception",
+  "channels": [],
+  "textActions": [],
+  "actions": [],
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "media.audio",
+        "version": 1,
+        "kind": "audio"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "media.audio",
+        "source": "phone.microphone",
+        "topic": "media.audio"
+      }
+    ],
+    "publications": [
+      "speech.partial",
+      "speech.final",
+      "speech.phase"
+    ],
+    "sends": []
+  }
+}

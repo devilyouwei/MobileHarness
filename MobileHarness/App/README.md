@@ -120,3 +120,5 @@ Failure keeps the container unpublished and offers reload using the same process
 ## Data I/O and processing composition
 
 PlatformKit owns capture/playback and device lifecycles; ModelKit owns model data processing. App converts platform data into model or Gateway contracts and injects services without either Kit depending on the other. PhotographySession retains a native frame in a ModelKit ImageFrame and supplies an opaque AgentCore attachment/resolver. Speech handlers receive ModelKit synthesis and a separate PlatformKit playback callback. Experience owns presentation; Gateway and Agents retain admission/routing and business policy respectively.
+
+✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.

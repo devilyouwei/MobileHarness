@@ -106,9 +106,25 @@
         "contract": "tool.result",
         "version": 1,
         "kind": "toolResult"
+      },
+      {
+        "contract": "speech.final",
+        "version": 1,
+        "kind": "observation"
       }
     ],
-    "subscriptions": [],
+    "subscriptions": [
+      {
+        "contract": "speech.final",
+        "source": "speechPerception",
+        "topic": "speech.final"
+      },
+      {
+        "contract": "user.text",
+        "source": "user",
+        "topic": "user.text"
+      }
+    ],
     "publications": [],
     "sends": []
   }

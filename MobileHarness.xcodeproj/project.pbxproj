@@ -315,7 +315,7 @@
 		"86F114B1295DEDD4EB228D12" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "MobileHarness/Gateway/Input/LiveSpeechInput.swift";
+			"path" = "MobileHarness/Agents/SpeechPerception/LiveSpeechInput.swift";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"33AC1B625192F62BF528BDEF" = {
@@ -351,7 +351,7 @@
 		"A7B982A9DDA4AD2100A76400" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "MobileHarness/Gateway/Input/VoiceActivitySegmenter.swift";
+			"path" = "MobileHarness/Agents/SpeechPerception/VoiceActivitySegmenter.swift";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"529C5EFC914300BA8D2CEB57" = {

@@ -92,3 +92,5 @@ The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#int
 ✅ Camera frames now pass a configurable Gateway grayscale-change filter (default 3%) to Photographer. It runs shared YOLO Pose once per accepted latest frame and emits UI.showPose through the action pipeline; green skeletons overlay the preview. ❌ Robot-arm control, composition/tracking behavior and device quality acceptance remain outstanding.
 
 Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.
+
+✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.

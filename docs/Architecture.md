@@ -169,3 +169,5 @@ Get/load coalesce bounded construction/loading; unload gates a resource and wait
 PlatformKit 以 Audio、Vision、Connectivity 组织设备/系统输入输出，Core 保存跨域权限契约；ModelKit 以 Speech、Language、Vision 组织模型数据处理。两层均按能力域分类，由 App 适配数据与注入服务，业务策略留在 Agent。相机源码移入 PlatformKit/Vision；共享音频会话仍由现有 AppleAudioIO 管理。此次仅调整目录和文档，不改变依赖、公开 API、队列或生命周期契约。见 [ADR 0039](adr/0039-platform-capability-domains.md)。
 
 Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.
+
+✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.

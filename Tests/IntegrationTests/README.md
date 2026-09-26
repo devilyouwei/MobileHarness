@@ -27,3 +27,5 @@ Update this README when adding or changing tests. Preserve ✅/❌ distinctions 
 ✅ Native-camera sampling fixtures cover padded rows and all four orientations. Sampled ImageInput tests verify unchanged threshold/baseline admission and malformed sample rejection; previous camera RGB-conversion fixtures were replaced with these current-path tests.
 
 ✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.
+
+✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.

@@ -25,7 +25,6 @@ final class AppLifecycleCoordinator {
     private(set) var voiceStatus = "点击麦克风开始持续对话"
     private(set) var voiceGeneration: UUID?
     private(set) var audioLevel: Float = 0
-    private let vadThreshold: Float = 0.5
     var isVoiceActive: Bool { voiceGeneration != nil }
     private let audio: AppleAudioIO
     private let voiceActivity: any VoiceActivityCapability
@@ -36,14 +35,14 @@ final class AppLifecycleCoordinator {
     private var requests: InputGateway?
     private var manager: AgentManager?
     private var captureTask: Task<Void, Never>?
-    private var recognitionTask: Task<Void, Never>?
+    private var speechTask: Task<Void, Never>?
+    private var speech: SpeechPerceptionAgent?
+    private var bus: InternalSignalBus?
     private var responseTask: Task<Void, Error>?
     private var responses: OutputGateway?
     private var displayedInputID: UUID?
     private var interruptionTask: Task<Void, Never>?
     private var routeTask: Task<Void, Never>?
-    private var voiceSegmenter: VoiceActivitySegmenter?
-    private var voiceInput: LiveSpeechInput?
     private var cleanupTask: Task<Void, Never>?
     private var handlingTurn = false
     private let log = Logger(subsystem: "dev.mobileharness", category: "AppLifecycle")
@@ -74,7 +73,22 @@ final class AppLifecycleCoordinator {
             record(voiceStatus)
             return
         }
-        let requests = InputGateway(manager: manager, recognition: recognition)
+        let policy: CommunicationPolicy
+        do {
+            policy = try CommunicationPolicy(configurations: [
+                AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
+            ])
+        } catch {
+            self.manager = nil
+            voicePhase = .failed
+            voiceStatus = "通信配置加载失败：\(error)"
+            return
+        }
+        let requests = InputGateway(manager: manager, policy: policy)
+        let bus = InternalSignalBus { input, target, incarnation in
+            try await requests.receiveInternal(input, target: target, incarnation: incarnation)
+        }
+        self.bus = bus
         let tools = ToolRegistry()
         let actions = AgentBootstrap.makeActions(
             synthesis: synthesis,
@@ -90,10 +104,11 @@ final class AppLifecycleCoordinator {
                 guard let self else { throw CancellationError() }
                 try await self.presentExpression(emoji, invocation: invocation)
             })
-        let responses = OutputGateway(manager: manager, requests: requests, tools: tools, actions: actions) {
-            [weak self] envelope in
-            await self?.show(envelope)
-        }
+        let responses = OutputGateway(
+            manager: manager, requests: requests, tools: tools, actions: actions,
+            policy: policy, bus: bus, observedContracts: ["speech.partial", "speech.final", "speech.phase"],
+            observeEvent: { [weak self] input in await self?.observeSpeech(input) },
+            sink: { [weak self] envelope in await self?.show(envelope) })
         self.responses = responses
         do {
             try await AgentBootstrap.register(agent, manager: manager, tools: tools)
@@ -118,7 +133,7 @@ final class AppLifecycleCoordinator {
                     {
                         // Generation and every queued action have completed, including physical playback.
                         try await Task.sleep(for: .milliseconds(350))
-                        resumeListening(generation: generation)
+                        try await resumeListening(generation: generation)
                     }
                 } catch is CancellationError {
                     if Task.isCancelled { throw CancellationError() }
@@ -137,7 +152,9 @@ final class AppLifecycleCoordinator {
         }
         isReady = false
         self.requests = nil
+        await cleanupTask?.value
         await manager.stopAll()
+        await bus.shutdown()
         await responses.shutdown()
         self.responses = nil
         self.manager = nil
@@ -175,31 +192,32 @@ final class AppLifecycleCoordinator {
             try await audio.requestPermissions()
             guard voiceGeneration == generation else { return }
             try Task.checkCancellation()
-            let vadSession = try await voiceActivity.detectVoiceActivity(
-                format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32))
+            guard let manager, let requests, let responses, let bus else { throw CapabilityError.sessionClosed }
+            let speech = try SpeechPerceptionAgent(recognition: recognition, vad: voiceActivity, sessionID: generation)
+            try await manager.register(speech, sessionID: generation)
+            self.speech = speech
+            try await bus.openSession(generation)
+            try await speech.bind(responses.messaging(for: .speechPerception))
+            try await speech.start()
             guard voiceGeneration == generation, !Task.isCancelled else {
-                await vadSession.cancel()
+                await speech.stop()
                 return
             }
-            let segmenter = VoiceActivitySegmenter(session: vadSession)
-            voiceSegmenter = segmenter
-            let frames: AsyncThrowingStream<MicrophoneFrame, Error>
-            do { frames = try audio.startCapture() } catch {
-                await segmenter.cancel()
-                throw error
+            speechTask = Task { [weak self] in
+                for await output in speech.outputs {
+                    guard let self, self.voiceGeneration == generation else { return }
+                    do { try await responses.dispatch(output) } catch { self.stopVoice(message: "语音处理失败：\(error)") }
+                }
             }
+            let frames = try audio.startCapture()
             handlingTurn = false
-            guard let requests else { throw CapabilityError.sessionClosed }
-            voiceInput = LiveSpeechInput(requests: requests, sessionID: generation) { [weak self] text in
-                await self?.preview(text, generation: generation)
-            }
             voicePhase = .listening
             voiceStatus = "正在聆听 · 停顿后自动识别"
             captureTask = Task { [weak self] in
                 let resampler = StreamingMonoPCMResampler()
                 var timestamp = 0.0
+                var sequence: UInt64 = 0
                 var suspended = false
-                defer { Task { await segmenter.cancel() } }
                 do {
                     for try await frame in frames {
                         try Task.checkCancellation()
@@ -210,53 +228,25 @@ final class AppLifecycleCoordinator {
                         }
                         guard !self.handlingTurn else {
                             if !suspended {
-                                try await segmenter.reset()
                                 await resampler.reset()
-                                timestamp = 0
                                 suspended = true
                             }
                             continue
                         }
                         suspended = false
-                        let normalized = try await resampler.process(frame)
-                        for packet in normalized {
-                            let input = try AudioFrame(
-                                data: packet.samples.withUnsafeBytes { Data($0) },
-                                format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
-                                sequence: packet.sequence, timestamp: timestamp)
+                        for packet in try await resampler.process(frame) {
+                            guard !self.handlingTurn else { break }
+                            let audioInput = try AudioInput(
+                                samples: packet.samples.withUnsafeBytes { Data($0) },
+                                sequence: sequence, timestamp: timestamp)
                             timestamp += packet.duration
-                            let result = try await segmenter.process(input, threshold: self.vadThreshold)
-                            guard self.voiceGeneration == generation else { return }
-                            guard let turn = self.voiceInput else { throw CapabilityError.sessionClosed }
-                            if result.isSpeaking && self.voicePhase == .listening
-                                && (!self.assistantReply.isEmpty || self.expression != nil)
-                            {
-                                self.expression = nil
-                                self.expressionID = UUID()
-                                self.assistantReply = ""
-                                self.liveTranscript = ""
+                            sequence += 1
+                            let report = try await requests.publish(
+                                AgentInput(sessionID: generation, payload: .audio(audioInput)))
+                            // Endpoint processing can close admission while the last capture packet is in flight.
+                            if !report.rejected.isEmpty, !self.handlingTurn {
+                                throw CommunicationError.unavailableTarget
                             }
-                            var events: [VoiceStreamEvent] = []
-                            for event in result.streamEvents {
-                                events.append(event)
-                                if case .end(let reason) = event, reason != .maximumDuration { break }
-                            }
-                            try await turn.enqueue(events)
-                            let ended = events.contains {
-                                if case .end(let reason) = $0 { return reason != .maximumDuration }
-                                return false
-                            }
-                            if ended {
-                                self.handlingTurn = true
-                                self.voicePhase = .processing
-                                self.audioLevel = 0
-                                self.voiceStatus = "正在识别 · 暂停接收新语句"
-                                self.recognitionTask = Task { [weak self] in
-                                    await self?.recognize(turn, generation: generation)
-                                }
-                                break
-                            }
-                            self.voiceStatus = result.isSpeaking ? "检测到语音 · 等待停顿" : "正在聆听 · 停顿后自动识别"
                         }
                     }
                 } catch is CancellationError {} catch {
@@ -316,10 +306,11 @@ final class AppLifecycleCoordinator {
         startupTask = nil
         let previousCleanup = cleanupTask
         let previousCapture = captureTask
-        let previousSegmenter = voiceSegmenter
-        voiceSegmenter = nil
-        let previousInput = voiceInput
-        voiceInput = nil
+        let previousSpeech = speech
+        speech = nil
+        let previousSpeechTask = speechTask
+        let previousManager = manager
+        let previousBus = bus
         cleanupTask = Task {
             await previousCleanup?.value
             await previousStartup?.value
@@ -329,14 +320,16 @@ final class AppLifecycleCoordinator {
                 await previousResponses?.cancel(sessionID: oldGeneration)
                 _ = try? await previousResponse?.value
             }
-            await previousInput?.cancel()
+            await previousSpeech?.stop()
             await previousCapture?.value
-            await previousSegmenter?.cancel()
+            await previousSpeechTask?.value
+            if previousSpeech != nil { try? await previousManager?.remove(.speechPerception) }
+            if let oldGeneration { await previousBus?.closeSession(oldGeneration) }
         }
         captureTask?.cancel()
         captureTask = nil
-        recognitionTask?.cancel()
-        recognitionTask = nil
+        speechTask?.cancel()
+        speechTask = nil
         responseTask?.cancel()
         responseTask = nil
         interruptionTask?.cancel()
@@ -349,46 +342,37 @@ final class AppLifecycleCoordinator {
         voiceStatus = message
     }
 
-    private func recognize(_ turn: LiveSpeechInput, generation: UUID) async {
-        guard let requests, voiceGeneration == generation else { return }
-        do {
-            let text = try await withTaskCancellationHandler {
-                try await turn.finish()
-            } onCancel: {
-                Task { await turn.cancel() }
+    private func observeSpeech(_ input: AgentInput) {
+        guard input.sessionID == voiceGeneration, case .observation(let observation) = input.payload else { return }
+        switch observation {
+        case .transcript(let text, let final):
+            if final || voicePhase != .speaking { liveTranscript = text }
+            if final { record("你（语音）：\(text)") }
+        case .speechPhase(let phase):
+            switch phase {
+            case .processing:
+                handlingTurn = true
+                voicePhase = .processing
+                audioLevel = 0
+                voiceStatus = "正在识别 · 暂停接收新语句"
+            case .speaking:
+                expression = nil
+                expressionID = UUID()
+                assistantReply = ""
+                voiceStatus = "检测到语音 · 等待停顿"
+            case .listening: voiceStatus = "正在聆听 · 停顿后自动识别"
+            case .empty:
+                handlingTurn = false
+                voicePhase = .listening
+                voiceStatus = "正在聆听 · 停顿后自动识别"
             }
-            guard voiceGeneration == generation else { return }
-            try Task.checkCancellation()
-            guard !text.isEmpty else {
-                resumeListening(generation: generation)
-                return
-            }
-            recognized(text, generation: generation)
-            let report = try await requests.submit(AgentInput(sessionID: generation, payload: .text(text)))
-            guard voiceGeneration == generation else { return }
-            guard !report.delivered.isEmpty, report.rejected.isEmpty else {
-                throw CapabilityError.unavailable("Agent 未接受语音输入")
-            }
-        } catch is CancellationError {} catch {
-            guard voiceGeneration == generation else { return }
-            stopVoice(message: "识别失败：\(String(describing: error))")
+        case .pose: break
         }
     }
-    private func preview(_ text: String, generation: UUID) {
-        guard voiceGeneration == generation, voicePhase != .speaking else { return }
-        liveTranscript = text
-    }
-    private func recognized(_ text: String, generation: UUID) {
+    private func resumeListening(generation: UUID) async throws {
         guard voiceGeneration == generation else { return }
-        liveTranscript = text
-        record("你（语音）：\(text)")
-    }
-    private func resumeListening(generation: UUID) {
+        try await speech?.resumeListening()
         guard voiceGeneration == generation else { return }
-        guard let requests else { return }
-        voiceInput = LiveSpeechInput(requests: requests, sessionID: generation) { [weak self] text in
-            await self?.preview(text, generation: generation)
-        }
         handlingTurn = false
         voicePhase = .listening
         voiceStatus = "正在聆听 · 停顿后自动识别"
@@ -448,6 +432,7 @@ final class AppLifecycleCoordinator {
         case .toolCall(let call): record("工具调用：\(call.toolPath)")
         case .control(let state):
             record("状态：\(state)")
+            if state.hasPrefix("agent.error:") { stopVoice(message: state) }
             if state.hasPrefix("assistant.error:") {
                 // A failed turn does not invalidate loaded models. Cancel the session and
                 // Actions, but reuse the prepared providers when the user retries.

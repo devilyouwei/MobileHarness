@@ -26,7 +26,7 @@ public actor AssistantAgent: Agent {
         guard configuration.agentID == .assistant else { throw AgentConfigurationError.identityMismatch }
         guard !configuration.textActions.isEmpty else { throw AgentConfigurationError.invalidField("textActions") }
         descriptor = AgentDescriptor(
-            id: configuration.agentID, name: "Assistant", inputs: [.text, .event, .toolResult],
+            id: configuration.agentID, name: "Assistant", inputs: [.text, .event, .toolResult, .observation],
             outputs: [.actionCall, .toolCall, .control], capabilities: configuration.capabilities)
         textActions = configuration.textActions
         precondition(capacity > 0)
@@ -63,6 +63,11 @@ public actor AssistantAgent: Agent {
     public func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard descriptor.inputs.contains(input.payload.kind) else { throw HarnessError.unsupportedInput }
+        guard !input.metadata.expired else { throw CommunicationError.expired }
+        if case .observation(let observation) = input.payload {
+            guard case .transcript(_, final: true) = observation else { throw HarnessError.unsupportedInput }
+            _ = try observation.validatedSize()
+        }
         // Control admission bypasses the ordinary queue, including when it is full or paused.
         if case .event("assistant.cancel") = input.payload {
             queue.removeAll { $0.sessionID == input.sessionID }
@@ -88,9 +93,10 @@ public actor AssistantAgent: Agent {
         guard worker == nil else { return }
         while lifecycle == .running && !queue.isEmpty {
             let input = queue.removeFirst()
+            if input.metadata.expired { continue }
             processed += 1
             switch input.payload {
-            case .text(let text):
+            case .text(let text), .observation(.transcript(let text, final: true)):
                 if text == "/status" {
                     do {
                         emit(

@@ -6,7 +6,7 @@ import ModelKitSilero
 import PlatformKit
 import Testing
 
-@testable import Gateway
+@testable import Agents
 
 private let format = try! AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
 private func pcm(_ samples: [Float], sequence: UInt64) throws -> AudioFrame {

@@ -1,29 +1,17 @@
 import AgentCore
 import Foundation
-import ModelKit
 
 public actor InputGateway {
     private let policy: CommunicationPolicy?
     private let manager: AgentManager
     private let router: any SignalRouter
-    private let recognition: (any SpeechRecognitionCapability)?
     public init(
         manager: AgentManager, router: any SignalRouter = LogicRouter(),
-        recognition: (any SpeechRecognitionCapability)? = nil, policy: CommunicationPolicy? = nil
+        policy: CommunicationPolicy? = nil
     ) {
         self.policy = policy
         self.manager = manager
         self.router = router
-        self.recognition = recognition
-    }
-
-    /// Ordered live input still enters through the gateway; the caller owns session cancellation.
-    public func openSpeechStream(sessionID: UUID, locale: String = "auto") async throws -> SpeechRecognitionSession {
-        guard let recognition else { throw CapabilityError.unavailable("未配置语音识别能力") }
-        return try await recognition.transcribe(
-            SpeechRecognitionRequest(
-                locale: locale, format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
-                context: InferenceContext(conversationID: sessionID)))
     }
 
     public func destinations(for input: AgentInput) throws -> [AgentID] {

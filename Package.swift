@@ -46,8 +46,11 @@ let package = Package(
             exclude: ["UI/README.md", "README.md", "Speech/README.md"]),
         .target(
             name: "Agents", dependencies: ["AgentCore", "ModelKit"], path: "MobileHarness/Agents",
-            exclude: ["Assistant/README.md", "Photographer/README.md", "README.md"],
-            resources: [.process("Assistant/Assistant.agent.json"), .process("Photographer/Photographer.agent.json")]),
+            exclude: ["Assistant/README.md", "Photographer/README.md", "SpeechPerception/README.md", "README.md"],
+            resources: [
+                .process("Assistant/Assistant.agent.json"), .process("Photographer/Photographer.agent.json"),
+                .process("SpeechPerception/SpeechPerception.agent.json"),
+            ]),
         .target(
             name: "ActionRuntime", dependencies: ["AgentCore"], path: "MobileHarness/ActionRuntime",
             exclude: ["README.md"]),
@@ -98,7 +101,7 @@ let package = Package(
         .testTarget(
             name: "SileroTests",
             dependencies: [
-                "ModelKit", "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro", "Gateway", "PlatformKit",
+                "ModelKit", "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro", "Agents", "PlatformKit",
             ], exclude: ["README.md"]),
         .target(
             name: "ModelKitCoreAI", path: "MobileHarness/ModelKit/Backends/CoreAI", exclude: ["README.md"]),

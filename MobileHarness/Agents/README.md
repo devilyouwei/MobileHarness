@@ -183,3 +183,5 @@ Each Agent README must follow the [concurrency documentation standard](../README
 ✅ Photographer accepts an App-injected image resolver for opaque native frame attachments. Capability declarations still come exclusively from Photographer.agent.json; the resolver is data adaptation, not a second Action/Tool registration list.
 
 JSON v4 requires communication with inputs (contract/version/kind), subscriptions (contract/source/topic), publications (contract names), and sends (contract/target). Empty arrays grant no communication permission. Sources and topics are exact; no wildcards or request/reply declarations.
+
+✅ Speech migration: SpeechPerceptionAgent owns VAD/ASR and publishes validated observations; InputGateway no longer holds recognition capabilities. App submits PCM through Gateway and observes speech through OutputGateway. ❌ Shared camera composition follows in stage 3.

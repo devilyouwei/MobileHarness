@@ -86,9 +86,10 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     try await manager.register(agent)
     try await agent.start()
     let probe = VoiceProbe()
-    let gateway = InputGateway(manager: manager, recognition: RecognitionFixture(text: "你好", includeFinal: true))
+    let gateway = InputGateway(manager: manager)
+    let recognition = RecognitionFixture(text: "你好", includeFinal: true)
     let sessionID = UUID()
-    let turn = LiveSpeechInput(requests: gateway, sessionID: sessionID) { _ in }
+    let turn = LiveSpeechInput(recognition: recognition, sessionID: sessionID) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     let text = try await turn.finish()
     await probe.displayed(text)
@@ -118,8 +119,8 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
     try await agent.start()
-    let gateway = InputGateway(manager: manager, recognition: RecognitionFixture(text: "", includeFinal: false))
-    let turn = LiveSpeechInput(requests: gateway, sessionID: UUID()) { _ in }
+    let recognition = RecognitionFixture(text: "", includeFinal: false)
+    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     #expect(try await turn.finish().isEmpty)
     #expect(await agent.status().processedInputs == 0)
@@ -130,9 +131,6 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     let manager = AgentManager()
     try await manager.register(AssistantAgent(chat: FixedTextChat()))
     let requests = InputGateway(manager: manager)
-    await #expect(throws: CapabilityError.self) {
-        _ = try await requests.openSpeechStream(sessionID: UUID())
-    }
     let probe = VoiceProbe()
     let responses = OutputGateway(
         manager: manager, requests: requests, tools: ToolRegistry(),
@@ -190,9 +188,10 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
     try await agent.start()
-    let gateway = InputGateway(manager: manager, recognition: RecognitionFixture(text: "一段", includeFinal: true))
+    let gateway = InputGateway(manager: manager)
+    let recognition = RecognitionFixture(text: "一段", includeFinal: true)
     let id = UUID()
-    let turn = LiveSpeechInput(requests: gateway, sessionID: id) { _ in }
+    let turn = LiveSpeechInput(recognition: recognition, sessionID: id) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.maximumDuration)])
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     let text = try await turn.finish()
@@ -224,8 +223,8 @@ private actor BlockedRecognition: SpeechRecognitionCapability {
 
 @Test func voiceQueueOverflowIsExplicitAndCancellationReleasesGateway() async throws {
     let model = BlockedRecognition()
-    let gateway = InputGateway(manager: AgentManager(), recognition: model)
-    let turn = LiveSpeechInput(requests: gateway, sessionID: UUID()) { _ in }
+    let recognition = model
+    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.maximumDuration)])
     var started = model.started.stream.makeAsyncIterator()
     _ = await started.next()
@@ -235,7 +234,7 @@ private actor BlockedRecognition: SpeechRecognitionCapability {
     }
     await turn.cancel()
     await #expect(throws: CapabilityError.self) { try await turn.finish() }
-    let next = LiveSpeechInput(requests: gateway, sessionID: UUID()) { _ in }
+    let next = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
     try await next.enqueue([.audio([sampleFrame()]), .end(.silence)])
     _ = await started.next()
     await next.cancel()
@@ -267,9 +266,9 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
     try await agent.start()
-    let gateway = InputGateway(manager: manager, recognition: LiveRecognitionFixture())
+    let recognition = LiveRecognitionFixture()
     let previews = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(8))
-    let turn = LiveSpeechInput(requests: gateway, sessionID: UUID()) { previews.continuation.yield($0) }
+    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { previews.continuation.yield($0) }
     try await turn.enqueue([.audio([sampleFrame()])])
     var iterator = previews.stream.makeAsyncIterator()
     #expect(await iterator.next() == "你好")
@@ -285,15 +284,15 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
 }
 
 @Test func cancellingLivePreviewClosesAdmissionAndAllowsNextSession() async throws {
-    let gateway = InputGateway(manager: AgentManager(), recognition: LiveRecognitionFixture())
+    let recognition = LiveRecognitionFixture()
     let previews = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(8))
-    let turn = LiveSpeechInput(requests: gateway, sessionID: UUID()) { previews.continuation.yield($0) }
+    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { previews.continuation.yield($0) }
     try await turn.enqueue([.audio([sampleFrame()])])
     var iterator = previews.stream.makeAsyncIterator()
     _ = await iterator.next()
     await turn.cancel()
     await #expect(throws: CapabilityError.self) { try await turn.enqueue([.end(.silence)]) }
-    let next = LiveSpeechInput(requests: gateway, sessionID: UUID()) { _ in }
+    let next = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
     try await next.enqueue([.audio([sampleFrame()]), .end(.silence)])
     #expect(try await next.finish() == "你好世界")
     previews.continuation.finish()
@@ -381,4 +380,70 @@ func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async
     try await UIActions.express(invocation: invocation) { value, _ in await probe.displayed(value) }
     #expect(await probe.displayedText == ["🙂"])
     #expect(await probe.spokenText.isEmpty)
+}
+
+private struct EndpointVAD: VoiceActivityCapability {
+    var availability: CapabilityAvailability { .available }
+    func detectVoiceActivity(format: AudioFormat) -> any VoiceActivitySession { EndpointVADSession() }
+}
+private actor EndpointVADSession: VoiceActivitySession {
+    private var position: Int64 = 0
+    func process(_ frame: AudioFrame) throws -> [VoiceActivityScore] {
+        defer { position += Int64(frame.sampleCount) }
+        return [
+            try VoiceActivityScore(
+                startSample: position, sampleCount: frame.sampleCount, probability: position == 0 ? 1 : 0)
+        ]
+    }
+    func finish() -> [VoiceActivityScore] { [] }
+    func reset() { position = 0 }
+    func cancel() {}
+}
+
+@Test(.timeLimit(.minutes(1))) func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
+    let policy = try CommunicationPolicy(configurations: [
+        AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
+    ])
+    let session = UUID()
+    let manager = AgentManager()
+    let assistant = ObservationRecorder(id: "assistant")
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session)
+    try await manager.register(assistant, sessionID: session)
+    await assistant.start()
+    try await manager.register(speech, sessionID: session)
+    let input = InputGateway(manager: manager, policy: policy)
+    let bus = InternalSignalBus { value, target, incarnation in
+        try await input.receiveInternal(value, target: target, incarnation: incarnation)
+    }
+    try await bus.openSession(session)
+    let observed = AsyncStream<AgentInput>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let output = OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, bus: bus,
+        observedContracts: ["speech.partial", "speech.phase"],
+        observeEvent: { value in observed.continuation.yield(value) }, sink: { _ in })
+    try await speech.bind(output.messaging(for: .speechPerception))
+    try await speech.start()
+    let first = try AudioInput(samples: Data(repeating: 0, count: 1536 * 4), sequence: 0, timestamp: 0)
+    let second = try AudioInput(samples: Data(repeating: 0, count: 12800 * 4), sequence: 1, timestamp: 0.096)
+    _ = try await input.publish(AgentInput(sessionID: session, payload: .audio(first)))
+    _ = try await input.publish(AgentInput(sessionID: session, payload: .audio(second)))
+    for _ in 0..<10000 {
+        if await assistant.inputs.count == 1 { break }
+        try await Task.sleep(for: .milliseconds(1))
+    }
+    #expect(await assistant.inputs.count == 1)
+    if let value = await assistant.inputs.first, case .observation(let event) = value.payload {
+        #expect(event == .transcript("你好", final: true))
+    } else {
+        Issue.record("Missing final observation")
+    }
+    try await speech.resumeListening()
+    await speech.stop()
+    await #expect(throws: HarnessError.notRunning) {
+        try await speech.receive(AgentInput(sessionID: session, payload: .audio(first)))
+    }
+    await bus.closeSession(session)
+    await bus.shutdown()
+    await manager.stopAll()
 }
