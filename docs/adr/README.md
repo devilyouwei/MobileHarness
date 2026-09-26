@@ -23,4 +23,4 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 
 ✅ 0036-photographer-pipeline.md records the camera-to-Agent perception loop; physical robot behavior remains deferred.
 
-✅ [Photographer aim commands](0037-photographer-aim.md) records the phase-2 arm-aim design on top of the implemented photographer pipeline. ❌ No aim Swift source exists yet. The earlier parallel-camera draft is withdrawn.
+✅ [Photographer aim commands](0037-photographer-aim.md) records phase-2 NexArm aim on top of the implemented photographer pipeline: Wi-Fi hotspot, logical `base` and `pitch`, and a provisional raw-2048 home for the other four joints. ❌ No aim Swift source exists yet. The earlier parallel-camera draft and the RoArm HTTP choice are withdrawn.

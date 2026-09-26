@@ -161,7 +161,7 @@ Changes require repackaging and a new Agent instance; no hot reload is implement
 - ✅ Shared parsers, parameter/Channel validation, bounded queues, and cancellation/completion regression coverage.
 - ✅ `say` maps to `Speech.speak`; `print`/`express` map to `UI.print`/`UI.express`. Default `Speech`/`Display` Channels remain compatible; Channel and module names need not match.
 - ❌ Configuration hot reload, remote configuration, full JSON Schema, dynamic handler discovery, and configuration-driven lifecycle budgets.
-- ✅ [Photographer](Photographer/README.md) implements pose perception and `UI.showPose`. ❌ Robot aim, composition, temporal tracking, and other Vision/Media/Control roles. The aim-command design is [ADR 0037](../../docs/adr/0037-photographer-aim.md).
+- ✅ [Photographer](Photographer/README.md) implements pose perception and `UI.showPose`. ❌ Robot aim, composition, temporal tracking, and other Vision/Media/Control roles. The aim-command design is [ADR 0037](../../docs/adr/0037-photographer-aim.md): logical `base` and `pitch` on a NexArm, still unimplemented.
 - ❌ Model-native tool deltas, general StateStore/AgentRuntime, restart, and InternalSignalBus.
 
 ## Maintenance

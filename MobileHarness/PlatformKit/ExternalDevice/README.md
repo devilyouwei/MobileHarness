@@ -1,52 +1,66 @@
 # ExternalDevice — Transport Contracts for External Hardware
 
-Purpose: abstract device transports without Agent business semantics, per architecture section 34. Design goals: keep the byte-oriented stream contract usable for genuinely persistent-connection hardware (serial, BLE), and give hardware with a different connection shape (request/response over local network) its own, equally thin abstraction rather than forcing a mismatched fit. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md). Camera capture is already implemented under `PlatformKit/Camera` and is not part of this contract.
+Purpose: abstract device transports without Agent business semantics, per architecture section 34. Design goals: keep `ExternalDeviceTransport` as the byte pipe, and put NexArm framing plus the logical aim mapping in `RobotArmControl`. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md). Camera capture is already implemented under `PlatformKit/Camera` and is not part of this contract.
 
 - ✅ `ExternalDeviceTransport.swift`: `connect`/`send([UInt8])`/`emergencyStop`/`disconnect` contract for persistent stream transports (serial, BLE). Implemented as a protocol only; no concrete adapter exists yet.
-- ❌ `RobotArmControl` (design only, this record): unified logical-angle control surface for the tracking rig's arm. Not built on `ExternalDeviceTransport` — see rationale below.
-- ❌ Concrete RoArm‑M2 WiFi/HTTP adapter. Blocked on confirming whether the final hardware is the full 4-axis arm or the 3-axis variant with the wrist/hand joint removed (see `arm/smart_capture.md` section 5.1/5.4 for why that distinction changes the adapter's internal math, not the protocol shape).
-- ❌ Any BLE/serial robot adapter, IoT adapter.
+- ❌ `RobotArmControl` (design only): logical `base` / `pitch` aim for the NexArm. Frames the reference driver's six-position write on top of `ExternalDeviceTransport`.
+- ❌ Concrete Wi-Fi adapter. The phone joins the arm hotspot (`NexArm` / `hiwonder`) and keeps one TCP connection, provisionally `192.168.4.1:8080`. Each aim is one six-position frame on that connection. The port-80 slider page is a separate tutorial sketch.
+- ❌ Provisional home table: raw 2048 on all six joints, replaced by a hardware read-back before any physical homing move. Wrist-travel recovery stays off until joint signs and stops are measured.
+- ❌ Any other BLE/serial robot adapter or IoT adapter.
 
-## Why `RobotArmControl` is a separate protocol, not a `ExternalDeviceTransport` use case
+## Why both protocols exist
 
-`ExternalDeviceTransport.send(_ bytes: [UInt8])` models a persistent connection where the caller pushes bytes and the device does not synchronously answer each one — the right shape for serial or BLE. RoArm‑M2's actual control surface for this project is `GET http://<arm-ip>/js?json={"T":...}` (confirmed against `arm/roarm_m2-main/RoArm-M2_python/http_simple_ctrl.py`): a request/response call over the local network, matching `PlatformKit/Device/DeviceCapability.swift`'s existing `.localNetwork` case. Forcing that into `send([UInt8])` would either discard the response or require a second out-of-band channel to correlate it — worse than defining the narrow contract the domain actually needs. `ExternalDeviceTransport` is unchanged and remains the right contract for a future serial/BLE device.
+`ExternalDeviceTransport.send(_ bytes: [UInt8])` is the persistent byte pipe. The NexArm tracking command is one such frame: the reference driver's bridge mode, then a six-position write (command 97 in that driver) that does not wait for a reply. `RobotArmControl` owns that framing, the logical-radian to raw 0–4095 mapping, and the four held joints. `Actions/Robot` sees only the injected `(base, pitch)` closure.
+
+Factory Cartesian command `0x08` is a different controller mode. Tracking does not use it.
 
 ## Planned `RobotArmControl` contract
 
 ```swift
-/// Logical control surface for one arm; concrete adapters own translating (base, shoulder) into
-/// whatever the confirmed hardware variant actually needs (firmware Cartesian IK, or direct joint
-/// angles with adapter-owned calibration — see ADR 0037).
+/// Logical aim for the phone on a NexArm. The adapter writes six raw positions on every call:
+/// base → shoulder_pan, pitch → wrist_flex, and the home table for the other four.
+/// Until a read-back replaces it, every home entry is raw 2048.
 public protocol RobotArmControl: Actor {
     var isConnected: Bool { get }
-    /// Best-known logical angles, radians. Read-only; not guaranteed to reflect an in-flight aim
-    /// command that has not yet been acknowledged by the arm controller.
+    /// Last logical angles this adapter sent, radians. Not a read-back of physical joint position.
     var baseAngle: Double { get }
-    var shoulderAngle: Double { get }
+    var pitchAngle: Double { get }
 
     func connect() async throws
-    /// Non-blocking: returns once the controller acknowledges receipt, not once physically settled.
-    func aim(base: Double, shoulder: Double) async throws
+    /// Returns once the byte transport accepts the six-position frame, not once the arm settles.
+    func aim(base: Double, pitch: Double) async throws
     func home() async throws
-    /// Independent of Channel scheduling and of any Agent decision; must not depend on iOS
-    /// background execution remaining active.
+    /// Torque off. Independent of Channel scheduling and of any Agent decision. Must not depend
+    /// on iOS background execution remaining active.
     func emergencyStop() async
     func disconnect() async
 }
 ```
 
-This is illustrative only — not an existing Swift API. The concrete RoArm adapter (WiFi/HTTP) is deferred until the axis-count question is resolved; per ADR 0037, only the adapter's internals change between the two hardware variants, not this protocol.
+This is illustrative only — not an existing Swift API.
+
+On each `aim`, the adapter:
+
+1. Converts `base` and `pitch` with the provisional scale: logical 0 is raw 2048, positive, `4096 / 2π` counts per radian. A hardware read-back replaces the center, sign, and scale.
+2. Clamps `shoulder_pan` and `wrist_flex` to 0–4095 until measured travel replaces that range.
+3. Fills `shoulder_lift`, `elbow_flex`, `wrist_roll`, and `gripper` from the home table. The provisional table is raw 2048 for every joint.
+4. Writes all six positions in one frame.
+
+Wrist-travel recovery is specified and starts disabled. When enabled, a `wrist_flex` target inside the end margin shifts `shoulder_lift` and `elbow_flex` by opposite amounts that keep the phone's world pitch, and pulls `wrist_flex` back toward mid-travel by the same amount. The Agent still sends only `base` and `pitch`.
+
+`home()` writes the six home positions once. Tracking does not call it when the person leaves the frame. On hardware, `home()` waits until the provisional 2048 table has been replaced.
 
 ## Direct relationships (planned)
 
 ```mermaid
 flowchart LR
-    Actions -->|"send(base, shoulder, invocation) closure, bound by App"| RobotArmControl
-    RobotArmControl -->|"GET /js?json={T:1041,...}"| ARM[RoArm-M2 controller over local network]
-    App -.->|"Local Network permission, adapter construction"| RobotArmControl
+    Actions -->|"send(base, pitch, invocation) closure, bound by App"| RobotArmControl
+    RobotArmControl -->|"six-position joint frame"| Transport[ExternalDeviceTransport]
+    Transport -->|"persistent TCP on the NexArm hotspot"| ARM[NexArm controller]
+    App -.->|"adapter construction and provisional home table"| RobotArmControl
 ```
 
-`Actions/Robot` never imports this protocol directly (see that module's README) — App's composition root is the only place that references both `Actions.Robot.aim`'s closure parameter and a concrete `RobotArmControl` instance.
+`Actions/Robot` never imports this protocol directly. App's composition root is the only place that references both `Actions.Robot.aim`'s closure and a concrete `RobotArmControl` instance.
 
 ## Maintenance
 
