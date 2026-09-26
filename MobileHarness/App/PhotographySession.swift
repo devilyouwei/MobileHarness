@@ -20,28 +20,40 @@ enum PhotographySession {
         let models = try await ModelKitDefaults.manager(
             resources: Bundle.main.bundleURL.appendingPathComponent("Models"))
         let pose = try await models.get(.pose, load: false)
-        let agent = try AgentBootstrap.makePhotographer(pose: pose, sessionID: sessionID)
-        let manager = AgentManager()
-        try await manager.register(agent)
-        let input = InputGateway(manager: manager)
-        let sampled = CameraInputSession(gateway: input, sessionID: sessionID, configuration: configuration)
-        let responses = OutputGateway(
-            manager: manager, requests: input, tools: ToolRegistry(),
-            actions: AgentBootstrap.makePoseActions(present: present), sink: { _ in })
+        let runtime = try ApplicationRuntime.shared()
+        let manager = runtime.manager
+        let input = runtime.input
+        let responses = runtime.output
+        let agent = try PhotographerAgent(sessionID: sessionID)
+        let vision = try VisionPerceptionAgent(
+            pose: pose, sessionID: sessionID, sampling: configuration,
+            resolveImage: CameraImageAttachment.resolve)
+        try await manager.register(agent, sessionID: sessionID)
+        do { try await manager.register(vision, sessionID: sessionID) } catch {
+            try? await manager.remove(.photographer)
+            throw error
+        }
+        runtime.presentation.pose = present
         do {
+            try await runtime.bus.openSession(sessionID)
+            try await vision.bind(responses.messaging(for: .visionPerception))
             try await manager.start(.photographer)
+            try await manager.start(.visionPerception)
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     for try await frame in frames {
                         try Task.checkCancellation()
-                        try await sampled.submit(
-                            ImageInput(
-                                width: frame.width, height: frame.height, gray64: frame.gray64,
-                                attachment: CameraImageAttachment(
-                                    image: try frame.withPixelBuffer {
-                                        try ImageFrame(pixelBuffer: $0, rotation: frame.rotation)
-                                    }),
-                                sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation))
+                        let image = try ImageInput(
+                            width: frame.width, height: frame.height, gray64: frame.gray64,
+                            attachment: CameraImageAttachment(
+                                image: try frame.withPixelBuffer {
+                                    try ImageFrame(pixelBuffer: $0, rotation: frame.rotation)
+                                }),
+                            sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation)
+                        let report = try await input.publish(AgentInput(sessionID: sessionID, payload: .image(image)))
+                        guard report.rejected.isEmpty, report.delivered == [.visionPerception] else {
+                            throw CommunicationError.unavailableTarget
+                        }
                     }
                 }
                 group.addTask {
@@ -54,15 +66,31 @@ enum PhotographySession {
                     }
                     if await agent.status().lifecycle == .failed { throw HarnessError.queueFull }
                 }
+                group.addTask {
+                    for await envelope in vision.outputs {
+                        try Task.checkCancellation()
+                        try await responses.dispatch(envelope)
+                        if case .control(let state) = envelope.output, state.hasPrefix("agent.error:") {
+                            throw HarnessError.notRunning
+                        }
+                    }
+                    if await vision.status().lifecycle == .failed { throw HarnessError.queueFull }
+                }
                 defer { group.cancelAll() }
                 try await group.next()
             }
-            await agent.stop()
-            await responses.shutdown()
+            try? await manager.remove(.visionPerception)
+            await runtime.bus.closeSession(sessionID)
+            try? await manager.remove(.photographer)
+            await responses.cancel(sessionID: sessionID)
+            runtime.presentation.pose = nil
             try Task.checkCancellation()
         } catch {
-            await agent.stop()
-            await responses.shutdown()
+            try? await manager.remove(.visionPerception)
+            await runtime.bus.closeSession(sessionID)
+            try? await manager.remove(.photographer)
+            await responses.cancel(sessionID: sessionID)
+            runtime.presentation.pose = nil
             throw error
         }
     }

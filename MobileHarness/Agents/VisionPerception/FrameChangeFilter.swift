@@ -62,28 +62,3 @@ public struct FrameChangeFilter: Sendable {
         return difference > 0 && Double(difference) / (255 * 4096) >= configuration.minimumChange
     }
 }
-
-/// One session/filter and one active submit. No image queue in the Gateway.
-public actor CameraInputSession {
-    private let gateway: InputGateway
-    private let sessionID: UUID
-    private var filter: FrameChangeFilter
-    private var busy = false
-    public init(gateway: InputGateway, sessionID: UUID, configuration: FrameChangeConfiguration) {
-        self.gateway = gateway
-        self.sessionID = sessionID
-        filter = FrameChangeFilter(configuration: configuration)
-    }
-    @discardableResult
-    public func submit(_ frame: ImageInput) async throws -> Bool {
-        try Task.checkCancellation()
-        guard !busy else { throw HarnessError.queueFull }
-        busy = true
-        defer { busy = false }
-        guard try filter.accepts(frame) else { return false }
-        let report = try await gateway.submit(
-            AgentInput(sessionID: sessionID, payload: .image(frame)), to: .photographer)
-        guard report.delivered == [.photographer], report.rejected.isEmpty else { throw HarnessError.notRunning }
-        return true
-    }
-}

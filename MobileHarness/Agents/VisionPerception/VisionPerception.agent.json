@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 4,
+  "agentID": "visionPerception",
+  "channels": [],
+  "textActions": [],
+  "actions": [],
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "media.image",
+        "version": 1,
+        "kind": "image"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "media.image",
+        "source": "phone.camera",
+        "topic": "media.image"
+      }
+    ],
+    "publications": [
+      "vision.pose"
+    ],
+    "sends": []
+  }
+}

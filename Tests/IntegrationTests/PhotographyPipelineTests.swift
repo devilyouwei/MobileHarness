@@ -73,10 +73,17 @@ private actor ControlledPose: PoseCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func photographerKeepsOnlyLatestAndNeverOverlapsOrReplays() async throws {
+@Test(.timeLimit(.minutes(1))) func visionKeepsOnlyLatestAndNeverOverlapsOrReplays() async throws {
     let model = ControlledPose()
     let session = UUID()
-    let agent = try PhotographerAgent(pose: model, sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session, sampling: FrameChangeConfiguration(minimumChange: 0))
+    let observations = AsyncStream<PerceptionObservation>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    try await agent.bind(
+        AgentMessaging { value, _, _ in
+            observations.continuation.yield(value)
+            return DeliveryReport(delivered: [.photographer])
+        })
     try await agent.start()
     var started = model.started.makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(1, sequence: 1))))
@@ -90,28 +97,30 @@ private actor ControlledPose: PoseCapability {
     await model.release()
     #expect(await started.next() == 3)
     await model.release()
-    var output = agent.outputs.makeAsyncIterator()
-    var sequences: [UInt64] = []
-    for _ in 0..<4 {
-        let envelope = try #require(await output.next())
-        if case .actionCall(let call) = envelope.output {
-            #expect(call.actionPath == ActionPath(module: "UI", function: "showPose"))
-            #expect(call.channel == "Vision")
-            let payload = try #require(call.parameters["payload"])
-            sequences.append(try JSONDecoder().decode(PoseOverlay.self, from: Data(payload.utf8)).sequence)
+    var stream = observations.stream.makeAsyncIterator()
+    for sequence: UInt64 in [1, 3] {
+        guard case .pose(let pose) = try #require(await stream.next()) else {
+            Issue.record("Missing pose")
+            return
         }
+        #expect(pose.sequence == sequence)
     }
-    #expect(sequences == [1, 3])
     #expect(await model.calls == [1, 3])
     #expect(await model.maximumActive == 1)
-    #expect(await agent.status().queuedInputs == 0)
+    #expect(await agent.replacements == 1)
     await agent.stop()
 }
 
-@Test(.timeLimit(.minutes(1))) func photographerPauseKeepsLatestAndStopSuppressesLateModelOutput() async throws {
+@Test(.timeLimit(.minutes(1))) func visionPauseKeepsLatestAndStopSuppressesLateModelOutput() async throws {
     let model = ControlledPose()
     let session = UUID()
-    let agent = try PhotographerAgent(pose: model, sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session, sampling: FrameChangeConfiguration(minimumChange: 0))
+    try await agent.bind(
+        AgentMessaging { _, _, _ in
+            Issue.record("Late output")
+            return DeliveryReport()
+        })
     try await agent.start()
     try await agent.pause()
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(1, sequence: 1))))
@@ -126,7 +135,7 @@ private actor ControlledPose: PoseCapability {
         await Task.yield()
     }
     #expect(await agent.status().lifecycle == .stopped)
-    await model.release()  // Backend deliberately ignores cancellation; Agent must fence its return.
+    await model.release()
     await stopping.value
     var output = agent.outputs.makeAsyncIterator()
     #expect(await output.next() == nil)
@@ -143,15 +152,36 @@ private actor OverlayRecorder {
     func record(_ value: UInt64) { sequences.append(value) }
 }
 
-@Test(.timeLimit(.minutes(1))) func cameraGatewayToPhotographerToActionClearsOverlayAndFinishesInputs() async throws {
+@Test(.timeLimit(.minutes(1))) func sharedPoseFeedsTwoSubscribersWithOneInferenceAndClearsOverlay() async throws {
     let session = UUID()
     let manager = AgentManager()
+    let model = ControlledPose()
+    let photo = try PhotographerAgent(sessionID: session)
+    let vision = try VisionPerceptionAgent(pose: model, sessionID: session)
+    let second = ObservationRecorder(id: "second")
+    let secondConfig = try AgentConfiguration(
+        data: JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 4, "agentID": "second", "actions": [], "tools": [], "channels": [], "textActions": [],
+            "communication": [
+                "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
+                "subscriptions": [["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]],
+                "publications": [], "sends": [],
+            ],
+        ]))
+    let policy = try CommunicationPolicy(configurations: [
+        AgentConfigurations.load(named: "Photographer"),
+        AgentConfigurations.load(named: "VisionPerception"), secondConfig,
+    ])
+    try await manager.register(photo, sessionID: session)
+    try await manager.register(vision, sessionID: session)
+    try await manager.register(second, sessionID: session)
+    await second.start()
+    let input = InputGateway(manager: manager, policy: policy)
+    let bus = InternalSignalBus { value, target, incarnation in
+        try await input.receiveInternal(value, target: target, incarnation: incarnation)
+    }
+    try await bus.openSession(session)
     let recorder = OverlayRecorder()
-    let agent = try PhotographerAgent(pose: EmptyPose(), sessionID: session)
-    try await manager.register(agent)
-    try await manager.start(.photographer)
-    let input = InputGateway(manager: manager)
-    let sampled = CameraInputSession(gateway: input, sessionID: session, configuration: try FrameChangeConfiguration())
     let actions = ChannelScheduler(
         registry: ActionRegistry(handlers: [
             ActionPath(module: "UI", function: "showPose"): { invocation in
@@ -162,15 +192,26 @@ private actor OverlayRecorder {
             }
         ]), maximumTrackedInputs: 1)
     let output = OutputGateway(
-        manager: manager, requests: input, tools: ToolRegistry(), actions: actions, sink: { _ in })
-    var envelopes = agent.outputs.makeAsyncIterator()
+        manager: manager, requests: input, tools: ToolRegistry(), actions: actions, policy: policy, bus: bus,
+        sink: { _ in })
+    try await vision.bind(output.messaging(for: .visionPerception))
+    try await photo.start()
+    try await vision.start()
+    var envelopes = photo.outputs.makeAsyncIterator()
+    var started = model.started.makeAsyncIterator()
     for i: UInt64 in 1...3 {
-        #expect(try await sampled.submit(image(UInt8(i * 40), sequence: i)))
+        let report = try await input.publish(
+            AgentInput(sessionID: session, payload: .image(image(UInt8(i * 40), sequence: i))))
+        #expect(report.delivered == [.visionPerception])
+        #expect(await started.next() == UInt8(i * 40))
+        await model.release()
         for _ in 0..<2 { try await output.dispatch(try #require(await envelopes.next())) }
     }
-    #expect(try await !sampled.submit(image(120, sequence: 4)))
     #expect(await recorder.sequences == [1, 2, 3])
-    await agent.stop()
+    #expect(await second.inputs.count == 3)
+    #expect(await model.calls.count == 3)
+    await manager.stopAll()
+    await bus.closeSession(session)
     await output.shutdown()
 }
 
@@ -202,26 +243,26 @@ private actor OverlayRecorder {
     #expect(throws: GenerationError.unknownCapability) { try text.append("unexpected prose") }
 }
 
-private struct CrowdPose: PoseCapability {
-    var availability: CapabilityAvailability { .available }
-    func estimatePose(_ request: PoseRequest) async throws -> PoseResult {
-        let joints = BodyJoint.allCases.map { PoseKeypoint(joint: $0, x: 2, y: 3, confidence: 0.9) }
-        return PoseResult(
-            context: request.context,
-            people: (0..<8).map { _ in
-                PersonPose(box: PoseBox(x: 0, y: 0, width: 4, height: 4), confidence: 0.9, keypoints: joints)
-            })
-    }
+private func poseInput(session: UUID, sequence: UInt64 = 1, people: Int = 8) throws -> AgentInput {
+    let joints = (0..<17).map { _ in PoseObservation.Joint(x: 2, y: 3, confidence: 0.9) }
+    return AgentInput(
+        sessionID: session,
+        payload: .observation(
+            .pose(
+                try PoseObservation(
+                    width: 4, height: 4,
+                    sequence: sequence, timestamp: Double(sequence), rotation: 1,
+                    people: Array(repeating: joints, count: people)))))
 }
 
 @Test(.timeLimit(.minutes(1))) func photographerCrowdFitsActionProtocolAndRejectsForeignSession() async throws {
     let session = UUID()
-    let agent = try PhotographerAgent(pose: CrowdPose(), sessionID: session)
+    let agent = try PhotographerAgent(sessionID: session)
     try await agent.start()
     await #expect(throws: ImageInputError.wrongSession) {
-        try await agent.receive(AgentInput(sessionID: UUID(), payload: .image(image(1, sequence: 1))))
+        try await agent.receive(poseInput(session: UUID()))
     }
-    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(1, sequence: 1))))
+    try await agent.receive(poseInput(session: session))
     var stream = agent.outputs.makeAsyncIterator()
     let envelope = try #require(await stream.next())
     guard case .actionCall(let call) = envelope.output else {
@@ -238,66 +279,54 @@ private struct CrowdPose: PoseCapability {
 }
 
 @Test(.timeLimit(.minutes(1))) func photographerOutputOverflowFailsInsteadOfReplacingActions() async throws {
-    let model = ControlledPose()
     let session = UUID()
-    let agent = try PhotographerAgent(pose: model, sessionID: session)
-    try await agent.start()
-    var started = model.started.makeAsyncIterator()
-    // Deliberately do not consume the capacity-eight output stream (two outputs per inference).
+    let photo = try PhotographerAgent(sessionID: session)
+    try await photo.start()
     for i: UInt64 in 1...5 {
-        try await agent.receive(AgentInput(sessionID: session, payload: .image(image(UInt8(i), sequence: i))))
-        #expect(await started.next() == UInt8(i))
-        await model.release()
+        try await photo.receive(poseInput(session: session, sequence: i))
+        for _ in 0..<1000 {
+            let status = await photo.status()
+            if status.processedInputs >= Int(i) || status.lifecycle == .failed { break }
+            await Task.yield()
+        }
     }
-    for _ in 0..<1000 {
-        if await agent.status().lifecycle == .failed { break }
-        await Task.yield()
-    }
-    #expect(await agent.status().lifecycle == .failed)
-    #expect(await agent.status().queuedInputs == 0)
-    await agent.stop()
+    #expect(await photo.status().lifecycle == .failed)
+    await photo.stop()
 }
 
-private struct PoseImageAttachment: ImageAttachment {
-    let image: ImageFrame
-}
-@Test(.timeLimit(.minutes(1))) func photographerResolvesOpaqueInputAndPreservesActionProtocol() async throws {
+private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
+@Test(.timeLimit(.minutes(1))) func visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation() async throws {
     let model = ControlledPose()
     let session = UUID()
-    let agent = try PhotographerAgent(
+    let agent = try VisionPerceptionAgent(
         pose: model, sessionID: session,
         resolveImage: { input in
-            guard case .sampled(_, let attachment) = input.content,
-                let attachment = attachment as? PoseImageAttachment
-            else { throw ImageInputError.invalidFrame }
+            guard case .sampled(_, let attachment) = input.content, let attachment = attachment as? PoseImageAttachment
+            else {
+                throw ImageInputError.invalidFrame
+            }
             return attachment.image
+        })
+    let observed = AsyncStream<PerceptionObservation>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    try await agent.bind(
+        AgentMessaging { value, _, _ in
+            observed.continuation.yield(value)
+            return DeliveryReport(delivered: [.photographer])
         })
     try await agent.start()
     let frame = try ImageInput(
         width: 4, height: 4, gray64: Data(repeating: 22, count: 4096),
         attachment: PoseImageAttachment(image: ImageFrame(width: 4, height: 4, rgb: Data(repeating: 22, count: 48))),
         sequence: 1, timestamp: 1, rotation: 0)
-    let manager = AgentManager()
-    try await manager.register(agent)
-    let gateway = CameraInputSession(
-        gateway: InputGateway(manager: manager), sessionID: session, configuration: try FrameChangeConfiguration())
-    #expect(try await gateway.submit(frame))
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(frame)))
     var started = model.started.makeAsyncIterator()
     #expect(await started.next() == 22)
     await model.release()
-    var output = agent.outputs.makeAsyncIterator()
-    let first = try #require(await output.next())
-    guard case .actionCall(let call) = first.output else {
-        Issue.record("Expected pose Action")
-        await agent.stop()
+    var values = observed.stream.makeAsyncIterator()
+    guard case .pose(let pose) = try #require(await values.next()) else {
+        Issue.record("Missing pose")
         return
     }
-    #expect(call.actionPath == ActionPath(module: "UI", function: "showPose"))
-    let second = try #require(await output.next())
-    guard case .control("agent.finished") = second.output else {
-        Issue.record("Expected finish")
-        await agent.stop()
-        return
-    }
+    #expect(pose.rotation == 0 && pose.sequence == 1 && pose.people.isEmpty)
     await agent.stop()
 }

@@ -62,7 +62,16 @@ final class AppLifecycleCoordinator {
 
     func run() async {
         guard manager == nil else { return }
-        let manager = AgentManager()
+        let runtime: ApplicationRuntime
+        do {
+            runtime = try ApplicationRuntime.shared()
+            try await runtime.prepareTools()
+        } catch {
+            voicePhase = .failed
+            voiceStatus = "通信配置加载失败：\(error)"
+            return
+        }
+        let manager = runtime.manager
         self.manager = manager
         let agent: Agents.AssistantAgent
         do { agent = try AgentBootstrap.makeAssistant(chat: chat) } catch {
@@ -73,45 +82,32 @@ final class AppLifecycleCoordinator {
             record(voiceStatus)
             return
         }
-        let policy: CommunicationPolicy
-        do {
-            policy = try CommunicationPolicy(configurations: [
-                AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
-            ])
-        } catch {
-            self.manager = nil
-            voicePhase = .failed
-            voiceStatus = "通信配置加载失败：\(error)"
-            return
-        }
-        let requests = InputGateway(manager: manager, policy: policy)
-        let bus = InternalSignalBus { input, target, incarnation in
-            try await requests.receiveInternal(input, target: target, incarnation: incarnation)
-        }
+        let requests = runtime.input
+        let responses = runtime.output
+        let bus = runtime.bus
         self.bus = bus
-        let tools = ToolRegistry()
-        let actions = AgentBootstrap.makeActions(
-            synthesis: synthesis,
-            play: { [weak self] frame, invocation in
-                guard let self else { throw CancellationError() }
-                try await self.play(frame, generation: invocation.envelope.sessionID)
-            },
-            present: { [weak self] text, invocation in
-                guard let self else { throw CancellationError() }
-                try await self.present(text, invocation: invocation)
-            },
-            express: { [weak self] emoji, invocation in
-                guard let self else { throw CancellationError() }
-                try await self.presentExpression(emoji, invocation: invocation)
-            })
-        let responses = OutputGateway(
-            manager: manager, requests: requests, tools: tools, actions: actions,
-            policy: policy, bus: bus, observedContracts: ["speech.partial", "speech.final", "speech.phase"],
-            observeEvent: { [weak self] input in await self?.observeSpeech(input) },
-            sink: { [weak self] envelope in await self?.show(envelope) })
+        runtime.presentation.synthesis = synthesis
+        runtime.presentation.play = { [weak self] frame, invocation in
+            guard let self else { throw CancellationError() }
+            try await self.play(frame, generation: invocation.envelope.sessionID)
+        }
+        runtime.presentation.text = { [weak self] text, invocation in
+            guard let self else { throw CancellationError() }
+            try await self.present(text, invocation: invocation)
+        }
+        runtime.presentation.emotion = { [weak self] emoji, invocation in
+            guard let self else { throw CancellationError() }
+            try await self.presentExpression(emoji, invocation: invocation)
+        }
+        runtime.presentation.speech = { [weak self] input in await self?.observeSpeech(input) }
+        runtime.presentation.control = { [weak self] envelope in
+            guard envelope.source == .assistant || envelope.source == .speechPerception else { return }
+            await self?.show(envelope)
+        }
         self.responses = responses
         do {
-            try await AgentBootstrap.register(agent, manager: manager, tools: tools)
+            try await manager.register(agent)
+            try await manager.start(.assistant)
             self.requests = requests
             voicePhase = .idle
             isReady = true
@@ -153,9 +149,13 @@ final class AppLifecycleCoordinator {
         isReady = false
         self.requests = nil
         await cleanupTask?.value
-        await manager.stopAll()
-        await bus.shutdown()
-        await responses.shutdown()
+        try? await manager.remove(.assistant)
+        runtime.presentation.play = nil
+        runtime.presentation.text = nil
+        runtime.presentation.emotion = nil
+        runtime.presentation.speech = nil
+        runtime.presentation.control = nil
+        runtime.presentation.synthesis = nil
         self.responses = nil
         self.manager = nil
     }

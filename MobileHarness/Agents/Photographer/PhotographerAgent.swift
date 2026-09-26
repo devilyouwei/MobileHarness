@@ -1,14 +1,11 @@
 import AgentCore
 import Foundation
-import ModelKit
 
-/// Photography/motion role, phase one: pose perception and UI actions only; no robot commands.
+/// Photography policy consumes shared poses and emits UI actions; no inference or raw media.
 public actor PhotographerAgent: Agent {
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let pose: any PoseCapability
-    private let resolveImage: @Sendable (ImageInput) throws -> ImageFrame
     private let sessionID: UUID
     private var lifecycle: AgentLifecycle = .registered
     private var pending: AgentInput?
@@ -18,19 +15,13 @@ public actor PhotographerAgent: Agent {
     private var processed = 0
 
     public init(
-        pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil,
-        resolveImage: @escaping @Sendable (ImageInput) throws -> ImageFrame = { input in
-            guard case .rgb(let rgb) = input.content else { throw ImageInputError.invalidFrame }
-            return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
-        }
+        sessionID: UUID, configuration: AgentConfiguration? = nil
     ) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
-            id: configuration.agentID, name: "Photographer", inputs: [.image],
+            id: configuration.agentID, name: "Photographer", inputs: [.observation],
             outputs: [.actionCall, .control], capabilities: configuration.capabilities)
-        self.pose = pose
-        self.resolveImage = resolveImage
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
         outputs = stream.stream
@@ -62,10 +53,12 @@ public actor PhotographerAgent: Agent {
     public func receive(_ input: AgentInput) throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID else { throw ImageInputError.wrongSession }
-        guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
+        guard case .observation(.pose(let image)) = input.payload else { throw HarnessError.unsupportedInput }
         guard lastSequence.map({ image.sequence > $0 }) ?? true,
             lastTimestamp.map({ image.timestamp >= $0 }) ?? true
         else { throw ImageInputError.outOfOrder }
+        try image.validate()
+        guard !input.metadata.expired else { throw CommunicationError.expired }
         lastSequence = image.sequence
         lastTimestamp = image.timestamp
         pending = input  // Explicit newest-frame replacement, never applied to Action/Tool outputs.
@@ -82,26 +75,14 @@ public actor PhotographerAgent: Agent {
             drain()
         }
         do {
-            guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
-            let context = InferenceContext(requestID: input.id, conversationID: input.sessionID)
-            let resolved = try resolveImage(image)
-            guard resolved.width == image.width, resolved.height == image.height else {
-                throw ImageInputError.invalidFrame
-            }
-            let result = try await pose.estimatePose(
-                PoseRequest(
-                    image: resolved, context: context))
-            try Task.checkCancellation()
-            guard lifecycle == .running || lifecycle == .paused else { return }
-            guard result.context == context else {
-                throw CapabilityError.invalidRequest("Pose result context mismatch")
-            }
-            let people = try result.people.prefix(6).map { person in
-                guard person.keypoints.count == 17 else { throw CapabilityError.invalidRequest("Invalid COCO pose") }
-                return try person.keypoints.enumerated().map { index, point in
-                    guard point.joint.rawValue == index, point.x.isFinite, point.y.isFinite,
+            guard case .observation(.pose(let image)) = input.payload else { throw HarnessError.unsupportedInput }
+            guard !input.metadata.expired else { return }
+            let people = try image.people.prefix(6).map { person in
+                guard person.count == 17 else { throw CommunicationError.invalidPayload }
+                return try person.enumerated().map { index, point in
+                    guard point.x.isFinite, point.y.isFinite,
                         point.confidence.isFinite, (0...1).contains(point.confidence)
-                    else { throw CapabilityError.invalidRequest("Invalid pose joint") }
+                    else { throw CommunicationError.invalidPayload }
                     let x = Double(point.x) / Double(image.width)
                     let y = Double(point.y) / Double(image.height)
                     // Bounded off-image transport; invisible points stay low confidence.
@@ -116,7 +97,7 @@ public actor PhotographerAgent: Agent {
                 sequence: image.sequence, timestamp: image.timestamp, rotation: image.rotation, people: people)
             let data = try JSONEncoder().encode(overlay)
             guard data.count <= 3000, let json = String(data: data, encoding: .utf8) else {
-                throw CapabilityError.eventTooLarge
+                throw CommunicationError.invalidPayload
             }
             // Deterministic CV output uses the same shared Function Token parser and JSON alias registry.
             var generator = try AgentGenerator(capabilities: descriptor.capabilities, textActions: [])
@@ -128,7 +109,7 @@ public actor PhotographerAgent: Agent {
             processed += 1
         } catch is CancellationError {} catch {
             if !Task.isCancelled && lifecycle != .stopped {
-                do { try emit(.control("agent.error: pose inference failed"), input: input) } catch {}
+                do { try emit(.control("agent.error: pose presentation failed"), input: input) } catch {}
                 lifecycle = .failed
                 pending = nil
                 continuation.finish()

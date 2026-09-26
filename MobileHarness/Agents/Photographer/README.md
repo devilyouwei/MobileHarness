@@ -146,3 +146,5 @@ Validation (2026-09-26): final root scripts/check.sh passed, including 66 Integr
 YOLO26 最终验证：完整 check.sh 通过（含 3 项离线 ZIP 校验测试、69 项集成测试、Vision/RGB 真实模型回归）；四个 iOS 模拟器方案及真机 Release 无签名构建通过。Release App 内模型各文件 SHA-256 匹配下载 profile，旧 YOLOv8 包不存在，Photographer 配置完整。该新模型版本尚未安装到手机。
 
 ✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.
+
+✅ Vision migration: VisionPerceptionAgent owns filtering/inference and publishes shared pose observations; Photographer owns only display policy. App now uses one shared manager/bus/Gateway assembly with independent voice and camera sessions. ❌ Device acceptance remains outstanding.

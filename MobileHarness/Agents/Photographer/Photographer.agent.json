@@ -31,12 +31,18 @@
   "communication": {
     "inputs": [
       {
-        "contract": "media.image",
+        "contract": "vision.pose",
         "version": 1,
-        "kind": "image"
+        "kind": "observation"
       }
     ],
-    "subscriptions": [],
+    "subscriptions": [
+      {
+        "contract": "vision.pose",
+        "source": "visionPerception",
+        "topic": "vision.pose"
+      }
+    ],
     "publications": [],
     "sends": []
   }

@@ -46,10 +46,14 @@ let package = Package(
             exclude: ["UI/README.md", "README.md", "Speech/README.md"]),
         .target(
             name: "Agents", dependencies: ["AgentCore", "ModelKit"], path: "MobileHarness/Agents",
-            exclude: ["Assistant/README.md", "Photographer/README.md", "SpeechPerception/README.md", "README.md"],
+            exclude: [
+                "Assistant/README.md", "Photographer/README.md", "SpeechPerception/README.md",
+                "VisionPerception/README.md", "README.md",
+            ],
             resources: [
                 .process("Assistant/Assistant.agent.json"), .process("Photographer/Photographer.agent.json"),
                 .process("SpeechPerception/SpeechPerception.agent.json"),
+                .process("VisionPerception/VisionPerception.agent.json"),
             ]),
         .target(
             name: "ActionRuntime", dependencies: ["AgentCore"], path: "MobileHarness/ActionRuntime",
