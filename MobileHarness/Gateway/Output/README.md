@@ -33,3 +33,5 @@ flowchart LR
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
 ✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. Photographer skeletons remain validated ActionCalls; no UI payload bypass exists.
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

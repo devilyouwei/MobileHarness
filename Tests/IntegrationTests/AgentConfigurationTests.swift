@@ -5,7 +5,8 @@ import Testing
 
 private func document() -> [String: Any] {
     [
-        "schemaVersion": 3, "agentID": "assistant", "channels": ["main"], "textActions": ["render"],
+        "schemaVersion": 4, "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
+        "agentID": "assistant", "channels": ["main"], "textActions": ["render"],
         "actions": [
             [
                 "alias": "render", "path": ["module": "UI", "function": "print"],

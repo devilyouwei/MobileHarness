@@ -37,3 +37,5 @@ Purpose: distinguish the current architecture and roadmap from historical design
 ✅ [Platform capability domains](adr/0039-platform-capability-domains.md) records Audio/Vision/Connectivity and shared Core directory ownership.
 
 Current layer ownership is defined in the [ModelKit / PlatformKit comparison](../MobileHarness/README.md#391-platformkit-versus-modelkit): model-driven data processing versus device/OS data I/O. Dated ADRs and validation reports describe the implementation at that time; current module READMEs and Repository-Structure govern present ownership.
+
+Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.

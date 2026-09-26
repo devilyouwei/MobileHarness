@@ -9,6 +9,8 @@ struct AgentRegistry {
         agents[agent.descriptor.id] = agent
     }
 
+    mutating func remove(_ id: AgentID) { agents[id] = nil }
+
     func agent(_ id: AgentID) throws -> any Agent {
         guard let agent = agents[id] else { throw HarnessError.unknownAgent }
         return agent

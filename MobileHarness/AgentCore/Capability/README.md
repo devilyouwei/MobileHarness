@@ -46,3 +46,5 @@ flowchart LR
 Update this README when changing files, validation or configuration semantics. ✅ means implemented; ❌ means outstanding. The target architecture is MobileHarness/README.md.
 
 ✅ resolveAction returns ActionCall; resolved-call validation checks its ActionPath, effective channel and parameter names against the Agent registry.
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

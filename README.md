@@ -90,3 +90,5 @@ The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#int
 ✅ Normal startup requests front-camera preview behind a translucent black overlay, voice orb and captions. Camera controls switch front/back or stop capture; off is black. Camera preview and perception are independent of microphone activation and voice model readiness.
 
 ✅ Camera frames now pass a configurable Gateway grayscale-change filter (default 3%) to Photographer. It runs shared YOLO Pose once per accepted latest frame and emits UI.showPose through the action pipeline; green skeletons overlay the preview. ❌ Robot-arm control, composition/tracking behavior and device quality acceptance remain outstanding.
+
+Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.

@@ -1,6 +1,6 @@
 # Agents — Business Agents and Development Standards
 
-Agents implements independent, stateful cognitive roles. Each Agent owns its business decisions and interprets model output into resolved calls. The [technical architecture](../README.md), especially sections 6–24 and 32, defines the target. This document is the implementation standard for developers and AI coding tools; the v3 JSON configuration rules are enforced by `AgentCore/Capability/AgentConfiguration.swift`.
+Agents implements independent, stateful cognitive roles. Each Agent owns its business decisions and interprets model output into resolved calls. The [technical architecture](../README.md), especially sections 6–24 and 32, defines the target. This document is the implementation standard for developers and AI coding tools; the v4 JSON configuration rules are enforced by `AgentCore/Capability/AgentConfiguration.swift`.
 
 ## Direct relationships
 
@@ -35,15 +35,15 @@ Agents/
 - Update the root Package.swift resource list and Xcode navigation references when adding resources. Do not duplicate them in the App target.
 - AgentCore owns shared contracts, configuration validation, parsers, and lifecycle infrastructure. Agents owns business policy. Do not copy a parser into a concrete Agent.
 
-## Capability configuration v3 — JSON
+## Capability configuration v4 — JSON
 
-Use UTF-8 `<AgentName>.agent.json`, parsed by Foundation JSONDecoder. JSON comments are not supported: use doc. Version 3 uses doc for usage guidance; the loader accepts JSON v3 only. Repackage configuration and code together.
+Use UTF-8 `<AgentName>.agent.json`, parsed by Foundation JSONDecoder. JSON comments are not supported: use doc. Version 4 uses doc for usage guidance; the loader accepts JSON v4 only. Repackage configuration and code together.
 
 All fields shown below are required except hidden, which defaults to false. Arrays must be present, and constraints may be empty. Unknown fields, incorrect types and missing fields are rejected. Names are case-sensitive. Changes to field semantics require coordinated validation, tests, documentation and version migration.
 
 | Top-level field | JSON type | Contract |
 | --- | --- | --- |
-| schemaVersion | Integer | Exactly 3 |
+| schemaVersion | Integer | Exactly 4 |
 | agentID | String | Stable identity matching the Agent implementation |
 | channels | Array of String | Additional allowed Channels, such as main; action defaults are also allowed |
 | textActions | Array of String | Ordered unique aliases for natural-text mapping, at most 8; each must accept string text without other required parameters |
@@ -157,7 +157,7 @@ Changes require repackaging and a new Agent instance; no hot reload is implement
 ## Implementation status
 
 - ✅ [Assistant](Assistant/README.md) loads actions/tools/channels/textActions from its own JSON resource.
-- ✅ AgentConfigurations loads package resources; AgentConfiguration strictly validates v3. Errors propagate to App.
+- ✅ AgentConfigurations loads package resources; AgentConfiguration strictly validates v4. Errors propagate to App.
 - ✅ Shared parsers, parameter/Channel validation, bounded queues, and cancellation/completion regression coverage.
 - ✅ `say` maps to `Speech.speak`; `print`/`express` map to `UI.print`/`UI.express`. Default `Speech`/`Display` Channels remain compatible; Channel and module names need not match.
 - ❌ Configuration hot reload, remote configuration, full JSON Schema, dynamic handler discovery, and configuration-driven lifecycle budgets.
@@ -178,6 +178,8 @@ Keep this standard synchronized with configuration validation and Agent changes.
 
 Each Agent README must follow the [concurrency documentation standard](../README.md#concurrency-documentation-standard). Document its inbox producer and drain worker, output consumer, capacities, pause/resume behavior, cancellation admission, failure propagation and completion semantics. A registry bound or actor mailbox is not a substitute for an explicit bounded application inbox. Include a Mermaid diagram and distinguish implemented behavior from planned scheduling features. The Assistant README provides the current concrete example.
 
-✅ Photographer is the phase-one 摄像师 role: injected PoseCapability, one active/one latest pending image, JSON v3 showPose action and shared output parsing. Robot motion, composition and tracking remain unimplemented; see Photographer/README.md.
+✅ Photographer is the phase-one 摄像师 role: injected PoseCapability, one active/one latest pending image, JSON v4 showPose action and shared output parsing. Robot motion, composition and tracking remain unimplemented; see Photographer/README.md.
 
 ✅ Photographer accepts an App-injected image resolver for opaque native frame attachments. Capability declarations still come exclusively from Photographer.agent.json; the resolver is data adaptation, not a second Action/Tool registration list.
+
+JSON v4 requires communication with inputs (contract/version/kind), subscriptions (contract/source/topic), publications (contract names), and sends (contract/target). Empty arrays grant no communication permission. Sources and topics are exact; no wildcards or request/reply declarations.

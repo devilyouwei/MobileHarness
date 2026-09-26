@@ -21,3 +21,5 @@ stop 仍是现有 Agent 的终态，恢复需新实例；pause 只阻止领取�
 维护：修改本目录代码、文件或子目录时同步 README；✅ 已实现，❌ 未实现。设计以 MobileHarness/README.md 为目标，历史决策见 ADR 0018。
 
 ✅ 生命周期枚举与文件名统一为 AgentLifecycle / AgentLifecycle.swift。
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

@@ -41,3 +41,5 @@ Keep this README synchronized with changes to responsibilities, files, interface
 ✅ ImageInput adds bounded upright RGB8 media transport (640 pixels per side), capture sequence/time and sensor rotation, independent of ModelKit/PlatformKit. PoseOverlay defines compact UI Action data and inverse sensor-coordinate mapping.
 
 ✅ ImageInput now supports either bounded RGB or a 64×64 gray sample plus opaque Sendable ImageAttachment. AgentCore still imports neither ModelKit nor CoreVideo; App supplies the attachment resolver. Native inputs are bounded to 4 MP / 4096 per side.
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

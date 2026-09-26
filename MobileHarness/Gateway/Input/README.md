@@ -78,3 +78,5 @@ Gray = (77R + 150G + 29B + 128) >> 8. Change = sum(abs(current - previous)) / (4
 CameraInputSession has one active submit, no queue, and rejects overlapping submits. It owns one filter and capture session ID, checks delivery rejection, and propagates errors. Two 4096-byte grayscale grids bound comparison memory. The producer's RGB frame stream keeps only the newest queued frame; Photographer independently replaces its one pending image. No Action, control command or Tool result is discarded by these media policies.
 
 ✅ FrameChangeFilter accepts native pre-sampled 64×64 grayscale alongside the original RGB path. The default 3% mean absolute grayscale difference, baseline updates, minimumInterval and first/geometry-frame behavior are unchanged. Direct raw-image sampling may differ numerically from the old resized-image sample.
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

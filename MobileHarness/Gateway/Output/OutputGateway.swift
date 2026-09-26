@@ -6,6 +6,13 @@ import ToolRuntime
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
     public typealias Sink = @Sendable (OutputEnvelope) async -> Void
+    private let requests: InputGateway
+    private let policy: CommunicationPolicy?
+    private let bus: InternalSignalBus?
+    private let observeEvent: (@Sendable (AgentInput) async throws -> Void)?
+    private let observedContracts: Set<String>
+    private var sequences: [AgentID: UInt64] = [:]
+    private var emitting: [AgentID: Int] = [:]
     private let manager: AgentManager
     private let actions: ActionDispatcher
     private let tools: ToolDispatcher
@@ -14,12 +21,78 @@ public actor OutputGateway {
     public init(
         manager: AgentManager, requests: InputGateway, tools: ToolRegistry,
         actions: ChannelScheduler = ChannelScheduler(registry: ActionRegistry(handlers: [:])),
+        policy: CommunicationPolicy? = nil, bus: InternalSignalBus? = nil,
+        observedContracts: Set<String> = [],
+        observeEvent: (@Sendable (AgentInput) async throws -> Void)? = nil,
         sink: @escaping Sink
     ) {
+        self.requests = requests
+        self.policy = policy
+        self.bus = bus
+        self.observedContracts = observedContracts
+        self.observeEvent = observeEvent
         self.manager = manager
         self.tools = ToolDispatcher(registry: tools, input: requests)
         self.actions = ActionDispatcher(executor: actions)
         self.sink = sink
+    }
+
+    public func messaging(for source: AgentID) async throws -> AgentMessaging {
+        let incarnation = try await manager.identity(source)
+        guard policy?.agents[source] != nil, bus != nil else { throw CommunicationError.unauthorized }
+        return AgentMessaging { [weak self] observation, parent, target in
+            guard let self else { throw CommunicationError.scopeClosed }
+            return try await self.emit(
+                observation, parent: parent, source: source, incarnation: incarnation, target: target)
+        }
+    }
+    private func emit(
+        _ observation: PerceptionObservation, parent: AgentInput, source: AgentID,
+        incarnation: UUID, target: AgentID?
+    ) async throws -> DeliveryReport {
+        guard let policy, let bus, let declaration = policy.agents[source] else {
+            throw CommunicationError.unauthorized
+        }
+        guard emitting[source, default: 0] < 16 else { throw CommunicationError.capacityExceeded }
+        emitting[source, default: 0] += 1
+        defer { emitting[source, default: 1] -= 1 }
+        try await manager.validate(source, incarnation: incarnation, sessionID: parent.sessionID)
+        _ = try observation.validatedSize()
+        if let target {
+            guard
+                declaration.sends.contains(where: {
+                    $0.contract == observation.contract && $0.target == target.rawValue
+                })
+            else {
+                throw CommunicationError.unauthorized
+            }
+        } else {
+            guard declaration.publications.contains(observation.contract) else { throw CommunicationError.unauthorized }
+        }
+        guard parent.metadata.hops < 8 else { throw CommunicationError.hopLimitExceeded }
+        sequences[source, default: 0] += 1
+        let payload = InputPayload.observation(observation)
+        let input = AgentInput(
+            sessionID: parent.sessionID, payload: payload,
+            metadata: InputMetadata(
+                payload: payload, source: source.rawValue, incarnation: incarnation,
+                capturedAt: parent.metadata.capturedAt, sequence: sequences[source]!, rootID: parent.metadata.rootID,
+                parentID: parent.id, hops: parent.metadata.hops + 1))
+        let destinations = target.map { [$0] } ?? policy.destinations(for: input)
+        let observed = target == nil && observedContracts.contains(observation.contract) && observeEvent != nil
+        guard !destinations.isEmpty || observed else { throw CommunicationError.noRecipients }
+        var targets: [(AgentID, UUID)] = []
+        var unavailable: [AgentID: String] = [:]
+        for id in destinations {
+            do { targets.append((id, try await manager.identity(id))) } catch {
+                unavailable[id] = String(describing: error)
+            }
+        }
+        // The observer is a runtime/UI endpoint, never a direct business-Agent callback.
+        if observed { try await observeEvent?(input) }
+        let report = targets.isEmpty ? DeliveryReport() : try await bus.publish(input, targets: targets)
+        return DeliveryReport(
+            delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new })
     }
 
     public func cancel(sessionID: UUID) async { await actions.cancel(sessionID: sessionID) }

@@ -25,3 +25,5 @@ Update this README when adding or changing tests. Preserve ✅/❌ distinctions 
 ✅ Camera conversion regression fixtures cover padded source rows, all four clockwise rotations, RGB channel order and 720p-to-640-long-edge bounds using native vImage.
 
 ✅ Native-camera sampling fixtures cover padded rows and all four orientations. Sampled ImageInput tests verify unchanged threshold/baseline admission and malformed sample rejection; previous camera RGB-conversion fixtures were replaced with these current-path tests.
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

@@ -58,3 +58,5 @@ flowchart LR
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
 ✅ New image payloads remain unsupported by Assistant and are rejected by its descriptor; Photographer owns camera input.
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

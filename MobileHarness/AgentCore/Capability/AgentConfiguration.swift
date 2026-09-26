@@ -10,6 +10,7 @@ public enum AgentConfigurationError: Error, Equatable, Sendable {
 
 /// Versioned, validated configuration. Only decoded snapshots can construct a registry.
 public struct AgentConfiguration: Sendable {
+    public let communication: CommunicationDeclaration
     public let agentID: AgentID
     public let capabilities: CapabilityRegistry
     public let textActions: [String]
@@ -21,14 +22,28 @@ public struct AgentConfiguration: Sendable {
             throw AgentConfigurationError.invalidFormat
         }
         let root = try Self.dictionary(
-            raw, keys: ["schemaVersion", "agentID", "channels", "textActions", "actions", "tools"], field: "root")
+            raw, keys: ["schemaVersion", "agentID", "channels", "textActions", "actions", "tools", "communication"],
+            field: "root")
         let decoded: Document
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.schemaVersion == 3 else {
+        guard decoded.schemaVersion == 4 else {
             throw AgentConfigurationError.unsupportedVersion(decoded.schemaVersion)
         }
+        let communicationObject = try Self.dictionary(
+            root["communication"] ?? NSNull(),
+            keys: ["inputs", "subscriptions", "publications", "sends"], field: "communication")
+        for (key, keys) in [
+            ("inputs", Set(["contract", "version", "kind"])),
+            ("subscriptions", Set(["contract", "source", "topic"])),
+            ("sends", Set(["contract", "target"])),
+        ] {
+            guard let entries = communicationObject[key] as? [Any] else { throw AgentConfigurationError.invalidFormat }
+            for entry in entries { _ = try Self.dictionary(entry, keys: keys, field: "communication.\(key)") }
+        }
+        try decoded.communication.validate()
+        communication = decoded.communication
         for field in ["channels", "textActions"] { try Self.uniqueStrings(root[field], field: field) }
         guard let actions = root["actions"] as? [Any], let tools = root["tools"] as? [Any],
             actions.count + tools.count <= 128
@@ -169,6 +184,7 @@ public struct AgentConfiguration: Sendable {
     private struct HiddenValue: Decodable { let value: Bool }
 
     private struct Document: Decodable {
+        let communication: CommunicationDeclaration
         let schemaVersion: Int
         let agentID: String
         let channels: [String]

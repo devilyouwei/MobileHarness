@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "agentID": "photographer",
   "channels": [],
   "textActions": [],
@@ -27,5 +27,17 @@
       "hidden": true
     }
   ],
-  "tools": []
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "media.image",
+        "version": 1,
+        "kind": "image"
+      }
+    ],
+    "subscriptions": [],
+    "publications": [],
+    "sends": []
+  }
 }

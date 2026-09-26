@@ -252,3 +252,5 @@ Required tests before enabling a second communicating Agent:
 5. Complete stress/lifecycle tests and update every affected module README before enabling production communication.
 
 No stage may introduce an AgentCore dependency on Gateway or executable placeholder handlers. Preserve the distinction between documented design ✅ and implemented transport ❌ until executable behavior and its tests are delivered.
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

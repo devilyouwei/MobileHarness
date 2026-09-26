@@ -144,3 +144,5 @@ Validation (2026-09-26): final root scripts/check.sh passed, including 66 Integr
 ❌ 新模型尚待手机真人姿态/持续时延验收；没有将旧模型或官方公开数据冒充新模型的本机测试结果。
 
 YOLO26 最终验证：完整 check.sh 通过（含 3 项离线 ZIP 校验测试、69 项集成测试、Vision/RGB 真实模型回归）；四个 iOS 模拟器方案及真机 Release 无签名构建通过。Release App 内模型各文件 SHA-256 匹配下载 profile，旧 YOLOv8 包不存在，Photographer 配置完整。该新模型版本尚未安装到手机。
+
+✅ Event migration stage 1: JSON v4 communication declarations, typed perception inputs, static subscription/direct delivery, bounded event transport and incarnation fencing. ❌ Production perception agents and shared App composition follow in subsequent stages.

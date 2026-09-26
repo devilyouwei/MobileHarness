@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "agentID": "assistant",
   "channels": [
     "main"
@@ -89,5 +89,27 @@
       "doc": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
       "hidden": false
     }
-  ]
+  ],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "user.text",
+        "version": 1,
+        "kind": "text"
+      },
+      {
+        "contract": "runtime.event",
+        "version": 1,
+        "kind": "event"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      }
+    ],
+    "subscriptions": [],
+    "publications": [],
+    "sends": []
+  }
 }

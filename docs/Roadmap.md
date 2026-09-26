@@ -232,3 +232,5 @@ Validation (2026-09-26): root scripts/check.sh passed, including 69 IntegrationT
 
 ✅ Current entry, architecture, repository layout, contribution guidance and App/Gateway/Actions/Experience/model READMEs distinguish PlatformKit device I/O from ModelKit processing. Stale image/camera status and App-owned model registration descriptions were corrected against current code. Historical ADRs, validation evidence and original design sources are preserved.
 ❌ No new runtime behavior or physical-device acceptance is implied by this documentation update.
+
+Gateway/perception migration: stage 1 adds JSON v4 and bounded event-only communication through both gateways. Speech/vision extraction and shared composition remain in progress; request/reply and robot reflex control remain deferred.
