@@ -56,3 +56,5 @@ flowchart LR
 ✅ The algorithm above describes the current implementation.
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+
+✅ New image payloads remain unsupported by Assistant and are rejected by its descriptor; Photographer owns camera input.

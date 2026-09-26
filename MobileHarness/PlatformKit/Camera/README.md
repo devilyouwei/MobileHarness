@@ -1,33 +1,35 @@
-# Camera — Frame Capture for the Tracking Agent (Design Only)
+# Camera preview
 
-Purpose: capture the phone's own camera feed and hand bounded, throttled frames to Gateway/Input, without performing detection or any Agent business logic here. Design goals match `PlatformKit/Audio`'s existing split: platform capture is a thin, Sendable-safe producer; the consumer (Gateway, then `TrackingAgent`) owns everything downstream. See [ADR 0035](../../../docs/adr/0035-tracking-agent-and-robot-actions.md).
+Purpose: acquire a foreground camera for local preview and bounded RGB frame delivery. Design goals: actor-owned hardware state, public AVFoundation APIs, explicit authorization and no audio-session interference.
 
-- ❌ Nothing in this directory is implemented.
+✅ AppleCamera configures one wide-angle front/back input at up to 720p. Session start, stop and configuration run on its actor, never MainActor. Switching restores the old input if replacement cannot be added; the caller stops the session on failure. No microphone input or photo/movie output is added, and application audio-session auto-configuration is disabled.
 
-## Why capture throttles before Gateway, not after
+✅ CameraPreviewSource is a narrowly scoped Sendable bridge: its private session is mutated exclusively by AppleCamera, while MainActor only attaches it to AVCaptureVideoPreviewLayer. Preview connection mirroring and rotation are presentation concerns. The wrapper does not expose session mutation to consumers. Native preview does not create an application frame queue.
 
-The phone's native capture rate (commonly 30–60 fps) is higher than `TrackingAgent`'s design target of 10–15 fps (per `Agents/Tracking/README.md`). Throttling belongs here, in the platform-facing producer, rather than in Gateway or the Agent, for the same reason `PlatformKit/Audio/MicrophoneFrame.swift` is the point where continuous hardware callbacks become bounded application data: dropping excess frames at the earliest possible point avoids doing any downstream work (detection, control math) on data that will never be used, and keeps `AgentInput` admission bounded by frame arrival rate rather than raw camera callback rate.
-
-## Planned data contract: `ImageFrame`
-
-`ModelKit/README.md` already reserves this: "Core also owns future shared image/video data contracts." A validated `ImageFrame` (in `ModelKit/Core`, mirroring `AudioFrame`'s pattern — bounded byte size, finite timestamp, explicit format) is the type this module would produce and `ModelKit/Vision`'s `PersonDetectionCapability` would consume. Designing `ImageFrame`'s exact encoding (raw BGRA8 plane vs. bounded-size compressed buffer) is deferred to when this directory is actually implemented, alongside `ModelKit/Vision` — the two must agree on one contract, so neither should be designed in isolation from the other.
-
-## Planned relationship
+## Lifecycle and bounds
 
 ```mermaid
 flowchart LR
-    Hardware[AVFoundation capture] -->|Native-rate frames| PK[PlatformKit/Camera]
-    PK -->|Throttled ImageFrame, 10-15 fps design target| GW["Gateway/Input (AgentInput payload: .image)"]
-    GW --> TA[TrackingAgent]
-    App -.->|Camera permission, session lifecycle| PK
+    App[Scene camera coordinator] -->|Permission / current intent| Camera[AppleCamera actor]
+    Camera -->|Single video input| Session[AVCaptureSession]
+    Session --> Preview[Native preview layer]
+    Session -->|Interruptions / error| Events[Newest status event: capacity 1]
+    Events --> App
+    App -->|Off / inactive| Stop[stopRunning]
 ```
 
-`InputKind.image` already exists in `AgentCore/InputKind.swift` (currently unused); `InputPayload.image` is the additive case this pipeline needs (see ADR 0035 decision 7), rather than the larger generic `Signal`/`SignalType`/`SignalAdapter` migration tracked as ❌ in `Gateway/Input/README.md`.
+The App coordinator admits one hardware transition at a time and coalesces pending UI preferences to the latest desired state; this is not an Agent command queue. Three notification observers feed one newest-status stream (capacity 1, older status notifications replaced). Interruption end requests reconciliation; runtime failures expose an explicit retry. Scene exit joins stop. AVFoundation owns native buffers; immutable RGB samples leave through the bounded frame stream.
 
-## Explicitly out of scope
+✅ Camera authorization, unavailable-device failures, start/stop, front/back switching and interruption reporting.
+❌ Recording, background capture and physical-device continuous camera/audio acceptance.
 
-Multiple simultaneous camera consumers (e.g. a live preview UI alongside tracking), photo/video capture Actions (`Actions.Camera.capturePhoto`, listed as a target in architecture section 28 but unrelated to this tracking pipeline), and any recording pipeline. Those are separate future designs.
+Implementation reference: [Apple AVCam](https://developer.apple.com/documentation/avfoundation/avcam-building-a-camera-app) for actor-isolated capture and native preview, and [RotationCoordinator](https://developer.apple.com/documentation/avfoundation/avcapturedevice/rotationcoordinator) for preview orientation.
 
-## Maintenance
+## RGB capture for perception
 
-Keep this README synchronized with implementation as soon as any file in this directory stops being documentation-only, following `PlatformKit/README.md`'s ✅/❌ convention. Update the root `PlatformKit/README.md` implementation-status list and directory table when a concrete capture adapter lands, and use public `AVFoundation` APIs with just-in-time camera permission requests per `PlatformKit/Device/DeviceCapability.swift`'s existing pattern.
+✅ AVCaptureVideoDataOutput uses BGRA, native unmirrored sensor orientation, one serial delegate queue and alwaysDiscardsLateVideoFrames. The delegate creates upright unmirrored RGB (max 640 pixels per dimension), rotating by the capture RotationCoordinator's nearest quarter turn. A lock protects only the stream continuation/sequence/rotation snapshot; conversion occurs outside it. One callback plus one newest pending CameraFrame is retained. No task per frame; native pixel buffers never escape the callback.
+
+✅ Stop closes the stream; restart stops capture and drains the delegate queue before installing a new stream, preventing old-lens buffers entering the new session. Sequence starts at one per stream, timestamps are native monotonic capture time. Rotation/crop/mirror metadata is preserved for UI projection. Preview mirroring never alters model pixels.
+❌ Arbitrary-angle resampling, recorded media, hardware tracking IDs and physical-device inference/audio coexistence acceptance.
+
+✅ Stream cancellation clears the receiver continuation only for its matching generation, so failed/cancelled analysis stops RGB conversion while live preview can continue. A late termination from an old session cannot close a replacement stream.

@@ -10,7 +10,7 @@ struct ConversationView: View {
         GeometryReader { geometry in
             let diameter = min(geometry.size.width * 0.84, 360.0)
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.clear
                 Button {
                     runtime.toggleVoice()
                 } label: {
@@ -94,7 +94,7 @@ struct ConversationStartupView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.clear
                 VoiceOrb(phase: error == nil ? .loading : .failed, level: 0, reduceMotion: reduceMotion)
                     .frame(width: min(geometry.size.width * 0.84, 360), height: min(geometry.size.width * 0.84, 360))
                     .allowsHitTesting(false)

@@ -89,9 +89,11 @@ Weight size alone is not a reliable runtime memory budget.
 
 ## Default capability acquisition
 
-register(registration, defaults:) binds selected capabilities atomically to a model ID. Selected defaults must be supported by that registration and unbound; collisions reject the whole registration without changing either table. There are at most five default bindings, one per capability kind. Explicit ID registrations can coexist for diagnostics without becoming defaults.
+register(registration, defaults:) binds selected capabilities atomically to a model ID. Selected defaults must be supported by that registration and unbound; collisions reject the whole registration without changing either table. There are at most six default bindings, one per capability kind. Explicit ID registrations can coexist for diagnostics without becoming defaults.
 
 get(.chat, load:) resolves the default ID and follows the same construction/resource path as get(id, as:, load:). load, warmup, unload, status and availability also accept a capability. Missing defaults fail explicitly; there is no model selection fallback or live replacement. The Defaults target owns production mappings while this target has no adapter dependency.
 
 ✅ Default and explicit acquisition share the same provider and lifecycle; registration failures preserve existing defaults.
 ❌ Automatic fallback and dynamic default replacement.
+
+✅ Typed `.pose` acquisition and availability use the existing factory, lifecycle and memory policy paths. The capability binding count is now six.

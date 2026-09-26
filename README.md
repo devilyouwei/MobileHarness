@@ -2,7 +2,7 @@
 
 MobileHarness is an Apple-native Agent harness with the iPhone as its interaction and inference host. Stateful Agent actors receive user input, Tool results and device events through shared gateways. The [technical architecture](MobileHarness/README.md) defines module responsibilities; [repository structure](docs/Repository-Structure.md) records implemented modules and outstanding scope.
 
-The physical-device composition is Nemotron streaming ASR + Silero VAD → AssistantAgent using Qwen3.5-2B MLX ChatCapability → sentence-level say/print ActionCalls → speech and captions. It requires iOS 27 and matching h18p artifacts, with no automatic model fallback. MobileHarnessSimulator is for UI debugging and reports unavailable chat. Models load and warm up before recording. The [Qwen adapter](MobileHarness/ModelKit/Language/LLM/Qwen35/README.md) exposes capabilities independently of business Agents. Camera and robot control are not implemented.
+The physical-device composition is Nemotron streaming ASR + Silero VAD → AssistantAgent using Qwen3.5-2B MLX ChatCapability → sentence-level say/print ActionCalls → speech and captions. It requires iOS 27 and matching h18p artifacts, with no automatic model fallback. MobileHarnessSimulator is for UI debugging and reports unavailable chat. Models load and warm up before recording. The [Qwen adapter](MobileHarness/ModelKit/Language/LLM/Qwen35/README.md) exposes capabilities independently of business Agents. Camera runs local pose perception through Photographer; robot control is not implemented.
 
 ## Development environment
 
@@ -22,7 +22,7 @@ The physical-device composition is Nemotron streaming ASR + Silero VAD → Assis
 
 2. Open MobileHarness.xcodeproj. Choose MobileHarness for a physical device or MobileHarnessSimulator for UI development.
 3. Copy Config/Local.xcconfig.example to ignored Config/Local.xcconfig and supply your development Team ID and Bundle ID.
-4. Download physical-device artifacts with `python3 scripts/download-nemotron.py`, `python3 scripts/download-qwen35.py` and `python3 scripts/download-kokoro.py`. Simulator ASR uses `python3 scripts/download-audio8.py`. Both configurations require `python3 scripts/download-silero.py`.
+4. Download physical-device artifacts with `python3 scripts/download-nemotron.py`, `python3 scripts/download-qwen35.py` `python3 scripts/download-kokoro.py` and `python3 scripts/download-yolov8-pose.py`. Simulator ASR uses `python3 scripts/download-audio8.py`. Both configurations require `python3 scripts/download-silero.py`.
 5. Tap the central circle, grant microphone permission and speak. After approximately 0.8 s of silence, the final transcript enters the Agent. Tap the circle again to stop recording and playback. The interface provides voice effects and captions without a text input field.
 
 Long utterances are segmented approximately every 12 s while capture continues, then merged into one submission after a pause. Each turn is limited to 60 s. Listening pauses during final recognition/reply handling and resumes after generation and all speech Actions complete. Stop discards unsubmitted content, clears conversation context and cancels inference, queued Actions and playback. Shared ModelManager retains model weights across recording turns and failures; explicit lifecycle operations own unloading.
@@ -71,7 +71,7 @@ ModelKit includes ASR, TTS, VAD, LLM and JEV interfaces; Management supplies the
 Queue algorithms, capacities, overflow policies and cancellation flows belong in each owning directory's README; follow the [concurrency documentation standard](MobileHarness/README.md#concurrency-documentation-standard). SwiftPM excludes module README files from compilation.
 
 - ✅ Capability-based voice pipeline, bounded queues, model adapters and automated checks.
-- ❌ Full sustained-device acceptance, camera/robot behavior and UI automation.
+- ❌ Full sustained-device acceptance, robot behavior and UI automation.
 
 See [Architecture](docs/Architecture.md), [ModelKit](MobileHarness/ModelKit/README.md), [Roadmap](docs/Roadmap.md), [Contributing](CONTRIBUTING.md) and [platform boundaries](docs/Platform-Boundaries.md). Preserve docs/Technical_Design.docx as the original design source. Keep documentation aligned with current names and behavior.
 
@@ -82,3 +82,9 @@ The [inter-Agent communication design](MobileHarness/AgentCore/Bus/README.md#int
 ✅ ModelKit is an internal foundation module built exclusively by root Package.swift. All model contracts and application evaluations live in separate targets under root Tests; boundary checks are enforced by scripts/check.sh.
 
 ✅ ModelKitDefaults assembles built-in providers internally; App obtains default capabilities from ModelManager without registering concrete models.
+
+✅ YOLOv8n Pose adds a separate PoseCapability and Core ML adapter; see MobileHarness/ModelKit/Vision/YOLO/README.md. ❌ Physical-device pose accuracy and robot behavior remain outstanding.
+
+✅ Normal startup requests front-camera preview behind a translucent black overlay, voice orb and captions. Camera controls switch front/back or stop capture; off is black. Camera preview and perception are independent of microphone activation and voice model readiness.
+
+✅ Camera frames now pass a configurable Gateway grayscale-change filter (default 3%) to Photographer. It runs shared YOLO Pose once per accepted latest frame and emits UI.showPose through the action pipeline; green skeletons overlay the preview. ❌ Robot-arm control, composition/tracking behavior and device quality acceptance remain outstanding.

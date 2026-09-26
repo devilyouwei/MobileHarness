@@ -19,4 +19,8 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 
 ✅ [Internal default model assembly](0034-modelkit-default-assembly.md) defines ModelKit-owned registrations and capability defaults. App supplies resources and handles OS events.
 
-✅ [Tracking Agent and Robot Actions](0035-tracking-agent-and-robot-actions.md) records the Milestone 1 minimal aim-loop design across Agents/Tracking, Actions/Robot, PlatformKit/Camera and ExternalDevice, and ModelKit/Vision. ❌ No Swift source exists yet; every touched directory is documentation-only.
+✅ 0035-yolov8-pose.md records bounded RGB pose inference and the separate Core ML adapter. ❌ Device accuracy and thermal acceptance remain outstanding.
+
+✅ 0036-photographer-pipeline.md records the camera-to-Agent perception loop; physical robot behavior remains deferred.
+
+✅ [Photographer aim commands](0037-photographer-aim.md) records the phase-2 arm-aim design on top of the implemented photographer pipeline. ❌ No aim Swift source exists yet. The earlier parallel-camera draft is withdrawn.

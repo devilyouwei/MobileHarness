@@ -10,3 +10,7 @@ The standalone test runner selects its bundled MLX Metal resource directory befo
 - ❌ These tests do not establish real inference or physical-device acceptance.
 
 ✅ Production assembly tests cover concurrent first access, shared manager identity, conflicting roots and terminal shutdown. Runtime tests use ModelAssembly SPI for isolated containers; production has no public manager constructor.
+
+✅ Pose default registration remains lazy and typed acquisition does not load absent weights.
+
+✅ Repeated .pose acquisition returns the identical provider; camera pipeline incarnations share its model lifecycle.

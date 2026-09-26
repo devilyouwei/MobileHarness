@@ -1,6 +1,6 @@
 # ExternalDevice — Transport Contracts for External Hardware
 
-Purpose: abstract device transports without Agent business semantics, per architecture section 34. Design goals: keep the byte-oriented stream contract usable for genuinely persistent-connection hardware (serial, BLE), and give hardware with a different connection shape (request/response over local network) its own, equally thin abstraction rather than forcing a mismatched fit. See [ADR 0035](../../../docs/adr/0035-tracking-agent-and-robot-actions.md) for the concrete decision that led to the second protocol below.
+Purpose: abstract device transports without Agent business semantics, per architecture section 34. Design goals: keep the byte-oriented stream contract usable for genuinely persistent-connection hardware (serial, BLE), and give hardware with a different connection shape (request/response over local network) its own, equally thin abstraction rather than forcing a mismatched fit. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md). Camera capture is already implemented under `PlatformKit/Camera` and is not part of this contract.
 
 - ✅ `ExternalDeviceTransport.swift`: `connect`/`send([UInt8])`/`emergencyStop`/`disconnect` contract for persistent stream transports (serial, BLE). Implemented as a protocol only; no concrete adapter exists yet.
 - ❌ `RobotArmControl` (design only, this record): unified logical-angle control surface for the tracking rig's arm. Not built on `ExternalDeviceTransport` — see rationale below.
@@ -16,7 +16,7 @@ Purpose: abstract device transports without Agent business semantics, per archit
 ```swift
 /// Logical control surface for one arm; concrete adapters own translating (base, shoulder) into
 /// whatever the confirmed hardware variant actually needs (firmware Cartesian IK, or direct joint
-/// angles with adapter-owned calibration — see ADR 0035 decision 3).
+/// angles with adapter-owned calibration — see ADR 0037).
 public protocol RobotArmControl: Actor {
     var isConnected: Bool { get }
     /// Best-known logical angles, radians. Read-only; not guaranteed to reflect an in-flight aim
@@ -35,7 +35,7 @@ public protocol RobotArmControl: Actor {
 }
 ```
 
-This is illustrative only — not an existing Swift API. The concrete RoArm adapter (WiFi/HTTP) is deferred until the axis-count question is resolved; per ADR 0035 decision 3, only the adapter's internals change between the two hardware variants, not this protocol.
+This is illustrative only — not an existing Swift API. The concrete RoArm adapter (WiFi/HTTP) is deferred until the axis-count question is resolved; per ADR 0037, only the adapter's internals change between the two hardware variants, not this protocol.
 
 ## Direct relationships (planned)
 

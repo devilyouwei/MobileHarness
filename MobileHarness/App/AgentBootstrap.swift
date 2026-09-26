@@ -2,6 +2,7 @@ import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import Foundation
 import Gateway
 import ModelKit
 import ToolRuntime
@@ -9,6 +10,19 @@ import Tools
 
 @MainActor
 enum AgentBootstrap {
+    static func makePhotographer(pose: any PoseCapability, sessionID: UUID) throws -> PhotographerAgent {
+        try PhotographerAgent(pose: pose, sessionID: sessionID)
+    }
+    static func makePoseActions(
+        present: @escaping @Sendable (PoseOverlay, ActionInvocation) async throws -> Void
+    ) -> ChannelScheduler {
+        ChannelScheduler(
+            registry: ActionRegistry(handlers: [
+                ActionPath(module: "UI", function: "showPose"): { invocation in
+                    try await UIActions.showPose(invocation: invocation, present: present)
+                }
+            ]), capacityPerChannel: 8, maximumTrackedInputs: 8)
+    }
     static func makeAssistant(chat: any ChatCapability) throws -> AssistantAgent {
         try AssistantAgent(chat: chat)
     }

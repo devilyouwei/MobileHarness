@@ -29,5 +29,7 @@ Captions preserve stable recognition prefixes and fade revised suffixes over abo
 
 VoiceOver, Dynamic Type and Reduce Motion are supported. SwiftUI remains MainActor-isolated. Views forward intents through the lifecycle coordinator and never call models or devices directly.
 
-- ❌ Camera/character pages and independent page-subscription lifetimes.
+- ❌ Character pages and independent page-subscription lifetimes.
 - ❌ Physical-device startup latency and visual acceptance require device testing.
+
+✅ Startup and conversation now have transparent content backgrounds inside CameraConversationSurface; the existing orb placement, microphone tap behavior and captions remain above the dimmed preview. ❌ Visual/audio coexistence acceptance requires a physical device.

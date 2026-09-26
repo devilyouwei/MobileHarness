@@ -13,6 +13,7 @@ let package = Package(
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro",
                 "PlatformKit",
             ]),
+        .library(name: "ModelKitYOLOPose", targets: ["ModelKitYOLOPose"]),
         .library(name: "ModelKitSilero", targets: ["ModelKitSilero"]),
         .library(name: "ModelKitKokoro", targets: ["ModelKitKokoro"]),
         .library(name: "ModelKitNemotron", targets: ["ModelKitNemotron"]),
@@ -45,8 +46,8 @@ let package = Package(
             exclude: ["UI/README.md", "README.md", "Speech/README.md", "Robot/README.md"]),
         .target(
             name: "Agents", dependencies: ["AgentCore", "ModelKit"], path: "MobileHarness/Agents",
-            exclude: ["Assistant/README.md", "README.md", "Tracking/README.md"],
-            resources: [.process("Assistant/Assistant.agent.json")]),
+            exclude: ["Assistant/README.md", "Photographer/README.md", "README.md"],
+            resources: [.process("Assistant/Assistant.agent.json"), .process("Photographer/Photographer.agent.json")]),
         .target(
             name: "ActionRuntime", dependencies: ["AgentCore"], path: "MobileHarness/ActionRuntime",
             exclude: ["README.md"]),
@@ -63,13 +64,13 @@ let package = Package(
                 "Language/LLM/Qwen35", "Language/LLM/README.md", "Backends",
                 "Core/README.md", "Management", "Defaults", "Speech/ASR/Apple", "Speech/TTS/Apple", "Speech/TTS/Kokoro",
                 "Speech/Shared",
-                "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Vision/README.md",
+                "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Vision/YOLO", "Vision/README.md",
             ]),
         .target(
             name: "ModelKitDefaults",
             dependencies: [
                 "ModelKit", "ModelKitRuntime", "ModelKitAppleSpeech", "ModelKitNemotron", "ModelKitSilero",
-                "ModelKitKokoro", "ModelKitQwen35",
+                "ModelKitKokoro", "ModelKitQwen35", "ModelKitYOLOPose",
             ],
             path: "MobileHarness/ModelKit/Defaults", exclude: ["README.md"]),
         .target(
@@ -84,6 +85,12 @@ let package = Package(
                 "TTS/SpeechSynthesisCapability.swift", "TTS/Kokoro", "ASR/Nemotron", "VAD",
             ],
             sources: ["ASR/Apple", "TTS/Apple", "Shared/Apple"]),
+        .target(
+            name: "ModelKitYOLOPose", dependencies: ["ModelKit", "ModelKitCoreML"],
+            path: "MobileHarness/ModelKit/Vision/YOLO", exclude: ["README.md"]),
+        .testTarget(
+            name: "YOLOPoseTests", dependencies: ["ModelKit", "ModelKitYOLOPose", "ModelKitCoreML", "ModelKitRuntime"],
+            exclude: ["README.md"]),
         .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Backends/CoreML", exclude: ["README.md"]),
         .target(
             name: "ModelKitSilero", dependencies: ["ModelKit", "ModelKitCoreML"],

@@ -24,7 +24,8 @@ flowchart LR
 - ✅ [UI](UI/README.md): `Print.swift` and `Express.swift` / `UIActions` present captions and expressions.
 - ✅ Each function owns its parameter validation and output handling; speak and print independently validate text without a shared TextAction helper.
 - ✅ ActionRuntime owns path registration and execution; Gateway owns Channel queues and resource exclusion.
-- ❌ Camera, Media, Device, Robot, `UI.show`, and `Speech.stopSpeak` implementations. [Robot](Robot/README.md) has a design-only contract for `RobotActions.aim`; see [ADR 0035](../../docs/adr/0035-tracking-agent-and-robot-actions.md).
+- ✅ [UI.showPose](UI/README.md) replaces the camera skeleton overlay.
+- ❌ Camera, Media, Device, Robot, `UI.show`, and `Speech.stopSpeak` implementations. [Robot](Robot/README.md) has a design-only contract for `RobotActions.aim`; see [ADR 0037](../../docs/adr/0037-photographer-aim.md).
 - ❌ General action metadata for execution policies and resource requirements; the current resource exclusion unit is the action module.
 
 Agent JSON configuration maps the model alias `say` to `Speech.speak`, and `print`/`express` to `UI.print`/`UI.express`. Default Channels remain `Speech` and `Display`; a Channel name need not equal its action module. Handlers must await real completion, propagate errors, and cooperate with cancellation.
@@ -137,3 +138,5 @@ Keep this README synchronized with changes to responsibilities, files, interface
 Action documentation must describe the actual function. Combine usage guidance in doc; do not invent a return-value section for Void functions. Use XML/natural-text example strings. Mark automatic text-mapping actions hidden when they should not be shown as explicit LLM commands.
 
 ✅ UI.express adds seven validated facial expressions through one injected presentation callback; smile is an emotion value. Expressions update the orb independently of captions.
+
+✅ UI.showPose validates and presents a bounded skeleton overlay through an App-injected callback. JSON v3 declares this capability only for Photographer.

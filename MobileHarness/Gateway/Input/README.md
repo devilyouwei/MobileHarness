@@ -9,7 +9,7 @@
 - ✅ [Routing](Routing/README.md)：可注入路由、定向投递、多目标去重及逐目标失败隔离。
 - ❌ `Signal.swift`、`SignalType.swift`、`SignalAdapter.swift`：等待统一 Signal 契约；当前沿用 AgentCore.AgentInput。
 - ❌ `ContextBuilder.swift`：独立上下文增强，尚未建立。
-- ❌ 相机、传感器等多模态适配。计划中的相机帧采样见 [PlatformKit/Camera](../../PlatformKit/Camera/README.md) 与 [ADR 0035](../../../docs/adr/0035-tracking-agent-and-robot-actions.md)；该方案先扩展 `AgentInput.InputPayload` 增加 `.image` case,不等待本条完整 Signal 迁移完成,仅为设计,尚未实现。
+- ✅ 相机灰度变化抽帧与图片路由；❌ 其他传感器适配。
 
 语音文件是已在用的输入适配实现，保留在 Input 下；本轮不将它们替换为无行为的通用 adapter。
 
@@ -55,3 +55,24 @@ flowchart LR
 ✅ The algorithm above describes the current implementation.
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+
+✅ FrameChangeFilter and CameraInputSession add configurable grayscale change selection. See the camera algorithm below; no pose inference occurs in Gateway.
+
+## Camera change sampling
+
+Purpose: convert a camera stream into changed-image inputs without choosing business behavior or running YOLO. FrameChangeConfiguration validates minimumChange (0...1, default 0.03) and minimumInterval (0...1 seconds, default 0). App exposes 1/3/5/10% threshold choices. Configuration replacement creates a fresh capture/filter/Agent session.
+
+```mermaid
+flowchart LR
+    Camera[Latest upright RGB frame] --> Order[Validate increasing sequence and monotonic time]
+    Order --> Interval[Optional minimum interval]
+    Interval --> Gray[64 x 64 center-sampled grayscale grid]
+    Gray --> Difference[Mean absolute difference / 255]
+    Difference -->|First frame / geometry change / threshold reached| Gateway[InputGateway.submit to Photographer]
+    Difference -->|Below threshold| Idle[No Agent input / no inference]
+    Gray --> Baseline[Replace previous examined frame baseline]
+```
+
+Gray = (77R + 150G + 29B + 128) >> 8. Change = sum(abs(current - previous)) / (4096 × 255). The baseline updates on every examined frame, including below-threshold frames; interval-skipped frames do not update it. This is a normalized brightness-difference metric, not percentage of changed pixels or comparison with the last inferred image. Slow cumulative motion can remain below a per-frame threshold; lower the configured threshold if needed. Identical frames never pass even at threshold zero. First frame and width/height/rotation changes always pass.
+
+CameraInputSession has one active submit, no queue, and rejects overlapping submits. It owns one filter and capture session ID, checks delivery rejection, and propagates errors. Two 4096-byte grayscale grids bound comparison memory. The producer's RGB frame stream keeps only the newest queued frame; Photographer independently replaces its one pending image. No Action, control command or Tool result is discarded by these media policies.

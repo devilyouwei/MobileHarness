@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 3,
+  "agentID": "photographer",
+  "channels": [],
+  "textActions": [],
+  "actions": [
+    {
+      "alias": "showPose",
+      "path": {
+        "module": "UI",
+        "function": "showPose"
+      },
+      "defaultChannel": "Vision",
+      "parameters": [
+        {
+          "name": "payload",
+          "valueType": "string",
+          "required": true,
+          "description": "JSON pose overlay for one observed camera frame.",
+          "constraints": "At most 3000 UTF-8 bytes. sequence, timestamp, rotation 0...3, and people (0...6 arrays of 17 COCO joints). Each joint is [x,y,confidence], coordinates in 1/10000 image units, confidence 0...1000."
+        }
+      ],
+      "examples": [
+        "<showPose payload='{\"sequence\":1,\"timestamp\":0,\"rotation\":1,\"people\":[]}'/>"
+      ],
+      "doc": "Replace the camera skeleton overlay atomically. Empty people clears previous skeletons. Coordinates describe the upright unmirrored inference image. Does not control physical equipment.",
+      "hidden": true
+    }
+  ],
+  "tools": []
+}

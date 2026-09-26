@@ -10,6 +10,7 @@ CURRENT_PROJECT_VERSION = 1
 GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_KEY_UIUserInterfaceStyle = Dark
 INFOPLIST_KEY_CFBundleDisplayName = Mobile Harness
+INFOPLIST_KEY_NSCameraUsageDescription = 摄像头用于实时预览与设备端人体姿态识别，可随时关闭；不会录制或上传画面。
 INFOPLIST_KEY_NSMicrophoneUsageDescription = 持续录音用于在设备上检测说话片段并转换为文本，停止后立即关闭麦克风。
 INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES
 INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES

@@ -17,3 +17,5 @@ flowchart LR
 ```
 
 Update this README with changes to names, routing rules and ✅/❌ status.
+
+✅ ExecutionRouter recognizes generic agent.finished and agent.error runtime controls as finish/cancel barriers, preserving legacy assistant names.

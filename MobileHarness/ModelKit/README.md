@@ -38,9 +38,9 @@ Concrete model SDKs and configuration belong to separate adapter targets. ModelK
 | `Core/` | Capability/session contracts, model resource admission, and minimal inference admission |
 | `Defaults/` | Fixed model assembly, capability defaults and backend configuration |
 | `Management/` | Separate ModelKitRuntime target: registration, typed acquisition and lifecycle management |
-| `Core/AudioFrame.swift` | Validated PCM transport; Core also owns future shared image/video data contracts |
+| `Core/AudioFrame.swift` | Validated PCM transport; Core also owns ImageFrame for shared RGB transport; video remains outstanding |
 | `Language/LLM/`, `Language/JEV/` | Chat and judgment protocols |
-| [`Vision/`](Vision/README.md) | Planned `PersonDetectionCapability` protocol for the tracking pipeline; design only |
+| [`Vision/`](Vision/README.md) | `PoseCapability`; YOLO adapter is a separate target |
 | [Qwen3.5](Language/LLM/Qwen35/README.md) | Current text-only MLX ChatCapability adapter |
 | `Speech/ASR/`, `Speech/TTS/`, `Speech/VAD/` | Recognition, synthesis, and voice-activity contracts and adapters |
 | [Apple speech](Speech/Shared/Apple/README.md) | Separate ModelKitAppleSpeech target with shared PCM conversion |
@@ -255,8 +255,7 @@ TTS returns PCM without playing it or requesting permissions. PlatformKit and Ap
 - ✅ ModelKitRuntimeTests covers isolated provider substitution, composition, concurrent factory deduplication, retry, duplicate registration, and invalid binding.
 - ✅ Shared ModelManager owns registration, provider identity, coalesced weight loads, typed get, unload and shutdown. Adapters use injected ModelResource handles; no adapter creates its own manager.
 - ❌ Priority/aging, waiting inference queues, timed idle eviction and measured cross-model memory/thermal budgeting.
-- ❌ VLM, computer vision, embeddings, general background artifact installation, and native tool-call model events.
-- ❌ [`Vision`](Vision/README.md) planned `PersonDetectionCapability` (Apple Vision-backed) for the tracking pipeline; see [ADR 0035](../../docs/adr/0035-tracking-agent-and-robot-actions.md). Design only.
+- ❌ VLM, embeddings, general background artifact installation, and native tool-call model events. Single-image pose is implemented; see the Vision status below.
 
 The voice loop does not imply completion of every model milestone. See the [Roadmap](../../docs/Roadmap.md) and [voice validation scope](../../docs/Voice.md). Run root `./scripts/check.sh` and `./scripts/build-ios.sh`; clearly distinguish contract tests, compilation, and real-device acceptance.
 
@@ -276,3 +275,5 @@ All tests live under root Tests. Qwen35Tests checks model/tokenizer contracts wi
 - ✅ scripts/check-modelkit-boundaries.py verifies production imports and target dependencies as part of check.sh.
 - ❌ A separately distributed SDK is outside this project's scope.
 
+
+✅ Vision/PoseCapability and Core/ImageFrame provide single-image COCO-17 pose inference. ModelKitYOLOPose depends only on ModelKit and ModelKitCoreML; Defaults registers yolov8n-pose as `.pose` with releaseWhenIdle. See Vision/YOLO/README.md for artifact, image, NMS and cancellation contracts. ❌ Device quality acceptance remains outstanding; Photographer uses the shared pose capability.

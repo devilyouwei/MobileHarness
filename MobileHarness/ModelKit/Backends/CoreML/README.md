@@ -15,3 +15,5 @@ flowchart LR
 
 - ✅ Fixed-shape float tensors, descriptor validation and serial graph execution.
 - ❌ General graph conversion, quantization, downloading and measured device energy guarantees.
+
+✅ CoreMLImageGraph adds actor-owned 640×640 RGB image inference and stride-aware extraction of 1×56×8400 predictions. It accepts local compiled models or compiles local packages to temporary artifacts, uses all compute units, and checks cancellation around native execution. No ModelKit or business dependency is introduced.

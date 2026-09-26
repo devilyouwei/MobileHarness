@@ -1,6 +1,6 @@
 # Robot — Arm Aim Action (Design Only)
 
-Purpose: send a non-blocking reorientation target to the arm carrying the phone/camera. Design goals: match the existing `Actions` cohesion rules (module owns its own validation, no shared helper), document a completion contract that means "command sent," not "arm settled," and stay closure-injected so this module does not add a `PlatformKit` dependency to the `Actions` target. See [ADR 0035](../../../docs/adr/0035-tracking-agent-and-robot-actions.md) and the [Actions development standard](../README.md).
+Purpose: send a non-blocking reorientation target to the arm carrying the phone/camera. Design goals: match the existing `Actions` cohesion rules (module owns its own validation, no shared helper), document a completion contract that means "command sent," not "arm settled," and stay closure-injected so this module does not add a `PlatformKit` dependency to the `Actions` target. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md) and the [Actions development standard](../README.md). `PhotographerAgent` will declare `aim` in its JSON and emit it as a Function Token, the same way it already emits `showPose`. This module does not construct calls.
 
 - ❌ Nothing in this directory is implemented.
 
@@ -23,7 +23,7 @@ public enum RobotActions {
 ```
 
 - Follows the same injection shape as `UIActions.express`'s `present` closure and `SpeechActions.speak`'s `play` closure: a plain `@Sendable` callback, not a `PlatformKit` protocol import. App's composition root (`AgentBootstrap`, or its future robot equivalent) binds this closure to a concrete `RobotArmControl` instance (`PlatformKit/ExternalDevice`, itself design-only — see that directory's README) at registration time. `Actions` therefore gains no new target dependency for this feature.
-- `base`/`shoulder` are **logical** angles in the unified arm abstraction's terms (radians), not raw firmware joint or Cartesian values — the concrete adapter behind the injected closure owns translating them to whatever the confirmed hardware variant actually needs (see ADR 0035 decision 3).
+- `base`/`shoulder` are **logical** angles in the unified arm abstraction's terms (radians), not raw firmware joint or Cartesian values. The concrete adapter behind the injected closure translates them for the confirmed hardware variant (see ADR 0037).
 
 ## Parameter validation (owned entirely by this function, per cohesion rules)
 

@@ -25,9 +25,14 @@ import Testing
     await #expect(throws: ModelKitConfigurationError.resourceDirectoryConflict) {
         _ = try await ModelKitDefaults.manager(resources: missing.appendingPathComponent("other"))
     }
-    for capability in [ProvidedCapability.chat, .recognition, .synthesis, .voiceActivity] {
+    for capability in [ProvidedCapability.chat, .recognition, .synthesis, .voiceActivity, .pose] {
         #expect(try await manager.status(capability) == .registered)
     }
+    let pose = try await manager.get(.pose, load: false)
+    let samePose = try await manager.get(.pose, load: false)
+    let samePoseInstance = (pose as AnyObject) === (samePose as AnyObject)
+    #expect(samePoseInstance)
+    #expect(try await manager.status(.pose) == .unloaded)
     let synthesis = try await manager.get(.synthesis, load: false)
     let again = try await manager.get(.synthesis, load: false)
     let sameInstance = (synthesis as AnyObject) === (again as AnyObject)

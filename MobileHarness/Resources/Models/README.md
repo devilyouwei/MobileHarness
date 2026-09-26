@@ -39,3 +39,7 @@ Never commit weights, user recordings, credentials or local signing settings. Up
 ✅ Validation: real Mac Qwen2B, Nemotron, Silero and Kokoro loading passed after migration. The signed Debug App contains only the selected resource directories and is about 3.3 GiB uncompressed; physical-device acceptance remains outstanding.
 
 ✅ Supported chat download profiles are Qwen3.5-2B and optional 4B. Native CoreAI resources support ASR and diagnostic TTS.
+
+✅ yolov8-pose.download.json pins hugging-mac YOLOv8n Pose Core ML revision and package files; download with scripts/download-yolov8-pose.py. Upstream model card declares AGPL-3.0. ✅ Physical App staging includes these artifacts.
+
+✅ YOLOPose is now included in physical-device model staging for the camera pipeline. Download via scripts/download-yolov8-pose.py before device builds; weights stay ignored.
