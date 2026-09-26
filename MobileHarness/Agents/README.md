@@ -161,7 +161,7 @@ Changes require repackaging and a new Agent instance; no hot reload is implement
 - ✅ Shared parsers, parameter/Channel validation, bounded queues, and cancellation/completion regression coverage.
 - ✅ `say` maps to `Speech.speak`; `print`/`express` map to `UI.print`/`UI.express`. Default `Speech`/`Display` Channels remain compatible; Channel and module names need not match.
 - ❌ Configuration hot reload, remote configuration, full JSON Schema, dynamic handler discovery, and configuration-driven lifecycle budgets.
-- ❌ Vision, Photography, Tracking, Media, and Control Agents.
+- ❌ Vision, Photography, Tracking, Media, and Control Agents. [Tracking](Tracking/README.md) has a design-only, non-LLM control-loop contract; see [ADR 0035](../../docs/adr/0035-tracking-agent-and-robot-actions.md).
 - ❌ Model-native tool deltas, general StateStore/AgentRuntime, restart, and InternalSignalBus.
 
 ## Maintenance

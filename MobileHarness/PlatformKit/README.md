@@ -26,6 +26,7 @@ flowchart LR
 - ✅ `ExternalDevice/ExternalDeviceTransport.swift`: connect, send, emergency-stop, and disconnect contracts.
 - ❌ Concrete Camera, Sensors, Storage, Network, BLE, robot, and IoT adapters.
 - ❌ Real robot integration and hardware safety validation; transport protocols alone do not establish either.
+- ❌ [`ExternalDevice`](ExternalDevice/README.md) planned `RobotArmControl` unified abstraction and RoArm‑M2 WiFi/HTTP adapter, and [`Camera`](Camera/README.md) planned frame capture for the tracking pipeline; see [ADR 0035](../../docs/adr/0035-tracking-agent-and-robot-actions.md). Design only, blocked on hardware axis-count confirmation for the arm adapter.
 
 External input enters through InputGateway; Agent device actions must pass through OutputGateway and runtime execution. Use public APIs and validate capabilities and permissions. Robot emergency-stop and disconnect protection must be enforced by the device, without relying on iOS background execution.
 

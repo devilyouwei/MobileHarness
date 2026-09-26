@@ -18,3 +18,5 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 ✅ [ModelKit project boundary](0033-modelkit-project-boundary.md) defines the root-package build, Management/Backends ownership, root test separation and automated boundary checks.
 
 ✅ [Internal default model assembly](0034-modelkit-default-assembly.md) defines ModelKit-owned registrations and capability defaults. App supplies resources and handles OS events.
+
+✅ [Tracking Agent and Robot Actions](0035-tracking-agent-and-robot-actions.md) records the Milestone 1 minimal aim-loop design across Agents/Tracking, Actions/Robot, PlatformKit/Camera and ExternalDevice, and ModelKit/Vision. ❌ No Swift source exists yet; every touched directory is documentation-only.

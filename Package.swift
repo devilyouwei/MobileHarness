@@ -42,10 +42,11 @@ let package = Package(
             ]),
         .target(
             name: "Actions", dependencies: ["AgentCore", "ActionRuntime", "ModelKit"], path: "MobileHarness/Actions",
-            exclude: ["UI/README.md", "README.md", "Speech/README.md"]),
+            exclude: ["UI/README.md", "README.md", "Speech/README.md", "Robot/README.md"]),
         .target(
             name: "Agents", dependencies: ["AgentCore", "ModelKit"], path: "MobileHarness/Agents",
-            exclude: ["Assistant/README.md", "README.md"], resources: [.process("Assistant/Assistant.agent.json")]),
+            exclude: ["Assistant/README.md", "README.md", "Tracking/README.md"],
+            resources: [.process("Assistant/Assistant.agent.json")]),
         .target(
             name: "ActionRuntime", dependencies: ["AgentCore"], path: "MobileHarness/ActionRuntime",
             exclude: ["README.md"]),
@@ -62,7 +63,7 @@ let package = Package(
                 "Language/LLM/Qwen35", "Language/LLM/README.md", "Backends",
                 "Core/README.md", "Management", "Defaults", "Speech/ASR/Apple", "Speech/TTS/Apple", "Speech/TTS/Kokoro",
                 "Speech/Shared",
-                "Speech/ASR/Nemotron", "Speech/VAD/Silero",
+                "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Vision/README.md",
             ]),
         .target(
             name: "ModelKitDefaults",
@@ -103,7 +104,9 @@ let package = Package(
             name: "ModelKitKokoro", dependencies: ["ModelKit", "ModelKitCoreAI"],
             path: "MobileHarness/ModelKit/Speech/TTS/Kokoro", exclude: ["README.md"]),
         .testTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
-        .target(name: "PlatformKit", path: "MobileHarness/PlatformKit", exclude: ["README.md", "Audio/README.md"]),
+        .target(
+            name: "PlatformKit", path: "MobileHarness/PlatformKit",
+            exclude: ["README.md", "Audio/README.md", "ExternalDevice/README.md", "Camera/README.md"]),
         .testTarget(
             name: "IntegrationTests",
             dependencies: [

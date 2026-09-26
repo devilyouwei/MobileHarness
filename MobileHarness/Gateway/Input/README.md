@@ -9,7 +9,7 @@
 - ✅ [Routing](Routing/README.md)：可注入路由、定向投递、多目标去重及逐目标失败隔离。
 - ❌ `Signal.swift`、`SignalType.swift`、`SignalAdapter.swift`：等待统一 Signal 契约；当前沿用 AgentCore.AgentInput。
 - ❌ `ContextBuilder.swift`：独立上下文增强，尚未建立。
-- ❌ 相机、传感器等多模态适配。
+- ❌ 相机、传感器等多模态适配。计划中的相机帧采样见 [PlatformKit/Camera](../../PlatformKit/Camera/README.md) 与 [ADR 0035](../../../docs/adr/0035-tracking-agent-and-robot-actions.md)；该方案先扩展 `AgentInput.InputPayload` 增加 `.image` case,不等待本条完整 Signal 迁移完成,仅为设计,尚未实现。
 
 语音文件是已在用的输入适配实现，保留在 Input 下；本轮不将它们替换为无行为的通用 adapter。
 
