@@ -90,3 +90,8 @@ OutputGateway 对调用复核并交给 Action/Tool runtime。ChannelScheduler �
 ✅ ADR 0046 replaces the UI.express emoji callback payload with a typed semantic emotion. Experience maps it to stable, continuously interpolated eye geometry. Gateway routes, Action path, session/turn admission and completion semantics are unchanged.
 
 ✅ ADR 0047 removes the legacy Input/Routing abstraction and submit API. External publish requires CommunicationPolicy; send names its target, including ToolResult return. Policy-free construction retains explicit directed admission only; no input defaults to Assistant. Production JSON routing and per-target receipts were unchanged by that cleanup; ADR 0048 subsequently removes InternalSignalBus in favor of direct Gateway admission.
+
+
+## 感知驱动眼睛跟随
+
+VisionPerception 复用 YOLO Pose 鼻尖、眼睛及耳部点位，在感知层完成目标稳定、丢失保持与自适应平滑，经 JSON 声明的 UI.moveEyes Action → OutputGateway → Gaze Channel → App 会话隔离回调驱动眼睛。骨架和视线共用容量 2 的可替换展示输出；App 对每个已接纳眼睛 Action 等待并回收调度状态，完成屏障不进入可替换队列。CameraCoordinator 独立于语音保存视线，SwiftUI 负责连续插值，详见 ADR 0049。

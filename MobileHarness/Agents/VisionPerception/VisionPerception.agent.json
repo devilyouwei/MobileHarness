@@ -3,7 +3,37 @@
   "agentID": "visionPerception",
   "channels": [],
   "textActions": [],
-  "actions": [],
+  "actions": [
+    {
+      "alias": "moveEyes",
+      "path": {
+        "module": "UI",
+        "function": "moveEyes"
+      },
+      "defaultChannel": "Gaze",
+      "parameters": [
+        {
+          "name": "x",
+          "valueType": "number",
+          "required": true,
+          "description": "Screen-space horizontal gaze: negative left, positive right.",
+          "constraints": "Finite number in [-1, 1]. Zero is centered."
+        },
+        {
+          "name": "y",
+          "valueType": "number",
+          "required": true,
+          "description": "Screen-space vertical gaze: negative up, positive down.",
+          "constraints": "Finite number in [-1, 1]. Zero is centered."
+        }
+      ],
+      "examples": [
+        "<moveEyes x=\"0.4\" y=\"-0.2\"/>"
+      ],
+      "doc": "Replace the animated eye gaze target. Completion means the target was accepted, not that animation ended. Independent of expression and physical equipment.",
+      "hidden": true
+    }
+  ],
   "tools": [
     {
       "alias": "showPose",

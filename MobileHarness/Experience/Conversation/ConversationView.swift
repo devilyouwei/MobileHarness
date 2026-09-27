@@ -7,6 +7,7 @@ struct ConversationView: View {
     @Bindable var runtime: ConversationViewModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.eyeGaze) private var eyeGaze
 
     var body: some View {
         GeometryReader { geometry in
@@ -20,6 +21,7 @@ struct ConversationView: View {
                         phase: runtime.voicePhase,
                         reduceMotion: reduceMotion,
                         expression: runtime.expression,
+                        gaze: eyeGaze,
                         faceWidth: min(geometry.size.width, 600)
                     )
                     .frame(width: diameter, height: diameter)
@@ -110,13 +112,14 @@ struct ConversationStartupView: View {
     let error: String?
     let retry: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.eyeGaze) private var eyeGaze
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 ConversationAtmosphere()
                 CompanionEyes(
-                    phase: error == nil ? .loading : .failed, reduceMotion: reduceMotion,
+                    phase: error == nil ? .loading : .failed, reduceMotion: reduceMotion, gaze: eyeGaze,
                     faceWidth: min(geometry.size.width, 600)
                 )
                 .frame(width: min(geometry.size.width * 0.84, 360), height: min(geometry.size.width * 0.84, 360))

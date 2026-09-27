@@ -12,3 +12,5 @@ Validation (2026-09-26): root scripts/check.sh passed; all four scripts/build-io
 ✅ Skeleton overlay arrives only through UI.showPose. Green joints/edges require confidence ≥0.3. Upright coordinates are converted back to native sensor coordinates; AVCaptureVideoPreviewLayer conversion applies front mirroring, resizeAspectFill crop and current rotation. Rotation-mismatched overlays are hidden. Camera close/switch/background clears overlay immediately. Threshold menu selects 1/3/5/10% (default 3%); changing it replaces the capture/filter/Agent incarnation and retains model weights.
 
 ✅ Camera controls start 64 pt below the top safe area, leaving the centered reply spectrum unobstructed. Camera actions and permissions are unchanged.
+
+✅ CameraConversationSurface injects the camera-owned normalized eyeGaze environment into startup and conversation content; front mirroring is handled once in perception. Lifecycle resets smoothly center gaze. ❌ Exact preview-crop projection is not used for the directional eye target.

@@ -61,3 +61,5 @@ VoiceOver, Dynamic Type and Reduce Motion are supported. SwiftUI remains MainAct
 ✅ Reply spectrum attachment: the lower capsule contour overlaps the estimated cutout edge by 1 pt; the ends taper down in length. Uses public safe-area geometry, not private hardware APIs. ❌ Expanded-island and per-device pixel alignment still require physical validation.
 
 ✅ Bowl refinement: the reply spectrum now uses a 166 × 62 pt padded Canvas; a 126 pt lower capsule contour sits inside it. Baseline is 24 pt below the canvas top, preventing the lifted corners from clipping. Bars follow outward normals on both lower rounded corners, taper near the ends, and join a faint violet open rim. No upper capsule edge or full ring is drawn; frequency energy remains real FFT data. Geometry remains a safe-area estimate pending newer API support.
+
+✅ Both ready and model-startup eyes consume camera-owned eyeGaze via the environment, so face following works independently of voice/model readiness. Expressions and tap-to-toggle voice behavior are preserved. ❌ Physical-device tracking acceptance remains manual.

@@ -48,3 +48,5 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 ✅ Removed obsolete Input/Routing navigator entries; Gateway input routing is implemented by InputGateway and shared CommunicationPolicy, with no duplicate source references.
 
 ✅ Communication navigation replaces Bus: AgentMessaging, CommunicationPolicy and PerceptionInput are compiled once by AgentCore through SwiftPM. InternalSignalBus has been removed.
+
+✅ Navigator includes MoveEyes.swift and FaceGazeTracker.swift; shared implementations remain in the existing Actions and Agents SwiftPM targets.

@@ -1,3 +1,5 @@
+import ActionRuntime
+import Actions
 import AgentCore
 import Agents
 import Foundation
@@ -7,12 +9,13 @@ import ModelKitDefaults
 import PlatformKit
 import ToolRuntime
 
-/// Composition only: external frames always traverse InputGateway and UI data always a resolved Tool call.
+/// Composition only: external frames always traverse InputGateway and UI data always resolved Action / Tool calls.
 @MainActor
 enum PhotographySession {
     static func run(
         frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: UUID,
-        configuration: FrameChangeConfiguration,
+        configuration: FrameChangeConfiguration, mirroredGaze: Bool,
+        moveEyes: @escaping @Sendable (UIActions.Gaze, ActionInvocation) async throws -> Void,
         present: @escaping @Sendable (PoseOverlay, OutputEnvelope) async throws -> Void
     ) async throws {
         let models = try await ModelKitDefaults.manager(
@@ -24,10 +27,12 @@ enum PhotographySession {
         let input = runtime.input
         let responses = runtime.output
         let vision = try VisionPerceptionAgent(
-            pose: pose, sessionID: sessionID, sampling: configuration,
+            pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze,
             resolveImage: CameraImageAttachment.resolve)
         try await manager.register(vision, sessionID: sessionID)
         runtime.presentation.pose = present
+        runtime.presentation.gaze = moveEyes
+        let presentationActions = runtime.presentationActions
         do {
             try await vision.bind(responses.messaging(for: .visionPerception))
             try await manager.start(.visionPerception)
@@ -52,6 +57,11 @@ enum PhotographySession {
                     for await envelope in vision.outputs {
                         try Task.checkCancellation()
                         try await responses.dispatch(envelope)
+                        if case .actionCall = envelope.output {
+                            // A frame has exactly one Action. Join and retire it before taking newer UI state.
+                            // This barrier lives outside the replaceable output buffer and cannot be dropped.
+                            try await presentationActions.finish(inputID: envelope.inputID, source: envelope.source)
+                        }
                         if case .control(let state) = envelope.output, state.hasPrefix("agent.error:") {
                             throw HarnessError.notRunning
                         }
@@ -64,11 +74,13 @@ enum PhotographySession {
             try? await manager.remove(.visionPerception)
             await responses.cancel(sessionID: sessionID)
             runtime.presentation.pose = nil
+            runtime.presentation.gaze = nil
             try Task.checkCancellation()
         } catch {
             try? await manager.remove(.visionPerception)
             await responses.cancel(sessionID: sessionID)
             runtime.presentation.pose = nil
+            runtime.presentation.gaze = nil
             throw error
         }
     }

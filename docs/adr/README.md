@@ -52,3 +52,5 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 ✅ [ADR 0047](0047-explicit-input-routing.md): explicit publish/send input routing, removal of legacy router and submit fallback, and static-policy regression tests.
 
 ✅ [ADR 0048](0048-direct-signal-admission.md): queue-free signal delivery, Agent-owned inbox policy and bounded structured Gateway admission without a Bus lifecycle.
+
+✅ [ADR 0049](0049-perception-eye-gaze.md): YOLO facial landmarks to UI.moveEyes, bounded state replacement and mandatory Action completion barrier.

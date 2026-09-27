@@ -1,6 +1,10 @@
 import Actions
 import SwiftUI
 
+extension EnvironmentValues {
+    @Entry var eyeGaze: CGSize = .zero
+}
+
 /// Stable eye identities; only numeric pose parameters change between emotions.
 @MainActor
 struct CompanionEyes: View {
@@ -23,13 +27,14 @@ struct CompanionEyes: View {
             }
             .scaleEffect(x: 1, y: blink)
             .offset(
-                x: min(1, max(-1, gaze.width)) * 18,
-                y: min(1, max(-1, gaze.height)) * 12 + (reduceMotion ? 0 : sin(time * 1.6) * 2)
+                x: min(1, max(-1, gaze.width)) * faceWidth * 0.085,
+                y: min(1, max(-1, gaze.height)) * faceWidth * 0.055 + (reduceMotion ? 0 : sin(time * 1.6) * 2)
             )
             .opacity(phase == .idle || phase == .failed ? 0.48 : 1)
             .scaleEffect(phase == .loading ? 0.88 + 0.04 * sin(time * 2) : 1)
             .animation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.55), value: phase)
-            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.3), value: gaze)
+            .animation(
+                reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.32, dampingFraction: 0.86), value: gaze)
         }
         .accessibilityHidden(true)
     }

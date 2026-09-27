@@ -1,3 +1,5 @@
+import ActionRuntime
+import Actions
 import AgentCore
 import Agents
 import Foundation
@@ -17,6 +19,8 @@ final class CameraCoordinator {
     private(set) var message: String?
     private(set) var needsSettings = false
     private(set) var skeleton: PoseOverlay?
+    private(set) var gaze: CGSize = .zero
+    private var gazeSequence: UInt64?
     private(set) var visionMessage: String?
     private(set) var changeThreshold = 0.03
     private var visionTask: Task<Void, Never>?
@@ -78,6 +82,8 @@ final class CameraCoordinator {
             case .interrupted:
                 visionSession = nil
                 skeleton = nil
+                gaze = .zero
+                gazeSequence = nil
                 visionTask?.cancel()
                 isVisible = false
                 message = "相机暂时被占用"
@@ -100,6 +106,8 @@ final class CameraCoordinator {
         revision += 1
         isVisible = false
         skeleton = nil
+        gaze = .zero
+        gazeSequence = nil
         visionMessage = nil
         visionSession = nil
         visionTask?.cancel()
@@ -112,10 +120,17 @@ final class CameraCoordinator {
         let id = UUID()
         visionSession = id
         let threshold = changeThreshold
+        let mirrored = facing == .front
         visionTask = Task { [weak self] in
             do {
                 let configuration = try FrameChangeConfiguration(minimumChange: threshold, maximumRefreshInterval: 0.1)
-                try await PhotographySession.run(frames: frames, sessionID: id, configuration: configuration) {
+                try await PhotographySession.run(
+                    frames: frames, sessionID: id, configuration: configuration, mirroredGaze: mirrored,
+                    moveEyes: { [weak self] gaze, invocation in
+                        guard let self else { throw CancellationError() }
+                        try await self.present(gaze, invocation: invocation)
+                    }
+                ) {
                     [weak self] overlay, invocation in
                     guard let self else { throw CancellationError() }
                     try await self.present(overlay, sessionID: invocation.sessionID)
@@ -123,11 +138,23 @@ final class CameraCoordinator {
             } catch is CancellationError {} catch {
                 guard let self, self.visionSession == id else { return }
                 self.skeleton = nil
+                self.gaze = .zero
+                self.gazeSequence = nil
                 self.visionMessage = "姿态识别暂不可用，请重试"
                 self.log.error("Pose pipeline failed: \(String(describing: error), privacy: .private)")
             }
         }
     }
+    private func present(_ target: UIActions.Gaze, invocation: ActionInvocation) throws {
+        try Task.checkCancellation()
+        guard visionSession == invocation.envelope.sessionID, foreground, isEnabled, isVisible else {
+            throw CancellationError()
+        }
+        guard gazeSequence.map({ invocation.envelope.sequence > $0 }) ?? true else { return }
+        gazeSequence = invocation.envelope.sequence
+        gaze = CGSize(width: target.x, height: target.y)
+    }
+
     private func present(_ overlay: PoseOverlay, sessionID: UUID) throws {
         try Task.checkCancellation()
         guard visionSession == sessionID, foreground, isEnabled, isVisible else { throw CancellationError() }

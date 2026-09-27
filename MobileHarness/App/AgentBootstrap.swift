@@ -30,6 +30,7 @@ final class ApplicationRuntime {
     let input: InputGateway
     let output: OutputGateway
     let presentation: RuntimePresentation
+    let presentationActions: ChannelScheduler
     private let tools: ToolRegistry
     private var toolSetup: Task<Void, Error>?
 
@@ -49,6 +50,7 @@ final class ApplicationRuntime {
                 ActionPath(module: "UI", function: "beginReplyTurn"): { try await presentation.beginReplyTurn($0) },
                 ActionPath(module: "UI", function: "setVoiceState"): { try await presentation.setVoiceState($0) },
                 ActionPath(module: "UI", function: "print"): { try await presentation.printText($0) },
+                ActionPath(module: "UI", function: "moveEyes"): { try await presentation.moveEyes($0) },
                 ActionPath(module: "UI", function: "express"): { try await presentation.express($0) },
             ]))
         let tools = ToolRegistry()
@@ -56,6 +58,7 @@ final class ApplicationRuntime {
         self.input = input
         self.presentation = presentation
         self.tools = tools
+        self.presentationActions = actions
         output = OutputGateway(
             manager: manager, requests: input, tools: tools, actions: actions, policy: policy,
             observedContracts: ["speech.partial", "speech.final", "speech.phase"],
@@ -85,6 +88,7 @@ final class RuntimePresentation {
     var beginReplyTurnHandler: (@Sendable (ActionInvocation) async throws -> Void)?
     var voiceState: (@Sendable (UIActions.VoiceState, ActionInvocation) async throws -> Void)?
     var emotion: (@Sendable (UIActions.Emotion, ActionInvocation) async throws -> Void)?
+    var gaze: (@Sendable (UIActions.Gaze, ActionInvocation) async throws -> Void)?
     var pose: (@Sendable (PoseOverlay, OutputEnvelope) async throws -> Void)?
     var speech: (@Sendable (AgentInput) async throws -> Void)?
     var control: (@Sendable (OutputEnvelope) async -> Void)?
@@ -115,6 +119,10 @@ final class RuntimePresentation {
     func express(_ invocation: ActionInvocation) async throws {
         guard let emotion else { throw CommunicationError.scopeClosed }
         try await UIActions.express(invocation: invocation, present: emotion)
+    }
+    func moveEyes(_ invocation: ActionInvocation) async throws {
+        guard let gaze else { throw CommunicationError.scopeClosed }
+        try await UIActions.moveEyes(invocation: invocation, present: gaze)
     }
     func showPose(_ call: ToolCall, envelope: OutputEnvelope) async throws {
         guard let pose else { throw CommunicationError.scopeClosed }

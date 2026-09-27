@@ -279,3 +279,8 @@ Validation (2026-09-27): scripts/check.sh passed with full Xcode selected, inclu
 ❌ No concurrent-delivery FIFO, dynamic subscription, automatic retry or hard-real-time device guarantee is introduced. Remote transport remains future work and does not inherently require a broker.
 
 Verified (2026-09-27): scripts/check.sh passed, including 92 IntegrationTests; scripts/build-ios.sh passed all four unsigned simulator schemes using full Xcode. Optional real-model evaluations and physical-device acceptance were not performed.
+
+
+## 眼睛跟随（2026-09-28）
+
+✅ 新增 UI.moveEyes Action；感知层复用 YOLO Pose 脸部点位完成目标选择、短暂丢失保持、回正和自适应平滑，前摄镜像、相机会话隔离以及启动页/会话页连续动画已接入。❌ 真机跟随观感、多人交叉、遮挡及长期运行功耗待体验验收。见 ADR 0049。

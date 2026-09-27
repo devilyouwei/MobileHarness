@@ -23,7 +23,7 @@ struct CameraConversationSurface<Content: View>: View {
             Color.black.opacity(0.42)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
-            content()
+            content().environment(\.eyeGaze, camera.gaze)
         }
         .overlay(alignment: .topTrailing) {
             VStack(alignment: .trailing, spacing: 12) {

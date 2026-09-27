@@ -60,3 +60,5 @@ Current layer ownership is defined in the [ModelKit / PlatformKit comparison](..
 ✅ [ADR 0047](adr/0047-explicit-input-routing.md) removes legacy input routers and default-Agent fallback; current Gateway entry points are publish and send.
 
 ✅ [ADR 0048](adr/0048-direct-signal-admission.md) makes Agent inboxes the sole pending-message queues. Gateways route and validate; InputGateway bounds structured direct calls; InternalSignalBus is removed. Action execution queues remain separate.
+
+✅ ADR 0049 documents perception-driven gaze Actions, bounded presentation state and camera-session ownership; device tracking acceptance remains outstanding (❌).

@@ -195,7 +195,14 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     await second.start()
     let input = InputGateway(manager: manager, policy: policy)
     let recorder = OverlayRecorder()
-    let actions = ChannelScheduler(registry: ActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
+    let actions = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            ActionPath(module: "UI", function: "moveEyes"): { invocation in
+                try await UIActions.moveEyes(invocation: invocation) { target, _ in
+                    #expect(target.x == 0 && target.y == 0)
+                }
+            }
+        ]), maximumTrackedInputs: 1)
     let tools = ToolRegistry()
     try await tools.registerCompletion("UI.showPose") { call, envelope in
         try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
@@ -216,10 +223,13 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
         #expect(report.delivered == [.visionPerception])
         #expect(await started.next() == UInt8(i * 40))
         await model.release()
-        for _ in 0..<1 {
+        for _ in 0..<2 {
             let envelope = try #require(await envelopes.next())
             #expect(envelope.source == .visionPerception)
             try await output.dispatch(envelope)
+            if case .actionCall = envelope.output {
+                try await actions.finish(inputID: envelope.inputID, source: envelope.source)
+            }
         }
         if withSubscribers {
             for _ in 0..<10000 {
@@ -261,7 +271,9 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
 
 @Test func visionShowPoseIsOnlyAConfiguredTool() throws {
     let config = try AgentConfigurations.load(named: "VisionPerception")
-    #expect(config.capabilities.actions.isEmpty)
+    #expect(config.capabilities.actions.count == 1)
+    let gaze = try config.capabilities.resolveAction("moveEyes", parameters: ["x": "0", "y": "0"])
+    #expect(gaze.actionPath == ActionPath(module: "UI", function: "moveEyes"))
     let call = try config.capabilities.resolveTool("showPose", arguments: ["payload": "{}"])
     #expect(call.toolPath == "UI.showPose")
 }
@@ -299,6 +311,15 @@ private struct CrowdPose: PoseCapability {
         #expect(overlay.people.allSatisfy { $0.count == 17 })
         #expect(overlay.people[0][0] == PoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
     }
+    let gazeEnvelope = try #require(await stream.next())
+    guard case .actionCall(let gazeCall) = gazeEnvelope.output else {
+        Issue.record("Missing gaze Action after the skeleton")
+        return
+    }
+    #expect(gazeEnvelope.sequence == 1 && gazeEnvelope.sessionID == session)
+    try await UIActions.moveEyes(invocation: ActionInvocation(envelope: gazeEnvelope, call: gazeCall)) { gaze, _ in
+        #expect(abs(gaze.x) < 0.001 && gaze.y > 0)
+    }
     await agent.stop()
 }
 
@@ -317,6 +338,7 @@ private struct CrowdPose: PoseCapability {
     }
     #expect(await agent.status().lifecycle == .running)
     #expect(await agent.overlayReplacements == 8)
+    #expect(await agent.gazeReplacements == 8)
     var output = agent.outputs.makeAsyncIterator()
     let envelope = try #require(await output.next())
     guard case .toolCall(let call) = envelope.output else {
@@ -421,6 +443,7 @@ private actor BlockedPosePublication {
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(30, sequence: 1))))
     #expect(await receipts.next() == 1)
     _ = try #require(await displays.next())
+    _ = try #require(await displays.next())
     for i: UInt64 in 2...4 {
         try await agent.receive(AgentInput(sessionID: session, payload: .image(image(UInt8(i * 30), sequence: i))))
         let envelope = try #require(await displays.next())
@@ -429,6 +452,10 @@ private actor BlockedPosePublication {
             return
         }
         try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in #expect(overlay.sequence == i) }
+        guard case .actionCall = try #require(await displays.next()).output else {
+            Issue.record("Missing gaze Action")
+            return
+        }
     }
     #expect(await agent.publicationReplacements == 2)
     await port.release()
@@ -468,7 +495,10 @@ private struct FailingSecondPose: PoseCapability {
     }
     #expect(await agent.status().lifecycle == .failed)
     var output = agent.outputs.makeAsyncIterator()
-    guard case .control(let value) = try #require(await output.next()).output else {
+    // The bounded pair may retain one older display before the terminal error.
+    var terminal = try #require(await output.next())
+    if case .control = terminal.output {} else { terminal = try #require(await output.next()) }
+    guard case .control(let value) = terminal.output else {
         Issue.record("Terminal error was lost behind display state")
         return
     }

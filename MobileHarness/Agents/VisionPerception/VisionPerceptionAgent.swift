@@ -2,13 +2,15 @@ import AgentCore
 import Foundation
 import ModelKit
 
-/// Shared visual perception: one model operation and one newest pending frame, publishes shared observations and invokes the skeleton visualization Tool.
+/// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven eye Actions.
 public actor VisionPerceptionAgent: Agent {
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private var port: AgentMessaging?
     private var filter: FrameChangeFilter
+    private var gaze: FaceGazeTracker
+    public private(set) var gazeReplacements = 0
     public private(set) var replacements = 0
     public private(set) var expiredInputs = 0
     private let pose: any PoseCapability
@@ -31,7 +33,7 @@ public actor VisionPerceptionAgent: Agent {
 
     public init(
         pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil,
-        sampling: FrameChangeConfiguration? = nil,
+        sampling: FrameChangeConfiguration? = nil, mirroredGaze: Bool = false,
         resolveImage: @escaping @Sendable (ImageInput) throws -> ImageFrame = { input in
             guard case .rgb(let rgb) = input.content else { throw ImageInputError.invalidFrame }
             return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
@@ -42,12 +44,13 @@ public actor VisionPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "VisionPerception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.toolCall, .control], capabilities: configuration.capabilities)
+            outputs: [.actionCall, .toolCall, .control], capabilities: configuration.capabilities)
         self.filter = FrameChangeFilter(configuration: try sampling ?? FrameChangeConfiguration())
+        self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
         self.pose = pose
         self.resolveImage = resolveImage
         self.sessionID = sessionID
-        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingNewest(2))
         outputs = stream.stream
         continuation = stream.continuation
     }
@@ -146,6 +149,10 @@ public actor VisionPerceptionAgent: Agent {
                 width: image.width, height: image.height, sequence: image.sequence,
                 timestamp: image.timestamp, rotation: image.rotation, people: people)
             try emitOverlay(observation, input: input)
+            let target = gaze.update(observation)
+            let move = try descriptor.capabilities.resolveAction(
+                "moveEyes", parameters: ["x": String(target.x), "y": String(target.y)])
+            try emit(.actionCall(move), input: input)
             if pendingPublication != nil { publicationReplacements += 1 }
             pendingPublication = Publication(observation: observation, parent: input)
             drainPublication()
@@ -221,14 +228,19 @@ public actor VisionPerceptionAgent: Agent {
         try emit(.toolCall(call), input: input)
     }
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
-        switch continuation.yield(OutputEnvelope(source: descriptor.id, input: input, output: output)) {
+        guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
+        switch continuation.yield(
+            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: image.sequence))
+        {
         case .enqueued: return
         case .dropped(let replaced):
             // Only this Agent's replaceable UI state may be coalesced; never arbitrary device commands.
-            guard case .toolCall(let call) = replaced.output, call.toolPath == "UI.showPose" else {
-                throw HarnessError.queueFull
+            switch replaced.output {
+            case .toolCall(let call) where call.toolPath == "UI.showPose": overlayReplacements += 1
+            case .actionCall(let call) where call.actionPath.module == "UI" && call.actionPath.function == "moveEyes":
+                gazeReplacements += 1
+            default: throw HarnessError.queueFull
             }
-            overlayReplacements += 1
         case .terminated: throw CancellationError()
         @unknown default: throw HarnessError.queueFull
         }

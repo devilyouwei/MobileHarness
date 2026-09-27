@@ -14,23 +14,23 @@ flowchart LR
     Publication --> Subscribers[Optional business subscribers]
     Observation --> Overlay[Up to six people / bounded display coordinates]
     Overlay --> Generator[CapabilityRegistry / JSON showPose tool alias]
-    Generator --> Output[One latest pending skeleton]
+    Generator --> Output[Latest skeleton / gaze pair]
     Output --> Gateway[OutputGateway / ToolRuntime]
     Gateway --> Action[UI.showPose Void tool / injected presentation handler]
 ```
 
-✅ VisionPerception.agent.json v4 declares showPose in tools only, with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), resolves the tool alias and emits one ToolCall per result. Empty people clears the overlay. No direct UI call, ActionCall or per-frame agent.finished is emitted. The registered Void handler completes without ToolResult feedback.
+✅ VisionPerception.agent.json v4 declares showPose in tools only, with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), resolves the tool alias and emits one ToolCall per result. Empty people clears the overlay. No direct UI call or per-frame agent.finished is emitted; moveEyes is a separate resolved Action. The registered Void handler completes without ToolResult feedback.
 
 ✅ Raw inputs have increasing sequence/timestamps and matching sessions. Grayscale compares previous examined frames. One worker processes a frame; one latest pending frame replaces older pending input. Pause suspends dequeue, stop cancels/joins inference and suppresses late outputs. Shared observations retain up to 300 people independently of the six-person display limit.
 
 ✅ Publication uses a separate Agent-owned worker and one latest pending observation. Slow subscriber admission does not hold the inference worker or UI output. Pending observations are replaced explicitly (publicationReplacements); expired pending observations are skipped. Missing subscribers is allowed; unexpected publication errors still fail the Agent and are surfaced through terminal control. Pause holds pending publication; stop cancels and joins inference and publication before finishing outputs.
 
-✅ Skeleton output is a capacity-one bufferingNewest stream. Only pending UI.showPose state is replaceable (overlayReplacements), never generic Tools or physical commands. The App consumer awaits one active Tool and then takes the latest pending skeleton. Terminal errors replace an old skeleton and finish the stream; they cannot be overwritten by subsequent results. OutputEnvelope holds correlation metadata rather than raw input media. A publication may retain its parent frame until delivery completes; active/pending publication slots bound that lifetime.
+✅ Presentation output is a capacity-two bufferingNewest stream: every inference emits showPose followed by moveEyes, including neutral gaze. Only these two replaceable presentation states can be superseded, with separate overlayReplacements/gazeReplacements counters; arbitrary commands fail overflow. App awaits the Tool and joins/retires each admitted Action before consuming the next state. This completion barrier is outside the replaceable buffer, so no accepted Action loses its finish. Terminal error may follow one buffered display state, finishes the stream, and cannot be overwritten by later results. OutputEnvelope holds correlation metadata rather than raw input media. A publication may retain its parent frame until delivery completes; active/pending publication slots bound that lifetime.
 
 ✅ FrameChangeConfiguration keeps adjacent-examined-frame comparison and optional minimumInterval. Optional maximumRefreshInterval bounds admission starvation: after that interval, the next newly captured frame is accepted even with unchanged gray samples. App uses 0.1 seconds; nil preserves pure change-triggered behavior. There is no timer, no repeated sequence and no inference without a new frame. This is an admission policy, not a guaranteed FPS or deadline under load; idle-camera inference and power use can increase.
 
 
-❌ Face detection, tracking, depth, robot movement and physical-device acceptance of this ownership change.
+❌ Separate face detector, identity recognition, depth, robot movement and physical-device tracking acceptance.
 
 
 ## 输入、订阅与输出契约
@@ -109,6 +109,27 @@ people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye�
 | joint.confidence | Int，0...1000；从共享观测的 Float 量化。 |
 | people | 从模型结果取前六人，按其置信排序；显示镜像和裁剪由预览层坐标转换处理。共享观测仍可保留最多 300 人。 |
 
-Tool 经 `outputs → App transport pump → OutputGateway → ToolRuntime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，当前 Vision 没有递增其 envelope.sequence（默认 0），帧顺序来自 payload.sequence。
+Tool 经 `outputs → App transport pump → OutputGateway → ToolRuntime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
 
-✅ 每次结果输出一个可替换 showPose 状态，不发每帧 agent.finished。失败输出 `control("agent.error: pose processing failed")` 并终止流；终态控制不能被后续骨架覆盖。`actions / channels / textActions / communication.sends` 均为空。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
+✅ 每次结果输出一个可替换 showPose / moveEyes 状态对，不发每帧 agent.finished。失败输出 `control("agent.error: pose processing failed")` 并终止流；终态控制不能被后续骨架覆盖。`actions` 声明 moveEyes，默认 Gaze Channel；`channels / textActions / communication.sends` 均为空。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
+
+## Eye attention policy
+
+✅ FaceGazeTracker uses the existing YOLO Pose observation, without another model. At least two of nose/eyes must be visible with confidence ≥0.45; ears help estimate face span. Initial selection prefers larger, reliable, central faces. Subsequent selection uses nearest spatial association with a size-bounded gate, holds brief occlusion, starts recentering after 350ms without a match, and releases the lock after 550ms. Array reordering does not switch attention. This is geometric association, not identity tracking; crossing faces can still exchange the lock.
+
+✅ A deadband and elapsed-time adaptive low-pass filter suppress jitter while responding faster to larger changes. Rotation resets association; upright coordinates are never rotated twice. App supplies front-camera mirroring once. x/y are screen directions in [-1,1], with 20% gain and clamping; display crop is not an exact projected-point overlay. SwiftUI handles continuous spring interpolation independently of expression. No synthetic random gaze or third-party animation library.
+
+✅ Tracker state is one face, timestamps and one filtered target; candidate work is bounded by the existing 300-person observation limit. Updates are driven by new pose results; no extra task, timer or frame replay. Camera shutdown, failure and session replacement reset UI gaze. A stalled source with no new result has no perception-driven timeout yet (❌).
+
+```mermaid
+flowchart LR
+    Pose[Shared pose observation] --> Face[Confident facial points]
+    Face --> Lock[Spatial lock / occlusion hold]
+    Lock --> Filter[Deadband / adaptive smoothing]
+    Filter --> Resolve[JSON moveEyes alias]
+    Resolve --> Gateway[OutputGateway]
+    Gateway --> Channel[Gaze Channel / UI module exclusion]
+    Channel --> Action[UI.moveEyes validation]
+    Action --> Scene[Active camera session / sequence check]
+    Scene --> Eyes[Native spring / stable eye shapes]
+```

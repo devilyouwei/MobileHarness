@@ -43,3 +43,5 @@ flowchart LR
 ❌ Device timing/animation acceptance remains manual. This policy does not provide durable delivery or synchronize speech with every displayed character.
 
 ✅ UI.express now supplies a validated `UIActions.Emotion` value, never an emoji or glyph. Missing/unknown values still fail. SwiftUI pose definitions belong to Experience, not Actions. Completion means presentation state accepted the target, not that the visual interpolation finished. See ADR 0046.
+
+✅ `MoveEyes.swift` / `UI.moveEyes(x:y:)` validates two finite numbers in [-1,1] before invoking a typed Gaze callback. Negative is left/up, positive right/down; zero centers. Gaze Channel is declared by VisionPerception JSON. Cancellation is checked before/after presentation. Success accepts a target, not animation completion. No physical motion or new dependency. ❌ Animation appearance requires device acceptance.
