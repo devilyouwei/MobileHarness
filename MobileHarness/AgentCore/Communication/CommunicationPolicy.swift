@@ -2,7 +2,7 @@ import Foundation
 
 public enum CommunicationError: Error, Equatable, Sendable {
     case unauthorized, unsupportedContract, invalidPayload, unknownTarget, unavailableTarget, noRecipients
-    case capacityExceeded, expired, scopeClosed, staleIncarnation, outOfOrder, hopLimitExceeded, messageConflict
+    case capacityExceeded, expired, scopeClosed, staleIncarnation, outOfOrder, hopLimitExceeded
 }
 
 public struct CommunicationDeclaration: Codable, Sendable {

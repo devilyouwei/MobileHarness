@@ -46,7 +46,7 @@ flowchart TD
     Camera --> Session[PhotographySession]
     Session --> Shared
     Shared --> Policy[Three JSON v4 configurations and communication policy]
-    Shared --> Transport[AgentManager / InputGateway / Bus / OutputGateway]
+    Shared --> Transport[AgentManager / InputGateway / OutputGateway]
     Shared --> Handlers[Explicit Action and Tool handlers]
     Transport --> Presentation[RuntimePresentation callbacks]
     Handlers --> Presentation
@@ -76,6 +76,52 @@ Stop closes capture and perception admission, cancels and joins producer/transpo
 
 See [SpeechPerception](../Agents/SpeechPerception/README.md), [VisionPerception](../Agents/VisionPerception/README.md), [audio I/O](../PlatformKit/Audio/README.md) and [scheduling](../Gateway/Output/Scheduling/README.md) for queue contracts.
 
+## Voice interruption and cancellation
+
+✅ App coordinates session-level stopping. User stop, system audio interruption, audio route changes and voice failures enter `AppLifecycleCoordinator.stopVoice`. This is the current implementation; it does not add Agent-initiated turn cancellation.
+
+```mermaid
+flowchart TD
+    Trigger["User stop / OS audio interruption<br/>Route change / Voice failure"] --> Stop["App.stopVoice"]
+    Stop --> Immediate["Invalidate active voice session<br/>Cancel capture and output-dispatch tasks<br/>Stop audio device"]
+    Stop --> Cleanup["Serialized cleanup task<br/>Wait for earlier cleanup and startup"]
+    Cleanup --> Perception["Stop SpeechPerception<br/>Join perception and capture tasks"]
+    Perception --> Send["InputGateway.send<br/>assistant.cancel for the old session"]
+    Send --> Receive["Assistant.receive: immediate control handling<br/>Clear session inbox and history"]
+    Receive --> Generation["Cancel and join active generation<br/>Model session.cancel"]
+    Generation --> Actions["App calls OutputGateway.cancel(sessionID)"]
+    Actions --> Scheduler["ChannelScheduler<br/>Remove pending actions<br/>Cancel running handlers and await return"]
+    Scheduler --> Finish["Join outstanding output dispatch<br/>Remove SpeechPerception instance"]
+    Immediate -.->|"Cancellation propagates through the active call"| Tool["ToolDispatcher / ToolExecutor / Tool handler"]
+    classDef app fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A
+    classDef agent fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    classDef execution fill:#FEF3C7,stroke:#D97706,color:#78350F
+    class Trigger,Stop,Immediate,Cleanup,Actions,Finish app
+    class Perception,Send,Receive,Generation agent
+    class Scheduler,Tool execution
+```
+
+The immediate stop actions and the serialized cleanup chain are distinct: audio and current tasks are stopped promptly, while cleanup awaits earlier work before completing the session teardown. The generation branch applies when Assistant has an active input from that session.
+
+`assistant.cancel` bypasses Assistant's ordinary inbox, including when it is full or the Agent is paused. It removes queued inputs and history for that session, cancels the matching generation task and awaits its return. Generation cancellation calls the model session's cancellation API. It does not retract Actions already admitted to ChannelScheduler.
+
+App therefore also calls `OutputGateway.cancel(sessionID)`. The scheduler removes pending Actions, signals cancellation to running handlers and waits for them to return before completing cleanup. Cancellation is cooperative; a handler that does not cooperate can delay the barrier. Completed device effects are not rolled back. Producers must stop first so that they cannot submit more work after cancellation.
+
+| Scope | Current cancellation path |
+| --- | --- |
+| Assistant work for one session | InputGateway.send → assistant.cancel → clear matching inbox/history and cancel/join generation |
+| Actions for one Agent/input | OutputGateway routes assistant.error or agent.error controls → ChannelScheduler.cancel(source, inputID) |
+| Actions for one session | App → OutputGateway.cancel(sessionID) → ChannelScheduler |
+| All Action scheduling | OutputGateway.shutdown → ChannelScheduler.shutdown; closes future admission and joins current work |
+| Tool execution | Cancel the task awaiting OutputGateway.dispatch; cancellation propagates through ToolExecutor to its handler |
+| Signal admission | Caller cancellation propagates through InputGateway's structured target tasks; already accepted work remains Agent-owned |
+
+`OutputGateway.cancel(sessionID)` currently targets Actions only; it is not a session-wide Tool cancellation registry. App separately cancels the active output-dispatch task. A cancelled Tool call throws cancellation rather than returning a cancellation ToolResult, and its handler must cooperate. Normal Tool results still return through InputGateway.send.
+
+App owns this coordination because stopping a voice session spans capture, perception, generation and device execution. Assistant owns its internal work; it currently emits no explicit cancellation output when handling assistant.cancel. ❌ Agent-initiated cancellation of its own turn/output and automatic user-speech interruption of an ongoing reply are not implemented. Reply processing currently suspends microphone data admission. If those behaviors are added, the Agent can initiate cancellation of its own output while App retains session-level teardown responsibility.
+
+Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control handling](../Agents/Assistant/AssistantAgent.swift), [output routing](../Gateway/Output/Routing/ExecutionRouter.swift), [Action cancellation](../Gateway/Output/Scheduling/ChannelScheduler.swift) and [Tool execution](../ToolRuntime/ToolExecutor.swift).
+
 ## Feature status
 
 - ✅ Shared communication assembly, JSON v4 validation, explicit handlers and separate camera/voice sessions.
@@ -90,3 +136,5 @@ See [SpeechPerception](../Agents/SpeechPerception/README.md), [VisionPerception]
 | Open | Competing scene-role registrations fail; multi-window ownership is not implemented. |
 | Open | Validate sustained camera/voice operation, startup latency and memory/thermal behavior on iPhone. |
 | Resolved — 2026-09-27 audit | Consolidated repeated presentation updates and corrected skeleton execution from Action to completion-only Tool. |
+
+✅ InternalSignalBus is removed. App assembles shared policy and gateways, stops producers and coordinates Agent/runtime cancellation and cleanup; Agent inboxes own pending messages. No communication session registry remains. Action completion barriers and independent camera/voice cleanup remain. See [ADR 0048](../../docs/adr/0048-direct-signal-admission.md).

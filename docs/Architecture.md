@@ -1,6 +1,6 @@
 # 架构与当前范围
 
-目标技术方案为 MobileHarness/README.md。原始 Technical_Design.docx 和历史 Tech_Design.md 保留；目录与例外见 Repository-Structure.md。当前感知与通信边界以 ADR 0040 为准，历史 ADR 中的 Gateway 模型适配与未实现 Bus 状态已被取代。
+目标技术方案为 MobileHarness/README.md。原始 Technical_Design.docx 和历史 Tech_Design.md 保留；目录与例外见 Repository-Structure.md。当前感知边界以 ADR 0040 为准，直接通信接纳以 ADR 0048 为准，历史 ADR 中的 Gateway 模型适配与未实现 Bus 状态已被取代。
 
 ## 依赖方向
 
@@ -32,8 +32,7 @@ flowchart LR
     Vision --> Models
     Speech --> Output[OutputGateway]
     Vision --> Output
-    Output --> Bus[InternalSignalBus]
-    Bus --> Input
+    Output --> Input
     Input --> Assistant[Assistant: chat]
     Assistant --> Output
     Vision -->|UI.showPose Tool| Output
@@ -50,19 +49,19 @@ SpeechPerception 管理 VAD/ASR 会话、分段与合并；partial 为共享感�
 
 所有 Agent 配置使用 JSON v4，动作、工具、Channel、文本映射和通信声明只在配置中定义。输入契约、订阅的来源/主题与发送权限由 App 启动时校验。错误传播，不使用 try! 或硬编码 fallback。
 
-publish 按 contract/source/topic 精确匹配；send 指定目标，无需订阅但仍检查权限、输入支持、实例、会话、期限及容量。ToolResult 保持原 Agent/session 定向回送。内部事件通过绑定身份端口经 OutputGateway → Bus → InputGateway，不经过模型 XML 或 ToolCall 语法。
+publish 按 contract/source/topic 精确匹配；send 指定目标，无需订阅但仍检查权限、输入支持、实例、会话、期限及容量。ToolResult 保持原 Agent/session 定向回送。内部事件通过绑定身份端口经 OutputGateway → InputGateway，不经过模型 XML 或 ToolCall 语法。
 
-最新状态仅适用于 pose/partial；普通离散事件与动作不可静默替换。接纳回执按目标返回结果，不代表处理或动作完成。请求/回复、动态订阅、持久化、重试和通用健康监督尚未实现。详见 AgentCore/Bus/README.md。
+Gateway 不维护待投送队列：直接调用目标 receive，由 Agent inbox 负责缓冲、顺序及明确允许的状态合并。InternalSignalBus 已移除；期限仅在 receive 前检查，调用方取消通过结构化调用传播；并发投送不承诺 FIFO。普通离散事件与动作不可静默替换。接纳回执按目标返回结果，不代表处理或动作完成。请求/回复、动态订阅、持久化、重试和通用健康监督尚未实现。详见 AgentCore/Communication/README.md。
 
 ## 生命周期与容量
 
-ApplicationRuntime 在语音模型准备前即可创建共享 manager、policy、bus 与双 Gateway。相机、语音使用独立 session；会话停止先关闭感知发布入口，取消并等待该会话的模型/传输清理，再取消消费者及其动作。旧 incarnation 不会路由到新实例。
+ApplicationRuntime 在语音模型准备前即可创建共享 manager、policy 与双 Gateway。相机、语音使用独立 session；会话停止先关闭感知发布入口，取消并等待该会话的模型/传输清理，再取消消费者及其动作。旧 incarnation 不会路由到新实例。
 
 语音原始 inbox 与 ASR 队列分别最多 128 项/64000 样本；每轮 60 秒。识别/回复期间保持原有采集抑制，动作全部完成后等待 350 ms 恢复。停止清空当前会话上下文；模型权重保留由 ModelManager 管理。
 
 VisionPerception 原始帧最多一项处理中、一项最新等待。过期观测不开始处理。Vision 保留最多 300 人的通用坐标，VisionPerception 的显示投影单独限制六人显示，不能将显示筛帧策略当作避碰采样保证。
 
-Bus 最多 128 活动操作、256 分支、8 MiB 载荷、64 目标 worker、256 状态通道、256 会话，每次最多 16 接收者。一般事件 16 KiB、姿态 256 KiB；默认离散接纳期限 10 秒，pose 1 秒、partial 2 秒，硬上限 60 秒。完整队列算法与溢出策略归各目录 README。
+InputGateway 对外部和内部调用共享 128 活动操作、256 分支、8 MiB observation 载荷（按接收者计费）的接纳限制；每次最多 16 接收者。OutputGateway 每个来源最多 16 个活动发布。没有排队等待或超时竞速任务。一般事件 16 KiB、姿态 256 KiB；默认离散接纳期限 10 秒，pose 1 秒、partial 2 秒，硬上限 60 秒。完整队列算法与溢出策略归各目录 README。
 
 ## 输出与执行
 
@@ -90,4 +89,4 @@ OutputGateway 对调用复核并交给 Action/Tool runtime。ChannelScheduler �
 
 ✅ ADR 0046 replaces the UI.express emoji callback payload with a typed semantic emotion. Experience maps it to stable, continuously interpolated eye geometry. Gateway routes, Action path, session/turn admission and completion semantics are unchanged.
 
-✅ ADR 0047 removes the legacy Input/Routing abstraction and submit API. External publish requires CommunicationPolicy; send names its target, including ToolResult return. Policy-free construction retains explicit directed admission only; no input defaults to Assistant. Production JSON routing, Bus queues and per-target receipts are unchanged.
+✅ ADR 0047 removes the legacy Input/Routing abstraction and submit API. External publish requires CommunicationPolicy; send names its target, including ToolResult return. Policy-free construction retains explicit directed admission only; no input defaults to Assistant. Production JSON routing and per-target receipts were unchanged by that cleanup; ADR 0048 subsequently removes InternalSignalBus in favor of direct Gateway admission.

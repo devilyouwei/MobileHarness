@@ -29,7 +29,7 @@ ApplicationRuntime provides one shared communication assembly before voice model
 
 ## Queue policy and failure semantics
 
-Discrete events use bounded FIFO admission, explicit rejection and a finite duplicate window. Continuous states use bounded per-source/incarnation/session/contract latest slots and sequence deduplication. Pose payloads allow 256 KiB/300 people; other events allow 16 KiB. Photographer applies the separate six-person display budget. Transport accounting remains bounded by count and bytes; complete limits and algorithms are in AgentCore/Bus/README.md.
+Discrete events use bounded FIFO admission, explicit rejection and a finite duplicate window. Continuous states use bounded per-source/incarnation/session/contract latest slots and sequence deduplication. Pose payloads allow 256 KiB/300 people; other events allow 16 KiB. Photographer applies the separate six-person display budget. Transport accounting remains bounded by count and bytes; complete limits and algorithms are in AgentCore/Communication/README.md.
 
 State replacement and expiration are observable. There is no retry or persistent/exactly-once guarantee. ASR final is a discrete event, partial is a latest state. Perception completion is distinct from Assistant generation or Action completion. The UI keeps the current no-barge-in conversational gating and existing 350 ms post-playback delay.
 

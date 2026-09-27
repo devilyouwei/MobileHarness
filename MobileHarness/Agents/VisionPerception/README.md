@@ -10,7 +10,7 @@ flowchart LR
     Model --> Observation[Up to 300 people / upright pixel joints]
     Observation --> Pending[One latest pending observation]
     Pending --> Publisher[One publication worker]
-    Publisher --> Publication[OutputGateway / Bus / InputGateway]
+    Publisher --> Publication[OutputGateway / InputGateway]
     Publication --> Subscribers[Optional business subscribers]
     Observation --> Overlay[Up to six people / bounded display coordinates]
     Overlay --> Generator[CapabilityRegistry / JSON showPose tool alias]
@@ -66,8 +66,8 @@ flowchart LR
     Pose --> Obs[PoseObservation: up to 300 people]
     Obs --> Pub[Independent bounded publisher]
     Pub -->|vision.pose| OG1[OutputGateway]
-    OG1 --> Bus[Bus / InputGateway]
-    Bus -.-> Future[Optional business subscribers]
+    OG1 --> IG[InputGateway]
+    IG -.-> Future[Optional business subscribers]
     Obs --> Projection[PoseOverlay: up to 6 people]
     Projection -->|UI.showPose ToolCall| OG2[OutputGateway]
     OG2 --> TR[ToolRuntime: completion-only]
@@ -88,7 +88,7 @@ PoseObservation {
 Joint { x: Float; y: Float; confidence: Float }
 ```
 
-x/y 是正向、未镜像图像的像素坐标，以左上角为原点，必须有限但可在图像外；confidence 为 0...1。共享观测只提取关节点，没有模型结果中的 bounding box、整个人置信度，也没有 tracking ID、动作指令或原始图像字段。编码校验上限 256 KiB，默认接纳期限 1 秒且受父输入期限约束。`people: []` 表示这一帧未检测到人，不是漏发数据。独立发布 worker 保留一项活动发布和一项最新等待观测，Bus 也按最新状态规则合并未接纳的旧 pose；不能依赖收到每帧。
+x/y 是正向、未镜像图像的像素坐标，以左上角为原点，必须有限但可在图像外；confidence 为 0...1。共享观测只提取关节点，没有模型结果中的 bounding box、整个人置信度，也没有 tracking ID、动作指令或原始图像字段。编码校验上限 256 KiB，默认接纳期限 1 秒且受父输入期限约束。`people: []` 表示这一帧未检测到人，不是漏发数据。独立发布 worker 保留一项活动发布和一项最新等待观测，通信层不再合并状态，最新状态策略由 Agent 自己负责；不能依赖收到每帧。
 
 people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye、leftEar、rightEar、leftShoulder、rightShoulder、leftElbow、rightElbow、leftWrist、rightWrist、leftHip、rightHip、leftKnee、rightKnee、leftAnkle、rightAnkle。左右以被识别者自身为准；显示投影保留相同顺序。
 

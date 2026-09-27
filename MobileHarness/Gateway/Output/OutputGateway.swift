@@ -8,7 +8,6 @@ public actor OutputGateway {
     public typealias Sink = @Sendable (OutputEnvelope) async -> Void
     private let requests: InputGateway
     private let policy: CommunicationPolicy?
-    private let bus: InternalSignalBus?
     private let observeEvent: (@Sendable (AgentInput) async throws -> Void)?
     private let observedContracts: Set<String>
     private var sequences: [AgentID: UInt64] = [:]
@@ -21,14 +20,13 @@ public actor OutputGateway {
     public init(
         manager: AgentManager, requests: InputGateway, tools: ToolRegistry,
         actions: ChannelScheduler = ChannelScheduler(registry: ActionRegistry(handlers: [:])),
-        policy: CommunicationPolicy? = nil, bus: InternalSignalBus? = nil,
+        policy: CommunicationPolicy? = nil,
         observedContracts: Set<String> = [],
         observeEvent: (@Sendable (AgentInput) async throws -> Void)? = nil,
         sink: @escaping Sink
     ) {
         self.requests = requests
         self.policy = policy
-        self.bus = bus
         self.observedContracts = observedContracts
         self.observeEvent = observeEvent
         self.manager = manager
@@ -39,7 +37,7 @@ public actor OutputGateway {
 
     public func messaging(for source: AgentID) async throws -> AgentMessaging {
         let incarnation = try await manager.identity(source)
-        guard policy?.agents[source] != nil, bus != nil else { throw CommunicationError.unauthorized }
+        guard policy?.agents[source] != nil else { throw CommunicationError.unauthorized }
         return AgentMessaging { [weak self] observation, parent, target in
             guard let self else { throw CommunicationError.scopeClosed }
             return try await self.emit(
@@ -50,7 +48,8 @@ public actor OutputGateway {
         _ observation: PerceptionObservation, parent: AgentInput, source: AgentID,
         incarnation: UUID, target: AgentID?
     ) async throws -> DeliveryReport {
-        guard let policy, let bus, let declaration = policy.agents[source] else {
+        try Task.checkCancellation()
+        guard let policy, let declaration = policy.agents[source] else {
             throw CommunicationError.unauthorized
         }
         guard emitting[source, default: 0] < 16 else { throw CommunicationError.capacityExceeded }
@@ -97,8 +96,11 @@ public actor OutputGateway {
             }
         }
         // The observer is a runtime/UI endpoint, never a direct business-Agent callback.
+        try Task.checkCancellation()
+        try await manager.validate(source, incarnation: incarnation, sessionID: input.sessionID)
+        guard !input.metadata.expired else { throw CommunicationError.expired }
         if observed { try await observeEvent?(input) }
-        let report = targets.isEmpty ? DeliveryReport() : try await bus.publish(input, targets: targets)
+        let report = targets.isEmpty ? DeliveryReport() : try await requests.sendInternal(input, targets: targets)
         return DeliveryReport(
             delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new })
     }

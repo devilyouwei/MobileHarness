@@ -194,10 +194,6 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     try await manager.register(second, sessionID: session)
     await second.start()
     let input = InputGateway(manager: manager, policy: policy)
-    let bus = InternalSignalBus { value, target, incarnation in
-        try await input.receiveInternal(value, target: target, incarnation: incarnation)
-    }
-    try await bus.openSession(session)
     let recorder = OverlayRecorder()
     let actions = ChannelScheduler(registry: ActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
     let tools = ToolRegistry()
@@ -208,7 +204,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
         }
     }
     let output = OutputGateway(
-        manager: manager, requests: input, tools: tools, actions: actions, policy: policy, bus: bus,
+        manager: manager, requests: input, tools: tools, actions: actions, policy: policy,
         sink: { _ in })
     try await vision.bind(output.messaging(for: .visionPerception))
     try await vision.start()
@@ -243,7 +239,6 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     #expect(await third.inputs.count == (withSubscribers ? 3 : 0))
     #expect(await model.calls.count == 3)
     await manager.stopAll()
-    await bus.closeSession(session)
     await output.shutdown()
 }
 

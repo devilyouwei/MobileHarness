@@ -1,6 +1,6 @@
 # AgentCore — Shared Agent Contracts
 
-Defines Agent identity, input/output, lifecycle, configuration, parsing and event transport. The goal is reusable infrastructure without business policy. It depends on Foundation and the Swift standard library, never UI, concrete Agents, model engines or device adapters.
+Defines Agent identity, input/output, lifecycle, configuration, parsing and communication contracts. The goal is reusable infrastructure without business policy. It depends on Foundation and the Swift standard library, never UI, concrete Agents, model engines or device adapters.
 
 ## Directory structure
 
@@ -13,7 +13,7 @@ AgentCore/
 ├── Capability/                                      # JSON v4 validation and local permissions
 ├── Generation/                                      # Shared parsers and text-to-Action mapping
 ├── Output/                                          # Resolved calls, results and trusted context
-├── Bus/                                             # Typed events, policy and bounded transport
+├── Communication/                                   # Typed inputs, messaging contracts and policy
 └── README.md                                        # Module boundary and status
 ```
 
@@ -44,16 +44,17 @@ flowchart LR
     Parse --> Resolve
     Resolve --> Output[ActionCall / ToolCall / OutputEnvelope]
     Runtime[AgentManager and registry] --> Identity[Live Agent identity and lifecycle]
-    Identity --> Bus[CommunicationPolicy / InternalSignalBus]
-    Events[Gateway-validated events] --> Bus
-    Bus --> Input[AgentInput via InputGateway]
+    Identity --> Messaging[Bound AgentMessaging identity]
+    Policy[CommunicationPolicy] --> Gateway[Gateway consumers]
+    Messaging --> Gateway
+    Gateway --> Input[AgentInput via InputGateway]
 ```
 
 AgentInput separates payload from source, session, turn and timing metadata. ToolResult stays here to avoid a circular runtime dependency. Agents own parser instances and resolve aliases before output leaves them. Native Tool calls are separate from text/XML Function Tokens.
 
-Runtime tracks Agents; it is not a generic mailbox worker. Business Agents own their inboxes and state. The bus bounds event delivery and rejects excess discrete work; partial speech and pose can replace pending state. Receipts confirm admission only. Cancellation closes admission and joins cooperative delivery.
+Runtime tracks Agents; it is not a generic mailbox worker. Business Agents own their inboxes and state. Gateways bound active direct calls without lanes or workers. Deadlines are freshness checks before receive; caller cancellation propagates through structured calls. Agent-owned buffers decide state replacement, ordering and accepted-work cleanup. Receipts confirm admission only.
 
-Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capability](Capability/README.md), [Generation](Generation/README.md), [Output](Output/README.md) and [Bus](Bus/README.md).
+Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capability](Capability/README.md), [Generation](Generation/README.md), [Output](Output/README.md) and [Communication](Communication/README.md).
 
 ## Feature status
 
@@ -69,4 +70,4 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 | --- | --- |
 | Open | Request/reply needs a bounded completion path that cannot block behind its requester. |
 | Open | Non-cooperative receivers can delay cancellation; transport is not a real-time safety system. |
-| Resolved — 2026-09-27 audit | Documented Bus as implemented and separated shared infrastructure from Agent-owned workers. |
+| Resolved — 2026-09-27 audit | Removed InternalSignalBus; Communication contains contracts and policy, while Agents own inboxes. |

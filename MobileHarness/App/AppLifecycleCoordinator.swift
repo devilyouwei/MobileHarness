@@ -39,7 +39,6 @@ final class AppLifecycleCoordinator {
     private var captureTask: Task<Void, Never>?
     private var speechTask: Task<Void, Never>?
     private var speech: SpeechPerceptionAgent?
-    private var bus: InternalSignalBus?
     private var responseTask: Task<Void, Error>?
     private var responses: OutputGateway?
     private var interruptionTask: Task<Void, Never>?
@@ -85,8 +84,6 @@ final class AppLifecycleCoordinator {
         }
         let requests = runtime.input
         let responses = runtime.output
-        let bus = runtime.bus
-        self.bus = bus
         runtime.presentation.synthesis = synthesis
         runtime.presentation.play = { [weak self] frame, invocation in
             guard let self else { throw CancellationError() }
@@ -213,7 +210,7 @@ final class AppLifecycleCoordinator {
             try await audio.requestPermissions()
             guard voiceGeneration == generation else { return }
             try Task.checkCancellation()
-            guard let manager, let requests, let responses, let bus else { throw CapabilityError.sessionClosed }
+            guard let manager, let requests, let responses else { throw CapabilityError.sessionClosed }
             let speech = try SpeechPerceptionAgent(recognition: recognition, vad: voiceActivity, sessionID: generation)
             try await manager.register(speech, sessionID: generation)
             guard voiceGeneration == generation, !Task.isCancelled else {
@@ -221,7 +218,6 @@ final class AppLifecycleCoordinator {
                 return
             }
             self.speech = speech
-            try await bus.openSession(generation)
             try await speech.bind(responses.messaging(for: .speechPerception))
             try await speech.start()
             guard voiceGeneration == generation, !Task.isCancelled else {
@@ -367,7 +363,6 @@ final class AppLifecycleCoordinator {
         speech = nil
         let previousSpeechTask = speechTask
         let previousManager = manager
-        let previousBus = bus
         cleanupTask = Task {
             await previousCleanup?.value
             await previousStartup?.value
@@ -375,7 +370,6 @@ final class AppLifecycleCoordinator {
             await previousSpeech?.stop()
             await previousCapture?.value
             await previousSpeechTask?.value
-            if let oldGeneration { await previousBus?.closeSession(oldGeneration) }
             if let oldGeneration, let previousRequests {
                 _ = try? await previousRequests.send(
                     AgentInput(sessionID: oldGeneration, payload: .event("assistant.cancel")), to: .assistant)

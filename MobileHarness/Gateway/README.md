@@ -26,8 +26,7 @@ flowchart LR
     App -->|Adapted external input| Input[InputGateway]
     Input --> Agents
     Agents -->|Resolved calls and typed events| Output[OutputGateway]
-    Output --> Bus[AgentCore InternalSignalBus]
-    Bus --> Input
+    Output -->|Internal observation| Input
     Output --> ActionRuntime
     Output --> ToolRuntime
     ToolRuntime -->|Returning ToolResult via dispatcher| Input
@@ -40,7 +39,7 @@ flowchart LR
 flowchart TD
     In[External input] --> Select[Static subscription or explicit destination]
     Select --> ValidateIn[Validate envelope and identity]
-    BusDelivery[Bus delivery with selected target] --> ValidateIn
+    InternalDelivery[OutputGateway selected target] --> ValidateIn
     ValidateIn --> Inbox[Admit to Agent inbox]
     Out[Agent output] --> ValidateOut[Validate source and permission]
     ValidateOut --> Route{Output kind}
@@ -48,7 +47,7 @@ flowchart TD
     Queue --> Action[ActionDispatcher / ActionExecutor]
     Route -->|Tool| Tool[ToolDispatcher / ToolExecutor]
     Tool -->|Non-nil result / explicit target| Select
-    Route -->|Event| Event[Bound port / InternalSignalBus]
+    Route -->|Event| Event[Bound port / InputGateway]
     Route -->|Finish or cancel| Barrier[Join or cancel input Actions]
 ```
 
@@ -56,12 +55,11 @@ Input admission reports acceptance, not Agent processing completion. Action disp
 
 | Owner | Default bound and overflow |
 | --- | --- |
-| InputGateway | 128 concurrent external admissions, up to 16 targets each; reject excess |
+| InputGateway | 128 concurrent admissions shared by external/internal calls, 256 branches, 8 MiB observation bytes, up to 16 targets each; reject excess |
 | OutputGateway event port | 16 concurrent emissions per source; reject excess |
 | ChannelScheduler | 32 jobs per channel including running work, 16 active channels, 64 tracked Agent/input pairs; reject excess |
-| InternalSignalBus | Separate bounded transport; see [Bus](../AgentCore/Bus/README.md) |
 
-Channels run FIFO and share Action-module exclusion. Different modules may run concurrently. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only declared latest-state paths coalesce pending state. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
+Channels run FIFO and share Action-module exclusion. Different modules may run concurrently. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only Agent-owned declared latest-state buffers coalesce pending state. Gateways do not queue signals. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
 
 ## Feature status
 

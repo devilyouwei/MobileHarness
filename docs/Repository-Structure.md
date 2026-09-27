@@ -69,7 +69,7 @@ Camera 与共享视觉感知已实现；Character、完整请求/回复、模型
 | App、Experience | ✅ 现有入口、Conversation、Components 归位；AppBootstrap 等装配辅助文件与 Diagnostics 为现有功能扩展。✅ Camera 预览、控件与骨架覆盖；❌ Character 未实现 |
 | Gateway/Input | ✅ InputGateway 提供 publish 静态订阅与 send 显式定向投递；旧 Input/Routing 目录及 submit 回退入口已移除。✅ 统一使用 AgentCore.AgentInput；模型路由判断移至未来独立 Agent，不新增重复 Signal 或 Gateway 模型路由器 |
 | Gateway/Output | ✅ Validation、Routing、Dispatch、Scheduling/Channel 与 ChannelScheduler 归位。❌ 独立 GhostShellScheduler 未建，当前调度直接消费结构化调用 |
-| AgentCore | ✅ 根契约、Runtime、Capability、Generation、Output 归位；ActionPath、AgentLifecycle 名称一致；ChannelParser 已拆分。✅ Bus 事件通信已实现；❌ 通用 AgentContext、AgentRuntime、State、请求/回复与独立 CapabilityAlias 未实现 |
+| AgentCore | ✅ 根契约、Runtime、Capability、Generation、Output 归位；ActionPath、AgentLifecycle 名称一致；ChannelParser 已拆分。✅ Communication 通信契约与 Gateway 直接接纳已实现；❌ 通用 AgentContext、AgentRuntime、State、请求/回复与独立 CapabilityAlias 未实现 |
 | Agents | ✅ Assistant、SpeechPerception、VisionPerception 与独立 JSON v4；Photographer 仅保留运镜设计文档；❌ 其他业务 Agent 尚未实现 |
 | Actions / ActionRuntime | ✅ Display → UI、Say → Speak、Actions/Runtime → ActionRuntime、ActionCatalog → ActionRegistry，并提取 ActionExecutor。❌ ActionResult、其余行为模块未实现 |
 | Tools / ToolRuntime | ✅ System/RuntimeInfo 实现归位，ToolRegistry 与 ToolExecutor 分离。❌ 其他工具模块尚未实现 |
@@ -91,7 +91,7 @@ See ADR 0021: PlatformKit/Audio now contains MicrophoneFrame and StreamingMonoPC
 
 ## Planned Agent communication directory
 
-`MobileHarness/AgentCore/Bus/README.md` contains the detailed communication design and is excluded from the AgentCore Swift target. InternalSignalBus, typed ports, policy and bounded event tracking are implemented; request completion endpoints remain deferred. Gateway adapters are in Input/Output; AgentCore never imports Gateway.
+`MobileHarness/AgentCore/Communication/README.md` contains the detailed communication design and is excluded from the AgentCore Swift target. Typed ports, policy and receipts are implemented; gateways own bounded direct admission, without InternalSignalBus; request completion endpoints remain deferred. Gateway adapters are in Input/Output; AgentCore never imports Gateway.
 
 ## Fixed local model resources
 
@@ -115,4 +115,8 @@ See ADR 0021: PlatformKit/Audio now contains MicrophoneFrame and StreamingMonoPC
 
 ## ADR 0040 additions
 
-✅ AgentCore/Bus now compiles typed communication contracts, policy and bounded event transport. SpeechPerception owns LiveSpeechInput/VoiceActivitySegmenter; VisionPerception owns FrameChangeFilter and pose inference. ApplicationRuntime (in AgentBootstrap.swift) shares manager/bus/gateways before voice readiness. ❌ General request/reply and ReflexAgent are future work.
+✅ AgentCore/Communication compiles typed communication contracts, receipts and policy. SpeechPerception owns LiveSpeechInput/VoiceActivitySegmenter; VisionPerception owns FrameChangeFilter and pose inference. ApplicationRuntime (in AgentBootstrap.swift) shares manager/policy/gateways before voice readiness. ❌ General request/reply and ReflexAgent are future work.
+
+## Direct signal admission (ADR 0048)
+
+✅ AgentCore/Communication retains policy, messaging contracts and receipts. InternalSignalBus and its lifecycle are removed. No message queue, FIFO lane, persistent target worker or transport state-replacement map remains. Gateways validate and route; Agents own pending-message inboxes. Action scheduling remains in Gateway/Output/Scheduling.

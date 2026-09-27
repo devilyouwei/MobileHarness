@@ -12,7 +12,7 @@ flowchart LR
     OutputGateway --> ActionRuntime --> UI[App presentation handler]
     ASR --> Port[Bound messaging port]
     Port --> OutputGateway
-    OutputGateway --> Bus --> InputGateway
+    OutputGateway --> InputGateway
 ```
 
 ✅ JSON v4 declarations; sequential raw audio admission; existing 128-event/64000-sample ASR queue and 60-second turn limit; partial/final separation; final publication once per nonempty turn. Empty turns resume capture. App resumes after Assistant actions finish.
@@ -44,7 +44,7 @@ flowchart LR
 | 生命周期，不是业务输入 | `bind / start / pause / resume / stop` | App / AgentManager | 注入发布端口及管理任务；不扩展 communication.inputs。 |
 
 ```swift
-// 结构摘要；真实定义在 AgentCore/Bus/PerceptionInput.swift。
+// 结构摘要；真实定义在 AgentCore/Communication/PerceptionInput.swift。
 AudioInput {
     samples: Data       // 当前 App 输入为 16 kHz、单声道 Float32 PCM
     sequence: UInt64
@@ -60,8 +60,7 @@ flowchart LR
     Adapt -->|media.audio| IG[InputGateway]
     IG --> S[SpeechPerception: VAD / ASR]
     S -->|typed observations via bound port| OG[OutputGateway]
-    OG --> Bus[InternalSignalBus]
-    Bus --> IG2[InputGateway]
+    OG --> IG2[InputGateway]
     IG2 -->|speech.final / speech.phase| Assistant
     OG --> Observer[App: capture coordination / logging]
     S -->|ActionCall and control| OG
@@ -72,7 +71,7 @@ flowchart LR
 
 ### 共享观测输出
 
-调用 `AgentMessaging.publish(observation, parent: input)`，经过 OutputGateway → Bus → InputGateway；不是往 outputs 流塞原始 JSON，也不是 Action/Tool。发布继承会话、轮次和因果信息，等待的是投递接纳回执，不是 Assistant 回答完成。
+调用 `AgentMessaging.publish(observation, parent: input)`，经过 OutputGateway → InputGateway；不是往 outputs 流塞原始 JSON，也不是 Action/Tool。发布继承会话、轮次和因果信息，等待的是投递接纳回执，不是 Assistant 回答完成。
 
 | contract / version | 类型与内容 | 发布时机 / 消费者 |
 | --- | --- | --- |

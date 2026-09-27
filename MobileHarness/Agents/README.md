@@ -28,8 +28,7 @@ flowchart LR
     ModelKit -->|Typed results| Agents
     Agents -->|Resolved calls and typed events| Output[OutputGateway]
     Output --> Runtime[Action / Tool runtimes]
-    Output --> Bus[InternalSignalBus]
-    Bus --> Input
+    Output --> Input
 ```
 
 ## Internal structure and data flow
@@ -70,7 +69,7 @@ All fields below are required except hidden, which defaults to false. Arrays mus
 | textActions | Array of String | Ordered unique aliases for natural-text mapping, at most 8; each must accept string text without other required parameters |
 | actions | Array of Object | Actions this Agent may invoke |
 | tools | Array of Object | Native tools this Agent may invoke |
-| communication | Object | Required inputs, subscriptions, publications and sends arrays; see AgentCore/Bus |
+| communication | Object | Required inputs, subscriptions, publications and sends arrays; see AgentCore/Communication |
 
 Each Action entry uses this common registration format:
 
@@ -141,3 +140,7 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 | Open | Sustained speech/camera operation and real-model output quality require physical-device acceptance. |
 | Open | Configured value types are documentation, not runtime casts; each handler must validate semantic values. |
 | Resolved — 2026-09-27 audit | Replaced the generic directory sketch with the actual roles; removed stale expression examples and repeated migration notes. |
+
+## Direct input admission contract
+
+✅ Gateways directly call receive; Agent inboxes own all pending-message buffering. Ordinary receive must validate/admit or reject promptly, without awaiting inference or inbox space. Concurrent calls have no transport FIFO guarantee: Agents requiring stale-state rejection use session/source/sequence checks. State coalescing belongs to the Agent and must be explicit; discrete events and device actions cannot silently disappear. Lifecycle/control cancellation may join cleanup. Existing Assistant, SpeechPerception and VisionPerception buffering policies remain; see ADR 0048.

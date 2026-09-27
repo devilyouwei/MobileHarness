@@ -29,7 +29,7 @@ Update this README when adding or changing tests. Preserve ✅/❌ distinctions 
 
 
 
-✅ CommunicationTests covers static/direct delivery, stale source ports, schema rejection, high-rate states, pending replacement, slow-target deadlines and independent scope close. VoiceTests exercises PCM → SpeechPerception → final observation; PhotographyPipelineTests verifies two subscribers share one inference and empty pose clears UI.
+✅ CommunicationTests covers static/direct delivery, stale source ports, schema rejection, high-rate states, direct admission, slow-target deadlines and independent scope close. VoiceTests exercises PCM → SpeechPerception → final observation; PhotographyPipelineTests verifies two subscribers share one inference and empty pose clears UI.
 
 Validation (2026-09-26): final scripts/check.sh passed, including 79 IntegrationTests, configuration and module-boundary checks. All four scripts/build-ios.sh simulator schemes passed; MobileHarnessSimulator was rebuilt after the final capture-gating fix. The unsigned MobileHarness device target built successfully. All four packaged Agent JSON resources are v4 and byte-identical to source. Original Technical_Design.docx is unchanged. Optional real-model evaluations were not enabled; no phone installation or continuous physical audio/camera/thermal acceptance was performed.
 
@@ -52,3 +52,5 @@ Validation (2026-09-26): final scripts/check.sh passed, including 79 Integration
 ✅ Parameterized expression coverage exercises every UIActions.Emotion through the Action and checks unchanged semantic identity, no caption/speech side effects, invalid input rejection and cancellation propagation.
 
 ✅ Input routing tests use real CommunicationPolicy declarations for subscription fan-out and unavailable-target isolation. Regression coverage rejects publish without policy or subscribers, verifies explicit send without subscription and checks declared input support. Voice, cancellation and ToolResult tests use explicit send; legacy test routers are removed.
+
+✅ ADR 0048 tests direct same-target overlap, per-source capacity rejection/recovery, shared external/internal capacity, structured caller cancellation, expired parents, wrong sessions, stopped targets and independent receiver rejection. Agent-owned state coalescing remains covered by PhotographyPipelineTests. Bus FIFO, session-registry and snapshot tests are removed with the implementation.

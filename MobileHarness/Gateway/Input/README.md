@@ -6,7 +6,7 @@ Purpose: admit external inputs and route validated signals to Agent inboxes. Gat
 
 ✅ `publish` matches static JSON v4 contract/source/topic subscriptions. `send(to:)` bypasses subscription matching but preserves acceptance, identity, session, deadline and capacity checks. `publish` requires CommunicationPolicy and fails if no subscriptions match. `send` requires an explicit target; there is no default-Agent fallback or compatibility router. Policy-free construction supports explicit directed admission only, using the target descriptor and runtime checks. ToolResult remains directed to its original Agent/session.
 
-✅ External admission is bounded to 128 concurrent operations and 16 distinct targets each. Gateway creates no persistent media mailbox. It reports per-target rejection; one destination does not prevent other destinations from admission. Concrete Agents own business queues. Internal delivery is reachable through the bound output/bus transport and validates both sender and destination incarnations.
+✅ External and internal admission share bounds of 128 concurrent operations, 256 branches, 8 MiB observation payload (charged per target) and 16 distinct targets per call; excess is rejected immediately. Gateway creates no persistent media mailbox. It reports per-target rejection; one destination does not prevent other destinations from admission. Concrete Agents own business queues. Internal delivery is reachable through the bound OutputGateway port and validates both sender and destination incarnations.
 
 ```mermaid
 flowchart LR
@@ -16,7 +16,7 @@ flowchart LR
     Route -->|send| Target[Explicit destination]
     Policy --> Admit[Capability / incarnation / session check]
     Target --> Admit
-    Bus[InternalSignalBus] --> Admit
+    Output[OutputGateway] --> Admit
     Admit --> Inbox[Bounded Agent inbox]
 ```
 
@@ -65,14 +65,14 @@ flowchart TB
 A/B/C represent selected destinations, not an unconditional broadcast. `send` selects one target; `publish` selects matching subscribers. The validation boxes belong to the same InputGateway instance. Inbox boxes represent Agent-owned business admission; individual Agents may handle explicit control inputs immediately instead of queuing them.
 
 1. Reject a supplied internal incarnation; resolve the explicit target or exact static subscriptions. A publication without subscribers fails with `noRecipients`.
-2. Validate the envelope/payload and expiry, reserve one of 128 concurrent admission operations, and validate the allowed external source and at most 16 distinct targets. Exhaustion rejects; there is no waiting admission queue.
+2. Validate the envelope/payload and expiry, reserve shared operation/branch/observation-byte capacity, and validate the allowed external source and at most 16 distinct targets. Exhaustion rejects; there is no waiting admission queue.
 3. A structured task group creates one task per target. Each checks declared input support, obtains and validates the live target identity/session, and awaits `receive`. These tasks are not persistent workers.
 4. Collect each target's success or rejection into DeliveryReport; one receiver's rejection does not suppress the others. The call awaits all target tasks, so a slow receiver can delay the aggregate report even while other targets admit independently.
-5. Release the admission count when the operation returns. `delivered` means reception/admission, not model processing or physical completion. Agent-owned queues enforce their own capacity, expiry and overflow rules.
+5. Release the operation, branch and byte reservations when the operation returns. `delivered` means reception/admission, not model processing or physical completion. Agent-owned queues enforce their own capacity, expiry and overflow rules.
 
-Concurrent external submissions have no Gateway per-target FIFO guarantee. This direct path also does not inherit Bus timeout races, latest-state replacement or session-close worker cleanup; those mechanisms belong to their owning transport/Agent layers. InputGateway actor isolation alone does not establish arrival order across suspension points.
+Concurrent external submissions have no Gateway per-target FIFO guarantee. Internal delivery uses the same bounded structured calls. Deadlines are checked before receive; there are no timeout tasks or communication session registries. Neither path has transport FIFO or state replacement; Agent inboxes own pending-message policy. InputGateway actor isolation alone does not establish arrival order across suspension points.
 
-Compare the [internal target queues and workers](../../AgentCore/Bus/README.md#target-selection-and-per-agent-delivery) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
+Compare the [internal direct admission lifecycle](../../AgentCore/Communication/README.md) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
 
 SpeechPerception owns LiveSpeechInput and VoiceActivitySegmenter. VisionPerception owns FrameChangeFilter. Source normalization means protocol validation and metadata here, not inference or perceptual transformations.
 

@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | P0 已建立 | SwiftUI 工程、六个 Package 模块、演示 Agent、双网关、工具回路、CI 与规范 | 核心测试、模拟器构建和启动；真机与完整 UI 验收另行记录 |
 | P1 Models / Capabilities | ASR、TTS、一个本地小型 LLM、JEV；模型契约、制品、管理器和最小调度；语音闭环所需平台封装 | 真机加载/预热/生成/取消/卸载；换 provider 不改 Agent；语音闭环；权限拒绝与资源不足可恢复 |
-| P2 Runtime / Routing | Agent 工厂、restart、完整 pause/resume、Tool 超时、EventBus、完整 Action Markup parser、混合路由增强 | 并行 Agent 失败隔离；无残留任务；半截标签/非法输出/重启恢复；高频输入有界 |
+| P2 Runtime / Routing | Agent 工厂、restart、完整 pause/resume、Tool 超时、完整 Action Markup parser、混合路由增强 | 并行 Agent 失败隔离；无残留任务；半截标签/非法输出/重启恢复；高频输入有界 |
 | P3 Perception / Agents | VLM、检测、关键点、embedding 按场景接入；Camera、Photography、Tracking、Perception、Media | 摄像头 → 模型 → 事件 → Agent → 动作闭环；测量延迟、内存、耗电和热状态 |
 | P4 Robot | Bluetooth / Local Network、配对、动作参数校验、watchdog、急停 | 先仿真再真机；断连与 App 挂起自动停机；限幅；不重放过期动作 |
 
@@ -146,7 +146,7 @@ Unified-expression validation: root checks passed, including 56 integration test
 
 ## Inter-Agent communication
 
-✅ High-level architecture and detailed algorithms are specified in section 32 and AgentCore/Bus/README.md.
+✅ High-level architecture and detailed algorithms are specified in section 32 and AgentCore/Communication/README.md.
 
 ✅ JSON v4, typed event contracts, static subscriptions/direct sends, bounded state/discrete delivery and lifecycle fencing are implemented by ADR 0040. ❌ Request/reply completion slots and generic AgentContext supervision remain deferred.
 
@@ -272,3 +272,10 @@ Validation (2026-09-26): root checks passed, including 86 IntegrationTests; all 
 ❌ Dynamic routing/subscriptions and additional transport guarantees remain outside this cleanup.
 
 Validation (2026-09-27): scripts/check.sh passed with full Xcode selected, including 92 IntegrationTests; scripts/build-ios.sh passed all four unsigned simulator schemes. No physical-device validation was performed.
+
+## Direct signal admission (ADR 0048)
+
+✅ Removed InternalSignalBus, transport queues/workers, timeout races, duplicate caches and communication session lifecycle. OutputGateway selects recipients and directly calls InputGateway; external and internal calls share bounded structured admission. Agent inboxes retain buffering, state policy and accepted-work cleanup. Receipts report admission; deadlines check freshness before receive. Action Channel queues are unchanged.
+❌ No concurrent-delivery FIFO, dynamic subscription, automatic retry or hard-real-time device guarantee is introduced. Remote transport remains future work and does not inherently require a broker.
+
+Verified (2026-09-27): scripts/check.sh passed, including 92 IntegrationTests; scripts/build-ios.sh passed all four unsigned simulator schemes using full Xcode. Optional real-model evaluations and physical-device acceptance were not performed.

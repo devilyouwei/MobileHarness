@@ -16,4 +16,4 @@ Request results use reserved runtime completion slots behind InputGateway, indep
 
 A future coordinated Agent JSON schema version is required for communication permissions and schemas; current v3 remains unchanged. Runtime completion ports and supervised Agent contexts must be implemented before enabling production communication. No direct Agent references, XML message tags, general-purpose control strings or unbounded streams substitute for these contracts.
 
-The normative architecture is [section 32](../../MobileHarness/README.md#32-internal-agent-communication); algorithms, capacity values, failures and tests are specified in [AgentCore/Bus](../../MobileHarness/AgentCore/Bus/README.md#inter-agent-communication-design). This decision creates documentation only, with no live messaging guarantees.
+The normative architecture is [section 32](../../MobileHarness/README.md#32-internal-agent-communication); algorithms, capacity values, failures and tests are specified in [AgentCore/Communication](../../MobileHarness/AgentCore/Communication/README.md). This decision creates documentation only, with no live messaging guarantees.

@@ -49,7 +49,6 @@ flowchart TB
         Input["InputGateway<br/>Input Validation & Routing"]
         Agents["Perception / Business Agents<br/>Perception & Decision Making"]
         Output["OutputGateway<br/>Output Validation & Coordination"]
-        Bus["InternalSignalBus<br/>Internal Event Transport"]
     end
 
     subgraph ExecutionLayer["Execution Layer"]
@@ -69,8 +68,7 @@ flowchart TB
     Input --> Agents
     Agents --> Models
     Agents --> Output
-    Output --> Bus
-    Bus -.->|Perception Feedback| Input
+    Output -.->|Perception Feedback| Input
     Output --> Runtime
     Runtime --> Functions
     Functions --> Models
@@ -85,12 +83,12 @@ flowchart TB
     classDef capability fill:#F3E8FF,stroke:#9333EA,color:#581C87
     class World,User external
     class Platform,App platform
-    class Input,Agents,Output,Bus core
+    class Input,Agents,Output core
     class Runtime,Functions execution
     class Models,UI capability
 ```
 
-Arrows describe runtime flow, not Swift imports. External inputs enter InputGateway directly; only internal Agent events use InternalSignalBus. Agents make decisions, Gateway validates and routes, runtimes execute registered behavior, ModelKit processes supplied data, and PlatformKit performs device I/O. App connects these responsibilities through adapters and injected services.
+Arrows describe runtime flow, not Swift imports. External inputs enter InputGateway directly; internal Agent events reach it through OutputGateway, without an intermediate Bus. Agents make decisions, Gateway validates and routes, runtimes execute registered behavior, ModelKit processes supplied data, and PlatformKit performs device I/O. App connects these responsibilities through adapters and injected services.
 
 The dependency boundaries keep these responsibilities independently testable:
 
@@ -128,7 +126,7 @@ MobileHarness/
 │   ├── Capability/         # JSON configuration, aliases, schemas and context generation
 │   ├── Generation/         # Function Token / Tool parsers and text mapping
 │   ├── Output/             # Resolved calls, ToolResult and trusted output context
-│   └── Bus/                # Communication policy, typed events and internal transport
+│   └── Communication/      # Typed messaging contracts and static routing policy
 ├── Agents/                 # Business actors and versioned Agent JSON declarations
 │   ├── Assistant/          # Conversation generation from text and final speech
 │   ├── SpeechPerception/   # Shared VAD/ASR, segmentation and speech observations
@@ -170,7 +168,7 @@ A physical parent directory does not imply one Swift target: ModelKit excludes D
 | Flow                  | Current path                                                                                               | Result                                                   |
 | --------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Voice perception      | Microphone → PlatformKit → App → InputGateway → SpeechPerception → ModelKit VAD/ASR                   | Typed partial/final transcript and speech phase          |
-| Conversation          | SpeechPerception → OutputGateway → Bus → InputGateway → Assistant → ChatCapability                    | Resolved speech, caption and expression Actions          |
+| Conversation          | SpeechPerception → OutputGateway → InputGateway → Assistant → ChatCapability                    | Resolved speech, caption and expression Actions          |
 | Spoken output         | OutputGateway → ChannelScheduler → ActionRuntime → Speech action → TTS capability → injected playback | Completion includes actual playback                      |
 | Camera perception     | Camera → PlatformKit → App → InputGateway → VisionPerception → PoseCapability                         | Shared pose observation and independent UI.showPose Tool |
 | Skeleton presentation | VisionPerception → OutputGateway → ToolRuntime → UI.showPose → App handler → Experience               | Awaited state update, without ToolResult                 |
@@ -182,7 +180,7 @@ Raw media reaches perception Agents before inference. The App does not resubmit 
 
 ### App
 
-[App](App/README.md) is the composition root. `AppContainer` prepares capabilities and platform services; `ApplicationRuntime` in `AgentBootstrap` assembles the shared AgentManager, immutable communication policy, Bus, gateways and explicit implementation handlers. Production registration lists come from Agent JSON, not duplicate Swift declarations.
+[App](App/README.md) is the composition root. `AppContainer` prepares capabilities and platform services; `ApplicationRuntime` in `AgentBootstrap` assembles the shared AgentManager, immutable communication policy, gateways and explicit implementation handlers. Production registration lists come from Agent JSON, not duplicate Swift declarations.
 
 Voice and camera coordinators own separate sessions and scene intent. App supplies ModelKit's resource root and gets capability interfaces from the process-wide manager. It adapts transport/media values and binds presentation callbacks, while startup, completion and cancellation remain runtime responsibilities.
 
@@ -204,13 +202,13 @@ Agent-selected UI changes arrive through registered Actions or Tools. Device aud
 - **Output/Validation:** recheck resolved executable calls and event permissions.
 - **Output/Routing and Dispatch:** classify outputs, dispatch Actions/Tools, and return data Tool results through InputGateway.
 - **Output/Scheduling:** bound Action queues, serialize by Channel and coordinate module exclusion, completion and cancellation.
-- **Internal messaging:** bind sender identity, select recipients and hand validated events to Bus; registered runtime observers do not create implicit Agent subscriptions.
+- **Internal messaging:** bind sender identity, select recipients and directly hand validated events to InputGateway; registered runtime observers do not create implicit Agent subscriptions.
 
 ✅ Static publish/send, output validation and execution coordination. ❌ Dynamic subscriptions and model-assisted routing; any future model routing decision belongs in an Agent.
 
 ### AgentCore
 
-[AgentCore](AgentCore/README.md) defines the reusable contracts and mechanisms without business policy. Root contracts describe Agents, identity, descriptors, input payloads and errors. `Runtime` manages instances and lifecycle; `Capability` validates configuration and local names; `Generation` parses generated output; `Output` defines resolved calls and context; `Bus` implements internal event transport and shared communication policy.
+[AgentCore](AgentCore/README.md) defines the reusable contracts and mechanisms without business policy. Root contracts describe Agents, identity, descriptors, input payloads and errors. `Runtime` manages instances and lifecycle; `Capability` validates configuration and local names; `Generation` parses generated output; `Output` defines resolved calls and context; `Communication` defines messaging contracts, receipts and shared communication policy.
 
 An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input: AgentInput) async throws` entry and an output stream. Concrete Agents own their bounded inboxes and domain state. Shared ToolResult belongs here to avoid a dependency cycle with ToolRuntime.
 
@@ -292,7 +290,7 @@ Signal is the conceptual input abstraction; `AgentInput` is its implemented type
 | Perception observation | Typed transcript, speech phase or pose without original media |
 | ToolResult             | Result correlated with its originating call and session       |
 
-Media streams are successive typed inputs. JSON v4 configures Agents; it is not the audio/image transport format. App-owned attachments bridge native frames without making AgentCore depend on model/platform frameworks. Remote serialization, compressed video and additional physical sensors remain future work. Bounds and value contracts live in [Input](Gateway/Input/README.md) and [Bus](AgentCore/Bus/README.md).
+Media streams are successive typed inputs. JSON v4 configures Agents; it is not the audio/image transport format. App-owned attachments bridge native frames without making AgentCore depend on model/platform frameworks. Remote serialization, compressed video and additional physical sensors remain future work. Bounds and value contracts live in [Input](Gateway/Input/README.md) and [Communication](AgentCore/Communication/README.md).
 
 ### Capability Declaration and Resolution
 
@@ -346,79 +344,65 @@ Both are validated executable outputs, and either may have side effects. Their d
 
 ### Communication Framework
 
-Communication covers external inputs, internal Agent observations and Tool-result return. **InputGateway is the common Agent admission boundary; InternalSignalBus is only the internal event transport.**
+Communication covers external input, internal Agent observations and Tool-result return. **Gateways perform intermediate validation, metadata construction and routing. Agent inboxes own pending messages. There is no independent message Bus.**
 
 ```mermaid
 flowchart TD
-    Config[Agent JSON communication declarations] --> Policy[App assembles immutable CommunicationPolicy]
-    External[App: user / microphone / camera / runtime] --> ExternalRoute[InputGateway: publish matches subscriptions; send selects target]
-    Policy -.-> ExternalRoute
+    Config[Agent JSON declarations] --> Policy[App assembles CommunicationPolicy]
+    External[App: user / microphone / camera / runtime] --> Input[InputGateway: validate / direct admission]
     Sender[Sending Agent] --> Port[Identity-bound AgentMessaging]
-    Port --> Output[OutputGateway: validate permission and select targets]
+    Port --> Output[OutputGateway: permission / metadata / target selection]
     Policy -.-> Output
-    Output --> Bus[InternalSignalBus: reserve and fan out]
-    Bus --> LaneA[Target A FIFO / worker]
-    Bus --> LaneB[Target B FIFO / worker]
-    LaneA --> Internal[InputGateway: validate internal delivery]
-    LaneB --> Internal
-    Tool[Returning ToolResult] --> Directed[InputGateway: original Agent / session]
-    ExternalRoute --> Receive[Target Agent.receive input]
-    Internal --> Receive
-    Directed --> Receive
+    Policy -.-> Input
+    Output --> Input
+    Tool[Returning ToolResult] -->|Original Agent / session| Input
+    Input --> Receive[Target Agent.receive]
+    Receive --> Inbox[Agent-owned bounded inbox]
 ```
 
 #### Subscription ownership and target selection
 
-Each Agent declares `communication.inputs`, `subscriptions`, `publications` and `sends`. App loads and validates them once into CommunicationPolicy, which Gateway uses. The Agent does not register runtime listeners or call a dynamic `subscribe` API.
+Each Agent JSON declares `inputs` (supported contract/version/kind), `subscriptions` (exact contract/source/topic), `publications` (publishable contracts) and `sends` (allowed contract/target pairs). App validates these into an immutable policy. Agents do not register listeners dynamically. Topic currently equals contract; there are no wildcards or implicit fallback recipients.
 
-| Declaration   | Meaning                                                     |
-| ------------- | ----------------------------------------------------------- |
-| inputs        | Supported contract, version and payload kind                |
-| subscriptions | Exact contract/source/topic accepted by publication routing |
-| publications  | Contracts an Agent may publish                              |
-| sends         | Contract/target pairs an Agent may send directly            |
+External publish/send selects targets in InputGateway. Internal publish/send selects targets in OutputGateway after outbound permission checks. Supporting an input is distinct from subscribing to it: directed sends bypass subscription matching but preserve supported-contract validation.
 
-Supporting an input is not the same as subscribing to it. Currently topic equals contract, with no wildcard matching. For example, Assistant declares support for speech.final and subscribes to source speechPerception / topic speech.final.
+OutputGateway binds source identity/incarnation, sequence, session, turn and causal parent into the envelope. It resolves live target identities and directly invokes the module-internal InputGateway entry. Public external entry points reject forged internal incarnations. Child deadlines cannot outlive their parent.
 
-For **external inputs**, InputGateway selects targets: `publish` matches the static policy; `send` uses the specified target. It validates external source and input support, checks live session/identity and calls receivers with per-target results. A structured task group performs direct admission for selected targets; there is no persistent Gateway mailbox or per-target worker, and these inputs do not pass through Bus. Concurrent submissions therefore have no Gateway per-target FIFO guarantee. Agent-owned inboxes bound subsequent business processing.
+#### Direct admission, lifetime and ownership
 
-For **internal events**, OutputGateway first checks `publications` or `sends` permission and determines recipients. A bound AgentMessaging port fixes sender identity/incarnation; the caller supplies an observation and causal parent, not a trusted source name. Child events inherit the session and cannot outlive the parent's deadline. OutputGateway then hands the selected targets to Bus.
+InputGateway uses structured per-target tasks and a common capacity boundary for external and internal admission. It checks source/target identity, session, supported payload, cancellation and message expiry before `receive`. One rejected destination does not suppress successful peers, but the aggregate report awaits all targets.
 
-#### Internal transport and common reception
+Ordinary `receive` must promptly validate and enqueue or reject; it must not await inference or inbox space. Cross-actor calls still use await. Explicit cancellation controls may join cleanup. Neither Gateway has a pending-message queue, persistent worker or independent delivery lifecycle. There is no communication FIFO guarantee across concurrent calls and no automatic duplicate suppression or state replacement.
 
-Bus has one FIFO lane and worker **per target**, not one global Signal queue. A publication fans out into target branches; a direct send creates one branch. Both share the same lane for a given target. Workers push deliveries into InputGateway; InputGateway does not poll Bus or rematch subscriptions after dequeue.
+InputGateway permits 128 active operations, 256 target branches and at most 16 targets per operation, plus an 8 MiB observation reservation. OutputGateway permits 16 emissions per source. Full admission rejects immediately; counters are released when structured calls finish. These are active-call bounds, not queues.
 
-InputGateway validates sender/receiver incarnations, session, contract, payload and deadline before invoking the same `receive(_ input: AgentInput)` method. The receiver inspects payload and metadata, then admits work into its own bounded inbox. There are no separate publish/send listeners, and the envelope has no delivery-mode flag distinguishing them.
+A message deadline is a freshness check, not a timer racing receive. Cancelling the caller propagates through structured admission calls; already accepted work belongs to the Agent. App stops producers and coordinates Agent/runtime cleanup. No Bus session registry, timeout tasks, retained operation registry or shutdown barrier remains. Action Channels remain separate execution queues.
 
-Internal lanes are distinct from Action Channels. Per-target workers progress independently, but Bus first reserves shared capacity for the operation; insufficient reservation can reject the whole publication. Once admitted, branch receipts report individual outcomes. `delivered` means inbox admission, not inference or effect completion.
+| Concern | External input | Internal Agent event |
+| --- | --- | --- |
+| Target selection | InputGateway subscription lookup or explicit target | OutputGateway permission check and target selection |
+| Admission | Shared InputGateway bounded task group | Same InputGateway bounded task group |
+| Queue / processing | Agent inbox | Agent inbox |
+| Lifecycle | Caller, App and Agent/runtime ownership | Same; source incarnation and causal context are also checked |
+| Receipt | Per-target admission, not processing completion | Same |
 
-| Concern          | External input                                                | Internal Agent event                                             |
-| ---------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Target selection | InputGateway matches subscriptions or uses an explicit target | OutputGateway checks outbound permissions and selects targets    |
-| Transport        | Direct per-target tasks; no Bus queue                         | Bus capacity reservation, per-target FIFO lanes and workers      |
-| Ordering         | No Gateway FIFO guarantee across concurrent submissions       | Per-target lane ordering, with explicit latest-state replacement |
-| Receiver         | InputGateway calls Agent.receive                              | Bus worker calls InputGateway, which calls Agent.receive         |
-| Completion       | Aggregate report waits for all target admission tasks         | Aggregate report waits for all delivery branches to settle       |
+Detailed diagrams: [external input](Gateway/Input/README.md#external-input-admission-and-delivery) and [internal direct delivery](AgentCore/Communication/README.md#target-selection-and-per-agent-delivery).
 
-Detailed diagrams: [external input admission and delivery](Gateway/Input/README.md#external-input-admission-and-delivery) and [internal target selection and per-Agent delivery](AgentCore/Bus/README.md#target-selection-and-per-agent-delivery). These are separate transport paths sharing the Agent reception contract, not one universal queue.
+#### Current routes and future scope
 
-#### Delivery semantics and current routes
+| Source | Input | Receiver |
+| --- | --- | --- |
+| phone.microphone | media.audio | SpeechPerception subscription |
+| phone.camera | media.image | VisionPerception subscription |
+| user | user.text | Assistant subscription; no current text-entry UI |
+| speechPerception | speech.final / speech.phase | Assistant subscription |
+| speechPerception | speech.partial / final / phase | Registered runtime observer for admission/logging, without UI mutation |
+| visionPerception | vision.pose | Declared business subscribers; skeleton output is an independent Tool |
+| runtime | ToolResult / assistant.cancel | Original or explicitly selected Agent/session |
 
-Partial speech and pose are replaceable latest states; newer pending state explicitly supersedes its predecessor. Active delivery is not replaced. Finals and phase transitions are discrete events and cannot be silently coalesced. Expiry prevents starting stale work, while cancellation closes affected session admission and joins cooperative deliveries. No retry or exactly-once execution is promised.
+The three production Agent configurations have empty sends lists: Agent direct send is available but currently unused in production. Zero recipients fails unless a registered publication observer handles the contract. Ordinary discrete events and physical actions must not be silently coalesced; Agent-local latest-state policies are explicit.
 
-| Source           | Contract / purpose             | Receiver or endpoint                                                                 |
-| ---------------- | ------------------------------ | ------------------------------------------------------------------------------------ |
-| phone.microphone | media.audio                    | SpeechPerception via external publish                                                |
-| phone.camera     | media.image                    | VisionPerception via external publish                                                |
-| user             | user.text                      | Assistant subscription; no current text-entry UI                                     |
-| speechPerception | speech.final / speech.phase    | Assistant via internal publish                                                       |
-| speechPerception | speech.partial / final / phase | Registered OutputGateway runtime observer for admission/logging, without UI mutation |
-| visionPerception | vision.pose                    | Available to declared business subscribers; display is a separate Tool               |
-| runtime          | tool.result / assistant.cancel | Directed return or App cancellation to original/selected Agent                       |
-
-The three current production Agent configurations have empty `sends` lists: Agent-to-Agent direct send is supported but not used in production. Runtime Tool returns and App cancellation are separate directed-input paths. A publication with no recipients reports noRecipients unless a registered observer handles its contract; VisionPerception handles lack of pose subscribers without suppressing its independent skeleton output.
-
-✅ Static configuration, external routing, internal event transport and directed results. ❌ Dynamic subscribe/unsubscribe, request/reply, persistence, retries and remote transport. Detailed algorithms belong in [InputGateway](Gateway/Input/README.md), [OutputGateway](Gateway/Output/README.md) and [Bus](AgentCore/Bus/README.md); the cross-module decision is [ADR 0040](../docs/adr/0040-shared-perception-and-event-routing.md).
+✅ Static subscriptions, direct delivery and correlated Tool return. ❌ Dynamic subscriptions, request/reply, remote transport, persistence and retry. Remote Agents may use a transport adapter; they do not inherently require a Bus or broker. See [ADR 0048](../docs/adr/0048-direct-signal-admission.md).
 
 ### Multi-Channel Action Scheduling
 
@@ -487,6 +471,8 @@ Stopping a conversation cancels work without automatically unloading weights. Ex
 
 Runtime lifecycle is separate from business state. AgentManager controls registration and running instances; each Agent owns domain state and bounded input processing. Voice and camera share infrastructure but close their own sessions independently. Stop first prevents producer admission, cancels and joins perception/transport work, then cancels consumers and Actions. Incarnations fence old instances from replacements.
 
+The current voice stop and interruption chain is coordinated by App: stop producers, send assistant.cancel through InputGateway, then cancel session Actions through OutputGateway. Tool cancellation follows the active dispatch task. See [Voice interruption and cancellation](App/README.md#voice-interruption-and-cancellation) for the flowchart, cleanup order and implemented boundaries.
+
 Agent-selected presentation uses JSON-declared, resolved Actions/Tools through OutputGateway. SpeechPerception owns recognition captions and phase presentation; Assistant owns reply captions, expressions and atomic beginReplyTurn; VisionPerception owns UI.showPose. Signal observers only coordinate capture admission/logging. App may reset state for user/OS lifecycle and present actual device telemetry.
 
 ConversationTurn carries an ID and session-local ordinal through input, observations, output and Tool return. A long utterance retains its turn across segments. Trusted output sequences and turn checks reject stale UI updates; model parameters cannot override this identity.
@@ -525,7 +511,7 @@ Run `./scripts/check.sh` for format, tests and configuration/boundary validation
 
 ## Summary
 
-MobileHarness connects **Signal → Cognition → Action** through explicit boundaries: App assembles services, Gateway validates and routes, Agents reason, runtimes execute declared behavior, ModelKit processes data and PlatformKit performs I/O. External input and internal events share Agent admission without sharing one universal Bus. Executable Action Channels remain separate from message delivery lanes.
+MobileHarness connects **Signal → Cognition → Action** through explicit boundaries: App assembles services, Gateway validates and routes, Agents reason, runtimes execute declared behavior, ModelKit processes data and PlatformKit performs I/O. External input and internal events use direct admission; Agents own the pending-message queues, with no independent Bus lifecycle. Executable Action Channels remain separate from Agent inboxes.
 
 ✅ Current implementation includes shared speech/vision perception, a conversational Assistant, static subscription and directed delivery, Function Token generation, bounded Action scheduling, direct Tools and shared model lifecycle.
 

@@ -7,7 +7,7 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 
 ✅ Output contracts distinguish ActionCall from native ToolCall; Function Token names the mixed text/XML protocol interpreted inside Agents.
 
-✅ [0028](0028-inter-agent-communication.md) specifies the internal Agent communication design. ❌ Executable bus, runtime ports and communication configuration remain pending.
+✅ [0028](0028-inter-agent-communication.md) specifies the internal Agent communication design. Runtime ports and configuration were subsequently implemented; ADR 0048 removes the separate Bus runtime.
 
 ✅ [0029](0029-channel-lock.md) defines channel lock ownership, immediate takeover and the separation between Agent decisions and runtime authorization. ❌ Runtime enforcement remains pending.
 
@@ -50,3 +50,5 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 ✅ [ADR 0046](0046-semantic-eye-expressions.md): typed expressions, stable procedural eyes and uninterrupted native interpolation.
 
 ✅ [ADR 0047](0047-explicit-input-routing.md): explicit publish/send input routing, removal of legacy router and submit fallback, and static-policy regression tests.
+
+✅ [ADR 0048](0048-direct-signal-admission.md): queue-free signal delivery, Agent-owned inbox policy and bounded structured Gateway admission without a Bus lifecycle.

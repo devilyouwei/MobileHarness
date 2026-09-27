@@ -29,7 +29,6 @@ final class ApplicationRuntime {
     let manager: AgentManager
     let input: InputGateway
     let output: OutputGateway
-    let bus: InternalSignalBus
     let presentation: RuntimePresentation
     private let tools: ToolRegistry
     private var toolSetup: Task<Void, Error>?
@@ -41,9 +40,6 @@ final class ApplicationRuntime {
             })
         let manager = AgentManager()
         let input = InputGateway(manager: manager, policy: policy)
-        let bus = InternalSignalBus { value, target, incarnation in
-            try await input.receiveInternal(value, target: target, incarnation: incarnation)
-        }
         let presentation = RuntimePresentation()
         let actions = ChannelScheduler(
             registry: ActionRegistry(handlers: [
@@ -58,11 +54,10 @@ final class ApplicationRuntime {
         let tools = ToolRegistry()
         self.manager = manager
         self.input = input
-        self.bus = bus
         self.presentation = presentation
         self.tools = tools
         output = OutputGateway(
-            manager: manager, requests: input, tools: tools, actions: actions, policy: policy, bus: bus,
+            manager: manager, requests: input, tools: tools, actions: actions, policy: policy,
             observedContracts: ["speech.partial", "speech.final", "speech.phase"],
             observeEvent: { try await presentation.observe($0) }, sink: { await presentation.output($0) })
     }

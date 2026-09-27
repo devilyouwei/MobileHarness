@@ -52,7 +52,7 @@ MobileHarness takes inspiration from how human intelligence connects perception,
 
 - **Continuous, stateful agents.** Independent Swift actors own their input queues, sessions and domain state.
 - **Shared multimodal perception.** SpeechPerception and VisionPerception process inputs once and publish typed observations for other agents.
-- **Explicit communication.** Static subscriptions and directed delivery cross validated gateways, with bounded internal transport and per-recipient admission results.
+- **Explicit communication.** Static subscriptions and directed delivery cross validated gateways, with bounded direct delivery and per-recipient admission results. Agents own message buffering; gateways own validation and routing.
 - **Streaming behavior.** Function Tokens combine natural text with registered Action tags; agents resolve capabilities before anything executes.
 - **Coordinated execution.** Actions use ordered Channels; Tools execute directly with explicit result or completion semantics.
 - **Apple-native capabilities.** ModelKit handles model processing, PlatformKit handles device I/O, and SwiftUI presents the experience.
@@ -90,11 +90,10 @@ flowchart LR
     Agents --> Output[Output Gateway]
     Output --> Execution[Actions & Tools]
     Execution --> Experience[Speech / UI / Device I/O]
-    Output -. Internal observations .-> Bus[Internal Signal Bus]
-    Bus -. Feedback .-> Gateway
+    Output -. Internal observations .-> Gateway
 ```
 
-External inputs enter InputGateway directly. Internal Agent events use the Bus before returning through InputGateway. ModelKit supplies processing capabilities; PlatformKit acquires device data and performs device output. App assembles these services, and agents receive capability interfaces rather than concrete model engines.
+External inputs enter InputGateway directly. Internal Agent events pass directly from OutputGateway to InputGateway; Agent inboxes own message buffering. ModelKit supplies processing capabilities; PlatformKit acquires device data and performs device output. App assembles these services, and agents receive capability interfaces rather than concrete model engines.
 
 See the [Technical Design](MobileHarness/README.md) for the layered architecture, module responsibilities, communication framework and execution protocols.
 

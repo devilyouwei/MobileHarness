@@ -14,7 +14,7 @@ When real camera-motion behavior is implemented, add its versioned JSON subscrip
 
 ```mermaid
 flowchart LR
-    Vision[VisionPerception] -->|implemented vision.pose publication| OG[OutputGateway / Bus / InputGateway]
+    Vision[VisionPerception] -->|implemented vision.pose publication| OG[OutputGateway / InputGateway]
     OG -.->|planned subscription| Photographer[Photographer: not implemented]
     Photographer -.->|planned resolved motion Actions| Output[OutputGateway / ActionRuntime]
     Output -.->|unimplemented adapters| Device[Robot arm / phone mount]
@@ -28,6 +28,6 @@ flowchart LR
 | 共享观测 / Agent 定向消息 | ❌ 无 publications / sends 配置 | 有具体消费者后再定义，不隐式拥有发送权限。 |
 | 骨架 UI | ✅ 已由 VisionPerception 实现 | `UI.showPose` 不属于 Photographer；移除或尚未实现 Photographer 不影响当前骨架显示。 |
 
-可复用的现有数据是 `AgentInput.payload = .observation(.pose(PoseObservation))`：width/height、sequence/timestamp、rotation 和 people；每人 17 个 COCO 点，每点为像素 x/y 与 0...1 confidence，最多 300 人，正向未镜像坐标。详见 [VisionPerception 输入输出契约](../VisionPerception/README.md#输入订阅与输出契约) 和 [PerceptionInput.swift](../../AgentCore/Bus/PerceptionInput.swift)。这个结构没有 tracking ID、深度、机器人状态或运动命令。
+可复用的现有数据是 `AgentInput.payload = .observation(.pose(PoseObservation))`：width/height、sequence/timestamp、rotation 和 people；每人 17 个 COCO 点，每点为像素 x/y 与 0...1 confidence，最多 300 人，正向未镜像坐标。详见 [VisionPerception 输入输出契约](../VisionPerception/README.md#输入订阅与输出契约) 和 [PerceptionInput.swift](../../AgentCore/Communication/PerceptionInput.swift)。这个结构没有 tracking ID、深度、机器人状态或运动命令。
 
 未来消费者必须接受最新状态可能跳帧、空 people 表示无人、观测可能过期的事实；目前 App 的 100ms 新帧刷新不提供硬实时控制保证。具体任务、机械动作结构及设备保护应在真正实现时补齐，不能把感知数据直接当作物理控制指令。

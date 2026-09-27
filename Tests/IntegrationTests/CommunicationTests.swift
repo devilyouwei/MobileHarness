@@ -30,7 +30,10 @@ actor ObservationRecorder: Agent {
     var inputs: [AgentInput] = []
     var lifecycle: AgentLifecycle = .registered
     let reject: Bool
-    init(id: String, reject: Bool = false) {
+    let blockText: String?
+    nonisolated let admissions = AsyncStream<UUID>.makeStream(bufferingPolicy: .bufferingOldest(16))
+    init(id: String, reject: Bool = false, blockText: String? = nil) {
+        self.blockText = blockText
         self.reject = reject
         descriptor = AgentDescriptor(id: AgentID(rawValue: id), name: id, inputs: [.observation], outputs: [])
     }
@@ -39,9 +42,14 @@ actor ObservationRecorder: Agent {
     func resume() { lifecycle = .running }
     func stop() { lifecycle = .stopped }
     func status() -> AgentStatus { AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: inputs.count) }
-    func receive(_ input: AgentInput) throws {
+    func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running else { throw HarnessError.notRunning }
         guard !reject else { throw HarnessError.queueFull }
+        admissions.continuation.yield(input.id)
+        if case .observation(.transcript(let text, _)) = input.payload, text == blockText {
+            try await Task.sleep(for: .seconds(30))
+        }
+        try Task.checkCancellation()
         inputs.append(input)
     }
 }
@@ -62,12 +70,8 @@ actor ObservationRecorder: Agent {
         await agent.start()
     }
     let input = InputGateway(manager: manager, policy: policy)
-    let bus = InternalSignalBus { value, target, incarnation in
-        try await input.receiveInternal(value, target: target, incarnation: incarnation)
-    }
-    try await bus.openSession(session)
     let output = OutputGateway(
-        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, bus: bus, sink: { _ in })
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
     let port = try await output.messaging(for: source.descriptor.id)
     let parent = AgentInput(sessionID: session, payload: .text("source"))
     let published = try await port.publish(.transcript("hello", final: true), parent: parent)
@@ -85,141 +89,145 @@ actor ObservationRecorder: Agent {
     await #expect(throws: CommunicationError.staleIncarnation) {
         try await port.publish(.transcript("stale", final: true), parent: parent)
     }
-    await bus.closeSession(session)
-    await bus.shutdown()
     await manager.stopAll()
 }
 
-@Test func highFrequencyStatesDoNotConsumeDiscreteDeduplicationCapacity() async throws {
-    let target = AgentID(rawValue: "consumer")
-    let incarnation = UUID()
+private func directFixture(blockText: String? = nil, reject: Bool = false) async throws
+    -> (AgentManager, InputGateway, OutputGateway, AgentMessaging, ObservationRecorder, UUID)
+{
+    let policy = try CommunicationPolicy(configurations: [
+        communicationConfiguration("producer", publishes: true),
+        communicationConfiguration("consumer", subscribes: true), communicationConfiguration("direct"),
+    ])
+    let manager = AgentManager()
     let session = UUID()
-    let recorder = ObservationRecorder(id: "consumer")
-    await recorder.start()
-    let bus = InternalSignalBus { input, _, _ in try await recorder.receive(input) }
-    try await bus.openSession(session)
-    for sequence in 0..<1100 {
-        let payload = InputPayload.observation(.transcript("preview", final: false))
-        let input = AgentInput(
-            sessionID: session, payload: payload, metadata: InputMetadata(payload: payload, sequence: UInt64(sequence)))
-        let report = try await bus.publish(input, targets: [(target, incarnation)])
-        #expect(report.delivered == [target])
+    let source = ObservationRecorder(id: "producer")
+    let consumer = ObservationRecorder(id: "consumer")
+    let direct = ObservationRecorder(id: "direct", reject: reject, blockText: blockText)
+    for agent in [source, consumer, direct] {
+        try await manager.register(agent, sessionID: session)
+        await agent.start()
     }
-    #expect(await recorder.inputs.count == 1100)
-    await bus.closeSession(session)
-    let input = AgentInput(sessionID: session, payload: .observation(.transcript("done", final: true)))
-    await #expect(throws: CommunicationError.scopeClosed) {
-        try await bus.publish(input, targets: [(target, incarnation)])
-    }
+    let input = InputGateway(manager: manager, policy: policy)
+    let output = OutputGateway(manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    return (manager, input, output, try await output.messaging(for: source.descriptor.id), direct, session)
 }
 
-@Test func eventFanoutRejectsOneDestinationWithoutSuppressingOthers() async throws {
-    let session = UUID()
-    let good = AgentID(rawValue: "good")
-    let bad = AgentID(rawValue: "bad")
-    let bus = InternalSignalBus { _, target, _ in if target == bad { throw HarnessError.queueFull } }
-    try await bus.openSession(session)
-    let input = AgentInput(sessionID: session, payload: .observation(.transcript("hello", final: true)))
-    let result = try await bus.publish(input, targets: [(good, UUID()), (bad, UUID())])
-    #expect(result.delivered == [good])
-    #expect(result.rejected[bad] != nil)
-    await #expect(throws: CommunicationError.messageConflict) {
-        try await bus.publish(input, targets: [(good, UUID())])
-    }
+@Test func directMessagingRejectsExpiredParentWrongSessionAndStoppedTarget() async throws {
+    let (manager, _, output, port, target, session) = try await directFixture()
+    let payload = InputPayload.text("parent")
     let expired = AgentInput(
-        sessionID: session, payload: input.payload,
-        metadata: InputMetadata(payload: input.payload, deadline: .now.advanced(by: .seconds(-1))))
-    await #expect(throws: CommunicationError.expired) { try await bus.publish(expired, targets: [(good, UUID())]) }
-    await bus.shutdown()
-}
-
-@Test(.timeLimit(.minutes(1))) func closingVoiceDoesNotWaitForOrCancelCameraDelivery() async throws {
-    let voice = UUID()
-    let camera = UUID()
-    let started = AsyncStream<UUID>.makeStream(bufferingPolicy: .bufferingOldest(2))
-    let bus = InternalSignalBus { value, _, _ in
-        started.continuation.yield(value.sessionID)
-        try await Task.sleep(for: .seconds(30))
-    }
-    try await bus.openSession(voice)
-    try await bus.openSession(camera)
-    let voiceTask = Task {
-        try await bus.publish(
-            AgentInput(sessionID: voice, payload: .observation(.transcript("voice", final: true))),
-            targets: [(AgentID(rawValue: "voice"), UUID())])
-    }
-    let cameraTask = Task {
-        try await bus.publish(
-            AgentInput(sessionID: camera, payload: .observation(.transcript("camera", final: true))),
-            targets: [(AgentID(rawValue: "camera"), UUID())])
-    }
-    var events = started.stream.makeAsyncIterator()
-    let a = await events.next()
-    let b = await events.next()
-    #expect(Set([a, b].compactMap { $0 }) == [voice, camera])
-    await bus.closeSession(voice)
-    #expect(try await voiceTask.value.rejected.count == 1)
-    #expect(await bus.snapshot().activeSessions == 1)
-    #expect(await bus.snapshot().operations == 1)
-    await bus.closeSession(camera)
-    #expect(try await cameraTask.value.rejected.count == 1)
-    #expect(await bus.snapshot().retainedBytes == 0)
-    await bus.shutdown()
-}
-
-@Test(.timeLimit(.minutes(1))) func pendingStatesReplaceWithoutGrowingQueuesOrDedupRecords() async throws {
-    let session = UUID()
-    let target = AgentID(rawValue: "slow")
-    let incarnation = UUID()
-    let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    let bus = InternalSignalBus { _, _, _ in
-        started.continuation.yield(())
-        try await Task.sleep(for: .seconds(30))
-    }
-    try await bus.openSession(session)
-    func value(_ sequence: UInt64) -> AgentInput {
-        let payload = InputPayload.observation(.transcript("\(sequence)", final: false))
-        return AgentInput(
-            sessionID: session, payload: payload, metadata: InputMetadata(payload: payload, sequence: sequence))
-    }
-    let first = Task { try await bus.publish(value(1), targets: [(target, incarnation)]) }
-    var start = started.stream.makeAsyncIterator()
-    _ = await start.next()
-    let second = Task { try await bus.publish(value(2), targets: [(target, incarnation)]) }
-    while await bus.snapshot().branches < 2 { await Task.yield() }
-    let third = Task { try await bus.publish(value(3), targets: [(target, incarnation)]) }
-    #expect(try await second.value.rejected[target] == "superseded")
-    #expect(await bus.replacements == 1)
-    #expect(await bus.snapshot().branches == 2)
-    #expect(await bus.snapshot().discreteRecords == 0)
-    await bus.closeSession(session)
-    _ = try await first.value
-    _ = try await third.value
-    #expect(await bus.snapshot().stateChannels == 0)
-    await bus.shutdown()
-}
-
-@Test(.timeLimit(.minutes(1))) func slowRecipientDoesNotBlockOtherAdmissionAndExpires() async throws {
-    let session = UUID()
-    let slow = AgentID(rawValue: "slow")
-    let fast = AgentID(rawValue: "fast")
-    let accepted = AsyncStream<AgentID>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    let bus = InternalSignalBus { _, target, _ in
-        if target == slow { try await Task.sleep(for: .seconds(30)) }
-        accepted.continuation.yield(target)
-    }
-    try await bus.openSession(session)
-    let payload = InputPayload.observation(.transcript("hello", final: true))
-    let input = AgentInput(
         sessionID: session, payload: payload,
-        metadata: InputMetadata(payload: payload, deadline: .now.advanced(by: .milliseconds(100))))
-    let delivery = Task { try await bus.publish(input, targets: [(slow, UUID()), (fast, UUID())]) }
-    var stream = accepted.stream.makeAsyncIterator()
-    #expect(await stream.next() == fast)
-    let result = try await delivery.value
-    #expect(result.delivered == [fast])
-    #expect(result.rejected[slow] == "expired")
-    await bus.shutdown()
+        metadata: InputMetadata(payload: payload, deadline: .now.advanced(by: .seconds(-1))))
+    await #expect(throws: CommunicationError.expired) {
+        try await port.send(.transcript("hello", final: true), parent: expired, to: .init(rawValue: "direct"))
+    }
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await port.publish(
+            .transcript("wrong session", final: true), parent: AgentInput(sessionID: UUID(), payload: payload))
+    }
+    try await manager.stop(target.descriptor.id)
+    let report = try await port.send(
+        .transcript("stopped", final: true), parent: AgentInput(sessionID: session, payload: payload),
+        to: target.descriptor.id)
+    #expect(report.delivered.isEmpty && report.rejected[target.descriptor.id] != nil)
+    await manager.stopAll()
+    await output.shutdown()
+}
+
+@Test(.timeLimit(.minutes(1))) func directCallsOverlapAndCancellationBelongsToCaller() async throws {
+    let (manager, _, output, port, target, session) = try await directFixture(blockText: "block")
+    let parent = AgentInput(sessionID: session, payload: .text("parent"))
+    let first = Task {
+        try await port.send(.transcript("block", final: true), parent: parent, to: target.descriptor.id)
+    }
+    var events = target.admissions.stream.makeAsyncIterator()
+    _ = await events.next()
+    let second = try await port.send(.transcript("second", final: true), parent: parent, to: target.descriptor.id)
+    #expect(second.delivered == [target.descriptor.id])
+    #expect(await target.inputs.count == 1)
+    first.cancel()
+    #expect(try await first.value.rejected[target.descriptor.id] != nil)
+    // Cancelling the first call does not retract the second accepted message.
+    #expect(await target.inputs.count == 1)
+    let third = try await port.send(.transcript("third", final: true), parent: parent, to: target.descriptor.id)
+    #expect(third.delivered == [target.descriptor.id])
+    await manager.stopAll()
+    await output.shutdown()
+}
+
+@Test(.timeLimit(.minutes(1))) func directOutputCapacityRejectsAndRecoversAfterCallerCancellation() async throws {
+    let (manager, _, output, port, target, session) = try await directFixture(blockText: "block")
+    let parent = AgentInput(sessionID: session, payload: .text("parent"))
+    var tasks: [Task<DeliveryReport, Error>] = []
+    var events = target.admissions.stream.makeAsyncIterator()
+    for _ in 0..<16 {
+        tasks.append(
+            Task { try await port.send(.transcript("block", final: true), parent: parent, to: target.descriptor.id) })
+        _ = await events.next()
+    }
+    await #expect(throws: CommunicationError.capacityExceeded) {
+        try await port.send(.transcript("overflow", final: true), parent: parent, to: target.descriptor.id)
+    }
+    for task in tasks { task.cancel() }
+    for task in tasks { #expect(try await task.value.rejected[target.descriptor.id] != nil) }
+    let report = try await port.send(.transcript("recovered", final: true), parent: parent, to: target.descriptor.id)
+    #expect(report.delivered == [target.descriptor.id])
+    await manager.stopAll()
+    await output.shutdown()
+}
+
+@Test(.timeLimit(.minutes(1))) func inputCapacityIsSharedByExternalAndInternalAdmission() async throws {
+    let (manager, input, output, port, target, session) = try await directFixture(blockText: "block")
+    var tasks: [Task<DeliveryReport, Error>] = []
+    var events = target.admissions.stream.makeAsyncIterator()
+    for _ in 0..<128 {
+        tasks.append(
+            Task {
+                try await input.send(
+                    AgentInput(sessionID: session, payload: .observation(.transcript("block", final: true))),
+                    to: target.descriptor.id)
+            })
+        _ = await events.next()
+    }
+    await #expect(throws: CommunicationError.capacityExceeded) {
+        try await port.send(
+            .transcript("overflow", final: true), parent: AgentInput(sessionID: session, payload: .text("parent")),
+            to: target.descriptor.id)
+    }
+    for task in tasks { task.cancel() }
+    for task in tasks { _ = try await task.value }
+    let report = try await port.send(
+        .transcript("recovered", final: true), parent: AgentInput(sessionID: session, payload: .text("parent")),
+        to: target.descriptor.id)
+    #expect(report.delivered == [target.descriptor.id])
+    await manager.stopAll()
+    await output.shutdown()
+}
+
+@Test func publicationReportsReceiverRejectionIndependently() async throws {
+    let policy = try CommunicationPolicy(configurations: [
+        communicationConfiguration("producer", publishes: true), communicationConfiguration("direct"),
+        communicationConfiguration("good", subscribes: true), communicationConfiguration("full", subscribes: true),
+    ])
+    let manager = AgentManager()
+    let session = UUID()
+    let source = ObservationRecorder(id: "producer")
+    let good = ObservationRecorder(id: "good")
+    let full = ObservationRecorder(id: "full", reject: true)
+    for agent in [source, good, full] {
+        try await manager.register(agent, sessionID: session)
+        await agent.start()
+    }
+    let input = InputGateway(manager: manager, policy: policy)
+    let output = OutputGateway(manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    let port = try await output.messaging(for: source.descriptor.id)
+    let report = try await port.publish(
+        .transcript("hello", final: true), parent: AgentInput(sessionID: session, payload: .text("parent")))
+    #expect(report.delivered == [good.descriptor.id])
+    #expect(report.rejected[full.descriptor.id] == String(describing: HarnessError.queueFull))
+    await manager.stopAll()
+    await output.shutdown()
 }
 
 @Test func communicationSchemaRejectsOldVersionsUnknownFieldsAndUnknownSources() throws {

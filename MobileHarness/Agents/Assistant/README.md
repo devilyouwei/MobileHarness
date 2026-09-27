@@ -88,7 +88,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 flowchart LR
     User["user.text / user"] --> IG[InputGateway]
     Speech["SpeechPerception: speech.final / speech.phase"] --> OG1[OutputGateway]
-    OG1 --> Bus[InternalSignalBus] --> IG
+    OG1 --> IG
     Runtime["runtime.event: directed"] --> IG
     IG --> A[Assistant]
     A -->|ordinary text or final| Chat[ChatCapability]

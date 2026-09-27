@@ -29,7 +29,6 @@ enum PhotographySession {
         try await manager.register(vision, sessionID: sessionID)
         runtime.presentation.pose = present
         do {
-            try await runtime.bus.openSession(sessionID)
             try await vision.bind(responses.messaging(for: .visionPerception))
             try await manager.start(.visionPerception)
             try await withThrowingTaskGroup(of: Void.self) { group in
@@ -63,13 +62,11 @@ enum PhotographySession {
                 try await group.next()
             }
             try? await manager.remove(.visionPerception)
-            await runtime.bus.closeSession(sessionID)
             await responses.cancel(sessionID: sessionID)
             runtime.presentation.pose = nil
             try Task.checkCancellation()
         } catch {
             try? await manager.remove(.visionPerception)
-            await runtime.bus.closeSession(sessionID)
             await responses.cancel(sessionID: sessionID)
             runtime.presentation.pose = nil
             throw error

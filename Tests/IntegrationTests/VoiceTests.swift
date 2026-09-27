@@ -414,10 +414,6 @@ private actor EndpointVADSession: VoiceActivitySession {
     await assistant.start()
     try await manager.register(speech, sessionID: session)
     let input = InputGateway(manager: manager, policy: policy)
-    let bus = InternalSignalBus { value, target, incarnation in
-        try await input.receiveInternal(value, target: target, incarnation: incarnation)
-    }
-    try await bus.openSession(session)
     let observed = AsyncStream<AgentInput>.makeStream(bufferingPolicy: .bufferingOldest(8))
     let captions = VoiceProbe()
     let scheduler = ChannelScheduler(
@@ -439,7 +435,7 @@ private actor EndpointVADSession: VoiceActivitySession {
             },
         ]))
     let output = OutputGateway(
-        manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, bus: bus,
+        manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy,
         observedContracts: ["speech.partial", "speech.phase"],
         observeEvent: { value in observed.continuation.yield(value) }, sink: { _ in })
     try await speech.bind(output.messaging(for: .speechPerception))
@@ -482,8 +478,6 @@ private actor EndpointVADSession: VoiceActivitySession {
     await #expect(throws: HarnessError.notRunning) {
         try await speech.receive(AgentInput(sessionID: session, payload: .audio(first)))
     }
-    await bus.closeSession(session)
-    await bus.shutdown()
     await manager.stopAll()
 }
 
@@ -546,10 +540,6 @@ private actor EndpointVADSession: VoiceActivitySession {
         AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
     ])
     let input = InputGateway(manager: manager, policy: policy)
-    let bus = InternalSignalBus { value, target, incarnation in
-        try await input.receiveInternal(value, target: target, incarnation: incarnation)
-    }
-    try await bus.openSession(session)
     let probe = VoiceProbe()
     let scheduler = ChannelScheduler(
         registry: ActionRegistry(handlers: [
@@ -561,7 +551,7 @@ private actor EndpointVADSession: VoiceActivitySession {
         ]))
     let output = OutputGateway(
         manager: manager, requests: input, tools: ToolRegistry(),
-        actions: scheduler, policy: policy, bus: bus, sink: { _ in })
+        actions: scheduler, policy: policy, sink: { _ in })
     let port = try await output.messaging(for: .speechPerception)
     let parent = AgentInput(
         sessionID: session,
@@ -591,7 +581,6 @@ private actor EndpointVADSession: VoiceActivitySession {
     #expect(await probe.displayedText.count == 1)
     await assistant.stop()
     await scheduler.shutdown()
-    await bus.shutdown()
     await manager.stopAll()
 }
 

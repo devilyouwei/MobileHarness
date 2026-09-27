@@ -31,7 +31,8 @@ let package = Package(
         .target(
             name: "AgentCore", path: "MobileHarness/AgentCore",
             exclude: [
-                "Bus/README.md", "Capability/README.md", "Generation/README.md", "Output/README.md", "README.md",
+                "Communication/README.md", "Capability/README.md", "Generation/README.md", "Output/README.md",
+                "README.md",
                 "Runtime/README.md",
             ]),
         .target(

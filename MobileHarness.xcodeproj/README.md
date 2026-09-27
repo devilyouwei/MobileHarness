@@ -46,3 +46,5 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 ✅ AudioSpectrum.swift is present in Xcode navigation and compiled only by the existing PlatformKit SwiftPM target.
 
 ✅ Removed obsolete Input/Routing navigator entries; Gateway input routing is implemented by InputGateway and shared CommunicationPolicy, with no duplicate source references.
+
+✅ Communication navigation replaces Bus: AgentMessaging, CommunicationPolicy and PerceptionInput are compiled once by AgentCore through SwiftPM. InternalSignalBus has been removed.
