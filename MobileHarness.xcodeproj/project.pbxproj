@@ -345,30 +345,6 @@
 			"path" = "MobileHarness/Gateway/Input/README.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
-		"AA03DD274AC7184F3F127FE6" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "MobileHarness/Gateway/Input/Routing/LogicRouter.swift";
-			"sourceTree" = "SOURCE_ROOT";
-		};
-		"2C74E819BD33E533679BEA90" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "net.daringfireball.markdown";
-			"path" = "MobileHarness/Gateway/Input/Routing/README.md";
-			"sourceTree" = "SOURCE_ROOT";
-		};
-		"5DF46113281AA0A7A316A06C" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "MobileHarness/Gateway/Input/Routing/SignalRouter.swift";
-			"sourceTree" = "SOURCE_ROOT";
-		};
-		"24205C823FD8B3FAF3E96D38" = {
-			"isa" = "PBXGroup";
-			"children" = ("AA03DD274AC7184F3F127FE6", "2C74E819BD33E533679BEA90", "5DF46113281AA0A7A316A06C");
-			"name" = "Routing";
-			"sourceTree" = "<group>";
-		};
 		"A7B982A9DDA4AD2100A76400" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
@@ -377,7 +353,7 @@
 		};
 		"529C5EFC914300BA8D2CEB57" = {
 			"isa" = "PBXGroup";
-			"children" = ("EDB0C02FA336453D19103ADF", "33AC1B625192F62BF528BDEF", "24205C823FD8B3FAF3E96D38");
+			"children" = ("EDB0C02FA336453D19103ADF", "33AC1B625192F62BF528BDEF");
 			"name" = "Input";
 			"sourceTree" = "<group>";
 		};
@@ -507,6 +483,12 @@
 			"path" = "MobileHarness/PlatformKit/Audio/MicrophoneFrame.swift";
 			"sourceTree" = "SOURCE_ROOT";
 		};
+		"A09270000000000000000001" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "MobileHarness/PlatformKit/Audio/AudioSpectrum.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
 		"67EB1A335E60484475A6133A" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "net.daringfireball.markdown";
@@ -521,7 +503,8 @@
 		};
 		"084E3DC6F9C84476E9CA11C4" = {
 			"isa" = "PBXGroup";
-			"children" = ("4E5A7E28EA707CE546F95B25", "889534E8875244241ED837CF", "67EB1A335E60484475A6133A", "E547B04EA89BA0C9DF02DEEC");
+			"children" = ("4E5A7E28EA707CE546F95B25", "889534E8875244241ED837CF",
+				"A09270000000000000000001", "67EB1A335E60484475A6133A", "E547B04EA89BA0C9DF02DEEC");
 			"name" = "Audio";
 			"sourceTree" = "<group>";
 		};

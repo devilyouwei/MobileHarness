@@ -1,23 +1,57 @@
 # ToolRuntime — Direct Tool Execution
 
-Purpose: register and execute resolved ToolCalls without Channel scheduling. Design goals: trusted handler selection, awaited completion, cancellation and explicit feedback semantics. Dependencies remain AgentCore only.
+Registers and executes resolved ToolCalls. The goal is explicit completion and feedback without Channel scheduling. This target depends only on AgentCore.
+
+## Directory structure
+
+```text
+ToolRuntime/
+├── ToolRegistry.swift  # Actor-owned handlers; rejects duplicate paths
+├── ToolExecutor.swift  # Execute and select result or completion semantics
+└── README.md           # Module contract and status
+```
+
+## Upstream and downstream
+
+Arrows show runtime calls through handlers injected by App; ToolRuntime does not import Tools.
 
 ```mermaid
 flowchart LR
-    App[App explicit registration] --> Registry[ToolRegistry]
-    Gateway[OutputGateway validated ToolCall and envelope] --> Executor[ToolExecutor]
-    Registry --> Executor
-    Executor --> Kind{Registered handler kind}
-    Kind -->|Returning String| Value[Execute and create correlated ToolResult]
-    Value --> Input[InputGateway to caller]
-    Kind -->|Completion Void| UI[Await execution]
-    UI --> End[Return nil: no ToolResult or input submission]
-    UI -->|Error / cancellation| Fail[Throw to dispatch caller]
+    App -->|Register handlers| ToolRuntime
+    Output[OutputGateway] -->|Resolved call and envelope| ToolRuntime
+    ToolRuntime -->|Invoke| Tools
+    Tools -->|Value, completion or error| ToolRuntime
+    ToolRuntime -->|Optional result via ToolDispatcher| Input[InputGateway]
+    Input -->|Correlated feedback| Agent[Originating Agent]
 ```
 
-✅ register registers data-returning handlers; registerCompletion registers Void handlers with the trusted OutputEnvelope for session/source checks. Names share one registry and duplicates fail across both kinds. Call arguments cannot select no-feedback behavior. Agent JSON still declares the tool path/parameters; its doc states completion semantics. App chooses the explicit implementation.
+## Internal flow
 
-✅ ToolExecutor.execute(call,envelope:) returns optional ToolResult. A returned empty String is still a normal result; nil means completion-only success. Ordinary data-tool errors retain callID in ToolResult. Unknown paths return an error result. Completion-tool errors propagate; cancellation propagates for both kinds. No error is silently converted to successful completion.
+```mermaid
+flowchart TD
+    Call[ToolCall and OutputEnvelope] --> Lookup[ToolRegistry lookup]
+    Lookup --> Kind{Registered kind}
+    Kind --> Returning[Await String handler]
+    Returning --> Result[ToolResult with call ID]
+    Kind --> Completion[Await Void handler]
+    Completion --> Done[Return nil on success]
+    Completion -->|Failure| Throw[Throw to dispatch caller]
+    Lookup -->|Unknown path| Result
+```
 
-✅ ToolDispatcher submits only non-nil results through InputGateway. No feedback is constructed for successful completion tools. No Channel queue, detached work, separate waiting queue or automatic replay is introduced. The caller awaits actual handler completion; a sequential output consumer serializes its Tool calls.
-❌ Dedicated timeouts, resource budgets, latest-pending replacement and native model tool-argument streaming remain outstanding.
+App selects the handler kind; call arguments cannot select feedback behavior. A returned empty String still creates a result. Returning-handler errors become error results; completion-handler errors throw. Cancellation throws for both kinds. ToolDispatcher sends only non-nil results through InputGateway.
+
+There is no execution queue, replay or automatic serialization of independent callers. The App output consumer awaits calls in order. Actor isolation protects registry access, not handler execution. The registry has no numeric entry cap; production uses a fixed App registration list.
+
+## Feature status
+
+- ✅ Shared path namespace, duplicate rejection, returning and completion-only handlers.
+- ✅ Correlated feedback, awaited completion and cancellation propagation.
+- ❌ Runtime timeouts, resource budgets, generic pending-call replacement and registry entry limits.
+
+## Issue record
+
+| Status | Issue / next step |
+| --- | --- |
+| Open | A non-cooperative handler can delay its caller; no timeout is enforced. |
+| Resolved — 2026-09-27 audit | Clarified that skeleton coalescing belongs to VisionPerception, not ToolRuntime. |

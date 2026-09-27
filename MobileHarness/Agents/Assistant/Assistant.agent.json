@@ -65,8 +65,8 @@
           "name": "emotion",
           "valueType": "string",
           "required": true,
-          "description": "The facial expression to display in the voice circle.",
-          "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love. clear removes the expression."
+          "description": "The emotion expressed by the two animated blue eyes; no emoji or text glyphs.",
+          "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear smoothly returns the eyes to neutral."
         }
       ],
       "examples": [
@@ -74,7 +74,7 @@
         "<express emotion=\"happy\"/> That is wonderful!",
         "<express emotion=\"thinking\"/> Let me think."
       ],
-      "doc": "Show or clear the facial expression. clear removes it. Does not modify captions or speech. The Assistant clears its previous expression on new user speech.",
+      "doc": "Smoothly change the procedural eye expression. clear returns to neutral. Never render an emoji as the expression. Does not modify captions or speech. The Assistant clears its previous expression on new user speech.",
       "hidden": false
     },
     {

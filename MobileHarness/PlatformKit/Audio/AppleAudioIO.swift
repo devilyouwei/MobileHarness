@@ -18,6 +18,14 @@
         private var playbackToken: UUID?
         public init() { playbackEngine.attach(player) }
 
+        /// Current buffer's rendered PCM cursor. Nil outside playback; never a wall-clock estimate.
+        public var playbackSampleOffset: Int? {
+            guard playbackToken != nil, player.isPlaying, let renderTime = player.lastRenderTime,
+                let time = player.playerTime(forNodeTime: renderTime), time.isSampleTimeValid
+            else { return nil }
+            return max(0, Int(time.sampleTime))
+        }
+
         public func requestPermissions() async throws {
             guard await AVAudioApplication.requestRecordPermission() else { throw AudioIOError.microphoneDenied }
 
@@ -92,6 +100,8 @@
                 try await withCheckedThrowingContinuation { continuation in
                     playbackToken = token
                     playbackWaiter = continuation
+                    // There is exactly one outstanding buffer; reset its public player timeline to zero.
+                    player.stop()
                     player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable [weak self] _ in
                         Task { @MainActor in self?.finishPlayback(token: token) }
                     }

@@ -49,22 +49,68 @@ import ToolRuntime
     }
 }
 
-private struct FanOutRouter: SignalRouter {
-    func destinations(for input: AgentInput) async throws -> [AgentID] {
-        [AgentID(rawValue: "missing"), .assistant, .assistant]
-    }
+private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) throws -> AgentConfiguration {
+    try AgentConfiguration(
+        data: JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 4, "agentID": id, "channels": [], "textActions": [], "actions": [], "tools": [],
+            "communication": [
+                "inputs": [["contract": "user.text", "version": 1, "kind": "text"]],
+                "subscriptions": subscribes
+                    ? [["contract": "user.text", "topic": "user.text", "source": "user"]] : [],
+                "publications": [], "sends": [],
+            ],
+        ]))
 }
 
-@Test func routingIsolatesFailuresAndDeduplicates() async throws {
+@Test func subscriptionRoutingIsolatesUnavailableTargets() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
     await #expect(throws: HarnessError.duplicateAgent) { try await manager.register(agent) }
     try await manager.start(.assistant)
-    let gateway = InputGateway(manager: manager, router: FanOutRouter())
-    let report = try await gateway.submit(AgentInput(sessionID: UUID(), payload: .text("hello")))
+    let policy = try CommunicationPolicy(configurations: [
+        textRoutingConfiguration("assistant"), textRoutingConfiguration("missing"),
+    ])
+    let gateway = InputGateway(manager: manager, policy: policy)
+    let report = try await gateway.publish(AgentInput(sessionID: UUID(), payload: .text("hello")))
     #expect(report.delivered == [.assistant])
-    #expect(report.rejected.count == 1)
+    #expect(Set(report.rejected.keys) == [AgentID(rawValue: "missing")])
+    #expect(await agent.status().processedInputs == 1)
+    await manager.stopAll()
+}
+
+@Test func publicationWithoutPolicyDoesNotFallBackToAssistant() async throws {
+    let manager = AgentManager()
+    let agent = try AssistantAgent(chat: FixedTextChat())
+    try await manager.register(agent)
+    try await manager.start(.assistant)
+    let gateway = InputGateway(manager: manager)
+    let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
+    await #expect(throws: CommunicationError.unsupportedContract) { try await gateway.publish(input) }
+    #expect(await agent.status().processedInputs == 0)
+    let report = try await gateway.send(input, to: .assistant)
+    #expect(report.delivered == [.assistant])
+    #expect(report.rejected.isEmpty)
+    await manager.stopAll()
+}
+
+@Test func directedAdmissionBypassesSubscriptionsButEnforcesInputSupport() async throws {
+    let manager = AgentManager()
+    let agent = try AssistantAgent(chat: FixedTextChat())
+    try await manager.register(agent)
+    try await manager.start(.assistant)
+    let policy = try CommunicationPolicy(configurations: [textRoutingConfiguration("assistant", subscribes: false)])
+    let gateway = InputGateway(manager: manager, policy: policy)
+    let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
+    await #expect(throws: CommunicationError.noRecipients) { try await gateway.publish(input) }
+    #expect(await agent.status().processedInputs == 0)
+    let report = try await gateway.send(input, to: .assistant)
+    #expect(report.delivered == [.assistant])
+    #expect(report.rejected.isEmpty)
+    let unsupported = AgentInput(sessionID: input.sessionID, payload: .event("not declared"))
+    let rejected = try await gateway.send(unsupported, to: .assistant)
+    #expect(rejected.delivered.isEmpty)
+    #expect(rejected.rejected[.assistant] == String(describing: CommunicationError.unsupportedContract))
     #expect(await agent.status().processedInputs == 1)
     await manager.stopAll()
 }
@@ -95,7 +141,7 @@ private actor Recorder {
     }
     let session = UUID()
     let input = AgentInput(sessionID: session, payload: .text("/status"))
-    _ = try await requests.submit(input)
+    _ = try await requests.send(input, to: .assistant)
     // Finish after dispatch to make this integration test finite even if no reply is produced.
     var iterator = agent.outputs.makeAsyncIterator()
     let first = try #require(await iterator.next())

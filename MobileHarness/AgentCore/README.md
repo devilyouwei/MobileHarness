@@ -1,50 +1,72 @@
-# AgentCore — Shared Agent Contracts and Infrastructure
+# AgentCore — Shared Agent Contracts
 
-AgentCore provides reusable Agent identity, lifecycle, capability registration, output interpretation, and input/output contracts. Architecture sections 6–24 and 32 describe its target responsibilities. Concrete business policies belong to Agents.
+Defines Agent identity, input/output, lifecycle, configuration, parsing and event transport. The goal is reusable infrastructure without business policy. It depends on Foundation and the Swift standard library, never UI, concrete Agents, model engines or device adapters.
 
-## Boundaries
+## Directory structure
 
-AgentCore depends only on the standard library and Foundation. It must not depend on UI, concrete Agents, Actions, Gateway, ModelKit, or device adapters. Parsers are shared infrastructure; each generation owns its own mutable parsing state.
+```text
+AgentCore/
+├── Agent.swift, AgentDescriptor.swift, AgentID.swift  # Agent interface and identity
+├── AgentInput.swift, ImageInput.swift, InputKind.swift # Input and media transport
+├── HarnessError.swift                               # Shared errors
+├── Runtime/                                         # Registry, manager and lifecycle
+├── Capability/                                      # JSON v4 validation and local permissions
+├── Generation/                                      # Shared parsers and text-to-Action mapping
+├── Output/                                          # Resolved calls, results and trusted context
+├── Bus/                                             # Typed events, policy and bounded transport
+└── README.md                                        # Module boundary and status
+```
 
-## Direct relationships
+## Upstream and downstream
 
-AgentCore is a foundation rather than a separate processing hop. These edges show the contracts and services its direct consumers use; they are not reverse compile-time dependencies.
+Arrows mean compile-time dependency on shared contracts; AgentCore does not import its consumers.
+
+```mermaid
+flowchart TD
+    App --> AgentCore
+    Agents --> AgentCore
+    Gateway --> AgentCore
+    Actions --> AgentCore
+    Tools --> AgentCore
+    ActionRuntime --> AgentCore
+    ToolRuntime --> AgentCore
+    AgentCore --> Foundation
+```
+
+## Internal structure and data flow
 
 ```mermaid
 flowchart LR
-    App -->|Registration and lifecycle requests| AgentCore
-    Gateway -->|Agent lookup and input delivery| AgentCore
-    AgentCore -->|Agent descriptors and lifecycle status| Gateway
-    Agents -->|Configuration and generation fragments| AgentCore
-    AgentCore -->|Validated capabilities and resolved calls| Agents
-    AgentCore -.->|Action invocation contracts| ActionRuntime
-    AgentCore -.->|ToolCall and ToolResult contracts| ToolRuntime
+    JSON[Agent JSON v4] --> Capability[Capability configuration and registry]
+    Capability --> Context[Visible Action prompt context]
+    Capability --> Resolve[AgentGenerator / alias resolution]
+    Fragments[Model text or complete native Tool call] --> Parse[Generation parsers]
+    Parse --> Resolve
+    Resolve --> Output[ActionCall / ToolCall / OutputEnvelope]
+    Runtime[AgentManager and registry] --> Identity[Live Agent identity and lifecycle]
+    Identity --> Bus[CommunicationPolicy / InternalSignalBus]
+    Events[Gateway-validated events] --> Bus
+    Bus --> Input[AgentInput via InputGateway]
 ```
 
-## Implementation status
+AgentInput separates payload from source, session, turn and timing metadata. ToolResult stays here to avoid a circular runtime dependency. Agents own parser instances and resolve aliases before output leaves them. Native Tool calls are separate from text/XML Function Tokens.
 
-- ✅ Root contracts: `Agent`, `AgentDescriptor`, `AgentInput`, `AgentID`, input kinds, and shared errors.
-- ✅ [Runtime](Runtime/README.md): AgentManager, bounded AgentRegistry, AgentLifecycle, and AgentStatus.
-- ✅ [Capability](Capability/README.md): versioned configuration validation, local aliases, ActionPath, parameter rules, default Channels, and model-facing capability context.
-- ✅ [Generation](Generation/README.md): streaming FunctionTokenParser, ChannelParser, text-to-action mapping, sentence buffering, and complete native ToolCall parsing.
-- ✅ [Output](Output/README.md): ActionCall, ToolCall, ToolResult, AgentOutput, and trusted OutputEnvelope association.
-- ✅ [Bus](Bus/README.md): typed perception inputs, JSON v4 policy, bound messaging ports, bounded event delivery, latest states, deadlines and session cleanup.
-- ❌ Generic AgentRuntime worker/mailbox container, AgentContext, StateStore, and request/reply completion endpoints. Assistant currently owns its bounded state and worker.
-- ✅ AgentInput is the unified signal contract, with separate content/source and causal/temporal metadata.
-- ❌ Incremental native tool-call argument assembly.
+Runtime tracks Agents; it is not a generic mailbox worker. Business Agents own their inboxes and state. The bus bounds event delivery and rejects excess discrete work; partial speech and pose can replace pending state. Receipts confirm admission only. Cancellation closes admission and joins cooperative delivery.
 
-`AgentInput` and `ToolResult` remain shared contracts here to prevent circular dependencies. Root Package.swift compiles these sources directly; there is no duplicate Contracts/Protocol source tree. Runtime notifications remain separate in meaning from the two model output protocols.
+Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capability](Capability/README.md), [Generation](Generation/README.md), [Output](Output/README.md) and [Bus](Bus/README.md).
 
-## Maintenance
+## Feature status
 
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+- ✅ Agent contracts, bounded registration, lifecycle and source/session identity.
+- ✅ JSON v4 permissions, Action prompt context, shared parsing and resolved output.
+- ✅ Typed events, static communication policy, deadlines and bounded event delivery.
+- ❌ Generic AgentRuntime, AgentContext, StateStore and request/reply endpoints.
+- ❌ Incremental native Tool argument assembly and durable event delivery.
 
-✅ ImageInput adds bounded upright RGB8 media transport (640 pixels per side), capture sequence/time and sensor rotation, independent of ModelKit/PlatformKit. PoseOverlay defines compact UI Action data and inverse sensor-coordinate mapping.
+## Issue record
 
-✅ ImageInput now supports either bounded RGB or a 64×64 gray sample plus opaque Sendable ImageAttachment. AgentCore still imports neither ModelKit nor CoreVideo; App supplies the attachment resolver. Native inputs are bounded to 4 MP / 4096 per side.
-
-
-
-✅ AudioInput provides bounded Float32 16 kHz mono PCM independently of ModelKit; PerceptionObservation carries speech and up to 300-person pose results. No raw media is included in derived observations.
-
-✅ ConversationTurn is optional, runtime-assigned context on AgentInput (UUID plus session ordinal); it contains no UI/platform dependency.
+| Status | Issue / next step |
+| --- | --- |
+| Open | Request/reply needs a bounded completion path that cannot block behind its requester. |
+| Open | Non-cooperative receivers can delay cancellation; transport is not a real-time safety system. |
+| Resolved — 2026-09-27 audit | Documented Bus as implemented and separated shared infrastructure from Agent-owned workers. |

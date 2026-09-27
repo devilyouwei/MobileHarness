@@ -101,7 +101,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     try await agent.start()
     let gateway = InputGateway(manager: manager)
     let session = UUID()
-    _ = try await gateway.submit(AgentInput(sessionID: session, payload: .text("wait")))
+    _ = try await gateway.send(AgentInput(sessionID: session, payload: .text("wait")), to: .assistant)
     for _ in 0..<10000 {
         if await model.pending != nil { break }
         await Task.yield()
@@ -109,7 +109,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     _ = try #require(await model.pending)
     try await agent.pause()
     try await agent.receive(AgentInput(sessionID: session, payload: .text("queued")))
-    let report = try await gateway.submit(
+    let report = try await gateway.send(
         AgentInput(sessionID: session, payload: .event("assistant.cancel")), to: .assistant)
     #expect(report.rejected.isEmpty)
     #expect(await agent.status().queuedInputs == 0)

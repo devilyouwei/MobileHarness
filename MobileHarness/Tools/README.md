@@ -1,29 +1,57 @@
-# Tools — Model-Callable Capabilities
+# Tools — Callable Functions
 
-Tools contains concrete callable capabilities exposed through the Tool Call path in architecture section 30. Tool implementation is separate from Agent-local capability permissions, runtime registration, execution, and feedback routing.
+Implements functions reached through ToolCalls. The goal is reusable behavior with explicit results or completion. Tools depends only on AgentCore; App injects any presentation or device service.
 
-## Direct relationships
+## Directory structure
+
+```text
+Tools/
+├── System/RuntimeInfo.swift  # Fixed configuration description
+├── UI/ShowPose.swift         # Validate and replace the skeleton overlay
+└── README.md                # Module boundary and status
+```
+
+## Upstream and downstream
+
+Arrows show runtime flow through App-supplied handlers.
 
 ```mermaid
 flowchart LR
-    App -->|Select implementations for registration| Tools
-    ToolRuntime -->|Resolved ToolCall| Tools
-    Tools -->|Result value or thrown error| ToolRuntime
+    Agents -->|Resolved ToolCall| Gateway[OutputGateway]
+    Gateway --> Runtime[ToolRuntime]
+    App -.->|Handler and service bindings| Runtime
+    Runtime --> Tools
+    Tools -->|Injected presentation callback| Experience
+    Tools -->|Value or completion| Runtime
+    Runtime -->|Returning tools only| Input[InputGateway]
+    Input --> Agents
 ```
 
-The current System tool has no model, network, storage, or device dependency. Tools may use injected model/platform/presentation services. Data-returning tools return through ToolRuntime and InputGateway; explicitly registered Void tools complete without feedback. Neither directly messages an Agent.
+## Internal flow
 
-## Implementation status
+```mermaid
+flowchart TD
+    Call[Resolved ToolCall] --> Kind{Registered path}
+    Kind -->|System.runtimeInfo| Info[Return fixed configuration text]
+    Kind -->|UI.showPose| Validate[Validate PoseOverlay]
+    Validate --> Present[Await App presentation callback]
+    Present --> Complete[Void completion without feedback]
+```
 
-- ✅ [System](System/README.md): `RuntimeInfo.swift` / `SystemTools.runtimeInfo`, registered by App as `System.runtimeInfo`.
-- ✅ Existing fixed runtime configuration description preserved after extraction from App.
-- ❌ Vision, Media, Memory, Search, Storage, and Network tool implementations.
-- ❌ Dynamic health, model readiness, and device diagnostics for runtimeInfo.
+`System.runtimeInfo` is a configuration description, not a live health probe. `UI.showPose` accepts at most 3000 UTF-8 bytes and six COCO-17 skeletons; an empty people list clears the display. App validates session and frame order. Completion means display state was accepted, not that a screen frame was rendered.
 
-`runtimeInfo` is a fixed configuration description, not a health probe. Tools bypass GhostShell Channel scheduling. Permission and availability checks belong to real implementations and adapters; a configured alias alone does not authorize device access.
+Tools owns no queue and bypasses Channel scheduling. VisionPerception retains the latest pending skeleton before dispatch. Tool failures remain observable; no Tool sends results directly to an Agent.
 
-## Maintenance
+## Feature status
 
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+- ✅ [System](System/README.md): fixed runtime information.
+- ✅ [UI](UI/README.md): bounded skeleton display as a completion-only Tool.
+- ❌ Search, storage, network, memory and other model/device tools.
+- ❌ Live model/device health reporting.
 
-✅ [UI](UI/README.md) contains showPose: immediate bounded skeleton replacement through an injected presentation service, registered as a Void completion tool. No Channel scheduling or ToolResult feedback.
+## Issue record
+
+| Status | Issue / next step |
+| --- | --- |
+| Open | Measure skeleton presentation latency on a physical device. |
+| Resolved — 2026-09-27 audit | Included UI alongside System and documented both feedback modes. |

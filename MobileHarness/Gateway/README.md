@@ -1,26 +1,78 @@
-# Gateway — model-independent input and output boundaries
+# Gateway — Input and Output Routing
 
-Purpose: connect admitted input, Agent communication and resolved execution without owning models or hardware. Design goals: explicit validation, bounded delivery, failure isolation and observable completion.
+Validates and routes Agent input, communication and resolved calls. The goal is bounded admission, explicit failure and clear completion semantics. The target depends only on AgentCore, ActionRuntime and ToolRuntime; model processing belongs to Agents.
 
-✅ InputGateway validates AgentInput envelopes and routes static subscriptions or explicit targets. PlatformKit performs device I/O; SpeechPerception and VisionPerception perform model-driven adaptation. No ASR/VAD/image-content processing remains here.
+## Directory structure
 
-✅ OutputGateway validates ActionCall/ToolCall and dispatches through ActionRuntime/ToolRuntime; ToolResult returns through InputGateway. Typed perception events use bound source ports and InternalSignalBus, separate from Action/Tool model protocols.
+```text
+Gateway/
+├── Input/
+│   └── InputGateway.swift            # Validation, static subscriptions and explicit delivery
+├── Output/
+│   ├── OutputGateway.swift           # Output dispatch and bound event ports
+│   ├── Validation/                   # Capability and call validation
+│   ├── Routing/                      # Select Action, Tool or control path
+│   ├── Dispatch/                     # Invoke runtimes and return Tool results
+│   └── Scheduling/                   # Channel FIFO and module exclusion
+└── README.md                         # Module boundary and status
+```
+
+## Upstream and downstream
+
+Arrows show runtime data flow. ModelKit and PlatformKit are not Gateway dependencies.
 
 ```mermaid
 flowchart LR
-    App -->|Captured inputs| InputGateway
-    InputGateway --> Agents
-    Agents -->|Resolved calls / bound events| OutputGateway
-    OutputGateway --> Bus[AgentCore InternalSignalBus]
-    Bus --> InputGateway
-    OutputGateway --> ActionRuntime
-    OutputGateway --> ToolRuntime
-    ToolRuntime --> InputGateway
-    OutputGateway -->|Validated observations| App
+    App -->|Adapted external input| Input[InputGateway]
+    Input --> Agents
+    Agents -->|Resolved calls and typed events| Output[OutputGateway]
+    Output --> Bus[AgentCore InternalSignalBus]
+    Bus --> Input
+    Output --> ActionRuntime
+    Output --> ToolRuntime
+    ToolRuntime -->|Returning ToolResult via dispatcher| Input
+    Output -->|Runtime observations| App
 ```
 
-✅ The Gateway target depends only on AgentCore, ActionRuntime and ToolRuntime. Automated checks reject ModelKit/PlatformKit/concrete Agent imports and model target dependencies.
+## Internal flow
 
-✅ Channel scheduling retains per-channel order, shared-module exclusion and explicit overflow; event delivery has independent bounds and latest-state lanes. See Input, Output and AgentCore/Bus READMEs for algorithms and limits.
+```mermaid
+flowchart TD
+    In[External input] --> Select[Static subscription or explicit destination]
+    Select --> ValidateIn[Validate envelope and identity]
+    BusDelivery[Bus delivery with selected target] --> ValidateIn
+    ValidateIn --> Inbox[Admit to Agent inbox]
+    Out[Agent output] --> ValidateOut[Validate source and permission]
+    ValidateOut --> Route{Output kind}
+    Route -->|Action| Queue[ChannelScheduler]
+    Queue --> Action[ActionDispatcher / ActionExecutor]
+    Route -->|Tool| Tool[ToolDispatcher / ToolExecutor]
+    Tool -->|Non-nil result / explicit target| Select
+    Route -->|Event| Event[Bound port / InternalSignalBus]
+    Route -->|Finish or cancel| Barrier[Join or cancel input Actions]
+```
 
-❌ General request/reply, dynamic subscriptions, model-assisted routing Agents, preemption and robot control remain future work. No separate Signal implementation or unused model router is created.
+Input admission reports acceptance, not Agent processing completion. Action dispatch waits for queue admission; finish controls join admitted Actions. Tool dispatch awaits execution and any result delivery. App observers supervise runtime state and capture admission; they do not turn events into UI commands.
+
+| Owner | Default bound and overflow |
+| --- | --- |
+| InputGateway | 128 concurrent external admissions, up to 16 targets each; reject excess |
+| OutputGateway event port | 16 concurrent emissions per source; reject excess |
+| ChannelScheduler | 32 jobs per channel including running work, 16 active channels, 64 tracked Agent/input pairs; reject excess |
+| InternalSignalBus | Separate bounded transport; see [Bus](../AgentCore/Bus/README.md) |
+
+Channels run FIFO and share Action-module exclusion. Different modules may run concurrently. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only declared latest-state paths coalesce pending state. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
+
+## Feature status
+
+- ✅ Static JSON v4 subscriptions via publish and explicit directed delivery via send, source/session validation and admission receipts. No legacy router or implicit Assistant fallback remains.
+- ✅ Action scheduling, direct Tools, event transport and completion/cancellation barriers.
+- ❌ Request/reply, dynamic subscriptions, ActionResult feedback, priorities and preemption.
+- ❌ Enforced Channel locks and physical control arbitration; current lock metadata grants no ownership.
+
+## Issue record
+
+| Status | Issue / next step |
+| --- | --- |
+| Open | Cleanup depends on cooperative handlers; device stop acknowledgements require future adapters. |
+| Resolved — 2026-09-27 audit | Removed model-processing ownership from Gateway and distinguished returning from completion-only Tools. |

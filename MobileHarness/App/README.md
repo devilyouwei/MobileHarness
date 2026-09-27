@@ -1,51 +1,92 @@
-# App composition and lifecycle
+# App — Composition and Lifecycle
 
-Purpose: assemble capabilities, device services, Agents and presentation. MainActor owns SwiftUI-facing state; actors own model, Agent and transport state. No business registrations are duplicated from Agent JSON.
+Assembles model capabilities, device services, Agents and presentation. The goal is one shared runtime with independent voice and camera sessions. MainActor owns presentation and coordination; actors own Agent, transport and model state.
 
-## Shared communication assembly
+## Directory structure
 
-✅ ApplicationRuntime in AgentBootstrap.swift constructs one process-local AgentManager, validated JSON v4 policy, InputGateway, InternalSignalBus, OutputGateway and explicit Action/Tool handlers. It is available before asynchronous voice model preparation, so camera startup remains independent. RuntimePresentation contains one endpoint per presentation role with weak coordinator captures.
+```text
+App/
+├── MobileHarnessApp.swift         # SwiftUI entry and startup/diagnostic selection
+├── AppContainer.swift             # Model capability preparation and platform services
+├── AgentBootstrap.swift           # Shared ApplicationRuntime and explicit handlers
+├── AppLifecycleCoordinator.swift  # Voice session, playback and presentation state
+├── CameraCoordinator.swift        # Camera intent, permissions and scene lifecycle
+├── PhotographySession.swift       # Camera-frame adaptation and vision session
+└── README.md                      # Composition and lifecycle contract
+```
+
+## Upstream and downstream
+
+Arrows show requests and data, not every Swift import.
 
 ```mermaid
 flowchart LR
-    Camera[CameraCoordinator / PhotographySession] --> Runtime[ApplicationRuntime shared manager / gateways / bus]
-    Voice[AppLifecycleCoordinator] --> Runtime
-    Runtime --> Speech[SpeechPerception]
-    Runtime --> Vision[VisionPerception]
-    Runtime --> Assistant
-    Runtime --> Handlers[Explicit Action handlers / presentation]
-    Container[AppContainer] --> Models[ModelKitDefaults shared ModelManager]
-    Models --> Speech
-    Models --> Vision
-    Models --> Assistant
+    Experience -->|User intent| App
+    PlatformKit -->|Audio, camera and device telemetry| App
+    App -->|Resource root| Defaults[ModelKitDefaults / ModelManager]
+    Defaults -->|Capability handles| App
+    App -->|Adapted input| Input[InputGateway]
+    Input --> Agents
+    App -.->|Capabilities and lifecycle| Agents
+    Agents --> Output[OutputGateway]
+    Output --> Runtime[ActionRuntime / ToolRuntime]
+    Runtime --> Handlers[App-bound Actions / Tools]
+    Handlers --> PlatformKit
+    Handlers -->|Accepted presentation state| Experience
 ```
 
-Three Agent configurations are loaded and cross-validated together. Each recording/camera session registers new perception instances with a fresh incarnation; camera owns VisionPerception only. Assistant persists across recording turns and its history is cleared on explicit session cancellation. Existing instance collisions fail explicitly; there is no silent replacement or duplicate registration fallback.
+## Internal structure and data flow
 
-## Voice path
+```mermaid
+flowchart TD
+    Entry[MobileHarnessApp] --> Container[AppContainer]
+    Entry --> Camera[CameraCoordinator]
+    Container --> Voice[AppLifecycleCoordinator]
+    Voice --> Shared[ApplicationRuntime in AgentBootstrap]
+    Camera --> Session[PhotographySession]
+    Session --> Shared
+    Shared --> Policy[Three JSON v4 configurations and communication policy]
+    Shared --> Transport[AgentManager / InputGateway / Bus / OutputGateway]
+    Shared --> Handlers[Explicit Action and Tool handlers]
+    Transport --> Presentation[RuntimePresentation callbacks]
+    Handlers --> Presentation
+    Presentation --> Voice
+    Presentation --> Camera
+```
 
-✅ AppContainer obtains stable capability handles from ModelManager, warms recognition/chat and loads VAD/system TTS before enabling conversation. It supplies resources to ModelKitDefaults, does not register concrete providers, and forwards coalesced memory warnings. Diagnostics for Kokoro/Qwen remain explicit separate screens.
+ApplicationRuntime is available before voice model preparation. App supplies the resource root to ModelKitDefaults and gets interfaces from the process-wide ModelManager; it does not register model providers. Voice prepares recognition, chat, VAD and system TTS before opening the microphone. Camera preview and its vision session start independently.
 
-✅ AppLifecycleCoordinator owns microphone permission/capture, platform resampling, playback and UI state. It publishes bounded PCM through InputGateway. SpeechPerception owns VAD/ASR/session segmentation; OutputGateway reports partial/final/phase observations to the App. Assistant subscribes to final speech for chat and speech.phase for its own onset UI Actions; no final-text resubmission exists in App. ✅ Recognition captions are updated only by SpeechPerception UI.setTranscript Actions through OutputGateway and the Action runtime. UI.finishTranscript clears and closes the caption after recognition finishes. The App handler checks cancellation and active session before replacing liveTranscript; Signal observation retains final logging and capture admission only; it never edits UI state. SpeechPerception sends UI.setVoiceState, while Assistant sends UI.beginReplyTurn on speech onset. Stop clears transient UI state and rejects late Actions.
+Voice PCM enters InputGateway, then SpeechPerception. Assistant subscribes to final speech and speech onset; App does not resubmit final text. Agent-selected UI changes use registered Actions or Tools. Runtime observations control admission, completion and failure supervision, never caption or expression commands. Device telemetry and local user/OS lifecycle changes remain App-owned.
 
-The capture task preserves audio level UI and suppresses new utterances during recognition/reply. Assistant finish waits for all admitted speech/display Actions, then the existing 350 ms delay precedes speech resume. Runtime resume is independent of the audio inbox. Startup and stop are serialized through a cleanup task; no new recording begins until old cleanup completes.
+Camera frames enter InputGateway through PhotographySession. VisionPerception filters frames, requests pose inference, publishes observations and emits the completion-only UI.showPose Tool. App checks camera session and frame order before updating the overlay. The default filter is 3% change with a 100 ms maximum refresh interval; this is an admission rule, not a processing-FPS guarantee.
 
-Stop masks UI state and closes capture immediately, invalidates/stops the perception producer, joins its tasks and session deliveries, then cancels Assistant and the session's Actions. This ordering prevents a late final from entering Assistant after cancellation. Models remain resident according to ModelManager policy.
+## Concurrency and cleanup
 
-## Camera path
+| Work | Owner, bound and completion |
+| --- | --- |
+| Startup / voice stop | One serialized cleanup chain; new capture waits for old cleanup |
+| Voice input and output | One capture consumer and sequential output consumers; bounded PCM/output queues belong to PlatformKit and SpeechPerception |
+| Reply completion | Join admitted speech/display Actions, then wait 350 ms before resuming speech input |
+| Camera changes | One reconciliation worker uses current intent; stop capture and join old analysis before replacement |
+| Camera output | One sequential Tool consumer; latest-frame and display replacement belong to VisionPerception |
+| Memory warnings | Capacity-one latest notification stream; one consumer forwards pressure to ModelManager |
+| Audio telemetry | Capture keeps 2048 latest samples, at most 4096 during append; 32-band analysis and playback cursor polling run at most every 33 ms |
 
-✅ CameraCoordinator retains existing front/back, enable/disable, foreground and permission intent. One reconciliation worker stops capture and joins the old analysis session before replacement. Camera error and voice error state remain independent; preview does not wait for inference.
+Stop closes capture and perception admission, cancels and joins producer/transport work, then cancels the session's consumers and Actions. Voice and camera close only their own sessions. Models follow ModelManager residency policy. Late UI work must pass active-session and turn/sequence checks. Failures propagate; already completed effects are not rolled back.
 
-PhotographySession bridges native frames with a bounded opaque attachment, publishes through InputGateway, binds VisionPerception and drains its Tool/control stream. VisionPerception filters, infers, publishes observations and emits UI.showPose. Cleanup invalidates vision, joins the camera Tool consumer, closes only the camera session and cancels any session Actions. It never shuts down the shared runtime or voice Agents.
+See [SpeechPerception](../Agents/SpeechPerception/README.md), [VisionPerception](../Agents/VisionPerception/README.md), [audio I/O](../PlatformKit/Audio/README.md) and [scheduling](../Gateway/Output/Scheduling/README.md) for queue contracts.
 
-✅ Camera presentation verifies session and sequence before updating the overlay. Native attachment conversion validates dimensions/rotation. All concrete device/UI effects enter through explicit registered Actions.
+## Feature status
 
-❌ Full multi-window independent Agent namespaces, persistent background supervision, robot motion and device acceptance of this migration are not implemented. Repeated competing role registrations fail rather than silently hijacking another scene.
+- ✅ Shared communication assembly, JSON v4 validation, explicit handlers and separate camera/voice sessions.
+- ✅ Turn-scoped captions, semantic emotions, actual playback state and frequency telemetry.
+- ✅ Explicit diagnostics and a labeled Debug-only conversation preview; the preview uses simulated state.
+- ❌ Independent multi-window Agent namespaces, persistent background supervision and robot control.
 
-✅ Runtime completion resumes speech processing; the SpeechPerception Agent emits the listening UI Action. App no longer clears expressions/replies or changes orb/status text from speech.phase observations. Local user/OS startup/stop and device-level telemetry remain App-owned, separate from Agent commands.
+## Issue record
 
-✅ PhotographySession prepares the shared Tool registry before camera processing. UI.showPose is a completion-only Tool handler; its callback carries OutputEnvelope directly for camera session validation. The visual stream is consumed sequentially, with no Channel or result-input round trip.
-
-✅ UI handlers combine active-session validation with ConversationPresentation. beginReplyTurn clears old reply/expression atomically without clearing new recognition text. Captions and expression persist after normal reply completion; stop/background/failure resets the state. UI.print never sets speaking status. The orb projects actual audio.play activity as speaking over the Action-controlled recognition phase; playback-level telemetry remains device-owned. This avoids declaring playback merely because text arrived.
-
-✅ CameraCoordinator configures the existing 3% frame-change threshold with a 100 ms maximum refresh interval. The next captured frame is admitted when refresh is due; this does not guarantee processing FPS. Tool consumption stays sequential while VisionPerception coalesces pending display state.
+| Status | Issue / next step |
+| --- | --- |
+| Open | Competing scene-role registrations fail; multi-window ownership is not implemented. |
+| Open | Validate sustained camera/voice operation, startup latency and memory/thermal behavior on iPhone. |
+| Resolved — 2026-09-27 audit | Consolidated repeated presentation updates and corrected skeleton execution from Action to completion-only Tool. |

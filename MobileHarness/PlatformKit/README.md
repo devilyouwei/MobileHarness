@@ -1,45 +1,73 @@
-# PlatformKit — Device Input and Output Capabilities
+# PlatformKit — Device Input and Output
 
-Purpose: expose operating-system and hardware capabilities through public platform APIs. Design goals: organize by capability domain, own device lifecycles and permissions, and deliver bounded input/output without model inference or Agent business decisions.
+Owns hardware and operating-system I/O through public APIs. The goal is permission-aware device lifecycles and bounded data delivery. PlatformKit has no project-target dependency; ModelKit processes supplied data separately.
 
-## Directory rules
+## Directory structure
 
-Both PlatformKit and ModelKit organize domain capabilities beneath their own layer. PlatformKit owns device input/output; ModelKit transforms data through model capabilities. Domain names describe each layer's scope: PlatformKit Audio includes microphone and speaker I/O, while ModelKit Speech includes ASR/TTS/VAD. Matching principles do not require identical directory names or dependencies between the layers.
+```text
+PlatformKit/
+├── Audio/
+│   ├── AppleAudioIO.swift                 # Capture, playback and audio-session setup
+│   ├── MicrophoneFrame.swift              # Bounded captured PCM
+│   ├── StreamingMonoPCMResampler.swift     # Continuous format conversion
+│   └── AudioSpectrum.swift                # FFT telemetry for captured/played PCM
+├── Vision/
+│   ├── AppleCamera.swift                  # Camera lifecycle and preview source
+│   ├── CameraFrame.swift                  # Native frame and orientation metadata
+│   └── CameraGraySampler.swift            # Compact luminance samples
+├── Core/DeviceCapability.swift            # Shared availability/authorization contract
+├── Connectivity/ExternalDeviceTransport.swift # External-device transport contract
+└── README.md                              # Device boundary and status
+```
 
-| Directory | Current ownership |
-| --- | --- |
-| [Audio](Audio/README.md) | Microphone capture, speaker playback, shared audio-session setup and continuous PCM conversion |
-| [Vision](Vision/README.md) | Camera acquisition, preview source, native image frames and gray sampling |
-| [Connectivity](Connectivity/README.md) | External-device transport contract; no concrete transport yet |
-| [Core](Core/README.md) | Cross-domain capability and authorization contracts |
+Group implementations by capability domain. Core holds shared contracts; add device subdirectories only when actual implementations need them.
 
-Core is the explicit shared-contract exception to domain grouping, like ModelKit/Core. Keep small domains flat; introduce device subdirectories only when actual implementations need them. Do not mix individual devices such as Camera or Microphone with domain directories at the top level. Keep existing implementation names such as AppleAudioIO and AppleCamera; directory grouping does not require artificial device wrappers.
+## Upstream and downstream
 
-## Data and dependency boundaries
-
-The arrows show logical data flow, not imports. App supplies adapters and callbacks; ModelKit and PlatformKit do not depend on each other.
+Arrows show data flow through App adapters, not imports between the two Kits.
 
 ```mermaid
 flowchart LR
-    Hardware[Hardware / OS] -->|PCM / native frames| Platform[PlatformKit: Audio / Vision]
-    Platform -->|App adaptation| Input[InputGateway]
-    Input --> Agent[Agent business policy]
-    Input -->|ASR / VAD| Model[ModelKit data processing]
-    Agent -->|Inference| Model
-    Model -->|Typed results| Agent
-    Agent --> Output[OutputGateway]
-    Output --> Runtime[Action / Tool execution]
-    Runtime -->|Injected device operations| Platform
-    Platform -->|Playback / device output| Hardware
+    Hardware[Hardware / OS] -->|Capture| PlatformKit
+    PlatformKit -->|PCM, frames and telemetry| App
+    App --> Input[InputGateway]
+    Input --> Agents[SpeechPerception / VisionPerception]
+    Agents -->|Inference| ModelKit
+    Output[OutputGateway] --> Runtime[Action / Tool handlers]
+    Runtime -->|App-injected device operation| PlatformKit
+    PlatformKit -->|Playback| Hardware
+    App -->|Preview and telemetry| Experience
 ```
 
-External inputs and tool results enter InputGateway; Agent outputs pass through OutputGateway. Device authorization and availability are checked at execution. Robot safety requires device-side enforcement, independent of iOS background execution.
+## Internal structure and data flow
 
-## Implementation status
+```mermaid
+flowchart TD
+    Intent[App device request] --> Permission[Authorization and availability]
+    Permission --> Audio[Audio capture / playback]
+    Permission --> Vision[Camera session]
+    Audio --> PCM[Bounded PCM / resampling]
+    PCM --> Capture[Capture consumer]
+    Audio --> Spectrum[AudioSpectrum from actual PCM]
+    Vision --> Frame[Native frame and gray samples]
+    Frame --> Latest[Capacity-one latest-frame stream]
+    Vision --> Preview[Native preview source]
+    InputPCM[Supplied synthesis PCM] --> Audio
+```
 
-- ✅ Audio capture/playback and continuous PCM conversion with explicit stream and playback bounds.
-- ✅ Vision capture, front/back switching, native preview and capacity-one latest-frame delivery with gray64 samples.
-- ✅ Core permission interfaces and Connectivity transport interface retained without API changes.
-- ❌ Concrete BLE/network/robot adapters, recording and sustained physical-device acceptance.
+Audio and camera own their devices and cleanup. Capture delivery is bounded; audio overflow is explicit, while the camera stream replaces its pending frame with the newest one. Playback waits for device completion and supports cancellation. FFT is device telemetry, not model inference or an Agent-selected UI command. See [Audio](Audio/README.md) and [Vision](Vision/README.md) for capacities and lifecycle rules.
 
-Maintain each domain README when changing ownership, lifecycle, bounds or directory layout. See [technical architecture](../README.md) and [layout audit](../../docs/Repository-Structure.md).
+## Feature status
+
+- ✅ Microphone capture, speaker playback, PCM conversion and spectrum analysis.
+- ✅ Foreground camera capture, front/back selection, native preview and compact gray samples.
+- ✅ Shared permission contracts and an external-device transport interface.
+- ❌ Concrete BLE/network/robot transports, recording and additional hardware domains.
+
+## Issue record
+
+| Status | Issue / next step |
+| --- | --- |
+| Open | Measure camera/audio coexistence, route-dependent playback latency and sustained thermal/power behavior on device. |
+| Open | Robot control requires device-side limits, stop acknowledgement and disconnect protection; iOS background execution cannot provide safety. |
+| Resolved — 2026-09-27 audit | Removed Gateway-to-ASR/VAD inference edges and included current spectrum telemetry. |

@@ -93,7 +93,7 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     let text = try await turn.finish()
     await probe.displayed(text)
-    let report = try await gateway.submit(AgentInput(sessionID: sessionID, payload: .text(text)))
+    let report = try await gateway.send(AgentInput(sessionID: sessionID, payload: .text(text)), to: .assistant)
     #expect(report.delivered == [.assistant])
     #expect(await agent.status().processedInputs == 1)
     let response = OutputGateway(
@@ -197,7 +197,7 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     let text = try await turn.finish()
     #expect(text == "一段 一段")
     #expect(await agent.status().processedInputs == 0)
-    _ = try await gateway.submit(AgentInput(sessionID: id, payload: .text(text)))
+    _ = try await gateway.send(AgentInput(sessionID: id, payload: .text(text)), to: .assistant)
     #expect(await agent.status().processedInputs == 1)
     await #expect(throws: CapabilityError.self) {
         try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
@@ -355,7 +355,7 @@ func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async
     let invocation = ActionInvocation(
         envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)), call: call)
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
-        try await UIActions.express(invocation: invocation) { value, _ in await probe.displayed(value) }
+        try await UIActions.express(invocation: invocation) { value, _ in await probe.displayed(value.rawValue) }
     }
     #expect(await probe.displayedText.isEmpty)
 }
@@ -371,14 +371,15 @@ func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async
     }
 }
 
-@Test func smileUsesParameterizedExpressionPresentation() async throws {
+@Test(arguments: UIActions.Emotion.allCases)
+func expressionPreservesSemanticIdentifier(_ emotion: UIActions.Emotion) async throws {
     let probe = VoiceProbe()
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
-    let call = expectedActionCall(name: "express", parameters: ["emotion": "smile"])
+    let call = expectedActionCall(name: "express", parameters: ["emotion": emotion.rawValue])
     let invocation = ActionInvocation(
         envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)), call: call)
-    try await UIActions.express(invocation: invocation) { value, _ in await probe.displayed(value) }
-    #expect(await probe.displayedText == ["🙂"])
+    try await UIActions.express(invocation: invocation) { value, _ in await probe.displayed(value.rawValue) }
+    #expect(await probe.displayedText == [emotion.rawValue])
     #expect(await probe.spokenText.isEmpty)
 }
 
@@ -637,4 +638,55 @@ private actor EndpointVADSession: VoiceActivitySession {
     #expect(accepted14)
     let accepted15 = state.accept(envelope(second, 8, .speechPerception), update: .expression)
     #expect(!accepted15)
+}
+
+// The UI must distinguish frequency content, not simply animate any nonzero RMS.
+@Test func spectrumSeparatesLowAndHighTonesAcrossSampleRates() {
+    for rate in [16000, 24000, 48000] {
+        func spectrum(_ frequency: Double, amplitude: Double = 0.1) -> [Float] {
+            AudioSpectrum.measure(
+                (0..<2048).map { index in
+                    Float(amplitude * sin(2 * .pi * frequency * Double(index) / Double(rate)))
+                }, sampleRate: rate)
+        }
+        let bass = spectrum(250)
+        let treble = spectrum(4000)
+        let bassPeak = bass.indices.max { bass[$0] < bass[$1] } ?? 0
+        let treblePeak = treble.indices.max { treble[$0] < treble[$1] } ?? 0
+        #expect((6...9).contains(bassPeak))
+        #expect((26...28).contains(treblePeak))
+        #expect(bass[bassPeak] > bass[treblePeak] + 0.5)
+        #expect(treble[treblePeak] > treble[bassPeak] + 0.5)
+        #expect(spectrum(250, amplitude: 0.01)[bassPeak] < bass[bassPeak] - 0.25)
+    }
+}
+
+@Test func spectrumSilenceDCAndInvalidPCMDoNotInventEnergy() {
+    #expect(AudioSpectrum.measure([Float](), sampleRate: 48000) == AudioSpectrum.silence)
+    #expect(AudioSpectrum.measure([Float](repeating: 0, count: 8192), sampleRate: 48000) == AudioSpectrum.silence)
+    #expect(AudioSpectrum.measure([Float](repeating: 0.2, count: 2048), sampleRate: 48000) == AudioSpectrum.silence)
+    #expect(AudioSpectrum.measure([Float.nan, .infinity], sampleRate: 48000) == AudioSpectrum.silence)
+    #expect(AudioSpectrum.measure([1], sampleRate: 0) == AudioSpectrum.silence)
+}
+
+@Test func spectrumUsesLatestBoundedWindowAndIsDeterministic() {
+    let signal = (0..<2048).map { Float(0.1 * sin(2 * Double.pi * 1000 * Double($0) / 16000)) }
+    let expected = AudioSpectrum.measure(signal, sampleRate: 16000)
+    let prefixed = [Float](repeating: 1, count: 20000) + signal
+    #expect(AudioSpectrum.measure(prefixed, sampleRate: 16000) == expected)
+    #expect(AudioSpectrum.measure(signal, sampleRate: 16000) == expected)
+    #expect(expected.count == 32)
+    #expect(expected.allSatisfy { $0.isFinite && (0...1).contains($0) })
+}
+
+@Test func spectrumReleaseSettlesWithoutOscillation() {
+    let target = [Float](repeating: 0.8, count: 32)
+    var levels = AudioSpectrum.smooth(target, previous: AudioSpectrum.silence)
+    #expect(levels[0] > 0.6)
+    for _ in 0..<24 {
+        let next = AudioSpectrum.smooth(AudioSpectrum.silence, previous: levels)
+        #expect(zip(next, levels).allSatisfy { $0 <= $1 })
+        levels = next
+    }
+    #expect(levels == AudioSpectrum.silence)
 }

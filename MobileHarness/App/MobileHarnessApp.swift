@@ -10,16 +10,26 @@ struct MobileHarnessApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if isDiagnostic {
+                if isVisualPreview {
+                    ConversationVisualPreview()
+                } else if isDiagnostic {
                     startupContent
                 } else {
                     CameraScene { startupContent }
                 }
             }
             .task(id: startupAttempt) {
-                await prepare()
+                if !isVisualPreview { await prepare() }
             }
         }
+    }
+
+    private var isVisualPreview: Bool {
+        #if DEBUG
+            ProcessInfo.processInfo.arguments.contains("-conversation-preview")
+        #else
+            false
+        #endif
     }
 
     private var isDiagnostic: Bool {

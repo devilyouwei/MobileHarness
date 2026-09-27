@@ -1,30 +1,53 @@
 # ActionRuntime — Action Registration and Execution
 
-ActionRuntime maps resolved action paths to executable Swift handlers, following architecture section 29. It separates the execution mechanism from concrete behavior implementations and Gateway scheduling.
+Maps resolved Action paths to App-supplied handlers. The goal is explicit handler selection and awaited execution; Gateway owns scheduling. This target depends only on AgentCore.
 
-## Direct relationships
+## Directory structure
+
+```text
+ActionRuntime/
+├── ActionRegistry.swift        # Immutable path-to-handler allowlist
+├── ActionExecutor.swift        # Lookup, cancellation checks and awaited execution
+├── ActionInvocation.swift      # Resolved call with trusted output context
+├── ActionExecutionError.swift  # Admission and execution errors
+└── README.md                   # Module contract and status
+```
+
+## Upstream and downstream
+
+Arrows show runtime calls; Actions is an injected handler library, not a target dependency.
 
 ```mermaid
 flowchart LR
-    App -->|Explicit path-to-handler registration| ActionRuntime
-    Gateway -->|Scheduled ActionInvocation| ActionRuntime
-    ActionRuntime -->|Invocation of registered handler| Actions
-    Actions -->|Actual completion or error| ActionRuntime
+    App -->|Register handlers| ActionRuntime
+    Gateway -->|Scheduled invocation| ActionRuntime
+    ActionRuntime -->|Injected handler| Actions
+    Actions -->|Completion or error| ActionRuntime
     ActionRuntime -->|Completion or error| Gateway
 ```
 
-Handlers are supplied by App. ActionRuntime has no compile-time dependency on Actions and depends only on AgentCore. The diagram shows runtime calls through those handlers.
+## Internal flow
 
-## Implementation status
+```mermaid
+flowchart LR
+    Invocation[ActionInvocation] --> Cancel[Check cancellation]
+    Cancel --> Registry[ActionRegistry lookup]
+    Registry --> Handler[Await registered handler]
+    Handler --> Finish[Check cancellation and return]
+    Registry -->|Missing path| Error[Throw]
+    Handler -->|Failure| Error
+```
 
-- ✅ `ActionRegistry.swift`: immutable ActionPath-to-ActionHandler allowlist; unregistered paths fail explicitly.
-- ✅ `ActionExecutor.swift`: looks up and awaits a handler, checking cancellation before and after execution.
-- ✅ `ActionInvocation.swift`: resolved ActionCall and trusted OutputEnvelope association.
-- ✅ `ActionExecutionError.swift`: shared action admission and execution errors.
-- ❌ Standard `ActionResult` and conversion into feedback signals. Success currently returns Void; failure throws.
+The immutable registry is shared safely across tasks. Execution creates no queue or detached work. A handler must await its promised effect and cooperate with cancellation. Failure propagates to Gateway; already completed effects are not rolled back. [Channel scheduling](../Gateway/Output/Scheduling/README.md) owns bounds, ordering, resource exclusion and cleanup barriers.
 
-Gateway checks registration before queue admission and owns capacity, FIFO ordering, module exclusion, and cancellation/completion barriers. ActionRuntime does not create another queue. Immutable registration can be shared across tasks; handler implementations must uphold completion and cooperative cancellation contracts.
+## Feature status
 
-## Maintenance
+- ✅ Explicit registration, trusted invocation context, awaited completion and cancellation checks.
+- ❌ Standard ActionResult and feedback through InputGateway; current success returns Void.
 
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+## Issue record
+
+| Status | Issue / next step |
+| --- | --- |
+| Open | Cleanup relies on handler cooperation; no forced interruption or runtime timeout exists. |
+| Resolved — 2026-09-27 audit | Separated execution from Gateway admission and scheduling in both diagrams. |

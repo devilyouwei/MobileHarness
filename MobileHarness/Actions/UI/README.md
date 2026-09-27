@@ -3,13 +3,13 @@
 Purpose: present captions and facial expressions using App-injected callbacks. Design goals: keep validation and output selection inside each function, remain independent of SwiftUI, and use one function for all expressions.
 
 - ✅ `Print.swift` / `UI.print`: required nonblank text, at most 2000 UTF-8 bytes; preserves original formatting.
-- ✅ `Express.swift` / `UI.express`: required, case-sensitive `emotion`: clear (empty expression), smile (🙂), happy (😊), laugh (😄), thinking (🤔), surprised (😮), sad (😔), love (🥰).
+- ✅ `Express.swift` / `UI.express`: required, case-sensitive `emotion`: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful.
 - ✅ Missing or unsupported emotion throws `ExpressionError.invalidEmotion` before presentation; no default or fallback. The separate smile function and registration are removed.
 - ✅ Both functions check cancellation before and after presentation and propagate callback failures. No shared TextAction helper is used.
 - ✅ Default Display Channel; explicit scopes can override it. Gateway owns ordering and module exclusion.
 - ❌ Physical facial control, general show actions and animation-completion acknowledgments.
 
-App injects separate expression and caption callbacks. Success means MainActor display state has been updated, not that the decorative animation has completed. One current expression replaces the previous state; no extra queue or timer is created. The circle clears on new user speech or session stop. XML example: `<express emotion="smile"/> Hello.`
+App injects separate expression and caption callbacks. Success means MainActor display state has been updated, not that the decorative animation has completed. One current expression replaces the previous state; no extra queue or timer is created. The eyes return to neutral on new user speech or session stop. XML example: `<express emotion="smile"/> Hello.`
 
 Maintain this README alongside implementation, Agent JSON and App handler bindings. Add new supported emotions to express rather than adding a separate Action for each face.
 
@@ -19,7 +19,7 @@ Maintain this README alongside implementation, Agent JSON and App handler bindin
 
 ✅ UI.showPose is declared and emitted by VisionPerception. The App keeps the explicit handler and MainActor presentation callback; Photographer does not participate in skeleton rendering.
 
-✅ BeginReplyTurn.swift / UI.beginReplyTurn accepts no parameters and atomically clears the previous Assistant reply and expression once per conversation turn. Assistant owns this behavior. UI.express additionally accepts emotion=clear; an empty resulting glyph tells its registered handler to remove the expression. Both use cancellation-checked Action execution, not Signals.
+✅ BeginReplyTurn.swift / UI.beginReplyTurn accepts no parameters and atomically clears the previous Assistant reply and expression once per conversation turn. Assistant owns this behavior. UI.express additionally accepts emotion=clear; the typed clear identifier tells its registered handler to return to neutral. Both use cancellation-checked Action execution, not Signals.
 ✅ SetVoiceState.swift / UI.setVoiceState requires state=listening|hearing|processing, validates it before calling the UI handler, and never changes capture admission. Missing/unknown values fail. Default Display Channel serializes these actions with expression/reply changes. Reply presentation state is updated by the explicit recognition state plus actual playback activity; UI.print only appends text.
 
 ✅ ShowPose.swift moved to Tools/UI. Skeleton presentation is no longer an Action registration; other UI Actions retain their existing Channel semantics.
@@ -41,3 +41,5 @@ flowchart LR
 ```
 
 ❌ Device timing/animation acceptance remains manual. This policy does not provide durable delivery or synchronize speech with every displayed character.
+
+✅ UI.express now supplies a validated `UIActions.Emotion` value, never an emoji or glyph. Missing/unknown values still fail. SwiftUI pose definitions belong to Experience, not Actions. Completion means presentation state accepted the target, not that the visual interpolation finished. See ADR 0046.

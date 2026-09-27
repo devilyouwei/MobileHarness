@@ -6,7 +6,7 @@ Purpose: send user input to ChatCapability, maintain bounded history and interpr
 - ✅ Assistant.agent.json registers say → Speech.speak, print → UI.print and express → UI.express, with Speech/Display defaults and explicit main scope support.
 - ✅ Each turn owns AgentGenerator state. Natural text maps through textActions (say + print); self-closing XML Actions resolve independently. Explicit channels override defaults.
 - ✅ CapabilityContextBuilder includes only hidden=false Action aliases, docs, parameters and examples in system context. Native tools are excluded regardless of hidden; say/print remain registered for text mapping.
-- ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad and love. It controls UI presentation only.
+- ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
 - ✅ /status resolves runtimeInfo → System.runtimeInfo. Tool results and event descriptions are escaped before text interpretation.
 - ✅ Limits: 4 KiB user text, 2000-byte generated text, 256 output tokens, 30 s generation deadline and at most 120 ActionCalls. History is saved only after successful generation and bounded to eight messages / 1600 characters.
 - ✅ Cancellation bypasses full/paused inbox admission, joins the worker and discards incomplete parsing state.
@@ -108,7 +108,7 @@ flowchart LR
 | --- | --- | --- |
 | Action | `say → Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射，交给语音 handler。 |
 | Action | `print → UI.print / Display` | 同样的 text 参数，追加回复字幕；与 say 来自同一段自然文本。 |
-| Action | `express → UI.express / Display` | `parameters["emotion"]` 为 `clear / smile / happy / laugh / thinking / surprised / sad / love`，设置或清除表情。 |
+| Action | `express → UI.express / Display` | `parameters["emotion"]` 为 `clear / smile / happy / laugh / thinking / surprised / sad / love / angry / scared / playful`，设置或清除表情。 |
 | Action | `beginReplyTurn → UI.beginReplyTurn / Display` | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
 | 有返回值 Tool | `runtimeInfo → System.runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。目前不是模型原生 Tool streaming。 |
 | control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。 |
@@ -118,3 +118,5 @@ flowchart LR
 Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 另允许 `main`。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
 
 ✅ `communication.publications` 和 `communication.sends` 均为空：Assistant 当前不发布共享感知，也没有 Agent 间定向发送权限。❌ 图像理解、partial 驱动回答及模型原生 Tool 增量仍未实现。
+
+✅ express emits semantic eye emotions; Assistant.agent.json remains the production capability declaration. No emoji conversion is performed. clear smoothly returns to neutral. Three added values are angry/scared/playful; JSON schema remains v4, with an additive parameter-domain extension.

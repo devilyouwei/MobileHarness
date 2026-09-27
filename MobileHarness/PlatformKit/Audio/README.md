@@ -37,3 +37,20 @@ flowchart LR
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
 Audio is the platform capability domain for microphone and speaker I/O. AppleAudioIO currently owns both operations and shared AVAudioSession setup; do not create independent session owners solely to match device filenames. Keep domain files flat until actual complexity requires device subdirectories. Recognition, synthesis and neural VAD belong to ModelKit/Speech; conversation policy belongs to Agents.
+
+## Measured spectrum telemetry
+
+✅ AudioSpectrum measures the latest 2048 mono samples, removes DC, applies a Hann window and radix-2 FFT, and sums power into 32 logarithmic bands (80 Hz to min(8 kHz, Nyquist)). Fixed −66…−6 dB mapping preserves level differences; there is no per-frame auto normalization. Invalid samples become zero. Attack/release smoothing is deterministic and settles to silence. This is device-level metering, not model inference.
+
+✅ AppleAudioIO.playbackSampleOffset exposes the current buffer render cursor through lastRenderTime/playerTime, nil outside active playback. Each single-buffer play resets the node timeline before scheduling; one waiter, cancellation token and dataPlayedBack completion remain unchanged. App polls at 33 ms; no callback or audio queue is added.
+
+```mermaid
+flowchart LR
+    Capture[Captured PCM: latest 2048] --> FFT[Hann / FFT / 32 logarithmic bands]
+    Player[Player render cursor] --> Window[Current output PCM window]
+    Window --> FFT
+    FFT --> Meter[Fast attack / slower release]
+    Meter --> UI[Canvas bars: no periodic waveform]
+```
+
+❌ The render cursor is not an acoustic measurement at the speaker; Bluetooth/output-route latency and device power require physical validation. See ADR 0045.

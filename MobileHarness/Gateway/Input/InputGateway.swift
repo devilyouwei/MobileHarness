@@ -5,14 +5,11 @@ public actor InputGateway {
     private var activeAdmissions = 0
     private let policy: CommunicationPolicy?
     private let manager: AgentManager
-    private let router: any SignalRouter
     public init(
-        manager: AgentManager, router: any SignalRouter = LogicRouter(),
-        policy: CommunicationPolicy? = nil
+        manager: AgentManager, policy: CommunicationPolicy? = nil
     ) {
         self.policy = policy
         self.manager = manager
-        self.router = router
     }
 
     public func destinations(for input: AgentInput) throws -> [AgentID] {
@@ -89,19 +86,5 @@ public actor InputGateway {
             for await (id, error) in group { if let error { rejected[id] = error } else { delivered.append(id) } }
             return DeliveryReport(delivered: delivered, rejected: rejected)
         }
-    }
-
-    /// Fan-out is best-effort; one rejected destination does not suppress delivery to others.
-    public func submit(_ input: AgentInput, to target: AgentID? = nil) async throws -> DeliveryReport {
-        let destinations: [AgentID]
-        if let target {
-            destinations = [target]
-        } else if let policy {
-            destinations = policy.destinations(for: input)
-        } else {
-            destinations = try await router.destinations(for: input)
-        }
-        guard !destinations.isEmpty else { throw CommunicationError.noRecipients }
-        return try await deliver(input, targets: destinations)
     }
 }

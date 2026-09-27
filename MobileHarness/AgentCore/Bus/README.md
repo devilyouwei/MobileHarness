@@ -23,6 +23,58 @@ The App loads all four Agent JSON v4 resources into an immutable policy. Each de
 
 Direct sends do not require subscription but still require outbound permission and receiver input support. A configured but unavailable target produces a rejection. Zero recipients is an explicit error unless the OutputGateway has a registered App observer for that contract. The observer is the UI/status endpoint for speech.partial, speech.final and speech.phase; it does not create an implicit Agent subscription. It runs through OutputGateway validation and does not invoke model or device code.
 
+## Target selection and per-Agent delivery
+
+This diagram expands the internal Agent-to-Agent path. OutputGateway selects recipients before Bus admission: `send` selects one explicit target; `publish` matches static contract/source/topic subscriptions. Both then use the same transport and the same queue for each target.
+
+```mermaid
+flowchart TB
+    subgraph Output["OutputGateway — permissions and target selection"]
+        Route{"Messaging operation"}
+        Route -->|send| Send["Select explicit target"]
+        Route -->|publish| Publish["Match static subscriptions"]
+        Send --> Targets["Resolve target list and live incarnations"]
+        Publish --> Targets
+    end
+
+    subgraph Bus["InternalSignalBus — bounded per-target transport"]
+        Reserve["Reserve capacity and create selected target branches"]
+        Reserve -->|Target A| QueueA["A FIFO queue"]
+        Reserve -->|Target B| QueueB["B FIFO queue"]
+        Reserve -->|Target C| QueueC["C FIFO queue"]
+        QueueA --> WorkerA["A worker"]
+        QueueB --> WorkerB["B worker"]
+        QueueC --> WorkerC["C worker"]
+    end
+
+    subgraph Input["InputGateway — validate each delivery"]
+        CheckA["Validate delivery to A"]
+        CheckB["Validate delivery to B"]
+        CheckC["Validate delivery to C"]
+    end
+
+    Targets --> Reserve
+    WorkerA --> CheckA
+    WorkerB --> CheckB
+    WorkerC --> CheckC
+    CheckA --> ReceiveA["A.receive(input)"]
+    CheckB --> ReceiveB["B.receive(input)"]
+    CheckC --> ReceiveC["C.receive(input)"]
+
+    classDef routing fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A
+    classDef transport fill:#F3E8FF,stroke:#9333EA,color:#581C87
+    classDef admission fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    class Route,Send,Publish,Targets routing
+    class Reserve,QueueA,QueueB,QueueC,WorkerA,WorkerB,WorkerC transport
+    class CheckA,CheckB,CheckC,ReceiveA,ReceiveB,ReceiveC admission
+```
+
+A/B/C illustrate possible targets, not unconditional broadcast: a direct send creates one branch, and a publication creates branches only for its selected subscribers. Capacity reservation can reject the whole operation before any branch is enqueued. Workers progress independently after admission, subject to shared transport limits and explicit latest-state replacement rules.
+
+The three validation boxes are calls to the same InputGateway instance, not separate gateways or queues. Each checks identity, session, contract, payload and deadline; it does not rematch subscriptions. Both routes reach the same Agent `receive` entry, which admits work into the Agent-owned inbox. Bus lanes are separate from those inboxes and from Action Channels. External inputs and ToolResult returns enter InputGateway directly and are outside this diagram.
+
+For the corresponding direct path without Bus queues, see [external input admission and delivery](../../Gateway/Input/README.md#external-input-admission-and-delivery). The [communication framework](../../README.md#communication-framework) compares both paths.
+
 ## Admission and bounded scheduling
 
 1. OutputGateway validates sender identity/session, contract/payload, outgoing policy and causal hop count. It issues an input ID/sequence and binds source incarnation; callers cannot select another source through that port. Child admission deadlines cannot outlive the parent.

@@ -89,7 +89,7 @@ final class RuntimePresentation {
     var finishTranscriptHandler: (@Sendable (ActionInvocation) async throws -> Void)?
     var beginReplyTurnHandler: (@Sendable (ActionInvocation) async throws -> Void)?
     var voiceState: (@Sendable (UIActions.VoiceState, ActionInvocation) async throws -> Void)?
-    var emotion: (@Sendable (String, ActionInvocation) async throws -> Void)?
+    var emotion: (@Sendable (UIActions.Emotion, ActionInvocation) async throws -> Void)?
     var pose: (@Sendable (PoseOverlay, OutputEnvelope) async throws -> Void)?
     var speech: (@Sendable (AgentInput) async throws -> Void)?
     var control: (@Sendable (OutputEnvelope) async -> Void)?

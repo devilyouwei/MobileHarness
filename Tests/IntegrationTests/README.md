@@ -46,3 +46,9 @@ Validation (2026-09-26): final scripts/check.sh passed, including 79 Integration
 ✅ Turn presentation tests cover delayed partials after final, old turns, same-ordinal conflicting IDs, component sequence ordering, wrong producer and beginReplyTurn idempotency. These are automated state/protocol tests, not device visual acceptance.
 
 ✅ Visual freshness tests block publication explicitly while inference/display progress, verify one latest pending observation, stop/join cancellation, nine unconsumed overlays collapsing to the newest without Agent failure, and bounded refresh with no sequence replay.
+
+✅ VoiceTests verifies frequency discrimination at 16/24/48 kHz, amplitude sensitivity, silence/DC/nonfinite rejection, bounded latest-window processing and monotonic release for audio spectra.
+
+✅ Parameterized expression coverage exercises every UIActions.Emotion through the Action and checks unchanged semantic identity, no caption/speech side effects, invalid input rejection and cancellation propagation.
+
+✅ Input routing tests use real CommunicationPolicy declarations for subscription fan-out and unavailable-target isolation. Regression coverage rejects publish without policy or subscribers, verifies explicit send without subscription and checks declared input support. Voice, cancellation and ToolResult tests use explicit send; legacy test routers are removed.

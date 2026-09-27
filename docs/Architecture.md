@@ -85,3 +85,9 @@ OutputGateway 对调用复核并交给 Action/Tool runtime。ChannelScheduler �
 ✅ ADR 0043 引入会话内 ConversationTurn 与输出序号：长句分段不换轮；Assistant 原子 beginReplyTurn；SpeechPerception finishTranscript 封闭识别字幕。UI.print 不再改变播放状态，播放中状态来自真实播放器活动。
 
 ✅ VisionPerception 的推理、观测发布和显示消费解耦：一项活动推理 + 一项最新待推理帧；一项活动发布 + 一项最新待发布观测；一项活动显示 Tool + 一项最新待显示骨架。只合并可替换的感知/显示状态，不改变 Gateway 协议或物理命令语义。App 默认最长刷新间隔 100ms，在有新帧时避免灰度阈值饥饿。见 ADR 0044。
+
+✅ Audio spectrum telemetry (ADR 0045): PlatformKit exposes PCM frequency analysis and the current player buffer render cursor. App retains one bounded latest microphone window and two 32-band snapshots; Experience draws them without time-generated waves. This extends device telemetry only; Gateway/Agent presentation contracts are unchanged.
+
+✅ ADR 0046 replaces the UI.express emoji callback payload with a typed semantic emotion. Experience maps it to stable, continuously interpolated eye geometry. Gateway routes, Action path, session/turn admission and completion semantics are unchanged.
+
+✅ ADR 0047 removes the legacy Input/Routing abstraction and submit API. External publish requires CommunicationPolicy; send names its target, including ToolResult return. Policy-free construction retains explicit directed admission only; no input defaults to Assistant. Production JSON routing, Bus queues and per-target receipts are unchanged.

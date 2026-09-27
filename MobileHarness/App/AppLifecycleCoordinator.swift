@@ -20,14 +20,13 @@ final class AppLifecycleCoordinator {
     private var conversationPresentation = ConversationPresentation()
     private(set) var liveTranscript = ""
     private(set) var assistantReply = ""
-    private(set) var expression: String?
-    private(set) var expressionID = UUID()
-    private(set) var playbackLevel: Float = 0
+    private(set) var expression: UIActions.Emotion?
+    private(set) var playbackSpectrum = AudioSpectrum.silence
+    private(set) var microphoneSpectrum = AudioSpectrum.silence
     private var startupTask: Task<Void, Never>?
     private(set) var isReady = false
     private(set) var voiceStatus = "点击麦克风开始持续对话"
     private(set) var voiceGeneration: UUID?
-    private(set) var audioLevel: Float = 0
     var isVoiceActive: Bool { voiceGeneration != nil }
     private let audio: AppleAudioIO
     private let voiceActivity: any VoiceActivityCapability
@@ -97,9 +96,9 @@ final class AppLifecycleCoordinator {
             guard let self else { throw CancellationError() }
             try await self.present(text, invocation: invocation)
         }
-        runtime.presentation.emotion = { [weak self] emoji, invocation in
+        runtime.presentation.emotion = { [weak self] emotion, invocation in
             guard let self else { throw CancellationError() }
-            try await self.presentExpression(emoji, invocation: invocation)
+            try await self.presentExpression(emotion, invocation: invocation)
         }
         runtime.presentation.transcript = { [weak self] text, invocation in
             guard let self else { throw CancellationError() }
@@ -247,16 +246,35 @@ final class AppLifecycleCoordinator {
                 var timestamp = 0.0
                 var sequence: UInt64 = 0
                 var suspended = false
+                var meterSamples: [Float] = []
+                let meterClock = ContinuousClock()
+                var lastMeterUpdate = meterClock.now
+                var meterRate = 0
                 do {
                     for try await frame in frames {
                         try Task.checkCancellation()
                         guard let self, self.voiceGeneration == generation else { return }
                         if !self.handlingTurn {
-                            let level = min(max((frame.rms - 0.003) * 16, 0), 1)
-                            self.audioLevel = self.audioLevel * 0.65 + level * 0.35
+                            if meterRate != frame.sampleRate {
+                                meterSamples.removeAll(keepingCapacity: true)
+                                self.microphoneSpectrum = AudioSpectrum.silence
+                                meterRate = frame.sampleRate
+                            }
+                            meterSamples.append(contentsOf: frame.samples.suffix(AudioSpectrum.sampleCount))
+                            if meterSamples.count > AudioSpectrum.sampleCount {
+                                meterSamples.removeFirst(meterSamples.count - AudioSpectrum.sampleCount)
+                            }
+                            if lastMeterUpdate.duration(to: meterClock.now) >= .milliseconds(33) {
+                                self.microphoneSpectrum = AudioSpectrum.smooth(
+                                    AudioSpectrum.measure(meterSamples, sampleRate: frame.sampleRate),
+                                    previous: self.microphoneSpectrum)
+                                lastMeterUpdate = meterClock.now
+                            }
                         }
                         guard !self.handlingTurn else {
                             if !suspended {
+                                meterSamples.removeAll(keepingCapacity: true)
+                                self.microphoneSpectrum = AudioSpectrum.silence
                                 await resampler.reset()
                                 suspended = true
                             }
@@ -332,14 +350,14 @@ final class AppLifecycleCoordinator {
         let previousResponses = responses
         let previousResponse = responseTask
         expression = nil
-        expressionID = UUID()
         voiceGeneration = nil
         conversationPresentation = ConversationPresentation()
         playbackActive = false
         assistantReply = ""
         liveTranscript = ""
         presentationPhase = message == "语音已停止" || message == "已提交，语音已结束" ? .idle : .failed
-        playbackLevel = 0
+        playbackSpectrum = AudioSpectrum.silence
+        microphoneSpectrum = AudioSpectrum.silence
         startupTask?.cancel()
         let previousStartup = startupTask
         startupTask = nil
@@ -377,7 +395,7 @@ final class AppLifecycleCoordinator {
         routeTask?.cancel()
         routeTask = nil
         audio.stop()
-        audioLevel = 0
+        microphoneSpectrum = AudioSpectrum.silence
         handlingTurn = false
         voiceStatus = message
     }
@@ -411,20 +429,25 @@ final class AppLifecycleCoordinator {
         let samples = frame.data.withUnsafeBytes { bytes in
             (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
         }
-        let envelope = Task { [weak self] in
-            let size = max(1, frame.format.sampleRate / 30)
-            for offset in stride(from: 0, to: samples.count, by: size) {
-                guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                let window = samples[offset..<min(samples.count, offset + size)]
-                let rms = sqrt(window.reduce(Float.zero) { $0 + $1 * $1 } / Float(window.count))
-                self.playbackLevel = min(rms * 9, 1)
-                do { try await Task.sleep(for: .seconds(Double(window.count) / Double(frame.format.sampleRate))) } catch
-                { return }
+        let meter = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, self.voiceGeneration == generation else { return }
+                if let cursor = self.audio.playbackSampleOffset {
+                    let end = min(samples.count, cursor)
+                    let start = max(0, end - AudioSpectrum.sampleCount)
+                    let window = samples[start..<end]
+                    self.playbackSpectrum = AudioSpectrum.smooth(
+                        AudioSpectrum.measure(window, sampleRate: frame.format.sampleRate),
+                        previous: self.playbackSpectrum)
+                }
+                do { try await Task.sleep(for: .milliseconds(33)) } catch { return }
             }
         }
         defer {
-            envelope.cancel()
-            if voiceGeneration == generation { playbackLevel = 0 }
+            meter.cancel()
+            if voiceGeneration == generation {
+                playbackSpectrum = AudioSpectrum.silence
+            }
         }
         playbackActive = true
         defer { if voiceGeneration == generation { playbackActive = false } }
@@ -454,7 +477,6 @@ final class AppLifecycleCoordinator {
         guard conversationPresentation.accept(invocation.envelope, update: .beginReply) else { return }
         assistantReply = ""
         expression = nil
-        expressionID = UUID()
     }
 
     private func presentVoiceState(_ state: UIActions.VoiceState, invocation: ActionInvocation) throws {
@@ -469,7 +491,7 @@ final class AppLifecycleCoordinator {
         switch state {
         case .processing:
             presentationPhase = .processing
-            audioLevel = 0
+            microphoneSpectrum = AudioSpectrum.silence
             voiceStatus = "正在识别 · 暂停接收新语句"
         case .hearing:
             presentationPhase = .listening
@@ -480,12 +502,11 @@ final class AppLifecycleCoordinator {
         }
     }
 
-    private func presentExpression(_ emoji: String, invocation: ActionInvocation) throws {
+    private func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.envelope, update: .expression) else { return }
-        expression = emoji.isEmpty ? nil : emoji
-        expressionID = UUID()
+        expression = emotion == .clear ? nil : emotion
     }
 
     private func present(_ text: String, invocation: ActionInvocation) throws {

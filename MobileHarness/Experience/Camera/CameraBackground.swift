@@ -82,7 +82,7 @@ struct CameraConversationSurface<Content: View>: View {
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
-            .padding(.top, 12)
+            .padding(.top, 64)
         }
         .preferredColorScheme(.dark)
         .task {

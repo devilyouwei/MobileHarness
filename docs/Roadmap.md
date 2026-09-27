@@ -261,3 +261,14 @@ Validation: root scripts/check.sh passed (82 IntegrationTests), all four simulat
 ✅ High-priority visual freshness fixes: bounded independent publication, latest-only skeleton output and optional maximum refresh interval (App 100 ms). ❌ Device latency/thermal measurement and actual Photographer motion control remain pending. See ADR 0044.
 
 Validation (2026-09-26): root checks passed, including 86 IntegrationTests; all four simulator schemes and the unsigned physical Release build passed. No phone installation or physical-device performance measurement was performed.
+
+✅ Product UI refinement: face-proportioned procedural eyes, below-island violet reply spectrum and bottom blue microphone spectrum. Hann-windowed FFT and render-cursor synchronization replace synthetic waves. ❌ Physical-device spectral readability, route-dependent acoustic latency and sustained power acceptance remain pending. See ADR 0045.
+
+✅ Procedural eye expression system: semantic emotions replace emoji throughout the presentation chain; stable paths and damped interpolation handle interrupted transitions. Sad/scared/thinking/playful presets are available. ❌ Complex authored performance sequences, real tracking and measured device animation performance remain pending. See ADR 0046.
+
+## Explicit input routing cleanup (ADR 0047)
+
+✅ Removed SignalRouter/LogicRouter and the submit fallback; migrated ToolResult delivery and tests to publish/send. Static-policy tests cover unavailable-target isolation, missing policy/subscribers and directed input validation. Package and Xcode directory references are updated.
+❌ Dynamic routing/subscriptions and additional transport guarantees remain outside this cleanup.
+
+Validation (2026-09-27): scripts/check.sh passed with full Xcode selected, including 92 IntegrationTests; scripts/build-ios.sh passed all four unsigned simulator schemes. No physical-device validation was performed.

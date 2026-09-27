@@ -52,3 +52,9 @@ Current layer ownership is defined in the [ModelKit / PlatformKit comparison](..
 ✅ ADR 0043 records turn-scoped captions, atomic reply reset and actual-playback presentation.
 
 ✅ [Visual freshness](adr/0044-visual-freshness.md) records Agent-local latency isolation without Gateway protocol changes.
+
+✅ [Audio spectrum telemetry](adr/0045-audio-spectrum-telemetry.md) records bounded FFT processing and render-cursor synchronization.
+
+✅ [Semantic eye expressions](adr/0046-semantic-eye-expressions.md) records the no-emoji Action payload and native continuous animation design.
+
+✅ [ADR 0047](adr/0047-explicit-input-routing.md) removes legacy input routers and default-Agent fallback; current Gateway entry points are publish and send.

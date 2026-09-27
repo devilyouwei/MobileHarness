@@ -1,27 +1,62 @@
-# Resources — Packaged Assets and Model Download Profiles
+# Resources — App Assets and Local Models
 
-Resources stores non-executable application resources and declarations. Architecture section 37 reserves model, prompt, and asset areas; directories are created only when they have actual content.
+Stores privacy declarations, visual assets and development download profiles. The goal is reproducible local packaging without committing weights, user media, credentials or signing settings. This directory is resource storage, not a Swift runtime module.
 
-## Direct relationships
+## Directory structure
 
-These are build-time packaging and load-time resource relationships, not message-processing stages.
+```text
+Resources/
+├── PrivacyInfo.xcprivacy       # App privacy declarations
+├── Assets.xcassets/
+│   ├── Contents.json          # Asset catalog metadata
+│   └── AppIcon.appiconset/     # Shared app icon and metadata
+├── Models/
+│   ├── *.download.json        # Pinned development download profiles
+│   └── <model directory>/     # Ignored local weights, created by download scripts
+└── README.md                  # Packaging boundary and status
+```
+
+## Upstream and downstream
+
+Arrows show download, packaging and resource loading.
 
 ```mermaid
 flowchart LR
-    Resources -->|Privacy declarations and packaged resource locations| App
-    Resources -->|Local model directories via App| ModelKit
+    Upstream[Model repositories / release assets] --> Scripts[Download scripts]
+    Scripts --> Resources
+    Resources --> Build[Xcode staging and asset compilation]
+    Build --> App[App bundle]
+    App -->|Local resource root| Models[ModelKitDefaults / adapters]
+    App -->|Privacy declarations| OS[Operating system]
 ```
 
-## Implementation status
+## Internal flow
 
-- ✅ [Models](Models/README.md): development-only download profiles and flat model directories.
-- ✅ `PrivacyInfo.xcprivacy`: application privacy declarations for relevant system APIs and data practices.
-- ✅ Local artifact download and platform selection workflows; weights are excluded from version control.
-- ✅ `Assets.xcassets/AppIcon.appiconset`: 1024 × 1024 full-bleed app icon shared by device and simulator app targets. iOS supplies the corner mask.
-- ❌ Dedicated `Prompts/` collection and separately art-directed icon appearance variants.
+```mermaid
+flowchart TD
+    Profile[Models download profile] --> Download[Download to temporary files]
+    Download --> Local[Ignored local model directory]
+    Local --> Stage[Select models and include licenses]
+    Privacy[PrivacyInfo.xcprivacy] --> Bundle[App resources]
+    Icon[Assets.xcassets] --> Bundle
+    Stage --> Bundle
+    Bundle --> Loader[Adapter validates and loads local files]
+```
 
-App and build configuration select and package resources. ModelKit and its adapters validate and load model artifacts and perform inference. Resources does not own model lifecycle, execution, or business logic. Never commit model weights, user media, credentials, or local signing configuration.
+Production uses Nemotron ASR, Qwen3.5-2B chat, Silero VAD and YOLO26n-Pose. System TTS uses Apple voices. Kokoro is diagnostic TTS; Audio8 and Qwen3.5-4B profiles are retained for comparison, not normal App inference. Profiles are development inputs, not runtime manifests.
 
-## Maintenance
+Download scripts own bounded workers, temporary files and failures; [Models](Models/README.md) documents that workflow. YOLO's profile pins archive/member hashes. Other profiles pin revisions without universal per-file checksum verification. App/build settings choose packaged resources; ModelKit owns loading and execution.
 
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+## Feature status
+
+- ✅ Privacy manifest, shared 1024 × 1024 app icon and model download profiles.
+- ✅ Local model staging with licenses; weights remain ignored by Git.
+- ❌ In-app model downloads, automatic cache repair and separate icon appearance variants.
+- ❌ Dedicated Prompts collection; current Agent configuration is bundled from Agents.
+
+## Issue record
+
+| Status | Issue / next step |
+| --- | --- |
+| Open | Confirm package size, startup and model behavior on physical devices; local files alone do not prove readiness. |
+| Resolved — 2026-09-27 audit | Distinguished active models, diagnostics and comparison-only profiles; removed obsolete artifact-layout wording. |

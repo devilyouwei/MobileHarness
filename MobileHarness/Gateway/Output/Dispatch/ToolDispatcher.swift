@@ -9,7 +9,7 @@ struct ToolDispatcher: Sendable {
     func dispatch(_ call: ToolCall, envelope: OutputEnvelope) async throws {
         guard let result = try await ToolExecutor(registry: registry).execute(call, envelope: envelope) else { return }
         try Task.checkCancellation()
-        let report = try await input.submit(
+        let report = try await input.send(
             AgentInput(sessionID: envelope.sessionID, payload: .toolResult(result), turn: envelope.turn),
             to: envelope.source)
         guard report.rejected.isEmpty else { throw HarnessError.notRunning }
