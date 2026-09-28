@@ -1,5 +1,7 @@
 # 0029 — Exclusive Channel Ownership
 
+> Scheduling update: [ADR 0059](0059-structured-wait-scheduling.md) supersedes shared cross-task Channel lanes and introduces typed nested wait groups. This document retains its historical decision context; Channel ownership/takeover remains planned.
+
 Status: ownership value definitions implemented; runtime lock behavior is design-only.
 
 ## Decision

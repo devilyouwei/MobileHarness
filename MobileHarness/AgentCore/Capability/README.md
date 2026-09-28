@@ -49,3 +49,6 @@ Update this README when changing files, validation or configuration semantics. �
 
 
 ✅ JSON v4 requires communication inputs, subscriptions, publications and sends; nested fields are strictly validated. App validates the closed cross-Agent policy before creating runtime consumers. Agent descriptors derive accepted kinds from the configuration. ❌ Request/reply schemas and dynamic policy updates remain deferred.
+
+
+✅ The registry no longer implicitly adds main; only configured/default channels are allowed. wait is a reserved alias. JSON remains v4; example parsing validates nested wait/Channel syntax. CapabilityContextBuilder supplies system scheduling rules followed by the registered visible Action list; no production action list is copied into the prompt. ❌ Semantic parameter-value validation still belongs to handlers.

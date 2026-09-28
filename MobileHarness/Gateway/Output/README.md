@@ -7,7 +7,7 @@ Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter C
 - ✅ assistant.finished waits for all admitted Actions of its source Agent/input; assistant.error cancels that input's Actions.
 - ✅ Session cancellation covers the session across Agents. ToolCalls bypass Action queues.
 - ✅ Resolved ActionCall/ToolCall inputs and runtime control notifications. Raw text and FunctionToken events are not accepted.
-- ✅ Channel FIFO, bounded admission and module exclusion. Different channels may run concurrently when modules permit; main is an ordinary channel.
+- ✅ Task-local Channel FIFO and nested wait groups, bounded admission and process-wide module exclusion. Different channels may run concurrently when modules permit; main is an ordinary channel.
 - ✅ Depends on ActionRuntime and App-registered handlers, not concrete Actions.
 - ❌ Unified ActionResult-to-Signal feedback, priorities, preemption and general resource declarations.
 
@@ -15,12 +15,12 @@ Keep this README synchronized with current interfaces, bounds and ✅/❌ status
 
 ## Queue and asynchronous processing contract
 
-OutputGateway owns no additional FIFO. Its caller supplies ordered envelopes (the App currently awaits each dispatch). Actor isolation alone is not a guarantee that independent concurrent callers finish in order across awaits. Validation precedes routing. Action calls await ChannelScheduler admission; successful dispatch does not mean the Action has completed. Terminal finish waits for the input's Action barrier; cancellation waits for cooperative Action cleanup. Tool calls await execution and result submission before the observation sink runs. Errors propagate to the caller; there is no automatic replay.
+OutputGateway owns no additional FIFO. Its caller supplies ordered envelopes (the App currently awaits each dispatch). Actor isolation alone is not a guarantee that independent concurrent callers finish in order across awaits. Validation precedes routing. Action calls and typed wait boundaries await ChannelScheduler admission; successful dispatch does not mean the Action has completed. Terminal finish waits for the input's Action barrier; cancellation waits for cooperative Action cleanup. Tool calls await execution and result submission before the observation sink runs. Errors propagate to the caller; there is no automatic replay.
 
 ```mermaid
 flowchart LR
     Caller[Ordered envelope consumer] --> Validate[Validate and route]
-    Validate -->|actionCall| Admit[Channel admission]
+    Validate -->|actionCall / scheduling| Admit[Channel admission]
     Validate -->|tool| Tool[Await tool and input result delivery]
     Validate -->|finish / cancel| Barrier[Await Action barrier]
     Admit --> Sink[Observation sink]
@@ -56,3 +56,6 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Directed speech.synthesize/speech.cancel requests use the authorized send path. Gateway validates Action declarations and performs Channel admission only. Audio ID lookup, ownership and readiness checks happen inside the scheduled playback handler. The output consumer handles rejected-admission resources; session owners handle cache cancellation independently of Gateway. ❌ Synthesis readiness is not a delivery receipt.
 
 ✅ Speech synthesis/cancel commands are newly generated work with a fresh 10-second admission deadline, preserving parent ID, root, hops, session and turn. They do not inherit the original input’s sensor-routing expiration; source identity/session validation and sender generation cancellation still apply. Forwarded perception observations continue to inherit the parent deadline. This prevents late generated segments from failing merely because the already-admitted input is older than 10 seconds.
+
+
+✅ Actions and typed wait boundaries enter one task-local execution tree. beginWait joins parent-prefix work; endWait seals the group, and its completed subtree releases the parent continuation. Gateway cancels the task on validation, Action/boundary admission or terminal finish errors. All envelopes must be supplied in order by the output pump. ❌ Concurrent callers for the same task have no implicit ordering guarantee.

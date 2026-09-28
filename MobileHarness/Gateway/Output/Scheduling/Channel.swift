@@ -17,7 +17,7 @@ extension ChannelScheduler {
         case locked(ChannelLockOwner)
     }
 
-    /// FIFO state isolated by ChannelScheduler; capacity includes the running action.
+    /// One task/phase/channel FIFO. Global name capacity includes dormant and running actions.
     struct Channel {
         // Immutable until lock admission and execution-time enforcement are implemented together.
         let lockState: ChannelLockState = .unlocked

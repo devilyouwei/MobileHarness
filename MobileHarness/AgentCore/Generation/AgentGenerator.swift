@@ -18,11 +18,11 @@ public struct AgentGenerator: Sendable {
         self.textActions = textActions
     }
 
-    public mutating func append(_ fragment: String) throws -> [ActionCall] {
+    public mutating func append(_ fragment: String) throws -> [GenerationEvent] {
         try append(Data(fragment.utf8))
     }
 
-    public mutating func append(_ bytes: Data) throws -> [ActionCall] {
+    public mutating func append(_ bytes: Data) throws -> [GenerationEvent] {
         guard !closed else { throw GenerationError.closed }
         do { return try interpret(parser.append(bytes)) } catch {
             closed = true
@@ -30,7 +30,7 @@ public struct AgentGenerator: Sendable {
         }
     }
 
-    public mutating func finish() throws -> [ActionCall] {
+    public mutating func finish() throws -> [GenerationEvent] {
         guard !closed else { throw GenerationError.closed }
         do {
             var output = try interpret(parser.finish())
@@ -49,8 +49,8 @@ public struct AgentGenerator: Sendable {
             .replacingOccurrences(of: ">", with: "&gt;")
     }
 
-    private mutating func interpret(_ tokens: [FunctionToken]) throws -> [ActionCall] {
-        var result: [ActionCall] = []
+    private mutating func interpret(_ tokens: [FunctionToken]) throws -> [GenerationEvent] {
+        var result: [GenerationEvent] = []
         for token in tokens {
             switch token {
             case .text(let text, let channel):
@@ -64,23 +64,27 @@ public struct AgentGenerator: Sendable {
                 result += try mapText(sentences.append(text))
             case .boundary:
                 result += try flush()
+            case .scheduling(let directive):
+                result += try flush()
+                result.append(.scheduling(directive))
             case .action(let alias, let parameters, let channel):
                 result += try flush()
                 try reserve(1)
-                result.append(try capabilities.resolveAction(alias, parameters: parameters, channel: channel))
+                result.append(.action(try capabilities.resolveAction(alias, parameters: parameters, channel: channel)))
             }
         }
         return result
     }
 
-    private mutating func flush() throws -> [ActionCall] { try mapText(sentences.finish()) }
+    private mutating func flush() throws -> [GenerationEvent] { try mapText(sentences.finish()) }
 
-    private mutating func mapText(_ chunks: [String]) throws -> [ActionCall] {
-        var output: [ActionCall] = []
+    private mutating func mapText(_ chunks: [String]) throws -> [GenerationEvent] {
+        var output: [GenerationEvent] = []
         for chunk in chunks {
             try reserve(textActions.count)
             for alias in textActions {
-                output.append(try capabilities.resolveAction(alias, parameters: ["text": chunk], channel: textChannel))
+                output.append(
+                    .action(try capabilities.resolveAction(alias, parameters: ["text": chunk], channel: textChannel)))
             }
         }
         return output

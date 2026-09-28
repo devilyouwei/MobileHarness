@@ -120,7 +120,10 @@ public actor OutputGateway {
         try Task.checkCancellation()
         let descriptor = try await manager.agent(envelope.source).descriptor
         try Task.checkCancellation()
-        try OutputValidator.validate(envelope.output, descriptor: descriptor)
+        do { try OutputValidator.validate(envelope.output, descriptor: descriptor) } catch {
+            await actions.cancel(envelope)
+            throw error
+        }
         switch try ExecutionRouter.route(envelope.output) {
         case .action(let token):
             do {
@@ -130,10 +133,18 @@ public actor OutputGateway {
                 await actions.cancel(envelope)
                 throw error
             }
+        case .scheduling(let directive):
+            do { try await actions.schedule(directive, envelope: envelope) } catch {
+                await actions.cancel(envelope)
+                throw error
+            }
         case .tool(let call):
             try await tools.dispatch(call, envelope: envelope)
         case .finish:
-            try await actions.finish(envelope)
+            do { try await actions.finish(envelope) } catch {
+                await actions.cancel(envelope)
+                throw error
+            }
         case .cancel:
             await actions.cancel(envelope)
         case .observe: break

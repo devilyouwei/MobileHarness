@@ -2,45 +2,59 @@ import ActionRuntime
 import AgentCore
 import Foundation
 
-/// Each resolved channel owns a FIFO lane. A handler must await its actual work (including playback).
+/// Task-local structured execution groups with process-wide module exclusion.
 public actor ChannelScheduler {
     struct InputKey: Hashable {
         let source: AgentID
         let inputID: UUID
     }
-
     private enum Outcome: Sendable {
         case success
         case failure(any Error)
-
-        func get() throws {
-            if case .failure(let error) = self { throw error }
-        }
+        func get() throws { if case .failure(let error) = self { throw error } }
     }
-
     struct Job: Sendable {
         let id = UUID()
         let sequence: UInt64
+        let phase: Int
         let path: ActionPath
         let invocation: ActionInvocation
-        var inputKey: InputKey {
-            InputKey(source: invocation.envelope.source, inputID: invocation.envelope.inputID)
-        }
+        var inputKey: InputKey { InputKey(source: invocation.envelope.source, inputID: invocation.envelope.inputID) }
     }
-
     struct Running {
         let job: Job
         let task: Task<Void, Never>
     }
-
-    private struct InputState {
+    private enum Entry {
+        case phase(Int)
+        case group(Int)
+    }
+    private struct Group {
+        var entries: [Entry]
+        var cursor = 0
+        var closed = false
+    }
+    private struct Phase {
+        var lanes: [String: Channel] = [:]
+        var closed = false
+        var empty: Bool { lanes.values.allSatisfy { $0.count == 0 } }
+    }
+    /// Reference state is owned exclusively by this actor; it never crosses an executor boundary.
+    private final class InputState {
         let sessionID: UUID
         let completion: Task<Outcome, Never>
         let signal: AsyncStream<Outcome>.Continuation
+        var phases = [Phase()]
+        var groups = [Group(entries: [.phase(0)])]
+        var stack = [0]
+        var writePhase = 0
+        var acceptedActions = 0
         var pending = 0
         var failure: (any Error)?
         var finishing = false
         var cancelling = false
+        // Failed tasks remain fenced until their producer finishes or explicit cancellation joins them.
+        var settled = false
 
         init(sessionID: UUID) {
             self.sessionID = sessionID
@@ -51,14 +65,26 @@ public actor ChannelScheduler {
                 return .failure(CancellationError())
             }
         }
+        func activePhase(in groupID: Int = 0) -> Int? {
+            while groups[groupID].cursor < groups[groupID].entries.count {
+                switch groups[groupID].entries[groups[groupID].cursor] {
+                case .phase(let phase):
+                    if !phases[phase].closed || !phases[phase].empty { return phase }
+                case .group(let child):
+                    if let phase = activePhase(in: child) { return phase }
+                    if !groups[child].closed { return nil }
+                }
+                groups[groupID].cursor += 1
+            }
+            return nil
+        }
     }
-
     private let registry: ActionRegistry
     private let capacityPerChannel: Int
     private let maximumChannels: Int
     private let maximumTrackedInputs: Int
-    private var lanes: [String: Channel] = [:]
     private var inputs: [InputKey: InputState] = [:]
+    private var channelCounts: [String: Int] = [:]
     private var isShutdown = false
     private var sequence: UInt64 = 0
     private var busyModules: Set<String> = []
@@ -68,55 +94,97 @@ public actor ChannelScheduler {
         maximumChannels: Int = 16
     ) {
         precondition(capacityPerChannel > 0 && maximumTrackedInputs > 0 && maximumChannels > 0)
-        self.maximumChannels = maximumChannels
         self.registry = registry
         self.capacityPerChannel = capacityPerChannel
         self.maximumTrackedInputs = maximumTrackedInputs
+        self.maximumChannels = maximumChannels
     }
-
-    /// Returns after admission; overflow rejects the action without evicting another action.
+    private func state(for envelope: OutputEnvelope) throws -> InputState {
+        try Task.checkCancellation()
+        guard !isShutdown else { throw ActionExecutionError.shutdown }
+        let key = InputKey(source: envelope.source, inputID: envelope.inputID)
+        if let state = inputs[key] {
+            guard state.sessionID == envelope.sessionID else { throw ActionExecutionError.inputSessionMismatch }
+            if let error = state.failure { throw error }
+            guard !state.finishing && !state.cancelling else { throw ActionExecutionError.inputClosing }
+            return state
+        }
+        guard inputs.count < maximumTrackedInputs else { throw ActionExecutionError.inputCapacityExceeded }
+        let state = InputState(sessionID: envelope.sessionID)
+        inputs[key] = state
+        return state
+    }
+    /// Returns after admission, never after execution. All dormant jobs count toward capacity.
     public func enqueue(path: ActionPath, invocation: ActionInvocation) throws {
         try Task.checkCancellation()
         guard !isShutdown else { throw ActionExecutionError.shutdown }
         _ = try registry.handler(for: path)
         guard path == invocation.call.actionPath else { throw ActionExecutionError.invalidCall }
-        guard lanes[invocation.call.channel] != nil || lanes.count < maximumChannels else {
+        let channel = invocation.call.channel
+        guard channelCounts[channel] != nil || channelCounts.count < maximumChannels else {
             throw ActionExecutionError.channelCountExceeded
         }
-        let key = InputKey(source: invocation.envelope.source, inputID: invocation.envelope.inputID)
-        if let state = inputs[key] {
-            guard state.sessionID == invocation.envelope.sessionID else {
-                throw ActionExecutionError.inputSessionMismatch
-            }
-            guard !state.finishing && !state.cancelling else { throw ActionExecutionError.inputClosing }
-            if let error = state.failure { throw error }
-        } else {
-            guard inputs.count < maximumTrackedInputs else { throw ActionExecutionError.inputCapacityExceeded }
+        guard channelCounts[channel, default: 0] < capacityPerChannel else {
+            throw ActionExecutionError.channelCapacityExceeded(channel)
         }
-        guard (lanes[invocation.call.channel]?.count ?? 0) < capacityPerChannel else {
-            throw ActionExecutionError.channelCapacityExceeded(invocation.call.channel)
-        }
-        if inputs[key] == nil {
-            inputs[key] = InputState(sessionID: invocation.envelope.sessionID)
-        }
-        inputs[key]?.pending += 1
+        let state = try state(for: invocation.envelope)
+        guard state.acceptedActions < 120 else { throw ActionExecutionError.taskActionLimitExceeded }
+        state.acceptedActions += 1
+        state.pending += 1
+        channelCounts[channel, default: 0] += 1
         sequence += 1
-        lanes[invocation.call.channel, default: Channel()].queued.append(
-            Job(sequence: sequence, path: path, invocation: invocation))
-        startNext(channel: invocation.call.channel)
+        state.phases[state.writePhase].lanes[channel, default: Channel()].queued.append(
+            Job(sequence: sequence, phase: state.writePhase, path: path, invocation: invocation))
+        startEligibleChannels()
     }
-
-    /// Seal one agent's input after its last token, then wait for its accepted actions.
-    /// At most one finish waiter may be active for each (agent, input) pair.
+    public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) throws {
+        let key = InputKey(source: envelope.source, inputID: envelope.inputID)
+        if directive == .endWait, inputs[key] == nil { throw ActionExecutionError.invalidSchedule }
+        let state = try state(for: envelope)
+        switch directive {
+        case .beginWait:
+            guard state.groups.count <= 32, state.stack.count <= 8 else {
+                throw ActionExecutionError.waitGroupLimitExceeded
+            }
+            let parent = state.stack.last!
+            state.phases[state.writePhase].closed = true
+            let child = state.groups.count
+            let phase = state.phases.count
+            state.groups[parent].entries.append(.group(child))
+            state.groups.append(Group(entries: [.phase(phase)]))
+            state.phases.append(Phase())
+            state.stack.append(child)
+            state.writePhase = phase
+        case .endWait:
+            guard state.stack.count > 1 else { throw ActionExecutionError.invalidSchedule }
+            state.phases[state.writePhase].closed = true
+            let child = state.stack.removeLast()
+            state.groups[child].closed = true
+            let parent = state.stack.last!
+            let phase = state.phases.count
+            state.phases.append(Phase())
+            state.groups[parent].entries.append(.phase(phase))
+            state.writePhase = phase
+        }
+        startEligibleChannels()
+    }
+    /// Seals the root group and joins all accepted work. Only one finish waiter is admitted.
     public func finish(inputID: UUID, source: AgentID = .assistant) async throws {
         let key = InputKey(source: source, inputID: inputID)
-        guard var state = inputs[key] else {
+        guard let state = inputs[key] else {
             try Task.checkCancellation()
             return
         }
         guard !state.finishing else { throw ActionExecutionError.duplicateFinish }
         state.finishing = true
-        inputs[key] = state
+        if state.stack.count != 1 {
+            state.failure = state.failure ?? ActionExecutionError.invalidSchedule
+            cancelJobs(key: key)
+        } else {
+            state.phases[state.writePhase].closed = true
+            state.groups[0].closed = true
+        }
+        startEligibleChannels()
         finalizeIfReady(key)
         let outcome = await withTaskCancellationHandler {
             await state.completion.value
@@ -126,105 +194,98 @@ public actor ChannelScheduler {
         try outcome.get()
         try Task.checkCancellation()
     }
-
-    /// Stop the producer before calling cancel, so it cannot admit later tokens for this ID.
-    /// Cancellation is cooperative; this barrier waits for running handlers to return.
     public func cancel(inputID: UUID, source: AgentID = .assistant) async {
         let key = InputKey(source: source, inputID: inputID)
         guard let completion = inputs[key]?.completion else { return }
         beginCancellation(key)
         _ = await completion.value
     }
-
     public func cancel(sessionID: UUID) async {
         let selected = inputs.filter { $0.value.sessionID == sessionID }
         for key in selected.keys { beginCancellation(key) }
         for state in selected.values { _ = await state.completion.value }
     }
-
     public func shutdown() async {
         isShutdown = true
         let selected = inputs
         for key in selected.keys { beginCancellation(key) }
         for state in selected.values { _ = await state.completion.value }
     }
-
-    private func startNext(channel: String) {
-        guard var lane = lanes[channel], lane.running == nil else { return }
-        guard !lane.queued.isEmpty else {
-            lanes.removeValue(forKey: channel)
-            return
-        }
-        guard !busyModules.contains(lane.queued[0].path.module) else { return }
-        let job = lane.queued.removeFirst()
-        busyModules.insert(job.path.module)
-        let task = Task {
-            let outcome: Outcome
-            do {
-                try Task.checkCancellation()
-                try await ActionExecutor(registry: registry).execute(job.invocation)
-                try Task.checkCancellation()
-                outcome = .success
-            } catch {
-                outcome = .failure(error)
+    private func startEligibleChannels() {
+        var candidates: [Job] = []
+        for state in inputs.values where state.failure == nil && !state.cancelling {
+            guard let phase = state.activePhase() else { continue }
+            for lane in state.phases[phase].lanes.values where lane.running == nil {
+                if let first = lane.queued.first { candidates.append(first) }
             }
-            self.completed(job, outcome: outcome)
         }
-        lane.running = Running(job: job, task: task)
-        lanes[channel] = lane
+        for job in candidates.sorted(by: { $0.sequence < $1.sequence }) {
+            guard !busyModules.contains(job.path.module), let state = inputs[job.inputKey] else { continue }
+            let channel = job.invocation.call.channel
+            state.phases[job.phase].lanes[channel]?.queued.removeFirst()
+            busyModules.insert(job.path.module)
+            let task = Task {
+                let outcome: Outcome
+                do {
+                    try Task.checkCancellation()
+                    try await ActionExecutor(registry: registry).execute(job.invocation)
+                    try Task.checkCancellation()
+                    outcome = .success
+                } catch { outcome = .failure(error) }
+                self.completed(job, outcome: outcome)
+            }
+            state.phases[job.phase].lanes[channel]?.running = Running(job: job, task: task)
+        }
     }
-
     private func completed(_ job: Job, outcome: Outcome) {
-        guard lanes[job.invocation.call.channel]?.running?.job.id == job.id else { return }
-        lanes[job.invocation.call.channel]?.running = nil
+        guard let state = inputs[job.inputKey],
+            state.phases[job.phase].lanes[job.invocation.call.channel]?.running?.job.id == job.id
+        else { return }
+        state.phases[job.phase].lanes[job.invocation.call.channel]?.running = nil
         busyModules.remove(job.path.module)
-        inputs[job.inputKey]?.pending -= 1
+        decrementChannel(job.invocation.call.channel, by: 1)
+        state.pending -= 1
         if case .failure(let error) = outcome {
-            if inputs[job.inputKey]?.failure == nil { inputs[job.inputKey]?.failure = error }
+            state.failure = state.failure ?? error
             cancelJobs(key: job.inputKey)
         }
         finalizeIfReady(job.inputKey)
         startEligibleChannels()
     }
-
-    /// Preserve admission order between ready heads competing for the same physical module.
-    private func startEligibleChannels() {
-        let ready = lanes.keys.sorted {
-            (lanes[$0]?.queued.first?.sequence ?? UInt64.max) < (lanes[$1]?.queued.first?.sequence ?? UInt64.max)
-        }
-        for channel in ready { startNext(channel: channel) }
-    }
-
     private func beginCancellation(_ key: InputKey) {
-        guard inputs[key] != nil else { return }
-        inputs[key]?.cancelling = true
-        if inputs[key]?.failure == nil { inputs[key]?.failure = CancellationError() }
+        guard let state = inputs[key] else { return }
+        state.cancelling = true
+        state.failure = state.failure ?? CancellationError()
         cancelJobs(key: key)
-        startEligibleChannels()
         finalizeIfReady(key)
+        startEligibleChannels()
     }
-
+    private func decrementChannel(_ name: String, by count: Int) {
+        guard count > 0 else { return }
+        let remaining = channelCounts[name, default: 0] - count
+        if remaining == 0 { channelCounts.removeValue(forKey: name) } else { channelCounts[name] = remaining }
+    }
     private func cancelJobs(key: InputKey) {
-        for channel in Array(lanes.keys) {
-            guard var lane = lanes[channel] else { continue }
-            let before = lane.queued.count
-            lane.queued.removeAll { $0.inputKey == key }
-            inputs[key]?.pending -= before - lane.queued.count
-            if lane.running?.job.inputKey == key { lane.running?.task.cancel() }
-            if lane.count == 0 {
-                lanes.removeValue(forKey: channel)
-            } else {
-                lanes[channel] = lane
+        guard let state = inputs[key] else { return }
+        for phase in state.phases.indices {
+            for name in Array(state.phases[phase].lanes.keys) {
+                let count = state.phases[phase].lanes[name]?.queued.count ?? 0
+                state.pending -= count
+                decrementChannel(name, by: count)
+                state.phases[phase].lanes[name]?.queued.removeAll()
+                state.phases[phase].lanes[name]?.running?.task.cancel()
             }
         }
     }
-
     private func finalizeIfReady(_ key: InputKey) {
-        guard let state = inputs[key], state.pending == 0, state.finishing || state.cancelling else {
-            return
+        guard let state = inputs[key], state.pending == 0,
+            state.finishing || state.cancelling || state.failure != nil
+        else { return }
+        if !state.settled {
+            state.settled = true
+            state.signal.yield(state.failure.map { .failure($0) } ?? .success)
+            state.signal.finish()
         }
-        inputs.removeValue(forKey: key)
-        state.signal.yield(state.failure.map { .failure($0) } ?? .success)
-        state.signal.finish()
+        if state.finishing || state.cancelling { inputs.removeValue(forKey: key) }
     }
 }

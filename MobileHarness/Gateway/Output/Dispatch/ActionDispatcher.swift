@@ -12,6 +12,10 @@ struct ActionDispatcher: Sendable {
             path: token.actionPath, invocation: ActionInvocation(envelope: envelope, call: token))
     }
 
+    func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {
+        try await executor.schedule(directive, envelope: envelope)
+    }
+
     func finish(_ envelope: OutputEnvelope) async throws {
         try await executor.finish(inputID: envelope.inputID, source: envelope.source)
     }

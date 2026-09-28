@@ -10,4 +10,5 @@ public enum ActionExecutionError: Error, Equatable, Sendable {
     case duplicateFinish
     case shutdown
     case invalidText
+    case invalidSchedule, taskActionLimitExceeded, waitGroupLimitExceeded
 }

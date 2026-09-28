@@ -35,12 +35,12 @@ public actor AssistantAgent: Agent {
         guard !configuration.textActions.isEmpty else { throw AgentConfigurationError.invalidField("textActions") }
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Assistant", inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.actionCall, .toolCall, .control], capabilities: configuration.capabilities)
+            outputs: [.actionCall, .toolCall, .control, .scheduling], capabilities: configuration.capabilities)
         textActions = configuration.textActions
         precondition(capacity > 0)
         self.capacity = capacity
         self.chat = chat
-        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(128))
+        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
         outputs = stream.stream
         continuation = stream.continuation
     }
@@ -243,8 +243,14 @@ public actor AssistantAgent: Agent {
             emit(.control("assistant.error: \(error)"), for: input)
         }
     }
-    private func emitFunctions(_ calls: [ActionCall], for input: AgentInput, count: inout Int) async throws {
-        for original in calls {
+    private func emitFunctions(_ calls: [GenerationEvent], for input: AgentInput, count: inout Int) async throws {
+        for event in calls {
+            if case .scheduling(let directive) = event {
+                try Task.checkCancellation()
+                guard emit(.scheduling(directive), for: input) else { throw HarnessError.queueFull }
+                continue
+            }
+            guard case .action(let original) = event else { continue }
             var call = original
             try Task.checkCancellation()
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }

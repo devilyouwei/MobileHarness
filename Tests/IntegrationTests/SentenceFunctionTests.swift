@@ -172,11 +172,12 @@ private struct ExcessiveSentencesChat: ChatCapability {
     let config = try AgentConfigurations.load(named: "Assistant")
     var generator = try AgentGenerator(capabilities: config.capabilities, textActions: ["say", "print"])
     #expect(try generator.append("你好，先想一下").isEmpty)
-    let calls =
-        try generator.append("<express emotion='thinking'/><channel.main>然后回答</channel.main>尾巴")
+    let events =
+        try generator.append("<express emotion='thinking'/><channel.Speech>然后回答</channel.Speech>尾巴")
         + generator.finish()
+    let calls = events.compactMap(\.actionCall)
     #expect(calls.map { $0.actionPath.function } == ["speak", "print", "express", "speak", "print", "speak", "print"])
     #expect(calls[0].parameters["text"] == "你好，先想一下")
-    #expect(calls[3].channel == "main" && calls[3].parameters["text"] == "然后回答")
+    #expect(calls[3].channel == "Speech" && calls[3].parameters["text"] == "然后回答")
     #expect(calls[5].parameters["text"] == "尾巴")
 }

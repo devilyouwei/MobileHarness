@@ -375,3 +375,224 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.finish(inputID: input.id)
     #expect(await log.values == ["first:start", "first:end", "second:start", "second:end"])
 }
+
+private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> OutputEnvelope {
+    OutputEnvelope(source: .assistant, input: input, output: .scheduling(directive))
+}
+
+@Test func waitGroupsJoinBeforeAndAfterWithoutBlockingIndependentTasks() async throws {
+    let beforeStarted = ActionTestGate()
+    let releaseBefore = ActionTestGate()
+    let insideStarted = ActionTestGate()
+    let releaseInside = ActionTestGate()
+    let displayStarted = ActionTestGate()
+    let releaseDisplay = ActionTestGate()
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            sayPath: { invocation in
+                let value = invocation.call.parameters["text"]!
+                await log.append(value + ":start")
+                if value == "before" {
+                    await beforeStarted.open()
+                    await releaseBefore.wait()
+                }
+                if value == "inside" {
+                    await insideStarted.open()
+                    await releaseInside.wait()
+                }
+                await log.append(value + ":end")
+            },
+            printPath: { invocation in
+                let value = invocation.call.parameters["text"]!
+                await log.append(value + ":start")
+                if value == "display" {
+                    await displayStarted.open()
+                    await releaseDisplay.wait()
+                }
+                await log.append(value + ":end")
+            },
+        ]))
+    let input = AgentInput(sessionID: UUID(), payload: .text("wait"))
+    let other = AgentInput(sessionID: UUID(), payload: .text("independent"))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("before", input: input))
+    await beforeStarted.wait()
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("inside", input: input))
+    try await scheduler.enqueue(path: printPath, invocation: actionInvocation("display", input: input, path: printPath))
+    try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    try await scheduler.enqueue(path: printPath, invocation: actionInvocation("after", input: input, path: printPath))
+    // Dormant UI jobs do not obstruct another task using the same channel and module.
+    try await scheduler.enqueue(path: printPath, invocation: actionInvocation("other", input: other, path: printPath))
+    try await scheduler.finish(inputID: other.id)
+    #expect(await log.values == ["before:start", "other:start", "other:end"])
+    await releaseBefore.open()
+    await insideStarted.wait()
+    await displayStarted.wait()
+    #expect(!(await log.values).contains("after:start"))
+    await releaseInside.open()
+    await releaseDisplay.open()
+    try await scheduler.finish(inputID: input.id)
+    let values = await log.values
+    #expect(values.firstIndex(of: "after:start")! > values.firstIndex(of: "inside:end")!)
+    #expect(values.firstIndex(of: "after:start")! > values.firstIndex(of: "display:end")!)
+}
+
+@Test func nestedWaitIsStreamingButUnclosedGroupCannotReleaseParentContinuation() async throws {
+    let ran = ActionTestGate()
+    let release = ActionTestGate()
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            sayPath: { invocation in
+                let value = invocation.call.parameters["text"]!
+                await log.append(value)
+                if value == "B" {
+                    await ran.open()
+                    await release.wait()
+                }
+            }
+        ]))
+    let input = AgentInput(sessionID: UUID(), payload: .text("nested"))
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("A", input: input))
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("B", input: input))
+    await ran.wait()  // Executes even before the inner group has closed.
+    try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("C", input: input))
+    try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("D", input: input))
+    #expect(await log.values == ["A", "B"])
+    await release.open()
+    try await scheduler.finish(inputID: input.id)
+    #expect(await log.values == ["A", "B", "C", "D"])
+}
+
+@Test func malformedSchedulesAndGroupCapacityFailAndCleanup() async throws {
+    let scheduler = ChannelScheduler(registry: ActionRegistry(handlers: [:]))
+    let input = AgentInput(sessionID: UUID(), payload: .text("limits"))
+    await #expect(throws: ActionExecutionError.invalidSchedule) {
+        try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    }
+    for _ in 0..<32 {
+        try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+        try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    }
+    await #expect(throws: ActionExecutionError.waitGroupLimitExceeded) {
+        try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    }
+    try await scheduler.finish(inputID: input.id)
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    await #expect(throws: ActionExecutionError.invalidSchedule) { try await scheduler.finish(inputID: input.id) }
+    for _ in 0..<8 { try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input)) }
+    await #expect(throws: ActionExecutionError.waitGroupLimitExceeded) {
+        try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    }
+    await scheduler.cancel(inputID: input.id)
+}
+
+@Test func waitFailureCancelsDormantGroupsAndFencesLateAdmission() async throws {
+    let started = ActionTestGate()
+    let release = ActionTestGate()
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            sayPath: { invocation in
+                if invocation.call.parameters["text"] == "probe" { return }
+                await started.open()
+                await release.wait()
+                throw ActionTestFailure.playback
+            },
+            printPath: { _ in await log.append("unexpected") },
+        ]))
+    let input = AgentInput(sessionID: UUID(), payload: .text("failure"))
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("fail", input: input))
+    await started.wait()
+    try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.enqueue(path: printPath, invocation: actionInvocation("dormant", input: input, path: printPath))
+    try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    await release.open()
+    // Acquiring the same module proves the failed handler was released and its task fenced.
+    let probe = AgentInput(sessionID: UUID(), payload: .text("probe"))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("probe", input: probe))
+    try await scheduler.finish(inputID: probe.id)
+    await #expect(throws: ActionTestFailure.playback) {
+        try await scheduler.enqueue(
+            path: printPath, invocation: actionInvocation("late", input: input, path: printPath))
+    }
+    await #expect(throws: ActionTestFailure.playback) { try await scheduler.finish(inputID: input.id) }
+    #expect(await log.values.isEmpty)
+}
+
+@Test func nestedWaitCancellationJoinsRunningCleanupAndDropsFuturePhases() async throws {
+    let started = ActionTestGate()
+    let cancelling = ActionTestGate()
+    let release = ActionTestGate()
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            sayPath: { _ in
+                await started.open()
+                await withTaskCancellationHandler {
+                    await release.wait()
+                } onCancel: {
+                    Task { await cancelling.open() }
+                }
+                await log.append("cleaned")
+            },
+            printPath: { invocation in await log.append(invocation.call.parameters["text"]!) },
+        ]))
+    let input = AgentInput(sessionID: UUID(), payload: .text("cancel"))
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("active", input: input))
+    await started.wait()
+    try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
+    try await scheduler.enqueue(
+        path: printPath, invocation: actionInvocation("must not run", input: input, path: printPath))
+    let cancellation = Task {
+        await scheduler.cancel(inputID: input.id)
+        await log.append("cancel returned")
+    }
+    await cancelling.wait()
+    #expect(await log.values.isEmpty)
+    let other = AgentInput(sessionID: UUID(), payload: .text("other"))
+    try await scheduler.enqueue(path: printPath, invocation: actionInvocation("other", input: other, path: printPath))
+    try await scheduler.finish(inputID: other.id)
+    #expect(await log.values == ["other"])
+    await release.open()
+    await cancellation.value
+    #expect(await log.values == ["other", "cleaned", "cancel returned"])
+}
+
+@Test func dormantActionsCountTowardGlobalChannelAndTaskBounds() async throws {
+    let input = AgentInput(sessionID: UUID(), payload: .text("bounds"))
+    let scheduler = ChannelScheduler(registry: ActionRegistry(handlers: [sayPath: { _ in }]), capacityPerChannel: 128)
+    for _ in 0..<120 {
+        try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("text", input: input))
+    }
+    await #expect(throws: ActionExecutionError.taskActionLimitExceeded) {
+        try await scheduler.enqueue(path: sayPath, invocation: actionInvocation("excess", input: input))
+    }
+    try await scheduler.finish(inputID: input.id)
+
+    let release = ActionTestGate()
+    let bounded = ChannelScheduler(
+        registry: ActionRegistry(handlers: [sayPath: { _ in await release.wait() }, printPath: { _ in }]),
+        capacityPerChannel: 1)
+    try await bounded.enqueue(path: sayPath, invocation: actionInvocation("before", input: input))
+    try await bounded.schedule(.beginWait, envelope: boundary(.beginWait, input))
+    try await bounded.enqueue(path: printPath, invocation: actionInvocation("dormant", input: input, path: printPath))
+    let other = AgentInput(sessionID: UUID(), payload: .text("other"))
+    await #expect(throws: ActionExecutionError.channelCapacityExceeded("UI")) {
+        try await bounded.enqueue(
+            path: printPath, invocation: actionInvocation("overflow", input: other, path: printPath))
+    }
+    await release.open()
+    await bounded.cancel(inputID: input.id)
+}

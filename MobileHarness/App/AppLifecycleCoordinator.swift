@@ -554,7 +554,7 @@ final class AppLifecycleCoordinator {
                 stopVoice(
                     message: "回复生成失败：" + String(state.dropFirst("assistant.error:".count)))
             }
-        case .actionCall: break
+        case .actionCall, .scheduling: break
         }
     }
     private func record(_ text: String) {

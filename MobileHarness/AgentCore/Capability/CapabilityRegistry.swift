@@ -6,13 +6,13 @@ public struct CapabilityRegistry: Sendable {
     public let tools: [ToolRegistration]
     public let channels: Set<String>
 
-    public init(actions: [ActionRegistration] = [], tools: [ToolRegistration] = [], channels: Set<String> = ["main"])
+    public init(actions: [ActionRegistration] = [], tools: [ToolRegistration] = [], channels: Set<String> = [])
         throws
     {
         guard actions.count + tools.count <= 128, channels.count <= 16 else { throw GenerationError.limitExceeded }
         let aliases = actions.map(\.alias) + tools.map(\.alias)
         guard Set(aliases).count == aliases.count else { throw GenerationError.duplicateAlias }
-        guard aliases.allSatisfy({ Self.validName($0) && !$0.hasPrefix("channel.") }),
+        guard aliases.allSatisfy({ Self.validName($0) && $0 != "wait" && !$0.hasPrefix("channel.") }),
             channels.allSatisfy(Self.validName),
             actions.allSatisfy({
                 Self.validName($0.defaultChannel) && Self.validName($0.path.module) && Self.validName($0.path.function)

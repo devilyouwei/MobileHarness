@@ -6,7 +6,10 @@ public struct GenerationTrace: Sendable {
     public static let maximumFragments = 8192
     public private(set) var raw = ""
     public private(set) var fragments: [String] = []
-    public private(set) var calls: [ActionCall] = []
+    public private(set) var events: [GenerationEvent] = []
+    public var calls: [ActionCall] {
+        events.compactMap { if case .action(let call) = $0 { call } else { nil } }
+    }
     public private(set) var parserError: String?
     public private(set) var finished = false
     private var closed = false
@@ -27,7 +30,7 @@ public struct GenerationTrace: Sendable {
         raw += delta
         fragments.append(delta)
         guard parserError == nil else { return }
-        do { calls += try generator.append(delta) } catch {
+        do { events += try generator.append(delta) } catch {
             parserError = "fragment \(fragments.count): \(error)"
         }
     }
@@ -38,7 +41,7 @@ public struct GenerationTrace: Sendable {
         closed = true
         finished = true
         guard parserError == nil else { return }
-        do { calls += try generator.finish() } catch {
+        do { events += try generator.finish() } catch {
             parserError = "finish: \(error)"
         }
     }

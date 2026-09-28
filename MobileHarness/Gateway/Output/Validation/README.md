@@ -8,3 +8,6 @@ Purpose: reject undeclared output before execution. Validation checks the source
 - ❌ Full JSON Schema and unified resource/device permissions. Platform adapters enforce their own permissions; capability allowlists do not grant hardware access.
 
 Update this README when changing the validation contract or implementation status.
+
+
+✅ Typed scheduling directives require OutputKind.scheduling in the Agent descriptor. Scheduler admission validates balanced boundaries, task/session identity and group bounds. OutputGateway cancels the owning task when output validation fails; raw wait XML is never accepted here. ❌ Tools are not members of Action wait groups.

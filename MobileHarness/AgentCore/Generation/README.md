@@ -7,7 +7,7 @@ Purpose: share incremental Agent-output parsing across Agents without depending 
 | Term | Definition |
 | --- | --- |
 | Function Token protocol | A mixed stream of natural text characters and restricted XML syntax. Text is a first-class part of the protocol, not content outside it. A document root is not required. |
-| FunctionToken | An internal parsed event: `.text`, `.action` or `.boundary`. It is not a model tokenizer token, a network fragment or necessarily one character. |
+| FunctionToken | An internal parsed event: `.text`, `.action`, `.boundary` or `.scheduling`. It is not a model tokenizer token, a network fragment or necessarily one character. |
 | FunctionTokenParser | Incrementally decodes UTF-8 and parses text, self-closing Action tags and paired Channel tags. It neither binds capabilities nor executes Actions. |
 | Action | A registered executable behavior, such as `Speech.speak` or `UI.express`. Its implementation owns parameter/value validation and behavior. |
 | ActionCall | One resolved Action invocation: ActionPath, string parameters and effective channel. It is distinct from raw FunctionToken events and model-native ToolCall invocations. |
@@ -17,24 +17,25 @@ A model tokenizer may split one XML tag across many model tokens. Conversely, on
 
 ## Syntax and meaning
 
-The protocol has three forms:
+The protocol has four forms:
 
 1. **Natural text**, such as `Hello.`: parsed as text and later mapped through the Agent's configured textActions. Assistant maps each accepted text chunk to say and print.
 2. **Self-closing XML Action tags**, such as `<express emotion="happy"/>`: parsed as an alias plus string attributes. AgentGenerator resolves the alias to a registered ActionPath.
-3. **Paired XML Channel tags**, such as `<channel.main>...</channel.main>`: control the channel scope for enclosed text and Actions. They emit boundary events but are not executable Actions.
+3. **Paired XML Channel tags**, such as `<channel.Speech>...</channel.Speech>`: control the channel scope for enclosed text and Actions. They emit boundary events but are not executable Actions.
+4. **Paired wait tags**, `<wait>...</wait>`: emit typed beginWait/endWait events and retain each enclosed Action's effective Channel. They form structured execution groups with entry/exit synchronization.
 
 ```xml
 Hello.
-<channel.main>
+<channel.Speech>
   <express emotion="happy"/>
   Good news!
   <channel.Display><express emotion="thinking"/></channel.Display>
-  Back in main.
-</channel.main>
+  Back in Speech.
+</channel.Speech>
 Back to each Action's default channel.
 ```
 
-All Action tags must be self-closing; `<say>Hello</say>` is invalid. Channel tags accept neither attributes nor self-closing syntax. Closing an inner channel restores its parent; closing the outermost channel restores a nil scope, which capability resolution replaces with each Action's default channel. `main` has no special global-blocking meaning in the current scheduler.
+All Action tags must be self-closing; `<say>Hello</say>` is invalid. Channel tags accept neither attributes nor self-closing syntax. Closing an inner channel restores its parent; closing the outermost channel restores a nil scope, which capability resolution replaces with each Action's default channel. No Channel name has special blocking meaning. Use wait for cross-channel synchronization.
 
 An Action is emitted as soon as its complete tag arrives, without waiting for channel closure. Action and channel boundaries first flush preceding text, preventing sentences from crossing scopes. Explicit speech calls do not automatically duplicate into display calls; only natural text uses textActions mapping. Hidden Actions remain registered but are omitted from model-facing instructions.
 
@@ -47,7 +48,7 @@ Each generation owns one parser, one bounded channel stack and one sentence buff
 1. Incrementally decode UTF-8 and retain only incomplete byte/entity/tag state and pending text.
 2. Parse completed tags; update ChannelParser scopes and emit text, Action or boundary events in order.
 3. AgentGenerator accumulates text in SentenceFunctionBuffer. At sentence or protocol boundaries, flush text and resolve the configured text-action aliases.
-4. Resolve explicit Action aliases and parameters through CapabilityRegistry. Return ordered ActionCalls to the Agent for its bounded output stream.
+4. Resolve explicit Action aliases and parameters through CapabilityRegistry. Return ordered GenerationEvents (resolved Actions and scheduling directives) to the Agent for its bounded output stream.
 5. On normal termination, call `finish` to flush valid remaining text and reject incomplete syntax. On cancellation, discard state instead of flushing partial output.
 
 ```mermaid
@@ -79,13 +80,14 @@ For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression c
 | Input per generation | 65,536 UTF-8 bytes |
 | One XML tag | 4096 UTF-8 bytes |
 | Tags per generation | 1024 |
-| Nested channels | 8 |
+| Combined Channel / wait nesting | 8 |
+| Wait groups | 32 per generation |
 | Attributes per tag | 32 |
 | Sentence text buffer | 2000 UTF-8 bytes |
-| Resolved calls per generation | 120, within the Agent's 128-envelope output buffer |
+| Resolved calls per generation | 120, within the Agent's 256-envelope output buffer |
 | Complete native tool argument JSON | 4096 UTF-8 bytes; string values only |
 
-Errors and limits terminate that parser/generator instance; it cannot be reused. Finish rejects incomplete UTF-8, entities, tags and unclosed channels. Unknown entities, mismatched closing tags, duplicate attributes, invalid UTF-8, unknown capabilities and invalid parameters fail explicitly.
+Errors and limits terminate that parser/generator instance; it cannot be reused. Finish rejects incomplete UTF-8, entities, tags and unclosed Channel/wait scopes. Unknown entities, mismatched closing tags, duplicate attributes, invalid UTF-8, unknown capabilities and invalid parameters fail explicitly.
 
 Failure cannot roll back Actions already emitted and executed. If one append throws, its local result is not returned; the Agent reports failure and Gateway cancels remaining work for that input. Invalid streams may have different already-executed prefixes under different fragmentation. There is no automatic retry or persistent replay.
 
@@ -137,4 +139,23 @@ flowchart LR
     Parser --> Calls[Resolved calls]
     Parser --> Error[Retain first error; continue raw capture]
     Bound --> Overflow[Explicit failure; preserve prefix]
+```
+
+## Structured wait protocol
+
+✅ `<wait>` and `</wait>` are exact, attribute-free paired tags; `<wait/>` is invalid and wait is reserved as a capability alias. The unified ChannelParser lexical stack rejects crossing scopes such as `<wait><channel.Speech></wait></channel.Speech>`. A Channel may surround a wait or be nested within it. Wait does not change the effective channel. begin/end flush preceding sentence text before emitting SchedulingDirective, preserving the lexical position of every action.
+
+✅ AgentGenerator append/finish now return `[GenerationEvent]` with `.action(ActionCall)` and `.scheduling(SchedulingDirective)`. Consumers must forward the entire event sequence, not filter out directives. Natural text still produces the configured textActions in declaration order; their default lanes allow concurrent speech/captions. No special text-step type is needed. The parser limits 32 waits and combined depth 8; scheduled execution additionally validates balanced groups and bounds. Each Agent owns its parser; Gateway only receives resolved values and typed boundaries.
+
+A wait waits for its parent's preceding work, executes internally by ordinary Channel rules, and releases its parent's continuation only once closed and all children complete. Nested waits apply the same rule locally. An open group may execute already received work. Completed XML is not physical completion; cancellation discards unfinished parsing state and Gateway cancels accepted work. Self-closing Actions never acquire paired start/stop semantics.
+
+GenerationTrace retains the full ordered event sequence for an indented wait/action preview, alongside its action-only convenience view. Parser failure still stops interpretation but continues exact raw capture; this preview never claims execution timing.
+
+```mermaid
+flowchart LR
+    XML[Text / Action / Channel / wait] --> Stack[Unified lexical scope stack]
+    Stack --> Generator[Flush text; resolve Actions; preserve wait edges]
+    Generator --> Events[GenerationEvent sequence]
+    Events --> Agent[Agent: speech audioID conversion in place]
+    Agent --> Gateway[Resolved Actions and typed scheduling directives]
 ```

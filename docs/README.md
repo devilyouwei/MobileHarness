@@ -28,3 +28,6 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ ADR 0053 records optional cloud credentials and endpoint defaults. ❌ Live provider acceptance remains pending.
 
 ✅ Architecture and Roadmap describe the opt-in raw LLM inspection page and its boundary from business execution. ❌ Its parser preview does not establish physical-device or scheduler acceptance.
+
+
+✅ [ADR 0059](adr/0059-structured-wait-scheduling.md) records nested wait synchronization, task-local queues and the removal of implicit main. ❌ Live-model and device acceptance remain separate from compile/test evidence.

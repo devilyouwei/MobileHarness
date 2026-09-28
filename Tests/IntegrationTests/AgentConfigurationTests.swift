@@ -183,7 +183,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(try config.capabilities.resolveAction("say", parameters: ["text": "hello"]).actionPath.function == "speak")
     var generator = try AgentGenerator(capabilities: config.capabilities, textActions: config.textActions)
     let calls = try generator.append("Hello.") + generator.finish()
-    #expect(calls.map(\.actionPath.function) == ["speak", "print"])
+    #expect(calls.compactMap(\.actionCall).map(\.actionPath.function) == ["speak", "print"])
     #expect(throws: AgentConfigurationError.invalidFormat) {
         try AgentConfiguration(
             data: PropertyListSerialization.data(fromPropertyList: document(), format: .xml, options: 0))

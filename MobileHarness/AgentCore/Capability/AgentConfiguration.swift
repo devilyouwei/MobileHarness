@@ -137,7 +137,7 @@ public struct AgentConfiguration: Sendable {
                     if let channel, !registry.channels.contains(channel) { throw GenerationError.forbiddenChannel }
                     if textActions.contains(action.alias) { demonstratesAction = true }
                 }
-            case .boundary: break
+            case .boundary, .scheduling: break
             }
         }
         guard demonstratesAction else { throw AgentConfigurationError.invalidField("actions.examples") }

@@ -28,3 +28,6 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 ✅ Completion-only tools are awaited directly and bypass Action lanes. No ToolResult is constructed/submitted on success; execution errors propagate to the caller. Data tools retain correlated result feedback. Cancellation is checked before execution and after the handler.
 
 ✅ Returning ToolResult inputs preserve the originating ConversationTurn so continuation output cannot lose UI round association.
+
+
+✅ ActionDispatcher forwards typed SchedulingDirective alongside resolved ActionCall to the same scheduler. Admission does not wait for group execution. Channel capacities aggregate unfinished Actions across tasks, including dormant groups; per-task limits are 120 Actions and 32 waits. ❌ No Tool grouping or cross-task synchronization is introduced.

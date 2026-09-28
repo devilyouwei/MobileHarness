@@ -1,5 +1,7 @@
 # ADR 0018 · Agent 内双协议解析与 Channel 调度
 
+> Scheduling update: [ADR 0059](0059-structured-wait-scheduling.md) supersedes shared cross-task Channel lanes and introduces typed nested wait groups. This document retains its historical decision context; Channel ownership/takeover remains planned.
+
 日期：2026-09-24。状态：采用。目标依据 MobileHarness/README.md 第 6–24、27、37 节。
 
 ## 决策

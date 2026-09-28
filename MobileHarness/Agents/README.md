@@ -65,7 +65,7 @@ Each actor documents its own capacity, overflow, pause, stop and cleanup rules: 
 | 方向 | 数据标准至少写明 | 边界 |
 | --- | --- | --- |
 | 输入 | 接收方式、contract/version/kind、source/topic 或目标、payload 类型与字段、单位/上限、会话/序号/期限、拒绝条件 | 所有外部输入和 ToolResult 经 InputGateway；注入依赖与生命周期方法须标为非业务输入。 |
-| 输出 | `OutputEnvelope` 中 ActionCall、ToolCall 或 control 的路径/参数/Channel、触发时机、完成语义和失败行为 | 输出流由 App 送 OutputGateway；调用接纳、Action 完成和最终播放是不同事件。 |
+| 输出 | `OutputEnvelope` 中 ActionCall、ToolCall、scheduling 或 control 的路径/参数/Channel、触发时机、完成语义和失败行为 | 输出流由 App 送 OutputGateway；调用接纳、Action 完成和最终播放是不同事件。 |
 | publish | `communication.publications` 的 contract、typed `AgentMessage` payload、发送时机、消费者、可替换/丢失策略和接纳回执含义 | `AgentMessaging.publish(..., parent:)` 经 OutputGateway → InputGateway 广播；不是 Action/Tool 输出。 |
 | send | `communication.sends` 的 contract/target、typed payload 字段、因果与所有权、接纳/取消/超时语义 | `AgentMessaging.send(..., parent:, to:)` 走同一双 Gateway 链路，但只定向一个 Agent。 |
 
@@ -91,7 +91,7 @@ All fields below are required except hidden, which defaults to false. Arrays mus
 | --- | --- | --- |
 | schemaVersion | Integer | Exactly 4 |
 | agentID | String | Stable identity matching the Agent implementation |
-| channels | Array of String | Additional allowed Channels, such as main; action defaults are also allowed |
+| channels | Array of String | Additional allowed Channel names; action defaults are also allowed |
 | textActions | Array of String | Ordered unique aliases for natural-text mapping, at most 8; each must accept string text without other required parameters |
 | actions | Array of Object | Actions this Agent may invoke |
 | tools | Array of Object | Native tools this Agent may invoke |
@@ -131,7 +131,7 @@ Visible examples must not explicitly call hidden Actions. Write natural text ins
 
 - Configurations are at most 64 KiB and contain at most 128 Action/Tool entries combined. Each capability has at most 32 uniquely named parameters and 1–8 examples. Each doc, parameter description/constraints string and example is at most 2048 UTF-8 bytes; doc, parameter descriptions and examples must be nonblank.
 - Agent IDs, aliases, path components, tool paths, Channels and parameter names match `[A-Za-z_][A-Za-z0-9_.-]*` and use at most 64 UTF-8 bytes. Paths are registry keys, not reflection or filesystem paths.
-- Actions and Tools share the alias namespace within an Agent. Duplicate aliases or parameter names fail. Aliases cannot start with channel.; different Agents may bind the same alias differently.
+- Actions and Tools share the alias namespace within an Agent. Duplicate aliases or parameter names fail. Aliases cannot be wait or start with channel.; different Agents may bind the same alias differently.
 - Channel and textActions arrays must be unique; at most 16 Channels are allowed after defaults are included. Text mapping accepts string text and no additional required parameters. Assistant requires a nonempty textActions list; other policies can leave it empty.
 - Required/optional name sets are derived from parameters[].required. Do not also maintain requiredParameters or optionalParameters in JSON; these obsolete fields are rejected.
 - Missing resources, malformed data, unsupported versions and invalid identity/structure propagate as errors. Do not use try!, swallow errors, fall back to hardcoded lists or broaden permissions. App remains unready on configuration failure.
@@ -142,7 +142,7 @@ Visible examples must not explicitly call hidden Actions. Write natural text ins
 - JSON is the sole production list of Actions, Tools, Channels, text mappings and communication permissions. App separately binds explicit Swift handlers; do not duplicate permission lists in Agent Swift code or discover arbitrary handlers by reflection.
 - `communication` requires inputs (contract/version/kind), subscriptions (contract/source/topic), publications (contract names) and sends (contract/target). Empty arrays grant no permission; source/topic matching is exact. Cross-Agent policy validation happens at App assembly.
 - CapabilityContextBuilder exposes only Actions with hidden=false. Tools remain a separate protocol and never enter this system-prompt text. Current ChatCapability has no native Tool-call event stream. A completion-only Tool must describe completion in its JSON doc; App selects its Void handler.
-- Resolve aliases inside the Agent with shared AgentCore parsers/registries. Emit resolved ActionCall or ToolCall through OutputGateway. Native Tool calls are not XML; recognized text and Tool results are data, not executable markup.
+- Resolve aliases inside the Agent with shared AgentCore parsers/registries. Emit resolved ActionCall/ToolCall and typed scheduling boundaries through OutputGateway. Native Tool calls are not XML; recognized text and Tool results are data, not executable markup.
 - External input and Tool results enter through InputGateway. Preserve session, input, turn and source context. Publish internal facts through the bound messaging port; no direct Agent-to-Agent call or UI callback is allowed.
 - Mutable state belongs to the Agent actor. Bound inboxes, history, parser buffers and output; do not spawn unlimited per-input tasks. Cancel model sessions, suppress stale output and join cleanup. Current stop is terminal; restart and background persistence are not implied.
 - Agent-selected presentation must use configured Actions or Tools. App event observers supervise runtime admission and errors; they cannot mutate business presentation. Model inference remains a capability request, not a device Action.
@@ -173,3 +173,6 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 
 
 ✅ SpeechSynthesisAgent is an independent JSON v4 directed service with one FIFO model worker. Agents may additionally depend on StorageAudio for the shared audio cache; they still cannot depend on Actions, Gateway, PlatformKit or concrete engines. Assistant binds a messaging port and sends text before emitting audioID playback. ❌ Hardware timing acceptance remains pending.
+
+
+✅ An Agent interpreting wait markup must declare OutputKind.scheduling and forward the entire GenerationEvent sequence through OutputGateway. SchedulingDirective is typed runtime coordination, not an extra business Action or message. Preserve directive order across speech preparation and substitutions; never forward only ActionCalls. Assistant's output buffer is 256 events, including at most 120 generated Actions and 64 wait edges. Wait is local to the originating task; native Tools and directed speech synthesis requests do not become wait members. ❌ Cross-task coordination is not implied.

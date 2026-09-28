@@ -2,8 +2,8 @@
 
 Purpose: send user input to ChatCapability, maintain bounded history and interpret generated output inside the Agent. Its local registry controls available capabilities; Gateway receives resolved calls.
 
-- ✅ AssistantAgent actor: 32 waiting inputs, 128 output envelopes and one generation worker; overflow fails explicitly.
-- ✅ Assistant.agent.json registers text mapping say → Speech.speak, print → UI.print and express → UI.express, with Speech/Display defaults and explicit main scope support. Assistant converts each resolved text-bearing say call into a directed synthesis request and a hidden playAudio → Speech.speak(audioID) call.
+- ✅ AssistantAgent actor: 32 waiting inputs, 256 output envelopes and one generation worker; overflow fails explicitly.
+- ✅ Assistant.agent.json registers text mapping say → Speech.speak, print → UI.print and express → UI.express, with Speech/Display defaults and nested wait scheduling. Assistant converts each resolved text-bearing say call into a directed synthesis request and a hidden playAudio → Speech.speak(audioID) call.
 - ✅ Each turn owns AgentGenerator state. Natural text maps through textActions (say + print); self-closing XML Actions resolve independently. Explicit channels override defaults.
 - ✅ CapabilityContextBuilder includes only hidden=false Action aliases, docs, parameters and examples in system context. Native tools are excluded regardless of hidden; say/print remain registered for text mapping.
 - ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
@@ -28,7 +28,7 @@ flowchart TD
     Cancel --> Parser
 ```
 
-Speech and captions use different default channels and can run concurrently; main can serialize speech, expressions and captions in generation order. Runtime notifications are not model-authored.
+Speech and captions use different default channels and can run concurrently. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
 
 ## Configuration and initialization
 
@@ -42,7 +42,7 @@ ChatCapability is a required dependency; tests inject FixedTextChat from Integra
 
 1. `receive` checks lifecycle and payload, appends an input, and starts draining when running.
 2. Pausing stops admission-to-execution transitions, but does not cancel an already running generation. Resume drains queued inputs.
-3. Generation consumes Chat events, parses them and emits resolved output envelopes. The output stream buffers 128 envelopes with `bufferingOldest`; the consumer is AppLifecycleCoordinator. Failed yields mark the Agent failed, clear the inbox, cancel generation and close the stream. This plain AsyncStream does not transmit a thrown error; the coordinator checks final Agent status.
+3. Generation consumes Chat events, parses them and emits resolved output envelopes. The output stream buffers 256 envelopes with `bufferingOldest`; the consumer is AppLifecycleCoordinator. Failed yields mark the Agent failed, clear the inbox, cancel generation and close the stream. This plain AsyncStream does not transmit a thrown error; the coordinator checks final Agent status.
 4. `assistant.cancel` bypasses the inbox, even when full or paused, removes the selected session's waiting inputs and awaits cancellation of its active worker. Stop clears all waiting inputs/history and joins the worker before closing outputs.
 
 Successful outputs already consumed are not rolled back. There is no automatic retry, durable inbox or priority scheduling. FIFO uses Array append/removeFirst; removal shifts remaining entries, with cost bounded by the configured capacity.
@@ -51,7 +51,7 @@ Successful outputs already consumed are not rolled back. There is no automatic r
 flowchart LR
     InputGateway -->|receive| Inbox[32 waiting inputs]
     Inbox -->|one worker| Chat[Chat and parser]
-    Chat -->|yield| Out[128 output envelopes]
+    Chat -->|yield| Out[256 output envelopes]
     Chat -->|speech text| Synth[Directed synthesis through both Gateways]
     Synth -->|audioID admitted| Out
     Out -->|App transport pump| Gateway[OutputGateway validation]
@@ -124,7 +124,7 @@ flowchart LR
 | control | `agent.finished` | speaking 阶段的展示 Action 完成屏障，释放该输入的 Action 跟踪。 |
 | control | `assistant.error: …` | 生成、解析、即时输出等失败；输出流溢出会直接进入 failed 并关闭流，不能保证再塞入错误消息。 |
 
-Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 另允许 `main`。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
+Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再额外声明 `main`；跨轨同步使用 wait。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
 
 ### Publish / send 数据标准
 
@@ -145,3 +145,5 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 另允
 ✅ ADR 0055 supersedes text-bearing production Speech actions: original text/XML segmentation stays here; each speech segment is sent to speechSynthesis with a program-generated UUID. After admission, hidden playAudio resolves Speech.speak(audioID) on the original Channel. speech.synthesize / speech.cancel sends are declared in JSON. No TTS model call or PCM ownership belongs to Assistant. ❌ Reusable audio handles are not supported.
 
 ✅ `AssistantAgent.systemPrompt(capabilities:)` is the single shared prompt builder used by production and the explicit raw-output test page. Visible declarations still come from packaged JSON; no registration list is duplicated. The diagnostic has no production history or side effects and does not change Assistant limits or runtime output contracts. ❌ The diagnostic's single-turn result cannot reconstruct an earlier voice turn.
+
+✅ Assistant emits `.scheduling(.beginWait/.endWait)` in the same ordered output stream as resolved Actions. Speech synthesis admission and audioID substitution preserve each event's position; directives do not count as Actions. Output holds 256 events; generation remains bounded to 120 Actions and 32 wait groups. The shared prompt explains default lanes, parallelism, local nested joins, lexical validity and actual completion; the appended JSON registry remains the only capability list. ❌ Tool calls and speech synthesis prefetch are not members of Action wait groups.

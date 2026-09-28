@@ -73,3 +73,6 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 
 
 ✅ Communication now includes generic AgentMessage with bounded synthesis requests and cancellation IDs; it contains no PCM cache, model or playback implementation. ❌ Persistent message delivery remains unsupported.
+
+
+✅ GenerationEvent preserves resolved Actions and typed wait boundaries. The shared lexical stack handles combined Channel/wait nesting; SchedulingDirective crosses the trusted output boundary without introducing runtime, UI or model dependencies. ❌ Execution policy remains in Gateway, not AgentCore.

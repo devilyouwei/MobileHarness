@@ -363,3 +363,12 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 ✅ 设置新增独立 LLM 测试页：复用已保存模型、Assistant 提示词和 JSON，展示完整接收原文、分片、结束原因、解析错误及解析出的 Action/Channel，可显式导出。解析失败继续收集；取消、传输失败、token 上限和保留上限均明确标记。生产 Agent/Gateway 契约未改变。
 
 ❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../MobileHarness/Experience/Diagnostics/README.md)。
+
+
+## Structured wait scheduling (2026-09-28)
+
+✅ Implemented typed wait boundaries, combined lexical scope validation, task-local nested execution groups and global module exclusion. Wait joins parent-prefix work and its own children before parent continuation. Assistant removes the implicit main declaration, preserves wait events through audioID conversion, and uses a 256-event output buffer. Diagnostics displays the ordered wait tree preview. See [ADR 0059](adr/0059-structured-wait-scheduling.md).
+
+❌ Live-model protocol compliance, device scheduling timing, cross-task barriers, preemption, rollback and native Tool grouping remain outside this implementation. Existing speech cache expiration still applies to long blocked plans; no new deployment or device installation is implied.
+
+Validation: final repository checks passed, including 129 IntegrationTests; all four simulator schemes and the signed generic-iOS Debug build passed. Device app signature verification passed. No device installation or live-model acceptance was performed; see [validation history](Validation-History.md).

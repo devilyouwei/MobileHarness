@@ -115,6 +115,16 @@ public struct FunctionTokenParser: Sendable {
         tokenCount += 1
         guard tokenCount <= 1024 else { throw GenerationError.limitExceeded }
         let content = String(value.dropFirst().dropLast())
+        if content == "wait" {
+            try channels.openWait()
+            result.append(.scheduling(.beginWait))
+            return
+        }
+        if content == "/wait" {
+            try channels.closeWait()
+            result.append(.scheduling(.endWait))
+            return
+        }
         if content.hasPrefix("/channel.") {
             let name = String(content.dropFirst(9))
             try channels.close(name)
@@ -138,7 +148,7 @@ public struct FunctionTokenParser: Sendable {
         }
         func skip() { while index < chars.count, whitespace(chars[index]) { index += 1 } }
         let alias = name()
-        guard CapabilityRegistry.validName(alias), !alias.hasPrefix("channel.") else {
+        guard CapabilityRegistry.validName(alias), alias != "wait", !alias.hasPrefix("channel.") else {
             throw GenerationError.malformedMarkup
         }
         var params: [String: String] = [:]

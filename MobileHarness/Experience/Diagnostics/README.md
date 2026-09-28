@@ -20,7 +20,7 @@ Update this README when changing this directory. ✅ means implemented; ❌ mean
 
 ✅ Settings → LLM 原始输出测试 opens `LLMRawOutputView` in both app targets, even if unrelated voice startup failed. App injects the saved chat binding from the process-wide manager after joining voice cleanup. Simulator local chat remains unavailable; configured cloud capability is real, not a stub. Each run is a new single-turn request with the shared Assistant system prompt and packaged JSON registry, no history, temperature 0.7 and a selectable 64–2048 output-token budget (default 256).
 
-The MainActor view owns one task, one session and one `GenerationTrace`. It consumes model events serially, retains exact text and fragment boundaries before parsing, and shows resolved Actions/Channels without invoking an Agent, Gateway, TTS or device handler. This is an explicit model-capability diagnostic, not an alternate business-input route. The original Assistant prompt, routing and execution behavior are unchanged.
+The MainActor view owns one task, one session and one `GenerationTrace`. It consumes model events serially, retains exact text and fragment boundaries before parsing, and shows resolved Actions/Channels without invoking an Agent, Gateway, TTS or device handler. This is an explicit model-capability diagnostic, not an alternate business-input route. The diagnostic reuses the production Assistant prompt and interprets the same resolved output protocol without executing it.
 
 ```mermaid
 flowchart LR
@@ -38,3 +38,6 @@ There is no pending run queue. Start is disabled until the current task exits; S
 The screen and share report expose request text, system prompt, saved model label, request ID, generation budget, raw text, escaped fragments, finish reason and parser outcome. XML/whitespace are preserved and never rendered as Markdown. The report flags output beyond the production Assistant's 2000-byte bound; diagnostic retention/deadline intentionally exceed production limits to inspect failure tails. Data stays in screen memory unless explicitly shared; no automatic disk logging, key export or clipboard reads.
 
 ❌ This does not capture tokenizer IDs, provider HTTP/SSE bytes or reasoning withheld by an adapter. It does not observe an existing voice turn or measure actual Channel admission/start/completion; call order is parser order before Assistant converts speech text into audio handles. Correct parsing narrows investigation toward downstream handling but does not prove scheduler correctness. Device UI and live-model acceptance remain manual.
+
+
+✅ The parser preview/report now retains and indents begin/end wait events alongside Actions, preserving order and effective Channel after nested scope restoration. It uses the same wait-aware Assistant prompt and packaged registry. Consecutive and nested waits are visible even when empty. ❌ This remains a non-executing preview; it cannot establish physical start/completion times or scheduler correctness.

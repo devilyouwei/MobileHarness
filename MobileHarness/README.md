@@ -402,15 +402,15 @@ Function Token is a streaming mixture of natural text and restricted XML. A pars
 ```xml
 <express emotion="smile"/>
 Hello.
-<channel.main>
+<wait>
   <express emotion="thinking"/>
   Let me think.
-</channel.main>
+</wait>
 ```
 
-The three forms are natural text, self-closing Action tags and paired Channel tags. FunctionTokenParser handles fragment boundaries; ChannelParser tracks scope; SentenceFunctionBuffer groups text; AgentGenerator resolves calls. Assistant maps natural text to both `say` and `print` through JSON `textActions`. Explicit Action tags do not implicitly duplicate that mapping.
+The four forms are natural text, self-closing Action tags, paired Channel scopes and paired wait groups. FunctionTokenParser handles fragment boundaries; ChannelParser tracks scope; SentenceFunctionBuffer groups text; AgentGenerator resolves calls. Assistant maps natural text to both `say` and `print` through JSON `textActions`. Explicit Action tags do not implicitly duplicate that mapping.
 
-Completed Actions can be emitted before a Channel closes. Tag/scope boundaries flush preceding text; normal completion flushes remaining valid text, while cancellation discards incomplete state. Raw markup and unresolved aliases never reach Gateway. Native Tool calls use the separate ToolCallParser; production incremental native Tool deltas are still outstanding.
+Completed Actions can be emitted before a Channel closes. Tag/scope boundaries flush preceding text; normal completion flushes remaining valid text, while cancellation discards incomplete state. Raw markup and unresolved aliases never reach Gateway; resolved Actions and typed wait boundaries do. Native Tool calls use the separate ToolCallParser; production incremental native Tool deltas are still outstanding.
 
 Syntax, escaping, nesting, bounds and malformed-stream behavior are defined in [Generation](AgentCore/Generation/README.md).
 
@@ -429,25 +429,24 @@ Both are validated executable outputs, and either may have side effects. Their d
 
 ### Multi-Channel Action Scheduling
 
-A Channel is an ordered Action execution scope. Every Action registration supplies a default; an explicit `<channel.name>` scope overrides it. Closing an inner scope restores the parent; closing the outermost restores each Action's default. Only permitted Channels may be selected.
+A Channel is an ordered Action execution scope. Every Action registration supplies a default; an explicit `<channel.name>` scope overrides it. Closing an inner scope restores the parent; closing the outermost restores each Action's default. Only permitted Channels may be selected. Channel scopes do not themselves create wait groups.
 
-With Assistant's default mapping, natural text produces speech on `Speech` and captions on `Display`. They may progress concurrently. Grouping the same text inside `<channel.main>` puts both calls in one serial lane. `main` is an ordinary Channel, not a global barrier, and scope closure does not cancel or flush already scheduled jobs.
+With Assistant's default mapping, natural text produces speech on `Speech` and captions on `Display`. They may progress concurrently. A `<wait>...</wait>` group joins its parent's preceding work, preserves ordinary Channel scheduling internally, and joins all its children before releasing its parent's continuation. Consecutive wait groups express sequential stages; nested waits synchronize only within their parent. Channel closing changes scope without waiting. No channel name, including main, has special semantics; Assistant does not declare main.
 
 ```mermaid
 flowchart LR
-    Calls[Resolved ActionCalls] --> Dispatch[ActionDispatcher]
-    Dispatch --> Scheduler[ChannelScheduler]
-    Scheduler --> Speech[Speech FIFO]
-    Scheduler --> Display[Display FIFO]
-    Speech --> Gate[Module resource exclusion]
-    Display --> Gate
-    Gate --> Execute[ActionExecutor: await full handler]
-    Execute --> Next[Release resource / advance eligible head]
+    Events[Resolved Actions / wait boundaries] --> Gateway[Validation and admission]
+    Gateway --> Tree[Task-local nested execution groups]
+    Tree --> Active[Active phase Channel FIFO heads]
+    Active --> Resources[Process-wide module exclusion]
+    Resources --> Execute[Await complete Action handler]
+    Execute --> Advance[Release resources; advance closed completed groups]
+    Advance --> Tree
 ```
 
-Channel names identify shared process-local lanes across Agents. Same-Channel Actions execute serially; different Channels may execute concurrently only when their modules are available. Module exclusion prevents conflicting Actions across Channels. Completion/failure tracks the originating Agent/input; finish seals that input and waits for all accepted Actions. Cancel/failure removes pending work and joins cooperative active work. Already performed effects cannot be rolled back.
+Channel queues are task-local; equal names across Agents do not impose cross-task FIFO. Resource exclusion is process-wide. A wait affects one Agent/session/input, never unrelated tasks. finish seals root input and joins accepted work; errors cancel that task's tree and cooperative running work. No queued device action is silently discarded on capacity exhaustion. Speech prefetch remains outside this schedule and retains cache deadlines.
 
-✅ Bounded FIFO, module exclusion, completion and cancellation barriers. ❌ Priority, preemption, dependency graphs and general resource arbitration. Limits and the ready-head algorithm belong in [Scheduling](Gateway/Output/Scheduling/README.md).
+✅ Bounded nested wait groups, streaming execution, local FIFO, global module exclusion and cancellation barriers. ❌ Priority, preemption, rollback and cross-task synchronization. Exact capacities and failure fencing belong in [Scheduling](Gateway/Output/Scheduling/README.md); protocol rules belong in [Generation](AgentCore/Generation/README.md). ADR 0059 records this change.
 
 <a id="201-channel-lock--exclusive-agent-control"></a>
 

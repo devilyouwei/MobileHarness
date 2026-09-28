@@ -5,6 +5,7 @@ enum ExecutionRouter {
     enum Route {
         case action(ActionCall)
         case tool(ToolCall)
+        case scheduling(SchedulingDirective)
         case finish
         case cancel
         case observe
@@ -13,6 +14,7 @@ enum ExecutionRouter {
     static func route(_ output: AgentOutput) throws -> Route {
         switch output {
         case .actionCall(let token): .action(token)
+        case .scheduling(let directive): .scheduling(directive)
         case .toolCall(let call): .tool(call)
         case .control("assistant.finished"), .control("agent.finished"): .finish
         case .control(let state) where state.hasPrefix("assistant.error:") || state.hasPrefix("agent.error:"): .cancel

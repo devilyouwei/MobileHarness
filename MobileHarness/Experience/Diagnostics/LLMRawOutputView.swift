@@ -103,11 +103,21 @@ struct LLMRawOutputView: View {
     }
 
     private var callReport: String {
-        (trace?.calls ?? []).enumerated().map { index, call in
-            let parameters = call.parameters.sorted { $0.key < $1.key }
-                .map { "\($0.key)=\(String(reflecting: $0.value))" }.joined(separator: ", ")
-            return
-                "\(index + 1). [\(call.channel)] \(call.actionPath.module).\(call.actionPath.function)(\(parameters))"
+        var depth = 0
+        return (trace?.events ?? []).enumerated().map { index, event in
+            if case .scheduling(.endWait) = event { depth = max(0, depth - 1) }
+            let prefix = "\(index + 1). " + String(repeating: "  ", count: depth)
+            switch event {
+            case .scheduling(.beginWait):
+                depth += 1
+                return prefix + "<wait> 等待父组前序工作"
+            case .scheduling(.endWait):
+                return prefix + "</wait> 组内完成后放行后续工作"
+            case .action(let call):
+                let parameters = call.parameters.sorted { $0.key < $1.key }
+                    .map { "\($0.key)=\(String(reflecting: $0.value))" }.joined(separator: ", ")
+                return prefix + "[\(call.channel)] \(call.actionPath)(\(parameters))"
+            }
         }.joined(separator: "\n")
     }
 

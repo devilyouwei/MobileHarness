@@ -73,3 +73,6 @@ Channels run FIFO and share Action-module exclusion. Different modules may run c
 | Status | Issue / next step |
 | --- | --- |
 | Open | Cleanup depends on cooperative handlers; device stop acknowledgements require future adapters. |
+
+
+✅ ADR 0059 adds task-local nested wait groups. Ordinary Channel FIFO order is scoped to a task/active phase, while name capacities and module exclusion are process-wide. Typed scheduling directives pass through validation/routing/dispatch; no XML enters Gateway. ❌ Cross-task barriers and preemption remain unsupported.

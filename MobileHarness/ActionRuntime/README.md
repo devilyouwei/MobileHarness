@@ -50,3 +50,6 @@ The immutable registry is shared safely across tasks. Execution creates no queue
 | Status | Issue / next step |
 | --- | --- |
 | Open | Cleanup relies on handler cooperation; no forced interruption or runtime timeout exists. |
+
+
+✅ Structured wait scheduling adds explicit invalidSchedule, taskActionLimitExceeded and waitGroupLimitExceeded admission errors. Execution is still one resolved ActionInvocation per handler; wait groups belong to Gateway and never invoke handlers themselves. ❌ ActionRuntime does not add timeouts, rollback or group ownership of physical resources.

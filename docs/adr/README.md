@@ -77,3 +77,6 @@ These are **dated decision records**, including proposals and stages later repla
 ✅ [0058 — MOSS-TTS-Nano default synthesis](0058-moss-tts-nano.md): replaces the production Kokoro path with bounded local MOSS streaming. ❌ Physical-device acceptance remains pending.
 
 ✅ ADR 0053 now records optional cloud authentication, official endpoint fallback and the visible default chat model. ❌ Model discovery cannot guarantee third-party chat compatibility.
+
+
+✅ [0059 — Structured wait scheduling](0059-structured-wait-scheduling.md): task-local groups, typed boundaries, module exclusion and cancellation. Supersedes the shared-lane scheduling portion of ADR 0018. ❌ Cross-task barriers, preemption and rollback remain deferred.

@@ -46,9 +46,13 @@ import ToolRuntime
     #expect(throws: HarnessError.forbiddenTool) {
         try OutputValidator.validate(.toolCall(ToolCall(toolPath: "deletePhotos")), descriptor: descriptor)
     }
+    try OutputValidator.validate(.scheduling(.beginWait), descriptor: descriptor)
     let restricted = AgentDescriptor(id: .assistant, name: "restricted", inputs: [.text], outputs: [.text])
     #expect(throws: HarnessError.forbiddenOutput) {
         try OutputValidator.validate(.control("start"), descriptor: restricted)
+    }
+    #expect(throws: HarnessError.forbiddenOutput) {
+        try OutputValidator.validate(.scheduling(.beginWait), descriptor: restricted)
     }
 }
 
@@ -245,4 +249,35 @@ private actor Recorder {
     await #expect(throws: CancellationError.self) {
         try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "cancel"), envelope: envelope)
     }
+}
+
+@Test func gatewayForwardsWaitBoundariesAndRejectsUnbalancedCompletion() async throws {
+    let manager = AgentManager()
+    try await manager.register(AssistantAgent(chat: FixedTextChat()))
+    let recorder = Recorder()
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            ActionPath(module: "UI", function: "express"): { _ in await recorder.act() }
+        ]))
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), actions: scheduler
+    ) { _ in }
+    let input = AgentInput(sessionID: UUID(), payload: .text("groups"))
+    for _ in 0..<2 {
+        try await gateway.dispatch(OutputEnvelope(source: .assistant, input: input, output: .scheduling(.beginWait)))
+        try await gateway.dispatch(
+            OutputEnvelope(
+                source: .assistant, input: input,
+                output: .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"]))))
+        try await gateway.dispatch(OutputEnvelope(source: .assistant, input: input, output: .scheduling(.endWait)))
+    }
+    try await gateway.dispatch(OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished")))
+    #expect(await recorder.actions == 2)
+    let malformed = AgentInput(sessionID: UUID(), payload: .text("malformed"))
+    try await gateway.dispatch(OutputEnvelope(source: .assistant, input: malformed, output: .scheduling(.beginWait)))
+    await #expect(throws: ActionExecutionError.invalidSchedule) {
+        try await gateway.dispatch(
+            OutputEnvelope(source: .assistant, input: malformed, output: .control("assistant.finished")))
+    }
+    await gateway.shutdown()
 }

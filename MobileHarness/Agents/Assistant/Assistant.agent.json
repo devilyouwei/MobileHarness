@@ -1,9 +1,7 @@
 {
   "schemaVersion": 4,
   "agentID": "assistant",
-  "channels": [
-    "main"
-  ],
+  "channels": [],
   "textActions": [
     "say",
     "print"
