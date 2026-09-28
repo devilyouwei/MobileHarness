@@ -177,3 +177,69 @@ private struct MarkupChat: ChatCapability {
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "recovered"])))
     await agent.stop()
 }
+
+private func generationTrace() throws -> GenerationTrace {
+    let configuration = try AgentConfigurations.load(named: "Assistant")
+    return try GenerationTrace(capabilities: configuration.capabilities, textActions: configuration.textActions)
+}
+
+@Test func generationTraceRetainsRawFragmentsAndResolvedChannels() throws {
+    let fragments = [" 你好 &amp; ", "世界。<channel.ma", "in><express emotion='smile'/>", "再见", "</channel.main>默认。\n"]
+    var trace = try generationTrace()
+    var expected = try generator()
+    var calls: [ActionCall] = []
+    for fragment in fragments {
+        try trace.append(fragment)
+        calls += try expected.append(fragment)
+    }
+    trace.finish()
+    calls += try expected.finish()
+    #expect(trace.raw == fragments.joined())
+    #expect(trace.fragments == fragments)
+    #expect(trace.calls == calls)
+    #expect(trace.calls.map(\.channel) == ["Speech", "Display", "main", "main", "main", "Speech", "Display"])
+    #expect(trace.parserError == nil)
+    #expect(trace.finished)
+}
+
+@Test func generationTraceKeepsCollectingAfterParserFailure() throws {
+    var trace = try generationTrace()
+    try trace.append("<express emotion='smile'/>")
+    try trace.append("<channel.unknown><express emotion='smile'/>broken")
+    #expect(trace.parserError != nil)
+    let failure = trace.parserError
+    try trace.append("\n仍然保留原文 &bogus; <unfinished")
+    trace.finish()
+    #expect(
+        trace.raw
+            == "<express emotion='smile'/><channel.unknown><express emotion='smile'/>broken\n仍然保留原文 &bogus; <unfinished"
+    )
+    #expect(trace.fragments.count == 3)
+    #expect(trace.calls.count == 1)
+    #expect(trace.parserError == failure)
+}
+
+@Test func generationTraceReportsUnclosedMarkupAtFinish() throws {
+    var trace = try generationTrace()
+    try trace.append("<express emotion='")
+    #expect(trace.parserError == nil)
+    #expect(!trace.finished)
+    trace.finish()
+    #expect(trace.parserError?.hasPrefix("finish:") == true)
+    #expect(trace.raw == "<express emotion='")
+    #expect(throws: GenerationError.closed) { try trace.append("smile'/>") }
+}
+
+@Test func generationTraceBoundsFailExplicitlyWithoutEvictingExistingText() throws {
+    var bytes = try generationTrace()
+    let source = String(repeating: "x", count: GenerationTrace.maximumBytes)
+    try bytes.append(source)
+    #expect(throws: GenerationError.limitExceeded) { try bytes.append("x") }
+    #expect(bytes.raw == source)
+    #expect(!bytes.finished)
+    var fragments = try generationTrace()
+    for _ in 0..<GenerationTrace.maximumFragments { try fragments.append("") }
+    #expect(throws: GenerationError.limitExceeded) { try fragments.append("excess") }
+    #expect(fragments.fragments.count == GenerationTrace.maximumFragments)
+    #expect(fragments.raw.isEmpty)
+}

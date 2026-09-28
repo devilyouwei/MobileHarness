@@ -20,3 +20,5 @@ Purpose: verify composed Agent, Gateway, Action, Tool, Storage and voice contrac
 Update this README when test responsibilities change; dated run results belong in [validation history](../../docs/Validation-History.md).
 
 ✅ Local document tests cover reopen, cached reads, explicit refresh/invalidation, stale and concurrent writers, size bounds and corrupt-file cache preservation. ❌ Keychain migration requires device acceptance.
+
+✅ FunctionTokenParserTests also covers GenerationTrace: exact raw/fragment preservation, equivalent production parsing and Channel resolution, continuing collection after parser failure, incomplete markup at finish and explicit byte/fragment overflow without eviction.

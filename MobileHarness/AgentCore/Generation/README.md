@@ -122,3 +122,19 @@ flowchart LR
     Mapping --> Speech[Speech Action]
     Speech --> Backend[TTS language / model limits]
 ```
+
+## Non-executing generation trace
+
+✅ `GenerationTrace` is an independently tested, Sendable value owned by an explicit diagnostic consumer. It records exact text and fragment boundaries before calling the existing AgentGenerator. The first parser failure is retained with fragment/finish location, parsing stops, and raw collection continues. Successfully returned calls remain in interpretation order; calls within an append that throws are not partially recovered. No dispatch or model dependency is introduced.
+
+Raw retention has a 256 KiB UTF-8 bound and 8192-fragment bound (including empty fragments); overflow throws limitExceeded and seals input without evicting existing text. The parser retains its existing bounds, including 120 calls. Finish flushes only on normal completion; consumers must not finish after model failure/cancellation. No extra worker, queue or persistence is involved. ❌ It is not an execution trace, tokenizer trace or automatic repair facility.
+
+```mermaid
+flowchart LR
+    Delta[Text fragment] --> Bound[Check retention limits]
+    Bound --> Raw[Exact raw text and fragment record]
+    Raw --> Parser[AgentGenerator if healthy]
+    Parser --> Calls[Resolved calls]
+    Parser --> Error[Retain first error; continue raw capture]
+    Bound --> Overflow[Explicit failure; preserve prefix]
+```

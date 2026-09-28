@@ -69,3 +69,5 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 
 
 ✅ MossValidation replaces the Kokoro diagnostic scheme and uses the default MOSS provider. ❌ Device synthesis and playback acceptance remain pending.
+
+✅ Both App targets compile LLMRawOutputView; GenerationTrace is navigator-only and compiled once by the existing AgentCore package target. ❌ Build success does not establish live-model Function Token compliance.

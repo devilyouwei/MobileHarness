@@ -26,3 +26,5 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ [MOSS validation](Moss-Validation.md) records replacement-model setup and evidence; [ADR 0058](adr/0058-moss-tts-nano.md) records the default change. ❌ Device acceptance is separate from build and Mac checks.
 
 ✅ ADR 0053 records optional cloud credentials and endpoint defaults. ❌ Live provider acceptance remains pending.
+
+✅ Architecture and Roadmap describe the opt-in raw LLM inspection page and its boundary from business execution. ❌ Its parser preview does not establish physical-device or scheduler acceptance.

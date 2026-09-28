@@ -32,7 +32,16 @@ struct MobileHarnessApp: App {
                 .navigationTitle("首页")
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(isPresented: $showingSettings) {
-                    SettingsView(settings: settings) {
+                    SettingsView(
+                        settings: settings,
+                        makeChat: {
+                            try await settings.restore()
+                            await container?.lifecycle.beginSettingsChange()
+                            defer { container?.lifecycle.endSettingsChange() }
+                            try Task.checkCancellation()
+                            return try await AppContainer.diagnosticChat()
+                        }
+                    ) {
                         let applied = await settings.save(
                             beginChange: { await container?.lifecycle.beginSettingsChange() },
                             endChange: { container?.lifecycle.endSettingsChange() })

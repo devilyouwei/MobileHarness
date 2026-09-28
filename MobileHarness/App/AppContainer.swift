@@ -16,6 +16,13 @@ final class AppContainer {
     let lifecycle: AppLifecycleCoordinator
     let conversation: ConversationViewModel
 
+    /// Independent of ASR/TTS startup, using the same process-wide manager and saved chat binding.
+    static func diagnosticChat() async throws -> any ChatCapability {
+        let resources = Bundle.main.bundleURL.appendingPathComponent("Models")
+        let models = try await ModelKitDefaults.manager(resources: resources)
+        return CurrentChatCapability(models: models)
+    }
+
     func makeMossValidationView() -> MossValidationView {
         let models = models
         let id = mossID

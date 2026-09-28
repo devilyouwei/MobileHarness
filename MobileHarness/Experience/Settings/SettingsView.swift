@@ -1,9 +1,11 @@
+import ModelKit
 import SwiftUI
 
 /// First-level settings list; feature-specific forms live in their own destination.
 @MainActor
 struct SettingsView: View {
     @Bindable var settings: AppSettings
+    let makeChat: () async throws -> any ChatCapability
     let save: () async -> Bool
 
     var body: some View {
@@ -14,6 +16,12 @@ struct SettingsView: View {
                 Label("云端 LLM", systemImage: "cloud")
             }
             .accessibilityIdentifier("settings.cloud.open")
+            NavigationLink {
+                LLMRawOutputView(modelName: settings.activeChatDescription, makeChat: makeChat)
+            } label: {
+                Label("LLM 原始输出测试", systemImage: "text.magnifyingglass")
+            }
+            .accessibilityIdentifier("settings.llm.raw")
         }
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)

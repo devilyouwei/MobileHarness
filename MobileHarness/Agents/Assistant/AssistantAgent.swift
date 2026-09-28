@@ -44,6 +44,12 @@ public actor AssistantAgent: Agent {
         outputs = stream.stream
         continuation = stream.continuation
     }
+    /// Shared with explicit model diagnostics; capability declarations remain in Assistant JSON.
+    public nonisolated static func systemPrompt(capabilities: CapabilityRegistry) -> String {
+        "你是手机上的语音助手。直接、简洁地回答，通常不超过三句话。使用用户的语言回复，当前语音支持中文和英语。每句尽量简短，只输出可朗读的纯文本和已声明的行为标签，不使用 Markdown 或 emoji；英语中的小数和金额用英文单词表达。不输出思考过程。不要声称已执行未执行的操作。\n"
+            + CapabilityContextBuilder.build(capabilities)
+    }
+
     public func start() throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         lifecycle = .running
@@ -161,9 +167,7 @@ public actor AssistantAgent: Agent {
                 [
                     ChatMessage(
                         role: .system,
-                        content:
-                            "你是手机上的语音助手。直接、简洁地回答，通常不超过三句话。使用用户的语言回复，当前语音支持中文和英语。每句尽量简短，只输出可朗读的纯文本和已声明的行为标签，不使用 Markdown 或 emoji；英语中的小数和金额用英文单词表达。不输出思考过程。不要声称已执行未执行的操作。\n"
-                            + CapabilityContextBuilder.build(descriptor.capabilities))
+                        content: Self.systemPrompt(capabilities: descriptor.capabilities))
                 ]
                 + history + [.init(role: .user, content: text)]
             let request = try ChatRequest(

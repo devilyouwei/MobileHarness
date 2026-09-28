@@ -143,3 +143,5 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 另允
 
 
 ✅ ADR 0055 supersedes text-bearing production Speech actions: original text/XML segmentation stays here; each speech segment is sent to speechSynthesis with a program-generated UUID. After admission, hidden playAudio resolves Speech.speak(audioID) on the original Channel. speech.synthesize / speech.cancel sends are declared in JSON. No TTS model call or PCM ownership belongs to Assistant. ❌ Reusable audio handles are not supported.
+
+✅ `AssistantAgent.systemPrompt(capabilities:)` is the single shared prompt builder used by production and the explicit raw-output test page. Visible declarations still come from packaged JSON; no registration list is duplicated. The diagnostic has no production history or side effects and does not change Assistant limits or runtime output contracts. ❌ The diagnostic's single-turn result cannot reconstruct an earlier voice turn.

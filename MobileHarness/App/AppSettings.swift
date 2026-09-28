@@ -28,6 +28,11 @@ final class AppSettings {
     private let store = CloudSettingsStore()
     private let resources = Bundle.main.bundleURL.appendingPathComponent("Models")
 
+    var activeChatDescription: String {
+        guard let saved, saved.enabled else { return "本地 Qwen3.5" }
+        return "云端：\(saved.model)"
+    }
+
     var canLoad: Bool { !isLoading && !isSaving }
     var canSave: Bool {
         !isLoading && !isSaving && (!isEnabled || !selectedModel.isEmpty)

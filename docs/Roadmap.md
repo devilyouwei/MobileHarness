@@ -357,3 +357,9 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 ✅ MOSS follow-up crash logs identify a MainActor isolation assertion in the AppleAudioIO mixer tap, corrected with an explicitly Sendable callback. Diagnostics now exercise production playback; see [MOSS validation](Moss-Validation.md) for evidence and device acceptance.
 
 ✅ Following MOSS playback buffer overflow, the production per-handle PCM cache was increased from 2 MiB to 8 MiB at the user’s request, matching the synthesis output limit. ❌ This does not add backpressure or remove long-reply limits; sustained conversation acceptance remains pending.
+
+## LLM 原始输出测试（2026-09-28）
+
+✅ 设置新增独立 LLM 测试页：复用已保存模型、Assistant 提示词和 JSON，展示完整接收原文、分片、结束原因、解析错误及解析出的 Action/Channel，可显式导出。解析失败继续收集；取消、传输失败、token 上限和保留上限均明确标记。生产 Agent/Gateway 契约未改变。
+
+❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../MobileHarness/Experience/Diagnostics/README.md)。
