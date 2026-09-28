@@ -7,3 +7,5 @@ Purpose: independently verify the OpenAI-compatible adapter without network acce
 
 
 ✅ Added model-list validation and replacement tests, including candidate-failure preservation, active-session cancellation, old-handle rejection and unrelated-provider identity. ❌ UI and Keychain tests are separate from this target.
+
+✅ Offline tests verify blank endpoint fallback, missing Authorization for empty credentials on chat and discovery, surfaced HTTP failures, and chat-family filtering with third-party deployment preservation. ❌ No live credentials or provider calls are used.

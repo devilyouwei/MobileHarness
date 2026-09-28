@@ -1,6 +1,6 @@
 # Kokoro 验证记录
 
-当前默认：FluidAudio Core ML 中英双语，资源位于 Models/KokoroCoreML；见 ADR 0052。下面 CoreAI / 英语单语数据为历史记录，不能代表当前模型的结果。
+历史默认：FluidAudio Core ML 中英双语；已因反复真机闪退由 MOSS 替换，见 ADR 0058 与 Moss-Validation.md。下面 CoreAI / 英语单语数据为历史记录，不能代表当前模型的结果。
 
 ## 历史 CoreAI 验证
 

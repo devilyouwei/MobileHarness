@@ -66,3 +66,6 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 ✅ Removed the obsolete Action preparation protocol and its navigator reference; current playback and cache references remain mapped to shared package sources.
 
 ✅ SpeechPlayback.swift replaces the old pipeline filename in the navigator; no compatibility alias or duplicate source remains.
+
+
+✅ MossValidation replaces the Kokoro diagnostic scheme and uses the default MOSS provider. ❌ Device synthesis and playback acceptance remain pending.

@@ -71,6 +71,16 @@ Each actor documents its own capacity, overflow, pause, stop and cleanup rules: 
 
 公共 `AgentInput` 包含 `id: UUID`、`sessionID: UUID`、`turn: ConversationTurn?` 和 `InputMetadata(contract, version, topic, source, incarnation, capturedAt, sequence, rootID, parentID, hops, deadline)`。publish/send 的端口绑定发送方身份，以 `parent` 继承会话、轮次和因果关系；接收方不能从业务 payload 自行推断授权身份。`DeliveryReport.delivered / rejected` 只表示目标 Agent 的接纳或拒绝，不代表推理、合成、Action 或播放完成。`OutputEnvelope` 含 `source / inputID / sessionID / turn / sequence / output`；它与共享观测消息是两条不同的输出通路。某方向没有声明或实现时，明确写“无”，不要把缓存副作用或本地方法误记为 publish/send。
 
+### 业务输出与系统功能调用边界
+
+Agent 的业务输出仅限于已在 JSON 声明通信权限的消息信号（publish/send），以及已注册的 ActionCall / ToolCall。消息必须通过绑定的 AgentMessaging 端口进入 OutputGateway → InputGateway；ActionCall / ToolCall 必须经 OutputGateway 分发执行。
+
+所有完整的业务功能调用，包括 UI 渲染变动、音量调节、媒体播放和设备控制，都必须先在 `<AgentName>.agent.json` 的 actions 或 tools 中注册，再由 Agent 输出解析完成的调用，经 OutputGateway 执行。不得通过注入服务、闭包回调、直接调用平台 API 或借用消息处理链路绕过这一边界；接收消息的 Agent 若要执行这些功能，也必须输出已注册的 ActionCall / ToolCall。App 的运行时观察器不能代替 Agent 执行业务展示或设备控制。
+
+Storage、ModelKit 等基础能力不属于这里的完整业务功能：Agent 可以通过注入的能力接口进行模型推理、内部状态与共享缓存管理，无须把这些基础操作包装为 Action / Tool。此例外不允许基础能力接口夹带 UI 变更、音量调节等业务副作用。
+
+`control` 是完成、失败等运行时协议通知，不是额外的业务输出或通用系统功能调用入口；它仍随输出流进入 OutputGateway，不能用于编码业务命令或触发未注册的业务功能。
+
 ## Capability configuration v4 — JSON
 
 Use UTF-8 `<AgentName>.agent.json`, parsed by Foundation JSONDecoder. JSON comments are not supported: use doc. Version 4 uses doc for usage guidance; the loader accepts JSON v4 only. Repackage configuration and code together.
@@ -143,6 +153,7 @@ Visible examples must not explicitly call hidden Actions. Write natural text ins
 
 - ✅ Assistant, SpeechPerception, SpeechSynthesis and VisionPerception actors with JSON v4 configuration.
 - ✅ Strict resource loading, local aliases, visible Action context and static event permissions.
+- ✅ Documented business-output boundary: messages and registered Action/Tool calls; Storage/ModelKit remain foundational capabilities.
 - ✅ Shared parsing, bounded processing, conversation-turn context and cancellation coverage.
 - ❌ Photographer camera-motion policy, tracking, media/control Agents and robot behavior. The future concept lives in [docs](../../docs/Photographer-Proposal.md), not an empty source directory.
 - ❌ Configuration hot reload, full executable value schemas, native Tool deltas and general request/reply.

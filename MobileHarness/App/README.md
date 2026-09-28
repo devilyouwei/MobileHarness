@@ -56,7 +56,7 @@ flowchart TD
     Presentation --> Camera
 ```
 
-ApplicationRuntime is available before voice model preparation. App supplies the resource root to ModelKitDefaults and gets interfaces from the process-wide ModelManager; it does not register model providers. Voice prepares recognition, chat, VAD and Kokoro TTS before opening the microphone. Camera preview and its vision session start independently.
+ApplicationRuntime is available before voice model preparation. App supplies the resource root to ModelKitDefaults and gets interfaces from the process-wide ModelManager; it does not register model providers. Voice prepares recognition, chat, VAD and MOSS-TTS-Nano TTS before opening the microphone. Camera preview and its vision session start independently.
 
 Voice PCM enters InputGateway, then SpeechPerception. Assistant subscribes to final speech and speech onset; App does not resubmit final text. Agent-selected UI changes use registered Actions or Tools. Runtime observations control admission, completion and failure supervision, never caption or expression commands. Device telemetry and local user/OS lifecycle changes remain App-owned.
 
@@ -142,7 +142,7 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 
 ✅ Camera gaze is owned by CameraCoordinator, independent of voice readiness. PhotographySession injects mirroring and a session-fenced moveEyes callback. ApplicationRuntime explicitly binds UI.moveEyes. Each camera Action is joined/retired via the existing ChannelScheduler after OutputGateway dispatch, before consuming the next bounded UI state; this prevents per-frame input bookkeeping leaks. The completion barrier cannot be coalesced. Off/interruption/error/session change centers gaze; old-session and non-increasing Action sequences cannot overwrite it. ❌ No face identity guarantee or no-frame timeout.
 
-✅ Default synthesis now resolves to local KokoroCoreML resources. App keeps its existing ModelManager load/unload, PCM playback and diagnostics injection; no concrete TTS engine enters Agent code.
+✅ Default synthesis now resolves to local MossTTSNano resources (beta). App keeps its existing ModelManager load/unload, PCM playback and diagnostics injection; no concrete TTS engine enters Agent code.
 
 ✅ AppSettings owns URL/key/model editing, bounded model-list loading and Storage-backed local persistence and device-only Keychain credentials. Save stops and joins current voice work, updates only the chat registration and writes settings with rollback on update failure. CurrentChatCapability resolves the manager binding on each operation; voice/vision providers remain shared. Startup restores settings before voice warmup. ❌ Live cloud compatibility/device settings acceptance remain pending.
 
@@ -167,3 +167,7 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 ✅ Existing whole-configuration Keychain records migrate on the first successful load. The original is deleted only after the new document and referenced key can be read back. Malformed files, unsupported schemas, missing credentials and version conflicts are surfaced rather than reset. An explicit empty cloud record prevents legacy resurrection after rollback.
 
 ❌ Keychain and file storage cannot form a single atomic transaction. A crash or cleanup failure can leave an unreferenced credential; automatic orphan collection is not implemented. Cross-device sync and live-device migration acceptance remain pending.
+
+✅ Startup/diagnostics now perform real in-memory synthesis warmup before conversation admission or measured speech. It exercises lazy kernels using synthetic Chinese text, drains PCM without playback and propagates failures. The first device run took 10.63 s to first PCM without warmup; startup must absorb that compilation cost instead of extending StorageAudio timeouts. ❌ Warmup does not prove sustained runtime stability.
+
+✅ Cloud settings initially show the official OpenAI base URL; a saved blank URL resolves to the same endpoint. Empty Key is valid and sends no Authorization. Before model discovery, gpt-4o-mini is the visible default, allowing cloud mode to be saved without successful authentication/discovery. Successful discovery still requires an explicit selection when the default is absent. Server failures remain visible. ❌ Live provider acceptance is pending.

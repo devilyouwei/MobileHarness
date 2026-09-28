@@ -36,7 +36,7 @@
         public init() {
             playbackEngine.attach(player)
             let telemetry = telemetry
-            playbackEngine.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
+            playbackEngine.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
                 guard let samples = buffer.floatChannelData?[0] else { return }
                 let count = min(Int(buffer.frameLength), AudioSpectrum.sampleCount)
                 let values = Array(UnsafeBufferPointer(start: samples, count: count))

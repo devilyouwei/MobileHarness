@@ -56,3 +56,5 @@ flowchart LR
 ❌ The render cursor is not an acoustic measurement at the speaker; Bluetooth/output-route latency and device power require physical validation. See ADR 0045.
 
 ✅ The mixer tap retains at most 2048 mono samples; App samples playbackSpectrum every 33 ms for the lifetime of a speech Action. This represents rendered audio, not synthesis progress, and does not toggle UI state for each PCM packet. Physical output latency remains device-dependent (❌).
+
+✅ All AVAudioEngine taps explicitly use `@Sendable` closures. The mixer tap captures only mutex-protected telemetry, never MainActor state. This prevents Swift 6 executor assertions on the audio callback queue; playback completion hops explicitly to MainActor. Device regression uses MOSS diagnostics with `-moss-autorun -moss-playback` through the production AppleAudioIO.

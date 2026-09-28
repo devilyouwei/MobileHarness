@@ -1,6 +1,6 @@
 import Foundation
 import ModelKit
-import ModelKitKokoro
+import ModelKitMossNano
 import ModelKitNemotron
 import ModelKitOpenAI
 @_spi(ModelAssembly) import ModelKitRuntime
@@ -13,7 +13,7 @@ import ModelKitYOLOPose
 
 /// Internal model selection and registration; consumers only receive capability protocols.
 public enum ModelKitDefaults {
-    public static let kokoro = ModelID("kokoro")
+    public static let mossNano = ModelID("moss-tts-nano")
 
     private static let process = ProcessModels()
 
@@ -73,10 +73,10 @@ public enum ModelKitDefaults {
             try await manager.register(
                 chatRegistration(resources: resources, configuration: cloudChat), defaults: [.chat])
             try await manager.register(
-                ModelRegistration(id: kokoro, capabilities: [.synthesis], memoryPolicy: .releaseWhenIdle) { context in
-                    ProvidedCapabilities(
-                        synthesis: try KokoroSpeechSynthesis(
-                            context: context, artifacts: resources.appendingPathComponent("KokoroCoreML")))
+                ModelRegistration(id: mossNano, capabilities: [.synthesis], memoryPolicy: .releaseWhenIdle) { context in
+                    let model = try MossSpeechSynthesis(
+                        context: context, artifacts: resources.appendingPathComponent("MossTTSNano"))
+                    return ProvidedCapabilities(warmup: { try await model.warmup() }, synthesis: model)
                 }, defaults: [.synthesis])
             try await manager.register(
                 ModelRegistration(id: ModelID("yolo26n-pose"), capabilities: [.pose], memoryPolicy: .releaseWhenIdle) {

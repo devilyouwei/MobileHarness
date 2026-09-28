@@ -23,7 +23,7 @@ public final class SpeechAudioStore: Sendable {
     private let waitTimeout: Duration
 
     public init(
-        capacity: Int = 32, audioBytes: Int = 2_097_152,
+        capacity: Int = 32, audioBytes: Int = 8_388_608,
         queueTTL: Duration = .seconds(60), readyTTL: Duration = .seconds(60),
         errorTTL: Duration = .seconds(30), waitTimeout: Duration = .seconds(3)
     ) {

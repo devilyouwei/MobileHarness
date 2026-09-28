@@ -8,10 +8,11 @@ Purpose: keep development download profiles beside ignored local model files. De
 | Nemotron-macos | Optional Mac ASR tests |
 | Qwen35 | Production Qwen3.5-2B 4-bit MLX chat |
 | Silero | Production Core ML VAD |
-| KokoroCoreML | Default Mandarin/English Core ML TTS and diagnostics |
+| MossTTSNano | Default Mandarin/English streaming Core ML TTS (beta) and diagnostics |
+| KokoroCoreML | Legacy comparison download only; excluded from App staging |
 | Qwen35-4B / Audio8 | Download destinations for retained comparison profiles; not bundled |
 
-Required model files live directly inside each directory, preserving backend-required internal structure. Native model containers can contain their own metadata and hashes; these are part of the backend format. Production TTS uses Kokoro Core ML with Mandarin zf_001 and US English af_heart. The kokoro profile installs into KokoroCoreML; the old Kokoro CoreAI directory is not staged.
+Required model files live directly inside each directory, preserving backend-required internal structure. Native model containers can contain their own metadata and hashes; these are part of the backend format. Production TTS uses MOSS-TTS-Nano Core ML with zh_1/en_2 presets. The moss-tts-nano profile installs into MossTTSNano. Kokoro is no longer staged.
 
 ## Download configuration
 
@@ -36,7 +37,7 @@ flowchart LR
 
 Never commit weights, user recordings, credentials or local signing settings. Update this table and staging inputs when changing bundled resources.
 
-✅ Supported chat download profiles are Qwen3.5-2B and optional 4B. Native CoreAI resources support ASR; Kokoro TTS uses Core ML.
+✅ Supported chat download profiles are Qwen3.5-2B and optional 4B. Native CoreAI resources support ASR; MOSS-TTS-Nano TTS uses Core ML; Kokoro is a legacy comparison profile.
 
 ✅ yolo26-pose.download.json pins the official Ultralytics YOLO26n-Pose INT8 archive and extracted file hashes; download with scripts/download-yolo26-pose.py. The model metadata declares AGPL-3.0. ✅ Physical App staging includes these artifacts.
 

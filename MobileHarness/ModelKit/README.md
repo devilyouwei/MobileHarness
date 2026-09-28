@@ -16,7 +16,7 @@ ModelKit/
 │   └── JEV/                  # JudgeCapability contract; no production provider
 ├── Speech/
 │   ├── ASR/                  # Recognition contract; Apple and Nemotron adapters
-│   ├── TTS/                  # Synthesis contract; Apple and Kokoro adapters
+│   ├── TTS/                  # Synthesis contract; Apple, MOSS and legacy Kokoro adapters
 │   ├── VAD/                  # Voice activity contract and Silero adapter
 │   └── Shared/Apple/         # Apple speech PCM helpers
 ├── Vision/                   # PoseCapability and separate YOLO adapter
@@ -89,7 +89,7 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 | Speech recognition | ✅ Nemotron streaming ASR in the physical App; Apple adapter available separately |
 | Voice activity | ✅ Silero with per-session state |
 | Chat | ✅ Qwen3.5-2B 4-bit MLX or explicitly configured OpenAI-compatible cloud, text-only |
-| Speech synthesis | ✅ Kokoro Core ML Mandarin/English TTS in conversation and diagnostics; Apple adapter remains separately testable |
+| Speech synthesis | ✅ MOSS-TTS-Nano Core ML Mandarin/English TTS (beta) in conversation and diagnostics; Apple and legacy Kokoro remain independently testable |
 | Pose | ✅ YOLO26n-Pose INT8 with end-to-end output through PoseCapability |
 | Judgment | ✅ Protocol; ❌ production provider |
 | Other capabilities | ❌ VLM input, embeddings and general video sessions |
@@ -112,3 +112,6 @@ The physical App requires iOS 27 and matching local artifacts. Simulator local A
 Add typed capability contracts only for real use cases. Put concrete SDKs in separate adapters and bind them in Defaults. Keep business state, permissions, device I/O and Agent contracts outside base ModelKit. New streams require byte estimates, bounds and cleanup semantics; unsupported capabilities must fail explicitly. Preserve the single source tree and test boundaries in root Package.swift.
 
 ✅ Optional `ModelKitOpenAI` supplies third-party cloud ChatCapability with configurable endpoint/key/model and bounded SSE. Defaults accepts `cloudChat:` explicitly; absent configuration retains local behavior. See [adapter](Language/LLM/OpenAI/README.md). ❌ Cloud speech/vision and live-provider acceptance remain pending.
+
+
+✅ `ModelKitMossNano` maps Speech/TTS/MossNano; `ModelKitMossCoreML` maps Backends/MossCoreML. Defaults depends on MOSS; legacy ModelKitKokoro is excluded from the aggregate App product.

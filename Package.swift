@@ -11,7 +11,7 @@ let package = Package(
                 "AgentCore", "Gateway", "Agents", "Actions", "ActionRuntime", "Tools", "ToolRuntime", "ModelKit",
                 "Storage", "StorageAudio",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
-                "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro",
+                "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
                 "PlatformKit",
             ]),
         .library(name: "ModelKitYOLOPose", targets: ["ModelKitYOLOPose"]),
@@ -85,6 +85,7 @@ let package = Package(
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
                 "Language/LLM/Qwen35", "Language/LLM/OpenAI", "Language/LLM/README.md", "Backends",
                 "Core/README.md", "Management", "Defaults", "Speech/ASR/Apple", "Speech/TTS/Apple", "Speech/TTS/Kokoro",
+                "Speech/TTS/MossNano",
                 "Speech/Shared",
                 "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Vision/YOLO", "Vision/README.md",
             ]),
@@ -98,7 +99,7 @@ let package = Package(
             name: "ModelKitDefaults",
             dependencies: [
                 "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero",
-                "ModelKitKokoro", "ModelKitQwen35", "ModelKitYOLOPose", "ModelKitOpenAI",
+                "ModelKitMossNano", "ModelKitQwen35", "ModelKitYOLOPose", "ModelKitOpenAI",
             ],
             path: "MobileHarness/ModelKit/Defaults", exclude: ["README.md"]),
         .target(
@@ -110,7 +111,7 @@ let package = Package(
                 "README.md", "ASR/README.md", "TTS/README.md", "Shared/README.md",
                 "Shared/Apple/README.md", "ASR/Apple/README.md", "TTS/Apple/README.md",
                 "ASR/SpeechRecognitionCapability.swift",
-                "TTS/SpeechSynthesisCapability.swift", "TTS/Kokoro", "ASR/Nemotron", "VAD",
+                "TTS/SpeechSynthesisCapability.swift", "TTS/Kokoro", "TTS/MossNano", "ASR/Nemotron", "VAD",
             ],
             sources: ["ASR/Apple", "TTS/Apple", "Shared/Apple"]),
         .target(
@@ -139,6 +140,13 @@ let package = Package(
             path: "MobileHarness/ModelKit/Speech/ASR/Nemotron", exclude: ["README.md"],
             resources: [.process("Resources")]),
         .testTarget(name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron"], exclude: ["README.md"]),
+        .target(name: "ModelKitMossCoreML", path: "MobileHarness/ModelKit/Backends/MossCoreML", exclude: ["README.md"]),
+        .target(
+            name: "ModelKitMossNano", dependencies: ["ModelKit", "ModelKitMossCoreML"],
+            path: "MobileHarness/ModelKit/Speech/TTS/MossNano", exclude: ["README.md"]),
+        .testTarget(
+            name: "MossNanoTests", dependencies: ["ModelKit", "ModelKitMossNano", "ModelKitMossCoreML"],
+            exclude: ["README.md"]),
         .target(
             name: "ModelKitKokoro", dependencies: ["ModelKit", "ModelKitFluidAudio"],
             path: "MobileHarness/ModelKit/Speech/TTS/Kokoro", exclude: ["README.md"]),

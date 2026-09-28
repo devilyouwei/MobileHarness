@@ -20,3 +20,6 @@ flowchart LR
 - ✅ Separate backend targets compiled from this single source tree.
 - ✅ Backend concurrency and cancellation contracts are documented in each child README.
 - ❌ A universal backend interchange format or cross-model scheduler.
+
+
+✅ [MossCoreML](MossCoreML/README.md) contains the pinned, narrowly adapted MOSS beta graph loop and tokenizer. No runtime downloader or new third-party package is introduced. ❌ iPhone stability/performance acceptance remains pending.

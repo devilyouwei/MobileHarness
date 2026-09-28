@@ -44,7 +44,7 @@ flowchart TD
     Bundle --> Loader[Adapter validates and loads local files]
 ```
 
-Production uses Nemotron ASR, Qwen3.5-2B chat, Silero VAD and YOLO26n-Pose. System TTS uses Apple voices. Kokoro is diagnostic TTS; Audio8 and Qwen3.5-4B profiles are retained for comparison, not normal App inference. Profiles are development inputs, not runtime manifests.
+Production uses Nemotron ASR, Qwen3.5-2B chat, Silero VAD and YOLO26n-Pose. MOSS-TTS-Nano is default and diagnostic TTS (beta); Kokoro and Apple are not selected.  Audio8 and Qwen3.5-4B profiles are retained for comparison, not normal App inference. Profiles are development inputs, not runtime manifests.
 
 Download scripts own bounded workers, temporary files and failures; [Models](Models/README.md) documents that workflow. YOLO's profile pins archive/member hashes. Other profiles pin revisions without universal per-file checksum verification. App/build settings choose packaged resources; ModelKit owns loading and execution.
 

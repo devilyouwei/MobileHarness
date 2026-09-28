@@ -5,6 +5,27 @@
 	"objectVersion" = "60";
 	"archiveVersion" = "1";
 	"objects" = {
+		"670341F7CA30E1B03B569E5D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/LocalMossEngine.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"CE30D56E7677DEA13178572D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoConstants.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"462CD510CEEABB061C7C3839" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoError.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"B4333CE60A079568F5A20BEB" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoPromptBuilder.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"F87DD3B33F937AF781310FD6" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoSynthesizer.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"4F929861DB7550269C8A92EC" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoTensor.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"BF7AC479CAF977A600456925" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoTextChunker.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"B9EBD68AA9D041C9834788A0" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoTokenizer.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"92D311D7357F6A5A59C4A841" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/MossTtsNanoTypes.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"44CF6F1817933037A337B7E5" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+		"1C27CDDFE92E9F632F98F492" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Backends/MossCoreML/SentencePieceProto.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"F1F0422977758EC9D17CECBD" = { "isa" = "PBXGroup"; "children" = ("670341F7CA30E1B03B569E5D", "CE30D56E7677DEA13178572D", "462CD510CEEABB061C7C3839", "B4333CE60A079568F5A20BEB", "F87DD3B33F937AF781310FD6", "4F929861DB7550269C8A92EC", "BF7AC479CAF977A600456925", "B9EBD68AA9D041C9834788A0", "92D311D7357F6A5A59C4A841", "44CF6F1817933037A337B7E5", "1C27CDDFE92E9F632F98F492"); "name" = "MossCoreML"; "sourceTree" = "<group>"; };
+		"FD1CB5C3C7831736516D5B5A" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Speech/TTS/MossNano/MossInput.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"2035D4326C6CA7819A01A42F" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Speech/TTS/MossNano/MossPCMEncoder.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"7CCDDBB33B2C5FFC146406A3" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/ModelKit/Speech/TTS/MossNano/MossSpeechSynthesis.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"D816A5B39F118335DBDF8831" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text"; "path" = "MobileHarness/ModelKit/Speech/TTS/MossNano/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+		"EF217958836D58CA827D7D19" = { "isa" = "PBXGroup"; "children" = ("FD1CB5C3C7831736516D5B5A", "2035D4326C6CA7819A01A42F", "7CCDDBB33B2C5FFC146406A3", "D816A5B39F118335DBDF8831"); "name" = "MossNano"; "sourceTree" = "<group>"; };
+		"69D1B9D2C0527E9EA9CE9C1D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "Tests/MossNanoTests/MossNanoTests.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"19E9839BE3D7739A8BDC8E7E" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text"; "path" = "Tests/MossNanoTests/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+		"654F8E9C7BB8AD04A7F52EC0" = { "isa" = "PBXGroup"; "children" = ("69D1B9D2C0527E9EA9CE9C1D", "19E9839BE3D7739A8BDC8E7E"); "name" = "MossNanoTests"; "sourceTree" = "<group>"; };
+
 "710A2F3A64A0F14DFEFC266A" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/Audio/SpeechAudioStore.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "06700822D3F590057AD4BB38" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Storage/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 "CD5570000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/LocalDocumentStore.swift"; "sourceTree" = "SOURCE_ROOT"; };
@@ -909,7 +930,7 @@
 		"C01600000000000000000001" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "MobileHarness/Experience/Diagnostics/KokoroValidationView.swift";
+			"path" = "MobileHarness/Experience/Diagnostics/MossValidationView.swift";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"CF3EFDC61078CAA3309AC0BB" = {
@@ -1407,7 +1428,7 @@
         };
 		"17FC7EBFB8069DC4B810FF75" = {
 			"isa" = "PBXGroup";
-			"children" = ("9EE539CA56551CD2FEA24F41", "B53923E9FDE95317ADB4B1E6", "F10DA001F10DA001F10DA001");
+			"children" = ("F1F0422977758EC9D17CECBD", "9EE539CA56551CD2FEA24F41", "B53923E9FDE95317ADB4B1E6", "F10DA001F10DA001F10DA001");
 			"name" = "Backends";
 			"sourceTree" = "<group>";
 		};
@@ -1549,7 +1570,7 @@
 		};
 		"A64234B5E17DBC38B0191BBD" = {
 			"isa" = "PBXGroup";
-			"children" = ("735482AE9A9594DC01542111", "03AAD66C0054208C42F650D3");
+			"children" = ("EF217958836D58CA827D7D19", "735482AE9A9594DC01542111", "03AAD66C0054208C42F650D3");
 			"name" = "TTS";
 			"sourceTree" = "<group>";
 		};
@@ -1710,7 +1731,7 @@
 		};
 		"6DC4FAD667A85B8567F612FB" = {
 			"isa" = "PBXGroup";
-			"children" = ("9F88A43768F705517862E8EF", "BF61B416ECFEF6FE19D3AA76", "C8EA67560ADCA3EDBD07DB9E", "1A04FFA96B240234E906E764", "D12A13EF040077207E206D99", "07E1033EBB0BCF4F8D7D6E22");
+			"children" = ("654F8E9C7BB8AD04A7F52EC0", "9F88A43768F705517862E8EF", "BF61B416ECFEF6FE19D3AA76", "C8EA67560ADCA3EDBD07DB9E", "1A04FFA96B240234E906E764", "D12A13EF040077207E206D99", "07E1033EBB0BCF4F8D7D6E22");
 			"name" = "Tests";
 			"sourceTree" = "<group>";
 		};

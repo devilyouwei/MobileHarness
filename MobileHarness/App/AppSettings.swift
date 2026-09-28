@@ -12,9 +12,9 @@ final class AppSettings {
             notice = nil
         }
     }
-    var url = "" { didSet { if url != oldValue { invalidateModels() } } }
+    var url = OpenAIChatConfiguration.defaultBaseURL { didSet { if url != oldValue { invalidateModels() } } }
     var key = "" { didSet { if key != oldValue { invalidateModels() } } }
-    var selectedModel = ""
+    var selectedModel = OpenAIChatConfiguration.defaultModel
     private(set) var models: [String] = []
     private(set) var isLoading = false
     private(set) var isSaving = false
@@ -28,9 +28,9 @@ final class AppSettings {
     private let store = CloudSettingsStore()
     private let resources = Bundle.main.bundleURL.appendingPathComponent("Models")
 
-    var canLoad: Bool { !url.isEmpty && !key.isEmpty && !isLoading && !isSaving }
+    var canLoad: Bool { !isLoading && !isSaving }
     var canSave: Bool {
-        !isLoading && !isSaving && (!isEnabled || models.contains(selectedModel))
+        !isLoading && !isSaving && (!isEnabled || !selectedModel.isEmpty)
     }
 
     func restore() async throws {
@@ -46,9 +46,9 @@ final class AppSettings {
         let value = try await store.load()
         saved = value
         isEnabled = value?.enabled ?? false
-        url = value?.url ?? ""
+        url = value?.url ?? OpenAIChatConfiguration.defaultBaseURL
         key = value?.key ?? ""
-        selectedModel = value?.model ?? ""
+        selectedModel = value.flatMap { $0.model.isEmpty ? nil : $0.model } ?? OpenAIChatConfiguration.defaultModel
         models = value.flatMap { $0.model.isEmpty ? nil : [$0.model] } ?? []
         try await ModelKitDefaults.configureChat(resources: resources, configuration: try value?.configuration())
         restored = true
@@ -65,16 +65,17 @@ final class AppSettings {
         error = nil
         notice = nil
         models = []
-        selectedModel = ""
+        selectedModel = OpenAIChatConfiguration.defaultModel
         discovery = Task { [weak self] in
             do {
-                guard let address = URL(string: endpoint) else { throw CloudSettingsError.invalidURL }
+                let address = try OpenAIChatConfiguration.endpoint(endpoint)
                 let result = try await OpenAIChatConfiguration.models(baseURL: address, apiKey: credential)
                 try Task.checkCancellation()
                 guard let self, self.revision == current else { return }
                 self.models = result
+                if !result.isEmpty && !result.contains(self.selectedModel) { self.selectedModel = "" }
                 self.isLoading = false
-                self.notice = result.isEmpty ? "此服务没有返回可用模型" : "请选择用于对话的模型"
+                self.notice = result.isEmpty ? "此服务没有返回可识别的聊天模型" : "请选择用于对话的模型"
             } catch {
                 guard let self, self.revision == current else { return }
                 self.isLoading = false
@@ -90,7 +91,7 @@ final class AppSettings {
         notice = nil
         defer { isSaving = false }
         do {
-            if isEnabled, !models.contains(selectedModel) { throw CloudSettingsError.invalidSelection }
+            if isEnabled, selectedModel.isEmpty { throw CloudSettingsError.invalidSelection }
             let value = CloudSettings(
                 enabled: isEnabled,
                 url: url.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -126,7 +127,7 @@ final class AppSettings {
     private func invalidateModels() {
         cancelDiscovery()
         models = []
-        selectedModel = ""
+        selectedModel = OpenAIChatConfiguration.defaultModel
         error = nil
         notice = nil
     }

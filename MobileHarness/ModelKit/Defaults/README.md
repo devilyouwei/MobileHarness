@@ -7,9 +7,9 @@ Purpose: select and register the project's concrete model providers inside Model
 | Chat | Qwen3.5-2B from Qwen35 |
 | Recognition | Nemotron from Nemotron |
 | Voice activity | Silero from Silero |
-| Synthesis | Kokoro Core ML (Mandarin zf_001 / US English af_heart) |
+| Synthesis | MOSS-TTS-Nano Core ML beta (Mandarin zh_1 / English en_2) |
 
-Kokoro is the synthesis default and is also accessible under ModelKitDefaults.kokoro; both return the same managed provider. Apple speech is not registered or used as fallback. Judgment has no provider and fails with missingDefault. Simulator local chat and ASR report unavailable; explicit cloud chat configuration is supported.
+MOSS is the synthesis default and is accessible under ModelKitDefaults.mossNano; both return the same managed provider. Kokoro and Apple speech are not registered or used as fallback. Judgment has no provider and fails with missingDefault. Simulator local chat and ASR report unavailable; explicit cloud chat configuration is supported.
 
 ModelKitDefaults.manager(resources:) configures the MLX cache to 64 MiB and registers factories without loading weights. App supplies the Models directory, obtains interfaces through manager.get(.chat), and forwards platform memory warnings. The Defaults target depends on management and adapters; ModelKitRuntime depends only on ModelKit. Models with large local weights opt into idle release on memory pressure.
 
@@ -22,7 +22,7 @@ flowchart LR
     Manager -->|Shared interface| App
 ```
 
-- ✅ Internal registration and fixed capability mapping; shared Kokoro conversation/diagnostic binding.
+- ✅ Internal registration and fixed capability mapping; shared MOSS conversation/diagnostic binding.
 - ✅ Lazy resource loading, fail-fast registration and teardown on assembly failure.
 - ❌ Judgment provider and automatic fallback.
 
@@ -57,3 +57,5 @@ flowchart TD
 ✅ `manager(resources:cloudChat:)` optionally selects OpenAI-compatible cloud chat, including on simulator, without loading Qwen or warming the remote service. Omission preserves local defaults. An explicit conflicting initial cloudChat throws `cloudConfigurationConflict`; ordinary manager(resources:) access uses the current configuration. Explicit updates use configureChat and preserve the resource root. App owns Keychain persistence and settings UI.
 
 ✅ configureChat(resources:configuration:) explicitly replaces the chat registration in the existing process manager. A nil configuration restores local Qwen. Ordinary manager(resources:) access now obtains the current process binding without resetting it. Explicit initial cloudChat still validates conflicts. App pauses its active voice session and resolves a fresh capability per operation. This supersedes the earlier restart-only limitation. ❌ Network/model availability is not verified by replacement itself.
+
+✅ Startup/diagnostics now perform real in-memory synthesis warmup before conversation admission or measured speech. It exercises lazy kernels using synthetic Chinese text, drains PCM without playback and propagates failures. The first device run took 10.63 s to first PCM without warmup; startup must absorb that compilation cost instead of extending StorageAudio timeouts. ❌ Warmup does not prove sustained runtime stability.

@@ -3,6 +3,17 @@ import ModelKit
 
 /// Assembly configuration only. Keep credentials in the host's secure storage, never in Agent JSON.
 public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
+    public static let defaultBaseURL = "https://api.openai.com/v1"
+    public static let defaultModel = "gpt-4o-mini"
+
+    public static func endpoint(_ text: String) throws -> URL {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed.isEmpty ? defaultBaseURL : trimmed) else {
+            throw CapabilityError.invalidRequest("Invalid HTTPS endpoint")
+        }
+        return url
+    }
+
     public let baseURL: URL
     public let model: String
     public let timeout: TimeInterval
@@ -11,13 +22,12 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
     public init(baseURL: URL, apiKey: String, model: String, timeout: TimeInterval = 60) throws {
         guard baseURL.scheme?.lowercased() == "https", baseURL.host?.isEmpty == false,
             baseURL.user == nil, baseURL.password == nil, baseURL.query == nil, baseURL.fragment == nil,
-            !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             !apiKey.contains(where: { $0.isNewline }),
             !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             timeout.isFinite, (1...600).contains(timeout)
         else { throw CapabilityError.invalidRequest("Invalid HTTPS endpoint, credential, model or timeout") }
         self.baseURL = baseURL
-        self.apiKey = apiKey
+        self.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         self.model = model
         self.timeout = timeout
     }
@@ -33,7 +43,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
 
     func fetchModels(sessionConfiguration: URLSessionConfiguration) async throws -> [String] {
         var request = URLRequest(url: baseURL.appendingPathComponent("models"))
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = timeout
         sessionConfiguration.timeoutIntervalForResource = timeout
@@ -73,7 +83,23 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         else {
             throw OpenAIChatError.invalidResponse
         }
-        return ids.filter { seen.insert($0).inserted }
+        return ids.filter { isLikelyChatModel($0) && seen.insert($0).inserted }
+    }
+
+    // /models has no standard capability field. Exclude known non-chat families while
+    // retaining opaque third-party deployment names; discovery is not a compatibility probe.
+    static func isLikelyChatModel(_ id: String) -> Bool {
+        let name = id.lowercased()
+        let excluded = [
+            "embedding", "embed-", "rerank", "moderation", "whisper", "tts", "transcribe",
+            "transcription", "realtime", "audio", "dall-e", "dalle", "image", "sora",
+            "stable-diffusion", "flux", "video", "davinci", "babbage", "gpt-3.5-turbo-instruct",
+            "deep-research", "computer-use", "codex",
+        ]
+        if excluded.contains(where: { name.contains($0) }) { return false }
+        return !["o1-pro", "o3-pro", "gpt-5-pro", "gpt-5.2-pro", "gpt-5.4-pro", "gpt-5.5-pro"].contains {
+            name == $0 || name.hasPrefix($0 + "-")
+        }
     }
 
     func request(_ chat: ChatRequest) throws -> URLRequest {
@@ -84,7 +110,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         var request = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONSerialization.data(withJSONObject: [

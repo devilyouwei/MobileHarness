@@ -21,3 +21,8 @@ When a runtime contract changes, update the owning module README first, then the
 ❌ A unified project requirements document and a dedicated proposal index have not yet been created; the current [Photographer proposal](Photographer-Proposal.md) is linked directly until there are enough proposals to index. Historical reports are not automatically current after model or prompt changes. The original `Technical_Design.docx` and historical `Tech_Design.md` remain source material, not current module specifications.
 
 ✅ [ADR 0057](adr/0057-local-settings-storage.md) records local document cache/persistence synchronization and user-settings migration. ❌ Cross-device synchronization remains deferred.
+
+
+✅ [MOSS validation](Moss-Validation.md) records replacement-model setup and evidence; [ADR 0058](adr/0058-moss-tts-nano.md) records the default change. ❌ Device acceptance is separate from build and Mac checks.
+
+✅ ADR 0053 records optional cloud credentials and endpoint defaults. ❌ Live provider acceptance remains pending.

@@ -37,7 +37,7 @@ private struct CloudLLMSettingsView: View {
             }
             Section {
                 HStack {
-                    TextField("https://provider.example/v1", text: $settings.url)
+                    TextField("https://api.openai.com/v1", text: $settings.url)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -53,7 +53,7 @@ private struct CloudLLMSettingsView: View {
                     .accessibilityIdentifier("settings.cloud.url.paste")
                 }
                 HStack {
-                    SecureField("API Key", text: $settings.key)
+                    SecureField("API Key（可选）", text: $settings.key)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .privacySensitive()
@@ -82,11 +82,13 @@ private struct CloudLLMSettingsView: View {
                         ForEach(settings.models, id: \.self) { Text($0).tag($0) }
                     }
                     .accessibilityIdentifier("settings.cloud.model")
+                } else {
+                    LabeledContent("默认对话模型", value: settings.selectedModel)
                 }
             } header: {
                 Text("服务配置")
             } footer: {
-                Text("填写 API 地址和 Key，加载后选择对话模型。Key 安全保存在此设备中。")
+                Text("URL 留空使用 OpenAI 官方 API；Key 可为空，为空时不发送鉴权信息。加载后可选择聊天模型，尚未加载时使用默认模型。Key 安全保存在此设备中。")
             }
             Section {
                 Text(settings.isSaving ? "正在保存…" : (settings.error ?? settings.notice ?? "配置修改后，点击右上角保存。"))

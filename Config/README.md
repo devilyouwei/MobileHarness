@@ -18,3 +18,6 @@ Purpose: own shared Xcode settings, local-signing templates and explicit model r
 ✅ Physical model file lists now stage yolo26n-pose.mlpackage only. The generated App Models cleanup and declared-file copy prevent the retired YOLOv8 package from shipping.
 
 ✅ Voice model file lists now stage KokoroCoreML Mandarin/English graphs, local pronunciation resources and FluidAudio license. Regenerate with scripts/update-model-filelists.py.
+
+
+✅ Voice model file lists now stage only the four MOSS streaming graphs, preset voice codes and supporting metadata for TTS. Kokoro resources are excluded. ❌ Physical-device acceptance remains pending.

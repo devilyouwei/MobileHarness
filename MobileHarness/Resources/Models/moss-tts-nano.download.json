@@ -1,0 +1,29 @@
+{
+  "directory": "MossTTSNano",
+  "source": "https://huggingface.co/FluidInference/moss-tts-nano-coreml",
+  "revision": "408475d01c46c9290b6546edf31e9cc5cbb202cd",
+  "files": [
+    "LICENSE",
+    "MossNano-CodecStep-fp16.mlmodelc/analytics/coremldata.bin",
+    "MossNano-CodecStep-fp16.mlmodelc/coremldata.bin",
+    "MossNano-CodecStep-fp16.mlmodelc/model.mil",
+    "MossNano-CodecStep-fp16.mlmodelc/weights/weight.bin",
+    "MossNano-Frame-fp16.mlmodelc/analytics/coremldata.bin",
+    "MossNano-Frame-fp16.mlmodelc/coremldata.bin",
+    "MossNano-Frame-fp16.mlmodelc/model.mil",
+    "MossNano-Frame-fp16.mlmodelc/weights/weight.bin",
+    "MossNano-Prefill-T512-M1024-fp16.mlmodelc/analytics/coremldata.bin",
+    "MossNano-Prefill-T512-M1024-fp16.mlmodelc/coremldata.bin",
+    "MossNano-Prefill-T512-M1024-fp16.mlmodelc/model.mil",
+    "MossNano-Prefill-T512-M1024-fp16.mlmodelc/weights/weight.bin",
+    "MossNano-Step-M1024-fp16.mlmodelc/analytics/coremldata.bin",
+    "MossNano-Step-M1024-fp16.mlmodelc/coremldata.bin",
+    "MossNano-Step-M1024-fp16.mlmodelc/model.mil",
+    "MossNano-Step-M1024-fp16.mlmodelc/weights/weight.bin",
+    "config.json",
+    "tokenizer.model",
+    "tokenizer_test_vectors.json",
+    "voices/en_2.json",
+    "voices/zh_1.json"
+  ]
+}

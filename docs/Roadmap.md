@@ -342,3 +342,18 @@ Settings validation: root checks and nine cloud tests passed; all four simulator
 ✅ Storage now supports bounded durable documents, read-through/write-through caching, explicit refresh and revision conflicts. App settings migrate from the legacy Keychain record to a sandbox document with device-local credential references. ❌ Cross-device sync, general media persistence and device migration acceptance remain pending. See [ADR 0057](adr/0057-local-settings-storage.md).
 
 Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four local-document synchronization tests. `scripts/build-ios.sh` passed all four simulator schemes. Device Keychain migration, live cloud requests and phone installation were not exercised in this change.
+
+
+## MOSS-TTS-Nano default synthesis (ADR 0058)
+
+✅ Default registration, local provisioning, bounded streaming synthesis, Chinese/English preset voices and MOSS diagnostics replace Kokoro after repeated iPhone crashes. No automatic fallback. ❌ Sustained iPhone 17 Pro/iOS 27 stability, cold-start latency across conditions, Chinese number/date pronunciation and continuous speech acceptance remain pending.
+
+✅ MOSS replacement checks: repository checks with real Mac synthesis, all four simulator schemes and signed physical Release build passed. Installed on iPhone 17 Pro; two short mixed-language synthesis runs completed without process termination. Cold prediction latency prompted explicit startup warmup; the final revision also completed a device diagnostic (loading/warmup 0.75 s, first PCM 0.04 s, total 1.85 s for 5.04 s audio, thermal nominal). ❌ Audible quality and sustained full-conversation acceptance remain pending; see [MOSS validation](Moss-Validation.md).
+
+### Cloud settings input defaults (2026-09-28)
+
+✅ Optional Key, blank URL fallback to the official OpenAI endpoint, visible default chat model and filtered model discovery are implemented. ❌ Live provider and device UI acceptance remain pending.
+
+✅ MOSS follow-up crash logs identify a MainActor isolation assertion in the AppleAudioIO mixer tap, corrected with an explicitly Sendable callback. Diagnostics now exercise production playback; see [MOSS validation](Moss-Validation.md) for evidence and device acceptance.
+
+✅ Following MOSS playback buffer overflow, the production per-handle PCM cache was increased from 2 MiB to 8 MiB at the user’s request, matching the synthesis output limit. ❌ This does not add backpressure or remove long-reply limits; sustained conversation acceptance remains pending.

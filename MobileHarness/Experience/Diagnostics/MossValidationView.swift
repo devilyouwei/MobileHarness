@@ -1,25 +1,25 @@
 import AVFAudio
 import ModelKit
+import PlatformKit
 import SwiftUI
 
 /// Explicit model validation mode. Does not submit Agent input or run a conversation.
 @MainActor
-struct KokoroValidationView: View {
+struct MossValidationView: View {
     @State private var text = "你好，Hello world，欢迎使用本地语音助手。"
-    @State private var report = "中英双语 · Core ML · af_heart / zf_001"
+    @State private var report = "中英双语 · Core ML · MOSS Nano Beta · zh_1 / en_2"
     @State private var task: Task<Void, Never>?
-    @State private var player: AVAudioPlayer?
+    @State private var player = AppleAudioIO()
     let provider: any SpeechSynthesisCapability
     let load: @Sendable () async throws -> Void
     let unload: @Sendable () async throws -> Void
     @State private var session: InferenceSession<SynthesisEvent>?
-    @State private var file: URL?
     @State private var stopping = false
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Kokoro 本地语音验证") {
+                Section("MOSS 本地语音验证") {
                     Text("支持中文、英语及混读。首次加载包含本地资源检查与模型编译。")
                     TextEditor(text: $text).frame(minHeight: 100).disabled(task != nil)
                     Button("合成并试听") { start() }.disabled(task != nil || stopping)
@@ -29,25 +29,25 @@ struct KokoroValidationView: View {
                 Text("首段为 PCM 生成时间；内存和发热请配合 Instruments 测量。声音自然度需人工试听。")
                     .font(.footnote)
             }
-            .navigationTitle("Kokoro 验证")
+            .navigationTitle("MOSS 验证")
             .onDisappear { stop() }
             .task {
-                if ProcessInfo.processInfo.arguments.contains("-kokoro-autorun") { start() }
+                if ProcessInfo.processInfo.arguments.contains("-moss-autorun") { start() }
             }
         }
     }
 
     private func start() {
-        player?.stop()
+        player.stop()
         task = Task {
             defer { task = nil }
             do {
                 #if targetEnvironment(simulator)
-                    throw CapabilityError.unavailable("请使用 iOS 27 真机运行 KokoroValidation")
+                    throw CapabilityError.unavailable("请使用 iOS 27 真机运行 MossValidation")
                 #else
                     let clock = ContinuousClock()
                     let loadStart = clock.now
-                    report = "正在加载本地模型…"
+                    report = "正在加载并预热本地模型…"
                     try await load()
                     let loadTime = seconds(loadStart.duration(to: clock.now))
                     let start = clock.now
@@ -76,16 +76,17 @@ struct KokoroValidationView: View {
                     try Task.checkCancellation()
                     guard finished, !samples.isEmpty else { throw CapabilityError.unavailable("没有生成音频") }
                     let elapsed = seconds(start.duration(to: clock.now))
-                    let duration = Double(samples.count) / 24_000
+                    let duration = Double(samples.count) / 48_000
                     report = String(
-                        format: "加载 %.2f 秒\n首段 PCM %.2f 秒\n总合成 %.2f 秒\n音频 %.2f 秒\n实时率 %.2f（越低越快）\n热状态：%@", loadTime,
+                        format: "加载及预热 %.2f 秒\n首段 PCM %.2f 秒\n总合成 %.2f 秒\n音频 %.2f 秒\n实时率 %.2f（越低越快）\n热状态：%@", loadTime,
                         first ?? elapsed, elapsed, duration, elapsed / duration,
                         String(describing: ProcessInfo.processInfo.thermalState))
-                    if ProcessInfo.processInfo.arguments.contains("-kokoro-autorun") {
-                        saveAutomaticReport(report)
-                    } else {
-                        try play(samples)
+                    let automatic = ProcessInfo.processInfo.arguments.contains("-moss-autorun")
+                    if !automatic || ProcessInfo.processInfo.arguments.contains("-moss-playback") {
+                        try await play(samples)
+                        report += "\n扬声器播放完成（AppleAudioIO）"
                     }
+                    saveAutomaticReport(report)
                 #endif
             } catch is CancellationError {
                 report = "已停止"
@@ -97,36 +98,26 @@ struct KokoroValidationView: View {
     }
 
     private func saveAutomaticReport(_ report: String) {
-        guard ProcessInfo.processInfo.arguments.contains("-kokoro-autorun"),
+        guard ProcessInfo.processInfo.arguments.contains("-moss-autorun"),
             let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         else { return }
-        try? report.write(to: folder.appendingPathComponent("kokoro-validation.txt"), atomically: true, encoding: .utf8)
+        try? report.write(to: folder.appendingPathComponent("moss-validation.txt"), atomically: true, encoding: .utf8)
     }
 
     private func seconds(_ duration: Duration) -> Double {
         Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
     }
 
-    private func play(_ samples: [Float]) throws {
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1),
-            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
-            let destination = buffer.floatChannelData?[0]
-        else { throw CapabilityError.unavailable("无法创建播放缓冲") }
-        buffer.frameLength = buffer.frameCapacity
-        samples.withUnsafeBufferPointer { source in
-            if let base = source.baseAddress { destination.update(from: base, count: source.count) }
-        }
-        if let file { try? FileManager.default.removeItem(at: file) }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("kokoro-\(UUID().uuidString).wav")
-        file = url
-        do {
-            let audio = try AVAudioFile(forWriting: url, settings: format.settings)
-            try audio.write(from: buffer)
-        }
+    private func play(_ samples: [Float]) async throws {
         try AVAudioSession.sharedInstance().setCategory(.playback)
         try AVAudioSession.sharedInstance().setActive(true)
-        player = try AVAudioPlayer(contentsOf: url)
-        guard player?.play() == true else { throw CapabilityError.unavailable("无法开始播放") }
+        var offset = 0
+        try await player.playStream {
+            guard offset < samples.count else { return nil }
+            let end = min(offset + 4096, samples.count)
+            defer { offset = end }
+            return PlaybackPCM(samples: Array(samples[offset..<end]), sampleRate: 48_000)
+        }
     }
 
     private func stop() {
@@ -134,18 +125,13 @@ struct KokoroValidationView: View {
         stopping = true
         session?.cancel()
         task?.cancel()
-        player?.stop()
-        player = nil
+        player.stop()
         let pending = task
         Task {
             await pending?.value
             #if !targetEnvironment(simulator)
                 try? await unload()
             #endif
-            if let file {
-                try? FileManager.default.removeItem(at: file)
-                self.file = nil
-            }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             report = "已停止并卸载"
             stopping = false

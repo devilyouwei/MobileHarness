@@ -248,3 +248,51 @@ private final class ModelListProtocol: URLProtocol, @unchecked Sendable {
     let models = try await config().fetchModels(sessionConfiguration: settings)
     #expect(models == ["chat-a", "chat-b"])
 }
+
+@Test func emptyCredentialsOmitAuthorizationAndBlankEndpointUsesOfficialDefault() throws {
+    for key in ["", "   "] {
+        let configuration = try OpenAIChatConfiguration(
+            baseURL: OpenAIChatConfiguration.endpoint("  \n "), apiKey: key,
+            model: OpenAIChatConfiguration.defaultModel)
+        let request = try configuration.request(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
+        #expect(request.url?.absoluteString == "https://api.openai.com/v1/chat/completions")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+}
+
+@Test func chatDiscoveryFiltersSpecializedModelsButKeepsThirdPartyChatNames() throws {
+    let allowed = ["gpt-4o-mini", "gpt-4.1", "o3-mini", "deepseek-chat", "Qwen3-Instruct", "my-deployment"]
+    let excluded = [
+        "text-embedding-3-small", "tts-1", "whisper-1", "gpt-4o-transcribe", "gpt-realtime",
+        "gpt-image-1", "sora-2", "omni-moderation-latest", "bge-reranker", "davinci-002",
+        "gpt-3.5-turbo-instruct", "o3-deep-research", "gpt-5-pro", "gpt-5.3-codex",
+    ]
+    let data = try JSONSerialization.data(withJSONObject: ["data": (allowed + excluded + allowed).map { ["id": $0] }])
+    #expect(try OpenAIChatConfiguration.decodeModels(data) == allowed)
+}
+
+private final class AnonymousModelListProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let valid =
+            request.url?.absoluteString == "https://api.openai.com/v1/models"
+            && request.value(forHTTPHeaderField: "Authorization") == nil
+        guard let url = request.url,
+            let response = HTTPURLResponse(url: url, statusCode: valid ? 401 : 400, httpVersion: nil, headerFields: nil)
+        else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@Test func anonymousDiscoveryActuallyRequestsAndSurfacesServerFailure() async throws {
+    let settings = URLSessionConfiguration.ephemeral
+    settings.protocolClasses = [AnonymousModelListProtocol.self]
+    let configuration = try OpenAIChatConfiguration(
+        baseURL: OpenAIChatConfiguration.endpoint(""), apiKey: "", model: OpenAIChatConfiguration.defaultModel)
+    await #expect(throws: OpenAIChatError.httpStatus(401)) {
+        try await configuration.fetchModels(sessionConfiguration: settings)
+    }
+}

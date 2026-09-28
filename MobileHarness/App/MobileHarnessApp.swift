@@ -80,7 +80,7 @@ struct MobileHarnessApp: App {
         #if DEBUG
             if arguments.contains("-qwen35-validation") { return true }
         #endif
-        return arguments.contains("-kokoro-benchmark")
+        return arguments.contains("-moss-benchmark")
     }
 
     private var startupContent: some View {
@@ -122,8 +122,8 @@ struct MobileHarnessApp: App {
     }
     @ViewBuilder
     private func standardContent(_ container: AppContainer) -> some View {
-        if ProcessInfo.processInfo.arguments.contains("-kokoro-benchmark") {
-            container.makeKokoroValidationView()
+        if ProcessInfo.processInfo.arguments.contains("-moss-benchmark") {
+            container.makeMossValidationView()
         } else {
             ConversationView(runtime: container.conversation)
         }

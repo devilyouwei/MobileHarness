@@ -12,16 +12,16 @@ final class AppContainer {
     private let models: ModelManager
     private var memoryWarnings: Task<Void, Never>?
     private let validationModel: any SpeechSynthesisCapability
-    private let kokoroID = ModelKitDefaults.kokoro
+    private let mossID = ModelKitDefaults.mossNano
     let lifecycle: AppLifecycleCoordinator
     let conversation: ConversationViewModel
 
-    func makeKokoroValidationView() -> KokoroValidationView {
+    func makeMossValidationView() -> MossValidationView {
         let models = models
-        let id = kokoroID
-        return KokoroValidationView(
+        let id = mossID
+        return MossValidationView(
             provider: validationModel,
-            load: { try await models.load(id) },
+            load: { try await models.warmup(id) },
             unload: { try await models.unload(id) })
     }
 
@@ -42,7 +42,7 @@ final class AppContainer {
         let chat = CurrentChatCapability(models: models)
         let vad = try await models.get(.voiceActivity, load: false)
         let synthesis = try await models.get(.synthesis, load: false)
-        validationModel = try await models.get(kokoroID, as: .synthesis, load: false)
+        validationModel = try await models.get(mossID, as: .synthesis, load: false)
         self.models = models
         #if DEBUG
             validateVoiceModels = {
@@ -64,7 +64,7 @@ final class AppContainer {
                 return "ASR + Qwen ready. Reply: \(answer). Total: \(Date().timeIntervalSince(started)) s"
             }
         #endif
-        if !ProcessInfo.processInfo.arguments.contains("-kokoro-benchmark") {
+        if !ProcessInfo.processInfo.arguments.contains("-moss-benchmark") {
             progress("正在加载语音识别模型…")
             try await models.warmup(.recognition)
             progress("正在加载对话模型…")
@@ -72,7 +72,7 @@ final class AppContainer {
             progress("正在加载语音检测模型…")
             try await models.load(.voiceActivity)
             progress("正在准备语音合成…")
-            try await models.load(.synthesis)
+            try await models.warmup(.synthesis)
         }
         try Task.checkCancellation()
         let lifecycle = AppLifecycleCoordinator(

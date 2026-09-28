@@ -30,8 +30,9 @@ struct CloudSettings: Codable, Equatable, Sendable {
 
     func configuration() throws -> OpenAIChatConfiguration? {
         guard enabled else { return nil }
-        guard let endpoint = URL(string: url) else { throw CloudSettingsError.invalidURL }
-        return try OpenAIChatConfiguration(baseURL: endpoint, apiKey: key, model: model)
+        let endpoint = try OpenAIChatConfiguration.endpoint(url)
+        return try OpenAIChatConfiguration(
+            baseURL: endpoint, apiKey: key, model: model.isEmpty ? OpenAIChatConfiguration.defaultModel : model)
     }
 }
 

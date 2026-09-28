@@ -467,7 +467,7 @@ sequenceDiagram
     participant OG as OutputGateway
     participant IG as InputGateway
     participant S as SpeechSynthesisAgent
-    participant M as ModelKit Kokoro / FluidAudio
+    participant M as ModelKit MOSS-TTS-Nano
     participant C as StorageAudio / Storage
     participant Q as ChannelScheduler
     participant R as ActionRuntime
@@ -505,9 +505,9 @@ sequenceDiagram
     end
 ```
 
-The Agent waits for **request admission**, not synthesis completion, before emitting `Speech.speak(audioID)`. SpeechSynthesisAgent processes admitted requests in its own serial FIFO and does not inspect Channels; the Gateway's ChannelScheduler independently decides when ActionRuntime invokes playback. App injects the process-wide ModelKit synthesis capability and one shared audio store into synthesis and playback. The current capability uses the Kokoro adapter over FluidAudio/Core ML; `StorageAudio` adapts PCM and owner identity to the general `Storage` memory primitives. Playback may consume PCM before synthesis finishes, but only as frames arrive: an empty initial or intermediate read waits up to three seconds from that read, then fails. This is not a three-second synthesis deadline. Kokoro can finish an internal waveform segment before emitting its PCM frames, so this design does not imply token-level audio generation.
+The Agent waits for **request admission**, not synthesis completion, before emitting `Speech.speak(audioID)`. SpeechSynthesisAgent processes admitted requests in its own serial FIFO and does not inspect Channels; the Gateway's ChannelScheduler independently decides when ActionRuntime invokes playback. App injects the process-wide ModelKit synthesis capability and one shared audio store into synthesis and playback. The current capability uses the MOSS-TTS-Nano adapter over Core ML; `StorageAudio` adapts PCM and owner identity to the general `Storage` memory primitives. Playback may consume PCM before synthesis finishes, but only as frames arrive: an empty initial or intermediate read waits up to three seconds from that read, then fails. This is not a three-second synthesis deadline. MOSS produces native 80 ms audio blocks after prompt prefill; neither block duration nor streaming guarantees a three-second first-audio deadline.
 
-Successful Action completion means the player has drained and the single-use cache lease has been released. Synthesis/cache errors, expiration, a missing handle or read starvation fail playback explicitly; cancellation and dispatch failure release the owning audio. No audio file, re-synthesis or Channel-driven synthesis reorder is involved. [Assistant](Agents/Assistant/README.md) owns current semantic segmentation; [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Speech playback](Actions/Speech/README.md), [Kokoro](ModelKit/Speech/TTS/Kokoro/README.md) and [PlatformKit Audio](PlatformKit/Audio/README.md) own their detailed limits and implementation contracts.
+Successful Action completion means the player has drained and the single-use cache lease has been released. Synthesis/cache errors, expiration, a missing handle or read starvation fail playback explicitly; cancellation and dispatch failure release the owning audio. No audio file, re-synthesis or Channel-driven synthesis reorder is involved. [Assistant](Agents/Assistant/README.md) owns current semantic segmentation; [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Speech playback](Actions/Speech/README.md), [MOSS](ModelKit/Speech/TTS/MossNano/README.md) and [PlatformKit Audio](PlatformKit/Audio/README.md) own their detailed limits and implementation contracts.
 
 ### Session, Turn and Presentation Boundaries
 
@@ -598,3 +598,6 @@ Keep this document focused on framework and module design. Maintain detailed alg
 
 
 ✅ ADR 0055 adds shared audio handles and Agents/SpeechSynthesis (directed serial synthesis); ADR 0056 moves the cache into StorageAudio. Semantic segmentation stays in the original Agent; the [StorageAudio README](Storage/Audio/README.md) owns the playback wait and cache limits. ❌ Persistence/replay and physical-device acceptance remain pending.
+
+
+✅ TTS target mapping: `Speech/TTS/MossNano` → ModelKitMossNano; `Backends/MossCoreML` → ModelKitMossCoreML. These independently tested targets replace the default Kokoro binding (ADR 0058). ❌ iPhone acceptance remains pending.

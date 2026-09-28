@@ -4,7 +4,7 @@ import ModelKitDefaults
 import ModelKitRuntime
 import Testing
 
-@Test func defaultAssemblyIsLazyAndSynthesisUsesKokoro() async throws {
+@Test func defaultAssemblyIsLazyAndSynthesisUsesMossNano() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
     // Standalone Swift Testing does not expose its XCTest bundle to MLX's bundle search.
     let testResources = try #require(Bundle(for: TestBundleAnchor.self).resourceURL)
@@ -37,15 +37,15 @@ import Testing
     let again = try await manager.get(.synthesis, load: false)
     let sameInstance = (synthesis as AnyObject) === (again as AnyObject)
     #expect(sameInstance)
-    let kokoro = try await manager.get(ModelKitDefaults.kokoro, as: .synthesis, load: false)
-    let sameKokoroInstance = (synthesis as AnyObject) === (kokoro as AnyObject)
-    #expect(sameKokoroInstance)
+    let mossNano = try await manager.get(ModelKitDefaults.mossNano, as: .synthesis, load: false)
+    let sameMossNanoInstance = (synthesis as AnyObject) === (mossNano as AnyObject)
+    #expect(sameMossNanoInstance)
     if case .available = await synthesis.availability {
-        Issue.record("Missing Kokoro resources must not resolve to system speech")
+        Issue.record("Missing MossNano resources must not resolve to system speech")
     }
     await #expect(throws: (any Error).self) { try await manager.load(.synthesis) }
     #expect(try await manager.status(.synthesis) == .unloaded)
-    #expect(try await manager.status(ModelKitDefaults.kokoro) == .unloaded)
+    #expect(try await manager.status(ModelKitDefaults.mossNano) == .unloaded)
     #expect(try await manager.status(.chat) == .registered)
     await #expect(throws: ModelRegistrationError.missingDefault(.judge)) { _ = try await manager.get(.judge) }
     await manager.shutdown()
