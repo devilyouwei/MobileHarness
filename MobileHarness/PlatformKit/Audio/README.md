@@ -22,7 +22,7 @@ Keep this README and stream continuity tests current when changing audio code. C
 
 The AVAudioEngine tap produces microphone frames into a 64-element `AsyncThrowingStream` using `bufferingOldest`; the App capture task consumes them. Tap requests are 1024 samples, but actual callback size is validated separately (1...8192 samples). Sequence numbers are allocated under a mutex. When yield reports a dropped frame, the stream finishes with `AudioIOError.overflow`; the pipeline must stop rather than continue with an unnoticed gap. This stream is not a fixed-duration buffer because hardware sample rate/frame size vary. `stopCapture` removes the tap, stops the engine and finishes the stream.
 
-Playback does not accumulate an application FIFO. `play` admits only one outstanding waiter, accepts at most 262,144 mono samples, schedules one AVAudioPlayerNode buffer and suspends until its `dataPlayedBack` completion. The caller therefore supplies playback backpressure. A token prevents stale callbacks from completing a newer play. Cancellation/stop halts playback and resumes the waiter with failure; a duration-plus-3-second deadline prevents an indefinite wait. There is no application-level mixing or parallel playback queue.
+Playback admits one active stream, with at most three scheduled buffers of up to 262,144 mono samples each. Capacity suspension supplies backpressure; final completion awaits all dataPlayedBack callbacks. Tokens fence stale callbacks, cancellation wakes capacity/drain waiters, and queued-duration-plus-three-second watchdogs bound missing hardware completion. There is no audio mixing or simultaneous playback of different Actions.
 
 ```mermaid
 flowchart LR
@@ -42,15 +42,17 @@ Audio is the platform capability domain for microphone and speaker I/O. AppleAud
 
 ✅ AudioSpectrum measures the latest 2048 mono samples, removes DC, applies a Hann window and radix-2 FFT, and sums power into 32 logarithmic bands (80 Hz to min(8 kHz, Nyquist)). Fixed −66…−6 dB mapping preserves level differences; there is no per-frame auto normalization. Invalid samples become zero. Attack/release smoothing is deterministic and settles to silence. This is device-level metering, not model inference.
 
-✅ AppleAudioIO.playbackSampleOffset exposes the current buffer render cursor through lastRenderTime/playerTime, nil outside active playback. Each single-buffer play resets the node timeline before scheduling; one waiter, cancellation token and dataPlayedBack completion remain unchanged. App polls at 33 ms; no callback or audio queue is added.
+✅ AppleAudioIO.playStream schedules up to three bounded mono PCM buffers continuously. Each is at most 262,144 samples; producer awaits capacity, final completion awaits dataPlayedBack for all buffers. The node is not stopped between packets or same-format Actions. Format changes reconnect only after drain; cancellation/timeout stops the node and resolves capacity/drain waiters. Each buffer has a watchdog allowing queued duration plus 3 seconds. play(samples:) remains a compatibility wrapper.
 
 ```mermaid
 flowchart LR
     Capture[Captured PCM: latest 2048] --> FFT[Hann / FFT / 32 logarithmic bands]
-    Player[Player render cursor] --> Window[Current output PCM window]
+    Player[Main mixer render tap] --> Window[Latest bounded output PCM window]
     Window --> FFT
     FFT --> Meter[Fast attack / slower release]
     Meter --> UI[Canvas bars: no periodic waveform]
 ```
 
 ❌ The render cursor is not an acoustic measurement at the speaker; Bluetooth/output-route latency and device power require physical validation. See ADR 0045.
+
+✅ The mixer tap retains at most 2048 mono samples; App samples playbackSpectrum every 33 ms for the lifetime of a speech Action. This represents rendered audio, not synthesis progress, and does not toggle UI state for each PCM packet. Physical output latency remains device-dependent (❌).

@@ -68,8 +68,11 @@ public actor OutputGateway {
         } else {
             guard declaration.publications.contains(observation.contract) else { throw CommunicationError.unauthorized }
         }
+        // These commands are newly produced work, not forwarded sensor observations. Their
+        // admission deadline starts now; the accepted input may outlive its original routing TTL.
+        let generatedCommand = observation.contract == "speech.synthesize" || observation.contract == "speech.cancel"
         guard (0..<8).contains(parent.metadata.hops) else { throw CommunicationError.hopLimitExceeded }
-        guard !parent.metadata.expired else { throw CommunicationError.expired }
+        guard generatedCommand || !parent.metadata.expired else { throw CommunicationError.expired }
         sequences[source, default: 0] += 1
         let payload = InputPayload.observation(observation)
         let input = AgentInput(
@@ -79,7 +82,7 @@ public actor OutputGateway {
                 capturedAt: parent.metadata.capturedAt, sequence: sequences[source]!, rootID: parent.metadata.rootID,
                 parentID: parent.id, hops: parent.metadata.hops + 1,
                 deadline: min(
-                    parent.metadata.deadline,
+                    generatedCommand ? .now.advanced(by: .seconds(10)) : parent.metadata.deadline,
                     .now.advanced(
                         by: .seconds(
                             observation.contract == "vision.pose"
@@ -105,8 +108,12 @@ public actor OutputGateway {
             delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new })
     }
 
-    public func cancel(sessionID: UUID) async { await actions.cancel(sessionID: sessionID) }
-    public func shutdown() async { await actions.shutdown() }
+    public func cancel(sessionID: UUID) async {
+        await actions.cancel(sessionID: sessionID)
+    }
+    public func shutdown() async {
+        await actions.shutdown()
+    }
 
     /// Admission is not playback completion. The terminal control joins accepted actions.
     public func dispatch(_ envelope: OutputEnvelope) async throws {
@@ -116,7 +123,13 @@ public actor OutputGateway {
         try OutputValidator.validate(envelope.output, descriptor: descriptor)
         switch try ExecutionRouter.route(envelope.output) {
         case .action(let token):
-            try await actions.dispatch(token, envelope: envelope)
+            do {
+                try Task.checkCancellation()
+                try await actions.dispatch(token, envelope: envelope)
+            } catch {
+                await actions.cancel(envelope)
+                throw error
+            }
         case .tool(let call):
             try await tools.dispatch(call, envelope: envelope)
         case .finish:

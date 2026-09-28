@@ -3,20 +3,63 @@ import SwiftUI
 @main
 @MainActor
 struct MobileHarnessApp: App {
+    @State private var camera = CameraCoordinator()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var settings = AppSettings()
+    @State private var showingSettings = false
     @State private var container: AppContainer?
     @State private var startupError: String?
     @State private var startupStatus = "正在准备…"
     @State private var startupAttempt = 0
     var body: some Scene {
         WindowGroup {
-            Group {
-                if isVisualPreview {
-                    ConversationVisualPreview()
-                } else if isDiagnostic {
-                    startupContent
-                } else {
-                    CameraScene { startupContent }
+            NavigationStack {
+                Group {
+                    if isVisualPreview {
+                        ConversationVisualPreview()
+                    } else if isDiagnostic {
+                        startupContent
+                    } else {
+                        CameraConversationSurface(
+                            camera: camera,
+                            openSettings: {
+                                container?.lifecycle.stopVoice()
+                                showingSettings = true
+                            }
+                        ) { startupContent }
+                    }
                 }
+                .navigationTitle("首页")
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(isPresented: $showingSettings) {
+                    SettingsView(settings: settings) {
+                        let applied = await settings.save(
+                            beginChange: { await container?.lifecycle.beginSettingsChange() },
+                            endChange: { container?.lifecycle.endSettingsChange() })
+                        if applied, container == nil {
+                            startupError = nil
+                            startupStatus = "正在准备…"
+                            startupAttempt += 1
+                        }
+                        return applied
+                    }
+
+                }
+            }
+            .task {
+                if !isVisualPreview && !isDiagnostic {
+                    camera.setForeground(scenePhase == .active && !showingSettings)
+                    await camera.observe()
+                }
+            }
+            .onChange(of: showingSettings) { _, showing in
+                if !isVisualPreview && !isDiagnostic { camera.setForeground(scenePhase == .active && !showing) }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if !isVisualPreview && !isDiagnostic { camera.setForeground(phase == .active && !showingSettings) }
+            }
+            .task(id: container.map { ObjectIdentifier($0) }) {
+                if let container, !isDiagnostic { await container.conversation.run() }
             }
             .task(id: startupAttempt) {
                 if !isVisualPreview { await prepare() }
@@ -57,6 +100,7 @@ struct MobileHarnessApp: App {
     private func prepare() async {
         guard container == nil, startupError == nil else { return }
         do {
+            try await settings.restore()
             let prepared = try await AppContainer { startupStatus = $0 }
             try Task.checkCancellation()
             container = prepared

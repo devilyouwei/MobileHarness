@@ -9,6 +9,7 @@ import ModelKit
 import OSLog
 import Observation
 import PlatformKit
+import StorageAudio
 import ToolRuntime
 
 @MainActor @Observable
@@ -23,6 +24,7 @@ final class AppLifecycleCoordinator {
     private(set) var expression: UIActions.Emotion?
     private(set) var playbackSpectrum = AudioSpectrum.silence
     private(set) var microphoneSpectrum = AudioSpectrum.silence
+    private var changingSettings = false
     private var startupTask: Task<Void, Never>?
     private(set) var isReady = false
     private(set) var voiceStatus = "点击麦克风开始持续对话"
@@ -38,6 +40,7 @@ final class AppLifecycleCoordinator {
     private var manager: AgentManager?
     private var captureTask: Task<Void, Never>?
     private var speechTask: Task<Void, Never>?
+    private var speechAudioStore: SpeechAudioStore?
     private var speech: SpeechPerceptionAgent?
     private var responseTask: Task<Void, Error>?
     private var responses: OutputGateway?
@@ -84,10 +87,12 @@ final class AppLifecycleCoordinator {
         }
         let requests = runtime.input
         let responses = runtime.output
-        runtime.presentation.synthesis = synthesis
-        runtime.presentation.play = { [weak self] frame, invocation in
+        let audioStore = SpeechAudioStore()
+        speechAudioStore = audioStore
+        runtime.presentation.speechPlayback = SpeechPlayback(store: audioStore)
+        runtime.presentation.playSpeech = { [weak self] stream, invocation in
             guard let self else { throw CancellationError() }
-            try await self.play(frame, envelope: invocation.envelope)
+            try await self.play(stream, envelope: invocation.envelope)
         }
         runtime.presentation.text = { [weak self] text, invocation in
             guard let self else { throw CancellationError() }
@@ -120,7 +125,11 @@ final class AppLifecycleCoordinator {
         }
         self.responses = responses
         do {
+            let synthesizer = try SpeechSynthesisAgent(synthesis: synthesis, store: audioStore)
+            try await manager.register(synthesizer)
+            try await manager.start(synthesizer.descriptor.id)
             try await manager.register(agent)
+            try await agent.bind(responses.messaging(for: .assistant))
             try await manager.start(.assistant)
             self.requests = requests
             presentationPhase = .idle
@@ -130,7 +139,12 @@ final class AppLifecycleCoordinator {
                 try Task.checkCancellation()
                 guard output.sessionID == voiceGeneration else { continue }
                 do {
-                    let task = Task { try await responses.dispatch(output) }
+                    let task = Task {
+                        do { try await responses.dispatch(output) } catch {
+                            await audioStore.cancel(inputID: output.inputID, source: output.source)
+                            throw error
+                        }
+                    }
                     responseTask = task
                     try await withTaskCancellationHandler {
                         try await task.value
@@ -164,7 +178,11 @@ final class AppLifecycleCoordinator {
         self.requests = nil
         await cleanupTask?.value
         try? await manager.remove(.assistant)
-        runtime.presentation.play = nil
+        try? await manager.remove(AgentID(rawValue: "speechSynthesis"))
+        await audioStore.shutdown()
+        speechAudioStore = nil
+        runtime.presentation.speechPlayback = nil
+        runtime.presentation.playSpeech = nil
         runtime.presentation.text = nil
         runtime.presentation.emotion = nil
         runtime.presentation.transcript = nil
@@ -173,13 +191,12 @@ final class AppLifecycleCoordinator {
         runtime.presentation.voiceState = nil
         runtime.presentation.speech = nil
         runtime.presentation.control = nil
-        runtime.presentation.synthesis = nil
         self.responses = nil
         self.manager = nil
     }
 
     func startVoice() async {
-        guard isReady, voiceGeneration == nil else { return }
+        guard isReady, !changingSettings, voiceGeneration == nil else { return }
         let generation = UUID()
         voiceGeneration = generation
         presentationPhase = .loading
@@ -332,7 +349,16 @@ final class AppLifecycleCoordinator {
         }
     }
 
+    func beginSettingsChange() async {
+        changingSettings = true
+        stopVoice()
+        await cleanupTask?.value
+    }
+
+    func endSettingsChange() { changingSettings = false }
+
     func toggleVoice() {
+        guard !changingSettings else { return }
         if isVoiceActive {
             stopVoice()
             return
@@ -344,6 +370,7 @@ final class AppLifecycleCoordinator {
         let oldGeneration = voiceGeneration
         let previousRequests = requests
         let previousResponses = responses
+        let previousAudioStore = speechAudioStore
         let previousResponse = responseTask
         expression = nil
         voiceGeneration = nil
@@ -373,6 +400,7 @@ final class AppLifecycleCoordinator {
             if let oldGeneration, let previousRequests {
                 _ = try? await previousRequests.send(
                     AgentInput(sessionID: oldGeneration, payload: .event("assistant.cancel")), to: .assistant)
+                await previousAudioStore?.cancel(sessionID: oldGeneration)
                 await previousResponses?.cancel(sessionID: oldGeneration)
                 _ = try? await previousResponse?.value
             }
@@ -403,7 +431,7 @@ final class AppLifecycleCoordinator {
             // Runtime capture admission only. Signals never mutate presentation state.
             if phase == .processing { handlingTurn = true }
             if phase == .empty { handlingTurn = false }
-        case .pose: break
+        case .pose, .speechSynthesis, .cancelSpeech: break
         }
     }
     private func resumeListening(generation: UUID) async throws {
@@ -412,28 +440,16 @@ final class AppLifecycleCoordinator {
         guard voiceGeneration == generation else { return }
         handlingTurn = false
     }
-    private func play(_ frame: AudioFrame, envelope: OutputEnvelope) async throws {
+    private func play(_ stream: SpeechAudio, envelope: OutputEnvelope) async throws {
         let generation = envelope.sessionID
-        guard conversationPresentation.isCurrent(envelope) else { throw CancellationError() }
-        guard accepts(session: generation) else { throw CancellationError() }
-        try Task.checkCancellation()
-        guard frame.format.encoding == .float32, frame.format.channels == 1 else {
-            throw CapabilityError.invalidRequest("播放仅支持单声道 Float32 PCM")
-        }
-        let samples = frame.data.withUnsafeBytes { bytes in
-            (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
+        guard conversationPresentation.isCurrent(envelope), accepts(session: generation) else {
+            throw CancellationError()
         }
         let meter = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self, self.voiceGeneration == generation else { return }
-                if let cursor = self.audio.playbackSampleOffset {
-                    let end = min(samples.count, cursor)
-                    let start = max(0, end - AudioSpectrum.sampleCount)
-                    let window = samples[start..<end]
-                    self.playbackSpectrum = AudioSpectrum.smooth(
-                        AudioSpectrum.measure(window, sampleRate: frame.format.sampleRate),
-                        previous: self.playbackSpectrum)
-                }
+                self.playbackSpectrum = AudioSpectrum.smooth(
+                    self.audio.playbackSpectrum, previous: self.playbackSpectrum)
                 do { try await Task.sleep(for: .milliseconds(33)) } catch { return }
             }
         }
@@ -441,11 +457,26 @@ final class AppLifecycleCoordinator {
             meter.cancel()
             if voiceGeneration == generation {
                 playbackSpectrum = AudioSpectrum.silence
+                playbackActive = false
             }
         }
-        playbackActive = true
-        defer { if voiceGeneration == generation { playbackActive = false } }
-        try await audio.play(samples: samples, sampleRate: frame.format.sampleRate)
+        try await audio.playStream { [weak self] in
+            guard let self, self.accepts(session: generation), self.conversationPresentation.isCurrent(envelope) else {
+                throw CancellationError()
+            }
+            guard let frame = try await stream.next() else { return nil }
+            guard self.accepts(session: generation), self.conversationPresentation.isCurrent(envelope) else {
+                throw CancellationError()
+            }
+            guard frame.format.encoding == .float32, frame.format.channels == 1 else {
+                throw AudioIOError.invalidFormat
+            }
+            let samples = frame.data.withUnsafeBytes { bytes in
+                (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
+            }
+            self.playbackActive = true
+            return PlaybackPCM(samples: samples, sampleRate: frame.format.sampleRate)
+        }
     }
     private func accepts(session: UUID) -> Bool {
         session == voiceGeneration

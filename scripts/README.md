@@ -3,6 +3,7 @@
 Purpose: validate code, download local models and stage selected resources. Design goals: reproducible development inputs and minimal runtime configuration.
 
 - ✅ check.sh runs formatting, root tests and metadata validation; build-ios.sh builds four simulator schemes.
+- ✅ select-app-icon.sh accepts `original` or `robot-camera`, copying a preserved 1024 × 1024 variant into the shared app icon slot; rebuild/install after selection.
 - ✅ model_download.py reads development-only *.download.json profiles with fixed remote revisions. Each wrapper chooses a model; Qwen defaults to 2B, with --size 4b for comparison. Audio8 keeps a download wrapper only.
 - ✅ Downloads use four workers, safe relative paths, .partial files and atomic replacement. Existing files are reused; --force refreshes them after a revision change or corruption. Errors propagate; no checksum catalog is generated.
 - ✅ clean-app-models.sh removes only generated app Models resources in the scheme pre-build action. stage-voice-models.sh copies Nemotron, Qwen35, Silero and diagnostic Kokoro plus licenses on iPhone; simulator ships no model weights.
@@ -34,3 +35,8 @@ flowchart LR
 ✅ Boundary checks restrict Agent imports/dependencies to AgentCore/base ModelKit/Foundation and reject presentation assignments in the speech Signal observer. This static check complements protocol tests; it is not a full semantic proof of arbitrary callback purity.
 
 ✅ Signal-observer checks also guard the Action-owned presentationPhase field.
+
+✅ download-kokoro.py provisions the pinned FluidAudio Core ML graph/lexicon profile. Optional per-file URLs support the separately pinned BERT vocabulary; inference does not download. Boundary checks allow FluidAudio only through its dedicated backend target.
+
+
+✅ Boundary validation permits the shared StorageAudio dependency in Agents while continuing to forbid device/UI/Actions/concrete model imports. It also enforces Foundation-only Storage core and the narrow StorageAudio dependency set. ❌ This check cannot establish physical playback behavior.

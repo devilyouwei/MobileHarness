@@ -71,3 +71,6 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 | Open | Request/reply needs a bounded completion path that cannot block behind its requester. |
 | Open | Non-cooperative receivers can delay cancellation; transport is not a real-time safety system. |
 | Resolved — 2026-09-27 audit | Removed InternalSignalBus; Communication contains contracts and policy, while Agents own inboxes. |
+
+
+✅ Communication now includes generic AgentMessage with bounded synthesis requests and cancellation IDs; it contains no PCM cache, model or playback implementation. ❌ Persistent message delivery remains unsupported.

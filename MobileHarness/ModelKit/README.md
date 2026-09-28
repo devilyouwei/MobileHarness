@@ -88,8 +88,8 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 | --- | --- |
 | Speech recognition | ✅ Nemotron streaming ASR in the physical App; Apple adapter available separately |
 | Voice activity | ✅ Silero with per-session state |
-| Chat | ✅ Qwen3.5-2B 4-bit MLX, text-only |
-| Speech synthesis | ✅ Apple system TTS in conversation; Kokoro for English diagnostics |
+| Chat | ✅ Qwen3.5-2B 4-bit MLX or explicitly configured OpenAI-compatible cloud, text-only |
+| Speech synthesis | ✅ Kokoro Core ML Mandarin/English TTS in conversation and diagnostics; Apple adapter remains separately testable |
 | Pose | ✅ YOLO26n-Pose INT8 with end-to-end output through PoseCapability |
 | Judgment | ✅ Protocol; ❌ production provider |
 | Other capabilities | ❌ VLM input, embeddings and general video sessions |
@@ -98,7 +98,7 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 - ✅ Independent contract, adapter and lifecycle tests; optional real-model tests are separate from device acceptance.
 - ❌ Timed eviction, measured cross-model memory/thermal budgets and native model Tool-call events.
 
-The physical App requires iOS 27 and matching local artifacts. Simulator ASR/chat report unavailable. No automatic model or network fallback is provided. Independent SDK distribution is outside the current project scope.
+The physical App requires iOS 27 and matching local artifacts. Simulator local ASR/chat report unavailable; explicitly configured cloud chat is supported. No automatic model or network fallback is provided. Independent SDK distribution is outside the current project scope.
 
 ## Issue record
 
@@ -111,3 +111,5 @@ The physical App requires iOS 27 and matching local artifacts. Simulator ASR/cha
 ## Extension rules
 
 Add typed capability contracts only for real use cases. Put concrete SDKs in separate adapters and bind them in Defaults. Keep business state, permissions, device I/O and Agent contracts outside base ModelKit. New streams require byte estimates, bounds and cleanup semantics; unsupported capabilities must fail explicitly. Preserve the single source tree and test boundaries in root Package.swift.
+
+✅ Optional `ModelKitOpenAI` supplies third-party cloud ChatCapability with configurable endpoint/key/model and bounded SSE. Defaults accepts `cloudChat:` explicitly; absent configuration retains local behavior. See [adapter](Language/LLM/OpenAI/README.md). ❌ Cloud speech/vision and live-provider acceptance remain pending.

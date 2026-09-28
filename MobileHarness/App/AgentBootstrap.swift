@@ -5,6 +5,7 @@ import Agents
 import Foundation
 import Gateway
 import ModelKit
+import StorageAudio
 import ToolRuntime
 import Tools
 
@@ -36,7 +37,7 @@ final class ApplicationRuntime {
 
     private init() throws {
         let policy = try CommunicationPolicy(
-            configurations: ["Assistant", "SpeechPerception", "VisionPerception"].map {
+            configurations: ["Assistant", "SpeechPerception", "VisionPerception", "SpeechSynthesis"].map {
                 try AgentConfigurations.load(named: $0)
             })
         let manager = AgentManager()
@@ -80,8 +81,8 @@ final class ApplicationRuntime {
 /// One endpoint per scene role, with weak UI captures supplied by coordinators.
 @MainActor
 final class RuntimePresentation {
-    var synthesis: (any SpeechSynthesisCapability)?
-    var play: (@Sendable (AudioFrame, ActionInvocation) async throws -> Void)?
+    var speechPlayback: SpeechPlayback?
+    var playSpeech: (@Sendable (SpeechAudio, ActionInvocation) async throws -> Void)?
     var text: (@Sendable (String, ActionInvocation) async throws -> Void)?
     var transcript: (@Sendable (String, ActionInvocation) async throws -> Void)?
     var finishTranscriptHandler: (@Sendable (ActionInvocation) async throws -> Void)?
@@ -93,8 +94,8 @@ final class RuntimePresentation {
     var speech: (@Sendable (AgentInput) async throws -> Void)?
     var control: (@Sendable (OutputEnvelope) async -> Void)?
     func speak(_ invocation: ActionInvocation) async throws {
-        guard let synthesis, let play else { throw CommunicationError.scopeClosed }
-        try await SpeechActions.speak(invocation: invocation, synthesis: synthesis, play: play)
+        guard let speechPlayback, let playSpeech else { throw CommunicationError.scopeClosed }
+        try await speechPlayback.play(invocation, using: playSpeech)
     }
     func printText(_ invocation: ActionInvocation) async throws {
         guard let text else { throw CommunicationError.scopeClosed }

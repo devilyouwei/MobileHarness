@@ -11,6 +11,7 @@ import ToolRuntime
     let agent = try AssistantAgent(capacity: 1, chat: FixedTextChat())
     let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
     await #expect(throws: HarnessError.notRunning) { try await agent.receive(input) }
+    _ = try await bindSpeechRequests(agent)
     try await agent.start()
     try await agent.pause()
     try await agent.receive(input)
@@ -24,10 +25,12 @@ import ToolRuntime
 
 @Test func outputOverflowFailsAgent() async throws {
     let agent = try AssistantAgent(chat: FixedTextChat())
+    _ = try await bindSpeechRequests(agent)
     try await agent.start()
     for _ in 0..<129 {
         if await agent.status().lifecycle == .failed { break }
         try await agent.receive(AgentInput(sessionID: UUID(), payload: .event("test")))
+        try await Task.sleep(for: .milliseconds(2))
     }
     #expect(await agent.status().lifecycle == .failed)
     await #expect(throws: HarnessError.notRunning) {
@@ -126,6 +129,7 @@ private actor Recorder {
     let manager = AgentManager()
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
+    let speechRequests = try await bindSpeechRequests(agent)
     try await manager.start(.assistant)
     let requests = InputGateway(manager: manager)
     let tools = ToolRegistry()
@@ -142,7 +146,7 @@ private actor Recorder {
     let session = UUID()
     let input = AgentInput(sessionID: session, payload: .text("/status"))
     _ = try await requests.send(input, to: .assistant)
-    // Finish after dispatch to make this integration test finite even if no reply is produced.
+    // Tool results now asynchronously admit synthesis before emitting playback.
     var iterator = agent.outputs.makeAsyncIterator()
     let first = try #require(await iterator.next())
     guard case .toolCall(let call) = first.output else {
@@ -153,12 +157,14 @@ private actor Recorder {
     let directResult = try #require(try await ToolExecutor(registry: tools).execute(call, envelope: first))
     #expect(directResult.callID == call.id)
     try await responses.dispatch(first)
-    await agent.stop()
     let reply = try #require(await iterator.next())
     #expect(reply.sessionID == session)
-    #expect(reply.output == .actionCall(expectedActionCall(name: "say", parameters: ["text": "runtime healthy"])))
+    #expect(
+        await speechRequests.restored(reply.output)
+            == .actionCall(expectedActionCall(name: "say", parameters: ["text": "runtime healthy"])))
     try await responses.dispatch(reply)
     #expect(await recorder.outputs.count == 2)
+    await agent.stop()
     await responses.shutdown()
 }
 

@@ -16,3 +16,5 @@ Purpose: own shared Xcode settings, local-signing templates and explicit model r
 ✅ Device resource file lists now stage the pinned YOLOPose mlpackage and upstream model card. Camera permission text describes local pose inference; no uploads or recording.
 
 ✅ Physical model file lists now stage yolo26n-pose.mlpackage only. The generated App Models cleanup and declared-file copy prevent the retired YOLOv8 package from shipping.
+
+✅ Voice model file lists now stage KokoroCoreML Mandarin/English graphs, local pronunciation resources and FluidAudio license. Regenerate with scripts/update-model-filelists.py.

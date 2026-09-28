@@ -54,3 +54,17 @@ Purpose: preserve the reason, scope and consequences of implementation decisions
 ✅ [ADR 0048](0048-direct-signal-admission.md): queue-free signal delivery, Agent-owned inbox policy and bounded structured Gateway admission without a Bus lifecycle.
 
 ✅ [ADR 0049](0049-perception-eye-gaze.md): YOLO facial landmarks to UI.moveEyes, bounded state replacement and mandatory Action completion barrier.
+
+✅ [0050 — Default Kokoro synthesis](0050-default-kokoro-synthesis.md): one managed synthesis provider for conversation and diagnostics; English-only speech without system fallback.
+
+- ✅ [0051: OpenAI-compatible cloud chat](0051-openai-compatible-chat.md). ❌ Live provider and credential UI acceptance remain pending.
+
+✅ [0052 — Kokoro Core ML bilingual synthesis](0052-kokoro-coreml-bilingual.md): local Mandarin/English resources, script-aware speech and process-owned model lifetime.
+
+- ✅ [0053: Settings and live cloud selection](0053-settings-live-chat.md); ❌ real provider acceptance pending.
+
+
+
+- ✅ [0055 — Synthesis Agent and audio handles](0055-synthesis-agent-audio-handles.md): independent FIFO synthesis, shared bounded PCM and state-based expiration. ❌ Device acceptance pending.
+
+- ✅ [0056 — Shared Storage core and PCM adapter](0056-storage-audio-migration.md): Foundation-only bounded memory and leases with a separate PCM adapter; disk persistence remains future work.

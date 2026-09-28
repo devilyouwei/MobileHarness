@@ -32,23 +32,24 @@ private actor StreamingSentenceChat: ChatCapability {
 @Test func sentenceTokensArriveBeforeModelCompletionAndFlushFinalTail() async throws {
     let model = StreamingSentenceChat()
     let agent = try AssistantAgent(chat: model)
+    let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("stream"))
     try await agent.receive(input)
     var outputs = agent.outputs.makeAsyncIterator()
     let earlySay = try #require(await outputs.next())
     let earlyPrint = try #require(await outputs.next())
-    #expect(earlySay.output == .actionCall(expectedActionCall(name: "say", parameters: ["text": "你好👋！"])))
+    #expect(
+        await speechRequests.restored(earlySay.output)
+            == .actionCall(expectedActionCall(name: "say", parameters: ["text": "你好👋！"])))
     #expect(earlyPrint.output == .actionCall(expectedActionCall(name: "print", parameters: ["text": "你好👋！"])))
     try await model.finish()
     var remainder: [AgentOutput] = []
-    for _ in 0..<5 { remainder.append(try #require(await outputs.next()).output) }
+    for _ in 0..<3 { remainder.append(try #require(await outputs.next()).output) }
     #expect(
-        remainder == [
-            .actionCall(expectedActionCall(name: "say", parameters: ["text": "下一句，"])),
-            .actionCall(expectedActionCall(name: "print", parameters: ["text": "下一句，"])),
-            .actionCall(expectedActionCall(name: "say", parameters: ["text": "尾巴"])),
-            .actionCall(expectedActionCall(name: "print", parameters: ["text": "尾巴"])),
+        await speechRequests.restored(remainder) == [
+            .actionCall(expectedActionCall(name: "say", parameters: ["text": "下一句，尾巴"])),
+            .actionCall(expectedActionCall(name: "print", parameters: ["text": "下一句，尾巴"])),
             .control("assistant.finished"),
         ])
     await agent.stop()
@@ -57,6 +58,7 @@ private actor StreamingSentenceChat: ChatCapability {
 @Test func cancellationDiscardsUnfinishedSentenceAndTurnCompletion() async throws {
     let model = StreamingSentenceChat()
     let agent = try AssistantAgent(chat: model)
+    _ = try await bindSpeechRequests(agent)
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("stream"))
     try await agent.receive(input)
@@ -82,7 +84,7 @@ private actor StreamingSentenceChat: ChatCapability {
     #expect(sentences.joined() == text)
     #expect(sentences.contains { $0.contains("3.14,") })
     #expect(sentences.contains { $0.contains("U.S. test;") })
-    #expect(sentences.count >= 8)
+    #expect(sentences.count == 6)
     #expect(sentences.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
 }
 
@@ -105,6 +107,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
 
 @Test func assistantSentenceBudgetFailsExplicitlyAfterSixtyPairs() async throws {
     let agent = try AssistantAgent(chat: ExcessiveSentencesChat())
+    _ = try await bindSpeechRequests(agent)
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("many")))
     var outputs = agent.outputs.makeAsyncIterator()
@@ -126,4 +129,54 @@ private struct ExcessiveSentencesChat: ChatCapability {
     #expect(state.hasPrefix("assistant.error:"))
     #expect(state.contains("limitExceeded"))
     await agent.stop()
+}
+
+@Test func speechChunksKeepWeakPunctuationAndWaitForSentenceContinuation() throws {
+    var buffer = SentenceFunctionBuffer()
+    #expect(try buffer.append("你好，我想说：苹果、香蕉，还有梨，").isEmpty)
+    #expect(try buffer.append("都很好。” ").isEmpty)
+    #expect(try buffer.append("下一句") == ["你好，我想说：苹果、香蕉，还有梨，都很好。” "])
+    #expect(buffer.finish() == ["下一句"])
+    var symbols = SentenceFunctionBuffer()
+    #expect(try symbols.append("，、： ").isEmpty)
+    #expect(symbols.finish().isEmpty)
+}
+
+@Test func speechLengthBoundariesAreIndependentOfFragmentation() throws {
+    let chinese = String(repeating: "你", count: 125)
+    let english = String(repeating: "hello ", count: 25) + "world"
+    let decimalAtLimit = String(repeating: "a ", count: 59) + " 3.14 is a number. Next"
+    for source in [chinese, english, decimalAtLimit, "Dr. Smith says 3.14 is fine, really: yes! Next"] {
+        var whole = SentenceFunctionBuffer()
+        let expected = try whole.append(source) + whole.finish()
+        for split in 0...source.count {
+            var streaming = SentenceFunctionBuffer()
+            let index = source.index(source.startIndex, offsetBy: split)
+            let actual =
+                try streaming.append(String(source[..<index]))
+                + streaming.append(String(source[index...])) + streaming.finish()
+            #expect(actual == expected)
+        }
+        #expect(expected.joined() == source)
+        if source == decimalAtLimit { #expect(expected[0].contains("3.14")) }
+        if source == chinese { #expect(expected.map(\.count) == [60, 60, 5]) }
+        if source == english {
+            #expect(expected.count == 2)
+            #expect(expected[0].count == 120)
+            #expect(expected[1].hasPrefix("hello"))
+        }
+    }
+}
+
+@Test func speechXMLBoundariesFlushShortUnpunctuatedTextInOrder() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    var generator = try AgentGenerator(capabilities: config.capabilities, textActions: ["say", "print"])
+    #expect(try generator.append("你好，先想一下").isEmpty)
+    let calls =
+        try generator.append("<express emotion='thinking'/><channel.main>然后回答</channel.main>尾巴")
+        + generator.finish()
+    #expect(calls.map { $0.actionPath.function } == ["speak", "print", "express", "speak", "print", "speak", "print"])
+    #expect(calls[0].parameters["text"] == "你好，先想一下")
+    #expect(calls[3].channel == "main" && calls[3].parameters["text"] == "然后回答")
+    #expect(calls[5].parameters["text"] == "尾巴")
 }

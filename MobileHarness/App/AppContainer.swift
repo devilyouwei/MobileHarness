@@ -39,7 +39,7 @@ final class AppContainer {
         let models = try await ModelKitDefaults.manager(resources: resources)
         // Resolve stable capability handles before preparing the conversation models.
         let recognition = try await models.get(.recognition, load: false)
-        let chat = try await models.get(.chat, load: false)
+        let chat = CurrentChatCapability(models: models)
         let vad = try await models.get(.voiceActivity, load: false)
         let synthesis = try await models.get(.synthesis, load: false)
         validationModel = try await models.get(kokoroID, as: .synthesis, load: false)
@@ -113,5 +113,19 @@ private func memoryWarningStream() -> AsyncStream<Void> {
             }
             if let observer { NotificationCenter.default.removeObserver(observer) }
         }
+    }
+}
+
+/// Capability-only consumers resolve the current binding on every operation after settings changes.
+private struct CurrentChatCapability: ChatCapability {
+    let models: ModelManager
+    var availability: CapabilityAvailability {
+        get async {
+            do { return try await models.availability(.chat) } catch { return .unavailable(reason: "对话模型暂不可用") }
+        }
+    }
+    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        let provider = try await models.get(.chat)
+        return try await provider.chat(request)
     }
 }

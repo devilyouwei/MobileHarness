@@ -56,3 +56,20 @@ Validation (2026-09-26): final scripts/check.sh passed, including 79 Integration
 ✅ ADR 0048 tests direct same-target overlap, per-source capacity rejection/recovery, shared external/internal capacity, structured caller cancellation, expired parents, wrong sessions, stopped targets and independent receiver rejection. Agent-owned state coalescing remains covered by PhotographyPipelineTests. Bus FIFO, session-registry and snapshot tests are removed with the implementation.
 
 ✅ EyeTrackingTests cover mirrored directions, confidence rejection, crowd reorder, occlusion hold/recenter/reacquisition, jitter deadband, rotation change and Action invalid parameters. Photography pipeline tests dispatch both Tool and Action with a one-input scheduler limit, exercising completion and replacement policies. ❌ Real-camera smoothness, crossing faces and thermal performance require device testing.
+
+✅ Synthesis Agent fixtures verify the default auto synthesis request while retaining playback, cancellation and completion checks.
+
+✅ SentenceFunctionTests now verify weak punctuation retention, sentence lookahead, 60-character Hanzi / 120-character English soft boundaries across every split, complete text preservation and short-text XML flush order. Existing cancellation and overflow regressions remain. ❌ Physical playback prosody and inter-segment latency require device evaluation.
+
+
+
+
+✅ Synthesis Agent tests cover: FIFO across multiple sources, arbitrary consumption order, explicit overflow/progress, expiry/lease/ownership, starvation cancellation and origin-scoped cleanup. SpeechRequestProbe checks text-to-ID mapping; the voice roundtrip uses real gateways and synthesis Agent with fake models. ❌ Device acoustics are not tested.
+
+✅ Removed legacy SpeechActions fixtures; empty synthesis output, mid-playback cancellation and text byte-limit preservation now run through the synthesis Agent and ID playback.
+
+✅ Gateway admission-failure tests now exercise caller-owned audio cleanup; voice tests close/cancel their cache explicitly. No preparation service is injected into Gateway. ❌ App lifecycle behavior still needs physical-device acceptance.
+
+✅ SpeechPlaybackTests names the playback/cache integration coverage; fixtures and error assertions use the current SpeechPlayback and SpeechAudioError names.
+
+✅ StorageTests exercises the Foundation-only generic stream and handle store with non-audio data, including byte limits, namespace ownership and a lease surviving ready expiry. ❌ Persistent and disk-backed storage have no implementation to test yet.

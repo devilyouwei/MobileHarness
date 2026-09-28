@@ -1,10 +1,11 @@
 import Foundation
 
 /// Preserves source text while waiting for one following character to disambiguate a boundary.
-/// The enclosing turn is separately capped at 2,000 UTF-8 bytes; an unfinished clause cannot grow forever.
+/// Soft length boundaries preserve words; the pending buffer retains a hard 2,000-byte safety bound.
 struct SentenceFunctionBuffer {
     private var buffer = ""
     private static let punctuation = Set<Character>(",，、;；:：.!?。！？؛،؟।॥\n\r")
+    private static let sentenceEnds = Set<Character>(";；.!?。！？؛؟।॥\n\r")
     private static let closing = Set<Character>("\"'”’»›）)]}」』】》〉")
     private static let abbreviations: Set<String> = ["mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc"]
 
@@ -21,8 +22,17 @@ struct SentenceFunctionBuffer {
         var output: [String] = []
         var start = 0
         var index = 0
+        var containsHanzi = false
         while index < characters.count {
-            guard Self.isBoundary(characters[index]), Self.hasContent(characters[start...index]) else {
+            let prefix = characters[start...index]
+            containsHanzi = containsHanzi || Self.isCJK(characters[index])
+            let threshold = containsHanzi ? 60 : 120
+            let lengthBoundary =
+                index - start + 1 >= threshold && index + 1 < characters.count
+                && Self.canSplit(after: characters[index], before: characters[index + 1])
+            guard Self.sentenceEnds.contains(characters[index]) || characters[index] == "\r\n" || lengthBoundary,
+                Self.hasContent(prefix)
+            else {
                 index += 1
                 continue
             }
@@ -42,6 +52,7 @@ struct SentenceFunctionBuffer {
             output.append(String(characters[start..<end]))
             start = end
             index = end
+            containsHanzi = false
         }
         buffer = String(characters[start...])
         if finishing, !buffer.isEmpty {
@@ -62,6 +73,20 @@ struct SentenceFunctionBuffer {
 
     private static func hasContent<S: Sequence>(_ characters: S) -> Bool where S.Element == Character {
         characters.contains { !$0.isWhitespace && !isBoundary($0) && !closing.contains($0) }
+    }
+
+    private static func isCJK(_ character: Character) -> Bool {
+        character.unicodeScalars.contains {
+            (0x3400...0x4DBF).contains($0.value) || (0x4E00...0x9FFF).contains($0.value)
+                || (0x20000...0x2FA1F).contains($0.value)
+        }
+    }
+
+    private static func canSplit(after previous: Character, before next: Character) -> Bool {
+        func word(_ value: Character) -> Bool {
+            (value.isLetter || value.isNumber || "'’_-.,".contains(value)) && !isCJK(value)
+        }
+        return !(word(previous) && word(next))
     }
 
     private static func isEmbeddedDot(_ characters: [Character], at index: Int) -> Bool {

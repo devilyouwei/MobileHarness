@@ -284,3 +284,45 @@ Verified (2026-09-27): scripts/check.sh passed, including 92 IntegrationTests; s
 ## 眼睛跟随（2026-09-28）
 
 ✅ 新增 UI.moveEyes Action；感知层复用 YOLO Pose 脸部点位完成目标选择、短暂丢失保持、回正和自适应平滑，前摄镜像、相机会话隔离以及启动页/会话页连续动画已接入。❌ 真机跟随观感、多人交叉、遮挡及长期运行功耗待体验验收。见 ADR 0049。
+
+## Kokoro 默认语音替换（2026-09-28）
+
+✅ 复用现有 ModelKitKokoro 三图推理，将 ModelKitDefaults 的 synthesis 默认切换为 Kokoro，并移除生产 Apple speech 注册。Assistant 请求简短美式英语，Speech Action 默认 en-US；诊断与对话共享 manager/provider。见 ADR 0050。
+
+❌ 中文前处理与中文音色、模型输出语言遵循、真实 iPhone 试听及持续运行验收仍待完成。历史系统中文 TTS 记录不代表当前默认行为。
+
+✅ 本轮复验：根检查、四个模拟器 scheme 和五项 Kokoro Release 测试（含真实 Mac 推理）全部通过；3.375 秒固定英语音频合成约 1.07–1.34 秒。具体边界见 [Kokoro 验证](Kokoro-Validation.md)。
+
+## Third-party cloud chat (2026-09-28)
+
+✅ OpenAI-compatible text chat adapter, configurable Base URL/key/model, shared capability/session/lifecycle and explicit Defaults selection. Bounded SSE, cancellation, sanitized errors and offline protocol tests are included. See ADR 0051.
+❌ Live-provider/device acceptance, cloud speech/vision and credential settings UI remain pending.
+
+## Kokoro Core ML 中英双语（2026-09-28，取代英语单语默认）
+
+✅ ModelKitKokoro 改用独立 ModelKitFluidAudio 后端：七阶段 Core ML、本地英文词典、中文数值/分词/声调/多音字处理。固定开发下载配置，App 只读本地资源；Assistant 恢复按用户语言回复，Speech locale=auto 保序合成中英混合文本。见 ADR 0052。
+
+❌ 日法西语尚未接线；iOS 27 上游进程崩溃修复仍需真机长测，不能用 Mac 短测代替。中英分段使用不同音色，尚非统一音色混读。
+
+✅ 双语替换复验：仓库检查、四个模拟器构建、真机目标无签名构建和五项 Release Kokoro 测试通过。真实 Mac 中英/混读/数字日期样例均生成音频；完整记录见 docs/Kokoro-Validation.md。
+
+## Settings and live chat selection (2026-09-28)
+
+✅ Top-right camera/settings toolbar, expandable camera controls, URL/key model discovery and picker, device-only Keychain and explicit chat replacement without process restart. See ADR 0053.
+❌ Real provider credentials and physical-device UI/network acceptance remain pending.
+
+Settings validation: root checks and nine cloud tests passed; all four simulator schemes passed. Visual automation timed out and live-provider/device acceptance remains pending.
+
+✅ Standalone settings list → cloud LLM form, persisted cloud/local switch retaining credentials, explicit URL/key paste controls and navigation-stable runtime ownership. ❌ Physical-device interaction acceptance pending.
+
+✅ 回复进入 TTS 前的分段已合并短逗号分句，使用句末、软长度、XML 边界和生成结束规则，并覆盖碎片边界一致性测试。❌ 真机韵律/停顿验收仍待完成。
+
+## 独立合成 Agent（ADR 0055）
+
+✅ 定向文本请求、串行合成、多来源所有权、按 ID 播放及内存缓存过期已接入，取代 Actions 内预合成和 Channel 优先级重排。✅ 仓库完整检查通过（108 项集成测试），四个 iOS 模拟器构建目标通过。❌ 可选真实模型评估未启用，本轮未安装真机，试听、Bluetooth 和持续运行验收待完成。
+
+✅ 已移除旧 Action 准备协议和 Gateway 准备调用；缓存目录归属已由 ADR 0056 解决。❌ 真机验收仍待完成。当前行为细节见 [合成 Agent](../MobileHarness/Agents/SpeechSynthesis/README.md)、[播放 Action](../MobileHarness/Actions/Speech/README.md) 和 [音频缓存](../MobileHarness/Storage/Audio/README.md)。
+
+## 共享存储里程碑（ADR 0056）
+
+✅ Storage 与 StorageAudio target 已接入，旧 SpeechRuntime 已移除；迁移后的仓库检查和四个 iOS 模拟器构建目标通过。当前技术契约只在 [Storage](../MobileHarness/Storage/README.md) 与 [StorageAudio](../MobileHarness/Storage/Audio/README.md) 维护。❌ 真机语音验收、可淘汰磁盘缓存、持久化文件与记忆记录仍待完成。

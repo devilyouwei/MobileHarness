@@ -50,3 +50,19 @@ Purpose: build and sign the iOS composition root and maintain the existing UI-on
 ✅ Communication navigation replaces Bus: AgentMessaging, CommunicationPolicy and PerceptionInput are compiled once by AgentCore through SwiftPM. InternalSignalBus has been removed.
 
 ✅ Navigator includes MoveEyes.swift and FaceGazeTracker.swift; shared implementations remain in the existing Actions and Agents SwiftPM targets.
+
+✅ OpenAI-compatible adapter sources are navigable under Language/LLM/OpenAI; SwiftPM alone compiles ModelKitOpenAI. ❌ Live-provider acceptance is not implied by building.
+
+✅ Navigator includes the FluidAudio backend source; root Package.swift owns its compilation. Device staging now selects pinned Kokoro Core ML resources and license; no old Kokoro CoreAI weights are copied.
+
+✅ AppSettings, CloudSettingsStore and SettingsView are compiled by both App targets. The settings UI uses the existing ModelKitOpenAI product dependency through Defaults. ❌ Build success alone does not validate user credentials.
+
+
+
+✅ Storage, StorageAudio and SpeechSynthesis Agent navigation entries map to root Swift package sources; the HarnessKit product exposes both storage targets. ❌ No signing or device installation changes in this migration.
+
+✅ Removed the obsolete Actions/Speech/Speak.swift reference after migrating its remaining test consumers.
+
+✅ Removed the obsolete Action preparation protocol and its navigator reference; current playback and cache references remain mapped to shared package sources.
+
+✅ SpeechPlayback.swift replaces the old pipeline filename in the navigator; no compatibility alias or duplicate source remains.

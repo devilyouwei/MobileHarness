@@ -110,3 +110,23 @@ private final class EndCounter: Sendable {
     #expect(counter.count == 1)
     #expect(throws: CapabilityError.sessionClosed) { try emitter?.yield(1) }
 }
+
+@Test(.timeLimit(.minutes(1))) func suspendingEmissionBackpressuresAndDrainsInOrder() async throws {
+    let pair = InferenceSession<Int>.make(limits: try StreamLimits(capacity: 1), estimatedBytes: { _ in 8 })
+    let producer = Task {
+        for value in 0..<100 { try await pair.emitter.yieldSuspending(value) }
+        pair.emitter.finish()
+    }
+    var values: [Int] = []
+    for try await value in pair.session.events { values.append(value) }
+    try await producer.value
+    #expect(values == Array(0..<100))
+}
+
+@Test(.timeLimit(.minutes(1))) func sessionCancellationUnblocksSuspendedEmitter() async throws {
+    let pair = InferenceSession<Int>.make(limits: try StreamLimits(capacity: 1), estimatedBytes: { _ in 8 })
+    try pair.emitter.yield(1)
+    let producer = Task { try await pair.emitter.yieldSuspending(2) }
+    pair.session.cancel()
+    await #expect(throws: (any Error).self) { try await producer.value }
+}

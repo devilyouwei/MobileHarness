@@ -7,6 +7,8 @@ Assembles model capabilities, device services, Agents and presentation. The goal
 ```text
 App/
 ├── MobileHarnessApp.swift         # SwiftUI entry and startup/diagnostic selection
+├── AppSettings.swift              # Model selection and application of saved configuration
+├── CloudSettingsStore.swift       # Device-only Keychain persistence
 ├── AppContainer.swift             # Model capability preparation and platform services
 ├── AgentBootstrap.swift           # Shared ApplicationRuntime and explicit handlers
 ├── AppLifecycleCoordinator.swift  # Voice session, playback and presentation state
@@ -45,7 +47,7 @@ flowchart TD
     Voice --> Shared[ApplicationRuntime in AgentBootstrap]
     Camera --> Session[PhotographySession]
     Session --> Shared
-    Shared --> Policy[Three JSON v4 configurations and communication policy]
+    Shared --> Policy[Four JSON v4 configurations and communication policy]
     Shared --> Transport[AgentManager / InputGateway / OutputGateway]
     Shared --> Handlers[Explicit Action and Tool handlers]
     Transport --> Presentation[RuntimePresentation callbacks]
@@ -54,7 +56,7 @@ flowchart TD
     Presentation --> Camera
 ```
 
-ApplicationRuntime is available before voice model preparation. App supplies the resource root to ModelKitDefaults and gets interfaces from the process-wide ModelManager; it does not register model providers. Voice prepares recognition, chat, VAD and system TTS before opening the microphone. Camera preview and its vision session start independently.
+ApplicationRuntime is available before voice model preparation. App supplies the resource root to ModelKitDefaults and gets interfaces from the process-wide ModelManager; it does not register model providers. Voice prepares recognition, chat, VAD and Kokoro TTS before opening the microphone. Camera preview and its vision session start independently.
 
 Voice PCM enters InputGateway, then SpeechPerception. Assistant subscribes to final speech and speech onset; App does not resubmit final text. Agent-selected UI changes use registered Actions or Tools. Runtime observations control admission, completion and failure supervision, never caption or expression commands. Device telemetry and local user/OS lifecycle changes remain App-owned.
 
@@ -140,3 +142,18 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 ✅ InternalSignalBus is removed. App assembles shared policy and gateways, stops producers and coordinates Agent/runtime cancellation and cleanup; Agent inboxes own pending messages. No communication session registry remains. Action completion barriers and independent camera/voice cleanup remain. See [ADR 0048](../../docs/adr/0048-direct-signal-admission.md).
 
 ✅ Camera gaze is owned by CameraCoordinator, independent of voice readiness. PhotographySession injects mirroring and a session-fenced moveEyes callback. ApplicationRuntime explicitly binds UI.moveEyes. Each camera Action is joined/retired via the existing ChannelScheduler after OutputGateway dispatch, before consuming the next bounded UI state; this prevents per-frame input bookkeeping leaks. The completion barrier cannot be coalesced. Off/interruption/error/session change centers gaze; old-session and non-increasing Action sequences cannot overwrite it. ❌ No face identity guarantee or no-frame timeout.
+
+✅ Default synthesis now resolves to local KokoroCoreML resources. App keeps its existing ModelManager load/unload, PCM playback and diagnostics injection; no concrete TTS engine enters Agent code.
+
+✅ AppSettings owns URL/key/model editing, bounded model-list loading and Keychain persistence (one device-only record). Save stops and joins current voice work, updates only the chat registration and writes settings with rollback on update failure. CurrentChatCapability resolves the manager binding on each operation; voice/vision providers remain shared. Startup restores settings before voice warmup. ❌ Live cloud compatibility/device settings acceptance remain pending.
+
+✅ Window-root tasks now own conversation runtime and camera event observation across navigation. Entering settings stops voice and suspends camera; returning restores camera intent without recreating the Agent. Cloud enabled state persists with credentials; pre-switch records decode as enabled. Disabled cloud configuration remains stored and is not validated/loaded at startup.
+
+✅ The home navigation item supplies the 首页 title for native back navigation while keeping its toolbar hidden. Settings uses system back items and edge-swipe behavior.
+
+✅ RuntimePresentation binds one SpeechPlayback and a stream playback callback when the voice runtime starts, keeps the audio store in the voice lifecycle owner, and closes that store on runtime teardown. Assistant JSON declares directed synthesis and hidden audioID playback; App also registers the synthesis Agent. App consumes PCM only inside the scheduled handler, fences session/turn before and after each awaited read, and measures the actual mixer output for spectrum. Existing startup and voice-start model preparation loads synthesis before the first reply. ❌ Physical-device playback acceptance remains pending.
+
+
+✅ App composes StorageAudio, registers SpeechSynthesisAgent, binds Assistant messaging before start, and binds scheduled Speech playback by audioID. Teardown stops/joins the synthesis Agent and closes its cache. ❌ This migration has not been accepted on a physical phone.
+
+✅ The ordered Assistant output consumer cancels source/input audio on dispatch failure. stopVoice first cancels/joins Assistant generation, then cancels the session cache and Channel work; scheduled playback owns per-ID failure cleanup. ❌ No generic Action preparation hook is part of this lifecycle.

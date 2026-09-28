@@ -39,7 +39,7 @@ private func decode(_ document: [String: Any]) throws -> AgentConfiguration {
     let config = try AgentConfigurations.load(named: "Assistant")
     #expect(config.agentID == .assistant)
     #expect(config.textActions == ["say", "print"])
-    #expect(config.capabilities.actions.map(\.alias) == ["say", "print", "express", "beginReplyTurn"])
+    #expect(config.capabilities.actions.map(\.alias) == ["say", "print", "express", "beginReplyTurn", "playAudio"])
     #expect(try config.capabilities.resolveAction("say", parameters: ["text": "hello"]).channel == "Speech")
     #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "System.runtimeInfo")
     #expect(throws: AgentConfigurationError.resourceMissing("MissingAgent")) {

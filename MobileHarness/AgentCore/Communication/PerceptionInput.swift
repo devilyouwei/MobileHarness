@@ -17,26 +17,33 @@ public struct AudioInput: Sendable {
 }
 
 public enum SpeechPhase: String, Codable, Sendable { case listening, speaking, processing, empty }
-public enum PerceptionObservation: Codable, Sendable, Equatable {
+public typealias PerceptionObservation = AgentMessage
+
+public enum AgentMessage: Codable, Sendable, Equatable {
     case transcript(String, final: Bool)
     case speechPhase(SpeechPhase)
     case pose(PoseObservation)
+    case speechSynthesis(SpeechSynthesisInput)
+    case cancelSpeech(UUID)
     public var contract: String {
         switch self {
         case .transcript(_, true): "speech.final"
         case .transcript(_, false): "speech.partial"
         case .speechPhase: "speech.phase"
         case .pose: "vision.pose"
+        case .speechSynthesis: "speech.synthesize"
+        case .cancelSpeech: "speech.cancel"
         }
     }
-    public var isState: Bool { contract != "speech.final" && contract != "speech.phase" }
+    public var isState: Bool { contract == "speech.partial" || contract == "vision.pose" }
     public func validatedSize() throws -> Int {
         switch self {
         case .transcript(let text, let final):
             guard text.utf8.count <= (final ? 4096 : 16300), !final || !text.isEmpty else {
                 throw CommunicationError.invalidPayload
             }
-        case .speechPhase: break
+        case .speechSynthesis(let request): try request.validate()
+        case .cancelSpeech, .speechPhase: break
         case .pose(let pose): try pose.validate()
         }
         let count = try JSONEncoder().encode(self).count
@@ -85,6 +92,24 @@ public struct PoseObservation: Codable, Equatable, Sendable {
                         $0.x.isFinite && $0.y.isFinite && $0.confidence.isFinite && (0...1).contains($0.confidence)
                     }
             })
+        else { throw CommunicationError.invalidPayload }
+    }
+}
+
+/// A synthesis unit selected by its originating Agent; audio IDs are application-generated.
+public struct SpeechSynthesisInput: Codable, Sendable, Equatable {
+    public let audioID: UUID
+    public let text: String
+    public let locale: String
+    public init(audioID: UUID = UUID(), text: String, locale: String = "auto") throws {
+        self.audioID = audioID
+        self.text = text
+        self.locale = locale
+        try validate()
+    }
+    public func validate() throws {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            text.utf8.count <= 2000, ["auto", "zh-CN", "en-US"].contains(locale)
         else { throw CommunicationError.invalidPayload }
     }
 }

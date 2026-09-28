@@ -70,7 +70,7 @@ flowchart TD
     Tools --> Tool[Resolved ToolCall]
 ```
 
-For `<express emotion="happy"/> Hello.`, Assistant produces an expression call to `UI.express`, then text calls to `Speech.speak` and `UI.print`. Outside a channel scope those calls use their respective defaults. This illustrates why text is a Function Token even when it contains no XML.
+For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression call to `UI.express`, then text-bearing calls to `Speech.speak` and `UI.print`. Assistant subsequently directs the speech text to SpeechSynthesisAgent and replaces the text-bearing call with `Speech.speak(audioID)` before output. Outside a channel scope those calls use their respective defaults. This illustrates why text is a Function Token even when it contains no XML.
 
 ## Bounds, completion and failure
 
@@ -102,3 +102,23 @@ Failure cannot roll back Actions already emitted and executed. If one append thr
 Update this README when changing syntax, names, bounds, ordering or completion/cancellation behavior.
 
 ✅ AgentGenerator now supports an empty textActions list for Action-only Agents such as Photographer. Explicit self-closing calls and Channel scopes still use the shared parser; non-whitespace natural text without a mapping fails explicitly rather than being discarded. Assistant still requires nonempty text mappings at its own configuration boundary.
+
+## Streaming speech/text segmentation
+
+✅ Natural text is submitted at sentence endings (`。！？.!?`, semicolons, paragraph breaks and supported multilingual sentence marks), XML Action/Channel boundaries, or normal generation completion. Commas, enumeration commas and colons no longer trigger short clauses. Adjacent punctuation, closing quotes and whitespace stay with the preceding text; one following content character disambiguates a streaming boundary. Decimal/abbreviation protection remains.
+
+✅ A soft length boundary is 60 Characters when the current prefix contains Hanzi, otherwise 120 Characters. It waits for a safe word boundary, never splitting a contiguous non-CJK word, number, apostrophe or hyphenated word. These are text Characters, not model tokens. Pending text retains its 2000 UTF-8-byte hard bound; an oversized unbreakable word fails explicitly. No timer or new queue is introduced. Cancellation still discards pending text.
+
+✅ The shared mechanism emits the same chunks to configured say/print mappings. Explicit XML Action parameters retain their own function validation and are not resegmented here. Kokoro's internal language switches and model input constraints remain independent backend adaptation. ❌ First-chunk special handling and timeout flushing are not implemented.
+
+```mermaid
+flowchart LR
+    Stream[Model fragments] --> XML[FunctionTokenParser]
+    XML --> Buffer[Sentence / soft length accumulation]
+    XML --> Boundary[Action or Channel boundary]
+    Boundary --> Flush[Flush preceding text]
+    Buffer --> Mapping[say and print mappings]
+    Flush --> Mapping
+    Mapping --> Speech[Speech Action]
+    Speech --> Backend[TTS language / model limits]
+```

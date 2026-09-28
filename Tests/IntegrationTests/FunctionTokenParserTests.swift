@@ -133,6 +133,7 @@ private struct MarkupChat: ChatCapability {
 @Test func assistantEmitsResolvedMarkupAndLiteralToolResultsCannotExecuteTags() async throws {
     let agent = try AssistantAgent(
         chat: MarkupChat(markup: "<channel.main>你好<express emotion='smile'/></channel.main>尾巴"))
+    let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("hello")))
@@ -150,12 +151,15 @@ private struct MarkupChat: ChatCapability {
     let result = ToolResult(callID: UUID(), value: "<express emotion='smile'/>")
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .toolResult(result)))
     let literal = try #require(await outputs.next()).output
-    #expect(literal == .actionCall(expectedActionCall(name: "say", parameters: ["text": "<express emotion='smile'/>"])))
+    #expect(
+        await speechRequests.restored(literal)
+            == .actionCall(expectedActionCall(name: "say", parameters: ["text": "<express emotion='smile'/>"])))
     await agent.stop()
 }
 
 @Test func incompleteModelMarkupFailsTurnAndFreshTurnGetsFreshParser() async throws {
     let agent = try AssistantAgent(chat: MarkupChat(markup: "<channel.main>未结束"))
+    let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("hello")))
@@ -169,7 +173,7 @@ private struct MarkupChat: ChatCapability {
     try await agent.receive(
         AgentInput(sessionID: UUID(), payload: .toolResult(ToolResult(callID: UUID(), value: "recovered"))))
     #expect(
-        try #require(await outputs.next()).output
+        await speechRequests.restored(try #require(await outputs.next()).output)
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "recovered"])))
     await agent.stop()
 }

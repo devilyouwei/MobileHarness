@@ -22,7 +22,7 @@ The architecture is designed around four core properties:
 - **Bio-inspired** — signal input, specialized cognition, centralized action coordination, and continuous feedback loops.
 - **Streaming & Stateful** — signals, model generation, Function Tokens, Tool Calls, and execution may operate continuously instead of following request-response semantics.
 
-This document describes the project architecture, module responsibilities and key cross-module techniques. Module READMEs own detailed algorithms, queue limits and API contracts; [Repository Structure](../docs/Repository-Structure.md) tracks migration exceptions, [Architecture](../docs/Architecture.md) records current scope, and [Roadmap](../docs/Roadmap.md) tracks delivery. The original `docs/Technical_Design.docx` remains preserved.
+This document is the target technical plan: it describes the project architecture, module responsibilities and key cross-module techniques. Module READMEs are the single current source for detailed algorithms, queue limits and API contracts. The [docs index](../docs/README.md) owns requirements, public explanations, change history, evidence and future proposals; those documents link to module READMEs instead of repeating current implementation specifications. [Repository Structure](../docs/Repository-Structure.md) tracks layout exceptions, [Architecture](../docs/Architecture.md) records current cross-module scope, and [Roadmap](../docs/Roadmap.md) tracks delivery. The original `docs/Technical_Design.docx` remains preserved.
 
 - [Part I — Architectural Framework](#part-i--architectural-framework): architecture, annotated directory structure and basic data flows.
 - [Part II — Module Design](#part-ii--module-design): each top-level source directory and its subdesigns.
@@ -95,6 +95,7 @@ The dependency boundaries keep these responsibilities independently testable:
 | Module                      | Allowed foundation / responsibility boundary                                                               |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | AgentCore                   | Foundation and shared contracts; no UI, concrete Agents, models or device adapters                         |
+| Storage                     | Foundation-only bounded memory streams and handles, with a separate PCM adapter; persistence is planned   |
 | Gateway                     | AgentCore, ActionRuntime and ToolRuntime; no ModelKit, PlatformKit or business Agents                      |
 | Agents                      | AgentCore and model capability protocols; no direct calls to other Agents or executable behavior libraries |
 | Actions / Tools             | Shared contracts and injected services; concrete behavior is registered by App                             |
@@ -130,16 +131,18 @@ MobileHarness/
 ├── Agents/                 # Business actors and versioned Agent JSON declarations
 │   ├── Assistant/          # Conversation generation from text and final speech
 │   ├── SpeechPerception/   # Shared VAD/ASR, segmentation and speech observations
+│   ├── SpeechSynthesis/    # Directed FIFO text-to-audio synthesis
 │   ├── VisionPerception/   # Frame selection, pose inference and skeleton output
 │   └── Photographer/      # Design only; future camera-motion policy
 ├── Actions/                # Channel-scheduled behavior implementations
-│   ├── Speech/             # Synthesis plus awaited playback
+│   ├── Speech/             # Audio-ID playback and awaited completion
 │   └── UI/                 # Captions, voice state, expressions and turn boundaries
 ├── ActionRuntime/          # ActionRegistry and ActionExecutor
 ├── Tools/                  # Direct callable behavior implementations
 │   ├── System/             # Fixed runtime configuration information
 │   └── UI/                 # Completion-only skeleton display
 ├── ToolRuntime/            # ToolRegistry and ToolExecutor
+├── Storage/                # Shared bounded memory and Audio PCM adapter; persistence planned
 ├── ModelKit/               # Capability SDK plus separately compiled support targets
 │   ├── Core/               # Media values, sessions and resource contracts
 │   ├── Speech/             # ASR, TTS and VAD capabilities / adapters
@@ -161,7 +164,7 @@ scripts/                    # Checks, builds and model provisioning
 MobileHarness.xcodeproj/    # App and framework schemes
 ```
 
-A physical parent directory does not imply one Swift target: ModelKit excludes Defaults, Management, adapters and backends from its foundation SDK. Tests stay under root `Tests/`. [Repository Structure](../docs/Repository-Structure.md) records detailed target mappings and outstanding modules.
+A physical parent directory does not imply one Swift target: ModelKit excludes Defaults, Management, adapters and backends from its foundation SDK. `Storage/` contains the Foundation-only `Storage` target and the separate `StorageAudio` PCM adapter target. Tests stay under root `Tests/`. [Repository Structure](../docs/Repository-Structure.md) records detailed target mappings and outstanding modules.
 
 ### Basic Data Flows
 
@@ -169,7 +172,7 @@ A physical parent directory does not imply one Swift target: ModelKit excludes D
 | --------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Voice perception      | Microphone → PlatformKit → App → InputGateway → SpeechPerception → ModelKit VAD/ASR                   | Typed partial/final transcript and speech phase          |
 | Conversation          | SpeechPerception → OutputGateway → InputGateway → Assistant → ChatCapability                    | Resolved speech, caption and expression Actions          |
-| Spoken output         | OutputGateway → ChannelScheduler → ActionRuntime → Speech action → TTS capability → injected playback | Completion includes actual playback                      |
+| Spoken output         | Assistant → directed SpeechSynthesisAgent → StorageAudio audio ID; Speech Action → injected playback | Completion includes actual playback                      |
 | Camera perception     | Camera → PlatformKit → App → InputGateway → VisionPerception → PoseCapability                         | Shared pose observation and independent UI.showPose Tool |
 | Skeleton presentation | VisionPerception → OutputGateway → ToolRuntime → UI.showPose → App handler → Experience               | Awaited state update, without ToolResult                 |
 | Returning Tool        | Agent → OutputGateway → ToolRuntime → handler → ToolResult → InputGateway → original Agent/session   | Correlated result available for further processing       |
@@ -229,7 +232,7 @@ An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input
 
 ### Actions
 
-[Actions](Actions/README.md) implements behavior that uses Channel scheduling. `Speech.speak` combines an injected TTS capability with an injected playback service and awaits completion. `UI` implements caption, expression, voice-state and turn-boundary operations through App-bound MainActor services.
+[Actions](Actions/README.md) implements behavior that uses Channel scheduling. `Speech.speak(audioID)` consumes shared StorageAudio PCM prepared by the independent SpeechSynthesisAgent, while its scheduled handler still awaits actual playback completion. `UI` implements caption, expression, voice-state and turn-boundary operations through App-bound MainActor services.
 
 Actions own behavior and parameter validation; Agent JSON owns available aliases/default Channels and App owns explicit implementation bindings. Shared physical resources must have coherent ownership across behavior functions.
 
@@ -254,6 +257,12 @@ Actions own behavior and parameter validation; Agent JSON owns available aliases
 Data-returning calls produce correlated ToolResult through Gateway. Void calls complete without feedback; failure propagates to the caller. Awaiting display-state acceptance does not guarantee the screen has rendered a frame.
 
 ✅ Both handler modes and correlated data feedback. ❌ General Tool timeout/retry supervision and durable execution.
+
+### Storage
+
+[Storage](Storage/README.md) provides Foundation-only bounded memory streams and single-checkout handles. [StorageAudio](Storage/Audio/README.md) adapts ModelKit PCM frames and Agent identity to those primitives; App injects the shared audio store into synthesis and playback. Storage core remains independent of ModelKit and SwiftUI. Reclaimable caches and persistent records/files are later stages.
+
+✅ Both Storage targets are registered and the production PCM cache uses them, preserving playback, failure, cancellation and expiry contracts. ❌ Persistent media, disk cache and memory records remain future work.
 
 ### ModelKit
 
@@ -374,7 +383,7 @@ InputGateway uses structured per-target tasks and a common capacity boundary for
 
 Ordinary `receive` must promptly validate and enqueue or reject; it must not await inference or inbox space. Cross-actor calls still use await. Explicit cancellation controls may join cleanup. Neither Gateway has a pending-message queue, persistent worker or independent delivery lifecycle. There is no communication FIFO guarantee across concurrent calls and no automatic duplicate suppression or state replacement.
 
-InputGateway permits 128 active operations, 256 target branches and at most 16 targets per operation, plus an 8 MiB observation reservation. OutputGateway permits 16 emissions per source. Full admission rejects immediately; counters are released when structured calls finish. These are active-call bounds, not queues.
+InputGateway and OutputGateway enforce explicit active-call bounds; full admission rejects immediately and structured calls release their reservations on completion. These are active-call bounds, not queues. Current values and release behavior belong in the [Gateway Input](Gateway/Input/README.md) and [Gateway Output](Gateway/Output/README.md) READMEs.
 
 A message deadline is a freshness check, not a timer racing receive. Cancelling the caller propagates through structured admission calls; already accepted work belongs to the Agent. App stops producers and coordinates Agent/runtime cleanup. No Bus session registry, timeout tasks, retained operation registry or shutdown barrier remains. Action Channels remain separate execution queues.
 
@@ -505,7 +514,7 @@ Every directory implementing queues, asynchronous workers or producer/consumer p
 
 Distinguish work queues, framing buffers, terminal signals and busy-reject admission. Actor isolation alone does not guarantee FIFO completion across suspension points. Document opaque third-party buffering as a limitation. Documentation changes alone do not alter runtime contracts.
 
-Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [speech perception](Agents/SpeechPerception/README.md), [Action scheduling](Gateway/Output/Scheduling/README.md), [model streams and leases](ModelKit/Core/README.md), [audio capture/playback](PlatformKit/Audio/README.md), and [App task coordination](App/README.md). Model adapters and streaming parsers carry their own local descriptions.
+Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [speech perception](Agents/SpeechPerception/README.md), [Action scheduling](Gateway/Output/Scheduling/README.md), [model streams and leases](ModelKit/Core/README.md), [audio capture/playback](PlatformKit/Audio/README.md), and [App task coordination](App/README.md). [Storage](Storage/README.md) owns the shared memory boundary and [StorageAudio](Storage/Audio/README.md) owns the live PCM contract. Model adapters and streaming parsers carry their own local descriptions.
 
 Run `./scripts/check.sh` for format, tests and configuration/boundary validation, and `./scripts/build-ios.sh` when full Xcode is available. Report unavailable checks and distinguish successful builds from physical-device acceptance. No third-party dependency is added without a concrete integration need.
 
@@ -520,3 +529,6 @@ MobileHarness connects **Signal → Cognition → Action** through explicit boun
 Keep this document focused on framework and module design. Maintain detailed algorithms in the owning directory README, runtime-contract changes in architecture decisions and the roadmap, and original design sources unchanged.
 
 ✅ Perception-driven eye gaze reuses YOLO facial landmarks, JSON-declared UI.moveEyes and camera-owned session state. Bounded presentation replacement and per-Action completion are specified in [ADR 0049](../docs/adr/0049-perception-eye-gaze.md). ❌ Physical-device smoothness and crossing-face acceptance remain pending.
+
+
+✅ ADR 0055 adds shared audio handles and Agents/SpeechSynthesis (directed serial synthesis); ADR 0056 moves the cache into StorageAudio. Semantic segmentation stays in the original Agent; the [StorageAudio README](Storage/Audio/README.md) owns the playback wait and cache limits. ❌ Persistence/replay and physical-device acceptance remain pending.

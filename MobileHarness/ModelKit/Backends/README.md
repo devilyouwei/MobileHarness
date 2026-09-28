@@ -4,8 +4,9 @@ Purpose: isolate native graph execution and MLX language generation. Design goal
 
 | Directory | Responsibility |
 | --- | --- |
-| CoreAI | Native graph and tensor execution for Nemotron and Kokoro |
+| CoreAI | Native graph and tensor execution for Nemotron |
 | CoreML | Validated Core ML graph execution for Silero |
+| FluidAudio | Pinned Kokoro Core ML graphs and local Mandarin frontend |
 | MLX | Local Qwen generation, tokenizer bridge and explicit allocator configuration |
 
 ```mermaid

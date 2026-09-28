@@ -29,6 +29,7 @@ public struct CommunicationDeclaration: Codable, Sendable {
     public static let contracts: [String: InputKind] = [
         "user.text": .text, "runtime.event": .event, "tool.result": .toolResult,
         "media.audio": .audio, "media.image": .image, "speech.final": .observation,
+        "speech.synthesize": .observation, "speech.cancel": .observation,
         "speech.partial": .observation, "speech.phase": .observation, "vision.pose": .observation,
     ]
     public func validate() throws {

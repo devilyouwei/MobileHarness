@@ -38,6 +38,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
 @Test func assistantUsesCapabilityAndIsolatesConversationHistory() async throws {
     let model = ChatFixture()
     let agent = try AssistantAgent(chat: model)
+    let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
     let session = UUID()
@@ -46,7 +47,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     let answer = try await completedTurn(&outputs)
     #expect(answer.allSatisfy { $0.inputID == first.id })
     #expect(
-        answer.map(\.output) == [
+        await speechRequests.restored(answer.map(\.output)) == [
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "模型回答"])),
             .actionCall(expectedActionCall(name: "print", parameters: ["text": "模型回答"])),
             .control("assistant.finished"),
@@ -98,6 +99,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     let agent = try AssistantAgent(capacity: 1, chat: model)
     let manager = AgentManager()
     try await manager.register(agent)
+    let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     let gateway = InputGateway(manager: manager)
     let session = UUID()
@@ -119,7 +121,9 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     var outputs = agent.outputs.makeAsyncIterator()
     let turn = try await completedTurn(&outputs)
     #expect(turn.allSatisfy { $0.inputID == next.id })
-    #expect(turn.first?.output == .actionCall(expectedActionCall(name: "say", parameters: ["text": "模型回答"])))
+    #expect(
+        await speechRequests.restored(try #require(turn.first).output)
+            == .actionCall(expectedActionCall(name: "say", parameters: ["text": "模型回答"])))
     await agent.stop()
 }
 
@@ -156,6 +160,7 @@ private actor MalformedChatFixture: ChatCapability {
 func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async throws {
     let model = MalformedChatFixture(malformed)
     let agent = try AssistantAgent(chat: model)
+    let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
     let sessionID = UUID()
@@ -179,8 +184,8 @@ func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async 
     let recovered = try await completedTurn(&outputs)
     #expect(recovered.allSatisfy { $0.inputID == next.id })
     #expect(
-        recovered.contains {
-            $0.output == .actionCall(expectedActionCall(name: "say", parameters: ["text": "Recovered."]))
+        (await speechRequests.restored(recovered.map(\.output))).contains {
+            $0 == .actionCall(expectedActionCall(name: "say", parameters: ["text": "Recovered."]))
         })
     let requests = await model.requests
     #expect(requests.count == 2)

@@ -7,6 +7,7 @@ Stores privacy declarations, visual assets and development download profiles. Th
 ```text
 Resources/
 ├── PrivacyInfo.xcprivacy       # App privacy declarations
+├── AppIconVariants/           # Original and robot-camera artwork for build-time selection
 ├── Assets.xcassets/
 │   ├── Contents.json          # Asset catalog metadata
 │   └── AppIcon.appiconset/     # Shared app icon and metadata
@@ -50,6 +51,7 @@ Download scripts own bounded workers, temporary files and failures; [Models](Mod
 ## Feature status
 
 - ✅ Privacy manifest, shared 1024 × 1024 app icon and model download profiles.
+- ✅ Original and robot-camera icons are preserved in [AppIconVariants](AppIconVariants/README.md); `scripts/select-app-icon.sh` selects the icon for the next build.
 - ✅ Local model staging with licenses; weights remain ignored by Git.
 - ❌ In-app model downloads, automatic cache repair and separate icon appearance variants.
 - ❌ Dedicated Prompts collection; current Agent configuration is bundled from Agents.

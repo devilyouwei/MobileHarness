@@ -209,11 +209,3 @@ final class CameraCoordinator {
         }
     }
 }
-
-/// State is allocated per window, before asynchronous voice/model composition.
-@MainActor
-struct CameraScene<Content: View>: View {
-    @State private var camera = CameraCoordinator()
-    @ViewBuilder let content: () -> Content
-    var body: some View { CameraConversationSurface(camera: camera, content: content) }
-}

@@ -1,13 +1,13 @@
 # Actions — Scheduled Behaviors
 
-Implements speech and presentation behaviors selected by Agents. The goal is cohesive functions with explicit validation, completion and cancellation. The target depends on AgentCore, ActionRuntime and ModelKit; App injects device and UI callbacks.
+Implements speech and presentation behaviors selected by Agents. The goal is cohesive functions with explicit validation, completion and cancellation. The target depends on AgentCore, ActionRuntime and the shared StorageAudio cache; App injects device and UI callbacks.
 
 ## Directory structure
 
 ```text
 Actions/
 ├── Speech/
-│   └── Speak.swift                 # Synthesize PCM and await playback
+│   └── SpeechPlayback.swift        # Validate audio IDs and await playback
 ├── UI/
 │   ├── Print.swift                 # Append reply captions
 │   ├── Express.swift               # Validate semantic emotion
@@ -29,8 +29,8 @@ flowchart LR
     Gateway --> Runtime[ActionRuntime]
     Runtime --> Actions
     App -.->|Bind services| Actions
-    Actions -->|Synthesis| ModelKit
-    ModelKit -->|PCM| Actions
+    Actions -->|Read audio ID| Cache[Shared PCM cache]
+    Cache -->|PCM| Actions
     Actions -->|Injected playback| PlatformKit
     Actions -->|Injected presentation| Experience
     Actions -->|Completion or error| Runtime
@@ -42,7 +42,7 @@ flowchart LR
 flowchart TD
     Invocation[ActionInvocation] --> Validate[Function-local validation]
     Validate --> Kind{Behavior}
-    Kind --> Speech[Await bounded TTS output and playback]
+    Kind --> Speech[Await cached PCM and playback]
     Kind --> UI[Await presentation callback]
     UI --> Policy[App session check and turn/sequence policy]
     Speech --> Finish[Cleanup and cancellation check]
@@ -63,7 +63,7 @@ Speech completion includes playback; UI completion means state accepted the upda
 
 ## Feature status
 
-- ✅ [Speech](Speech/README.md): local TTS and playback, with an 8 MiB synthesized-audio budget and explicit cleanup.
+- ✅ [Speech](Speech/README.md): audio-ID playback with bounded cached PCM, three-second starvation errors and explicit cleanup.
 - ✅ [UI](UI/README.md): captions, turn handling, recognition phase and typed expressions. `clear` returns to neutral; supported emotions are defined in Express.swift and Agent JSON.
 - ✅ ConversationPresentation retains one turn and at most six component sequence records to reject stale UI updates.
 - ❌ Camera capture, media, device and robot Actions; general resource declarations and ActionResult feedback.
@@ -74,3 +74,5 @@ Speech completion includes playback; UI completion means state accepted the upda
 | --- | --- |
 | Open | Physical-device timing and animation acceptance remain pending. |
 | Resolved — 2026-09-27 audit | Removed obsolete emoji/seven-expression descriptions and the Photographer Action claim. Skeleton presentation belongs to [Tools/UI](../Tools/UI/README.md). |
+
+✅ Legacy SpeechActions.speak(text) has been removed; synthesis belongs to SpeechSynthesisAgent. ❌ Shared-cache directory placement is pending a separate layout decision.

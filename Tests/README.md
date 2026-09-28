@@ -19,3 +19,5 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ Skeleton visualization regression coverage belongs to VisionPerception in IntegrationTests; no Photographer runtime is required.
 
 ✅ IntegrationTests covers direct no-feedback skeleton Tool calls while preserving normal ToolResult round trips.
+
+✅ OpenAIChatTests independently checks cloud chat encoding, bounded SSE and managed lifecycle with local URLProtocol fixtures. ❌ Live-provider acceptance is separate.

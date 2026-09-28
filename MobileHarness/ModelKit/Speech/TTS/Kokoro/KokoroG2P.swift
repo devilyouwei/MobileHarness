@@ -17,33 +17,18 @@ import ModelKit
 struct KokoroG2P: Sendable {
     private let lexicon: [String: String]
 
-    /// Loads the misaki lexicons. Silver loads first so gold wins on shared keys.
-    init(goldURL: URL, silverURL: URL) throws {
-        var lexicon: [String: String] = [:]
-        for url in [silverURL, goldURL] {
-            let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
-            guard let entries = raw as? [String: Any] else {
-                throw CapabilityError.invalidRequest("Invalid Kokoro lexicon")
-            }
-            for (word, value) in entries {
-                if let phonemes = value as? String {
-                    lexicon[word] = phonemes
-                } else if let variants = value as? [String: Any] {
-                    // Homograph entry: {"DEFAULT": "...", "NOUN": ...}. Take DEFAULT, else the
-                    // first non-null reading.
-                    if let phonemes = variants["DEFAULT"] as? String {
-                        lexicon[word] = phonemes
-                    } else if let phonemes = variants.keys.sorted().compactMap({ variants[$0] as? String }).first {
-                        lexicon[word] = phonemes
-                    }
-                }
-            }
+    /// Local FluidAudio/Misaki cache; no singleton G2P model or network lookup.
+    init(cacheURL: URL) throws {
+        let data = try Data(contentsOf: cacheURL)
+        let cache = try JSONDecoder().decode([String: [String: [String]]].self, from: data)
+        guard let lower = cache["lower"], let exact = cache["caseSensitive"], !lower.isEmpty else {
+            throw CapabilityError.invalidRequest("Invalid Kokoro English lexicon")
         }
-        self.lexicon = lexicon
+        lexicon = lower.merging(exact) { _, exact in exact }.mapValues { $0.joined() }
     }
 
     /// Text → misaki phoneme string. Words become phoneme runs separated by spaces;
-    /// punctuation stays in place (unknown characters are dropped later at vocab mapping).
+    /// punctuation stays in place; the backend rejects unknown phonemes.
     func phonemize(_ text: String) -> String {
         var out = ""
         var word = ""
@@ -55,7 +40,11 @@ struct KokoroG2P: Sendable {
             word = ""
         }
 
-        for ch in text {
+        let normalized = text.replacingOccurrences(of: "，", with: ",")
+            .replacingOccurrences(of: "。", with: ".").replacingOccurrences(of: "！", with: "!")
+            .replacingOccurrences(of: "？", with: "?").replacingOccurrences(of: "；", with: ";")
+            .replacingOccurrences(of: "：", with: ":").replacingOccurrences(of: "、", with: ",")
+        for ch in normalized {
             if ch.isLetter || ch.isNumber || ch == "'" || ch == "’" {
                 word.append(ch == "’" ? "'" : ch)
             } else if ch.isWhitespace {

@@ -8,6 +8,11 @@ public actor AssistantAgent: Agent {
     private let textActions: [String]
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
+    private var port: AgentMessaging?
+    public func bind(_ port: AgentMessaging) throws {
+        guard lifecycle == .registered, self.port == nil else { throw HarnessError.invalidTransition }
+        self.port = port
+    }
     private var lifecycle: AgentLifecycle = .registered
     private var queue: [AgentInput] = []
     private var processed = 0
@@ -120,8 +125,14 @@ public actor AssistantAgent: Agent {
                     emit(.control("agent.finished"), for: input)
                 } catch { emit(.control("assistant.error: \(error)"), for: input) }
             case .image, .audio, .observation: break  // Rejected by the descriptor before admission.
-            case .event(let event): emitImmediate("事件：\(event)", for: input)
-            case .toolResult(let result): emitImmediate(result.value, for: input)
+            case .event(let event):
+                activeInput = input
+                worker = Task { await self.emitImmediate("事件：\(event)", for: input) }
+                return
+            case .toolResult(let result):
+                activeInput = input
+                worker = Task { await self.emitImmediate(result.value, for: input) }
+                return
             }
         }
     }
@@ -150,7 +161,8 @@ public actor AssistantAgent: Agent {
                 [
                     ChatMessage(
                         role: .system,
-                        content: "你是手机上的语音助手。直接、简洁地回答，通常不超过三句话。使用用户的语言，不输出思考过程。不要声称已执行未执行的操作。\n"
+                        content:
+                            "你是手机上的语音助手。直接、简洁地回答，通常不超过三句话。使用用户的语言回复，当前语音支持中文和英语。每句尽量简短，只输出可朗读的纯文本和已声明的行为标签，不使用 Markdown 或 emoji；英语中的小数和金额用英文单词表达。不输出思考过程。不要声称已执行未执行的操作。\n"
                             + CapabilityContextBuilder.build(descriptor.capabilities))
                 ]
                 + history + [.init(role: .user, content: text)]
@@ -196,38 +208,68 @@ public actor AssistantAgent: Agent {
                 case .text(let delta):
                     guard text.utf8.count + delta.utf8.count <= 2000 else { throw CapabilityError.eventTooLarge }
                     text += delta
-                    try emitFunctions(generator.append(delta), for: input, count: &emittedCalls)
+                    try await emitFunctions(generator.append(delta), for: input, count: &emittedCalls)
                 case .finished: finished = true
                 }
             }
             guard finished, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw CapabilityError.unavailable("LLM returned no completed answer")
             }
-            try emitFunctions(generator.finish(), for: input, count: &emittedCalls)
+            try await emitFunctions(generator.finish(), for: input, count: &emittedCalls)
             guard emittedCalls > 0 else { throw CapabilityError.unavailable("LLM returned no speakable answer") }
             return text
         } onCancel: {
             session.cancel()
         }
     }
-    private func emitImmediate(_ text: String, for input: AgentInput) {
+    private func emitImmediate(_ text: String, for input: AgentInput) async {
+        defer {
+            worker = nil
+            activeInput = nil
+            drain()
+        }
         do {
             guard text.utf8.count <= 2000 else { throw CapabilityError.eventTooLarge }
             var generator = try AgentGenerator(capabilities: descriptor.capabilities, textActions: textActions)
             var count = 0
-            try emitFunctions(
+            try await emitFunctions(
                 generator.append(AgentGenerator.escapeText(text)) + generator.finish(), for: input, count: &count)
             emit(.control("assistant.finished"), for: input)
         } catch {
             emit(.control("assistant.error: \(error)"), for: input)
         }
     }
-    private func emitFunctions(_ calls: [ActionCall], for input: AgentInput, count: inout Int) throws {
-        for call in calls {
+    private func emitFunctions(_ calls: [ActionCall], for input: AgentInput, count: inout Int) async throws {
+        for original in calls {
+            var call = original
             try Task.checkCancellation()
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
             guard count < 120 else { throw GenerationError.limitExceeded }
             count += 1
+            if call.actionPath == ActionPath(module: "Speech", function: "speak"), let text = call.parameters["text"] {
+                guard let port else { throw CommunicationError.scopeClosed }
+                let request = try SpeechSynthesisInput(text: text)
+                let target = AgentID(rawValue: "speechSynthesis")
+                let report = try await port.send(.speechSynthesis(request), parent: input, to: target)
+                guard report.delivered.contains(target), report.rejected.isEmpty else {
+                    throw CommunicationError.unavailableTarget
+                }
+                do {
+                    try Task.checkCancellation()
+                    call = try descriptor.capabilities.resolveAction(
+                        "playAudio", parameters: ["audioID": request.audioID.uuidString], channel: original.channel)
+                    guard emit(.actionCall(call), for: input) else { throw HarnessError.queueFull }
+                } catch {
+                    // Explicit command admission has its own deadline and preserves the owning input ID.
+                    let cleanup = input
+                    let cleanupTask = Task.detached {
+                        try await port.send(.cancelSpeech(request.audioID), parent: cleanup, to: target)
+                    }
+                    _ = try? await cleanupTask.value
+                    throw error
+                }
+                continue
+            }
             guard emit(.actionCall(call), for: input) else { throw HarnessError.queueFull }
         }
     }

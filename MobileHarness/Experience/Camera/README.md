@@ -14,3 +14,7 @@ Validation (2026-09-26): root scripts/check.sh passed; all four scripts/build-io
 ✅ Camera controls start 64 pt below the top safe area, leaving the centered reply spectrum unobstructed. Camera actions and permissions are unchanged.
 
 ✅ CameraConversationSurface injects the camera-owned normalized eyeGaze environment into startup and conversation content; front mirroring is handled once in perception. Lifecycle resets smoothly center gaze. ❌ Exact preview-crop projection is not used for the directional eye target.
+
+✅ The primary toolbar sits 8 pt below the top safe area and contains camera toggle plus settings. Camera lens switching and threshold controls expand in a second row only while camera intent is enabled; closing camera removes them. Reduce Motion disables the expansion animation. ❌ Camera hardware behavior is unchanged.
+
+✅ Camera observation is window-owned across page navigation. Settings suspends capture without changing on/off intent; returning to home resumes if enabled. ❌ Physical-device navigation/capture acceptance remains pending.

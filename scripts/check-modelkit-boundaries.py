@@ -8,7 +8,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Actions', 'ActionRuntime', 'Tools', 'ToolRuntime', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit'}
+FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'ActionRuntime', 'Tools', 'ToolRuntime', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit'}
 errors = []
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
@@ -36,7 +36,7 @@ for target in package['targets']:
         name = values[0]
         if kind in ('byName', 'target') and not name.startswith('ModelKit'):
             errors.append(f"{target['name']} depends on external project target {name}")
-        if kind == 'product' and target['name'] != 'ModelKitMLXLanguage':
+        if kind == 'product' and target['name'] not in {'ModelKitMLXLanguage', 'ModelKitFluidAudio'}:
             errors.append(f"Third-party dependency outside a backend: {target['name']} -> {name}")
         if name in FORBIDDEN:
             errors.append(f"Forbidden target dependency: {target['name']} -> {name}")
@@ -59,7 +59,7 @@ for module, forbidden in {
         if name in forbidden or name.startswith('ModelKit'):
             errors.append(f'Forbidden {module} dependency: {name}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'AgentCore', 'ModelKit', 'Foundation'}
+agent_allowed = {'AgentCore', 'ModelKit', 'StorageAudio', 'Foundation'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
         if imported not in agent_allowed:
@@ -67,8 +67,20 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
 agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
 for dependency in agent_target.get('dependencies', []):
     name = next(iter(dependency.values()))[0]
-    if name not in {'AgentCore', 'ModelKit'}:
+    if name not in {'AgentCore', 'ModelKit', 'StorageAudio'}:
         errors.append(f'Forbidden Agents dependency: {name}')
+# Storage core stays Foundation-only; media adapters may use the corresponding domain contracts.
+storage_target = next(t for t in package['targets'] if t['name'] == 'Storage')
+if storage_target.get('dependencies'):
+    errors.append('Storage must have no target/product dependencies')
+for source in (ROOT / 'MobileHarness/Storage').glob('*.swift'):
+    for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+        if imported != 'Foundation':
+            errors.append(f'Forbidden Storage import {imported}: {source.relative_to(ROOT)}')
+audio_target = next(t for t in package['targets'] if t['name'] == 'StorageAudio')
+audio_dependencies = [next(iter(d.values()))[0] for d in audio_target.get('dependencies', [])]
+if audio_dependencies != ['Storage', 'AgentCore', 'ModelKit']:
+    errors.append('StorageAudio must depend only on Storage, AgentCore and ModelKit')
 # Speech signal observation is runtime admission/logging, never a UI-command side channel.
 coordinator = (ROOT / 'MobileHarness/App/AppLifecycleCoordinator.swift').read_text()
 observer = coordinator.split('private func observeSpeech(', 1)[1].split('private func resumeListening(', 1)[0]

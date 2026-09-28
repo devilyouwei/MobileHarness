@@ -5,8 +5,8 @@ import SwiftUI
 /// Explicit model validation mode. Does not submit Agent input or run a conversation.
 @MainActor
 struct KokoroValidationView: View {
-    @State private var text = "The quick brown fox jumps over the lazy dog."
-    @State private var report = "英语 · af_heart · 本地验证，非多语言验收"
+    @State private var text = "你好，Hello world，欢迎使用本地语音助手。"
+    @State private var report = "中英双语 · Core ML · af_heart / zf_001"
     @State private var task: Task<Void, Never>?
     @State private var player: AVAudioPlayer?
     let provider: any SpeechSynthesisCapability
@@ -20,7 +20,7 @@ struct KokoroValidationView: View {
         NavigationStack {
             Form {
                 Section("Kokoro 本地语音验证") {
-                    Text("此版本仅验证美式英语。首次加载包含文件校验与模型编译。")
+                    Text("支持中文、英语及混读。首次加载包含本地资源检查与模型编译。")
                     TextEditor(text: $text).frame(minHeight: 100).disabled(task != nil)
                     Button("合成并试听") { start() }.disabled(task != nil || stopping)
                     Button("停止并卸载") { stop() }.disabled(stopping)
@@ -51,7 +51,7 @@ struct KokoroValidationView: View {
                     try await load()
                     let loadTime = seconds(loadStart.duration(to: clock.now))
                     let start = clock.now
-                    let output = try await provider.synthesize(SpeechSynthesisRequest(text: text, locale: "en-US"))
+                    let output = try await provider.synthesize(SpeechSynthesisRequest(text: text, locale: "auto"))
                     session = output
                     defer {
                         output.cancel()

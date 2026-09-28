@@ -22,13 +22,13 @@
           "valueType": "string",
           "required": true,
           "description": "Text to speak.",
-          "constraints": "Nonblank; at most 2000 UTF-8 bytes. Original formatting is preserved."
+          "constraints": "Mandarin or US English, including mixed text; nonblank, at most 2000 UTF-8 bytes. Spell out English decimals and currency; no Markdown or emoji."
         }
       ],
       "examples": [
         "Hello."
       ],
-      "doc": "Speak text aloud using the configured speech capability. Playback can be partially audible before an error. No silent fallback.",
+      "doc": "Internal text mapping: Assistant submits text to speechSynthesis, then resolves playAudio on the same Channel.",
       "hidden": true
     },
     {
@@ -90,6 +90,28 @@
       ],
       "doc": "Begin the current conversation turn once: atomically clear the previous reply and expression. Preserve recognition text.",
       "hidden": true
+    },
+    {
+      "alias": "playAudio",
+      "path": {
+        "module": "Speech",
+        "function": "speak"
+      },
+      "defaultChannel": "Speech",
+      "parameters": [
+        {
+          "name": "audioID",
+          "valueType": "string",
+          "required": true,
+          "description": "Application-generated audio UUID.",
+          "constraints": "Single consumption, scoped to the originating input and session."
+        }
+      ],
+      "examples": [
+        "<playAudio audioID=\"00000000-0000-0000-0000-000000000001\"/>"
+      ],
+      "doc": "Internal playback of accepted synthesis audio; waits at most three seconds for each missing PCM chunk.",
+      "hidden": true
     }
   ],
   "tools": [
@@ -150,6 +172,15 @@
       }
     ],
     "publications": [],
-    "sends": []
+    "sends": [
+      {
+        "contract": "speech.synthesize",
+        "target": "speechSynthesis"
+      },
+      {
+        "contract": "speech.cancel",
+        "target": "speechSynthesis"
+      }
+    ]
   }
 }

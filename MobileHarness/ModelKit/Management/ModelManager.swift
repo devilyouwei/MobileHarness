@@ -18,6 +18,7 @@ public actor ModelManager {
     private let loadGate = ModelLoadGate()
     private var entries: [ModelID: Entry] = [:]
     private var defaults: [ProvidedCapability: ModelID] = [:]
+    private var replacements: [ModelID: Entry] = [:]
     private var constructing = 0
     private var closed = false
     private var shutdownTask: Task<Void, Never>?
@@ -35,6 +36,32 @@ public actor ModelManager {
         }
         entries[registration.id] = Entry(registration, gate: loadGate)
         for capability in selected { defaults[capability] = registration.id }
+    }
+
+    /// Assembly-only replacement. Old resource-backed handles become terminal after success.
+    /// Candidate construction failure preserves the old registration. No pending replacement queue.
+    @_spi(ModelAssembly) public func replace(_ registration: ModelRegistration) async throws {
+        let old = try entry(registration.id)
+        guard !old.unloading else { throw CapabilityError.inputBusy }
+        guard old.registration.capabilities == registration.capabilities else {
+            throw ModelRegistrationError.invalidRegistration
+        }
+        old.unloading = true
+        defer { old.unloading = false }
+        let candidate = Entry(registration, gate: loadGate)
+        replacements[registration.id] = candidate
+        defer { replacements[registration.id] = nil }
+        do {
+            _ = try await construct(candidate)
+            try Task.checkCancellation()
+            if let construction = old.construction?.task { _ = try? await construction.value }
+            await old.context.shutdown()
+            guard !closed else { throw CapabilityError.sessionClosed }
+            entries[registration.id] = candidate
+        } catch {
+            await candidate.context.shutdown()
+            throw error
+        }
     }
 
     public func get<Value: Sendable>(_ key: CapabilityKey<Value>, load: Bool = true) async throws -> Value {
@@ -148,7 +175,7 @@ public actor ModelManager {
             return
         }
         closed = true
-        let work = entries.values.map { ($0.context, $0.construction?.task) }
+        let work = (Array(entries.values) + Array(replacements.values)).map { ($0.context, $0.construction?.task) }
         let task = Task {
             await withTaskGroup(of: Void.self) { group in
                 for (context, construction) in work {

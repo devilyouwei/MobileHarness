@@ -54,7 +54,7 @@ InputGateway uses one common admission path for external and internal calls. It 
 | Fan-out | At most 16 distinct targets per operation, 256 reserved branches total |
 | Observation memory | 8 MiB reserved bytes, conservatively charged per target until all branches return |
 | Observation size | 16 KiB normally, 256 KiB pose |
-| Causal context | At most 8 hops; child deadline cannot extend its parent |
+| Causal context | At most 8 hops; forwarded observations cannot extend their parent deadline; newly generated synthesis/cancel commands receive a fresh admission deadline (ADR 0055) |
 | Message validity | Discrete default 10 s, pose 1 s, partial 2 s, maximum 60 s |
 
 Limits describe active calls, not queue capacity. A whole-operation capacity failure throws before target tasks are created. A receiver failure is reported independently; other targets can succeed. The caller waits for all target admissions. Task creation is bounded; no retry or waiting for free capacity occurs.
@@ -72,3 +72,8 @@ OutputGateway may await a registered App observer for a published contract. It d
 Remote or cross-process Agents would require an explicit transport adapter, not automatically a Bus. Add serialization, authentication and network-failure handling only for a concrete integration. A broker is a separate future choice for offline delivery, persistence or replay.
 
 See [external input delivery](../../Gateway/Input/README.md#external-input-admission-and-delivery), [OutputGateway](../../Gateway/Output/README.md) and the [communication framework](../../README.md#communication-framework). Tests cover direct overlap, capacity recovery, receiver rejection, expired/foreign-session inputs and stale source ports; Agent tests cover their own buffering policies.
+
+
+✅ AgentMessage now carries typed speech.synthesize and speech.cancel directed requests in addition to perception facts; PerceptionObservation remains a source-compatible alias. Requests are discrete, never state-coalesced. Payload validation bounds text/locale; cache ownership uses source/session/parent input. ❌ General request/reply remains unsupported.
+
+✅ Speech synthesis/cancel commands are newly generated work with a fresh 10-second admission deadline, preserving parent ID, root, hops, session and turn. They do not inherit the original input’s sensor-routing expiration; source identity/session validation and sender generation cancellation still apply. Forwarded perception observations continue to inherit the parent deadline. This prevents late generated segments from failing merely because the already-admitted input is older than 10 seconds.

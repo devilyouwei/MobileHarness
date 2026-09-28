@@ -4,7 +4,7 @@ import ModelKitDefaults
 import ModelKitRuntime
 import Testing
 
-@Test func defaultAssemblyIsLazyAndDiagnosticSynthesisIsSeparate() async throws {
+@Test func defaultAssemblyIsLazyAndSynthesisUsesKokoro() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
     // Standalone Swift Testing does not expose its XCTest bundle to MLX's bundle search.
     let testResources = try #require(Bundle(for: TestBundleAnchor.self).resourceURL)
@@ -37,7 +37,13 @@ import Testing
     let again = try await manager.get(.synthesis, load: false)
     let sameInstance = (synthesis as AnyObject) === (again as AnyObject)
     #expect(sameInstance)
-    _ = try await manager.get(ModelKitDefaults.kokoro, as: .synthesis, load: false)
+    let kokoro = try await manager.get(ModelKitDefaults.kokoro, as: .synthesis, load: false)
+    let sameKokoroInstance = (synthesis as AnyObject) === (kokoro as AnyObject)
+    #expect(sameKokoroInstance)
+    if case .available = await synthesis.availability {
+        Issue.record("Missing Kokoro resources must not resolve to system speech")
+    }
+    await #expect(throws: (any Error).self) { try await manager.load(.synthesis) }
     #expect(try await manager.status(.synthesis) == .unloaded)
     #expect(try await manager.status(ModelKitDefaults.kokoro) == .unloaded)
     #expect(try await manager.status(.chat) == .registered)

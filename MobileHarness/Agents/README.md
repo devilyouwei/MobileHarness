@@ -1,6 +1,6 @@
 # Agents — Perception and Business Policy
 
-Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends only on AgentCore and ModelKit; App injects capabilities and binds executable handlers.
+Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
 
 ## Directory structure
 
@@ -9,6 +9,7 @@ Agents/
 ├── AgentConfigurations.swift  # Load versioned JSON from package resources
 ├── Assistant/                 # Chat, reply history and resolved speech/UI Actions
 ├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
+├── SpeechSynthesis/           # Directed serial synthesis into shared PCM handles
 ├── VisionPerception/          # Frame filtering, pose inference and skeleton ToolCalls
 ├── Photographer/              # Future camera-motion design; README only
 └── README.md                  # Shared Agent and configuration rules
@@ -35,7 +36,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    JSON[Three Agent JSON v4 resources] --> Loader[AgentConfigurations]
+    JSON[Four Agent JSON v4 resources] --> Loader[AgentConfigurations]
     Loader --> Config[AgentCore configuration validator]
     Config --> Permissions[Capabilities and communication policy]
     PCM[Admitted audio] --> Speech[SpeechPerception: VAD / ASR]
@@ -144,3 +145,6 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ## Direct input admission contract
 
 ✅ Gateways directly call receive; Agent inboxes own all pending-message buffering. Ordinary receive must validate/admit or reject promptly, without awaiting inference or inbox space. Concurrent calls have no transport FIFO guarantee: Agents requiring stale-state rejection use session/source/sequence checks. State coalescing belongs to the Agent and must be explicit; discrete events and device actions cannot silently disappear. Lifecycle/control cancellation may join cleanup. Existing Assistant, SpeechPerception and VisionPerception buffering policies remain; see ADR 0048.
+
+
+✅ SpeechSynthesisAgent is an independent JSON v4 directed service with one FIFO model worker. Agents may additionally depend on StorageAudio for the shared audio cache; they still cannot depend on Actions, Gateway, PlatformKit or concrete engines. Assistant binds a messaging port and sends text before emitting audioID playback. ❌ Hardware timing acceptance remains pending.

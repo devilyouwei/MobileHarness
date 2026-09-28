@@ -6,6 +6,7 @@ import Foundation
 import Gateway
 import ModelKit
 import PlatformKit
+import StorageAudio
 import Synchronization
 import Testing
 import ToolRuntime
@@ -49,6 +50,7 @@ private struct SynthesisFixture: SpeechSynthesisCapability {
     var producesAudio = true
     var availability: CapabilityAvailability { .available }
     func synthesize(_ request: SpeechSynthesisRequest) async throws -> InferenceSession<SynthesisEvent> {
+        #expect(request.locale == "auto")
         await probe.synthesized(request.text)
         let pair = InferenceSession<SynthesisEvent>.make(
             context: request.context,
@@ -66,27 +68,61 @@ private func sampleFrame() throws -> AudioFrame {
         format: AudioFormat(sampleRate: 16_000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
 }
 
-private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> ChannelScheduler {
-    ChannelScheduler(
-        registry: ActionRegistry(handlers: [
-            ActionPath(module: "Speech", function: "speak"): { invocation in
-                try await SpeechActions.speak(
-                    invocation: invocation, synthesis: SynthesisFixture(probe: probe, producesAudio: producesAudio),
-                    play: { frame, _ in await probe.played(frame) })
-            },
-            ActionPath(module: "UI", function: "print"): { invocation in
-                try await UIActions.print(invocation: invocation) { text, _ in await probe.displayed(text) }
-            },
-        ]))
+private func preparedSpeech(
+    text: String, input: AgentInput, probe: VoiceProbe, producesAudio: Bool = true
+) async throws -> (SpeechSynthesisAgent, SpeechAudioStore, SpeechPlayback, ActionInvocation) {
+    let store = SpeechAudioStore()
+    let agent = try SpeechSynthesisAgent(
+        synthesis: SynthesisFixture(probe: probe, producesAudio: producesAudio), store: store)
+    try await agent.start()
+    let request = try SpeechSynthesisInput(text: text)
+    let payload = InputPayload.observation(.speechSynthesis(request))
+    try await agent.receive(
+        AgentInput(
+            sessionID: input.sessionID, payload: payload,
+            metadata: InputMetadata(payload: payload, source: "assistant", parentID: input.id)))
+    let call = ActionCall(
+        actionPath: ActionPath(module: "Speech", function: "speak"), channel: "Speech",
+        parameters: ["audioID": request.audioID.uuidString])
+    return (
+        agent, store, SpeechPlayback(store: store),
+        ActionInvocation(
+            envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)), call: call)
+    )
 }
 
 @Test func voiceGatewaysRoundTripThroughSayAndPrint() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(chat: FixedTextChat(text: "固定回复"))
     try await manager.register(agent)
-    try await agent.start()
+
     let probe = VoiceProbe()
-    let gateway = InputGateway(manager: manager)
+    let store = SpeechAudioStore()
+    let synth = try SpeechSynthesisAgent(synthesis: SynthesisFixture(probe: probe), store: store)
+    try await manager.register(synth)
+    try await synth.start()
+    let policy = try CommunicationPolicy(
+        configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis"].map {
+            try AgentConfigurations.load(named: $0)
+        })
+    let gateway = InputGateway(manager: manager, policy: policy)
+    let playback = SpeechPlayback(store: store)
+    let scheduler = ChannelScheduler(
+        registry: ActionRegistry(handlers: [
+            ActionPath(module: "Speech", function: "speak"): { invocation in
+                try await playback.play(invocation) { audio, _ in
+                    while let frame = try await audio.next() { await probe.played(frame) }
+                }
+            },
+            ActionPath(module: "UI", function: "print"): { invocation in
+                try await UIActions.print(invocation: invocation) { text, _ in await probe.displayed(text) }
+            },
+        ]))
+    let response = OutputGateway(
+        manager: manager, requests: gateway, tools: ToolRegistry(), actions: scheduler, policy: policy,
+    ) { _ in }
+    try await agent.bind(response.messaging(for: .assistant))
+    try await agent.start()
     let recognition = RecognitionFixture(text: "你好", includeFinal: true)
     let sessionID = UUID()
     let turn = LiveSpeechInput(recognition: recognition, sessionID: sessionID) { _ in }
@@ -96,9 +132,6 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     let report = try await gateway.send(AgentInput(sessionID: sessionID, payload: .text(text)), to: .assistant)
     #expect(report.delivered == [.assistant])
     #expect(await agent.status().processedInputs == 1)
-    let response = OutputGateway(
-        manager: manager, requests: gateway, tools: ToolRegistry(), actions: voiceActions(probe: probe)
-    ) { _ in }
     var tokens: [String] = []
     for await envelope in agent.outputs {
         #expect(envelope.sessionID == sessionID)
@@ -112,6 +145,8 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
     #expect(await probe.displayedText == ["你好", "固定回复"])
     #expect(await probe.audio.count == 1)
     await response.shutdown()
+    await synth.stop()
+    await store.shutdown()
 }
 
 @Test func partialRecognitionNeverSubmitsAgentInput() async throws {
@@ -128,58 +163,51 @@ private func voiceActions(probe: VoiceProbe, producesAudio: Bool = true) -> Chan
 }
 
 @Test func speechFailureDoesNotInventSuccess() async throws {
-    let manager = AgentManager()
-    try await manager.register(AssistantAgent(chat: FixedTextChat()))
-    let requests = InputGateway(manager: manager)
     let probe = VoiceProbe()
-    let responses = OutputGateway(
-        manager: manager, requests: requests, tools: ToolRegistry(),
-        actions: voiceActions(probe: probe, producesAudio: false)
-    ) { _ in }
     let input = AgentInput(sessionID: UUID(), payload: .text("你好"))
-    try await responses.dispatch(
-        OutputEnvelope(
-            source: .assistant, input: input,
-            output: .actionCall(expectedActionCall(name: "say", parameters: ["text": "回复"])))
-    )
-    await #expect(throws: CapabilityError.self) {
-        try await responses.dispatch(
-            OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished")))
+    let (synth, store, playback, invocation) = try await preparedSpeech(
+        text: "回复", input: input, probe: probe, producesAudio: false)
+    await #expect(throws: SpeechAudioError.invalidAudio) {
+        try await playback.play(invocation) { audio, _ in
+            while let frame = try await audio.next() { await probe.played(frame) }
+        }
     }
     #expect(await probe.audio.isEmpty)
-    await responses.shutdown()
+    await synth.stop()
+    await store.shutdown()
 }
 
 @Test func cancellingDuringPlaybackDoesNotDeliverLaterAudio() async throws {
     let manager = AgentManager()
     try await manager.register(AssistantAgent(chat: FixedTextChat()))
     let probe = VoiceProbe()
+    let input = AgentInput(sessionID: UUID(), payload: .text("你好"))
+    let (synth, store, playback, invocation) = try await preparedSpeech(text: "回复", input: input, probe: probe)
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let actions = ChannelScheduler(
         registry: ActionRegistry(handlers: [
             ActionPath(module: "Speech", function: "speak"): { invocation in
-                try await SpeechActions.speak(invocation: invocation, synthesis: SynthesisFixture(probe: probe)) {
-                    frame, _ in
-                    entered.continuation.yield(())
-                    try await Task.sleep(for: .seconds(30))
-                    await probe.played(frame)
+                try await playback.play(invocation) { audio, _ in
+                    while let frame = try await audio.next() {
+                        entered.continuation.yield(())
+                        try await Task.sleep(for: .seconds(30))
+                        await probe.played(frame)
+                    }
                 }
             }
         ]))
     let responses = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), actions: actions
+        manager: manager, requests: InputGateway(manager: manager),
+        tools: ToolRegistry(), actions: actions
     ) { _ in }
-    let input = AgentInput(sessionID: UUID(), payload: .text("你好"))
-    try await responses.dispatch(
-        OutputEnvelope(
-            source: .assistant, input: input,
-            output: .actionCall(expectedActionCall(name: "say", parameters: ["text": "回复"])))
-    )
+    try await responses.dispatch(invocation.envelope)
     var iterator = entered.stream.makeAsyncIterator()
     _ = await iterator.next()
+    await store.cancel(sessionID: input.sessionID)
     await responses.cancel(sessionID: input.sessionID)
     #expect(await probe.audio.isEmpty)
     await responses.shutdown()
+    await synth.stop()
     entered.continuation.finish()
 }
 
@@ -302,25 +330,16 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
 func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async throws {
     let probe = VoiceProbe()
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
-    for module in ["Speech", "UI"] {
-        let call = ActionCall(
-            actionPath: ActionPath(module: module, function: module == "Speech" ? "speak" : "print"),
-            channel: module, parameters: text.map { ["text": $0] } ?? [:])
-        let invocation = ActionInvocation(
-            envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)), call: call)
-        await #expect(throws: ActionExecutionError.invalidText) {
-            if module == "Speech" {
-                try await SpeechActions.speak(invocation: invocation, synthesis: SynthesisFixture(probe: probe)) {
-                    frame, _ in await probe.played(frame)
-                }
-            } else {
-                try await UIActions.print(invocation: invocation) { value, _ in await probe.displayed(value) }
-            }
-        }
+    let call = ActionCall(
+        actionPath: ActionPath(module: "UI", function: "print"), channel: "Display",
+        parameters: text.map { ["text": $0] } ?? [:])
+    let invocation = ActionInvocation(
+        envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)), call: call)
+    await #expect(throws: ActionExecutionError.invalidText) {
+        try await UIActions.print(invocation: invocation) { value, _ in await probe.displayed(value) }
     }
-    #expect(await probe.spokenText.isEmpty)
+    #expect(throws: CommunicationError.invalidPayload) { _ = try SpeechSynthesisInput(text: text ?? "") }
     #expect(await probe.displayedText.isEmpty)
-    #expect(await probe.audio.isEmpty)
 }
 
 @Test func textActionsPreserveAcceptedTextAtByteLimit() async throws {
@@ -328,21 +347,19 @@ func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async 
     #expect(text.utf8.count == 2000)
     let probe = VoiceProbe()
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
-    for alias in ["say", "print"] {
-        let call = expectedActionCall(name: alias, parameters: ["text": text])
-        let invocation = ActionInvocation(
-            envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)), call: call)
-        if alias == "say" {
-            try await SpeechActions.speak(invocation: invocation, synthesis: SynthesisFixture(probe: probe)) {
-                frame, _ in await probe.played(frame)
-            }
-        } else {
-            try await UIActions.print(invocation: invocation) { value, _ in await probe.displayed(value) }
-        }
+    let (synth, store, playback, invocation) = try await preparedSpeech(text: text, input: input, probe: probe)
+    try await playback.play(invocation) { audio, _ in
+        while let frame = try await audio.next() { await probe.played(frame) }
     }
+    let call = expectedActionCall(name: "print", parameters: ["text": text])
+    let display = ActionInvocation(
+        envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)), call: call)
+    try await UIActions.print(invocation: display) { value, _ in await probe.displayed(value) }
     #expect(await probe.spokenText == [text])
     #expect(await probe.displayedText == [text])
     #expect(await probe.audio.count == 1)
+    await synth.stop()
+    await store.shutdown()
 }
 
 @Test(arguments: [nil, "", "Happy", "unknown"])
@@ -404,6 +421,7 @@ private actor EndpointVADSession: VoiceActivitySession {
 @Test(.timeLimit(.minutes(1))) func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
     let policy = try CommunicationPolicy(configurations: [
         AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
+        AgentConfigurations.load(named: "SpeechSynthesis"),
     ])
     let session = UUID()
     let manager = AgentManager()
@@ -538,6 +556,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     await source.start()
     let policy = try CommunicationPolicy(configurations: [
         AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
+        AgentConfigurations.load(named: "SpeechSynthesis"),
     ])
     let input = InputGateway(manager: manager, policy: policy)
     let probe = VoiceProbe()

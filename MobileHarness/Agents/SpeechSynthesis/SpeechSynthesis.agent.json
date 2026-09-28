@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "agentID": "speechSynthesis",
+  "channels": [],
+  "textActions": [],
+  "actions": [],
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "speech.synthesize",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "speech.cancel",
+        "version": 1,
+        "kind": "observation"
+      }
+    ],
+    "subscriptions": [],
+    "publications": [],
+    "sends": []
+  }
+}

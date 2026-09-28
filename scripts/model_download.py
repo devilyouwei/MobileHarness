@@ -48,7 +48,7 @@ def main(profile, variants=None):
         target.parent.mkdir(parents=True, exist_ok=True)
         partial = target.with_name(target.name + ".partial")
         remote = (platform + "/" if platform else "") + relative
-        url = config["source"] + "/resolve/" + config["revision"] + "/" + remote
+        url = config.get("fileURLs", {}).get(relative) or config["source"] + "/resolve/" + config["revision"] + "/" + remote
         subprocess.run(["curl", "-fL", "--retry", "3", "--connect-timeout", "30", url, "-o", str(partial)], check=True)
         partial.replace(target)
         print("downloaded", relative, flush=True)

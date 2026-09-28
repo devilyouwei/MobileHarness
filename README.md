@@ -66,13 +66,13 @@ MobileHarness takes inspiration from how human intelligence connects perception,
 | --- | --- |
 | Voice input | Nemotron streaming ASR and Silero VAD, shared through SpeechPerception |
 | Conversation | Qwen3.5-2B through MLX, with bounded conversation history and streaming output |
-| Speech and captions | Apple system TTS, sequential playback and progressive reply captions |
+| Speech and captions | Kokoro Core ML Mandarin/English TTS, sequential playback and progressive reply captions |
 | Camera | Foreground preview, front/back switching and local YOLO26n-Pose perception |
 | Presentation | Recognition captions, semantic eye expressions, audio spectrum and skeleton overlay |
 | Agent runtime | JSON v4 capability declarations, static subscriptions, directed events and session isolation |
 | Execution | Function Token parsing, Channel scheduling, Action/Tool validation and cancellation |
 
-The current backend integrations include **Core ML** for Silero VAD and YOLO pose, **CoreAI** for Nemotron ASR and Kokoro diagnostics, and **MLX** for Qwen generation. Silero uses CPU execution; pose defaults to CPU + ANE eligibility; the MLX path uses GPU execution. Actual hardware placement depends on the model, runtime and device—enabling ANE does not mean every operation runs on it. General cross-model CPU/GPU/ANE scheduling remains future work. See [ModelKit Backends](MobileHarness/ModelKit/Backends/README.md).
+The current backend integrations include **Core ML** for Silero VAD and YOLO pose, **CoreAI** for Nemotron ASR, **Core ML** via FluidAudio for Kokoro TTS, and **MLX** for Qwen generation. Silero uses CPU execution; pose defaults to CPU + ANE eligibility; the MLX path uses GPU execution. Actual hardware placement depends on the model, runtime and device—enabling ANE does not mean every operation runs on it. General cross-model CPU/GPU/ANE scheduling remains future work. See [ModelKit Backends](MobileHarness/ModelKit/Backends/README.md).
 
 ✅ These paths are implemented, with module and integration tests. Build success does not establish device accuracy, latency or sustained stability.
 
@@ -150,7 +150,7 @@ python3 scripts/download-yolo26-pose.py
 python3 scripts/download-kokoro.py
 ```
 
-Downloads are several gigabytes. Nemotron defaults to the iOS export; Qwen defaults to the 2B model. Kokoro is included for standalone TTS diagnostics; normal conversation uses Apple system TTS. Model weights remain local and are not committed. See [model resources](MobileHarness/Resources/Models/README.md) for profiles, platform variants and redistribution notices.
+Downloads are several gigabytes. Nemotron defaults to the iOS export; Qwen defaults to the 2B model. Kokoro supplies normal conversation speech and standalone diagnostics. Replies follow the user language; Mandarin/English speech and mixed-script segmentation are supported. Other speech languages remain unavailable. Model weights remain local and are not committed. See [model resources](MobileHarness/Resources/Models/README.md) for profiles, platform variants and redistribution notices.
 
 ### 4. Run on an iPhone
 
@@ -190,6 +190,7 @@ Input routing uses explicit `publish` (configured subscriptions) or `send` (name
 | [Agents](MobileHarness/Agents/README.md) | Agent authoring, JSON declarations and input/output conventions |
 | [ModelKit](MobileHarness/ModelKit/README.md) | Capability interfaces, providers and model lifecycle |
 | [PlatformKit](MobileHarness/PlatformKit/README.md) | Device I/O, permissions and platform boundaries |
+| [Storage](MobileHarness/Storage/README.md) | Bounded process-local storage and PCM adapter; disk and persistent storage remain planned |
 | [Architecture Decisions](docs/adr/README.md) | Design rationale and contract changes |
 | [Roadmap](docs/Roadmap.md) | Implementation stages and outstanding acceptance work |
 
@@ -216,3 +217,11 @@ Do not commit or post credentials, signing settings, model weights, user recordi
 **A project license has not yet been selected.** This repository currently contains no root LICENSE granting an open-source license; the maintainer must choose one before an open-source release.
 
 MobileHarness builds on the work behind Apple frameworks, MLX, Qwen, Nemotron, Silero, Kokoro and Ultralytics YOLO. Dependencies and model artifacts retain their own licenses and redistribution conditions. The configured YOLO26 pose artifact declares AGPL-3.0; model notices are documented with the [resource profiles](MobileHarness/Resources/Models/README.md).
+
+✅ Optional third-party cloud text chat supports configurable HTTPS Base URL, API key and model through the same ModelKit capability as local Qwen. See [cloud adapter](MobileHarness/ModelKit/Language/LLM/OpenAI/README.md). ❌ Live-provider acceptance and configuration UI remain pending.
+
+
+
+✅ Speech synthesis now runs in a dedicated Agent receiving directed text requests. Scheduled speech consumes transient audio IDs; cache limits and lifetimes are described in ADR 0055. ❌ Physical-device validation of this revision remains pending.
+
+✅ Speech output now goes directly from validated Action admission to scheduled audio-ID playback. The output/session owner releases unused audio after failures and cancellation; no preparation stage remains. ❌ Physical-device acceptance is pending.

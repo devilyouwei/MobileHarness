@@ -9,6 +9,7 @@ let package = Package(
             name: "HarnessKit",
             targets: [
                 "AgentCore", "Gateway", "Agents", "Actions", "ActionRuntime", "Tools", "ToolRuntime", "ModelKit",
+                "Storage", "StorageAudio",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro",
                 "PlatformKit",
@@ -17,12 +18,16 @@ let package = Package(
         .library(name: "ModelKitSilero", targets: ["ModelKitSilero"]),
         .library(name: "ModelKitKokoro", targets: ["ModelKitKokoro"]),
         .library(name: "ModelKitNemotron", targets: ["ModelKitNemotron"]),
+        .library(name: "ModelKitOpenAI", targets: ["ModelKitOpenAI"]),
         .library(name: "ModelKit", targets: ["ModelKit"]),
         .library(name: "ModelKitQwen35", targets: ["ModelKitQwen35"]),
         .library(name: "ModelKitRuntime", targets: ["ModelKitRuntime"]),
         .library(name: "ModelKitAppleSpeech", targets: ["ModelKitAppleSpeech"]),
     ],
     dependencies: [
+        .package(
+            url: "https://github.com/FluidInference/FluidAudio", revision: "20d4f0bd46d11d7f50a6eb4f7835cfdbd2b4ba14",
+            traits: []),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", exact: "3.31.4"),
         .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.31.4"),
         .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.1.0"),
@@ -43,19 +48,28 @@ let package = Package(
                 "Output/Routing/README.md", "Output/Scheduling/README.md", "Output/Validation/README.md", "README.md",
             ]),
         .target(
-            name: "Actions", dependencies: ["AgentCore", "ActionRuntime", "ModelKit"], path: "MobileHarness/Actions",
+            name: "Actions", dependencies: ["AgentCore", "ActionRuntime", "StorageAudio"],
+            path: "MobileHarness/Actions",
             exclude: ["UI/README.md", "README.md", "Speech/README.md"]),
         .target(
-            name: "Agents", dependencies: ["AgentCore", "ModelKit"], path: "MobileHarness/Agents",
+            name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageAudio"], path: "MobileHarness/Agents",
             exclude: [
-                "Assistant/README.md", "Photographer/README.md", "SpeechPerception/README.md",
+                "SpeechSynthesis/README.md", "Assistant/README.md", "Photographer/README.md",
+                "SpeechPerception/README.md",
                 "VisionPerception/README.md", "README.md",
             ],
             resources: [
                 .process("Assistant/Assistant.agent.json"),
+                .process("SpeechSynthesis/SpeechSynthesis.agent.json"),
                 .process("SpeechPerception/SpeechPerception.agent.json"),
                 .process("VisionPerception/VisionPerception.agent.json"),
             ]),
+        .target(
+            name: "Storage", path: "MobileHarness/Storage",
+            exclude: ["README.md", "Audio"]),
+        .target(
+            name: "StorageAudio", dependencies: ["Storage", "AgentCore", "ModelKit"],
+            path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
             name: "ActionRuntime", dependencies: ["AgentCore"], path: "MobileHarness/ActionRuntime",
             exclude: ["README.md"]),
@@ -69,16 +83,22 @@ let package = Package(
             exclude: [
                 "README.md", "Language/README.md", "Language/JEV/README.md",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
-                "Language/LLM/Qwen35", "Language/LLM/README.md", "Backends",
+                "Language/LLM/Qwen35", "Language/LLM/OpenAI", "Language/LLM/README.md", "Backends",
                 "Core/README.md", "Management", "Defaults", "Speech/ASR/Apple", "Speech/TTS/Apple", "Speech/TTS/Kokoro",
                 "Speech/Shared",
                 "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Vision/YOLO", "Vision/README.md",
             ]),
         .target(
+            name: "ModelKitOpenAI", dependencies: ["ModelKit"],
+            path: "MobileHarness/ModelKit/Language/LLM/OpenAI", exclude: ["README.md"]),
+        .testTarget(
+            name: "OpenAIChatTests", dependencies: ["ModelKit", "ModelKitOpenAI", "ModelKitRuntime"],
+            exclude: ["README.md"]),
+        .target(
             name: "ModelKitDefaults",
             dependencies: [
-                "ModelKit", "ModelKitRuntime", "ModelKitAppleSpeech", "ModelKitNemotron", "ModelKitSilero",
-                "ModelKitKokoro", "ModelKitQwen35", "ModelKitYOLOPose",
+                "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero",
+                "ModelKitKokoro", "ModelKitQwen35", "ModelKitYOLOPose", "ModelKitOpenAI",
             ],
             path: "MobileHarness/ModelKit/Defaults", exclude: ["README.md"]),
         .target(
@@ -99,6 +119,10 @@ let package = Package(
         .testTarget(
             name: "YOLOPoseTests", dependencies: ["ModelKit", "ModelKitYOLOPose", "ModelKitCoreML", "ModelKitRuntime"],
             exclude: ["README.md"]),
+        .target(
+            name: "ModelKitFluidAudio",
+            dependencies: [.product(name: "FluidAudio", package: "FluidAudio")],
+            path: "MobileHarness/ModelKit/Backends/FluidAudio", exclude: ["README.md"]),
         .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Backends/CoreML", exclude: ["README.md"]),
         .target(
             name: "ModelKitSilero", dependencies: ["ModelKit", "ModelKitCoreML"],
@@ -116,7 +140,7 @@ let package = Package(
             resources: [.process("Resources")]),
         .testTarget(name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron"], exclude: ["README.md"]),
         .target(
-            name: "ModelKitKokoro", dependencies: ["ModelKit", "ModelKitCoreAI"],
+            name: "ModelKitKokoro", dependencies: ["ModelKit", "ModelKitFluidAudio"],
             path: "MobileHarness/ModelKit/Speech/TTS/Kokoro", exclude: ["README.md"]),
         .testTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
         .target(
@@ -126,6 +150,7 @@ let package = Package(
             name: "IntegrationTests",
             dependencies: [
                 "AgentCore", "Gateway", "Agents", "Actions", "ActionRuntime", "Tools", "ToolRuntime", "ModelKit",
+                "Storage", "StorageAudio",
                 "PlatformKit",
             ],
             exclude: ["README.md"]),
@@ -150,7 +175,7 @@ let package = Package(
         .testTarget(
             name: "ModelKitDefaultsTests", dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults"],
             exclude: ["README.md"]),
-        .testTarget(name: "ModelKitTests", dependencies: ["ModelKit"]),
+        .testTarget(name: "ModelKitTests", dependencies: ["ModelKit"], exclude: ["README.md"]),
         .testTarget(
             name: "ModelKitRuntimeTests", dependencies: ["ModelKit", "ModelKitRuntime"], exclude: ["README.md"]),
         .testTarget(

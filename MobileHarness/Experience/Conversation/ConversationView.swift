@@ -77,7 +77,6 @@ struct ConversationView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task { await runtime.run() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { runtime.stopVoice(message: "已进入后台，轻触重新开始") }
         }

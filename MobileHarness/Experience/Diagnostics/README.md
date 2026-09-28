@@ -9,3 +9,5 @@ Purpose: provide opt-in model diagnostics separately from normal Agent conversat
 - ❌ Separate the existing Kokoro playback/measurement coordinator from its view.
 
 Update this README when changing this directory. ✅ means implemented; ❌ means outstanding. Do not create unused placeholders.
+
+✅ Kokoro diagnostics now sends auto-locale Mandarin/English mixed text through the same default managed provider. ❌ Device acoustic quality and iOS 27 soak testing remain manual acceptance.

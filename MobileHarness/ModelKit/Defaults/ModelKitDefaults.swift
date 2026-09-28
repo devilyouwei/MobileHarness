@@ -1,8 +1,8 @@
 import Foundation
 import ModelKit
-import ModelKitAppleSpeech
 import ModelKitKokoro
 import ModelKitNemotron
+import ModelKitOpenAI
 @_spi(ModelAssembly) import ModelKitRuntime
 import ModelKitSilero
 import ModelKitYOLOPose
@@ -19,18 +19,39 @@ public enum ModelKitDefaults {
 
     /// Every caller receives the same process-wide manager. A different resource root is rejected.
     @available(iOS 27, macOS 27, *)
-    public static func manager(resources: URL) async throws -> ModelManager {
-        try await process.manager(resources: resources)
+    public static func manager(resources: URL, cloudChat: OpenAIChatConfiguration? = nil) async throws -> ModelManager {
+        try await process.manager(resources: resources, cloudChat: cloudChat)
+    }
+
+    /// Explicit settings update; preserves the process manager and unrelated model instances.
+    @available(iOS 27, macOS 27, *)
+    public static func configureChat(resources: URL, configuration: OpenAIChatConfiguration?) async throws {
+        try await process.configureChat(resources: resources, configuration: configuration)
+    }
+
+    @available(iOS 27, macOS 27, *)
+    fileprivate static func chatRegistration(resources: URL, configuration: OpenAIChatConfiguration?) throws
+        -> ModelRegistration
+    {
+        try ModelRegistration(id: ModelID("chat"), capabilities: [.chat], memoryPolicy: .releaseWhenIdle) { context in
+            if let configuration {
+                return ProvidedCapabilities(chat: try OpenAIChat(context: context, configuration: configuration))
+            }
+            #if targetEnvironment(simulator)
+                return ProvidedCapabilities(chat: UnsupportedChat())
+            #else
+                try Qwen35Chat.configureCache(limitBytes: 64 * 1024 * 1024)
+                let model = try Qwen35Chat(context: context, artifacts: resources.appendingPathComponent("Qwen35"))
+                return ProvidedCapabilities(warmup: { try await model.warmup() }, chat: model)
+            #endif
+        }
     }
 
     /// Registers lightweight factories without loading weights or requesting device permissions.
     @available(iOS 27, macOS 27, *)
-    fileprivate static func assemble(resources: URL) async throws -> ModelManager {
+    fileprivate static func assemble(resources: URL, cloudChat: OpenAIChatConfiguration?) async throws -> ModelManager {
         let manager = ModelManager()
         do {
-            #if !targetEnvironment(simulator)
-                try Qwen35Chat.configureCache(limitBytes: 64 * 1024 * 1024)
-            #endif
             try await manager.register(
                 ModelRegistration(id: ModelID("silero"), capabilities: [.voiceActivity]) { context in
                     ProvidedCapabilities(
@@ -50,26 +71,13 @@ public enum ModelKitDefaults {
                     #endif
                 }, defaults: [.recognition])
             try await manager.register(
-                ModelRegistration(id: ModelID("chat"), capabilities: [.chat], memoryPolicy: .releaseWhenIdle) {
-                    context in
-                    #if targetEnvironment(simulator)
-                        return ProvidedCapabilities(chat: UnsupportedChat())
-                    #else
-                        let model = try Qwen35Chat(
-                            context: context, artifacts: resources.appendingPathComponent("Qwen35"))
-                        return ProvidedCapabilities(warmup: { try await model.warmup() }, chat: model)
-                    #endif
-                }, defaults: [.chat])
-            try await manager.register(
-                ModelRegistration(id: ModelID("apple-speech"), capabilities: [.synthesis]) { context in
-                    ProvidedCapabilities(synthesis: try await AppleSpeechSynthesis(context: context))
-                }, defaults: [.synthesis])
+                chatRegistration(resources: resources, configuration: cloudChat), defaults: [.chat])
             try await manager.register(
                 ModelRegistration(id: kokoro, capabilities: [.synthesis], memoryPolicy: .releaseWhenIdle) { context in
                     ProvidedCapabilities(
                         synthesis: try KokoroSpeechSynthesis(
-                            context: context, artifacts: resources.appendingPathComponent("Kokoro")))
-                })
+                            context: context, artifacts: resources.appendingPathComponent("KokoroCoreML")))
+                }, defaults: [.synthesis])
             try await manager.register(
                 ModelRegistration(id: ModelID("yolo26n-pose"), capabilities: [.pose], memoryPolicy: .releaseWhenIdle) {
                     context in
@@ -101,25 +109,43 @@ public enum ModelKitDefaults {
 
 public enum ModelKitConfigurationError: Error, Equatable, Sendable {
     case resourceDirectoryConflict
+    case cloudConfigurationConflict
 }
 
 private actor ProcessModels {
     private var root: URL?
+    private var cloudChat: OpenAIChatConfiguration?
     private var assembly: Task<ModelManager, Error>?
     private var waiters = 0
+    private var updating = false
 
     @available(iOS 27, macOS 27, *)
-    func manager(resources: URL) async throws -> ModelManager {
+    func configureChat(resources: URL, configuration: OpenAIChatConfiguration?) async throws {
+        guard !updating else { throw CapabilityError.inputBusy }
+        updating = true
+        defer { updating = false }
+        let manager = try await manager(resources: resources, cloudChat: nil)
+        guard cloudChat != configuration else { return }
+        try await manager.replace(ModelKitDefaults.chatRegistration(resources: resources, configuration: configuration))
+        cloudChat = configuration
+    }
+
+    @available(iOS 27, macOS 27, *)
+    func manager(resources: URL, cloudChat: OpenAIChatConfiguration?) async throws -> ModelManager {
         try Task.checkCancellation()
         let requested = resources.standardizedFileURL.resolvingSymlinksInPath()
         if let root, root != requested { throw ModelKitConfigurationError.resourceDirectoryConflict }
+        if assembly != nil, let cloudChat, self.cloudChat != cloudChat {
+            throw ModelKitConfigurationError.cloudConfigurationConflict
+        }
         guard waiters < 32 else { throw CapabilityError.inputBusy }
         waiters += 1
         defer { waiters -= 1 }
         if assembly == nil {
             root = requested
+            self.cloudChat = cloudChat
             // Stored before suspension: simultaneous callers cannot create another manager.
-            assembly = Task { try await ModelKitDefaults.assemble(resources: requested) }
+            assembly = Task { try await ModelKitDefaults.assemble(resources: requested, cloudChat: cloudChat) }
         }
         guard let assembly else { throw CapabilityError.sessionClosed }
         let manager = try await assembly.value
