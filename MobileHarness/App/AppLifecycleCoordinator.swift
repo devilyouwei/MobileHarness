@@ -164,6 +164,11 @@ final class AppLifecycleCoordinator {
                 } catch {
                     stopVoice(message: "语音处理失败：\(error.localizedDescription)")
                     record("处理失败：\(String(describing: error))")
+                    await cleanupTask?.value
+                    do {
+                        try await runtime.conversations.recordExecutionFailure(
+                            String(describing: error), for: output.inputID)
+                    } catch { record("保存执行错误失败：\(error)") }
                 }
             }
         } catch is CancellationError {} catch {

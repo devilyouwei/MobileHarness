@@ -4,6 +4,12 @@ import ModelKit
 
 /// Streaming perception only. Device capture and playback remain composition-owned.
 public actor SpeechPerceptionAgent: Agent {
+    private static let transcript = InternalAction(
+        module: "UI", function: "setTranscript", channel: "Transcript", required: ["text"])
+    private static let voiceState = InternalAction(
+        module: "UI", function: "setVoiceState", channel: "Display", required: ["state"])
+    private static let finishTranscript = InternalAction(
+        module: "UI", function: "finishTranscript", channel: "Transcript")
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
@@ -39,7 +45,10 @@ public actor SpeechPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Speech Perception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.actionCall, .control], capabilities: configuration.capabilities)
+            outputs: [.actionCall, .control],
+            capabilities: try configuration.capabilities.adding(internalActions: [
+                Self.transcript, Self.voiceState, Self.finishTranscript,
+            ]))
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(32))
         outputs = stream.stream
         continuation = stream.continuation
@@ -132,15 +141,14 @@ public actor SpeechPerceptionAgent: Agent {
         try Task.checkCancellation()
         guard lifecycle == .running || lifecycle == .paused else { throw CancellationError() }
         // Presentation is bounded separately from the complete shared transcription.
-        let call = try descriptor.capabilities.resolveAction(
-            "setTranscript", parameters: ["text": String(text.suffix(320))])
+        let call = try Self.transcript.call(["text": String(text.suffix(320))])
         try emit(.actionCall(call), input: input)
         // Release scheduler input tracking after this ordered display update completes.
         try emit(.control("agent.finished"), input: input)
     }
     private func presentPhase(_ phase: SpeechPhase, input: AgentInput) throws {
         let state = phase == .processing ? "processing" : phase == .speaking ? "hearing" : "listening"
-        let call = try descriptor.capabilities.resolveAction("setVoiceState", parameters: ["state": state])
+        let call = try Self.voiceState.call(["state": state])
         try emit(.actionCall(call), input: input)
         try emit(.control("agent.finished"), input: input)
     }
@@ -223,7 +231,7 @@ public actor SpeechPerceptionAgent: Agent {
                     _ = try await port.publish(.speechPhase(.processing), parent: input)
                     let text = try await turn.finish()
                     try Task.checkCancellation()
-                    let close = try descriptor.capabilities.resolveAction("finishTranscript", parameters: [:])
+                    let close = try Self.finishTranscript.call()
                     try emit(.actionCall(close), input: input)
                     try emit(.control("agent.finished"), input: input)
                     if text.isEmpty {

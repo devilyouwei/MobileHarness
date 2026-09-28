@@ -40,6 +40,11 @@ struct MobileHarnessApp: App {
                             defer { container?.lifecycle.endSettingsChange() }
                             try Task.checkCancellation()
                             return try await AppContainer.diagnosticChat()
+                        },
+                        loadHistory: {
+                            await container?.lifecycle.beginSettingsChange()
+                            defer { container?.lifecycle.endSettingsChange() }
+                            return try ApplicationRuntime.shared().conversations
                         }
                     ) {
                         let applied = await settings.save(

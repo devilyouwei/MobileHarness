@@ -5,6 +5,7 @@ import Agents
 import Foundation
 import Gateway
 import ModelKit
+import Storage
 import StorageAudio
 import ToolRuntime
 import Tools
@@ -12,9 +13,18 @@ import Tools
 @MainActor
 enum AgentBootstrap {
     static func makeAssistant(chat: any ChatCapability) throws -> AssistantAgent {
-        try AssistantAgent(chat: chat)
+        try AssistantAgent(
+            chat: chat, conversations: ApplicationRuntime.shared().conversations,
+            modelName: {
+                try await currentModelName()
+            })
     }
 
+    private static func currentModelName() async throws -> String {
+        let settings = try await CloudSettingsStore().load()
+        guard let settings, settings.enabled else { return "Local Qwen3.5" }
+        return settings.model.isEmpty ? "Cloud default model" : settings.model
+    }
 }
 
 /// Process-local communication assembly, available before voice models are ready.
@@ -27,6 +37,7 @@ final class ApplicationRuntime {
         instance = runtime
         return runtime
     }
+    let conversations: ConversationHistoryStore
     let manager: AgentManager
     let input: InputGateway
     let output: OutputGateway
@@ -36,6 +47,18 @@ final class ApplicationRuntime {
     private var toolSetup: Task<Void, Error>?
 
     private init() throws {
+        let root = try FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        var directory = root.appendingPathComponent("MobileHarness/Conversations", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        var attributes = URLResourceValues()
+        attributes.isExcludedFromBackup = true
+        try directory.setResourceValues(attributes)
+        let document = try LocalDocumentStore<ConversationArchive>(
+            url: directory.appendingPathComponent("history.json"),
+            maximumBytes: ConversationHistoryStore.maximumBytes)
+        conversations = ConversationHistoryStore(document: document)
         let policy = try CommunicationPolicy(
             configurations: ["Assistant", "SpeechPerception", "VisionPerception", "SpeechSynthesis"].map {
                 try AgentConfigurations.load(named: $0)
@@ -68,7 +91,7 @@ final class ApplicationRuntime {
     func prepareTools() async throws {
         if toolSetup == nil {
             toolSetup = Task { [tools, presentation] in
-                try await tools.register("System.runtimeInfo") { try await SystemTools.runtimeInfo($0) }
+                try await tools.register("runtimeInfo") { try await SystemTools.runtimeInfo($0) }
                 try await tools.registerCompletion("UI.showPose") { call, envelope in
                     try await presentation.showPose(call, envelope: envelope)
                 }

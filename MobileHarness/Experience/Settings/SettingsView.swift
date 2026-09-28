@@ -1,4 +1,5 @@
 import ModelKit
+import Storage
 import SwiftUI
 
 /// First-level settings list; feature-specific forms live in their own destination.
@@ -6,6 +7,7 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     let makeChat: () async throws -> any ChatCapability
+    let loadHistory: () async throws -> ConversationHistoryStore
     let save: () async -> Bool
 
     var body: some View {
@@ -17,11 +19,11 @@ struct SettingsView: View {
             }
             .accessibilityIdentifier("settings.cloud.open")
             NavigationLink {
-                LLMRawOutputView(modelName: settings.activeChatDescription, makeChat: makeChat)
+                ConversationHistoryView(loadHistory: loadHistory, makeChat: makeChat)
             } label: {
-                Label("LLM 原始输出测试", systemImage: "text.magnifyingglass")
+                Label("对话历史", systemImage: "clock.arrow.circlepath")
             }
-            .accessibilityIdentifier("settings.llm.raw")
+            .accessibilityIdentifier("settings.conversation.history")
         }
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)

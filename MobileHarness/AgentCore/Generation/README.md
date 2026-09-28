@@ -8,7 +8,7 @@ Purpose: share incremental Agent-output parsing across Agents without depending 
 | --- | --- |
 | Function Token protocol | A mixed stream of natural text characters and restricted XML syntax. Text is a first-class part of the protocol, not content outside it. A document root is not required. |
 | FunctionToken | An internal parsed event: `.text`, `.action`, `.boundary` or `.scheduling`. It is not a model tokenizer token, a network fragment or necessarily one character. |
-| FunctionTokenParser | Incrementally decodes UTF-8 and parses text, self-closing Action tags and paired Channel tags. It neither binds capabilities nor executes Actions. |
+| FunctionTokenParser | Incrementally decodes UTF-8 and parses text, self-closing Action tags, paired Channel scopes and paired wait groups. It neither binds capabilities nor executes Actions. |
 | Action | A registered executable behavior, such as `Speech.speak` or `UI.express`. Its implementation owns parameter/value validation and behavior. |
 | ActionCall | One resolved Action invocation: ActionPath, string parameters and effective channel. It is distinct from raw FunctionToken events and model-native ToolCall invocations. |
 | ToolCall | A separate native tool invocation resolved by ToolCallParser. It does not pass through XML parsing or Channel action queues. |
@@ -19,7 +19,7 @@ A model tokenizer may split one XML tag across many model tokens. Conversely, on
 
 The protocol has four forms:
 
-1. **Natural text**, such as `Hello.`: parsed as text and later mapped through the Agent's configured textActions. Assistant maps each accepted text chunk to say and print.
+1. **Natural text**, such as `Hello.`: parsed as text and later expanded through the Agent's code-owned text callback. Assistant maps each accepted chunk to speech preparation and captions.
 2. **Self-closing XML Action tags**, such as `<express emotion="happy"/>`: parsed as an alias plus string attributes. AgentGenerator resolves the alias to a registered ActionPath.
 3. **Paired XML Channel tags**, such as `<channel.Speech>...</channel.Speech>`: control the channel scope for enclosed text and Actions. They emit boundary events but are not executable Actions.
 4. **Paired wait tags**, `<wait>...</wait>`: emit typed beginWait/endWait events and retain each enclosed Action's effective Channel. They form structured execution groups with entry/exit synchronization.
@@ -37,17 +37,17 @@ Back to each Action's default channel.
 
 All Action tags must be self-closing; `<say>Hello</say>` is invalid. Channel tags accept neither attributes nor self-closing syntax. Closing an inner channel restores its parent; closing the outermost channel restores a nil scope, which capability resolution replaces with each Action's default channel. No Channel name has special blocking meaning. Use wait for cross-channel synchronization.
 
-An Action is emitted as soon as its complete tag arrives, without waiting for channel closure. Action and channel boundaries first flush preceding text, preventing sentences from crossing scopes. Explicit speech calls do not automatically duplicate into display calls; only natural text uses textActions mapping. Hidden Actions remain registered but are omitted from model-facing instructions.
+An Action is emitted as soon as its complete tag arrives, without waiting for channel closure. Action, Channel and wait boundaries first flush preceding text, preventing sentences from crossing scopes. Only natural text invokes the Agent-owned mapping. Explicit XML resolves model-callable Actions only; internal permissions have no XML aliases.
 
 Literal `<` and `&` in text must be escaped as `&lt;` and `&amp;`. Attribute values must be quoted; single and double quotes, five predefined XML entities and valid numeric XML character references are supported. Escaped markup stays text and is not parsed a second time. Tool results and demonstration text use `escapeText` before entering this protocol. Comments, DOCTYPE, CDATA, processing instructions and non-self-closing Actions are rejected. This is a restricted XML syntax, not a general XML document parser.
 
 ## Algorithm and data flow
 
-Each generation owns one parser, one bounded channel stack and one sentence buffer. The Agent supplies fragments in order and synchronously consumes returned calls; there is no async mailbox in this module.
+Each generation owns one parser, one bounded unified Channel/wait scope stack and one sentence buffer. The Agent supplies fragments in order and synchronously consumes returned GenerationEvents; there is no async mailbox in this module.
 
 1. Incrementally decode UTF-8 and retain only incomplete byte/entity/tag state and pending text.
-2. Parse completed tags; update ChannelParser scopes and emit text, Action or boundary events in order.
-3. AgentGenerator accumulates text in SentenceFunctionBuffer. At sentence or protocol boundaries, flush text and resolve the configured text-action aliases.
+2. Parse completed tags; update ChannelParser scopes and emit text, Action, scope-boundary or scheduling events in order.
+3. AgentGenerator accumulates text in SentenceFunctionBuffer. At sentence or protocol boundaries, flush text and invoke the Agent-owned text callback.
 4. Resolve explicit Action aliases and parameters through CapabilityRegistry. Return ordered GenerationEvents (resolved Actions and scheduling directives) to the Agent for its bounded output stream.
 5. On normal termination, call `finish` to flush valid remaining text and reject incomplete syntax. On cancellation, discard state instead of flushing partial output.
 
@@ -56,17 +56,21 @@ flowchart TD
     Model[Ordered model text or UTF-8 fragments] --> Parser[FunctionTokenParser]
     Parser --> Text[Text event]
     Parser --> Action[Self-closing Action event]
-    Parser --> Channel[ChannelParser scope stack]
-    Channel --> Boundary[Boundary event]
+    Parser --> Channel[Unified Channel / wait scope stack]
+    Channel --> Boundary[Channel boundary event]
+    Channel --> Wait[Typed wait boundary]
+    Wait --> Flush
     Text --> Sentence[SentenceFunctionBuffer]
     Action --> Flush[Flush preceding text]
     Boundary --> Flush
-    Sentence --> Mapping[Configured textActions mapping]
+    Sentence --> Mapping[Agent-owned text callback]
     Flush --> Mapping
     Mapping --> Registry[CapabilityRegistry]
     Action --> Registry
     Registry --> Calls[Resolved ActionCalls]
-    Calls --> Agent[Agent output stream]
+    Calls --> Events[Ordered GenerationEvents]
+    Wait --> Events
+    Events --> Agent[Agent output stream]
     Native[Native tool invocation] --> Tools[ToolCallParser]
     Tools --> Tool[Resolved ToolCall]
 ```
@@ -84,7 +88,7 @@ For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression c
 | Wait groups | 32 per generation |
 | Attributes per tag | 32 |
 | Sentence text buffer | 2000 UTF-8 bytes |
-| Resolved calls per generation | 120, within the Agent's 256-envelope output buffer |
+| Resolved calls per generation | 120; Assistant separately buffers 256 output envelopes including wait boundaries and runtime notifications |
 | Complete native tool argument JSON | 4096 UTF-8 bytes; string values only |
 
 Errors and limits terminate that parser/generator instance; it cannot be reused. Finish rejects incomplete UTF-8, entities, tags and unclosed Channel/wait scopes. Unknown entities, mismatched closing tags, duplicate attributes, invalid UTF-8, unknown capabilities and invalid parameters fail explicitly.
@@ -94,32 +98,32 @@ Failure cannot roll back Actions already emitted and executed. If one append thr
 ## Implementation status
 
 - ✅ FunctionTokenParser.swift: incremental mixed text/XML protocol parser.
-- ✅ FunctionToken.swift: text, Action and scope-boundary events plus generation errors.
-- ✅ ChannelParser.swift: bounded nesting and scope restoration.
-- ✅ AgentGenerator.swift: alias binding, effective channels and configured text mappings.
+- ✅ FunctionToken.swift: parsed tokens, GenerationEvent, SchedulingDirective and generation errors.
+- ✅ ChannelParser.swift: unified Channel/wait nesting, matching closure and Channel restoration.
+- ✅ AgentGenerator.swift: alias binding, effective channels and code-owned text mappings.
 - ✅ SentenceFunctionBuffer.swift: progressive multilingual sentence segmentation, including punctuation, quotes, decimals and abbreviations.
 - ✅ ToolCallParser.swift: complete native tool arguments and registered capability resolution.
 - ❌ Incremental native tool-argument assembly and full JSON Schema. ChatEvent currently exposes text/completion only; the existing /status tool route remains separate.
 
 Update this README when changing syntax, names, bounds, ordering or completion/cancellation behavior.
 
-✅ AgentGenerator supports an empty textActions list for Agents that emit only explicit Action calls. Explicit self-closing calls and Channel scopes still use the shared parser; non-whitespace natural text without a mapping fails explicitly rather than being discarded. Assistant still requires nonempty text mappings at its own configuration boundary.
+✅ AgentGenerator accepts an optional TextMapping callback. Without it, non-whitespace natural text fails explicitly. Each chunk expands into 1–8 ActionCalls, counts toward the 120-Action bound, and retains its effective Channel and execution group. Assistant supplies its fixed mapping in code; no text aliases are registered.
 
 ## Streaming speech/text segmentation
 
-✅ Natural text is submitted at sentence endings (`。！？.!?`, semicolons, paragraph breaks and supported multilingual sentence marks), XML Action/Channel boundaries, or normal generation completion. Commas, enumeration commas and colons no longer trigger short clauses. Adjacent punctuation, closing quotes and whitespace stay with the preceding text; one following content character disambiguates a streaming boundary. Decimal/abbreviation protection remains.
+✅ Natural text is submitted at sentence endings (`。！？.!?`, semicolons, paragraph breaks and supported multilingual sentence marks), XML Action/Channel/wait boundaries, or normal generation completion. Commas, enumeration commas and colons no longer trigger short clauses. Adjacent punctuation, closing quotes and whitespace stay with the preceding text; one following content character disambiguates a streaming boundary. Decimal/abbreviation protection remains.
 
 ✅ A soft length boundary is 60 Characters when the current prefix contains Hanzi, otherwise 120 Characters. It waits for a safe word boundary, never splitting a contiguous non-CJK word, number, apostrophe or hyphenated word. These are text Characters, not model tokens. Pending text retains its 2000 UTF-8-byte hard bound; an oversized unbreakable word fails explicitly. No timer or new queue is introduced. Cancellation still discards pending text.
 
-✅ The shared mechanism emits the same chunks to configured say/print mappings. Explicit XML Action parameters retain their own function validation and are not resegmented here. Kokoro's internal language switches and model input constraints remain independent backend adaptation. ❌ First-chunk special handling and timeout flushing are not implemented.
+✅ The shared mechanism emits the same chunks to Agent-owned speech/caption mapping. Explicit XML Action parameters retain their own function validation and are not resegmented here. Kokoro's internal language switches and model input constraints remain independent backend adaptation. ❌ First-chunk special handling and timeout flushing are not implemented.
 
 ```mermaid
 flowchart LR
     Stream[Model fragments] --> XML[FunctionTokenParser]
     XML --> Buffer[Sentence / soft length accumulation]
-    XML --> Boundary[Action or Channel boundary]
+    XML --> Boundary[Action / Channel / wait boundary]
     Boundary --> Flush[Flush preceding text]
-    Buffer --> Mapping[say and print mappings]
+    Buffer --> Mapping[Speech and caption mapping]
     Flush --> Mapping
     Mapping --> Speech[Speech Action]
     Speech --> Backend[TTS language / model limits]
@@ -127,7 +131,7 @@ flowchart LR
 
 ## Non-executing generation trace
 
-✅ `GenerationTrace` is an independently tested, Sendable value owned by an explicit diagnostic consumer. It records exact text and fragment boundaries before calling the existing AgentGenerator. The first parser failure is retained with fragment/finish location, parsing stops, and raw collection continues. Successfully returned calls remain in interpretation order; calls within an append that throws are not partially recovered. No dispatch or model dependency is introduced.
+✅ `GenerationTrace` is an independently tested, Sendable value owned by an explicit diagnostic consumer. It records exact text and fragment boundaries before calling the existing AgentGenerator. The first parser failure is retained with fragment/finish location, parsing stops, and raw collection continues. Successfully returned Actions and wait directives remain in interpretation order; events within an append that throws are not partially recovered. No dispatch or model dependency is introduced.
 
 Raw retention has a 256 KiB UTF-8 bound and 8192-fragment bound (including empty fragments); overflow throws limitExceeded and seals input without evicting existing text. The parser retains its existing bounds, including 120 calls. Finish flushes only on normal completion; consumers must not finish after model failure/cancellation. No extra worker, queue or persistence is involved. ❌ It is not an execution trace, tokenizer trace or automatic repair facility.
 
@@ -136,7 +140,7 @@ flowchart LR
     Delta[Text fragment] --> Bound[Check retention limits]
     Bound --> Raw[Exact raw text and fragment record]
     Raw --> Parser[AgentGenerator if healthy]
-    Parser --> Calls[Resolved calls]
+    Parser --> Calls[Ordered Actions and wait boundaries]
     Parser --> Error[Retain first error; continue raw capture]
     Bound --> Overflow[Explicit failure; preserve prefix]
 ```
@@ -145,7 +149,7 @@ flowchart LR
 
 ✅ `<wait>` and `</wait>` are exact, attribute-free paired tags; `<wait/>` is invalid and wait is reserved as a capability alias. The unified ChannelParser lexical stack rejects crossing scopes such as `<wait><channel.Speech></wait></channel.Speech>`. A Channel may surround a wait or be nested within it. Wait does not change the effective channel. begin/end flush preceding sentence text before emitting SchedulingDirective, preserving the lexical position of every action.
 
-✅ AgentGenerator append/finish now return `[GenerationEvent]` with `.action(ActionCall)` and `.scheduling(SchedulingDirective)`. Consumers must forward the entire event sequence, not filter out directives. Natural text still produces the configured textActions in declaration order; their default lanes allow concurrent speech/captions. No special text-step type is needed. The parser limits 32 waits and combined depth 8; scheduled execution additionally validates balanced groups and bounds. Each Agent owns its parser; Gateway only receives resolved values and typed boundaries.
+✅ AgentGenerator append/finish now return `[GenerationEvent]` with `.action(ActionCall)` and `.scheduling(SchedulingDirective)`. Consumers must forward the entire event sequence, not filter out directives. Natural text produces the code-owned mapped Actions in callback order; their default lanes allow concurrent speech/captions. No special text-step type is needed. The parser limits 32 waits and combined depth 8; scheduled execution additionally validates balanced groups and bounds. Each Agent owns its parser; Gateway only receives resolved values and typed boundaries.
 
 A wait waits for its parent's preceding work, executes internally by ordinary Channel rules, and releases its parent's continuation only once closed and all children complete. Nested waits apply the same rule locally. An open group may execute already received work. Completed XML is not physical completion; cancellation discards unfinished parsing state and Gateway cancels accepted work. Self-closing Actions never acquire paired start/stop semantics.
 

@@ -4,6 +4,8 @@ import ModelKit
 
 /// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven eye Actions.
 public actor VisionPerceptionAgent: Agent {
+    private static let gaze = InternalAction(module: "UI", function: "moveEyes", channel: "Gaze", required: ["x", "y"])
+    private static let overlay = InternalTool(path: "UI.showPose", required: ["payload"])
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
@@ -44,7 +46,9 @@ public actor VisionPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "VisionPerception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.actionCall, .toolCall, .control], capabilities: configuration.capabilities)
+            outputs: [.actionCall, .toolCall, .control],
+            capabilities: try configuration.capabilities.adding(
+                internalActions: [Self.gaze], internalTools: [Self.overlay]))
         self.filter = FrameChangeFilter(configuration: try sampling ?? FrameChangeConfiguration())
         self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
         self.pose = pose
@@ -150,8 +154,7 @@ public actor VisionPerceptionAgent: Agent {
                 timestamp: image.timestamp, rotation: image.rotation, people: people)
             try emitOverlay(observation, input: input)
             let target = gaze.update(observation)
-            let move = try descriptor.capabilities.resolveAction(
-                "moveEyes", parameters: ["x": String(target.x), "y": String(target.y)])
+            let move = try Self.gaze.call(["x": String(target.x), "y": String(target.y)])
             try emit(.actionCall(move), input: input)
             if pendingPublication != nil { publicationReplacements += 1 }
             pendingPublication = Publication(observation: observation, parent: input)
@@ -224,7 +227,7 @@ public actor VisionPerceptionAgent: Agent {
         guard data.count <= 3000, let json = String(data: data, encoding: .utf8) else {
             throw CommunicationError.invalidPayload
         }
-        let call = try descriptor.capabilities.resolveTool("showPose", arguments: ["payload": json])
+        let call = try Self.overlay.call(["payload": json])
         try emit(.toolCall(call), input: input)
     }
     private func emit(_ output: AgentOutput, input: AgentInput) throws {

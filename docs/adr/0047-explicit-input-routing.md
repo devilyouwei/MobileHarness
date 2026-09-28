@@ -1,5 +1,7 @@
 # ADR 0047 — Explicit input routing
 
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
 Accepted: 2026-09-27.
 
 ## Context

@@ -1,5 +1,7 @@
 # ADR 0041 — Vision Perception Owns Skeleton Visualization
 
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
 > Historical scope: Historical skeleton Action stage. [ADR 0042](0042-show-pose-completion-tool.md) changed UI.showPose to a completion-only Tool while VisionPerception retained ownership.
 
 Status: accepted, 2026-09-26.

@@ -3,7 +3,7 @@
 Purpose: connect classified resolved calls to execution runtimes while preserving errors and result correlation.
 
 - ✅ ActionDispatcher accepts ActionCall and delegates admission/execution to ChannelScheduler; no alias parsing occurs here.
-- ✅ Scheduler bounds: 32 jobs per channel including running work, 16 active channels and 64 tracked Agent/input pairs. Overflow is explicit.
+- ✅ Scheduler bounds: 32 unfinished Actions per Channel name across all tasks (including running and dormant work), 16 live names, 64 tracked tasks, 120 Actions and 32 waits per task. Overflow is explicit.
 - ✅ Completion/cancellation barriers use source AgentID and inputID; session cancellation is supported.
 - ✅ ToolDispatcher awaits ToolExecutor and preserves callID; InputGateway.send explicitly targets the originating Agent/session.
 - ❌ Unified ActionResult-to-Signal feedback.
@@ -16,7 +16,7 @@ ActionDispatcher forwards resolved calls to ChannelScheduler; the scheduler owns
 
 ```mermaid
 flowchart LR
-    Router --> ActionDispatcher --> ChannelScheduler
+    Router -->|Action / scheduling| ActionDispatcher --> ChannelScheduler
     Router --> ToolDispatcher --> ToolExecutor
     ToolExecutor -->|result| InputGateway --> Agent[Originating Agent inbox]
 ```

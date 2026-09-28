@@ -6,3 +6,9 @@ Design goals: explicit ownership, capability boundaries and no duplicate product
 
 - ✅ HARNESS_EVAL_QWEN35=1 enables serialized synthetic prompt comparisons; results go to /tmp/qwen35-prompt-variants.json. Scenarios are application evaluation data, separate from tokenizer parity fixtures.
 - ❌ Default test runs do not load weights or establish model quality.
+
+✅ The clarified comparison variant now uses the complete current English Assistant system prompt, including registered text mappings. It no longer drops protocol lines by position or injects an undeclared main Channel. Historical baseline fixtures remain comparison data. ❌ This change alone supplies no new live-model quality evidence.
+
+✅ JSON v5 uses Channel-grouped callable Actions; Assistant text interpretation uses Assistant.mapText rather than JSON aliases. Regression coverage checks internal permissions cannot be called through model markup and preserves wait event order. ❌ Live-model/device acceptance is separate from automated checks.
+
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.

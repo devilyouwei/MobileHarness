@@ -35,7 +35,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     return turn
 }
 
-@Test func assistantUsesCapabilityAndIsolatesConversationHistory() async throws {
+@Test func assistantUsesCapabilityAndRetainsConversationAcrossVoiceSessions() async throws {
     let model = ChatFixture()
     let agent = try AssistantAgent(chat: model)
     let speechRequests = try await bindSpeechRequests(agent)
@@ -59,35 +59,36 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     let requests = await model.requests
     #expect(requests.count == 3)
     #expect(requests[1].messages.contains(.init(role: .assistant, content: "模型回答")))
-    #expect(requests[2].messages.count == 2)
+    #expect(requests[2].messages.count == 6)
     #expect(requests[0].context.requestID == first.id)
     // Inspect the actual capability request, including subsequent conversation turns.
     let configuration = try AgentConfigurations.load(named: "Assistant")
     for request in requests {
+        #expect(request.maximumOutputTokens == nil)
         let system = try #require(request.messages.first)
         #expect(system.role == .system)
+        #expect(
+            system.content
+                == (try AssistantAgent.systemPrompt(
+                    capabilities: configuration.capabilities)))
         #expect(!system.content.contains("Tool Call"))
         for tool in configuration.capabilities.tools {
             #expect(!system.content.contains(tool.alias))
-            let documentation = try #require(tool.documentation)
-            #expect(!system.content.contains(documentation.doc))
-            for example in documentation.examples { #expect(!system.content.contains(example)) }
+            #expect(!system.content.contains(try #require(tool.definition).function.description))
         }
-        #expect(!system.content.contains("Action smile："))
-        #expect(system.content.contains("Action express："))
+        #expect(!system.content.contains("Action smile:"))
+        #expect(system.content.contains("Action express:"))
         #expect(system.content.contains("<express emotion=\"happy\"/>"))
         for action in configuration.capabilities.actions {
             let documentation = try #require(action.documentation)
-            #expect(system.content.contains("Action \(action.alias)：") == !action.hidden)
-            #expect(system.content.contains(documentation.doc) == !action.hidden)
+            #expect(system.content.contains("Action \(action.alias):") == true)
+            #expect(system.content.contains(documentation.doc) == true)
             for example in documentation.examples {
-                #expect(system.content.contains("Example: " + example) == !action.hidden)
+                #expect(system.content.contains("Example: " + example) == true)
             }
-            if !action.hidden {
-                for parameter in documentation.parameters {
-                    #expect(system.content.contains(parameter.description))
-                    #expect(system.content.contains(parameter.constraints))
-                }
+            for parameter in documentation.parameters {
+                #expect(system.content.contains(parameter.description))
+                #expect(system.content.contains(parameter.constraints))
             }
         }
     }
@@ -192,4 +193,38 @@ func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async 
     #expect(requests[1].messages.count == 2)
     #expect(!requests[1].messages.contains { $0.content == "bad turn" })
     await agent.stop()
+}
+
+private struct LongReplyChat: ChatCapability {
+    var availability: CapabilityAvailability { .available }
+    static let fragment = String(repeating: "word ", count: 14) + ". "
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        #expect(request.maximumOutputTokens == nil)
+        let pair = InferenceSession<ChatEvent>.make(
+            limits: try StreamLimits(capacity: 64), estimatedBytes: { $0.estimatedBytes })
+        for _ in 0..<40 { try pair.emitter.yield(.text(Self.fragment)) }
+        try pair.emitter.yield(.finished(.stop))
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+
+@Test(.timeLimit(.minutes(1))) func assistantAcceptsStreamingReplyBeyondFormerWholeReplyLimit() async throws {
+    let agent = try AssistantAgent(chat: LongReplyChat())
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("A longer reply")))
+    var captions = ""
+    for await envelope in agent.outputs {
+        switch envelope.output {
+        case .actionCall(let call) where call.actionPath == ActionPath(module: "UI", function: "print"):
+            captions += call.parameters["text"] ?? ""
+        case .control(let message):
+            #expect(message == "assistant.finished")
+            await agent.stop()
+        default: break
+        }
+    }
+    #expect(captions.utf8.count > 2000)
+    #expect(captions == String(repeating: LongReplyChat.fragment, count: 40))
 }

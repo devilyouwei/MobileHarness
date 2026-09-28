@@ -1,59 +1,8 @@
 {
-  "schemaVersion": 4,
-  "agentID": "visionPerception",
-  "channels": [],
-  "textActions": [],
-  "actions": [
-    {
-      "alias": "moveEyes",
-      "path": {
-        "module": "UI",
-        "function": "moveEyes"
-      },
-      "defaultChannel": "Gaze",
-      "parameters": [
-        {
-          "name": "x",
-          "valueType": "number",
-          "required": true,
-          "description": "Screen-space horizontal gaze: negative left, positive right.",
-          "constraints": "Finite number in [-1, 1]. Zero is centered."
-        },
-        {
-          "name": "y",
-          "valueType": "number",
-          "required": true,
-          "description": "Screen-space vertical gaze: negative up, positive down.",
-          "constraints": "Finite number in [-1, 1]. Zero is centered."
-        }
-      ],
-      "examples": [
-        "<moveEyes x=\"0.4\" y=\"-0.2\"/>"
-      ],
-      "doc": "Replace the animated eye gaze target. Completion means the target was accepted, not that animation ended. Independent of expression and physical equipment.",
-      "hidden": true
-    }
-  ],
-  "tools": [
-    {
-      "alias": "showPose",
-      "path": "UI.showPose",
-      "parameters": [
-        {
-          "name": "payload",
-          "valueType": "string",
-          "required": true,
-          "description": "JSON pose overlay for one observed camera frame.",
-          "constraints": "At most 3000 UTF-8 bytes. sequence, timestamp, rotation 0...3, and people (0...6 arrays of 17 COCO joints). Each joint is [x,y,confidence], coordinates in 1/10000 image units, confidence 0...1000."
-        }
-      ],
-      "examples": [
-        "{\"name\": \"showPose\", \"arguments\": {\"payload\": \"{\\\"sequence\\\":1,\\\"timestamp\\\":0,\\\"rotation\\\":1,\\\"people\\\":[]}\"}}"
-      ],
-      "doc": "Replace the camera skeleton overlay atomically. Empty people clears previous skeletons. Coordinates describe the upright unmirrored inference image. Does not control physical equipment. Completes without returning data or feeding a ToolResult to the Agent.",
-      "hidden": true
-    }
-  ],
+  "version": 5,
+  "id": "visionPerception",
+  "actions": {},
+  "tools": [],
   "communication": {
     "inputs": [
       {

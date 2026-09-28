@@ -169,7 +169,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let third = ObservationRecorder(id: "third")
     let secondConfig = try AgentConfiguration(
         data: JSONSerialization.data(withJSONObject: [
-            "schemaVersion": 4, "agentID": "second", "actions": [], "tools": [], "channels": [], "textActions": [],
+            "version": 5, "id": "second", "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
                 "subscriptions": [["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]],
@@ -178,7 +178,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
         ]))
     let thirdConfig = try AgentConfiguration(
         data: JSONSerialization.data(withJSONObject: [
-            "schemaVersion": 4, "agentID": "third", "actions": [], "tools": [], "channels": [], "textActions": [],
+            "version": 5, "id": "third", "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
                 "subscriptions": [["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]],
@@ -269,13 +269,17 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     #expect(point.sensorPoint(rotation: 3).x == 0.25)
 }
 
-@Test func visionShowPoseIsOnlyAConfiguredTool() throws {
+@Test func visionOutputsAreCodeOwnedPermissions() throws {
     let config = try AgentConfigurations.load(named: "VisionPerception")
-    #expect(config.capabilities.actions.count == 1)
-    let gaze = try config.capabilities.resolveAction("moveEyes", parameters: ["x": "0", "y": "0"])
-    #expect(gaze.actionPath == ActionPath(module: "UI", function: "moveEyes"))
-    let call = try config.capabilities.resolveTool("showPose", arguments: ["payload": "{}"])
-    #expect(call.toolPath == "UI.showPose")
+    #expect(config.capabilities.actions.isEmpty && config.capabilities.tools.isEmpty)
+    let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: UUID())
+    let registry = agent.descriptor.capabilities
+    #expect(
+        registry.permits(
+            ActionCall(
+                actionPath: .init(module: "UI", function: "moveEyes"),
+                channel: "Gaze", parameters: ["x": "0", "y": "0"])))
+    #expect(registry.permits(ToolCall(toolPath: "UI.showPose", arguments: ["payload": "{}"])))
 }
 
 private struct CrowdPose: PoseCapability {

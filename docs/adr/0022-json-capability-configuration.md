@@ -1,5 +1,7 @@
 # ADR 0022: JSON Capability Configuration v2
 
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
 > Historical scope: Historical JSON v2 format. Later versions changed documentation and communication fields; the [Agents README](../../MobileHarness/Agents/README.md) owns current JSON v4.
 
 Status: accepted. Date: 2026-09-24.

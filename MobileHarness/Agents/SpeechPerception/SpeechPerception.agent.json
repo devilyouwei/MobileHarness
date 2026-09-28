@@ -1,69 +1,7 @@
 {
-  "schemaVersion": 4,
-  "agentID": "speechPerception",
-  "channels": [],
-  "textActions": [],
-  "actions": [
-    {
-      "alias": "setTranscript",
-      "path": {
-        "module": "UI",
-        "function": "setTranscript"
-      },
-      "defaultChannel": "Transcript",
-      "parameters": [
-        {
-          "name": "text",
-          "valueType": "string",
-          "required": true,
-          "description": "Replace the live recognition caption.",
-          "constraints": "At most 4096 UTF-8 bytes; empty text clears the caption."
-        }
-      ],
-      "examples": [
-        "<setTranscript text=\"正在识别\"/>",
-        "<setTranscript text=\"\"/>"
-      ],
-      "doc": "Replace the live recognition caption, separately from Assistant replies. Empty text clears the preview without closing the turn; finishTranscript closes it after recognition.",
-      "hidden": true
-    },
-    {
-      "alias": "setVoiceState",
-      "path": {
-        "module": "UI",
-        "function": "setVoiceState"
-      },
-      "defaultChannel": "Display",
-      "parameters": [
-        {
-          "name": "state",
-          "valueType": "string",
-          "required": true,
-          "description": "Conversation presentation state.",
-          "constraints": "One of listening, hearing, processing."
-        }
-      ],
-      "examples": [
-        "<setVoiceState state=\"processing\"/>"
-      ],
-      "doc": "Set only the conversation presentation state; does not start or stop capture.",
-      "hidden": true
-    },
-    {
-      "alias": "finishTranscript",
-      "path": {
-        "module": "UI",
-        "function": "finishTranscript"
-      },
-      "defaultChannel": "Transcript",
-      "parameters": [],
-      "examples": [
-        "<finishTranscript/>"
-      ],
-      "doc": "Clear and close recognition captions for this conversation turn. Later partial updates for the closed turn are ignored.",
-      "hidden": true
-    }
-  ],
+  "version": 5,
+  "id": "speechPerception",
+  "actions": {},
   "tools": [],
   "communication": {
     "inputs": [

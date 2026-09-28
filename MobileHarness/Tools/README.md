@@ -32,13 +32,13 @@ flowchart LR
 ```mermaid
 flowchart TD
     Call[Resolved ToolCall] --> Kind{Registered path}
-    Kind -->|System.runtimeInfo| Info[Return fixed configuration text]
+    Kind -->|runtimeInfo| Info[Return fixed configuration text]
     Kind -->|UI.showPose| Validate[Validate PoseOverlay]
     Validate --> Present[Await App presentation callback]
     Present --> Complete[Void completion without feedback]
 ```
 
-`System.runtimeInfo` is a configuration description, not a live health probe. `UI.showPose` accepts at most 3000 UTF-8 bytes and six COCO-17 skeletons; an empty people list clears the display. App validates session and frame order. Completion means display state was accepted, not that a screen frame was rendered.
+`runtimeInfo` is a configuration description, not a live health probe. `UI.showPose` accepts at most 3000 UTF-8 bytes and six COCO-17 skeletons; an empty people list clears the display. App validates session and frame order. Completion means display state was accepted, not that a screen frame was rendered.
 
 Tools owns no queue and bypasses Channel scheduling. VisionPerception retains the latest pending skeleton before dispatch. Tool failures remain observable; no Tool sends results directly to an Agent.
 

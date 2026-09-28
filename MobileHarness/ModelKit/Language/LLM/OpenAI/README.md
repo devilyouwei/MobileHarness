@@ -31,7 +31,7 @@ flowchart LR
     Network -->|finish or error| Release
 ```
 
-✅ Requests: at most 64 messages, 64 KiB text and 32768 requested output tokens. No inference waiting queue; overlap fails `inputBusy`. SSE line/event: 64 KiB, cumulative response: 8 MiB. Output: 128 events × 65568 estimated bytes. Exceeding limits fails explicitly, never drops text silently. CR/LF/CRLF, fragmented UTF-8, comments and multiline data fields are supported.
+✅ Requests: at most 64 messages, 64 KiB text and at most 32768 explicitly requested output tokens (omitted by default). No inference waiting queue; overlap fails `inputBusy`. SSE line/event: 64 KiB, cumulative response: 8 MiB. Output: 128 events × 65568 estimated bytes. Exceeding limits fails explicitly, never drops text silently. CR/LF/CRLF, fragmented UTF-8, comments and multiline data fields are supported.
 
 ✅ `stop` and `length` map to the shared finish reasons. A finish reason is required; premature EOF or `[DONE]` fails. The HTTP request ends on the terminal choice; trailing usage is not exposed. Unsupported native tools, refusal and finish reasons fail explicitly. Errors do not expose provider bodies, URLs or credentials. No automatic retry/fallback; partial text may already have reached the consumer.
 
@@ -44,3 +44,5 @@ Protocol reference: [official OpenAI Chat API](https://developers.openai.com/api
 ✅ OpenAIChatConfiguration.models performs GET /models with optional authentication for explicit user selection: 30-second timeout, no redirects/cache/cookies, 1 MiB response, at most 2048 IDs of at most 512 bytes, deduplicated in server order. Discovery errors are sanitized. App stores nonsecret configuration through Storage and credentials in Keychain and applies it through Defaults.configureChat without restart. ❌ A listed model is not guaranteed to support chat; generation errors remain explicit.
 
 ✅ Empty credentials omit Authorization for both discovery and chat. Blank endpoint text resolves to https://api.openai.com/v1; HTTPS validation remains enforced. Discovery excludes known embedding, reranking, moderation, media, legacy completion and specialized non-chat families. Standard /models objects do not expose capabilities, so name-based filtering is heuristic: unknown third-party deployment names remain available. ❌ Discovery does not prove provider compatibility. See [official model objects](https://developers.openai.com/api/reference/resources/models).
+
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.

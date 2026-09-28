@@ -170,7 +170,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
 
 @Test func speechXMLBoundariesFlushShortUnpunctuatedTextInOrder() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    var generator = try AgentGenerator(capabilities: config.capabilities, textActions: ["say", "print"])
+    var generator = AgentGenerator(capabilities: config.capabilities, textMapping: AssistantAgent.mapText)
     #expect(try generator.append("你好，先想一下").isEmpty)
     let events =
         try generator.append("<express emotion='thinking'/><channel.Speech>然后回答</channel.Speech>尾巴")

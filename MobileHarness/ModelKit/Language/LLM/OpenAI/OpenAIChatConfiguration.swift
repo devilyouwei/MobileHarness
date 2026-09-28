@@ -105,7 +105,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
     func request(_ chat: ChatRequest) throws -> URLRequest {
         guard chat.messages.count <= 64,
             chat.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536,
-            chat.maximumOutputTokens <= 32768
+            chat.maximumOutputTokens.map { $0 <= 32768 } ?? true
         else { throw CapabilityError.invalidRequest("Cloud chat exceeds message or output limits") }
         var request = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
         request.httpMethod = "POST"
@@ -113,11 +113,13 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
+        var body: [String: Any] = [
             "model": model,
             "messages": chat.messages.map { ["role": $0.role.rawValue, "content": $0.content] },
-            "temperature": chat.temperature, "max_tokens": chat.maximumOutputTokens, "stream": true,
-        ])
+            "temperature": chat.temperature, "stream": true,
+        ]
+        if let maximum = chat.maximumOutputTokens { body["max_tokens"] = maximum }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request
     }
 }

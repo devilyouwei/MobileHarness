@@ -27,7 +27,15 @@ When a runtime contract changes, update the owning module README first, then the
 
 ✅ ADR 0053 records optional cloud credentials and endpoint defaults. ❌ Live provider acceptance remains pending.
 
-✅ Architecture and Roadmap describe the opt-in raw LLM inspection page and its boundary from business execution. ❌ Its parser preview does not establish physical-device or scheduler acceptance.
+✅ Architecture and Roadmap describe the persistent conversation-history page, which supersedes the standalone raw-output test. It records real Assistant traffic; historical parser preview never executes Actions. ❌ Its preview does not establish physical-device or scheduler acceptance.
 
 
 ✅ [ADR 0059](adr/0059-structured-wait-scheduling.md) records nested wait synchronization, task-local queues and the removal of implicit main. ❌ Live-model and device acceptance remain separate from compile/test evidence.
+
+✅ Current generation/output/routing diagrams include typed wait boundaries. The [historical technical baseline](Tech_Design.md) and ADR 0015 explicitly point to the replacement scheduling rules; their original algorithms remain historical evidence. The Channel lock section is a future ownership proposal, not current wait behavior.
+
+✅ [ADR 0060](adr/0060-persistent-conversation-history.md) records durable current/past conversations, ten-round context and archived-title generation. ❌ Earlier in-memory conversations are not recoverable.
+
+✅ [ADR 0061](adr/0061-agent-json-v5.md) defines the current JSON v5 model catalog and code-owned internal permissions. Older ADRs describe historical schemas where marked superseded. ❌ Full native Tool schemas/streaming remain future work.
+
+✅ [ADR 0062](adr/0062-default-chat-output-budget.md) documents optional output budgets and default-provider behavior.

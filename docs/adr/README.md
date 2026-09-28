@@ -79,4 +79,10 @@ These are **dated decision records**, including proposals and stages later repla
 ✅ ADR 0053 now records optional cloud authentication, official endpoint fallback and the visible default chat model. ❌ Model discovery cannot guarantee third-party chat compatibility.
 
 
-✅ [0059 — Structured wait scheduling](0059-structured-wait-scheduling.md): task-local groups, typed boundaries, module exclusion and cancellation. Supersedes the shared-lane scheduling portion of ADR 0018. ❌ Cross-task barriers, preemption and rollback remain deferred.
+✅ [0059 — Structured wait scheduling](0059-structured-wait-scheduling.md): task-local groups, typed boundaries, module exclusion and cancellation. Supersedes module FIFO in ADR 0015 and the shared-lane scheduling portion of ADR 0018. ❌ Cross-task barriers, preemption and rollback remain deferred.
+
+✅ [0060 — Persistent conversation history](0060-persistent-conversation-history.md): actual user/raw model/request records, explicit logical conversation reset and title-only archival summaries. ❌ Live-model title quality and device performance remain unverified.
+
+✅ [0061 — Agent JSON v5](0061-agent-json-v5.md): Channel-grouped model Actions and code-owned internal permissions replace redundant hidden/text declarations. ❌ Full JSON Schema/native Tool streaming are not included.
+
+✅ [0062 — Optional output-token budgets](0062-default-chat-output-budget.md): provider defaults for Assistant, bounded local context and backward-compatible history records. ❌ Live-provider acceptance remains separate.

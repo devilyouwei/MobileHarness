@@ -47,7 +47,7 @@ flowchart TD
     Voice --> Shared[ApplicationRuntime in AgentBootstrap]
     Camera --> Session[PhotographySession]
     Session --> Shared
-    Shared --> Policy[Four JSON v4 configurations and communication policy]
+    Shared --> Policy[Four JSON v5 configurations and communication policy]
     Shared --> Transport[AgentManager / InputGateway / OutputGateway]
     Shared --> Handlers[Explicit Action and Tool handlers]
     Transport --> Presentation[RuntimePresentation callbacks]
@@ -89,7 +89,7 @@ flowchart TD
     Stop --> Cleanup["Serialized cleanup task<br/>Wait for earlier cleanup and startup"]
     Cleanup --> Perception["Stop SpeechPerception<br/>Join perception and capture tasks"]
     Perception --> Send["InputGateway.send<br/>assistant.cancel for the old session"]
-    Send --> Receive["Assistant.receive: immediate control handling<br/>Clear session inbox and history"]
+    Send --> Receive["Assistant.receive: immediate control handling<br/>Clear session inbox; retain durable history"]
     Receive --> Generation["Cancel and join active generation<br/>Model session.cancel"]
     Generation --> Actions["App calls OutputGateway.cancel(sessionID)"]
     Actions --> Scheduler["ChannelScheduler<br/>Remove pending actions<br/>Cancel running handlers and await return"]
@@ -105,13 +105,13 @@ flowchart TD
 
 The immediate stop actions and the serialized cleanup chain are distinct: audio and current tasks are stopped promptly, while cleanup awaits earlier work before completing the session teardown. The generation branch applies when Assistant has an active input from that session.
 
-`assistant.cancel` bypasses Assistant's ordinary inbox, including when it is full or the Agent is paused. It removes queued inputs and history for that session, cancels the matching generation task and awaits its return. Generation cancellation calls the model session's cancellation API. It does not retract Actions already admitted to ChannelScheduler.
+`assistant.cancel` bypasses Assistant's ordinary inbox, including when it is full or the Agent is paused. It removes queued inputs for that session, preserves durable conversation history, cancels the matching generation task and awaits its return. Generation cancellation calls the model session's cancellation API. It does not retract Actions already admitted to ChannelScheduler.
 
 App therefore also calls `OutputGateway.cancel(sessionID)`. The scheduler removes pending Actions, signals cancellation to running handlers and waits for them to return before completing cleanup. Cancellation is cooperative; a handler that does not cooperate can delay the barrier. Completed device effects are not rolled back. Producers must stop first so that they cannot submit more work after cancellation.
 
 | Scope | Current cancellation path |
 | --- | --- |
-| Assistant work for one session | InputGateway.send → assistant.cancel → clear matching inbox/history and cancel/join generation |
+| Assistant work for one session | InputGateway.send → assistant.cancel → clear matching inbox, preserve history and cancel/join generation |
 | Actions for one Agent/input | OutputGateway routes assistant.error or agent.error controls → ChannelScheduler.cancel(source, inputID) |
 | Actions for one session | App → OutputGateway.cancel(sessionID) → ChannelScheduler |
 | All Action scheduling | OutputGateway.shutdown → ChannelScheduler.shutdown; closes future admission and joins current work |
@@ -126,7 +126,7 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 
 ## Feature status
 
-- ✅ Shared communication assembly, JSON v4 validation, explicit handlers and separate camera/voice sessions.
+- ✅ Shared communication assembly, JSON v5 validation, explicit handlers and separate camera/voice sessions.
 - ✅ Turn-scoped captions, semantic emotions, actual playback state and frequency telemetry.
 - ✅ Explicit diagnostics and a labeled Debug-only conversation preview; the preview uses simulated state.
 - ❌ Independent multi-window Agent namespaces, persistent background supervision and robot control.
@@ -150,7 +150,7 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 
 ✅ The home navigation item supplies the 首页 title for native back navigation while keeping its toolbar hidden. Settings uses system back items and edge-swipe behavior.
 
-✅ RuntimePresentation binds one SpeechPlayback and a stream playback callback when the voice runtime starts, keeps the audio store in the voice lifecycle owner, and closes that store on runtime teardown. Assistant JSON declares directed synthesis and hidden audioID playback; App also registers the synthesis Agent. App consumes PCM only inside the scheduled handler, fences session/turn before and after each awaited read, and measures the actual mixer output for spectrum. Existing startup and voice-start model preparation loads synthesis before the first reply. ❌ Physical-device playback acceptance remains pending.
+✅ RuntimePresentation binds one SpeechPlayback and a stream playback callback when the voice runtime starts, keeps the audio store in the voice lifecycle owner, and closes that store on runtime teardown. Assistant JSON declares directed synthesis; Assistant code declares internal audioID playback; App also registers the synthesis Agent. App consumes PCM only inside the scheduled handler, fences session/turn before and after each awaited read, and measures the actual mixer output for spectrum. Existing startup and voice-start model preparation loads synthesis before the first reply. ❌ Physical-device playback acceptance remains pending.
 
 
 ✅ App composes StorageAudio, registers SpeechSynthesisAgent, binds Assistant messaging before start, and binds scheduled Speech playback by audioID. Teardown stops/joins the synthesis Agent and closes its cache. ❌ This migration has not been accepted on a physical phone.
@@ -172,6 +172,14 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 
 ✅ Cloud settings initially show the official OpenAI base URL; a saved blank URL resolves to the same endpoint. Empty Key is valid and sends no Authorization. Before model discovery, gpt-4o-mini is the visible default, allowing cloud mode to be saved without successful authentication/discovery. Successful discovery still requires an explicit selection when the default is absent. Server failures remain visible. ❌ Live provider acceptance is pending.
 
-✅ Settings exposes an independent LLM raw-output diagnostic. App restores saved settings, joins voice cleanup, then injects a capability backed by the same process-wide manager/current binding. It can acquire chat without successful ASR/TTS startup. AppSettings displays the saved model identity rather than unsaved form edits. The diagnostic owns cancellation and never resumes recording automatically. ❌ Live-device diagnostic acceptance remains pending; see [Diagnostics](../Experience/Diagnostics/README.md).
+✅ Settings owns LLM configuration and conversation-history pages. App joins voice cleanup before exposing the shared journal and supplies the managed chat capability for archived-title generation. History retains the actual saved model/request identity; parser previews never execute Actions. ❌ Live-device interaction acceptance remains pending; see [Settings](../Experience/Settings/README.md).
 
 ✅ The ordered output pump forwards typed wait boundaries through OutputGateway alongside Actions. The observation sink ignores these runtime coordination events; it does not trigger UI/device effects or claim group completion. Existing dispatch-failure audio cleanup and session stop remain responsible for unused prefetched handles. ❌ Wait does not extend audio-cache lifetime or provide physical-device timeout guarantees.
+
+## Conversation-history composition
+
+✅ ApplicationRuntime owns one ConversationHistoryStore, backed by Application Support/MobileHarness/Conversations/history.json through LocalDocumentStore, with iOS file protection and exclusion from automatic backup. Its schema and bounds live in [Storage](../Storage/README.md); production never falls back to memory on disk/configuration errors. AgentBootstrap injects this same store into Assistant and supplies the saved model label without exporting credentials. The Settings history page waits for voice producer/executor cleanup before accessing or archiving it. Opening settings stops voice but no longer erases logical conversation context.
+
+✅ The output pump saves execution failures after joining cleanup, separately from generation status. History owns no Action queue and never replays raw XML. Archived-title generation uses the shared managed Chat capability after voice cleanup. ❌ This is local conversation persistence, not cross-device synchronization, durable Action replay or general semantic memory.
+
+✅ JSON v5 model Tool names are the explicit handler keys; runtimeInfo binds SystemTools.runtimeInfo. Fixed internal Agent outputs retain explicit App handlers and Gateway authorization. ❌ Native model Tool transport is not added by the schema migration.

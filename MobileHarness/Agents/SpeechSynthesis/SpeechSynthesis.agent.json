@@ -1,9 +1,7 @@
 {
-  "schemaVersion": 4,
-  "agentID": "speechSynthesis",
-  "channels": [],
-  "textActions": [],
-  "actions": [],
+  "version": 5,
+  "id": "speechSynthesis",
+  "actions": {},
   "tools": [],
   "communication": {
     "inputs": [

@@ -59,7 +59,7 @@ import ToolRuntime
 private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) throws -> AgentConfiguration {
     try AgentConfiguration(
         data: JSONSerialization.data(withJSONObject: [
-            "schemaVersion": 4, "agentID": id, "channels": [], "textActions": [], "actions": [], "tools": [],
+            "version": 5, "id": id, "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "user.text", "version": 1, "kind": "text"]],
                 "subscriptions": subscribes
@@ -137,7 +137,7 @@ private actor Recorder {
     try await manager.start(.assistant)
     let requests = InputGateway(manager: manager)
     let tools = ToolRegistry()
-    try await tools.register("System.runtimeInfo") { _ in "runtime healthy" }
+    try await tools.register("runtimeInfo") { _ in "runtime healthy" }
     let recorder = Recorder()
     let actions = ChannelScheduler(
         registry: ActionRegistry(handlers: [

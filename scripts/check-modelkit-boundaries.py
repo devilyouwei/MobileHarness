@@ -59,7 +59,7 @@ for module, forbidden in {
         if name in forbidden or name.startswith('ModelKit'):
             errors.append(f'Forbidden {module} dependency: {name}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'AgentCore', 'ModelKit', 'StorageAudio', 'Foundation'}
+agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageAudio', 'Foundation'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
         if imported not in agent_allowed:
@@ -67,7 +67,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
 agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
 for dependency in agent_target.get('dependencies', []):
     name = next(iter(dependency.values()))[0]
-    if name not in {'AgentCore', 'ModelKit', 'StorageAudio'}:
+    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageAudio'}:
         errors.append(f'Forbidden Agents dependency: {name}')
 # Storage core stays Foundation-only; media adapters may use the corresponding domain contracts.
 storage_target = next(t for t in package['targets'] if t['name'] == 'Storage')

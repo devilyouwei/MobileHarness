@@ -11,9 +11,9 @@ Gateway/
 ├── Output/
 │   ├── OutputGateway.swift           # Output dispatch and bound event ports
 │   ├── Validation/                   # Capability and call validation
-│   ├── Routing/                      # Select Action, Tool or control path
+│   ├── Routing/                      # Select Action, scheduling, Tool or control path
 │   ├── Dispatch/                     # Invoke runtimes and return Tool results
-│   └── Scheduling/                   # Channel FIFO and module exclusion
+│   └── Scheduling/                   # Task-local wait groups, Channel FIFO and module exclusion
 └── README.md                         # Module boundary and status
 ```
 
@@ -43,8 +43,9 @@ flowchart TD
     ValidateIn --> Inbox[Admit to Agent inbox]
     Out[Agent output] --> ValidateOut[Validate source and permission]
     ValidateOut --> Route{Output kind}
-    Route -->|Action| Queue[ChannelScheduler]
-    Queue --> Action[ActionDispatcher / ActionExecutor]
+    Route -->|Action / scheduling| Dispatch[ActionDispatcher admission]
+    Dispatch --> Queue[ChannelScheduler task tree]
+    Queue -->|Active Action only| Action[ActionExecutor]
     Route -->|Tool| Tool[ToolDispatcher / ToolExecutor]
     Tool -->|Non-nil result / explicit target| Select
     Route -->|Event| Event[Bound port / InputGateway]
@@ -57,13 +58,13 @@ Input admission reports acceptance, not Agent processing completion. Action disp
 | --- | --- |
 | InputGateway | 128 concurrent admissions shared by external/internal calls, 256 branches, 8 MiB observation bytes, up to 16 targets each; reject excess |
 | OutputGateway event port | 16 concurrent emissions per source; reject excess |
-| ChannelScheduler | 32 jobs per channel including running work, 16 active channels, 64 tracked Agent/input pairs; reject excess |
+| ChannelScheduler | 32 unfinished Actions per Channel name across tasks, including running/dormant work; 16 live names, 64 tracked tasks, 120 Actions and 32 waits per task; reject excess |
 
-Channels run FIFO and share Action-module exclusion. Different modules may run concurrently. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only Agent-owned declared latest-state buffers coalesce pending state. Gateways do not queue signals. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
+Each active task phase runs FIFO per Channel and shares process-wide Action-module exclusion. Different Channels may run concurrently when modules permit; equal names in separate tasks do not share a FIFO. Wait gates only its parent continuation. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only Agent-owned declared latest-state buffers coalesce pending state. Gateways do not queue signals. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
 
 ## Feature status
 
-- ✅ Static JSON v4 subscriptions via publish and explicit directed delivery via send, source/session validation and admission receipts. No legacy router or implicit Assistant fallback remains.
+- ✅ Static JSON v5 subscriptions via publish and explicit directed delivery via send, source/session validation and admission receipts. No legacy router or implicit Assistant fallback remains.
 - ✅ Action scheduling, direct Tools, event transport and completion/cancellation barriers.
 - ❌ Request/reply, dynamic subscriptions, ActionResult feedback, priorities and preemption.
 - ❌ Enforced Channel locks and physical control arbitration; current lock metadata grants no ownership.

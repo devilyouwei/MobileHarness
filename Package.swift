@@ -52,7 +52,8 @@ let package = Package(
             path: "MobileHarness/Actions",
             exclude: ["UI/README.md", "README.md", "Speech/README.md"]),
         .target(
-            name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageAudio"], path: "MobileHarness/Agents",
+            name: "Agents", dependencies: ["AgentCore", "ModelKit", "Storage", "StorageAudio"],
+            path: "MobileHarness/Agents",
             exclude: [
                 "SpeechSynthesis/README.md", "Assistant/README.md",
                 "SpeechPerception/README.md",

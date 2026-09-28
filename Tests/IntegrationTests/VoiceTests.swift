@@ -525,9 +525,9 @@ private actor EndpointVADSession: VoiceActivitySession {
 
 @Test func transcriptActionAllowsClearAndRejectsInvalidPayloads() async throws {
     let probe = VoiceProbe()
-    let config = try AgentConfigurations.load(named: "SpeechPerception")
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
-    let call = try config.capabilities.resolveAction("setTranscript", parameters: ["text": ""])
+    let call = ActionCall(
+        actionPath: .init(module: "UI", function: "setTranscript"), channel: "Transcript", parameters: ["text": ""])
     let invocation = ActionInvocation(
         envelope: OutputEnvelope(source: .speechPerception, input: input, output: .actionCall(call)), call: call)
     try await UIActions.setTranscript(invocation: invocation) { value, _ in await probe.displayed(value) }

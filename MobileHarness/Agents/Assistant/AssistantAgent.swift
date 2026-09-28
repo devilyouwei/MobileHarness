@@ -1,11 +1,11 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Storage
 
 /// Model-backed assistant; concrete model selection belongs exclusively to the composition root.
 public actor AssistantAgent: Agent {
     public nonisolated let descriptor: AgentDescriptor
-    private let textActions: [String]
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private var port: AgentMessaging?
@@ -20,34 +20,57 @@ public actor AssistantAgent: Agent {
     private let chat: any ChatCapability
     private var worker: Task<Void, Never>?
     private var activeInput: AgentInput?
-    private var historySession: UUID?
     private var begunSession: UUID?
     private var begunTurn: ConversationTurn?
     private var outputSequence: UInt64 = 0
-    private var history: [ChatMessage] = []
+    private let conversations: ConversationHistoryStore
+    private let modelName: @Sendable () async throws -> String
+    private var generationFinishReason: String?
 
     public init(
         capacity: Int = 32, chat: any ChatCapability,
-        configuration: AgentConfiguration? = nil
+        configuration: AgentConfiguration? = nil,
+        conversations: ConversationHistoryStore = ConversationHistoryStore(),
+        modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" }
     ) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Assistant")
         guard configuration.agentID == .assistant else { throw AgentConfigurationError.identityMismatch }
-        guard !configuration.textActions.isEmpty else { throw AgentConfigurationError.invalidField("textActions") }
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Assistant", inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.actionCall, .toolCall, .control, .scheduling], capabilities: configuration.capabilities)
-        textActions = configuration.textActions
+            outputs: [.actionCall, .toolCall, .control, .scheduling],
+            capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         precondition(capacity > 0)
         self.capacity = capacity
         self.chat = chat
+        self.conversations = conversations
+        self.modelName = modelName
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
         outputs = stream.stream
         continuation = stream.continuation
     }
     /// Shared with explicit model diagnostics; capability declarations remain in Assistant JSON.
-    public nonisolated static func systemPrompt(capabilities: CapabilityRegistry) -> String {
-        "你是手机上的语音助手。直接、简洁地回答，通常不超过三句话。使用用户的语言回复，当前语音支持中文和英语。每句尽量简短，只输出可朗读的纯文本和已声明的行为标签，不使用 Markdown 或 emoji；英语中的小数和金额用英文单词表达。不输出思考过程。不要声称已执行未执行的操作。\n"
-            + CapabilityContextBuilder.build(capabilities)
+    public nonisolated static func systemPrompt(capabilities: CapabilityRegistry) throws
+        -> String
+    {
+        "You are a voice assistant on a phone. Answer directly and concisely, usually in no more than three short sentences. Reply in the user's language; speech currently supports Mandarin and English. Ordinary replies should be natural text; all text is automatically converted to audio and played. Use tags when an Action or explicit ordering is needed. Output speakable plain text and declared Action tags only, without Markdown, emoji or reasoning commentary. Spell out English decimals and currency in words. Do not claim an operation succeeded without confirmation.\n"
+            + (try CapabilityContextBuilder.build(capabilities, speechChannel: "Speech"))
+    }
+
+    private static let beginReply = InternalAction(module: "UI", function: "beginReplyTurn", channel: "Display")
+    private static let playback = InternalAction(
+        module: "Speech", function: "speak", channel: "Speech", required: ["audioID"])
+    private static let caption = InternalAction(module: "UI", function: "print", channel: "Display", required: ["text"])
+
+    public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
+        try model.adding(internalActions: [beginReply, playback, caption])
+    }
+
+    /// Agent-owned text expansion. Speech text is replaced with an audioID before Gateway admission.
+    public nonisolated static func mapText(_ text: String, channel: String?) throws -> [ActionCall] {
+        [
+            ActionCall(actionPath: playback.path, channel: channel ?? playback.channel, parameters: ["text": text]),
+            try caption.call(["text": text], channel: channel),
+        ]
     }
 
     public func start() throws {
@@ -66,7 +89,6 @@ public actor AssistantAgent: Agent {
     public func stop() async {
         lifecycle = .stopped
         queue.removeAll()
-        history.removeAll()
         worker?.cancel()
         await worker?.value
         continuation.finish()
@@ -88,10 +110,6 @@ public actor AssistantAgent: Agent {
         // Control admission bypasses the ordinary queue, including when it is full or paused.
         if case .event("assistant.cancel") = input.payload {
             queue.removeAll { $0.sessionID == input.sessionID }
-            if historySession == input.sessionID {
-                history.removeAll()
-                historySession = nil
-            }
             if activeInput?.sessionID == input.sessionID {
                 let task = worker
                 task?.cancel()
@@ -146,7 +164,7 @@ public actor AssistantAgent: Agent {
         guard let turn = input.turn else { return }
         if begunSession == input.sessionID, let begunTurn, turn.ordinal <= begunTurn.ordinal { return }
         if begunTurn == turn { return }
-        let call = try descriptor.capabilities.resolveAction("beginReplyTurn", parameters: [:])
+        let call = try Self.beginReply.call()
         guard emit(.actionCall(call), for: input) else { throw HarnessError.queueFull }
         begunSession = input.sessionID
         begunTurn = turn
@@ -157,24 +175,26 @@ public actor AssistantAgent: Agent {
             worker = nil
             drain()
         }
+        var recorded = false
+        generationFinishReason = nil
         do {
+            let record = try await conversations.begin(
+                id: input.id, user: text,
+                system: Self.systemPrompt(capabilities: descriptor.capabilities),
+                model: try await modelName())
+            recorded = true
+            try Task.checkCancellation()
             try beginReplyTurn(input)
-            if historySession != input.sessionID {
-                history.removeAll()
-                historySession = input.sessionID
+            let messages = record.request.map { message in
+                ChatMessage(
+                    role: message.role == .system ? .system : (message.role == .user ? .user : .assistant),
+                    content: message.content)
             }
-            let messages =
-                [
-                    ChatMessage(
-                        role: .system,
-                        content: Self.systemPrompt(capabilities: descriptor.capabilities))
-                ]
-                + history + [.init(role: .user, content: text)]
             let request = try ChatRequest(
                 messages: messages,
                 context: InferenceContext(requestID: input.id, conversationID: input.sessionID),
-                maximumOutputTokens: 256, temperature: 0.7)
-            let reply = try await withThrowingTaskGroup(of: String.self) { group in
+                maximumOutputTokens: record.maximumOutputTokens, temperature: record.temperature)
+            _ = try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask { try await self.collect(request, input: input, using: chat) }
                 group.addTask {
                     try await Task.sleep(for: .seconds(30))
@@ -184,17 +204,23 @@ public actor AssistantAgent: Agent {
                 return try await group.next() ?? ""
             }
             try Task.checkCancellation()
+            try await conversations.finish(input.id, state: .completed, reason: generationFinishReason)
             guard lifecycle == .running || lifecycle == .paused else { return }
-            history += [.init(role: .user, content: text), .init(role: .assistant, content: reply)]
-            while history.count > 8 || history.reduce(0, { $0 + $1.content.count }) > 1600 {
-                history.removeFirst(min(2, history.count))
-            }
             emit(.control("assistant.finished"), for: input)
-        } catch is CancellationError {} catch {
+        } catch {
+            var failure = String(describing: error)
+            if recorded {
+                do {
+                    try await conversations.finish(
+                        input.id, state: Task.isCancelled || error is CancellationError ? .cancelled : .failed,
+                        reason: generationFinishReason, error: failure)
+                } catch { failure += "; history persistence failed: \(error)" }
+            }
             guard !Task.isCancelled, lifecycle == .running || lifecycle == .paused else { return }
-            emit(.control("assistant.error: \(error)"), for: input)
+            emit(.control("assistant.error: \(failure)"), for: input)
         }
     }
+
     private func collect(_ request: ChatRequest, input: AgentInput, using chat: any ChatCapability) async throws
         -> String
     {
@@ -203,17 +229,19 @@ public actor AssistantAgent: Agent {
         return try await withTaskCancellationHandler {
             var text = ""
             var finished = false
-            var generator = try AgentGenerator(capabilities: descriptor.capabilities, textActions: textActions)
+            var generator = AgentGenerator(capabilities: descriptor.capabilities, textMapping: Self.mapText)
             var emittedCalls = 0
             for try await event in session.events {
                 try Task.checkCancellation()
+                if case .text(let delta) = event { try await conversations.append(delta, to: input.id) }
                 guard !finished else { throw CapabilityError.invalidRequest("Events after chat completion") }
                 switch event {
                 case .text(let delta):
-                    guard text.utf8.count + delta.utf8.count <= 2000 else { throw CapabilityError.eventTooLarge }
                     text += delta
                     try await emitFunctions(generator.append(delta), for: input, count: &emittedCalls)
-                case .finished: finished = true
+                case .finished(let reason):
+                    generationFinishReason = reason == .stop ? "stop" : "lengthLimit"
+                    finished = true
                 }
             }
             guard finished, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -234,7 +262,7 @@ public actor AssistantAgent: Agent {
         }
         do {
             guard text.utf8.count <= 2000 else { throw CapabilityError.eventTooLarge }
-            var generator = try AgentGenerator(capabilities: descriptor.capabilities, textActions: textActions)
+            var generator = AgentGenerator(capabilities: descriptor.capabilities, textMapping: Self.mapText)
             var count = 0
             try await emitFunctions(
                 generator.append(AgentGenerator.escapeText(text)) + generator.finish(), for: input, count: &count)
@@ -266,8 +294,7 @@ public actor AssistantAgent: Agent {
                 }
                 do {
                     try Task.checkCancellation()
-                    call = try descriptor.capabilities.resolveAction(
-                        "playAudio", parameters: ["audioID": request.audioID.uuidString], channel: original.channel)
+                    call = try Self.playback.call(["audioID": request.audioID.uuidString], channel: original.channel)
                     guard emit(.actionCall(call), for: input) else { throw HarnessError.queueFull }
                 } catch {
                     // Explicit command admission has its own deadline and preserves the owning input ID.

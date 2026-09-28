@@ -52,7 +52,10 @@ public actor Qwen35Chat: ChatCapability {
                 request.messages.map {
                     MLXLanguageTurn(role: $0.role.rawValue, content: $0.content)
                 })
-            guard !tokens.isEmpty, tokens.count <= contextLimit - request.maximumOutputTokens else {
+            let maximumTokens = request.maximumOutputTokens ?? (contextLimit - tokens.count)
+            guard !tokens.isEmpty, maximumTokens > 0, maximumTokens <= contextLimit,
+                tokens.count <= contextLimit - maximumTokens
+            else {
                 throw CapabilityError.invalidRequest(
                     "Prompt plus output budget exceeds 4096 tokens; shorten history explicitly")
             }
@@ -70,7 +73,7 @@ public actor Qwen35Chat: ChatCapability {
             let task = Task {
                 do {
                     let stopped = try await lease.model.generate(
-                        tokens: tokens, maximumTokens: request.maximumOutputTokens, temperature: request.temperature,
+                        tokens: tokens, maximumTokens: maximumTokens, temperature: request.temperature,
                         stopTokens: [248044, 248046]
                     ) { delta in
                         try emitter.yield(.text(delta))
@@ -94,13 +97,14 @@ public actor Qwen35Chat: ChatCapability {
     }
 
     static func validate(_ request: ChatRequest) throws {
-        guard request.messages.count <= 64, request.maximumOutputTokens <= 1024,
+        guard request.messages.count <= 64,
             request.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536,
             request.messages.last?.role == .user,
             request.messages.allSatisfy({ !$0.content.isEmpty })
         else {
             throw CapabilityError.invalidRequest(
-                "Qwen35 requires 1–64 nonempty messages ending in user, at most 64 KiB, and 1–1024 output tokens")
+                "Qwen35 requires 1–64 nonempty messages ending in user, at most 64 KiB, and an output budget fitting the local context window"
+            )
         }
         guard !request.messages.dropFirst().contains(where: { $0.role == .system }) else {
             throw CapabilityError.invalidRequest("System instructions must be the first message")

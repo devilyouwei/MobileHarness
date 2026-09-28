@@ -11,7 +11,7 @@ Purpose: classify output without performing its side effects. ActionCalls use Ac
 ```mermaid
 flowchart LR
     Output[AgentOutput] --> Router[ExecutionRouter]
-    Router -->|actionCall| Actions[ActionDispatcher]
+    Router -->|actionCall / scheduling| Actions[ActionDispatcher]
     Router -->|toolCall| Tools[ToolDispatcher]
     Router -->|control| Lifecycle[Finish / cancel / observe]
 ```

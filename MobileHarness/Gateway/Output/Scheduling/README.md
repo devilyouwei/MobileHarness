@@ -49,6 +49,8 @@ Handler completion means the implementation's actual completion (including drain
 
 ## Channel Lock Design
 
+This is a future device-ownership proposal, not wait synchronization. Task-local phase lanes cannot serve as a process-wide ownership registry; enforcement will require a separate bounded resource-domain registry spanning all tasks.
+
 A lock gives one authorized Agent exclusive control of one or more channels. **Acquisition interrupts existing control:** block new calls, cancel queued work, stop running work, then grant ownership.
 
 - ✅ `Channel.swift` defines owner identity and `unlocked` / `locked` metadata. Every channel is currently immutable `unlocked`.
@@ -102,12 +104,12 @@ flowchart TD
 
 A channel name is a scheduling scope. Exclusive **device** control additionally requires:
 
-- App-defined ActionPath → resource-domain mapping, covering alternative channels such as `main`.
+- App-defined ActionPath → resource-domain mapping, covering every allowed Channel, regardless of its name or task.
 - The same ownership fence for side-effecting Tools, or exclusion of those Tools from that device.
 - Adapter cancellation and generation checks so revoked commands or late callbacks cannot restore old control.
 - Complete route coverage before enabling a physical-control lock. Module mutual exclusion alone is insufficient.
 
-Current Agent JSON v3 has no lock permissions. Configuration and trusted invocation context need coordinated changes before enabling this API.
+Current Agent JSON v5 has no lock permissions. Configuration and trusted invocation context need coordinated changes before enabling this API.
 
 ### Release and owner loss
 
@@ -143,7 +145,7 @@ func release(_ lease: ChannelLease) async throws
 
 ### Bounds and required checks
 
-- Channel groups and live lock/transition records share `maximumChannels` (currently 16). Empty owned or faulted lanes retain their gate and count toward that bound.
+- The proposed ownership registry must bound live leases, groups and transition records independently of ephemeral task lanes. The current `maximumChannels` value (16 live names with unfinished Actions) is not an implemented ownership limit. Empty owned or faulted resource domains must retain their gate until explicit cleanup.
 - Use bounded deadline bookkeeping; no waiting-lock queue. Release/cancel must remain serviceable when business and Action queues are full.
 - Revalidate identity, deadline and transition generation after every external await.
 

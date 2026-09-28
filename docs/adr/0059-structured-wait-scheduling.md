@@ -26,4 +26,4 @@ Each task admits 120 Actions and 32 waits; root plus child groups require at mos
 
 ❌ Arbitrary dependency graphs, Tool grouping, global barriers, priority, preemption, rollback and hardware takeover are not added. Handlers must cooperate with cancellation. Long waits may expire prefetched audio. Model syntax reliability and physical-device behavior require separate acceptance.
 
-This supersedes the scheduling/shared-lane portion of ADR 0018. Current exact contracts live in AgentCore/Generation and Gateway/Output/Scheduling READMEs; original design sources and earlier ADR narratives remain preserved.
+This supersedes module FIFO in ADR 0015 and the scheduling/shared-lane portion of ADR 0018. Current exact contracts live in AgentCore/Generation and Gateway/Output/Scheduling READMEs; original design sources and earlier ADR narratives remain preserved.

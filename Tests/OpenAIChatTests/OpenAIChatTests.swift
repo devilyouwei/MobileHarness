@@ -296,3 +296,16 @@ private final class AnonymousModelListProtocol: URLProtocol, @unchecked Sendable
         try await configuration.fetchModels(sessionConfiguration: settings)
     }
 }
+
+@Test func defaultOutputBudgetIsOmittedFromProviderRequest() throws {
+    let chat = try ChatRequest(messages: [.init(role: .user, content: "Hello")])
+    #expect(chat.maximumOutputTokens == nil)
+    let request = try config().request(chat)
+    let data = try #require(request.httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(body["max_tokens"] == nil)
+    #expect(body["max_completion_tokens"] == nil)
+    #expect(throws: CapabilityError.self) {
+        try ChatRequest(messages: chat.messages, maximumOutputTokens: 0)
+    }
+}

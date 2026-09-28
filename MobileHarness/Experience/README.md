@@ -14,9 +14,11 @@ Experience/
 │   └── FadingCaption.swift          # Caption rendering and accessibility
 ├── Camera/
 │   └── CameraBackground.swift       # Native preview bridge, skeletons and controls
-├── Settings/                      # URL/key, model picker and save
+├── Settings/                       # Cloud settings and conversation history
+│   ├── SettingsView.swift           # Feature list and Cloud LLM form
+│   └── ConversationHistoryView.swift # Durable current/past conversation inspection
 ├── Diagnostics/
-│   ├── KokoroValidationView.swift   # Explicit English TTS validation
+│   ├── MossValidationView.swift     # Explicit local TTS validation
 │   └── Qwen35ValidationView.swift   # Debug model/voice validation
 └── README.md                        # Presentation boundary and status
 ```
@@ -70,3 +72,5 @@ Presentation replaces current state and adds no Agent work queue. Caption render
 ✅ Settings/SettingsView provides URL/key entry, model loading/selection and immediate save. The top-right toolbar contains camera and settings, with conditional camera controls below. ❌ Physical-device layout acceptance remains pending.
 
 ✅ Standalone Settings list and Cloud LLM detail support saved enablement and native explicit paste; window-root tasks preserve runtime ownership during navigation. ❌ Device visual acceptance pending.
+
+✅ Conversation history reads actual persisted user/model exchanges, starts a new context and requests metadata-only archived titles. Its raw/Channel/wait previews never execute stored Actions. ❌ Device history UI acceptance remains pending.

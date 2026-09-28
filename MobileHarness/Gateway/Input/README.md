@@ -4,7 +4,7 @@ Purpose: admit external inputs and route validated signals to Agent inboxes. Gat
 
 ✅ `AgentInput` carries payload, contract/version, source/incarnation, session, capture metadata, sequence, causal root/parent, hop count and a monotonic admission deadline. Audio/image transport contracts are AgentCore-owned; App converts platform frames without exposing concrete model types to Gateway.
 
-✅ `publish` matches static JSON v4 contract/source/topic subscriptions. `send(to:)` bypasses subscription matching but preserves acceptance, identity, session, deadline and capacity checks. `publish` requires CommunicationPolicy and fails if no subscriptions match. `send` requires an explicit target; there is no default-Agent fallback or compatibility router. Policy-free construction supports explicit directed admission only, using the target descriptor and runtime checks. ToolResult remains directed to its original Agent/session.
+✅ `publish` matches static JSON v5 contract/source/topic subscriptions. `send(to:)` bypasses subscription matching but preserves acceptance, identity, session, deadline and capacity checks. `publish` requires CommunicationPolicy and fails if no subscriptions match. `send` requires an explicit target; there is no default-Agent fallback or compatibility router. Policy-free construction supports explicit directed admission only, using the target descriptor and runtime checks. ToolResult remains directed to its original Agent/session.
 
 ✅ External and internal admission share bounds of 128 concurrent operations, 256 branches, 8 MiB observation payload (charged per target) and 16 distinct targets per call; excess is rejected immediately. Gateway creates no persistent media mailbox. It reports per-target rejection; one destination does not prevent other destinations from admission. Concrete Agents own business queues. Internal delivery is reachable through the bound OutputGateway port and validates both sender and destination incarnations.
 
@@ -12,7 +12,7 @@ Purpose: admit external inputs and route validated signals to Agent inboxes. Gat
 flowchart LR
     Platform[PlatformKit via App] --> Validate[Envelope / size / expiry validation]
     Validate --> Route{Publish or send}
-    Route -->|publish| Policy[Static JSON v4 subscriptions]
+    Route -->|publish| Policy[Static JSON v5 subscriptions]
     Route -->|send| Target[Explicit destination]
     Policy --> Admit[Capability / incarnation / session check]
     Target --> Admit

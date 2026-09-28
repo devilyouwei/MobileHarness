@@ -10,7 +10,7 @@ AgentCore/
 ├── AgentInput.swift, ImageInput.swift, InputKind.swift # Input and media transport
 ├── HarnessError.swift                               # Shared errors
 ├── Runtime/                                         # Registry, manager and lifecycle
-├── Capability/                                      # JSON v4 validation and local permissions
+├── Capability/                                      # JSON v5 validation and local permissions
 ├── Generation/                                      # Shared parsers and text-to-Action mapping
 ├── Output/                                          # Resolved calls, results and trusted context
 ├── Communication/                                   # Typed inputs, messaging contracts and policy
@@ -37,12 +37,12 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    JSON[Agent JSON v4] --> Capability[Capability configuration and registry]
-    Capability --> Context[Visible Action prompt context]
+    JSON[Agent JSON v5] --> Capability[Capability configuration and registry]
+    Capability --> Context[Scheduling rules and visible Action prompt context]
     Capability --> Resolve[AgentGenerator / alias resolution]
     Fragments[Model text or complete native Tool call] --> Parse[Generation parsers]
     Parse --> Resolve
-    Resolve --> Output[ActionCall / ToolCall / OutputEnvelope]
+    Resolve --> Output[ActionCall / scheduling / ToolCall in OutputEnvelope]
     Runtime[AgentManager and registry] --> Identity[Live Agent identity and lifecycle]
     Identity --> Messaging[Bound AgentMessaging identity]
     Policy[CommunicationPolicy] --> Gateway[Gateway consumers]
@@ -59,7 +59,7 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ## Feature status
 
 - ✅ Agent contracts, bounded registration, lifecycle and source/session identity.
-- ✅ JSON v4 permissions, Action prompt context, shared parsing and resolved output.
+- ✅ JSON v5 permissions, Action prompt context, shared parsing and resolved output.
 - ✅ Typed events, static communication policy, deadlines and bounded event delivery.
 - ❌ Generic AgentRuntime, AgentContext, StateStore and request/reply endpoints.
 - ❌ Incremental native Tool argument assembly and durable event delivery.
@@ -76,3 +76,5 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 
 
 ✅ GenerationEvent preserves resolved Actions and typed wait boundaries. The shared lexical stack handles combined Channel/wait nesting; SchedulingDirective crosses the trusted output boundary without introducing runtime, UI or model dependencies. ❌ Execution policy remains in Gateway, not AgentCore.
+
+✅ Runtime registries separate model alias resolution from code-owned InternalAction/InternalTool permission checks. Generator text mapping is a bounded Agent-supplied callback. See [capabilities](Capability/README.md). ❌ Full JSON Schema/native Tool transport remain deferred.

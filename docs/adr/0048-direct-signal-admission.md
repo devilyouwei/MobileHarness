@@ -1,5 +1,7 @@
 # ADR 0048 — Direct signal admission and Agent-owned inboxes
 
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
 Accepted: 2026-09-27. Supersedes the separate transport runtime and FIFO/latest-state mechanisms of ADR 0028/0040; permission and perception boundaries remain.
 
 ## Decision

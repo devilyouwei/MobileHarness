@@ -1,5 +1,7 @@
 # ADR 0055 — Directed synthesis Agent and transient audio handles
 
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
 Status: implemented.
 
 ## Decision

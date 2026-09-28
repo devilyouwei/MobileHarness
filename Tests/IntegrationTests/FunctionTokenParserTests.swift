@@ -6,12 +6,12 @@ import Testing
 
 private func generator() throws -> AgentGenerator {
     try AgentGenerator(
-        capabilities: AgentConfigurations.load(named: "Assistant").capabilities, textActions: ["say", "print"])
+        capabilities: AgentConfigurations.load(named: "Assistant").capabilities, textMapping: AssistantAgent.mapText)
 }
 
 @Test func functionTokenParserEveryByteSplitPreservesActionsTextAndNestedChannels() throws {
     let source =
-        "前👨‍👩‍👧。<channel.Speech>你好 &amp; 世界<express emotion='smile'/><channel.Display><print text='a&gt;b &quot;引号&quot;'/></channel.Display>再见</channel.Speech>默认。"
+        "前👨‍👩‍👧。<channel.Speech>你好 &amp; 世界<express emotion='smile'/><channel.Display><express emotion='a&gt;b &quot;引号&quot;'/></channel.Display>再见</channel.Speech>默认。"
     let data = Data(source.utf8)
     var whole = try generator()
     let expected = try whole.append(data) + whole.finish()
@@ -30,7 +30,7 @@ private func generator() throws -> AgentGenerator {
             "Speech", "Display", "Speech", "Speech", "Speech", "Display", "Speech", "Speech", "Speech", "Display",
         ])
     #expect(expected[2].actionCall?.parameters["text"] == "你好 & 世界")
-    #expect(expected[5].actionCall?.parameters["text"] == "a>b \"引号\"")
+    #expect(expected[5].actionCall?.parameters["emotion"] == "a>b \"引号\"")
 }
 
 @Test func functionTokenParserStreamsCompleteActionsWithoutWaitingForChannelClose() throws {
@@ -94,7 +94,11 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
                 alias: "say", path: ActionPath(module: "Robot", function: "speak"), defaultChannel: "robot",
                 requiredParameters: ["text"])
         ], tools: [ToolRegistration(alias: "lookup", path: "Memory.lookup", requiredParameters: ["query"])])
-    var other = try AgentGenerator(capabilities: camera, textActions: ["say"])
+    var other = AgentGenerator(
+        capabilities: camera,
+        textMapping: { text, channel in
+            [try camera.resolveAction("say", parameters: ["text": text], channel: channel)]
+        })
     let calls = try other.append("hello") + other.finish()
     #expect(
         calls.count == 1 && calls[0].actionCall?.actionPath.module == "Robot" && calls[0].actionCall?.channel == "robot"
@@ -110,14 +114,18 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
     #expect(throws: GenerationError.duplicateAlias) {
         try CapabilityRegistry(actions: camera.actions, tools: [ToolRegistration(alias: "say", path: "Other.say")])
     }
-    var xmlTool = try AgentGenerator(capabilities: camera, textActions: ["say"])
+    var xmlTool = AgentGenerator(
+        capabilities: camera,
+        textMapping: { text, channel in
+            [try camera.resolveAction("say", parameters: ["text": text], channel: channel)]
+        })
     #expect(throws: GenerationError.unknownCapability) { try xmlTool.append("<lookup query='x'/>") }
     var forbidden = try generator()
     #expect(throws: GenerationError.forbiddenChannel) {
         try forbidden.append("<channel.robot><express emotion='smile'/>")
     }
     var missing = try generator()
-    #expect(throws: GenerationError.invalidParameters) { try missing.append("<say/>") }
+    #expect(throws: GenerationError.invalidParameters) { try missing.append("<express/>") }
 }
 
 private struct MarkupChat: ChatCapability {
@@ -182,7 +190,7 @@ private struct MarkupChat: ChatCapability {
 
 private func generationTrace() throws -> GenerationTrace {
     let configuration = try AgentConfigurations.load(named: "Assistant")
-    return try GenerationTrace(capabilities: configuration.capabilities, textActions: configuration.textActions)
+    return GenerationTrace(capabilities: configuration.capabilities, textMapping: AssistantAgent.mapText)
 }
 
 @Test func generationTraceRetainsRawFragmentsAndResolvedChannels() throws {

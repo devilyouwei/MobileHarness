@@ -4,9 +4,12 @@
 
 ## 当前待验收与后续方向
 
-- ❌ 在 iPhone 上完成连续中英语音、真实 Kokoro 试听、音频路由切换、摄像头姿态与眼睛跟随的体验、延迟、内存和热状态验收；自动化测试及模拟器构建不能代替这些结果。
+- ❌ 在 iPhone 上完成连续中英语音、当前默认 MOSS-TTS-Nano 试听、音频路由切换、摄像头姿态与眼睛跟随的体验、延迟、内存和热状态验收；自动化测试及模拟器构建不能代替这些结果。
 - ❌ 用真实第三方服务验证已接入的云聊天配置、切换和失败恢复。
 - ❌ 在现有本地设置存储之外，按实际需求扩展持久化媒体与记忆、跨 Agent 请求/回复、更多感知能力及机器人动作；物理运动的限幅、失联停机和确认必须由设备侧承担。
+
+- ✅ 嵌套 wait、任务内阶段/Channel FIFO 与模块互斥已实现；当前契约见[调度 README](../MobileHarness/Gateway/Output/Scheduling/README.md)，历史模块 FIFO 和共享 Channel 描述已由 [ADR 0059](adr/0059-structured-wait-scheduling.md) 取代。
+- ❌ 新版 wait 的真实模型输出质量、嵌套等待/取消和语音字幕真机交互验收仍待完成。
 
 ## 历史实施计划与里程碑
 
@@ -358,7 +361,7 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 
 ✅ Following MOSS playback buffer overflow, the production per-handle PCM cache was increased from 2 MiB to 8 MiB at the user’s request, matching the synthesis output limit. ❌ This does not add backpressure or remove long-reply limits; sustained conversation acceptance remains pending.
 
-## LLM 原始输出测试（2026-09-28）
+## LLM 原始输出测试（2026-09-28，已由对话历史取代）
 
 ✅ 设置新增独立 LLM 测试页：复用已保存模型、Assistant 提示词和 JSON，展示完整接收原文、分片、结束原因、解析错误及解析出的 Action/Channel，可显式导出。解析失败继续收集；取消、传输失败、token 上限和保留上限均明确标记。生产 Agent/Gateway 契约未改变。
 
@@ -372,3 +375,19 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 ❌ Live-model protocol compliance, device scheduling timing, cross-task barriers, preemption, rollback and native Tool grouping remain outside this implementation. Existing speech cache expiration still applies to long blocked plans; no new deployment or device installation is implied.
 
 Validation: final repository checks passed, including 129 IntegrationTests; all four simulator schemes and the signed generic-iOS Debug build passed. Device app signature verification passed. No device installation or live-model acceptance was performed; see [validation history](Validation-History.md).
+
+## 持久化对话历史（2026-09-28）
+
+✅ “对话历史”取代单轮原始输出测试页，接入真实 Assistant 请求，持久化用户原文、模型文本分片、实际上下文和错误。当前会话按最近十轮完整对话构建上下文，停止录音或重启不清空；开始新对话后原子归档，单独生成历史标题，失败可重试。当前标题取最新用户输入。见 [ADR 0060](adr/0060-persistent-conversation-history.md)。
+
+❌ GPT-4.1 wait 遵循率、真实标题质量、真机页面交互和持久化写入性能尚待验收。此版本之前未落盘的聊天无法恢复。
+
+## Agent JSON v5（2026-09-28）
+
+✅ 四个 Agent 统一使用 version/id、按 Channel 分组的 actions、标准 function tools 和 communication。移除旧 channels/textActions/hidden/defaultChannel 配置；固定内部行为与权限由 Agent 代码定义。解析器只能解析模型可调用清单，内部 Action/Tool 仍由 Gateway 校验。此节取代上文历史阶段的 v1–v4 配置描述。见 [ADR 0061](adr/0061-agent-json-v5.md)。
+
+❌ 本次不增加完整 JSON Schema 或原生 Tool 流；模型遵循率与真机交互需要独立验收。
+
+新版配置验证：完整仓库检查通过（140 个 IntegrationTests），完整 Xcode 下四个模拟器目标构建通过。可选真实模型评测未启用；未进行新版真机安装和交互验收。
+
+✅ Assistant 不再固定 256 output tokens；云端请求省略 max_tokens，本地生成受剩余上下文约束。历史记录兼容旧数值并显示新请求的“模型默认”。取消整段回复 2000 字节限制，保留解析与调度容量保护。❌ 实际长回复及真机交互仍需验收。

@@ -54,7 +54,7 @@ MobileHarness takes inspiration from how human intelligence connects perception,
 - **Shared multimodal perception.** SpeechPerception and VisionPerception process inputs once and publish typed observations for other agents.
 - **Explicit communication.** Static subscriptions and directed delivery cross validated gateways, with bounded direct delivery and per-recipient admission results. Agents own message buffering; gateways own validation and routing.
 - **Streaming behavior.** Function Tokens combine natural text with registered Action tags; agents resolve capabilities before anything executes.
-- **Coordinated execution.** Actions use ordered Channels; Tools execute directly with explicit result or completion semantics.
+- **Coordinated execution.** Actions use task-local Channel queues and nested wait groups, with process-wide module exclusion; Tools execute directly with explicit result or completion semantics.
 - **Apple-native capabilities.** ModelKit handles model processing, PlatformKit handles device I/O, and SwiftUI presents the experience.
 - **Apple silicon acceleration.** Designed to make effective use of the CPU, GPU and Apple Neural Engine (ANE) through Core ML, CoreAI and MLX, with backend and compute choices suited to each model and workload.
 - **Edge-first, device–cloud collaboration.** Keep responsive processing on the device and request cloud compute for demanding tasks; the architecture is designed to combine both.
@@ -70,7 +70,7 @@ MobileHarness takes inspiration from how human intelligence connects perception,
 | Speech and captions | MOSS-TTS-Nano Core ML Mandarin/English TTS (beta), sequential playback and progressive reply captions |
 | Camera | Foreground preview, front/back switching and local YOLO26n-Pose perception |
 | Presentation | Recognition captions, semantic eye expressions, audio spectrum and skeleton overlay |
-| Agent runtime | JSON v4 capability declarations, static subscriptions, directed events and session isolation |
+| Agent runtime | JSON v5 capability declarations, static subscriptions, directed events and session isolation |
 | Execution | Function Token parsing, Channel scheduling, Action/Tool validation and cancellation |
 
 The current backend integrations include **Core ML** for Silero VAD and YOLO pose, **CoreAI** for Nemotron ASR, **Core ML** for MOSS-TTS-Nano TTS, and **MLX** for Qwen generation. Silero uses CPU execution; pose defaults to CPU + ANE eligibility; the MLX path uses GPU execution. Actual hardware placement depends on the model, runtime and device—enabling ANE does not mean every operation runs on it. General cross-model CPU/GPU/ANE scheduling remains future work. See [ModelKit Backends](MobileHarness/ModelKit/Backends/README.md).
@@ -230,3 +230,5 @@ Local user settings now use Storage-backed cached persistence in the application
 
 
 ✅ Function Token output supports nested `<wait>...</wait>` execution groups. Wait joins earlier parent work and all internal Actions while preserving ordinary Channel concurrency; it does not block unrelated Agent tasks. See [scheduling](MobileHarness/Gateway/Output/Scheduling/README.md). ❌ Physical-device acceptance of the new coordination behavior is pending.
+
+✅ Settings → 对话历史 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](MobileHarness/Experience/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.

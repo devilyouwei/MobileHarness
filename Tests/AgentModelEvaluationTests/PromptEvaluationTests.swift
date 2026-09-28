@@ -36,17 +36,8 @@ struct AgentModelEvaluationTests {
                         forResource: "cases", withExtension: "json", subdirectory: "Scenarios")))
         )
         let configuration = try AgentConfigurations.load(named: "Assistant")
-        let clarified = """
-            你是手机上的语音助手。使用用户的语言简短回答，不输出思考过程。
-            普通聊天直接输出自然文本。不要为了回答而包裹任何 XML 标签。
-            只有需要动作时，才插入已注册动作的自闭标签。参数名称和值必须符合下面的说明。不要发明标签。
-            channel 是可选作用域，仅当用户明确要求时才使用；普通回答和表情调用不需要 channel。
-            channel 标签必须成对闭合，不要重复开启同一个 channel。先关闭作用域，再输出用户要求放在作用域外的文本。
-            例如：<channel.main><express emotion="smile"/><express emotion="surprised"/></channel.main>你好。
-            自然文本中的 < 和 & 使用 &lt; 和 &amp;。
-            """ + "\n"
-            + CapabilityContextBuilder.build(configuration.capabilities).split(separator: "\n").dropFirst(3).joined(
-                separator: "\n")
+        let clarified = try AssistantAgent.systemPrompt(
+            capabilities: AssistantAgent.runtimeCapabilities(configuration.capabilities))
         var results: [[String: Any]] = []
         for (variant, system) in [
             ("minimal", "你是中文语音助手，直接简短回答用户问题。"), ("clarified", clarified),
@@ -60,13 +51,14 @@ struct AgentModelEvaluationTests {
                     }
                 let started = Date()
                 let session = try await model.chat(
-                    ChatRequest(messages: messages, maximumOutputTokens: 256, temperature: 0))
+                    ChatRequest(messages: messages, temperature: 0))
                 var answer = ""
                 for try await event in session.events { if case .text(let delta) = event { answer += delta } }
                 var error = ""
                 do {
                     var generator = try AgentGenerator(
-                        capabilities: configuration.capabilities, textActions: configuration.textActions)
+                        capabilities: AssistantAgent.runtimeCapabilities(configuration.capabilities),
+                        textMapping: AssistantAgent.mapText)
                     _ = try generator.append(answer) + generator.finish()
                 } catch let failure { error = String(describing: failure) }
                 results.append([

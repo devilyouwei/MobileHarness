@@ -60,8 +60,8 @@ private func faceObservation(
 
 @Test(arguments: [[:], ["x": "nan", "y": "0"], ["x": "0", "y": "inf"], ["x": "1.1", "y": "0"]])
 func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
-    let configuration = try AgentConfigurations.load(named: "VisionPerception")
-    let valid = try configuration.capabilities.resolveAction("moveEyes", parameters: ["x": "0", "y": "0"])
+    let valid = ActionCall(
+        actionPath: .init(module: "UI", function: "moveEyes"), channel: "Gaze", parameters: ["x": "0", "y": "0"])
     let call = ActionCall(actionPath: valid.actionPath, channel: valid.channel, parameters: parameters)
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .actionCall(call))
@@ -73,8 +73,8 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
 }
 
 @Test func moveEyesAcceptsBoundaryAndPropagatesPresentationFailure() async throws {
-    let config = try AgentConfigurations.load(named: "VisionPerception")
-    let call = try config.capabilities.resolveAction("moveEyes", parameters: ["x": "-1", "y": "1"])
+    let call = ActionCall(
+        actionPath: .init(module: "UI", function: "moveEyes"), channel: "Gaze", parameters: ["x": "-1", "y": "1"])
     let envelope = OutputEnvelope(
         source: .visionPerception,
         input: AgentInput(sessionID: UUID(), payload: .text("test")), output: .actionCall(call))

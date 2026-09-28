@@ -7,7 +7,7 @@ flowchart LR
     InputGateway --> Inbox[128 frames / 64000 samples]
     Inbox --> VAD[VoiceActivitySegmenter]
     VAD --> ASR[LiveSpeechInput / recognition capability]
-    ASR --> Caption[JSON-resolved UI.setTranscript Action]
+    ASR --> Caption[Code-owned UI.setTranscript Action]
     Caption --> OutputGateway
     OutputGateway --> ActionRuntime --> UI[App presentation handler]
     ASR --> Port[Bound messaging port]
@@ -15,20 +15,20 @@ flowchart LR
     OutputGateway --> InputGateway
 ```
 
-✅ JSON v4 declarations; sequential raw audio admission; existing 128-event/64000-sample ASR queue and 60-second turn limit; partial/final separation; final publication once per nonempty turn. Empty turns resume capture. App resumes after Assistant actions finish.
+✅ JSON v5 declarations; sequential raw audio admission; existing 128-event/64000-sample ASR queue and 60-second turn limit; partial/final separation; final publication once per nonempty turn. Empty turns resume capture. App resumes after Assistant actions finish.
 
 ✅ Endpoint recognition suppresses queued capture after the endpoint while replies play. This is explicit conversational capture gating, not an audio overflow policy. Overflow fails; no unbounded tasks. Stop cancels and joins ASR/VAD/worker before completing. Models remain resident.
 
 ❌ Barge-in, background listening and physical sustained speech acceptance of this migration.
 
-✅ Accepted input kinds derive from the JSON v4 communication snapshot; Swift retains handlers, not a duplicate production input registry.
+✅ Accepted input kinds derive from the JSON v5 communication snapshot; Swift retains handlers, not a duplicate production input registry.
 
-✅ JSON declares setTranscript → UI.setTranscript on the Transcript Channel. Each preview publishes its shared observation and emits a resolved caption Action containing the last 320 characters. Recognition completion emits UI.finishTranscript before publishing final (also clears empty turns). No XML parsing of recognized text is needed: alias resolution uses the configured capability registry directly. Each update emits agent.finished to join its Action and release scheduler tracking.
+✅ Code declares UI.setTranscript on Transcript. Each preview publishes its shared observation and emits a resolved caption Action containing the last 320 characters. Recognition completion emits UI.finishTranscript before publishing final (also clears empty turns). No XML parsing of recognized text is needed: typed InternalAction calls carry the code-owned permission. Each update emits agent.finished to join its Action and release scheduler tracking.
 
 ✅ The output stream holds at most 32 envelopes; overflow fails the session rather than silently dropping Actions. App drains it serially through OutputGateway, including completion barriers. Stop cancels perception work, closes/drains output, cancels session Actions, and the App rejects stale-session presentation. Partial/final observations remain available to subscribers independently of UI Actions.
 ❌ Sustained device caption timing and overload acceptance remain unverified.
 
-✅ setVoiceState → UI.setVoiceState is JSON-declared for hearing/processing/listening presentation. Phase Signals only communicate facts: App uses them for capture admission, Assistant chooses its atomic beginReplyTurn Action on first onset. Resume emits a listening Action; each display update has a completion barrier. No UI changes occur in Signal observers.
+✅ UI.setVoiceState is code-declared for hearing/processing/listening presentation. Phase Signals only communicate facts: App uses them for capture admission, Assistant chooses its atomic beginReplyTurn Action on first onset. Resume emits a listening Action; each display update has a completion barrier. No UI changes occur in Signal observers.
 
 ✅ ConversationTurn is allocated at the first confirmed onset/audio event and remains stable across maximum-duration segments and short VAD transitions. It propagates through shared observations and Action envelopes. Resume after reply (or empty recognition) arms a new utterance; ordinals increase within the capture session. Previews carry bounded text, finishTranscript seals it, and output sequences are monotonic.
 
@@ -83,7 +83,7 @@ flowchart LR
 
 ### Action 与控制输出
 
-| alias → 路径 / 默认 Channel | 参数结构 | 触发与语义 |
+| 内部路径 / 默认 Channel | 参数结构 | 触发与语义 |
 | --- | --- | --- |
 | `setTranscript → UI.setTranscript / Transcript` | `["text": String]`；handler 上限 4096 UTF-8 字节 | 预览先发布 partial，再发 Action；当前投影保留最后 320 个字符。空串清空预览，但不封闭轮次。 |
 | `finishTranscript → UI.finishTranscript / Transcript` | `[:]` | 识别结束（包括空结果）清空并封闭本轮识别字幕，拒绝迟到的旧 partial；随后才发布非空 final。 |
@@ -95,4 +95,4 @@ Action/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, 
 
 ### Publish / send 边界
 
-`communication.publications` 仅包含上表三个 `speech.*` contract，typed payload、长度、触发时机和消费者均按“共享观测输出”表；它们不携带 PCM，也不作为 Agent `outputs` 流的 Action。`communication.sends = []`：SpeechPerception 不发送定向 Agent 消息；Assistant 接收 final/phase 是订阅广播，不是 send。`tools / textActions` 均为空，无 ToolResult 输入；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。
+`communication.publications` 仅包含上表三个 `speech.*` contract，typed payload、长度、触发时机和消费者均按“共享观测输出”表；它们不携带 PCM，也不作为 Agent `outputs` 流的 Action。`communication.sends = []`：SpeechPerception 不发送定向 Agent 消息；Assistant 接收 final/phase 是订阅广播，不是 send。JSON `actions / tools` 均为空；内部展示权限由代码声明，无 ToolResult 输入；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。

@@ -8,12 +8,11 @@ public enum AgentConfigurationError: Error, Equatable, Sendable {
     case identityMismatch
 }
 
-/// Versioned, validated configuration. Only decoded snapshots can construct a registry.
+/// Versioned model-callable catalog and communication policy; internal behavior is assembled by the Agent.
 public struct AgentConfiguration: Sendable {
     public let communication: CommunicationDeclaration
     public let agentID: AgentID
     public let capabilities: CapabilityRegistry
-    public let textActions: [String]
 
     public init(data: Data) throws {
         guard !data.isEmpty, data.count <= 65_536 else { throw AgentConfigurationError.invalidFormat }
@@ -22,14 +21,14 @@ public struct AgentConfiguration: Sendable {
             throw AgentConfigurationError.invalidFormat
         }
         let root = try Self.dictionary(
-            raw, keys: ["schemaVersion", "agentID", "channels", "textActions", "actions", "tools", "communication"],
+            raw, keys: ["version", "id", "actions", "tools", "communication"],
             field: "root")
         let decoded: Document
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.schemaVersion == 4 else {
-            throw AgentConfigurationError.unsupportedVersion(decoded.schemaVersion)
+        guard decoded.version == 5 else {
+            throw AgentConfigurationError.unsupportedVersion(decoded.version)
         }
         let communicationObject = try Self.dictionary(
             root["communication"] ?? NSNull(),
@@ -44,65 +43,47 @@ public struct AgentConfiguration: Sendable {
         }
         try decoded.communication.validate()
         communication = decoded.communication
-        for field in ["channels", "textActions"] { try Self.uniqueStrings(root[field], field: field) }
-        guard let actions = root["actions"] as? [Any], let tools = root["tools"] as? [Any],
-            actions.count + tools.count <= 128
+        guard let groups = root["actions"] as? [String: [Any]], let tools = root["tools"] as? [Any],
+            groups.values.reduce(0, { $0 + $1.count }) + tools.count <= 128
         else { throw AgentConfigurationError.invalidField("actions/tools") }
-        for (index, action) in actions.enumerated() {
-            let field = "actions[\(index)]"
-            let entry = try Self.entry(action, action: true, field: field)
-            _ = try Self.dictionary(entry["path"] ?? NSNull(), keys: ["module", "function"], field: "\(field).path")
+        for (channel, actions) in groups {
+            for (index, action) in actions.enumerated() {
+                let field = "actions.\(channel)[\(index)]"
+                let entry = try Self.entry(action, field: field)
+                _ = try Self.dictionary(
+                    entry["path"] ?? NSNull(), keys: ["module", "function"], field: "\(field).path")
+            }
         }
-        for (index, tool) in tools.enumerated() {
-            _ = try Self.entry(tool, action: false, field: "tools[\(index)]")
-        }
-        guard CapabilityRegistry.validName(decoded.agentID) else {
-            throw AgentConfigurationError.invalidField("agentID")
+        for tool in tools { try Self.validateTool(tool) }
+        guard CapabilityRegistry.validName(decoded.id) else {
+            throw AgentConfigurationError.invalidField("id")
         }
         capabilities = try CapabilityRegistry(
-            actions: decoded.actions.map {
-                ActionRegistration(
-                    alias: $0.alias, path: ActionPath(module: $0.path.module, function: $0.path.function),
-                    defaultChannel: $0.defaultChannel,
-                    requiredParameters: Set($0.parameters.filter(\.required).map(\.name)),
-                    optionalParameters: Set($0.parameters.filter { !$0.required }.map(\.name)),
-                    documentation: $0.documentation, hidden: $0.hidden ?? false)
+            actions: decoded.actions.keys.sorted().flatMap { channel in
+                decoded.actions[channel, default: []].map {
+                    ActionRegistration(
+                        alias: $0.alias, path: ActionPath(module: $0.path.module, function: $0.path.function),
+                        defaultChannel: channel,
+                        requiredParameters: Set($0.parameters.filter(\.required).map(\.name)),
+                        optionalParameters: Set($0.parameters.filter { !$0.required }.map(\.name)),
+                        documentation: $0.documentation)
+                }
             },
-            tools: decoded.tools.map {
-                ToolRegistration(
-                    alias: $0.alias, path: $0.path,
-                    requiredParameters: Set($0.parameters.filter(\.required).map(\.name)),
-                    optionalParameters: Set($0.parameters.filter { !$0.required }.map(\.name)),
-                    documentation: $0.documentation, hidden: $0.hidden ?? false)
-            }, channels: Set(decoded.channels))
-        guard decoded.textActions.count <= 8 else {
-            throw AgentConfigurationError.invalidField("textActions")
-        }
-        for alias in decoded.textActions {
-            _ = try capabilities.resolveAction(alias, parameters: ["text": "configuration validation"])
-        }
+            tools: try tools.map { raw in
+                let data = try JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys])
+                let tool = try JSONDecoder().decode(NativeToolDefinition.self, from: data)
+                return ToolRegistration(
+                    alias: tool.function.name, path: tool.function.name,
+                    requiredParameters: Set(tool.function.parameters.required),
+                    optionalParameters: Set(tool.function.parameters.properties.keys)
+                        .subtracting(tool.function.parameters.required), definition: tool)
+            }, channels: Set(decoded.actions.keys))
         for action in capabilities.actions {
             for example in action.documentation?.examples ?? [] {
-                try Self.validateExample(example, for: action, registry: capabilities, textActions: decoded.textActions)
+                try Self.validateExample(example, for: action, registry: capabilities)
             }
         }
-        for tool in capabilities.tools {
-            for example in tool.documentation?.examples ?? [] {
-                guard let data = example.data(using: .utf8),
-                    let raw = try? JSONSerialization.jsonObject(with: data),
-                    let object = raw as? [String: Any], Set(object.keys) == ["name", "arguments"],
-                    object["name"] as? String == tool.alias, let arguments = object["arguments"] as? [String: String]
-                else { throw AgentConfigurationError.invalidField("tools.examples") }
-                _ = try capabilities.resolveTool(tool.alias, arguments: arguments)
-            }
-        }
-        for entry in decoded.actions where decoded.textActions.contains(entry.alias) {
-            guard entry.parameters.first(where: { $0.name == "text" })?.valueType == .string else {
-                throw AgentConfigurationError.invalidField("textActions")
-            }
-        }
-        textActions = decoded.textActions
-        agentID = AgentID(rawValue: decoded.agentID)
+        agentID = AgentID(rawValue: decoded.id)
     }
 
     private static func dictionary(_ raw: Any, keys: Set<String>, field: String) throws -> [String: Any] {
@@ -112,14 +93,8 @@ public struct AgentConfiguration: Sendable {
         return value
     }
 
-    private static func uniqueStrings(_ raw: Any?, field: String) throws {
-        guard let values = raw as? [String], Set(values).count == values.count else {
-            throw AgentConfigurationError.invalidField(field)
-        }
-    }
-
     private static func validateExample(
-        _ example: String, for action: ActionRegistration, registry: CapabilityRegistry, textActions: [String]
+        _ example: String, for action: ActionRegistration, registry: CapabilityRegistry
     ) throws {
         var parser = FunctionTokenParser()
         let tokens = try parser.append(example) + parser.finish()
@@ -128,14 +103,10 @@ public struct AgentConfiguration: Sendable {
             switch token {
             case .action(let alias, let parameters, let channel):
                 _ = try registry.resolveAction(alias, parameters: parameters, channel: channel)
-                if !action.hidden, registry.actions.first(where: { $0.alias == alias })?.hidden == true {
-                    throw AgentConfigurationError.invalidField("actions.examples.hiddenReference")
-                }
                 if alias == action.alias { demonstratesAction = true }
             case .text(let text, let channel):
                 if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     if let channel, !registry.channels.contains(channel) { throw GenerationError.forbiddenChannel }
-                    if textActions.contains(action.alias) { demonstratesAction = true }
                 }
             case .boundary, .scheduling: break
             }
@@ -143,18 +114,10 @@ public struct AgentConfiguration: Sendable {
         guard demonstratesAction else { throw AgentConfigurationError.invalidField("actions.examples") }
     }
 
-    private static func entry(_ raw: Any, action: Bool, field: String) throws -> [String: Any] {
-        var keys: Set<String> = [
+    private static func entry(_ raw: Any, field: String) throws -> [String: Any] {
+        let keys: Set<String> = [
             "alias", "path", "doc", "parameters", "examples",
         ]
-        if action { keys.insert("defaultChannel") }
-        guard let object = raw as? [String: Any] else { throw AgentConfigurationError.invalidField(field) }
-        if let hidden = object["hidden"] {
-            keys.insert("hidden")
-            guard let data = try? JSONSerialization.data(withJSONObject: ["value": hidden]),
-                (try? JSONDecoder().decode(HiddenValue.self, from: data)) != nil
-            else { throw AgentConfigurationError.invalidField("\(field).hidden") }
-        }
         let value = try dictionary(raw, keys: keys, field: field)
         try prose(value["doc"], field: "\(field).doc")
         guard let parameters = value["parameters"] as? [Any], parameters.count <= 32,
@@ -181,43 +144,60 @@ public struct AgentConfiguration: Sendable {
         else { throw AgentConfigurationError.invalidField(field) }
     }
 
-    private struct HiddenValue: Decodable { let value: Bool }
+    private static func validateTool(_ raw: Any) throws {
+        let tool = try dictionary(raw, keys: ["type", "function"], field: "tools")
+        guard tool["type"] as? String == "function", let function = tool["function"] as? [String: Any],
+            Set(function.keys).isSubset(of: ["name", "description", "parameters", "strict"]),
+            Set(["name", "description", "parameters"]).isSubset(of: Set(function.keys))
+        else { throw AgentConfigurationError.invalidField("tools.function") }
+        try prose(function["description"], field: "tools.function.description")
+        let schema = try dictionary(
+            function["parameters"] ?? NSNull(),
+            keys: ["type", "properties", "required", "additionalProperties"], field: "tools.function.parameters")
+        guard schema["type"] as? String == "object", let properties = schema["properties"] as? [String: Any],
+            let required = schema["required"] as? [String], Set(required).count == required.count,
+            Set(required).isSubset(of: Set(properties.keys)), properties.count <= 32
+        else { throw AgentConfigurationError.invalidField("tools.function.parameters") }
+        // The current ToolCall transport has string values. Reject unsupported schemas instead of coercing them.
+        for (name, rawProperty) in properties {
+            guard CapabilityRegistry.validName(name), let property = rawProperty as? [String: Any],
+                Set(property.keys).isSubset(of: ["type", "description", "enum"]),
+                property["type"] as? String == "string"
+            else { throw AgentConfigurationError.invalidField("tools.function.parameters.properties") }
+            if let description = property["description"] {
+                try prose(description, field: "tools.parameter.description")
+            }
+            if let enumeration = property["enum"] {
+                guard let values = enumeration as? [String], !values.isEmpty, Set(values).count == values.count,
+                    values.count <= 128, values.allSatisfy({ $0.utf8.count <= 4096 })
+                else { throw AgentConfigurationError.invalidField("tools.parameter.enum") }
+            }
+        }
+        let definition = try JSONDecoder().decode(
+            NativeToolDefinition.self,
+            from: JSONSerialization.data(withJSONObject: raw))
+        guard !definition.function.parameters.additionalProperties,
+            definition.function.strict != true || Set(required) == Set(properties.keys)
+        else { throw AgentConfigurationError.invalidField("tools.function.strict") }
+    }
 
     private struct Document: Decodable {
         let communication: CommunicationDeclaration
-        let schemaVersion: Int
-        let agentID: String
-        let channels: [String]
-        let textActions: [String]
-        let actions: [Action]
-        let tools: [Tool]
+        let version: Int
+        let id: String
+        let actions: [String: [Action]]
         struct Action: Decodable {
             let alias: String
             let path: Path
-            let defaultChannel: String
             let doc: String
-            let hidden: Bool?
             let parameters: [CapabilityDocumentation.Parameter]
             let examples: [String]
             var documentation: CapabilityDocumentation {
-                CapabilityDocumentation(
-                    doc: doc, parameters: parameters, examples: examples)
+                CapabilityDocumentation(doc: doc, parameters: parameters, examples: examples)
             }
             struct Path: Decodable {
                 let module: String
                 let function: String
-            }
-        }
-        struct Tool: Decodable {
-            let alias: String
-            let path: String
-            let doc: String
-            let hidden: Bool?
-            let parameters: [CapabilityDocumentation.Parameter]
-            let examples: [String]
-            var documentation: CapabilityDocumentation {
-                CapabilityDocumentation(
-                    doc: doc, parameters: parameters, examples: examples)
             }
         }
     }

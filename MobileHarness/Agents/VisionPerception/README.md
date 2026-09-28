@@ -13,13 +13,13 @@ flowchart LR
     Publisher --> Publication[OutputGateway / InputGateway]
     Publication --> Subscribers[Optional business subscribers]
     Observation --> Overlay[Up to six people / bounded display coordinates]
-    Overlay --> Generator[CapabilityRegistry / JSON showPose tool alias]
+    Overlay --> Generator[Code-owned UI.showPose permission]
     Generator --> Output[Latest skeleton / gaze pair]
     Output --> Gateway[OutputGateway / ToolRuntime]
     Gateway --> Action[UI.showPose Void tool / injected presentation handler]
 ```
 
-✅ VisionPerception.agent.json v4 declares showPose in tools only, with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), resolves the tool alias and emits one ToolCall per result. Empty people clears the overlay. No direct UI call or per-frame agent.finished is emitted; moveEyes is a separate resolved Action. The registered Void handler completes without ToolResult feedback.
+✅ VisionPerception.agent.json v5 contains communication policy and empty model catalogs. Code declares UI.showPose as an internal Tool with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), constructs a typed internal ToolCall and emits one ToolCall per result. Empty people clears the overlay. No direct UI call or per-frame agent.finished is emitted; moveEyes is a separate resolved Action. The registered Void handler completes without ToolResult feedback.
 
 ✅ Raw inputs have increasing sequence/timestamps and matching sessions. Grayscale compares previous examined frames. One worker processes a frame; one latest pending frame replaces older pending input. Pause suspends dequeue, stop cancels/joins inference and suppresses late outputs. Shared observations retain up to 300 people independently of the six-person display limit.
 
@@ -94,7 +94,7 @@ people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye�
 
 ### 显示数据：UI.showPose
 
-本地 alias `showPose` 解析为 `ToolCall(id: UUID, toolPath: "UI.showPose", arguments: ["payload": String])`。payload 是以下 PoseOverlay 的 JSON 文本，最多 3000 UTF-8 字节；外层 arguments 的值仍是字符串。
+代码内部权限产生 `ToolCall(id: UUID, toolPath: "UI.showPose", arguments: ["payload": String])`。payload 是以下 PoseOverlay 的 JSON 文本，最多 3000 UTF-8 字节；外层 arguments 的值仍是字符串。
 
 ```json
 {"sequence":42,"timestamp":123.5,"rotation":1,"people":[]}
@@ -120,7 +120,7 @@ Tool 经 `outputs → App transport pump → OutputGateway → ToolRuntime → M
 | publish | `communication.publications` 仅有 `vision.pose`；typed payload、坐标单位、人数与容量按上文“共享感知数据”段落。该发布与骨架 ToolCall/眼睛 Action 分离。 |
 | send | `communication.sends = []`，不向其他 Agent 定向发送消息；当前也没有其他业务 Agent 订阅 `vision.pose`。 |
 
-`actions` 声明 moveEyes；`channels / textActions` 均为空。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
+JSON `actions / tools` 均为空；代码声明 UI.moveEyes（Gaze）与 UI.showPose 内部权限。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
 
 ## Eye attention policy
 
@@ -135,7 +135,7 @@ flowchart LR
     Pose[Shared pose observation] --> Face[Confident facial points]
     Face --> Lock[Spatial lock / occlusion hold]
     Lock --> Filter[Deadband / adaptive smoothing]
-    Filter --> Resolve[JSON moveEyes alias]
+    Filter --> Resolve[Code-owned gaze Action]
     Resolve --> Gateway[OutputGateway]
     Gateway --> Channel[Gaze Channel / UI module exclusion]
     Channel --> Action[UI.moveEyes validation]

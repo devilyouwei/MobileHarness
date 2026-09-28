@@ -172,7 +172,7 @@ private actor SynthesisClient: Agent {
 private func synthesisClientConfiguration(_ name: String, permitted: Bool) throws -> AgentConfiguration {
     try AgentConfiguration(
         data: JSONSerialization.data(withJSONObject: [
-            "schemaVersion": 4, "agentID": name, "channels": [], "textActions": [], "actions": [], "tools": [],
+            "version": 5, "id": name, "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [], "subscriptions": [], "publications": [],
                 "sends": permitted ? [["contract": "speech.synthesize", "target": "speechSynthesis"]] : [],

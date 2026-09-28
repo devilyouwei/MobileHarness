@@ -4,12 +4,18 @@ import Foundation
 public struct CapabilityRegistry: Sendable {
     public let actions: [ActionRegistration]
     public let tools: [ToolRegistration]
+    public let internalActions: [InternalAction]
+    public let internalTools: [InternalTool]
     public let channels: Set<String>
 
-    public init(actions: [ActionRegistration] = [], tools: [ToolRegistration] = [], channels: Set<String> = [])
+    public init(
+        actions: [ActionRegistration] = [], tools: [ToolRegistration] = [], channels: Set<String> = [],
+        internalActions: [InternalAction] = [], internalTools: [InternalTool] = []
+    )
         throws
     {
-        guard actions.count + tools.count <= 128, channels.count <= 16 else { throw GenerationError.limitExceeded }
+        guard actions.count + tools.count + internalActions.count + internalTools.count <= 128, channels.count <= 16
+        else { throw GenerationError.limitExceeded }
         let aliases = actions.map(\.alias) + tools.map(\.alias)
         guard Set(aliases).count == aliases.count else { throw GenerationError.duplicateAlias }
         guard aliases.allSatisfy({ Self.validName($0) && $0 != "wait" && !$0.hasPrefix("channel.") }),
@@ -25,9 +31,21 @@ public struct CapabilityRegistry: Sendable {
         for tool in tools {
             try Self.validateSchema(required: tool.requiredParameters, optional: tool.optionalParameters)
         }
+        for action in internalActions {
+            guard Self.validName(action.path.module), Self.validName(action.path.function),
+                Self.validName(action.channel)
+            else { throw GenerationError.invalidParameters }
+            try Self.validateSchema(required: action.requiredParameters, optional: action.optionalParameters)
+        }
+        for tool in internalTools {
+            guard Self.validName(tool.path) else { throw GenerationError.invalidParameters }
+            try Self.validateSchema(required: tool.requiredParameters, optional: tool.optionalParameters)
+        }
+        self.internalActions = internalActions
+        self.internalTools = internalTools
         self.actions = actions
         self.tools = tools
-        self.channels = channels.union(actions.map(\.defaultChannel))
+        self.channels = channels.union(actions.map(\.defaultChannel)).union(internalActions.map(\.channel))
         guard self.channels.count <= 16 else { throw GenerationError.limitExceeded }
     }
 
@@ -44,23 +62,54 @@ public struct CapabilityRegistry: Sendable {
     public func resolveTool(_ alias: String, arguments: [String: String], id: UUID = UUID()) throws -> ToolCall {
         guard let tool = tools.first(where: { $0.alias == alias }) else { throw GenerationError.unknownCapability }
         try Self.validate(arguments, required: tool.requiredParameters, optional: tool.optionalParameters)
+        guard Self.permitsValues(arguments, definition: tool.definition) else {
+            throw GenerationError.invalidParameters
+        }
         return ToolCall(id: id, toolPath: tool.path, arguments: arguments)
     }
 
+    public func adding(internalActions: [InternalAction] = [], internalTools: [InternalTool] = []) throws -> Self {
+        try Self(
+            actions: actions, tools: tools, channels: channels,
+            internalActions: self.internalActions + internalActions, internalTools: self.internalTools + internalTools)
+    }
+
     public func permits(_ call: ActionCall) -> Bool {
-        channels.contains(call.channel)
-            && actions.contains {
+        guard channels.contains(call.channel) else { return false }
+        return actions.contains {
+            $0.path == call.actionPath
+                && (try? Self.validate(
+                    call.parameters,
+                    required: $0.requiredParameters, optional: $0.optionalParameters)) != nil
+        }
+            || internalActions.contains {
                 $0.path == call.actionPath
                     && (try? Self.validate(
-                        call.parameters, required: $0.requiredParameters, optional: $0.optionalParameters)) != nil
+                        call.parameters,
+                        required: $0.requiredParameters, optional: $0.optionalParameters)) != nil
             }
     }
 
     public func permits(_ call: ToolCall) -> Bool {
         tools.contains {
             $0.path == call.toolPath
-                && (try? Self.validate(call.arguments, required: $0.requiredParameters, optional: $0.optionalParameters))
-                    != nil
+                && (try? Self.validate(
+                    call.arguments,
+                    required: $0.requiredParameters, optional: $0.optionalParameters)) != nil
+                && Self.permitsValues(call.arguments, definition: $0.definition)
+        }
+            || internalTools.contains {
+                $0.path == call.toolPath
+                    && (try? Self.validate(
+                        call.arguments,
+                        required: $0.requiredParameters, optional: $0.optionalParameters)) != nil
+            }
+    }
+
+    private static func permitsValues(_ arguments: [String: String], definition: NativeToolDefinition?) -> Bool {
+        arguments.allSatisfy { name, value in
+            guard let allowed = definition?.function.parameters.properties[name]?.enum else { return true }
+            return allowed.contains(value)
         }
     }
 
@@ -77,7 +126,7 @@ public struct CapabilityRegistry: Sendable {
         else { throw GenerationError.invalidParameters }
     }
 
-    private static func validate(_ values: [String: String], required: Set<String>, optional: Set<String>) throws {
+    static func validate(_ values: [String: String], required: Set<String>, optional: Set<String>) throws {
         let keys = Set(values.keys)
         guard required.isSubset(of: keys), keys.isSubset(of: required.union(optional)),
             values.count <= 32, values.allSatisfy({ validName($0.key) && $0.value.utf8.count <= 4096 })

@@ -15,8 +15,8 @@ public struct GenerationTrace: Sendable {
     private var closed = false
     private var generator: AgentGenerator
 
-    public init(capabilities: CapabilityRegistry, textActions: [String]) throws {
-        generator = try AgentGenerator(capabilities: capabilities, textActions: textActions)
+    public init(capabilities: CapabilityRegistry, textMapping: AgentGenerator.TextMapping? = nil) {
+        generator = AgentGenerator(capabilities: capabilities, textMapping: textMapping)
     }
 
     public mutating func append(_ delta: String) throws {

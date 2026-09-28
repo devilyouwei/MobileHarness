@@ -37,7 +37,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ## Typed event path
 
-✅ `messaging(for:)` returns a port bound to the current source incarnation. It validates outbound JSON v4 permissions, payload schema/size, session, parent deadline and hop count before bounded direct InputGateway admission. Gateways have no message queue; Agents own pending input and any state replacement. Limits are 16 concurrent emissions per source; each schema is bounded. Gateway creates source IDs/sequences, and expired ports cannot publish after replacement.
+✅ `messaging(for:)` returns a port bound to the current source incarnation. It validates outbound JSON v5 permissions, payload schema/size, session, parent deadline and hop count before bounded direct InputGateway admission. Gateways have no message queue; Agents own pending input and any state replacement. Limits are 16 concurrent emissions per source; each schema is bounded. Gateway creates source IDs/sequences, and expired ports cannot publish after replacement.
 
 ```mermaid
 flowchart LR

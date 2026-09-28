@@ -1,5 +1,7 @@
 # ADR 0024: Present expressions independently from captions
 
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
 > Historical scope: Historical emoji/orb presentation. [ADR 0046](0046-semantic-eye-expressions.md) replaced glyph transport with procedural eyes.
 
 UI.smile and UI.express use an explicitly injected expression callback; UI.print retains caption presentation. Actions remain independent of SwiftUI. Assistant declares express in JSON v3; parameter metadata and invocation types remain unchanged.

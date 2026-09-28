@@ -3,7 +3,7 @@
 Purpose: define typed Agent communication without owning transport tasks, message queues or session lifecycle. Gateways validate and route; Agents own inbox buffering and processing. AgentCore remains independent of Gateway and concrete Agents.
 
 - ✅ AgentMessaging binds publish/send to the sender's live incarnation through an OutputGateway closure.
-- ✅ CommunicationPolicy validates JSON v4 inputs, exact contract/source/topic subscriptions, publications and direct-send permissions.
+- ✅ CommunicationPolicy validates JSON v5 inputs, exact contract/source/topic subscriptions, publications and direct-send permissions.
 - ✅ DeliveryReport describes per-target admission; PerceptionInput defines typed media/observations.
 - ❌ Dynamic subscriptions, request/reply, remote transport, persistence and automatic retry.
 

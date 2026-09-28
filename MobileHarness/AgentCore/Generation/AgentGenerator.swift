@@ -3,19 +3,17 @@ import Foundation
 /// Shared model-output interpreter. It owns one parser and sentence buffer per generation.
 public struct AgentGenerator: Sendable {
     private let capabilities: CapabilityRegistry
-    private let textActions: [String]
+    public typealias TextMapping = @Sendable (String, String?) throws -> [ActionCall]
+    private let mapTextCalls: TextMapping?
     private var parser = FunctionTokenParser()
     private var sentences = SentenceFunctionBuffer()
     private var textChannel: String?
     private var calls = 0
     private var closed = false
 
-    public init(capabilities: CapabilityRegistry, textActions: [String]) throws {
-        guard textActions.count <= 8, Set(textActions).count == textActions.count,
-            textActions.allSatisfy({ alias in capabilities.actions.contains { $0.alias == alias } })
-        else { throw GenerationError.unknownCapability }
+    public init(capabilities: CapabilityRegistry, textMapping: TextMapping? = nil) {
         self.capabilities = capabilities
-        self.textActions = textActions
+        self.mapTextCalls = textMapping
     }
 
     public mutating func append(_ fragment: String) throws -> [GenerationEvent] {
@@ -54,9 +52,10 @@ public struct AgentGenerator: Sendable {
         for token in tokens {
             switch token {
             case .text(let text, let channel):
-                guard !textActions.isEmpty || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                guard mapTextCalls != nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     throw GenerationError.unknownCapability
                 }
+                if let channel, !capabilities.channels.contains(channel) { throw GenerationError.forbiddenChannel }
                 if channel != textChannel {
                     result += try flush()
                     textChannel = channel
@@ -81,11 +80,11 @@ public struct AgentGenerator: Sendable {
     private mutating func mapText(_ chunks: [String]) throws -> [GenerationEvent] {
         var output: [GenerationEvent] = []
         for chunk in chunks {
-            try reserve(textActions.count)
-            for alias in textActions {
-                output.append(
-                    .action(try capabilities.resolveAction(alias, parameters: ["text": chunk], channel: textChannel)))
-            }
+            guard let mapTextCalls else { throw GenerationError.unknownCapability }
+            let calls = try mapTextCalls(chunk, textChannel)
+            guard !calls.isEmpty, calls.count <= 8 else { throw GenerationError.limitExceeded }
+            try reserve(calls.count)
+            output += calls.map { .action($0) }
         }
         return output
     }

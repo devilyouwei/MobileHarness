@@ -19,7 +19,7 @@ func communicationConfiguration(_ id: String, subscribes: Bool = false, publishe
     ]
     return try AgentConfiguration(
         data: JSONSerialization.data(withJSONObject: [
-            "schemaVersion": 4, "agentID": id, "channels": [], "textActions": [], "actions": [], "tools": [],
+            "version": 5, "id": id, "actions": [String: [String]](), "tools": [],
             "communication": communication,
         ]))
 }
@@ -234,13 +234,13 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     let config = try communicationConfiguration("receiver")
     #expect(config.agentID.rawValue == "receiver")
     var root: [String: Any] = [
-        "schemaVersion": 3, "agentID": "receiver", "channels": [], "textActions": [], "actions": [], "tools": [],
+        "version": 3, "id": "receiver", "actions": [String: [String]](), "tools": [],
         "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
     ]
     #expect(throws: AgentConfigurationError.unsupportedVersion(3)) {
         try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))
     }
-    root["schemaVersion"] = 4
+    root["version"] = 5
     root["communication"] = ["inputs": [], "subscriptions": [], "publications": [], "sends": [], "requests": []]
     #expect(throws: AgentConfigurationError.self) {
         try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))

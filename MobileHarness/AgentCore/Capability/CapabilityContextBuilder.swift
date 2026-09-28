@@ -1,23 +1,49 @@
-/// Builds system-prompt guidance for visible Function Token Actions only.
-/// Native Tool Call metadata belongs to a separate provider protocol, never this text context.
+/// Builds English scheduling guidance and registered, visible Action metadata.
+/// Internal permissions and native Tool metadata never enter the model-facing catalog.
 public enum CapabilityContextBuilder {
-    public static func build(_ registry: CapabilityRegistry) -> String {
+    public static func build(_ registry: CapabilityRegistry, speechChannel: String? = nil) throws -> String {
+        if let speechChannel, !registry.channels.contains(speechChannel) { throw GenerationError.forbiddenChannel }
         var lines = [
-            "输出协议：自然文本自动映射为语音、字幕等已配置动作。显式 Action 只能使用下列清单中的自闭 XML 标签，参数值必须加引号。",
-            "同一任务内，同一 Channel 的动作按顺序执行，前一个完成后才开始下一个；不同 Channel 可以并行，但同一设备模块不能同时执行多个动作。输出先后不代表跨轨完成先后。",
-            "未指定 Channel 时使用各 Action 的默认轨道。使用 <channel.名称>...</channel.名称> 改变内部文本和动作的轨道；闭合只恢复外层或默认轨道，不等待、不停止动作。Channel 名称没有特殊主轨语义。",
-            "<wait>...</wait> 表示前后等待：先等所在父组此前的动作全部完成，再执行组内动作；组内仍同轨串行、异轨并行，全部完成后才放行父组后续动作。等待只影响当前任务。",
-            "需要先 A 后 B：写成 <wait>A</wait><wait>B</wait>；需要一组动作同时进行再继续：将它们放入同一个 wait，并使用不同轨道。A、B 是说明用的占位符，实际输出应是已注册动作或要说的话。",
-            "wait 可以嵌套，内层只等待父组此前的工作。wait 不接受属性或自闭写法；必须使用 </wait> 结束。所有标签正确嵌套，不要交叉闭合。最多 32 个 wait，wait 与 Channel 合计嵌套最多 8 层。",
-            "动作完成由其实现决定，例如语音要等播放结束；标签闭合、请求生成或入队不代表实际动作完成，不要声称未经确认的操作已完成。",
-            "文本中的 < 和 & 必须写为 &lt; 和 &amp;，属性里的双引号使用 &quot;。不输出根标签、注释、DOCTYPE、CDATA、成对 Action、parallel/serial 标签或 sync 属性。",
-            "可用 Channel：\(registry.channels.sorted().joined(separator: ", "))。以下为已注册的可见 Action：",
+            "OUTPUT FORMAT",
+            "Write natural text and registered self-closing Action tags. Use only aliases from the callable Action list below; quote all attribute values. Do not invent Actions, parameters or Channels.",
+            "SCHEDULING: CHANNEL, MODULE, WAIT",
+            "A Channel is an ordering queue, not a device module. Within this task, Actions on the same Channel execute in output order, each waiting for the previous Action to finish. Different Channels may run concurrently; output order alone does not order their completion.",
+            "A module is an execution resource. Only one Action per module can run at a time across all tasks, even on different Channels. Changing a Channel never changes an Action's module. Different modules on the same Channel still execute serially. Parallel execution is allowed, never guaranteed.",
+            "Each Action uses its listed default Channel unless enclosed in <channel.NAME>...</channel.NAME>, using an available Channel name. This overrides the Channel of enclosed text and Actions. Closing the scope restores the outer scope or each Action's own default. Channel tags neither wait nor stop Actions; no name has special main-channel behavior.",
+            "Use <wait>...</wait> for execution dependencies. Before its contents can start, all earlier work in its parent group must finish. Inside the group, normal Channel ordering and module exclusion still apply. Later work in the parent cannot start until the group is closed AND all its Actions and nested groups have finished.",
+            "The whole response has an implicit root group. Nested waits apply the same rule within their own parent only; they never wait on themselves, ancestors or unrelated tasks. A group may start received Actions before its closing tag arrives. <wait></wait> is a valid empty synchronization point. Wait does not change Channels.",
+            "Patterns (A, B, C and D are placeholders for actual Actions or natural text, not tags to output): <wait>A B</wait><wait>C D</wait> completes the first group before starting the second. <wait>A <wait>B C</wait> D</wait> completes A before B/C, and completes B/C before D. B/C may overlap only on different Channels and different modules.",
+            "When the user asks for sequential behavior, encode the order with wait groups. To speak first and then act, put the entire spoken text inside <wait>...</wait> and put the Action after </wait>. Merely writing text before an Action does NOT wait for audio playback. Putting both inside the same wait does NOT make them sequential. Use consecutive wait groups for consecutive steps.",
+            "A wait containing text waits for its audio playback to finish. Emitting a tag is a request, not proof that its effect occurred. Wait coordinates only the current task; it adds no implicit timeout or rollback.",
+            "SYNTAX RULES",
+            "Channel and wait tags must be paired, properly nested and attribute-free. Never cross closing tags or write <wait/> or a self-closing Channel. Action tags must be self-closing. At most 32 wait groups, 8 combined Channel/wait nesting levels and 120 generated Actions are allowed.",
+            "Escape literal < and & in text as &lt; and &amp;; use &quot; for quotes inside double-quoted attributes. Do not output a document root, comments, DOCTYPE, CDATA, paired Action tags, parallel/serial tags or sync attributes.",
+            "AVAILABLE CHANNELS: \(registry.channels.sorted().joined(separator: ", "))",
         ]
-        for action in registry.actions where !action.hidden {
+        if let speechChannel {
             lines.append(
-                "Action \(action.alias)：必填字符串参数 \(action.requiredParameters.sorted())；可选 \(action.optionalParameters.sorted())；默认 channel=\(action.defaultChannel)"
+                "All natural text is automatically converted to audio and played on the independent \(speechChannel) Channel by default. Audio playback may run in parallel with Actions on other Channels. Use wait whenever speech must finish before an Action starts."
             )
-            if let documentation = action.documentation { lines += describe(documentation) }
+        } else {
+            lines.append("Output registered Action tags only; natural text is not supported in this configuration.")
+        }
+        lines.append("ACTIONS BY DEFAULT CHANNEL (use the Action alias as the XML tag):")
+        for channel in registry.channels.sorted() {
+            lines.append(
+                "Channel \(channel)" + (speechChannel == channel ? " — automatic audio playback" : ""))
+            for action in registry.actions where action.defaultChannel == channel {
+                lines.append(
+                    "Action \(action.alias): module=\(action.path.module); default Channel=\(action.defaultChannel); required string parameters=\(action.requiredParameters.sorted()); optional=\(action.optionalParameters.sorted())."
+                )
+                if let documentation = action.documentation { lines += describe(documentation) }
+            }
+        }
+        if speechChannel != nil,
+            let example = registry.actions.first?.documentation?.examples.first
+        {
+            lines.append("Speak-then-act example: <wait>I will finish speaking first.</wait>" + example)
+            lines.append(
+                "In this example, everything after the first </wait> starts only after that sentence finishes playing.")
         }
         return lines.joined(separator: "\n")
     }

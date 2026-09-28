@@ -58,7 +58,7 @@ Speech completion includes playback; UI completion means state accepted the upda
 - Accept resolved invocations and explicit capability protocols or Sendable callbacks. Keep UI state on MainActor and runtime state in actors. Do not construct concrete models or perform global service lookup.
 - Each function owns required parameters, defaults, units, bounds, semantic validation, cleanup and error propagation. Validate before side effects; configuration metadata does not convert values or replace runtime checks.
 - Await promised completion, propagate cancellation to owned work and release resources before returning. Bound buffers and retries; never silently discard device Actions or use cancellation to trigger fallback.
-- Declare permissions, aliases, Channels and text mappings only in [Agent JSON v4](../Agents/README.md). App registers explicit Swift handlers. Agents do not import or directly call Actions.
+- Declare permissions, aliases, Channels and text mappings only in [Agent JSON v5](../Agents/README.md). App registers explicit Swift handlers. Agents do not import or directly call Actions.
 - Document each function's parameters, dependencies, side effects, completion, failure and cancellation in its domain README. Cover meaningful contract boundaries in root Tests. Run repository checks; update ADRs and roadmap when runtime contracts change.
 
 ## Feature status

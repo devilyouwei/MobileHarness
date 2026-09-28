@@ -1,127 +1,47 @@
 {
-  "schemaVersion": 4,
-  "agentID": "assistant",
-  "channels": [],
-  "textActions": [
-    "say",
-    "print"
-  ],
-  "actions": [
-    {
-      "alias": "say",
-      "path": {
-        "module": "Speech",
-        "function": "speak"
-      },
-      "defaultChannel": "Speech",
-      "parameters": [
-        {
-          "name": "text",
-          "valueType": "string",
-          "required": true,
-          "description": "Text to speak.",
-          "constraints": "Mandarin or US English, including mixed text; nonblank, at most 2000 UTF-8 bytes. Spell out English decimals and currency; no Markdown or emoji."
-        }
-      ],
-      "examples": [
-        "Hello."
-      ],
-      "doc": "Internal text mapping: Assistant submits text to speechSynthesis, then resolves playAudio on the same Channel.",
-      "hidden": true
-    },
-    {
-      "alias": "print",
-      "path": {
-        "module": "UI",
-        "function": "print"
-      },
-      "defaultChannel": "Display",
-      "parameters": [
-        {
-          "name": "text",
-          "valueType": "string",
-          "required": true,
-          "description": "Text to display.",
-          "constraints": "Nonblank; at most 2000 UTF-8 bytes. Original formatting is preserved."
-        }
-      ],
-      "examples": [
-        "Hello."
-      ],
-      "doc": "Append text to the conversation caption. Preserves accepted text, including surrounding whitespace.",
-      "hidden": true
-    },
-    {
-      "alias": "express",
-      "path": {
-        "module": "UI",
-        "function": "express"
-      },
-      "defaultChannel": "Display",
-      "parameters": [
-        {
-          "name": "emotion",
-          "valueType": "string",
-          "required": true,
-          "description": "The emotion expressed by the two animated blue eyes; no emoji or text glyphs.",
-          "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear smoothly returns the eyes to neutral."
-        }
-      ],
-      "examples": [
-        "<express emotion=\"smile\"/> Hello.",
-        "<express emotion=\"happy\"/> That is wonderful!",
-        "<express emotion=\"thinking\"/> Let me think."
-      ],
-      "doc": "Smoothly change the procedural eye expression. clear returns to neutral. Never render an emoji as the expression. Does not modify captions or speech. The Assistant clears its previous expression on new user speech.",
-      "hidden": false
-    },
-    {
-      "alias": "beginReplyTurn",
-      "path": {
-        "module": "UI",
-        "function": "beginReplyTurn"
-      },
-      "defaultChannel": "Display",
-      "parameters": [],
-      "examples": [
-        "<beginReplyTurn/>"
-      ],
-      "doc": "Begin the current conversation turn once: atomically clear the previous reply and expression. Preserve recognition text.",
-      "hidden": true
-    },
-    {
-      "alias": "playAudio",
-      "path": {
-        "module": "Speech",
-        "function": "speak"
-      },
-      "defaultChannel": "Speech",
-      "parameters": [
-        {
-          "name": "audioID",
-          "valueType": "string",
-          "required": true,
-          "description": "Application-generated audio UUID.",
-          "constraints": "Single consumption, scoped to the originating input and session."
-        }
-      ],
-      "examples": [
-        "<playAudio audioID=\"00000000-0000-0000-0000-000000000001\"/>"
-      ],
-      "doc": "Internal playback of accepted synthesis audio; waits at most three seconds for each missing PCM chunk.",
-      "hidden": true
-    }
-  ],
+  "version": 5,
+  "id": "assistant",
+  "actions": {
+    "Display": [
+      {
+        "alias": "express",
+        "path": {
+          "module": "UI",
+          "function": "express"
+        },
+        "parameters": [
+          {
+            "name": "emotion",
+            "valueType": "string",
+            "required": true,
+            "description": "The emotion expressed by the two animated blue eyes; no emoji or text glyphs.",
+            "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear smoothly returns the eyes to neutral."
+          }
+        ],
+        "examples": [
+          "<express emotion=\"smile\"/> Hello.",
+          "<express emotion=\"happy\"/> That is wonderful!",
+          "<express emotion=\"thinking\"/> Let me think."
+        ],
+        "doc": "Smoothly change the procedural eye expression. clear returns to neutral. Never render an emoji as the expression. Does not modify captions or speech. The Assistant clears its previous expression on new user speech."
+      }
+    ],
+    "Speech": []
+  },
   "tools": [
     {
-      "alias": "runtimeInfo",
-      "path": "System.runtimeInfo",
-      "parameters": [],
-      "examples": [
-        "{\"name\":\"runtimeInfo\",\"arguments\":{}}"
-      ],
-      "doc": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
-      "hidden": false
+      "type": "function",
+      "function": {
+        "name": "runtimeInfo",
+        "description": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "strict": true
+      }
     }
   ],
   "communication": {
