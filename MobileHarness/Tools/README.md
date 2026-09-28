@@ -54,4 +54,3 @@ Tools owns no queue and bypasses Channel scheduling. VisionPerception retains th
 | Status | Issue / next step |
 | --- | --- |
 | Open | Measure skeleton presentation latency on a physical device. |
-| Resolved — 2026-09-27 audit | Included UI alongside System and documented both feedback modes. |

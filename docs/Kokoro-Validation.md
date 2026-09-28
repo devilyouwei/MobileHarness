@@ -50,7 +50,7 @@
 - ✅ 当前 Mac 缓存加载 0.160 秒；固定英语句子生成 3.375 秒音频，两次首段 1.339 / 1.072 秒，总耗时 1.339 / 1.072 秒。音频 24 kHz mono，路径仍为 `/tmp/mobileharness-kokoro-0.wav` 和 `/tmp/mobileharness-kokoro-1.wav`。
 - ❌ 本轮未执行 iPhone 安装/试听、持续热状态测量或完整真实 ASR→LLM→TTS 对话测试；英语提示不保证每次模型输出都符合输入范围。
 
-默认合成绑定和语言策略见 [ADR 0050](adr/0050-default-kokoro-synthesis.md)。当前以英语回复和朗读替代 Apple TTS，不支持中文合成，也不自动回退。
+该次英语单语默认切换的绑定和语言策略见 [ADR 0050](adr/0050-default-kokoro-synthesis.md)；随后已由 [ADR 0052](adr/0052-kokoro-coreml-bilingual.md) 的 Core ML 中英双语实现取代。以下一节记录后续验收；两阶段均不自动回退到 Apple TTS。
 
 ## Core ML 中英双语替换验收（2026-09-28）
 

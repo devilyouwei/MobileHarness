@@ -61,4 +61,3 @@ Download scripts own bounded workers, temporary files and failures; [Models](Mod
 | Status | Issue / next step |
 | --- | --- |
 | Open | Confirm package size, startup and model behavior on physical devices; local files alone do not prove readiness. |
-| Resolved — 2026-09-27 audit | Distinguished active models, diagnostics and comparison-only profiles; removed obsolete artifact-layout wording. |

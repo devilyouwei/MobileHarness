@@ -1,5 +1,7 @@
 # ADR 0019 · Agent 独立 plist 配置与统一开发规范
 
+> Historical scope: Historical plist v1 format. [ADR 0022](0022-json-capability-configuration.md) replaced it with JSON, and current production declarations use JSON v4; see the [Agents README](../../MobileHarness/Agents/README.md).
+
 日期：2026-09-24。状态：采用。
 
 ## 决策与格式

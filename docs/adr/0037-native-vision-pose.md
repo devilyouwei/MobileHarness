@@ -1,5 +1,7 @@
 # ADR 0037 — Native camera frames and Vision pose inference
 
+> Historical scope: Historical transport and model stage. Its native frame approach remains relevant, but [ADR 0040](0040-shared-perception-and-event-routing.md) moved inference to VisionPerception and [ADR 0038](0038-yolo26-pose.md) replaced the model.
+
 Accepted: 2026-09-26. Supersedes the RGB-only camera transport portions of ADR 0035/0036.
 
 Purpose: remove unnecessary full-frame camera conversions while keeping ModelKit independent and Gateway responsible for admission. Design goals: bounded immutable native-buffer lifetime, explicit adapter boundaries, standard Vision preprocessing and measurable CPU+ANE baseline.

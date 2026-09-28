@@ -1,5 +1,7 @@
 # 0028 — Gateway-mediated Internal Agent Communication
 
+> Historical scope: Superseded transport proposal. [ADR 0048](0048-direct-signal-admission.md) removed InternalSignalBus and its queues; current communication contracts live in [AgentCore/Communication](../../MobileHarness/AgentCore/Communication/README.md).
+
 Status: design specified; implementation pending.
 
 ## Context and decision

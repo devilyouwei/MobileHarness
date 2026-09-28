@@ -10,7 +10,7 @@ Purpose: verify contracts and application integration in separate test targets. 
 
 ✅ YOLOPoseTests covers RGB boundaries, letterbox geometry, NMS and pose registration; YOLO_POSE_MODEL_ROOT enables real-model smoke and lifecycle checks. ❌ Human-image/device accuracy remains manual acceptance.
 
-✅ IntegrationTests/PhotographyPipelineTests exercises the new camera-to-Photographer-to-UI action pipeline with injected model doubles; native camera/device visual quality still requires device acceptance.
+✅ IntegrationTests/PhotographyPipelineTests exercises camera input, shared pose inference and the VisionPerception skeleton display path with injected model doubles; native camera/device visual quality still requires device acceptance. The test filename records the earlier Photographer design.
 
 ✅ test_model_download.py contains offline ZIP hash/member/path/symlink and replacement-preservation tests, invoked by scripts/check.sh. YOLOPoseTests use the new end-to-end model/output contract.
 
@@ -21,3 +21,5 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ IntegrationTests covers direct no-feedback skeleton Tool calls while preserving normal ToolResult round trips.
 
 ✅ OpenAIChatTests independently checks cloud chat encoding, bounded SSE and managed lifecycle with local URLProtocol fixtures. ❌ Live-provider acceptance is separate.
+
+✅ IntegrationTests cover Storage document cache/disk synchronization, concurrent revision conflicts, bounded I/O, unsupported schemas and invalid files. ❌ Device Keychain migration acceptance is separate.

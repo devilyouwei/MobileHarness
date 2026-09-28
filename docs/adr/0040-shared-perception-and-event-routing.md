@@ -1,5 +1,7 @@
 # ADR 0040 — Pure Gateway and shared perception
 
+> Historical scope: Historical Bus-based transport stage. [ADR 0048](0048-direct-signal-admission.md) removes InternalSignalBus and transport queues; [ADR 0041](0041-vision-perception-skeleton-action.md) and [ADR 0042](0042-show-pose-completion-tool.md) replace Photographer-driven skeleton Actions.
+
 Status: implemented; physical-device acceptance pending.
 
 ## Decision

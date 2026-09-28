@@ -101,7 +101,7 @@ Failure cannot roll back Actions already emitted and executed. If one append thr
 
 Update this README when changing syntax, names, bounds, ordering or completion/cancellation behavior.
 
-✅ AgentGenerator now supports an empty textActions list for Action-only Agents such as Photographer. Explicit self-closing calls and Channel scopes still use the shared parser; non-whitespace natural text without a mapping fails explicitly rather than being discarded. Assistant still requires nonempty text mappings at its own configuration boundary.
+✅ AgentGenerator supports an empty textActions list for Agents that emit only explicit Action calls. Explicit self-closing calls and Channel scopes still use the shared parser; non-whitespace natural text without a mapping fails explicitly rather than being discarded. Assistant still requires nonempty text mappings at its own configuration boundary.
 
 ## Streaming speech/text segmentation
 

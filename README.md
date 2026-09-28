@@ -66,6 +66,7 @@ MobileHarness takes inspiration from how human intelligence connects perception,
 | --- | --- |
 | Voice input | Nemotron streaming ASR and Silero VAD, shared through SpeechPerception |
 | Conversation | Qwen3.5-2B through MLX, with bounded conversation history and streaming output |
+| Optional cloud chat | OpenAI-compatible provider selection and local credential storage; real-provider acceptance pending |
 | Speech and captions | Kokoro Core ML Mandarin/English TTS, sequential playback and progressive reply captions |
 | Camera | Foreground preview, front/back switching and local YOLO26n-Pose perception |
 | Presentation | Recognition captions, semantic eye expressions, audio spectrum and skeleton overlay |
@@ -76,7 +77,7 @@ The current backend integrations include **Core ML** for Silero VAD and YOLO pos
 
 ✅ These paths are implemented, with module and integration tests. Build success does not establish device accuracy, latency or sustained stability.
 
-❌ Cloud inference, fast/slow model orchestration, robot/device control, Photographer motion policy, dynamic subscriptions, general request/reply, persistent messaging and Channel takeover are not implemented. The simulator supports UI development; it does not provide the physical-device model pipeline.
+❌ Fast/slow model orchestration, robot/device control, Photographer motion policy, dynamic subscriptions, general request/reply, persistent messaging and Channel takeover are not implemented. Configured cloud chat has an implementation, but real-provider acceptance remains pending. The simulator supports UI development; it does not provide the physical-device model pipeline.
 
 ## Architecture at a Glance
 
@@ -186,7 +187,6 @@ Input routing uses explicit `publish` (configured subscriptions) or `send` (name
 | --- | --- |
 | [Technical Design](MobileHarness/README.md) | Architecture, directory responsibilities and key techniques |
 | [Current Architecture](docs/Architecture.md) | Current implementation scope and runtime boundaries |
-| [Repository Structure](docs/Repository-Structure.md) | Source/target mapping and migration exceptions |
 | [Agents](MobileHarness/Agents/README.md) | Agent authoring, JSON declarations and input/output conventions |
 | [ModelKit](MobileHarness/ModelKit/README.md) | Capability interfaces, providers and model lifecycle |
 | [PlatformKit](MobileHarness/PlatformKit/README.md) | Device I/O, permissions and platform boundaries |
@@ -225,3 +225,5 @@ MobileHarness builds on the work behind Apple frameworks, MLX, Qwen, Nemotron, S
 ✅ Speech synthesis now runs in a dedicated Agent receiving directed text requests. Scheduled speech consumes transient audio IDs; cache limits and lifetimes are described in ADR 0055. ❌ Physical-device validation of this revision remains pending.
 
 ✅ Speech output now goes directly from validated Action admission to scheduled audio-ID playback. The output/session owner releases unused audio after failures and cancellation; no preparation stage remains. ❌ Physical-device acceptance is pending.
+
+Local user settings now use Storage-backed cached persistence in the application sandbox; credentials remain in Keychain. Optional repository-local runtime files belong under ignored `.local/`. See [Storage](MobileHarness/Storage/README.md).

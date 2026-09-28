@@ -54,4 +54,3 @@ There is no execution queue, replay or automatic serialization of independent ca
 | Status | Issue / next step |
 | --- | --- |
 | Open | A non-cooperative handler can delay its caller; no timeout is enforced. |
-| Resolved — 2026-09-27 audit | Clarified that skeleton coalescing belongs to VisionPerception, not ToolRuntime. |

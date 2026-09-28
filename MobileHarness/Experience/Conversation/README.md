@@ -40,7 +40,7 @@ VoiceOver, Dynamic Type and Reduce Motion are supported. SwiftUI remains MainAct
 
 ✅ Turn behavior: onset clears the previous reply/expression once; VAD silence retains the last recognition preview until final; final closes recognition; completed replies and expressions remain visible until the next onset. Actual playback controls the speaking projection, independently of caption arrival.
 
-## Product visual pass (2026-09-27)
+## Current visual design
 
 ✅ Navy translucent atmosphere preserves camera visibility and existing controls. Central pure blue eyes replace the ring. The entire central tap area retains start/stop behavior; startup is noninteractive. ASR/reply share the lower caption slot with unchanged priority and fade behavior; bottom bars extend through the bottom safe area. Reply bars trace only the estimated island lower edge inside a padded 166 × 62 pt canvas, descending from it with tapered corners; no upper/side corona is drawn.
 
@@ -48,15 +48,9 @@ VoiceOver, Dynamic Type and Reduce Motion are supported. SwiftUI remains MainAct
 
 ❌ Physical-device top-area layout (including expanded system activities), landscape/accessibility visual acceptance, and actual face/hand gaze delivery remain pending. No runtime contract, perception pipeline or production expression registrations changed.
 
-验证：`scripts/check.sh` 通过（含 86 个 IntegrationTests；可选真实模型测试未启用）。模拟器实际启动并检查聆听/回应视觉预览；顶部光柱按可用空间限高。预览增加 `-preview-speaking` 可直接打开回应状态。真机音视频与精确岛位置验收未执行。
-
-✅ 2026-09-27 refinement: larger face-proportioned eyes (21% width each, 19% gap), 40% eye line, 32 measured bands, blue input/violet reply. Preview tone remains steady at fixed frequency; the slider moves its spectral peak rather than triggering canned animation. See ADR 0045.
-
-频谱改版验证：根 `scripts/check.sh` 通过（含 90 个 IntegrationTests）；四个模拟器 scheme 与签名 Release 真机构建通过。已检查模拟器双眼比例与下置紫色频谱布局。真实麦克风频谱观感及输出路由延迟仍需用户真机体验。
+✅ Larger face-proportioned eyes (21% width each, 19% gap), 40% eye line, 32 measured bands, blue input/violet reply. Preview tone remains steady at fixed frequency; the slider moves its spectral peak rather than triggering canned animation. `-preview-speaking` directly opens the reply preview. See ADR 0045.
 
 ✅ Eye expressions use typed semantic values with stable rendering identities; the debug preview picker exposes every implemented pose. Clear/new turn morphs to neutral. No emoji or UUID-based eye replacement remains. Eye motion samples up to 60 Hz; audio spectra remain approximately 30 Hz.
-
-表情改版验证：根检查通过（90 个 IntegrationTests，其中表情测试遍历 11 个合法值）；四个模拟器 scheme 和签名 Release 真机构建通过，打包的 Assistant JSON 与源码一致。实际快速切换的观感和帧耗时仍需真机验收。
 
 ✅ Reply spectrum attachment: the lower capsule contour overlaps the estimated cutout edge by 1 pt; the ends taper down in length. Uses public safe-area geometry, not private hardware APIs. ❌ Expanded-island and per-device pixel alignment still require physical validation.
 

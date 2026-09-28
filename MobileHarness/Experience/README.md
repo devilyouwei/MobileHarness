@@ -66,7 +66,6 @@ Presentation replaces current state and adds no Agent work queue. Caption render
 | --- | --- |
 | Open | Validate visual timing, spectrum readability, cutout alignment and animation power use on physical devices. |
 | Open | Components still use App voice-phase state; a general presentation-state contract is deferred. |
-| Resolved — 2026-09-27 audit | Removed obsolete orb/emoji descriptions and Action-delivered skeleton wording. VoiceOrb.swift is a retained filename, not the current visual design. |
 
 ✅ Settings/SettingsView provides URL/key entry, model loading/selection and immediate save. The top-right toolbar contains camera and settings, with conditional camera controls below. ❌ Physical-device layout acceptance remains pending.
 

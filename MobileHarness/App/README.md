@@ -8,7 +8,7 @@ Assembles model capabilities, device services, Agents and presentation. The goal
 App/
 ├── MobileHarnessApp.swift         # SwiftUI entry and startup/diagnostic selection
 ├── AppSettings.swift              # Model selection and application of saved configuration
-├── CloudSettingsStore.swift       # Device-only Keychain persistence
+├── CloudSettingsStore.swift       # Storage-backed settings and Keychain credentials
 ├── AppContainer.swift             # Model capability preparation and platform services
 ├── AgentBootstrap.swift           # Shared ApplicationRuntime and explicit handlers
 ├── AppLifecycleCoordinator.swift  # Voice session, playback and presentation state
@@ -137,7 +137,6 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 | --- | --- |
 | Open | Competing scene-role registrations fail; multi-window ownership is not implemented. |
 | Open | Validate sustained camera/voice operation, startup latency and memory/thermal behavior on iPhone. |
-| Resolved — 2026-09-27 audit | Consolidated repeated presentation updates and corrected skeleton execution from Action to completion-only Tool. |
 
 ✅ InternalSignalBus is removed. App assembles shared policy and gateways, stops producers and coordinates Agent/runtime cancellation and cleanup; Agent inboxes own pending messages. No communication session registry remains. Action completion barriers and independent camera/voice cleanup remain. See [ADR 0048](../../docs/adr/0048-direct-signal-admission.md).
 
@@ -145,7 +144,7 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 
 ✅ Default synthesis now resolves to local KokoroCoreML resources. App keeps its existing ModelManager load/unload, PCM playback and diagnostics injection; no concrete TTS engine enters Agent code.
 
-✅ AppSettings owns URL/key/model editing, bounded model-list loading and Keychain persistence (one device-only record). Save stops and joins current voice work, updates only the chat registration and writes settings with rollback on update failure. CurrentChatCapability resolves the manager binding on each operation; voice/vision providers remain shared. Startup restores settings before voice warmup. ❌ Live cloud compatibility/device settings acceptance remain pending.
+✅ AppSettings owns URL/key/model editing, bounded model-list loading and Storage-backed local persistence and device-only Keychain credentials. Save stops and joins current voice work, updates only the chat registration and writes settings with rollback on update failure. CurrentChatCapability resolves the manager binding on each operation; voice/vision providers remain shared. Startup restores settings before voice warmup. ❌ Live cloud compatibility/device settings acceptance remain pending.
 
 ✅ Window-root tasks now own conversation runtime and camera event observation across navigation. Entering settings stops voice and suspends camera; returning restores camera intent without recreating the Agent. Cloud enabled state persists with credentials; pre-switch records decode as enabled. Disabled cloud configuration remains stored and is not validated/loaded at startup.
 
@@ -157,3 +156,14 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 ✅ App composes StorageAudio, registers SpeechSynthesisAgent, binds Assistant messaging before start, and binds scheduled Speech playback by audioID. Teardown stops/joins the synthesis Agent and closes its cache. ❌ This migration has not been accepted on a physical phone.
 
 ✅ The ordered Assistant output consumer cancels source/input audio on dispatch failure. stopVoice first cancels/joins Assistant generation, then cancels the session cache and Channel work; scheduled playback owns per-ID failure cleanup. ❌ No generic Action preparation hook is part of this lifecycle.
+
+
+### Durable user settings
+
+✅ `CloudSettingsStore` owns payload version 1 at `Application Support/MobileHarness/Settings/settings.json` in the application sandbox. Storage caches and atomically persists the nonsecret cloud switch, URL, model and opaque credential reference. API keys remain in Keychain with `WhenUnlockedThisDeviceOnly` protection. The settings directory is excluded from backup because its credential references are device-local. Runtime files are outside Git; optional repository-local development data belongs under ignored `.local/`.
+
+✅ Saving stages a new credential, commits the document using its expected revision, then removes the previous credential. A failed file commit removes the staged credential and preserves the previous document. Runtime reconfiguration failure attempts to persist the previous configuration again; rollback failure is surfaced. Turning cloud off retains URL, key and model. Startup refreshes disk before selecting the runtime capability.
+
+✅ Existing whole-configuration Keychain records migrate on the first successful load. The original is deleted only after the new document and referenced key can be read back. Malformed files, unsupported schemas, missing credentials and version conflicts are surfaced rather than reset. An explicit empty cloud record prevents legacy resurrection after rollback.
+
+❌ Keychain and file storage cannot form a single atomic transaction. A crash or cleanup failure can leave an unreferenced credential; automatic orphan collection is not implemented. Cross-device sync and live-device migration acceptance remain pending.

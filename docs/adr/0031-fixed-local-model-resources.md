@@ -1,5 +1,7 @@
 # ADR 0031: Fixed local model resources
 
+> Historical scope: Fixed-provider snapshot. Later decisions changed default synthesis to bilingual Kokoro and added explicit cloud chat selection; see [ADR 0052](0052-kokoro-coreml-bilingual.md) and [ADR 0053](0053-settings-live-chat.md).
+
 Status: accepted.
 
 App selects one fixed model per capability: Nemotron for ASR, Qwen3.5-2B for chat, Silero for VAD and Apple system TTS. Kokoro remains an explicit diagnostic provider. The shared ModelManager owns registration, instance identity and load/unload; capability consumers do not inspect resource configuration.

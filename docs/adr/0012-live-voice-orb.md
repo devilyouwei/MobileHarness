@@ -1,5 +1,7 @@
 # ADR 0012：实时语音预览与圆环交互
 
+> Historical scope: Historical visual and voice stage. The circular UI was replaced by procedural eyes and frequency-based spectra; see [ADR 0045](0045-audio-spectrum-telemetry.md) and [ADR 0046](0046-semantic-eye-expressions.md).
+
 日期：2026-09-24。状态：已实现；真机连续语音与性能验收待完成。
 
 ## 决策

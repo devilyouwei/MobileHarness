@@ -73,6 +73,5 @@ Speech completion includes playback; UI completion means state accepted the upda
 | Status | Issue / next step |
 | --- | --- |
 | Open | Physical-device timing and animation acceptance remain pending. |
-| Resolved — 2026-09-27 audit | Removed obsolete emoji/seven-expression descriptions and the Photographer Action claim. Skeleton presentation belongs to [Tools/UI](../Tools/UI/README.md). |
 
-✅ Legacy SpeechActions.speak(text) has been removed; synthesis belongs to SpeechSynthesisAgent. ❌ Shared-cache directory placement is pending a separate layout decision.
+✅ Production `Speech.speak(audioID)` uses [StorageAudio](../Storage/Audio/README.md) prepared by SpeechSynthesisAgent. The former text-bearing helper has been removed from Actions.

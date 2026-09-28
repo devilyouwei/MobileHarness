@@ -1,5 +1,7 @@
 # ADR 0051: OpenAI-compatible cloud chat
 
+> Historical scope: Historical adapter-only stage. [ADR 0053](0053-settings-live-chat.md) added the settings UI, Keychain storage and immediate selection; real-provider acceptance remains open.
+
 Accepted 2026-09-28.
 
 Third-party cloud text models must be usable without exposing endpoint/provider identity to Agents or adding a dependency from the capability SDK to network implementations.

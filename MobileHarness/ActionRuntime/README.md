@@ -50,4 +50,3 @@ The immutable registry is shared safely across tasks. Execution creates no queue
 | Status | Issue / next step |
 | --- | --- |
 | Open | Cleanup relies on handler cooperation; no forced interruption or runtime timeout exists. |
-| Resolved — 2026-09-27 audit | Separated execution from Gateway admission and scheduling in both diagrams. |

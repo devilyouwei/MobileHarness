@@ -1,5 +1,7 @@
 # ADR 0036: Changed camera frames → Photographer → skeleton Action
 
+> Historical scope: Historical camera/Agent stage. [ADR 0040](0040-shared-perception-and-event-routing.md) moved inference to VisionPerception, [ADR 0041](0041-vision-perception-skeleton-action.md) removed the display-only Photographer, and [ADR 0042](0042-show-pose-completion-tool.md) made skeleton display a Tool.
+
 Accepted 2026-09-26. Camera input is no longer preview-only. External images enter through InputGateway; YOLO inference belongs to the new Photographer Agent, not Gateway. ModelKit supplies the shared .pose capability via the process-wide ModelManager. AgentCore remains independent of ModelKit and platform adapters; App maps platform RGB values to ImageInput and Photographer maps that to ModelKit ImageFrame.
 
 Gateway compares 64×64 grayscale grids to the previous examined frame. Default admission is normalized mean absolute difference ≥3%; exact duplicates never pass, and first/geometry-changed frames pass. Threshold and optional minimum sampling interval are validated configuration. This explicitly favors per-frame changes over accumulated drift from the last admitted frame.

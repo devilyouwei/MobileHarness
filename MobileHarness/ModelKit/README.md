@@ -106,7 +106,6 @@ The physical App requires iOS 27 and matching local artifacts. Simulator local A
 | --- | --- |
 | Open | Validate sustained voice/pose coexistence, retry stability, pose accuracy and thermal behavior on iPhone. |
 | Open | Non-cooperative backend calls can delay cancellation/shutdown; generic forced interruption is unavailable. |
-| Resolved — 2026-09-27 audit | Removed Gateway ASR/VAD ownership, YOLOv8 defaults, Photographer inference ownership and the obsolete claim that computer vision is unimplemented. |
 
 ## Extension rules
 

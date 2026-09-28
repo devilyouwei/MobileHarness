@@ -1,5 +1,7 @@
 # ADR 0009 Audio8 原生 ASR adapter
 
+> Historical scope: Historical adapter decision. Audio8 was removed from the current source tree; this record does not describe an available provider. See the [validation history](../Audio8-Validation.md).
+
 状态：已实施，独立能力；未切换 App；iPhone 运行待验收。日期：2026-09-23。
 
 用户要求参考 hugging-mac/models/audio8_asr 添加模型。该参考的 audio tower 为 Core ML，decoder 为 PyTorch/MPS。为支持 iOS，本项目采用官方 Audio8-ASR-0.1B-iOS-ANE 固定提交 6a3f52c400cd436e1bd32c0514758345ddf14bfa，复用其 Swift 算法并适配现有能力、资源与并发边界。模型及官方 SDK 为 CC-BY-NC-4.0，保留许可和来源，不视作可无限制商用制品。

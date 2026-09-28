@@ -17,12 +17,8 @@ Maintain this README alongside implementation, Agent JSON and App handler bindin
 
 ✅ SetTranscript.swift / UI.setTranscript replaces the recognition caption independently of UI.print reply captions. Required text accepts empty string to clear and at most 4096 UTF-8 bytes. Missing/oversized text fails before presentation. The function checks cancellation before and after the injected callback. SpeechPerception declares the Transcript Channel in JSON; the App handler rejects old voice sessions. Completion means MainActor state was updated. This Action introduces no extra queue or timer.
 
-✅ UI.showPose is declared and emitted by VisionPerception. The App keeps the explicit handler and MainActor presentation callback; Photographer does not participate in skeleton rendering.
-
 ✅ BeginReplyTurn.swift / UI.beginReplyTurn accepts no parameters and atomically clears the previous Assistant reply and expression once per conversation turn. Assistant owns this behavior. UI.express additionally accepts emotion=clear; the typed clear identifier tells its registered handler to return to neutral. Both use cancellation-checked Action execution, not Signals.
 ✅ SetVoiceState.swift / UI.setVoiceState requires state=listening|hearing|processing, validates it before calling the UI handler, and never changes capture admission. Missing/unknown values fail. Default Display Channel serializes these actions with expression/reply changes. Reply presentation state is updated by the explicit recognition state plus actual playback activity; UI.print only appends text.
-
-✅ ShowPose.swift moved to Tools/UI. Skeleton presentation is no longer an Action registration; other UI Actions retain their existing Channel semantics.
 
 ## Turn-scoped presentation
 

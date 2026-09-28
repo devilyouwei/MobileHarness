@@ -27,3 +27,6 @@ Config/Local.xcconfig
 MobileHarness/Resources/Models/*/
 *.aimodel/
 *.aimodelc/
+
+# Optional local runtime/development configuration; never commit user data.
+/.local/

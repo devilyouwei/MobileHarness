@@ -1,52 +1,32 @@
-# Current architecture and scope
+# MobileHarness architecture
 
-Purpose: explain present cross-module ownership and dependency direction. [MobileHarness/README.md](../MobileHarness/README.md) is the target technical plan; [Repository-Structure.md](Repository-Structure.md) maps it to physical targets. Exact module APIs, capacities and cleanup rules live in the corresponding source-directory README. [Roadmap.md](Roadmap.md) tracks pending work. The original `Technical_Design.docx` and historical `Tech_Design.md` remain unchanged design sources.
-
-## Dependency direction
-
-```text
-App → Agents / Gateway / Actions / ActionRuntime / Tools / ToolRuntime / PlatformKit / ModelKit capabilities / StorageAudio
-Gateway → AgentCore / ActionRuntime / ToolRuntime
-Agents → AgentCore / ModelKit / StorageAudio
-Actions → AgentCore / ActionRuntime / StorageAudio
-StorageAudio → Storage / AgentCore / ModelKit
-Storage → Foundation
-ActionRuntime / Tools / ToolRuntime → AgentCore
-ModelKitRuntime → ModelKit
-ModelKit adapters → ModelKit / separate backends / platform SDKs
-AgentCore → Foundation
-ModelKit → Foundation / supported system frameworks
-```
-
-App assembles and injects services. AgentCore is independent of UI, concrete Agents, model engines and device adapters. ModelKit is an independent capability layer; its provider/default assembly stays inside ModelKitDefaults. Storage is independent of business and model types; StorageAudio is the PCM adapter shared by synthesis and playback. The current Storage contract is in [Storage README](../MobileHarness/Storage/README.md), with speech-specific behavior in [StorageAudio README](../MobileHarness/Storage/Audio/README.md). Disk and durable storage are future stages.
-
-## Signal and execution flow
+MobileHarness turns device signals into Agent decisions and observable actions. An iPhone is the current host: it captures audio and camera frames, runs local perception and language models, and presents speech, captions, eyes and camera overlays. A configured cloud chat provider is optional. The project is designed to add more Agents and external devices, but robot control is not implemented today.
 
 ```mermaid
 flowchart LR
-    Device[PlatformKit device input] --> App[App adaptation]
-    App --> IG[InputGateway]
-    IG --> Perception[SpeechPerception / VisionPerception]
-    IG --> Synthesis[SpeechSynthesisAgent]
-    Perception --> Models[ModelKit capabilities]
-    Perception --> OG[OutputGateway]
-    OG --> IG
-    IG --> Business[Assistant / other Agents]
-    Business -->|outputs and directed text| OG
-    OG --> Runtimes[ActionRuntime / ToolRuntime]
-    Runtimes --> UI[App / Experience / device output]
-    Synthesis --> StorageAudio[StorageAudio]
-    StorageAudio -->|audioID checkout| Runtimes
+    World[Microphone / camera / user input] --> Input[Validated input]
+    Input --> Perception[Shared speech and vision perception]
+    Perception --> Decisions[Assistant and future task Agents]
+    Decisions --> Output[Validated actions and tools]
+    Output --> Phone[Speech / captions / eyes / camera overlay]
+    Perception <--> Models[Local model capabilities]
+    Decisions <--> Models
+    Decisions -. optional explicit choice .-> Cloud[Cloud chat provider]
 ```
 
-External inputs and tool results enter through InputGateway; Agent outputs pass through OutputGateway. Static publish and explicit directed send are validated against JSON v4 communication policy. Gateway routes and validates but does not own pending Agent message queues. Each Agent owns its inbox and overflow policy. OutputGateway validates resolved ActionCall/ToolCall; Channel scheduling applies only to Actions, while Tools execute directly. See [communication](../MobileHarness/AgentCore/Communication/README.md), [Gateway](../MobileHarness/Gateway/README.md), [Agents](../MobileHarness/Agents/README.md) and [Action scheduling](../MobileHarness/Gateway/Output/Scheduling/README.md) for current contracts. [ADR 0048](adr/0048-direct-signal-admission.md) explains direct admission, and [ADR 0042](adr/0042-show-pose-completion-tool.md) explains the completion-only skeleton Tool.
+## How the current system works
 
-SpeechPerception owns VAD/ASR and recognition-caption Actions; Assistant owns conversational text segmentation and submits segments to the independent SpeechSynthesisAgent. It emits `Speech.speak(audioID)` only after synthesis request admission. Synthesis may proceed alongside scheduled playback; the Action owns actual playback completion. The App coordinates session and source cleanup, while the cache enforces owner scope and expiry. See the [voice acceptance guide](Voice.md), the [synthesis Agent README](../MobileHarness/Agents/SpeechSynthesis/README.md), the [playback README](../MobileHarness/Actions/Speech/README.md), [ADR 0055](adr/0055-synthesis-agent-audio-handles.md) and [ADR 0056](adr/0056-storage-audio-migration.md).
+- **Perception is shared.** Speech recognition and pose estimation produce observations that other Agents can consume. Camera preview remains available independently of voice-model readiness.
+- **Agents decide behavior.** The conversational Assistant handles recognized speech and produces text, speech and presentation requests. An independent synthesis Agent prepares speech audio while playback follows the accepted Action order.
+- **Outputs are explicit.** Gateways validate incoming signals and requested behavior. Actions provide scheduled behavior such as speech playback and captions; Tools provide direct functions such as skeleton display.
+- **Capabilities stay separate.** ModelKit supplies model processing, PlatformKit handles device input/output, Experience presents the UI, and App connects those parts. Current speech audio uses a bounded process-local cache; user settings use synchronized cached local persistence. General persistent media and memory remain planned.
 
-VisionPerception owns camera pose interpretation and produces display/gaze behavior through declared Tool/Action paths; it does not control the camera hardware. PlatformKit owns device I/O, ModelKit owns model processing, and Experience owns presentation. [ADR 0039](adr/0039-platform-capability-domains.md) records that domain boundary. Physical robot safety cannot depend on iOS background execution.
+The current repository implementation and source-to-target map are documented in the [internal technical plan](../MobileHarness/README.md#project-structure); exact contracts live in the module READMEs linked from its [module design](../MobileHarness/README.md#part-ii--module-design). This page describes behavior and boundaries for external readers; it does not define code-level limits or target dependencies.
 
-## Current limits of scope
+## Current scope
 
-✅ Static subscription, directed delivery, shared speech/vision perception, serial synthesis, bounded process-local audio handles, Channel Action scheduling, direct Tools and model lifecycle are implemented. Module READMEs state their exact limits and failure behavior.
+✅ Local speech perception, conversational replies, synthesis and playback, camera pose perception, eye expressions/gaze, captions and explicit cloud chat selection have implementation and automated checks. The [voice acceptance guide](Voice.md) and dated validation reports distinguish test evidence from physical-device experience.
 
-❌ General request/reply, durable messaging/storage, cross-model scheduling, Channel takeover, robot control and sustained physical-device acceptance remain open. [Roadmap.md](Roadmap.md) owns milestone status; dated [ADRs](adr/README.md) preserve decisions without becoming duplicate current specifications.
+❌ Durable memory, general cross-Agent request/reply, robot motion control, continuous background execution and sustained iPhone latency/thermal acceptance remain open. Future work is tracked in the [roadmap](Roadmap.md); historical decisions are in the [ADR index](adr/README.md). Physical robot safety would have to be enforced by the external controller, not by an iPhone App remaining active in the background.
+
+User settings persist on this device, while credentials remain in protected device storage. The current design does not synchronize settings across devices. [ADR 0057](adr/0057-local-settings-storage.md) records the storage decision; the [Storage README](../MobileHarness/Storage/README.md) owns the implementation contract.

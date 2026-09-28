@@ -1,7 +1,7 @@
 # Repository instructions
 
 Read README.md, docs/Architecture.md and docs/Roadmap.md before architectural work. Preserve docs/Technical_Design.docx as the original design source.
-Use MobileHarness/README.md as the target technical plan. Migrate in stages; Implemented modules follow its section 37 layout, including Actions, ActionRuntime, Tools and ToolRuntime; documented exceptions and outstanding modules are listed in docs/Repository-Structure.md. Keep tests under root Tests/ (and existing optional package tests); root Package.swift maps shared sources into independently tested targets. Do not recreate Packages/HarnessKit/Sources or duplicate sources.
+Use MobileHarness/README.md as the target technical plan. Migrate in stages; Implemented modules follow its section 37 layout, including Actions, ActionRuntime, Tools and ToolRuntime; target mapping, documented exceptions and outstanding modules are listed in its Project Structure section. Keep tests under root Tests/ (and existing optional package tests); root Package.swift maps shared sources into independently tested targets. Do not recreate Packages/HarnessKit/Sources or duplicate sources.
 
 - Swift 6 language mode with Swift 6.4+ tooling; SwiftUI UI isolated to MainActor, runtime state isolated to actors.
 - Keep modules acyclic. AgentCore must not depend on UI, concrete agents, model engines, or device adapters.

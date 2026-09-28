@@ -70,4 +70,3 @@ Audio and camera own their devices and cleanup. Capture delivery is bounded; aud
 | --- | --- |
 | Open | Measure camera/audio coexistence, route-dependent playback latency and sustained thermal/power behavior on device. |
 | Open | Robot control requires device-side limits, stop acknowledgement and disconnect protection; iOS background execution cannot provide safety. |
-| Resolved — 2026-09-27 audit | Removed Gateway-to-ASR/VAD inference edges and included current spectrum telemetry. |

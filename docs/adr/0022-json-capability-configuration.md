@@ -1,5 +1,7 @@
 # ADR 0022: JSON Capability Configuration v2
 
+> Historical scope: Historical JSON v2 format. Later versions changed documentation and communication fields; the [Agents README](../../MobileHarness/Agents/README.md) owns current JSON v4.
+
 Status: accepted. Date: 2026-09-24.
 
 Replace per-Agent XML plist resources with UTF-8 JSON and schemaVersion 2. Do not silently fall back to plist. Keep alias/path/defaultChannel/textActions behavior unchanged and keep real handler registration in App.

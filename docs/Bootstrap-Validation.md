@@ -1,5 +1,7 @@
 # 初始化验证记录
 
+这是项目初始化时的历史验收快照。文中的目录、命令和“待安装 Xcode”仅对应 2026-09-22 的环境；当前检查入口见 [验证历史](Validation-History.md) 和 [语音验收指南](Voice.md)。
+
 日期：2026-09-22。环境：Apple Silicon Mac，Swift 6.4 Command Line Tools；尚未安装完整 Xcode。
 
 ## 已通过

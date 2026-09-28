@@ -93,4 +93,6 @@ flowchart LR
 
 Action/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, output)`；首次起音分配 `ConversationTurn(id: UUID, ordinal: UInt64)`，长语音切段不换轮。调用 Action 后发屏障不意味着另一条观测通路的接收者已经处理完毕，两个通路没有全局完成顺序。
 
-✅ `tools / textActions / communication.sends` 均为空，无 ToolResult 输入、无定向 Agent 消息；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。
+### Publish / send 边界
+
+`communication.publications` 仅包含上表三个 `speech.*` contract，typed payload、长度、触发时机和消费者均按“共享观测输出”表；它们不携带 PCM，也不作为 Agent `outputs` 流的 Action。`communication.sends = []`：SpeechPerception 不发送定向 Agent 消息；Assistant 接收 final/phase 是订阅广播，不是 send。`tools / textActions` 均为空，无 ToolResult 输入；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。

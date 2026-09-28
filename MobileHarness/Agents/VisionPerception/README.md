@@ -111,7 +111,16 @@ people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye�
 
 Tool 经 `outputs → App transport pump → OutputGateway → ToolRuntime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
 
-✅ 每次结果输出一个可替换 showPose / moveEyes 状态对，不发每帧 agent.finished。失败输出 `control("agent.error: pose processing failed")` 并终止流；终态控制不能被后续骨架覆盖。`actions` 声明 moveEyes，默认 Gaze Channel；`channels / textActions / communication.sends` 均为空。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
+### 其他输出与 send 边界
+
+| 方向 | 数据标准与语义 |
+| --- | --- |
+| Action 输出 | `moveEyes → UI.moveEyes / Gaze`，`parameters["x"] / ["y"]` 为数值的十进制字符串，目标范围各为 -1...1；由 FaceGazeTracker 根据本帧脸部点位生成，未锁定目标时回中。它是显示方向，不是关节点像素坐标。与同一帧的 showPose ToolCall 组成可替换状态对。 |
+| control 输出 | 推理失败发 `control("agent.error: pose processing failed")` 并终止流；不发每帧 `agent.finished`。终态控制不能被后续骨架覆盖。 |
+| publish | `communication.publications` 仅有 `vision.pose`；typed payload、坐标单位、人数与容量按上文“共享感知数据”段落。该发布与骨架 ToolCall/眼睛 Action 分离。 |
+| send | `communication.sends = []`，不向其他 Agent 定向发送消息；当前也没有其他业务 Agent 订阅 `vision.pose`。 |
+
+`actions` 声明 moveEyes；`channels / textActions` 均为空。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
 
 ## Eye attention policy
 

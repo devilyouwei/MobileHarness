@@ -36,8 +36,6 @@ flowchart LR
 
 Never commit weights, user recordings, credentials or local signing settings. Update this table and staging inputs when changing bundled resources.
 
-✅ Validation: real Mac Qwen2B, Nemotron, Silero and Kokoro loading passed after migration. The signed Debug App contains only the selected resource directories and is about 3.3 GiB uncompressed; physical-device acceptance remains outstanding.
-
 ✅ Supported chat download profiles are Qwen3.5-2B and optional 4B. Native CoreAI resources support ASR; Kokoro TTS uses Core ML.
 
 ✅ yolo26-pose.download.json pins the official Ultralytics YOLO26n-Pose INT8 archive and extracted file hashes; download with scripts/download-yolo26-pose.py. The model metadata declares AGPL-3.0. ✅ Physical App staging includes these artifacts.

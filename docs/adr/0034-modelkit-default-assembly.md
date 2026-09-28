@@ -1,5 +1,7 @@
 # ADR 0034: Internal default model assembly
 
+> Historical scope: Historical default-provider snapshot. [ADR 0052](0052-kokoro-coreml-bilingual.md) replaced Apple speech with bilingual Kokoro; [ADR 0053](0053-settings-live-chat.md) added explicit cloud chat selection.
+
 Status: accepted.
 
 ModelKitDefaults owns the project's fixed mapping: chat uses Qwen3.5, recognition uses Nemotron, VAD uses Silero, synthesis uses Apple system voices. Kokoro has an explicit diagnostic ID without a default binding; judgment has no implementation. Simulator chat and recognition are unavailable without substituting providers.

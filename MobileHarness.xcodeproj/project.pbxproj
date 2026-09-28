@@ -7,11 +7,12 @@
 	"objects" = {
 "710A2F3A64A0F14DFEFC266A" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/Audio/SpeechAudioStore.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "06700822D3F590057AD4BB38" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Storage/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+"CD5570000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/LocalDocumentStore.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "CD5410000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/BoundedMemoryStream.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "CD5410000000000000000002" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/MemoryLeaseStore.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "CD5410000000000000000003" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Storage/Audio/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 "CD5410000000000000000004" = { "isa" = "PBXGroup"; "children" = ("CD5400000000000000000002", "710A2F3A64A0F14DFEFC266A", "CD5410000000000000000003"); "name" = "Audio"; "sourceTree" = "<group>"; };
-"A8A737D86D439890A23BB48A" = { "isa" = "PBXGroup"; "children" = ("CD5410000000000000000001", "CD5410000000000000000002", "CD5410000000000000000004", "06700822D3F590057AD4BB38"); "name" = "Storage"; "sourceTree" = "<group>"; };
+"A8A737D86D439890A23BB48A" = { "isa" = "PBXGroup"; "children" = ("CD5570000000000000000001", "CD5410000000000000000001", "CD5410000000000000000002", "CD5410000000000000000004", "06700822D3F590057AD4BB38"); "name" = "Storage"; "sourceTree" = "<group>"; };
 "2BF205610DB867B85B94B08B" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/SpeechSynthesis/SpeechSynthesisAgent.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "9F306046D7455E79804EA05E" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Agents/SpeechSynthesis/SpeechSynthesis.agent.json"; "sourceTree" = "SOURCE_ROOT"; };
 "12F1D1CDFDECD985F6B7ACE1" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Agents/SpeechSynthesis/README.md"; "sourceTree" = "SOURCE_ROOT"; };
@@ -1743,12 +1744,6 @@
 			"path" = "docs/Platform-Boundaries.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
-		"C504C8BA5BF21CB86A0EC7A8" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "text";
-			"path" = "docs/Repository-Structure.md";
-			"sourceTree" = "SOURCE_ROOT";
-		};
 		"1F6F0344AD507391063C00EE" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text";
@@ -1883,9 +1878,27 @@
 		};
 		"558FBFC0D83238F684619786" = {
 			"isa" = "PBXGroup";
-			"children" = ("5A2D47B61C84C80CFEBA7167", "BDD9B31CF5294859E35D68E1", "AC6E5427D9343878D1581BB7", "51B597E7B7F2CC25BF6E99B3", "835ED4A2CC90209A84D23B00", "C504C8BA5BF21CB86A0EC7A8", "1F6F0344AD507391063C00EE", "3EB536D9DC8329A706FC789A", "0BA0B71F5F15E41C468A98F4", "3B6F6F4DF78589B6EF624C46", "1D497440DACE8EF888B1A530", "3423033F32961F99BD1378C0", "2AB0A694258DD2E080C668EF");
+			"children" = ("5A2D47B61C84C80CFEBA7167", "BDD9B31CF5294859E35D68E1", "AC6E5427D9343878D1581BB7", "51B597E7B7F2CC25BF6E99B3", "835ED4A2CC90209A84D23B00", "1F6F0344AD507391063C00EE", "3EB536D9DC8329A706FC789A", "0BA0B71F5F15E41C468A98F4", "3B6F6F4DF78589B6EF624C46", "1D497440DACE8EF888B1A530", "3423033F32961F99BD1378C0", "D0C20A9B9E9141A4B214A001", "D0C20A9B9E9141A4B214A002", "D0C20A9B9E9141A4B214A003", "2AB0A694258DD2E080C668EF");
 			"name" = "docs";
 			"sourceTree" = "<group>";
+		};
+		"D0C20A9B9E9141A4B214A001" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "net.daringfireball.markdown";
+			"path" = "docs/Change-Log.md";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"D0C20A9B9E9141A4B214A002" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "net.daringfireball.markdown";
+			"path" = "docs/Photographer-Proposal.md";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"D0C20A9B9E9141A4B214A003" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "net.daringfireball.markdown";
+			"path" = "docs/Validation-History.md";
+			"sourceTree" = "SOURCE_ROOT";
 		};
 		"F913940C58E8744A2AF1C68B" = {
 			"isa" = "PBXFileReference";

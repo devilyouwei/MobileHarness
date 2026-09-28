@@ -2,7 +2,7 @@ import Foundation
 import ModelKitDefaults
 import ModelKitOpenAI
 import Observation
-import Security
+import Storage
 
 @MainActor @Observable
 final class AppSettings {
@@ -23,6 +23,7 @@ final class AppSettings {
     private var discovery: Task<Void, Never>?
     private var revision = 0
     private var restored = false
+    private var restoration: Task<Void, any Error>?
     private var saved: CloudSettings?
     private let store = CloudSettingsStore()
     private let resources = Bundle.main.bundleURL.appendingPathComponent("Models")
@@ -34,8 +35,15 @@ final class AppSettings {
 
     func restore() async throws {
         guard !restored else { return }
-        // Reserve before suspension so startup and settings never restore stale storage over edits.
-        let value = try store.load()
+        if let restoration { return try await restoration.value }
+        let task = Task { try await restoreSettings() }
+        restoration = task
+        defer { restoration = nil }
+        try await task.value
+    }
+
+    private func restoreSettings() async throws {
+        let value = try await store.load()
         saved = value
         isEnabled = value?.enabled ?? false
         url = value?.url ?? ""
@@ -91,11 +99,11 @@ final class AppSettings {
             let previous = saved
             await beginChange()
             defer { endChange() }
-            try store.save(value)
+            try await store.save(value)
             do {
                 try await ModelKitDefaults.configureChat(resources: resources, configuration: configuration)
             } catch {
-                do { try store.save(previous) } catch { throw CloudSettingsError.keychain(errSecIO) }
+                do { try await store.save(previous) } catch { throw CloudSettingsError.persistence }
                 throw error
             }
             saved = value
@@ -127,6 +135,11 @@ final class AppSettings {
         if case OpenAIChatError.httpStatus(let status) = error {
             return status == 401 || status == 403 ? "Key 无效或没有访问权限，请检查后重试" : "服务返回错误（\(status)），请检查 URL 后重试"
         }
+        if error is DocumentStorageError || error is CocoaError || error is DecodingError {
+            return "本地配置读取或保存失败，可能已被修改，请重新启动后重试"
+        }
+        if case CloudSettingsError.persistence = error { return "配置持久化或回滚失败，请重新启动后检查配置" }
+        if case CloudSettingsError.busy = error { return "配置正在读取或保存，请稍后重试" }
         if error is CloudSettingsError { return "无法保存配置，请检查地址、模型选择或设备钥匙串访问" }
         if error is CancellationError { return "操作已取消" }
         return "无法连接服务，请检查 HTTPS URL、Key 和网络后重试"

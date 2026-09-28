@@ -35,4 +35,4 @@ Implementation reference: [Apple AVCam](https://developer.apple.com/documentatio
 
 ❌ Sustained camera-buffer pool pressure, thermal behavior and device alignment after Vision migration remain acceptance work. Grayscale values can differ from the former resize-then-sample pipeline even though thresholds/baseline rules are unchanged.
 
-The Vision directory is a capability domain, distinct from Apple’s Vision framework. It owns camera I/O and frame adaptation; model preprocessing/inference belongs to ModelKit/Vision and its backends, change admission to Gateway, and photography decisions to Agents/Photographer. Camera files remain flat until multiple device implementations justify subdirectories.
+The Vision directory is a capability domain, distinct from Apple’s Vision framework. It owns camera I/O and frame adaptation; model preprocessing/inference belongs to ModelKit/Vision and its backends, change admission to Gateway. VisionPerception owns current pose decisions; future camera-motion policy is a [Photographer proposal](../../../docs/Photographer-Proposal.md). Camera files remain flat until multiple device implementations justify subdirectories.

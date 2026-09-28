@@ -1,5 +1,7 @@
 # ADR 0035: YOLOv8 Pose capability
 
+> Historical scope: Historical model choice. [ADR 0038](0038-yolo26-pose.md) replaced YOLOv8 with YOLO26n-Pose.
+
 Accepted: 2026-09-26.
 
 The requested model is an image-input Core ML graph with raw pose outputs; the existing tensor-only Silero backend cannot accept it directly. Add a separate CoreMLImageGraph backend and ModelKitYOLOPose adapter under Vision/YOLO, with a model-independent PoseCapability and bounded RGB8 ImageFrame. Management depends only on the base capability; Defaults selects n and provides lazy `.pose` registration with idle eviction.

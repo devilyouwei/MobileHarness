@@ -1,5 +1,7 @@
 # 0030 — Shared Model Manager
 
+> Historical scope: Historical assembly stage. [ADR 0034](0034-modelkit-default-assembly.md) moved production provider registration to ModelKitDefaults; current management contracts live in [ModelKit/Management](../../MobileHarness/ModelKit/Management/README.md).
+
 Status: implemented; sustained device acceptance pending.
 
 ## Decision

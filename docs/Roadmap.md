@@ -1,5 +1,15 @@
 # 实施计划
 
+本页按日期保留实施里程碑和当时的验证记录；较早的“✅”描述反映该日期的实现，不代表当前模块仍按相同方式运行。当前能力以 [项目概览](../README.md) 和 [公开架构](Architecture.md) 为准，精确实现契约见[模块设计入口](../MobileHarness/README.md#part-ii--module-design)所链接的各模块 README。
+
+## 当前待验收与后续方向
+
+- ❌ 在 iPhone 上完成连续中英语音、真实 Kokoro 试听、音频路由切换、摄像头姿态与眼睛跟随的体验、延迟、内存和热状态验收；自动化测试及模拟器构建不能代替这些结果。
+- ❌ 用真实第三方服务验证已接入的云聊天配置、切换和失败恢复。
+- ❌ 在现有本地设置存储之外，按实际需求扩展持久化媒体与记忆、跨 Agent 请求/回复、更多感知能力及机器人动作；物理运动的限幅、失联停机和确认必须由设备侧承担。
+
+## 历史实施计划与里程碑
+
 依据原始技术方案与当前产品优先级，P1 首先接入必备模型与能力封装。模型通过统一能力协议解耦，Runtime 只同步补齐真实调用闭环所需的最小功能。详细目录与职责见 [ModelKit 设计](../MobileHarness/ModelKit/README.md)。本表为实施顺序，不是已完成清单。
 
 | 阶段 | 范围 | 验收条件 |
@@ -76,7 +86,7 @@ AgentCore 的 Signal、Agent 内解析与完整 ActionCall、Output 的 GhostShe
 
 ## 正式 README 目录与命名对齐（2026-09-24）
 
-✅ 权威设计链接更新；Actions/UI、Speech/Speak、ActionPath、AgentLifecycle 对齐；独立 ActionRuntime、Tools/System 与 ToolExecutor；ChannelParser/Channel 职责拆分；Package 和 Xcode 引用同步。完整核对见 Repository-Structure.md 与 ADR 0020。
+✅ 权威设计链接更新；Actions/UI、Speech/Speak、ActionPath、AgentLifecycle 对齐；独立 ActionRuntime、Tools/System 与 ToolExecutor；ChannelParser/Channel 职责拆分；Package 和 Xcode 引用同步。当前目录映射见 [MobileHarness/README.md 的项目结构](../MobileHarness/README.md#project-structure)；原始决策见 ADR 0020。
 
 ❌ 目标大纲中的未来模块仍按实际需求实现；共享契约及根测试目录例外已说明。运行行为保留现有模型 alias、默认 Channel、FIFO/资源互斥和工具回流。
 
@@ -136,7 +146,7 @@ Unified-expression validation: root checks passed, including 56 integration test
 
 ✅ Added a separate Qwen35Chat adapter and MLX language backend; the physical app selects Qwen3.5-2B 4bit through the existing ChatCapability. Pinned model/dependency versions, local loading and resource/license staging are implemented.
 
-✅ Swift/Python parity passed for ten complete prompts. Local real-model generation and cancellation/unload/reload checks passed. Device results and remaining acceptance limits are recorded in output/qwen35-mlx-2026-09-25. See ADR 0027.
+✅ Swift/Python parity passed for ten complete prompts. Local real-model generation and cancellation/unload/reload checks passed. Device experiment artifacts were stored in local, unversioned `output/qwen35-mlx-2026-09-25`; [ADR 0027](adr/0027-qwen35-mlx-chat.md) summarizes the dated limitations without treating that path as a public report.
 
 ❌ Long-running thermal/memory measurements, complete microphone/ASR/TTS coexistence acceptance, reliable constrained XML generation and vision input remain outstanding.
 
@@ -211,7 +221,7 @@ Validation (2026-09-26): `scripts/check.sh` passed with full Xcode selected and 
 
 Validation (2026-09-26): root scripts/check.sh passed; all four scripts/build-ios.sh simulator schemes passed; the physical MobileHarness Debug target compiled without signing. Simulator launch confirmed camera controls render during model preparation and the system camera permission prompt appears. The simulator has no physical camera and lacks voice model resources, so live video, front/back switching, camera/voice coexistence and ready-conversation visual acceptance still require an iPhone. No physical device installation was performed.
 
-✅ P3 first camera perception flow: configurable grayscale threshold, latest-only Photographer pose inference, shared singleton model provider and Action-delivered skeleton UI. ❌ Robot arm motion, composition policy, tracking IDs and physical-device performance/accuracy acceptance.
+✅ At this milestone, the first P3 camera perception flow used configurable grayscale thresholds, latest-only Photographer pose inference, a shared model provider and Action-delivered skeleton UI. ADR 0041 later moved inference and skeleton display to VisionPerception and removed Photographer from the App. ❌ Robot arm motion, composition policy, tracking IDs and physical-device performance/accuracy acceptance.
 
 Validation (2026-09-26): final root scripts/check.sh passed, including 66 IntegrationTests and shared .pose provider identity. A separate full check with YOLO_POSE_MODEL_ROOT enabled passed real Core ML blank-image inference, unload/reload and shutdown checks. All four simulator schemes and the unsigned physical MobileHarness Debug build passed. Inspected the final device App: Photographer.agent.json matches source, pinned YOLO weight bytes match, and the AGPL license is present. An old generated Agent bundle was invalidated so the new configuration was recopied. No physical camera/phone installation or human-pose alignment/accuracy/thermal acceptance is claimed.
 
@@ -238,7 +248,7 @@ Validation (2026-09-26): root scripts/check.sh passed, including 69 IntegrationT
 
 ## Shared perception and pure Gateway (ADR 0040)
 
-✅ SpeechPerception owns ASR/VAD; VisionPerception owns image-content filtering and shared YOLO inference. Photographer consumes poses and applies UI policy. AgentCore defines transport-only audio and typed observations. Gateway imports no model/platform capability module.
+✅ SpeechPerception owns ASR/VAD; VisionPerception owns image-content filtering and shared YOLO inference. At this milestone, Photographer consumed poses for UI policy; ADR 0041 later moved skeleton display into VisionPerception and removed that runtime. AgentCore defines transport-only audio and typed observations. Gateway imports no model/platform capability module.
 ✅ Shared App communication assembly, JSON v4 permissions/subscriptions, directed events, bounded latest-state/discrete lanes, monotonic admission deadlines, per-target receipts and independent voice/camera cleanup.
 ❌ Device continuous voice/camera behavior and latency/thermal acceptance remain pending. Future face/depth/tracking/ReflexAgent work requires separate sampling and control-arbitration design; no robot safety or motion behavior was added.
 
@@ -326,3 +336,9 @@ Settings validation: root checks and nine cloud tests passed; all four simulator
 ## 共享存储里程碑（ADR 0056）
 
 ✅ Storage 与 StorageAudio target 已接入，旧 SpeechRuntime 已移除；迁移后的仓库检查和四个 iOS 模拟器构建目标通过。当前技术契约只在 [Storage](../MobileHarness/Storage/README.md) 与 [StorageAudio](../MobileHarness/Storage/Audio/README.md) 维护。❌ 真机语音验收、可淘汰磁盘缓存、持久化文件与记忆记录仍待完成。
+
+### Local settings persistence and cache synchronization (2026-09-28)
+
+✅ Storage now supports bounded durable documents, read-through/write-through caching, explicit refresh and revision conflicts. App settings migrate from the legacy Keychain record to a sandbox document with device-local credential references. ❌ Cross-device sync, general media persistence and device migration acceptance remain pending. See [ADR 0057](adr/0057-local-settings-storage.md).
+
+Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four local-document synchronization tests. `scripts/build-ios.sh` passed all four simulator schemes. Device Keychain migration, live cloud requests and phone installation were not exercised in this change.

@@ -21,10 +21,34 @@ flowchart LR
     Audio[StorageAudio PCM adapter] --> Memory
 ```
 
+## Local cache and persistence synchronization
+
+✅ `LocalDocumentStore<Value>` is a Foundation-only actor providing one bounded JSON document and its read-through, write-through memory cache. The default encoded envelope limit is 64 KiB; oversized reads/writes fail explicitly. One cached snapshot is retained per instance, with no background write queue. App injects a trusted sandbox file URL and owns the payload schema.
+
+- `load()` reuses the cache; `refresh()` reads disk and replaces the cache only on success; `invalidate()` releases the cached value.
+- `save(_:expecting:)` rereads the durable revision, rejects stale writers, atomically replaces the file and then updates the cache. A nil expected revision requires an absent file. Failed writes leave the cache unchanged.
+- A process-wide lock protects revision comparison and replacement across instances, including different payload types. This is local synchronization, not cross-process locking or cross-device replication. App assembles one owner per settings file. External edits are noticed by refresh or the next save; no filesystem watcher is installed.
+- Envelope version 1 is independent of the consumer payload version. Invalid JSON, unsupported envelopes and nonregular files fail explicitly; corrupt data is never silently reset. iOS writes use complete file protection. App controls backup and credential policies.
+- App settings are the first durable consumer. PCM remains transient and retains its existing expiry and capacity rules.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Cache as Storage actor/cache
+    participant Disk as Local document
+    App->>Cache: load / refresh
+    Cache->>Disk: bounded read when needed
+    Disk-->>Cache: value + revision
+    App->>Cache: save(value, expected revision)
+    Cache->>Disk: locked compare + atomic replace
+    Disk-->>Cache: success or conflict/error
+    Cache-->>App: update cache only after success
+```
+
 ## Staged boundary
 
 ✅ The Foundation-only `Storage` target implements `BoundedMemoryStream` and `MemoryLeaseStore`. Both are actor-isolated, bounded process-local primitives with explicit overflow failure, single-reader/checkout behavior, scoped owners, cancellation and expiry. `StorageAudio` under [Audio](Audio/README.md) adapts the production PCM cache; App injects one instance into synthesis and playback. No third-party package is required.
 
-❌ Reclaimable disk cache, persistent media and memory records require concrete consumers, retention rules and separate verification. The general primitives do not yet coordinate global byte budgets across namespaces; each instance supplies an explicit item and byte bound.
+❌ Reclaimable disk caches, persistent media and semantic memory records require concrete consumers, retention rules and separate verification. The general primitives do not yet coordinate global byte budgets across namespaces; each instance supplies an explicit item and byte bound.
 
-❌ Decide on-disk layout, schema migration, retention and backup rules with their first concrete use cases. Keep secrets in the existing credential store and model weights in the existing resource system; this module is not a replacement for either.
+✅ App settings define their layout, payload schema, legacy migration and device-local credential policy in [App](../App/README.md). ❌ Cross-device sync, cross-process writers, general persistent media/indexes and automatic disk-cache eviction are not implemented. Model weights remain in the resource system.

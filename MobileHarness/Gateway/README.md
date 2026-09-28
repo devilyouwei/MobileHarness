@@ -73,4 +73,3 @@ Channels run FIFO and share Action-module exclusion. Different modules may run c
 | Status | Issue / next step |
 | --- | --- |
 | Open | Cleanup depends on cooperative handlers; device stop acknowledgements require future adapters. |
-| Resolved — 2026-09-27 audit | Removed model-processing ownership from Gateway and distinguished returning from completion-only Tools. |

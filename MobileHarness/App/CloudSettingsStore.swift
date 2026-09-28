@@ -1,9 +1,10 @@
 import Foundation
 import ModelKitOpenAI
 import Security
+import Storage
 
-/// One atomic Keychain record keeps URL, key and selected model consistent across launches.
-struct CloudSettings: Codable, Equatable {
+/// Runtime configuration; credentials are persisted separately from the document.
+struct CloudSettings: Codable, Equatable, Sendable {
     let enabled: Bool
     let url: String
     let key: String
@@ -38,9 +39,11 @@ enum CloudSettingsError: Error {
     case invalidURL
     case keychain(OSStatus)
     case invalidSelection
+    case persistence
+    case busy
 }
 
-struct CloudSettingsStore {
+private struct LegacyCloudSettingsStore {
     private var query: [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
@@ -79,5 +82,131 @@ struct CloudSettingsStore {
         } else if status != errSecSuccess {
             throw CloudSettingsError.keychain(status)
         }
+    }
+}
+
+private nonisolated struct UserSettingsDocument: Codable, Sendable {
+    let version: Int
+    let cloud: CloudRecord?
+
+    struct CloudRecord: Codable, Sendable {
+        let enabled: Bool
+        let url: String
+        let model: String
+        let credentialID: String
+    }
+}
+
+/// App owns schema, credential references and legacy migration; Storage owns file/cache consistency.
+@MainActor
+final class CloudSettingsStore {
+    private var document: LocalDocumentStore<UserSettingsDocument>?
+    private var snapshot: DocumentSnapshot<UserSettingsDocument>?
+    private var loaded = false
+    private var busy = false
+    private let legacy = LegacyCloudSettingsStore()
+
+    private func documents() throws -> LocalDocumentStore<UserSettingsDocument> {
+        if let document { return document }
+        let root = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask, appropriateFor: nil, create: true)
+        var directory = root.appendingPathComponent("MobileHarness/Settings", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try directory.setResourceValues(values)
+        let document = try LocalDocumentStore<UserSettingsDocument>(
+            url: directory.appendingPathComponent("settings.json"))
+        self.document = document
+        return document
+    }
+
+    func load() async throws -> CloudSettings? {
+        guard !busy else { throw CloudSettingsError.busy }
+        busy = true
+        defer { busy = false }
+        do {
+            snapshot = try await documents().refresh()
+            if let snapshot {
+                guard snapshot.value.version == 1 else { throw CloudSettingsError.persistence }
+                let value = try resolve(snapshot.value.cloud)
+                loaded = true
+                return value
+            }
+            let value = try legacy.load()
+            loaded = true
+            if let value {
+                try await persist(value)
+                // Remove the original only after the document and its credential can be read back.
+                let verified = try await documents().refresh()
+                guard let verified, try resolve(verified.value.cloud) == value else {
+                    throw CloudSettingsError.persistence
+                }
+                try legacy.save(nil)
+            }
+            return value
+        } catch {
+            loaded = false
+            throw error
+        }
+    }
+
+    func save(_ value: CloudSettings?) async throws {
+        guard !busy else { throw CloudSettingsError.busy }
+        guard loaded else { throw CloudSettingsError.persistence }
+        busy = true
+        defer { busy = false }
+        try await persist(value)
+    }
+
+    private func persist(_ value: CloudSettings?) async throws {
+        let oldID = snapshot?.value.cloud?.credentialID
+        let newID = UUID().uuidString
+        if let value { try writeKey(value.key, id: newID) }
+        let record = value.map {
+            UserSettingsDocument.CloudRecord(
+                enabled: $0.enabled, url: $0.url, model: $0.model, credentialID: newID)
+        }
+        do {
+            snapshot = try await documents().save(
+                UserSettingsDocument(version: 1, cloud: record), expecting: snapshot?.revision)
+        } catch {
+            if value != nil { SecItemDelete(keyQuery(newID) as CFDictionary) }
+            throw error
+        }
+        // Cleanup is best-effort after commit. An interrupted cleanup may leave an unreferenced key.
+        if let oldID { SecItemDelete(keyQuery(oldID) as CFDictionary) }
+    }
+
+    private func resolve(_ record: UserSettingsDocument.CloudRecord?) throws -> CloudSettings? {
+        guard let record else { return nil }
+        var query = keyQuery(record.credentialID)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data,
+            let key = String(data: data, encoding: .utf8)
+        else {
+            throw CloudSettingsError.keychain(status)
+        }
+        return CloudSettings(enabled: record.enabled, url: record.url, key: key, model: record.model)
+    }
+
+    private func keyQuery(_ id: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "dev.mobileharness.cloud-chat.keys",
+            kSecAttrAccount as String: id,
+        ]
+    }
+
+    private func writeKey(_ key: String, id: String) throws {
+        var query = keyQuery(id)
+        query[kSecValueData as String] = Data(key.utf8)
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else { throw CloudSettingsError.keychain(status) }
     }
 }

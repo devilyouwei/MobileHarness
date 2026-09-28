@@ -1,5 +1,7 @@
 # MobileHarness 技术方案
 
+> **历史设计基线（2026-09-23）。** 本文保留当时的需求、技术设想与示例接口，供追溯原始方案；其中的“必须”、目录、API、容量和完成状态不构成当前实现约束。现行技术计划与目录映射见 [MobileHarness/README.md](../MobileHarness/README.md)，模块契约见其中链接的各模块 README，已实施范围见 [公开架构](Architecture.md)。原始 [Word 设计源](Technical_Design.docx) 保持不变。
+
 > 文档版本：1.0 · 技术基线：2026-09-23 · 目标平台：iOS / macOS · 实现语言：Swift
 >
 > 定位：面向 Apple 设备的长期并行、有状态、多模态、多 Agent 运行框架。

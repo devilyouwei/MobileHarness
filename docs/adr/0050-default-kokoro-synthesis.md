@@ -1,5 +1,7 @@
 # 0050 — Default Kokoro synthesis
 
+> Historical scope: Historical English-only Kokoro default. [ADR 0052](0052-kokoro-coreml-bilingual.md) replaced its model path and language selection with the bilingual Core ML implementation.
+
 Date: 2026-09-28. Supersedes ADR 0016's diagnostic-only selection, not its model limits.
 
 ## Context

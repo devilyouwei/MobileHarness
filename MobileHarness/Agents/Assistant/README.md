@@ -115,6 +115,7 @@ flowchart LR
 | 输出类别 | 本地 alias → 路径 / Channel | 数据、触发与接收者 |
 | --- | --- | --- |
 | Action | `say → Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成隐藏的 `playAudio → Speech.speak(audioID)`。 |
+| Action | `playAudio → Speech.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用原 say 的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
 | Action | `print → UI.print / Display` | 同样的 text 参数，追加回复字幕；与 say 来自同一段自然文本。 |
 | Action | `express → UI.express / Display` | `parameters["emotion"]` 为 `clear / smile / happy / laugh / thinking / surprised / sad / love / angry / scared / playful`，设置或清除表情。 |
 | Action | `beginReplyTurn → UI.beginReplyTurn / Display` | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
@@ -125,7 +126,16 @@ flowchart LR
 
 Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 另允许 `main`。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
 
-✅ `communication.publications` 为空；`communication.sends` 显式允许向 speechSynthesis 发送 `speech.synthesize` 与 `speech.cancel`，用于音频准备和失败清理。Assistant 不发布共享感知。❌ 图像理解、partial 驱动回答及模型原生 Tool 增量仍未实现。
+### Publish / send 数据标准
+
+`communication.publications = []`：Assistant 不广播共享观测。`communication.sends` 只允许以下两种定向消息，目标均为 `speechSynthesis`，均通过 `AgentMessaging.send(message, parent: input, to:)` 经 OutputGateway → InputGateway。发送端身份由绑定端口确定为 `assistant`；parent 是触发该段回复的输入，保留 session/turn/因果链。send 的回执只确认接纳，不等待模型合成或播放。
+
+| contract / version / kind | typed payload 与字段标准 | 时机与失败语义 |
+| --- | --- | --- |
+| `speech.synthesize / 1 / observation` | `.speechSynthesis(SpeechSynthesisInput(audioID: UUID, text: String, locale: String))`；audioID 为每段新建的唯一句柄；text 为 Agent 分好的非空语义段，最多 2000 UTF-8 字节；locale 当前默认 `auto`，协议允许 `auto / zh-CN / en-US`。完整编码受 16 KiB 消息上限约束。 | 解析出 say 后立即提交；必须在回执中确认目标已接纳且无拒绝，才输出同一 audioID 的隐藏 playAudio Action。合成与后续 Action 调度并行。 |
+| `speech.cancel / 1 / observation` | `.cancelSpeech(audioID: UUID)`；只带待取消的音频句柄，不携带文本或 PCM。 | 提交已接纳但 playAudio 无法成功入队等清理场景发送；SpeechSynthesis 按发送方、session、父输入所有权校验，不能取消别的请求。当前清理发送失败被忽略，原始入队错误继续上抛。 |
+
+❌ 图像理解、partial 驱动回答及模型原生 Tool 增量仍未实现。
 
 ✅ express emits semantic eye emotions; Assistant.agent.json remains the production capability declaration. No emoji conversion is performed. clear smoothly returns to neutral. Three added values are angry/scared/playful; JSON schema remains v4, with an additive parameter-domain extension.
 
