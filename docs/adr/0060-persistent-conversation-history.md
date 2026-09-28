@@ -14,7 +14,7 @@ Settings → 对话历史 replaces the single-turn raw-output generator. It sepa
 
 ## Bounds and ownership
 
-One process-wide actor, one bounded revision-checked document, no pending write queue or automatic eviction. The journal supports one current conversation, 64 archives, 256 turns per conversation and a 32 MiB document. Per-turn raw retention is 256 KiB/8192 fragments, while production generation retains its existing 2000-byte limit. Errors preserve admitted prefixes; quota rejection is explicit. Completed records and original user data are never silently replaced. Archived deletion requires explicit user action. Exact contracts live in [Storage](../../MobileHarness/Storage/README.md), [Assistant](../../MobileHarness/Agents/Assistant/README.md) and [history UI](../../MobileHarness/Experience/Settings/README.md).
+One process-wide actor, one bounded revision-checked document, no pending write queue or automatic eviction. The journal supports one current conversation, 64 archives, 256 turns per conversation and a 32 MiB document. Per-turn raw retention is 256 KiB/8192 fragments, while production generation retains its existing 2000-byte limit. Errors preserve admitted prefixes; quota rejection is explicit. Completed records and original user data are never silently replaced. Archived deletion requires explicit user action. Exact contracts live in [Storage](../../MobileHarness/Storage/README.md), [Assistant](../../MobileHarness/Agents/Assistant/README.md) and [history UI](../../MobileHarness/App/Views/Settings/README.md).
 
 ```mermaid
 flowchart LR

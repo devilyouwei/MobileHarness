@@ -36,7 +36,7 @@ flowchart LR
     Output[OutputGateway] --> Runtime[Action / Tool handlers]
     Runtime -->|App-injected device operation| PlatformKit
     PlatformKit -->|Playback| Hardware
-    App -->|Preview and telemetry| Experience
+    App -->|Preview and telemetry| Views
 ```
 
 ## Internal structure and data flow

@@ -1,6 +1,6 @@
 # System · 系统信息工具
 
-用途：提供运行配置说明。设计目标：与 App 装配和 ToolRuntime 注册解耦。
+用途：提供运行配置说明。设计目标：与 App 装配和 Tools/Runtime 注册解耦。
 
 - ✅ RuntimeInfo.swift / SystemTools.runtimeInfo：返回原有固定配置说明，由 App 绑定 runtimeInfo。
 - ❌ 真实健康探测、模型加载状态与设备诊断查询。

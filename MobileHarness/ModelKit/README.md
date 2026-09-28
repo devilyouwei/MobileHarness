@@ -12,7 +12,7 @@ ModelKit/
 ├── Defaults/                 # ModelKitDefaults: provider assembly and default bindings
 ├── Management/               # ModelKitRuntime: ModelManager and registration contracts
 ├── Language/
-│   ├── LLM/                  # ChatCapability and separate Qwen35 adapter
+│   ├── LLM/                  # ChatCapability; separate Qwen35 and OpenAI adapters
 │   └── JEV/                  # JudgeCapability contract; no production provider
 ├── Speech/
 │   ├── ASR/                  # Recognition contract; Apple and Nemotron adapters
@@ -20,7 +20,7 @@ ModelKit/
 │   ├── VAD/                  # Voice activity contract and Silero adapter
 │   └── Shared/Apple/         # Apple speech PCM helpers
 ├── Vision/                   # PoseCapability and separate YOLO adapter
-├── Backends/                 # Separate CoreAI, CoreML and MLX execution targets
+├── Backends/                 # Separate CoreAI, CoreML, MLX, FluidAudio and MossCoreML targets
 └── README.md                 # Capability boundary and status
 ```
 
@@ -33,12 +33,11 @@ flowchart LR
     App -->|Resource root and lifecycle| Assembly[Defaults / ModelManager]
     Assembly -->|Capability handles| App
     Agents -->|Speech, chat and pose requests| Capabilities[ModelKit capabilities]
-    Actions -->|Synthesis request| Capabilities
     Diagnostics[Explicit App diagnostics] --> Capabilities
     Capabilities --> Adapters[Concrete adapters]
     Adapters --> Engines[MLX / CoreAI / Core ML / Apple speech]
     Engines -->|Tokens, scores, joints or PCM| Adapters
-    Adapters -->|Typed results| Consumers[Agents / Actions / diagnostics]
+    Adapters -->|Typed results| Consumers[Agents / diagnostics]
 ```
 
 ## Internal structure and data flow
@@ -48,11 +47,11 @@ Dependency arrows below mean imports. Backends use engine-specific data; adapter
 ```mermaid
 flowchart TD
     Defaults[ModelKitDefaults] --> Manager[ModelKitRuntime]
-    Defaults --> Adapters[Speech / Qwen35 / YOLO adapters]
+    Defaults --> Adapters[Speech / Qwen35 / OpenAI / YOLO adapters]
     Defaults --> Base[ModelKit contracts]
     Manager --> Base
     Adapters --> Base
-    Adapters --> Backends[CoreAI / CoreML / MLX backends]
+    Adapters --> Backends[CoreAI / CoreML / MLX / FluidAudio / MossCoreML]
     Backends --> SDKs[System and third-party engine SDKs]
     Adapters --> Apple[Apple speech frameworks]
 ```

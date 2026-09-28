@@ -17,3 +17,5 @@ Update this README when changing this directory. ✅ means implemented; ❌ mean
 ✅ MOSS audition uses the production AppleAudioIO mixer/player path, including its render telemetry callback. `-moss-autorun -moss-playback` explicitly enables automatic speaker playback and writes success only after playback drains; plain autorun remains synthesis-only.
 
 Conversation history is a regular settings feature; its implementation and documentation live in [Settings](../Settings/README.md).
+
+✅ Source location: `MobileHarness/App/Views/Diagnostics`; compiled by `App`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.

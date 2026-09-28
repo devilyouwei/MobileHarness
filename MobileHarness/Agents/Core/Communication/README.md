@@ -7,7 +7,7 @@ Purpose: define typed Agent communication without owning transport tasks, messag
 - ✅ DeliveryReport describes per-target admission; PerceptionInput defines typed media/observations.
 - ❌ Dynamic subscriptions, request/reply, remote transport, persistence and automatic retry.
 
-InternalSignalBus and its queue/active-call registry, timers, session API, duplicate cache and snapshots have been removed. This directory replaces AgentCore/Bus; see [ADR 0048](../../../docs/adr/0048-direct-signal-admission.md).
+InternalSignalBus and its queue/active-call registry, timers, session API, duplicate cache and snapshots have been removed. This directory replaces the former `AgentCore/Bus` directory (historical path); see [ADR 0048](../../../../docs/adr/0048-direct-signal-admission.md).
 
 ## Target selection and per-Agent delivery
 
@@ -71,9 +71,11 @@ OutputGateway may await a registered App observer for a published contract. It d
 
 Remote or cross-process Agents would require an explicit transport adapter, not automatically a Bus. Add serialization, authentication and network-failure handling only for a concrete integration. A broker is a separate future choice for offline delivery, persistence or replay.
 
-See [external input delivery](../../Gateway/Input/README.md#external-input-admission-and-delivery), [OutputGateway](../../Gateway/Output/README.md) and the [communication framework](../../README.md#communication-framework). Tests cover direct overlap, capacity recovery, receiver rejection, expired/foreign-session inputs and stale source ports; Agent tests cover their own buffering policies.
+See [external input delivery](../../../Gateway/Input/README.md#external-input-admission-and-delivery), [OutputGateway](../../../Gateway/Output/README.md) and the [communication framework](../../../README.md#communication-framework). Tests cover direct overlap, capacity recovery, receiver rejection, expired/foreign-session inputs and stale source ports; Agent tests cover their own buffering policies.
 
 
 ✅ AgentMessage now carries typed speech.synthesize and speech.cancel directed requests in addition to perception facts; PerceptionObservation remains a source-compatible alias. Requests are discrete, never state-coalesced. Payload validation bounds text/locale; cache ownership uses source/session/parent input. ❌ General request/reply remains unsupported.
 
 ✅ Speech synthesis/cancel commands are newly generated work with a fresh 10-second admission deadline, preserving parent ID, root, hops, session and turn. They do not inherit the original input’s sensor-routing expiration; source identity/session validation and sender generation cancellation still apply. Forwarded perception observations continue to inherit the parent deadline. This prevents late generated segments from failing merely because the already-admitted input is older than 10 seconds.
+
+✅ Source location: `MobileHarness/Agents/Core/Communication`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.

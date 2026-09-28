@@ -1,5 +1,4 @@
 import AVFAudio
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
@@ -10,7 +9,7 @@ import OSLog
 import Observation
 import PlatformKit
 import StorageAudio
-import ToolRuntime
+import Tools
 
 @MainActor @Observable
 final class AppLifecycleCoordinator {

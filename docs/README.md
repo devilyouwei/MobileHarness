@@ -39,3 +39,5 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ [ADR 0061](adr/0061-agent-json-v5.md) defines the current JSON v5 model catalog and code-owned internal permissions. Older ADRs describe historical schemas where marked superseded. ❌ Full native Tool schemas/streaming remain future work.
 
 ✅ [ADR 0062](adr/0062-default-chat-output-budget.md) documents optional output budgets and default-provider behavior.
+
+✅ [模块目录整合](adr/0063-module-directory-consolidation.md) 记录 Runtime 子目录、Agents/Core 编译边界和 App/Views 的当前归属。

@@ -1,5 +1,5 @@
 import AgentCore
-import ToolRuntime
+import Tools
 
 /// Tool calls bypass action queues; only data-returning tools feed results through the input gateway.
 struct ToolDispatcher: Sendable {

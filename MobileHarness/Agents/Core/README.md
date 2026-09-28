@@ -1,11 +1,11 @@
-# AgentCore — Shared Agent Contracts
+# Agents/Core — Shared Agent Contracts
 
 Defines Agent identity, input/output, lifecycle, configuration, parsing and communication contracts. The goal is reusable infrastructure without business policy. It depends on Foundation and the Swift standard library, never UI, concrete Agents, model engines or device adapters.
 
 ## Directory structure
 
 ```text
-AgentCore/
+Agents/Core/
 ├── Agent.swift, AgentDescriptor.swift, AgentID.swift  # Agent interface and identity
 ├── AgentInput.swift, ImageInput.swift, InputKind.swift # Input and media transport
 ├── HarnessError.swift                               # Shared errors
@@ -28,8 +28,6 @@ flowchart TD
     Gateway --> AgentCore
     Actions --> AgentCore
     Tools --> AgentCore
-    ActionRuntime --> AgentCore
-    ToolRuntime --> AgentCore
     AgentCore --> Foundation
 ```
 
@@ -78,3 +76,5 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ✅ GenerationEvent preserves resolved Actions and typed wait boundaries. The shared lexical stack handles combined Channel/wait nesting; SchedulingDirective crosses the trusted output boundary without introducing runtime, UI or model dependencies. ❌ Execution policy remains in Gateway, not AgentCore.
 
 ✅ Runtime registries separate model alias resolution from code-owned InternalAction/InternalTool permission checks. Generator text mapping is a bounded Agent-supplied callback. See [capabilities](Capability/README.md). ❌ Full JSON Schema/native Tool transport remain deferred.
+
+✅ Physically owned by Agents/Core, compiled as the independent AgentCore target. The business Agents target excludes Core to prevent duplicate compilation and the Agents → StorageAudio → AgentCore dependency cycle. Core stays Foundation-only; importing Agents from Core is forbidden. ❌ Directory consolidation does not merge business policy into shared contracts.

@@ -8,7 +8,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'ActionRuntime', 'Tools', 'ToolRuntime', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit'}
+FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit'}
 errors = []
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
@@ -44,12 +44,27 @@ for target in package['targets']:
         names = [next(iter(d.values()))[0] for d in dependencies]
         if names != ['ModelKit']:
             errors.append('ModelKitRuntime must depend only on ModelKit')
+# Consolidated source ownership must retain an acyclic, non-overlapping build map.
+targets = {t['name']: t for t in package['targets']}
+for obsolete in ('ActionRuntime', 'ToolRuntime'):
+    if obsolete in targets:
+        errors.append(f'Obsolete standalone target: {obsolete}')
+if targets['AgentCore'].get('path') != 'MobileHarness/Agents/Core':
+    errors.append('AgentCore must compile Agents/Core')
+if 'Core' not in targets['Agents'].get('exclude', []):
+    errors.append('Agents must exclude the separately compiled Core directory')
+for name in ('Actions', 'Tools'):
+    if not (ROOT / 'MobileHarness' / name / 'Runtime' / 'README.md').is_file():
+        errors.append(f'Missing consolidated {name}/Runtime')
 # Gateway is transport-only; AgentCore remains independent of models/platform/business.
 for module, forbidden in {
     'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'PlatformKit'},
     'AgentCore': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Gateway', 'Agents', 'PlatformKit', 'SwiftUI', 'UIKit', 'CoreVideo'},
 }.items():
-    for source in (ROOT / 'MobileHarness' / module).rglob('*.swift'):
+    source_root = ROOT / 'MobileHarness' / ('Agents/Core' if module == 'AgentCore' else module)
+    if not source_root.is_dir():
+        errors.append(f'Missing checked source root: {source_root}')
+    for source in source_root.rglob('*.swift'):
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
             if imported in forbidden or imported.startswith('ModelKit'):
                 errors.append(f'Forbidden {module} import {imported}: {source.relative_to(ROOT)}')
@@ -58,9 +73,15 @@ for module, forbidden in {
         name = next(iter(dependency.values()))[0]
         if name in forbidden or name.startswith('ModelKit'):
             errors.append(f'Forbidden {module} dependency: {name}')
+# The unified behavior libraries expose runtime APIs to Gateway, not direct behavior calls.
+for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
+    if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools)\b', source.read_text()):
+        errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
 agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageAudio', 'Foundation'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
+    if 'Core' in source.relative_to(ROOT / 'MobileHarness/Agents').parts:
+        continue
     for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
         if imported not in agent_allowed:
             errors.append(f'Forbidden Agents import {imported}: {source.relative_to(ROOT)}')

@@ -1,5 +1,7 @@
 # ADR 0059 — Structured wait groups for Action scheduling
 
+> Source layout: [ADR 0063](0063-module-directory-consolidation.md) supersedes standalone runtime targets and former top-level Core/presentation locations; the behavioral decisions below remain historical records.
+
 Date: 2026-09-28. Status: accepted and implemented; device acceptance pending.
 
 ## Context

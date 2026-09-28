@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import Gateway
 import Testing
-import ToolRuntime
+import Tools
 
 func communicationConfiguration(_ id: String, subscribes: Bool = false, publishes: Bool = false) throws
     -> AgentConfiguration

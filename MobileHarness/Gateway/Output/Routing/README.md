@@ -4,7 +4,7 @@ Purpose: classify output without performing its side effects. ActionCalls use Ac
 
 - ✅ ExecutionRouter returns action, scheduling, tool, finish, cancel or observe routes.
 - ✅ AgentOutput.actionCall carries ActionCall; natural text is mapped to resolved Actions inside the Agent.
-- ✅ ActionDispatcher admits ActionCalls into ChannelScheduler; ToolCalls enter ToolRuntime directly.
+- ✅ ActionDispatcher admits ActionCalls into ChannelScheduler; ToolCalls enter Tools/Runtime directly.
 - ✅ Runtime control messages map to completion, cancellation and observation routes.
 - ❌ Separate typed runtime lifecycle events.
 

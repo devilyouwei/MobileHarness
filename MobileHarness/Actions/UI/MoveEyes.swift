@@ -1,5 +1,3 @@
-import ActionRuntime
-
 extension UIActions {
     /// Screen-space target: -1 left/up, +1 right/down; zero looks straight ahead.
     public struct Gaze: Sendable, Equatable {

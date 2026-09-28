@@ -72,7 +72,7 @@ A/B/C represent selected destinations, not an unconditional broadcast. `send` se
 
 Concurrent external submissions have no Gateway per-target FIFO guarantee. Internal delivery uses the same bounded structured calls. Deadlines are checked before receive; there are no timeout tasks or communication session registries. Neither path has transport FIFO or state replacement; Agent inboxes own pending-message policy. InputGateway actor isolation alone does not establish arrival order across suspension points.
 
-Compare the [internal direct admission lifecycle](../../AgentCore/Communication/README.md) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
+Compare the [internal direct admission lifecycle](../../Agents/Core/Communication/README.md) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
 
 SpeechPerception owns LiveSpeechInput and VoiceActivitySegmenter. VisionPerception owns FrameChangeFilter. Source normalization means protocol validation and metadata here, not inference or perceptual transformations.
 

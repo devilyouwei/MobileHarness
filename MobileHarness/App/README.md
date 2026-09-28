@@ -6,6 +6,7 @@ Assembles model capabilities, device services, Agents and presentation. The goal
 
 ```text
 App/
+├── Views/                        # SwiftUI pages, components, camera and diagnostics
 ├── MobileHarnessApp.swift         # SwiftUI entry and startup/diagnostic selection
 ├── AppSettings.swift              # Model selection and application of saved configuration
 ├── CloudSettingsStore.swift       # Storage-backed settings and Keychain credentials
@@ -23,7 +24,7 @@ Arrows show requests and data, not every Swift import.
 
 ```mermaid
 flowchart LR
-    Experience -->|User intent| App
+    Views -->|User intent| App
     PlatformKit -->|Audio, camera and device telemetry| App
     App -->|Resource root| Defaults[ModelKitDefaults / ModelManager]
     Defaults -->|Capability handles| App
@@ -31,10 +32,10 @@ flowchart LR
     Input --> Agents
     App -.->|Capabilities and lifecycle| Agents
     Agents --> Output[OutputGateway]
-    Output --> Runtime[ActionRuntime / ToolRuntime]
+    Output --> Runtime[ActionExecution / ToolExecution]
     Runtime --> Handlers[App-bound Actions / Tools]
     Handlers --> PlatformKit
-    Handlers -->|Accepted presentation state| Experience
+    Handlers -->|Accepted presentation state| Views
 ```
 
 ## Internal structure and data flow
@@ -122,7 +123,7 @@ App therefore also calls `OutputGateway.cancel(sessionID)`. The scheduler remove
 
 App owns this coordination because stopping a voice session spans capture, perception, generation and device execution. Assistant owns its internal work; it currently emits no explicit cancellation output when handling assistant.cancel. ❌ Agent-initiated cancellation of its own turn/output and automatic user-speech interruption of an ongoing reply are not implemented. Reply processing currently suspends microphone data admission. If those behaviors are added, the Agent can initiate cancellation of its own output while App retains session-level teardown responsibility.
 
-Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control handling](../Agents/Assistant/AssistantAgent.swift), [output routing](../Gateway/Output/Routing/ExecutionRouter.swift), [Action cancellation](../Gateway/Output/Scheduling/ChannelScheduler.swift) and [Tool execution](../ToolRuntime/ToolExecutor.swift).
+Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control handling](../Agents/Assistant/AssistantAgent.swift), [output routing](../Gateway/Output/Routing/ExecutionRouter.swift), [Action cancellation](../Gateway/Output/Scheduling/ChannelScheduler.swift) and [Tool execution](../Tools/Runtime/ToolExecutor.swift).
 
 ## Feature status
 
@@ -172,7 +173,7 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 
 ✅ Cloud settings initially show the official OpenAI base URL; a saved blank URL resolves to the same endpoint. Empty Key is valid and sends no Authorization. Before model discovery, gpt-4o-mini is the visible default, allowing cloud mode to be saved without successful authentication/discovery. Successful discovery still requires an explicit selection when the default is absent. Server failures remain visible. ❌ Live provider acceptance is pending.
 
-✅ Settings owns LLM configuration and conversation-history pages. App joins voice cleanup before exposing the shared journal and supplies the managed chat capability for archived-title generation. History retains the actual saved model/request identity; parser previews never execute Actions. ❌ Live-device interaction acceptance remains pending; see [Settings](../Experience/Settings/README.md).
+✅ Settings owns LLM configuration and conversation-history pages. App joins voice cleanup before exposing the shared journal and supplies the managed chat capability for archived-title generation. History retains the actual saved model/request identity; parser previews never execute Actions. ❌ Live-device interaction acceptance remains pending; see [Settings](Views/Settings/README.md).
 
 ✅ The ordered output pump forwards typed wait boundaries through OutputGateway alongside Actions. The observation sink ignores these runtime coordination events; it does not trigger UI/device effects or claim group completion. Existing dispatch-failure audio cleanup and session stop remain responsible for unused prefetched handles. ❌ Wait does not extend audio-cache lifetime or provide physical-device timeout guarantees.
 
@@ -183,3 +184,5 @@ Implementation: [stopVoice](AppLifecycleCoordinator.swift), [Assistant control h
 ✅ The output pump saves execution failures after joining cleanup, separately from generation status. History owns no Action queue and never replays raw XML. Archived-title generation uses the shared managed Chat capability after voice cleanup. ❌ This is local conversation persistence, not cross-device synchronization, durable Action replay or general semantic memory.
 
 ✅ JSON v5 model Tool names are the explicit handler keys; runtimeInfo binds SystemTools.runtimeInfo. Fixed internal Agent outputs retain explicit App handlers and Gateway authorization. ❌ Native model Tool transport is not added by the schema migration.
+
+✅ App/Views now contains all former presentation directories: Conversation, Components, Camera, Settings and Diagnostics. App coordinators continue to own lifecycle and injected capabilities. ❌ This move does not change input routing or presentation-effect authorization.

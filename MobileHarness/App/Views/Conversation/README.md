@@ -59,3 +59,5 @@ VoiceOver, Dynamic Type and Reduce Motion are supported. SwiftUI remains MainAct
 ✅ Both ready and model-startup eyes consume camera-owned eyeGaze via the environment, so face following works independently of voice/model readiness. Expressions and tap-to-toggle voice behavior are preserved. ❌ Physical-device tracking acceptance remains manual.
 
 ✅ The window root owns the long-lived conversation run task so navigation to settings does not tear down/re-register Assistant. Entering settings explicitly stops the voice session. ❌ Device navigation/audio acceptance remains pending.
+
+✅ Source location: `MobileHarness/App/Views/Conversation`; compiled by `App`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.

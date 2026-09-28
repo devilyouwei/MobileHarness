@@ -9,7 +9,7 @@ Purpose: define executable values at the Agent boundary. ActionCall and ToolCall
 - ✅ `.control` carries runtime completion/error notifications and supports cancellation/playback barriers. It is not a model generation protocol.
 - ❌ Typed lifecycle notifications replacing control strings, ActionResult/Signal feedback, public ActionCall invocation IDs, priorities and deadlines.
 
-ActionCall is a value type correlated with input through OutputEnvelope. ChannelScheduler allocates an internal UUID per admitted job; cross-process idempotent replay is not provided. ToolResult is shared by input/output contracts without introducing a dependency on ToolRuntime.
+ActionCall is a value type correlated with input through OutputEnvelope. ChannelScheduler allocates an internal UUID per admitted job; cross-process idempotent replay is not provided. ToolResult is shared by input/output contracts without introducing a dependency on Tools/Runtime.
 
 ```mermaid
 flowchart LR
@@ -32,3 +32,5 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 
 
 ✅ `AgentOutput.scheduling(SchedulingDirective)` and OutputKind.scheduling carry beginWait/endWait as typed runtime coordination. They inherit trusted source/session/input from the envelope, have no model-supplied group ID, and cannot invoke a device handler. Completion/error controls remain separate. Agent descriptors must explicitly permit scheduling output. ❌ General typed replacement of legacy control strings is still outstanding.
+
+✅ Source location: `MobileHarness/Agents/Core/Output`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.

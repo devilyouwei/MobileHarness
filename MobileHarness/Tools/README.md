@@ -6,6 +6,7 @@ Implements functions reached through ToolCalls. The goal is reusable behavior wi
 
 ```text
 Tools/
+├── Runtime/                 # Registry and direct execution
 ├── System/RuntimeInfo.swift  # Fixed configuration description
 ├── UI/ShowPose.swift         # Validate and replace the skeleton overlay
 └── README.md                # Module boundary and status
@@ -18,10 +19,10 @@ Arrows show runtime flow through App-supplied handlers.
 ```mermaid
 flowchart LR
     Agents -->|Resolved ToolCall| Gateway[OutputGateway]
-    Gateway --> Runtime[ToolRuntime]
+    Gateway --> Runtime[ToolExecution]
     App -.->|Handler and service bindings| Runtime
     Runtime --> Tools
-    Tools -->|Injected presentation callback| Experience
+    Tools -->|Injected presentation callback| Views
     Tools -->|Value or completion| Runtime
     Runtime -->|Returning tools only| Input[InputGateway]
     Input --> Agents
@@ -54,3 +55,5 @@ Tools owns no queue and bypasses Channel scheduling. VisionPerception retains th
 | Status | Issue / next step |
 | --- | --- |
 | Open | Measure skeleton presentation latency on a physical device. |
+
+✅ ToolRegistry and ToolExecutor compile in this same Tools module under Runtime. Consumers import Tools; the separate runtime target is removed. ❌ The merge adds no Channel scheduling, timeout or implicit handler registration.

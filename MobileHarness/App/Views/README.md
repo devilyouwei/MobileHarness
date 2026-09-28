@@ -1,11 +1,11 @@
-# Experience — User Interaction and Presentation
+# App/Views — User Interaction and Presentation
 
 Renders conversation, camera and diagnostic views and forwards user intent to App. The goal is clear, accessible presentation without owning Agent decisions, model construction or device capture. SwiftUI and observable UI state remain MainActor-isolated.
 
 ## Directory structure
 
 ```text
-Experience/
+Views/
 ├── Conversation/
 │   ├── ConversationView.swift       # Conversation screen and labeled visual preview
 │   └── ConversationViewModel.swift  # Expose App state and forward controls
@@ -29,11 +29,11 @@ Arrows show UI intent and supplied presentation data. Device and Agent output re
 
 ```mermaid
 flowchart LR
-    User -->|Controls| Experience
-    Experience -->|Voice and camera intent| App
-    App -->|Validated presentation state| Experience
-    PlatformKit -->|Preview and telemetry via App| Experience
-    Experience -->|Eyes, spectra, captions and camera| User
+    User -->|Controls| Views
+    Views -->|Voice and camera intent| App
+    App -->|Validated presentation state| Views
+    PlatformKit -->|Preview and telemetry via App| Views
+    Views -->|Eyes, spectra, captions and camera| User
 ```
 
 ## Internal structure and data flow
@@ -50,7 +50,7 @@ flowchart TD
     Selection[Explicit diagnostic selection] --> Diagnostics[Validation views]
 ```
 
-Semantic emotions drive stable procedural eye shapes; production gaze remains centered. The microphone and reply bars display real 32-band FFT telemetry. Caption state follows conversation turns, while speaking state follows actual playback. Camera controls and preview remain available during voice preparation; skeleton updates arrive through UI.showPose Tool execution.
+Semantic emotions drive stable procedural eye shapes; camera-owned gaze follows facial landmarks through VisionPerception and UI.moveEyes, returning to center on lifecycle reset. The microphone and reply bars display real 32-band FFT telemetry. Caption state follows conversation turns, while speaking state follows actual playback. Camera controls and preview remain available during voice preparation; skeleton updates arrive through UI.showPose Tool execution.
 
 Presentation replaces current state and adds no Agent work queue. Caption rendering limits visible text to the latest 320 characters while retaining full accessibility text. Reduce Motion limits decorative movement. The Debug visual preview is labeled and uses simulated data; it does not demonstrate model/device readiness.
 
@@ -60,7 +60,7 @@ Presentation replaces current state and adds no Agent work queue. Caption render
 - ✅ [Components](Components/README.md): semantic eye expressions, frequency bars and accessible captions.
 - ✅ [Camera](Camera/README.md): preview, on/off, front/back switching, skeleton overlay and threshold selection.
 - ✅ [Diagnostics](Diagnostics/README.md): separate validation screens.
-- ❌ Independent Character module, authored expression sequences and live gaze tracking.
+- ❌ Independent Character module and authored expression sequences; physical-device gaze smoothness still needs acceptance.
 
 ## Issue record
 
@@ -74,3 +74,5 @@ Presentation replaces current state and adds no Agent work queue. Caption render
 ✅ Standalone Settings list and Cloud LLM detail support saved enablement and native explicit paste; window-root tasks preserve runtime ownership during navigation. ❌ Device visual acceptance pending.
 
 ✅ Conversation history reads actual persisted user/model exchanges, starts a new context and requests metadata-only archived titles. Its raw/Channel/wait previews never execute stored Actions. ❌ Device history UI acceptance remains pending.
+
+✅ Views are owned and compiled by App, under App/Views. This SwiftUI naming includes pages plus reusable Components and platform preview bridges; no separate Views package target exists. ❌ View relocation does not give Views runtime lifecycle ownership.

@@ -112,8 +112,8 @@ flowchart LR
     Begin --> OG2
     Tool --> OG2
     OG2 --> Schedule[ChannelScheduler task tree]
-    Schedule --> AR[ActionRuntime: speech / display]
-    OG2 --> TR[ToolRuntime]
+    Schedule --> AR[ActionExecution: speech / display]
+    OG2 --> TR[ToolExecution]
     TR -->|ToolResult via ToolDispatcher| IG
 ```
 

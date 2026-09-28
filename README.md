@@ -90,7 +90,7 @@ flowchart LR
     Models -. Planned compute escalation .-> Cloud[Cloud Models]
     Agents --> Output[Output Gateway]
     Output --> Execution[Actions & Tools]
-    Execution --> Experience[Speech / UI / Device I/O]
+    Execution --> Views[Speech / UI / Device I/O]
     Output -. Internal observations .-> Gateway
 ```
 
@@ -231,4 +231,4 @@ Local user settings now use Storage-backed cached persistence in the application
 
 ✅ Function Token output supports nested `<wait>...</wait>` execution groups. Wait joins earlier parent work and all internal Actions while preserving ordinary Channel concurrency; it does not block unrelated Agent tasks. See [scheduling](MobileHarness/Gateway/Output/Scheduling/README.md). ❌ Physical-device acceptance of the new coordination behavior is pending.
 
-✅ Settings → 对话历史 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](MobileHarness/Experience/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.
+✅ Settings → 对话历史 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](MobileHarness/App/Views/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.

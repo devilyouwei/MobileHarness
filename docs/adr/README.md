@@ -86,3 +86,5 @@ These are **dated decision records**, including proposals and stages later repla
 ✅ [0061 — Agent JSON v5](0061-agent-json-v5.md): Channel-grouped model Actions and code-owned internal permissions replace redundant hidden/text declarations. ❌ Full JSON Schema/native Tool streaming are not included.
 
 ✅ [0062 — Optional output-token budgets](0062-default-chat-output-budget.md): provider defaults for Assistant, bounded local context and backward-compatible history records. ❌ Live-provider acceptance remains separate.
+
+✅ [0063 — Module directory consolidation](0063-module-directory-consolidation.md): Actions/Tools each own Runtime; Agents owns Core; App owns Views. Foundational AgentCore compilation remains independent. ❌ No behavior change or new device acceptance is implied.

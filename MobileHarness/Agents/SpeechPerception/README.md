@@ -9,7 +9,7 @@ flowchart LR
     VAD --> ASR[LiveSpeechInput / recognition capability]
     ASR --> Caption[Code-owned UI.setTranscript Action]
     Caption --> OutputGateway
-    OutputGateway --> ActionRuntime --> UI[App presentation handler]
+    OutputGateway --> ActionExecution --> UI[App presentation handler]
     ASR --> Port[Bound messaging port]
     Port --> OutputGateway
     OutputGateway --> InputGateway
@@ -44,7 +44,7 @@ flowchart LR
 | 生命周期，不是业务输入 | `bind / start / pause / resume / stop` | App / AgentManager | 注入发布端口及管理任务；不扩展 communication.inputs。 |
 
 ```swift
-// 结构摘要；真实定义在 AgentCore/Communication/PerceptionInput.swift。
+// 结构摘要；真实定义在 Agents/Core/Communication/PerceptionInput.swift。
 AudioInput {
     samples: Data       // 当前 App 输入为 16 kHz、单声道 Float32 PCM
     sequence: UInt64
@@ -64,7 +64,7 @@ flowchart LR
     IG2 -->|speech.final / speech.phase| Assistant
     OG --> Observer[App: capture coordination / logging]
     S -->|ActionCall and control| OG
-    OG --> AR[ActionRuntime]
+    OG --> AR[ActionExecution]
     AR --> UI[Transcript / voice-state handlers]
     App[App: reply completion] -.->|resumeListening| S
 ```

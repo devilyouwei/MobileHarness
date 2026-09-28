@@ -1,11 +1,12 @@
 # Agents — Perception and Business Policy
 
-Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
+Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit, Storage and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
 
 ## Directory structure
 
 ```text
 Agents/
+├── Core/                     # Independent AgentCore compilation boundary
 ├── AgentConfigurations.swift  # Load versioned JSON from package resources
 ├── Assistant/                 # Chat, reply history and resolved speech/UI Actions
 ├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
@@ -14,7 +15,7 @@ Agents/
 └── README.md                  # Shared Agent and configuration rules
 ```
 
-Each implemented Agent has `<AgentName>.agent.json`, an actor implementation and a README. Helper files remain in that Agent's directory. Shared parsers belong in AgentCore/Generation. Add JSON resources to root Package.swift; the loader uses Bundle.module, not App bundle lookup.
+Each implemented Agent has `<AgentName>.agent.json`, an actor implementation and a README. Helper files remain in that Agent's directory. Shared parsers belong in Agents/Core/Generation. Add JSON resources to root Package.swift; the loader uses Bundle.module, not App bundle lookup.
 
 ## Upstream and downstream
 
@@ -196,3 +197,5 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ✅ An Agent interpreting wait markup must declare OutputKind.scheduling and forward the entire GenerationEvent sequence through OutputGateway. SchedulingDirective is typed runtime coordination, not an extra business Action or message. Preserve directive order across speech preparation and substitutions; never forward only ActionCalls. Assistant's output buffer is 256 events, including at most 120 generated Actions and 64 wait edges. Wait is local to the originating task; native Tools and directed speech synthesis requests do not become wait members. ❌ Cross-task coordination is not implied.
 
 ✅ Assistant receives a shared Storage journal from App; ten completed rounds form current context, while failed/cancelled raw records remain inspectable. Voice sessions no longer determine conversation boundaries. New conversation archives the current context explicitly. Title inference is metadata-only and never generates dispatched Actions. ❌ Persistent Action execution/replay is not introduced.
+
+✅ Shared contracts/parsers are managed under Core in this directory. Package.swift compiles Core as AgentCore and the remaining business files as Agents; Core is excluded from the Agents target. This retains acyclic Gateway/StorageAudio dependencies while unifying source ownership. ❌ Core cannot import concrete Agents, model engines or UI.

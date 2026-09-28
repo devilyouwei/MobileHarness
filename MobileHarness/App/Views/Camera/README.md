@@ -16,3 +16,5 @@ Purpose: present an edge-to-edge live camera background behind the conversation.
 ✅ The primary toolbar sits 8 pt below the top safe area and contains camera toggle plus settings. Camera lens switching and threshold controls expand in a second row only while camera intent is enabled; closing camera removes them. Reduce Motion disables the expansion animation. ❌ Camera hardware behavior is unchanged.
 
 ✅ Camera observation is window-owned across page navigation. Settings suspends capture without changing on/off intent; returning to home resumes if enabled. ❌ Physical-device navigation/capture acceptance remains pending.
+
+✅ Source location: `MobileHarness/App/Views/Camera`; compiled by `App`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.

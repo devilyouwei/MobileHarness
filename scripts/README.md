@@ -45,3 +45,5 @@ flowchart LR
 ✅ download-moss-tts-nano.py provisions the four streaming graphs, tokenizer, config and two preset voice-code files at a fixed revision; no custom-voice encoder or source .mlpackage is packaged. ❌ Phone performance remains unverified.
 
 ✅ Agent boundary validation now allows Foundation-only Storage for the shared conversation journal. ModelKit remains independent of Storage and business modules.
+
+✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, remove standalone runtime targets and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.

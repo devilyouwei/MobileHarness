@@ -63,7 +63,7 @@ A lock gives one authorized Agent exclusive control of one or more channels. **A
 - Agent A decides whether to request control.
 - The runtime checks permission and performs the takeover; a signal never transfers ownership.
 
-See the general [signal-to-takeover flow](../../../AgentCore/Communication/README.md). Input delivery continues while a channel is locked.
+See the general [signal-to-takeover flow](../../../Agents/Core/Communication/README.md). Input delivery continues while a channel is locked.
 
 ### Acquire: interrupt, then grant
 

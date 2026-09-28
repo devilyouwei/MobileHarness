@@ -6,7 +6,7 @@ Purpose: document the implemented concurrency contracts and their limits. Design
 
 One synthesis worker is admitted; further requests fail. Each request is limited to 2048 UTF-8 bytes. AVSpeechSynthesizer callbacks produce PCM, serialized with a mutex around accumulation and emission. SynthesisPCMAccumulator emits 16,384-byte chunks and retains a smaller remainder after append; the zero-length terminal callback flushes that tail, emits finished and closes the stream. Format changes fail. The accumulator does not independently bound the incoming callback allocation.
 
-Speech Actions consume a 256-event stream, each event at most 16,448 estimated bytes. A full stream fails rather than blocking the framework callback. A 30 s timer terminates stalled synthesis. Termination schedules MainActor worker removal and immediate speech stop. Actual speaker playback is downstream and must be awaited separately; synthesis completion is not playback completion. There is no application FIFO of waiting synthesis requests.
+Capability consumers receive a 256-event stream, each event at most 16,448 estimated bytes. A full stream fails rather than blocking the framework callback. A 30 s timer terminates stalled synthesis. Termination schedules MainActor worker removal and immediate speech stop. Actual speaker playback is downstream and must be awaited separately; synthesis completion is not playback completion. There is no application FIFO of waiting synthesis requests.
 
 ```mermaid
 flowchart LR
@@ -14,7 +14,7 @@ flowchart LR
     Worker --> Callback[System PCM callback]
     Callback --> Chunks[Mutex and 16384-byte chunking]
     Chunks --> Buffer[256-event stream]
-    Buffer --> Action[Speech Action awaits playback]
+    Buffer --> Consumer[Capability consumer receives PCM]
     End[Timeout / cancellation / overflow] --> Stop[Remove worker and stop synthesis]
 ```
 

@@ -163,3 +163,5 @@ flowchart LR
     Events --> Agent[Agent: speech audioID conversion in place]
     Agent --> Gateway[Resolved Actions and typed scheduling directives]
 ```
+
+✅ Source location: `MobileHarness/Agents/Core/Generation`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.

@@ -15,7 +15,7 @@ Maintain this README alongside implementation, Agent JSON and App handler bindin
 
 ✅ Skeleton presentation moved to [Tools/UI](../../Tools/UI/README.md); UI.showPose has no Action registration or default Channel.
 
-✅ SetTranscript.swift / UI.setTranscript replaces the recognition caption independently of UI.print reply captions. Required text accepts empty string to clear and at most 4096 UTF-8 bytes. Missing/oversized text fails before presentation. The function checks cancellation before and after the injected callback. SpeechPerception declares the Transcript Channel in JSON; the App handler rejects old voice sessions. Completion means MainActor state was updated. This Action introduces no extra queue or timer.
+✅ SetTranscript.swift / UI.setTranscript replaces the recognition caption independently of UI.print reply captions. Required text accepts empty string to clear and at most 4096 UTF-8 bytes. Missing/oversized text fails before presentation. The function checks cancellation before and after the injected callback. SpeechPerception code declares its internal transcript permissions on the Transcript Channel; the App handler rejects old voice sessions. Completion means MainActor state was updated. This Action introduces no extra queue or timer.
 
 ✅ BeginReplyTurn.swift / UI.beginReplyTurn accepts no parameters and atomically clears the previous Assistant reply and expression once per conversation turn. Assistant owns this behavior. UI.express additionally accepts emotion=clear; the typed clear identifier tells its registered handler to return to neutral. Both use cancellation-checked Action execution, not Signals.
 ✅ SetVoiceState.swift / UI.setVoiceState requires state=listening|hearing|processing, validates it before calling the UI handler, and never changes capture admission. Missing/unknown values fail. Default Display Channel serializes these actions with expression/reply changes. Reply presentation state is updated by the explicit recognition state plus actual playback activity; UI.print only appends text.
@@ -29,7 +29,7 @@ Maintain this README alongside implementation, Agent JSON and App handler bindin
 ```mermaid
 flowchart LR
     Agent[Agent with runtime turn context] --> Gateway[OutputGateway validation]
-    Gateway --> Runtime[ActionRuntime]
+    Gateway --> Runtime[ActionExecution]
     Runtime --> Action[UI Action validation]
     Action --> Session[App active-session check]
     Session --> Turn[ConversationPresentation turn / sequence check]
@@ -38,6 +38,6 @@ flowchart LR
 
 ❌ Device timing/animation acceptance remains manual. This policy does not provide durable delivery or synchronize speech with every displayed character.
 
-✅ UI.express now supplies a validated `UIActions.Emotion` value, never an emoji or glyph. Missing/unknown values still fail. SwiftUI pose definitions belong to Experience, not Actions. Completion means presentation state accepted the target, not that the visual interpolation finished. See ADR 0046.
+✅ UI.express now supplies a validated `UIActions.Emotion` value, never an emoji or glyph. Missing/unknown values still fail. SwiftUI pose definitions belong to App/Views, not Actions. Completion means presentation state accepted the target, not that the visual interpolation finished. See ADR 0046.
 
-✅ `MoveEyes.swift` / `UI.moveEyes(x:y:)` validates two finite numbers in [-1,1] before invoking a typed Gaze callback. Negative is left/up, positive right/down; zero centers. Gaze Channel is declared by VisionPerception JSON. Cancellation is checked before/after presentation. Success accepts a target, not animation completion. No physical motion or new dependency. ❌ Animation appearance requires device acceptance.
+✅ `MoveEyes.swift` / `UI.moveEyes(x:y:)` validates two finite numbers in [-1,1] before invoking a typed Gaze callback. Negative is left/up, positive right/down; zero centers. VisionPerception code declares its internal UI.moveEyes permission on the Gaze Channel. Cancellation is checked before/after presentation. Success accepts a target, not animation completion. No physical motion or new dependency. ❌ Animation appearance requires device acceptance.

@@ -1,5 +1,7 @@
 # ADR 0020：按正式 README 对齐实现目录与命名
 
+> Source layout: [ADR 0063](0063-module-directory-consolidation.md) supersedes standalone runtime targets and former top-level Core/presentation locations; the behavioral decisions below remain historical records.
+
 > Scheduling update: [ADR 0059](0059-structured-wait-scheduling.md) supersedes shared cross-task Channel lanes and introduces typed nested wait groups. This document retains its historical decision context; Channel ownership/takeover remains planned.
 
 状态：采用。日期：2026-09-24。

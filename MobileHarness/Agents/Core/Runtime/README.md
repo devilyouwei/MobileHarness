@@ -24,3 +24,5 @@ stop 仍是现有 Agent 的终态，恢复需新实例；pause 只阻止领取�
 
 
 ✅ Registration issues an incarnation UUID with optional session binding. Stop invalidates identity before joining the Agent; remove allows a freshly constructed replacement only after cleanup. Speech/camera session instances are isolated; generic restart/factory supervision remains unimplemented.
+
+✅ Source location: `MobileHarness/Agents/Core/Runtime`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.

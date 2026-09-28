@@ -1,5 +1,3 @@
-import ActionRuntime
-
 extension UIActions {
     public static func finishTranscript(
         invocation: ActionInvocation,

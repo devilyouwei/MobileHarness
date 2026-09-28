@@ -1,4 +1,3 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
@@ -7,7 +6,7 @@ import Gateway
 import ModelKit
 import ModelKitDefaults
 import PlatformKit
-import ToolRuntime
+import Tools
 
 /// Composition only: external frames always traverse InputGateway and UI data always resolved Action / Tool calls.
 @MainActor

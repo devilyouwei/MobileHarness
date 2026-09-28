@@ -15,7 +15,7 @@ flowchart LR
     Observation --> Overlay[Up to six people / bounded display coordinates]
     Overlay --> Generator[Code-owned UI.showPose permission]
     Generator --> Output[Latest skeleton / gaze pair]
-    Output --> Gateway[OutputGateway / ToolRuntime]
+    Output --> Gateway[OutputGateway / ToolExecution]
     Gateway --> Action[UI.showPose Void tool / injected presentation handler]
 ```
 
@@ -44,7 +44,7 @@ flowchart LR
 | 生命周期，不是订阅 | `bind / start / pause / resume / stop` | App / AgentManager | 注入消息端口、管理两条有界 worker；没有外部指令或 ToolResult 输入。 |
 
 ```swift
-// 结构摘要；真实定义在 AgentCore/ImageInput.swift。
+// 结构摘要；真实定义在 Agents/Core/ImageInput.swift。
 ImageInput {
     width: Int; height: Int  // 正向推理图像的尺寸
     sequence: UInt64; timestamp: TimeInterval
@@ -70,7 +70,7 @@ flowchart LR
     IG -.-> Future[Optional business subscribers]
     Obs --> Projection[PoseOverlay: up to 6 people]
     Projection -->|UI.showPose ToolCall| OG2[OutputGateway]
-    OG2 --> TR[ToolRuntime: completion-only]
+    OG2 --> TR[ToolExecution: completion-only]
     TR --> UI[MainActor overlay state]
 ```
 
@@ -109,7 +109,7 @@ people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye�
 | joint.confidence | Int，0...1000；从共享观测的 Float 量化。 |
 | people | 从模型结果取前六人，按其置信排序；显示镜像和裁剪由预览层坐标转换处理。共享观测仍可保留最多 300 人。 |
 
-Tool 经 `outputs → App transport pump → OutputGateway → ToolRuntime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
+Tool 经 `outputs → App transport pump → OutputGateway → Tools/Runtime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
 
 ### 其他输出与 send 边界
 

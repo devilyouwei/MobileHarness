@@ -1,6 +1,6 @@
 # Gateway — Input and Output Routing
 
-Validates and routes Agent input, communication and resolved calls. The goal is bounded admission, explicit failure and clear completion semantics. The target depends only on AgentCore, ActionRuntime and ToolRuntime; model processing belongs to Agents.
+Validates and routes Agent input, communication and resolved calls. The goal is bounded admission, explicit failure and clear completion semantics. The target depends on AgentCore, Actions and Tools, using only their Runtime APIs; model processing belongs to Agents.
 
 ## Directory structure
 
@@ -27,9 +27,9 @@ flowchart LR
     Input --> Agents
     Agents -->|Resolved calls and typed events| Output[OutputGateway]
     Output -->|Internal observation| Input
-    Output --> ActionRuntime
-    Output --> ToolRuntime
-    ToolRuntime -->|Returning ToolResult via dispatcher| Input
+    Output --> ActionExecution[Actions/Runtime]
+    Output --> ToolExecution[Tools/Runtime]
+    ToolExecution -->|Returning ToolResult via dispatcher| Input
     Output -->|Runtime observations| App
 ```
 
@@ -77,3 +77,5 @@ Each active task phase runs FIFO per Channel and shares process-wide Action-modu
 
 
 ✅ ADR 0059 adds task-local nested wait groups. Ordinary Channel FIFO order is scoped to a task/active phase, while name capacities and module exclusion are process-wide. Typed scheduling directives pass through validation/routing/dispatch; no XML enters Gateway. ❌ Cross-task barriers and preemption remain unsupported.
+
+✅ Consolidated Actions/Tools targets provide execution APIs; Gateway still cannot directly call concrete behavior helpers. Boundary checks enforce source imports and reject direct behavior symbols. ❌ Transitive linkage through Actions/StorageAudio does not authorize Gateway model inference.

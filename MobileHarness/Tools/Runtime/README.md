@@ -1,11 +1,11 @@
-# ToolRuntime — Direct Tool Execution
+# Tools/Runtime — Direct Tool Execution
 
-Registers and executes resolved ToolCalls. The goal is explicit completion and feedback without Channel scheduling. This target depends only on AgentCore.
+Registers and executes resolved ToolCalls. The goal is explicit completion and feedback without Channel scheduling. These runtime files compile within Tools, whose only package dependency is AgentCore.
 
 ## Directory structure
 
 ```text
-ToolRuntime/
+Runtime/
 ├── ToolRegistry.swift  # Actor-owned handlers; rejects duplicate paths
 ├── ToolExecutor.swift  # Execute and select result or completion semantics
 └── README.md           # Module contract and status
@@ -13,15 +13,15 @@ ToolRuntime/
 
 ## Upstream and downstream
 
-Arrows show runtime calls through handlers injected by App; ToolRuntime does not import Tools.
+Arrows show runtime calls through handlers injected by App; Runtime and behavior handlers now share the Tools module without self-imports.
 
 ```mermaid
 flowchart LR
-    App -->|Register handlers| ToolRuntime
-    Output[OutputGateway] -->|Resolved call and envelope| ToolRuntime
-    ToolRuntime -->|Invoke| Tools
-    Tools -->|Value, completion or error| ToolRuntime
-    ToolRuntime -->|Optional result via ToolDispatcher| Input[InputGateway]
+    App -->|Register handlers| ToolExecution
+    Output[OutputGateway] -->|Resolved call and envelope| ToolExecution
+    ToolExecution -->|Invoke| Tools
+    Tools -->|Value, completion or error| ToolExecution
+    ToolExecution -->|Optional result via ToolDispatcher| Input[InputGateway]
     Input -->|Correlated feedback| Agent[Originating Agent]
 ```
 

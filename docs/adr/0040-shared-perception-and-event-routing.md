@@ -1,5 +1,7 @@
 # ADR 0040 — Pure Gateway and shared perception
 
+> Source layout: [ADR 0063](0063-module-directory-consolidation.md) supersedes standalone runtime targets and former top-level Core/presentation locations; the behavioral decisions below remain historical records.
+
 > Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
 
 > Historical scope: Historical Bus-based transport stage. [ADR 0048](0048-direct-signal-admission.md) removes InternalSignalBus and transport queues; [ADR 0041](0041-vision-perception-skeleton-action.md) and [ADR 0042](0042-show-pose-completion-tool.md) replace Photographer-driven skeleton Actions.

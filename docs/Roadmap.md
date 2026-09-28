@@ -155,7 +155,7 @@ Unified-expression validation: root checks passed, including 56 integration test
 
 ## Function Token terminology (2026-09-25)
 
-✅ FunctionTokenParser parses mixed text/XML protocol output; AgentGenerator resolves ActionCalls. AgentOutput.actionCall and OutputKind.actionCall classify Action invocations. ToolCall represents the separate native tool protocol. The canonical definitions are in MobileHarness/AgentCore/Generation/README.md and AgentCore/Output/README.md.
+✅ FunctionTokenParser parses mixed text/XML protocol output; AgentGenerator resolves ActionCalls. AgentOutput.actionCall and OutputKind.actionCall classify Action invocations. ToolCall represents the separate native tool protocol. The canonical definitions are in MobileHarness/Agents/Core/Generation/README.md and AgentCore/Output/README.md.
 
 ## Inter-Agent communication
 
@@ -365,7 +365,7 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 
 ✅ 设置新增独立 LLM 测试页：复用已保存模型、Assistant 提示词和 JSON，展示完整接收原文、分片、结束原因、解析错误及解析出的 Action/Channel，可显式导出。解析失败继续收集；取消、传输失败、token 上限和保留上限均明确标记。生产 Agent/Gateway 契约未改变。
 
-❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../MobileHarness/Experience/Diagnostics/README.md)。
+❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../MobileHarness/App/Views/Diagnostics/README.md)。
 
 
 ## Structured wait scheduling (2026-09-28)
@@ -391,3 +391,9 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 新版配置验证：完整仓库检查通过（140 个 IntegrationTests），完整 Xcode 下四个模拟器目标构建通过。可选真实模型评测未启用；未进行新版真机安装和交互验收。
 
 ✅ Assistant 不再固定 256 output tokens；云端请求省略 max_tokens，本地生成受剩余上下文约束。历史记录兼容旧数值并显示新请求的“模型默认”。取消整段回复 2000 字节限制，保留解析与调度容量保护。❌ 实际长回复及真机交互仍需验收。
+
+## 模块目录整合
+
+✅ Actions/Runtime 与行为实现统一编译为 Actions；Tools 同理。AgentCore 移入 Agents/Core，保留独立核心编译边界；Experience 移入 App/Views。同步 SwiftPM、Xcode、import、边界检查和技术文档，核心链路及功能保持原样。见 [ADR 0063](adr/0063-module-directory-consolidation.md)。❌ 本轮不新增功能，也不代表新的真机交互验收。
+
+目录整合验证：完整仓库检查通过（142 个 IntegrationTests），完整 Xcode 下四个模拟器目标构建通过。194 个 Swift 实现文件除 import/格式外无变化；未新增本地文档断链。本轮未安装真机。

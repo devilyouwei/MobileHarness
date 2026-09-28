@@ -1,6 +1,6 @@
 # Output — Resolved Invocation Gateway
 
-Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter ChannelScheduler; ToolCalls execute through ToolRuntime and return results through InputGateway. Alias binding belongs to Agents.
+Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter ChannelScheduler; ToolCalls execute through Tools/Runtime and return results through InputGateway. Alias binding belongs to Agents.
 
 - ✅ OutputGateway connects validation, routing, dispatch and the observation sink, with error propagation and cancellation/completion barriers.
 - ✅ Validation, Routing, Dispatch and Scheduling have separate responsibilities.
@@ -8,7 +8,7 @@ Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter C
 - ✅ Session cancellation covers the session across Agents. ToolCalls bypass Action queues.
 - ✅ Resolved ActionCall/ToolCall inputs and runtime control notifications. Raw text and FunctionToken events are not accepted.
 - ✅ Task-local Channel FIFO and nested wait groups, bounded admission and process-wide module exclusion. Different channels may run concurrently when modules permit; main is an ordinary channel.
-- ✅ Depends on ActionRuntime and App-registered handlers, not concrete Actions.
+- ✅ Imports the unified Actions module for Runtime APIs and App-registered handlers; never directly invokes concrete behavior helpers.
 - ❌ Unified ActionResult-to-Signal feedback, priorities, preemption and general resource declarations.
 
 Keep this README synchronized with current interfaces, bounds and ✅/❌ status.
@@ -32,7 +32,7 @@ flowchart LR
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
-✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. VisionPerception skeletons use validated ToolCalls through ToolRuntime; no UI payload bypass exists.
+✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. VisionPerception skeletons use validated ToolCalls through Tools/Runtime; no UI payload bypass exists.
 
 
 ## Typed event path
