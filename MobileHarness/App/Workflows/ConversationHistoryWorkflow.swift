@@ -2,7 +2,7 @@ import AgentCore
 import Agents
 import Foundation
 import ModelKit
-import Storage
+import StorageChat
 import UI
 
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.

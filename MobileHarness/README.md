@@ -163,7 +163,9 @@ MobileHarness/
 │   ├── Runtime/            # ToolRegistry and ToolExecutor
 │   ├── System/             # Fixed runtime information
 │   └── UI/                 # Completion-only skeleton display
-├── Storage/                # Memory, local documents and Audio adapter
+├── Storage/                # Core cache, persistence and local synchronization
+│   ├── Audio/              # StorageAudio: PCM handles
+│   └── Chat/               # StorageChat: conversation records and journal
 ├── ModelKit/               # Independent SDK and separate provider targets
 │   ├── Core/
 │   ├── Speech/
@@ -193,14 +195,15 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 | --- | --- | --- |
 | `App/` excluding the two subtargets below | Xcode App targets | Composition root; see [App](App/README.md) for bindings |
 | `App/Composition/Behaviors/` | BehaviorAssembly | AgentCore, Actions, Tools |
-| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit |
-| `UI/` | UI | AgentCore, Storage; shared values only |
+| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, StorageChat, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit |
+| `UI/` | UI | AgentCore, StorageChat; shared values only |
 | `Agents/Core/` | AgentCore | None |
-| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, Storage, StorageAudio |
+| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio |
 | `Gateway/` | Gateway | AgentCore, Actions, Tools; execution uses Runtime APIs only |
 | `Actions/` including `Runtime/` | Actions | AgentCore, StorageAudio |
 | `Tools/` including `Runtime/` | Tools | AgentCore |
-| `Storage/` excluding `Audio/` | Storage | None |
+| `Storage/` excluding `Audio/` and `Chat/` | Storage | None |
+| `Storage/Chat/` | StorageChat | Storage |
 | `Storage/Audio/` | StorageAudio | Storage, AgentCore, ModelKit |
 | `PlatformKit/` | PlatformKit | None |
 | `ModelKit/` shared capability sources | ModelKit | None |
@@ -657,3 +660,9 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 ✅ Current scope includes shared perception and synthesis, conversation history, explicit Agent communication, streaming generation, scheduled Actions, direct Tools, typed execution feedback and declared resource ownership.
 
 ❌ General semantic fusion, fast/slow cognition orchestration, dynamic subscriptions, general request/reply, durable message delivery, native Tool streaming, Channel ownership, broader device/resource integration and sustained physical-device acceptance remain open. Delivery milestones and validation records belong in the [Roadmap](../docs/Roadmap.md); design history belongs in the [ADRs](../docs/adr/README.md).
+
+## Storage core and domains
+
+✅ Outer Storage files implement reusable bounded memory/cache, persistence and local synchronization. Audio and Chat own their business contracts in separate subdirectories/targets; core never depends on domains. Chat moved without data migration. See [Storage layout](Storage/README.md) and [ADR 0069](../docs/adr/0069-storage-core-domain-layout.md).
+
+❌ Image, Video and semantic Memory domains are planned only; no empty directories or placeholder APIs. MemoryLeaseStore is a generic RAM lease primitive, not semantic memory. Cross-device sync and general reclaimable disk cache remain unimplemented.

@@ -53,3 +53,9 @@ Update this README when test responsibilities change; dated run results belong i
 ## Action implementation audit
 
 ✅ ActionAuthoringTests verifies Speech entry validation and cancellation/error semantics. Existing speech tests use a test-only service convenience that enters through SpeechActions.speak before invoking typed playback.
+
+## Storage domain organization
+
+✅ ConversationHistoryTests imports StorageChat for journal behavior and Storage for durable document fixtures. Core StorageTests remains independent of chat and audio domains.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

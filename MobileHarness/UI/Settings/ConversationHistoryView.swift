@@ -1,5 +1,5 @@
 #if os(iOS)
-    import Storage
+    import StorageChat
     import SwiftUI
 
     /// Durable records of actual Assistant requests. Viewing never executes stored markup.

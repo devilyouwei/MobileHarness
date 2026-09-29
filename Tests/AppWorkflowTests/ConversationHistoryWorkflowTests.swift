@@ -2,6 +2,7 @@ import AppWorkflows
 import Foundation
 import ModelKit
 import Storage
+import StorageChat
 import Testing
 import UI
 

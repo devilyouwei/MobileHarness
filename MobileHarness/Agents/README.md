@@ -1,6 +1,6 @@
 # Agents — Perception and Business Policy
 
-Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit, Storage and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
+Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit, StorageChat and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
 
 ## Directory structure
 
@@ -19,7 +19,7 @@ Each implemented Agent has `<AgentName>.agent.json`, an actor implementation and
 
 ## Upstream and downstream
 
-Arrows show runtime data flow; Agents never call concrete Actions or Tools. Compile-time dependencies are `AgentCore` (contracts, permissions and parsers), `ModelKit` (capability protocols), `Storage` (conversation history) and `StorageAudio` (shared PCM handles). App injects the production services; neither storage service delivers Agent messages.
+Arrows show runtime data flow; Agents never call concrete Actions or Tools. Compile-time dependencies are `AgentCore` (contracts, permissions and parsers), `ModelKit` (capability protocols), `StorageChat` (conversation history) and `StorageAudio` (shared PCM handles). App injects the production services; neither storage service delivers Agent messages.
 
 ```mermaid
 flowchart LR
@@ -235,12 +235,12 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ✅ Gateways directly call receive; Agent inboxes own all pending-message buffering. Ordinary receive must validate/admit or reject promptly, without awaiting inference or inbox space. Concurrent calls have no transport FIFO guarantee: Agents requiring stale-state rejection use session/source/sequence checks. State coalescing belongs to the Agent and must be explicit; discrete events and device actions cannot silently disappear. Lifecycle/control cancellation may join cleanup. Existing Assistant, SpeechPerception and VisionPerception buffering policies remain; see ADR 0048.
 
 
-✅ SpeechSynthesisAgent is an independent JSON v5 directed service with one FIFO model worker. Agents may additionally depend on Storage for durable conversation records and StorageAudio for the shared audio cache; they still cannot depend on Actions, Gateway, PlatformKit or concrete engines. Assistant binds a messaging port and sends text before emitting audioID playback. ❌ Hardware timing acceptance remains pending.
+✅ SpeechSynthesisAgent is an independent JSON v5 directed service with one FIFO model worker. Agents may additionally depend on StorageChat for durable conversation records and StorageAudio for the shared audio cache; they still cannot depend on Actions, Gateway, PlatformKit or concrete engines. Assistant binds a messaging port and sends text before emitting audioID playback. ❌ Hardware timing acceptance remains pending.
 
 
 ✅ An Agent interpreting wait markup must declare OutputKind.scheduling and forward the entire GenerationEvent sequence through OutputGateway. SchedulingDirective is typed runtime coordination, not an extra business Action or message. Preserve directive order across speech preparation and substitutions; never forward only ActionCalls. Assistant's output buffer is 256 events, including at most 120 generated Actions and 64 wait edges. Wait is local to the originating task; native Tools and directed speech synthesis requests do not become wait members. ❌ Cross-task coordination is not implied.
 
-✅ Assistant receives a shared Storage journal from App; ten completed rounds form current context, while failed/cancelled raw records remain inspectable. Voice sessions no longer determine conversation boundaries. New conversation archives the current context explicitly. Title inference is metadata-only and never generates dispatched Actions. ❌ Persistent Action execution/replay is not introduced.
+✅ Assistant receives a shared StorageChat journal from App; ten completed rounds form current context, while failed/cancelled raw records remain inspectable. Voice sessions no longer determine conversation boundaries. New conversation archives the current context explicitly. Title inference is metadata-only and never generates dispatched Actions. ❌ Persistent Action execution/replay is not introduced.
 
 ✅ Shared contracts/parsers are managed under Core in this directory. Package.swift compiles Core as AgentCore and the remaining business files as Agents; Core is excluded from the Agents target. This retains acyclic Gateway/StorageAudio dependencies while unifying source ownership. ❌ Core cannot import concrete Agents, model engines or UI.
 
@@ -249,3 +249,9 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ## Action runtime stage 2
 
 ✅ Assistant, SpeechPerception and VisionPerception declare action.result in communication.inputs. They retain runtime receipts without scheduling a model call. JSON v5 model-callable actions/tools remain unchanged. ❌ Result-driven planning/recovery and activity subscriptions are not enabled.
+
+## Storage domain organization
+
+✅ Agents depends on StorageChat for conversation storage and StorageAudio for speech media. Both domains reuse Storage core; concrete model/device boundaries remain unchanged.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

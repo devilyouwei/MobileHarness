@@ -57,3 +57,9 @@ flowchart LR
 ## Action implementation audit
 
 ✅ The Action standard check validates domain namespace files and checks each declared Action path has a matching invocation:using: entry file. It exempts Runtime infrastructure.
+
+## Storage domain organization
+
+✅ Boundary checks enforce Storage core exclusion of Audio/Chat, StorageChat → Storage dependency, Foundation/Storage-only chat imports and Storage directory READMEs. UI may use StorageChat values only.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

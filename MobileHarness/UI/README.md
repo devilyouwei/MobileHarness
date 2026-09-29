@@ -15,7 +15,7 @@ UI/
 
 ## Upstream and downstream
 
-UI is a separate SwiftPM target. Its only project dependencies are AgentCore (PoseOverlay values) and Storage (conversation record values). It does not import App, AppWorkflows, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit. Platform rendering content is supplied by App; no full service container is passed to a page.
+UI is a separate SwiftPM target. Its only project dependencies are AgentCore (PoseOverlay values) and StorageChat (conversation record values). It does not import App, AppWorkflows, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit. Platform rendering content is supplied by App; no full service container is passed to a page.
 
 [Actions/UI](../Actions/UI/README.md) and [Tools/UI](../Tools/UI/README.md) declare executable behavior in their owning modules. They reach this UI module's state through App-bound handlers; their `UI.*` call paths are protocol names, independent of the Swift module name.
 
@@ -38,3 +38,9 @@ Pages can own short-lived rendering/load tasks and cancel their scoped operation
 ✅ Source-level boundary checks and an independent target prevent reverse App dependencies. UI state and workflow contracts are tested on macOS; iOS views compile only on iOS.
 
 ❌ Cross-platform visual implementation, independent multi-window state routing, and physical-device layout/animation acceptance of this refactor.
+
+## Storage domain organization
+
+✅ UI depends on AgentCore and StorageChat shared values. Chat records moved from the generic Storage target to its domain subtarget; no storage service enters UI.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

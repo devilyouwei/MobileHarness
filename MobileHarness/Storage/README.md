@@ -12,7 +12,7 @@ Purpose: provide one project-wide home for transient and durable data used by mu
 
 ## Upstream and downstream
 
-The base `Storage` target depends only on Foundation. Its direct production consumers are App/AppWorkflows (settings and history assembly/operations), Agents (Assistant history and title values), and StorageAudio (bounded PCM primitives). Actions depends on StorageAudio rather than importing Storage. UI imports conversation record values only; its pages receive state/operation interfaces rather than a store. These arrows show runtime use, not reverse imports into Storage.
+The base `Storage` target depends only on Foundation. Its direct production consumers are App/AppWorkflows (document assembly/settings), StorageChat (conversation persistence) and StorageAudio (bounded PCM primitives). Agents import StorageChat and StorageAudio. Actions depends on StorageAudio. UI imports StorageChat conversation record values only; its pages receive state/operation interfaces rather than a store. These arrows show runtime use, not reverse imports into Storage.
 
 ```mermaid
 flowchart LR
@@ -64,36 +64,33 @@ sequenceDiagram
 
 ✅ App settings define their layout, payload schema, legacy migration and device-local credential policy in [App](../App/README.md). ❌ Cross-device sync, cross-process writers, general persistent media/indexes and automatic disk-cache eviction are not implemented. Model weights remain in the resource system.
 
-## Conversation journal
+## Directory and target ownership
 
-✅ ConversationHistoryStore is the Foundation-only domain store for current and archived conversations. App provides one LocalDocumentStore<ConversationArchive> and injects that owner into Assistant and the history application workflow. A nil document explicitly selects volatile storage for tests, never production fallback. The versioned payload stores original user text, exact request messages, model label/options, received text fragments, generation status/finish reason/error and optional execution error. Credentials and media are not recorded. Current title is computed from the latest original user input; only archived conversations have a generated summary title.
-
-| Bound | Policy |
-| --- | --- |
-| Journal document | 32 MiB encoded envelope; reject excess, no automatic eviction |
-| Conversations | One current plus at most 64 archives; explicit deletion of archives |
-| Turns | At most 256 per conversation; start a new conversation when full |
-| Input / system / model label | 4096 / 32768 / 512 UTF-8 bytes per record |
-| Received raw response | 256 KiB / 8192 fragments; reject excess preserving prior data |
-| Context | Latest ten completed rounds of current conversation, oldest to newest; no archived or failed rounds |
-| Title / error | 80 characters / 4096 characters |
-| Mutations | One actor-owned write admission; concurrent mutation fails busy, no queue |
-
-Each accepted fragment is atomically persisted before current Action parsing. Admission/append reserve encoded headroom for terminal error state. Disk failures preserve the previous durable revision and surface explicitly. If a terminal write fails after the producer has stopped, the in-memory record is marked interrupted with an unsaved-status error so it cannot permanently fence the next input; a later successful write persists that recovery state. Interrupted generating records loaded after restart are marked interrupted in the snapshot and excluded from context. A subsequent successful write persists that recovery state. New conversation is one atomic archive-and-reset write; pending title failure never loses the archived conversation. An active producer blocks archival until stopped/joined.
-
-```mermaid
-flowchart TD
-    Begin[Original input and system prompt] --> Context[Last ten completed rounds]
-    Context --> Commit[Revision-checked atomic document write]
-    Delta[Received fragment before parsing] --> Commit
-    End[Completion / cancellation / failure] --> Commit
-    New[Archive current and reset atomically] --> Commit
-    Title[Archived title or retry error] --> Commit
-    Commit --> Cache[Actor snapshot]
-    Commit --> Disk[Protected local JSON]
-    Disk --> Recover[Restart: generating becomes interrupted]
+```text
+Storage/                         # Storage target: reusable storage mechanisms only
+├── BoundedMemoryStream.swift     # Bounded transient data stream
+├── MemoryLeaseStore.swift        # Generic in-memory handles/leases, not semantic memory
+├── LocalDocumentStore.swift      # Persistent JSON, cached snapshot and revision synchronization
+├── README.md
+├── Audio/                       # StorageAudio: audio lifetime and PCM contracts
+│   ├── SpeechAudio.swift
+│   ├── SpeechAudioStore.swift
+│   └── README.md
+└── Chat/                        # StorageChat: conversation records and journal
+    ├── ConversationHistory.swift
+    └── README.md
 ```
 
-❌ Cross-process writers, cross-device sync, semantic retrieval, compressed archives and automatic retention are not implemented. Whole-document fragment writes favor diagnostic durability; no background unbounded flush queue exists. Provider token budgets are independent of journal storage limits.
+✅ The outer layer owns reusable cache, persistence and local synchronization mechanisms. Domain directories own schemas, domain limits, retention and domain-specific APIs. Chat and Audio depend on core; core never imports a domain. StorageChat depends only on Storage. Existing file formats, paths on disk and data limits are unchanged by the source move.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+| Domain | Status and responsibility |
+| --- | --- |
+| Audio/ | ✅ Process-local single-use PCM; persistent audio remains pending |
+| Chat/ | ✅ Raw conversation records, current/archived history, context extraction and durable journal |
+| Image/ | ❌ Planned only: image metadata, file/cache handles and retention |
+| Video/ | ❌ Planned only: video files, finalization and retention |
+| Memory/ | ❌ Planned only: semantic memory records, provenance, retrieval and forgetting; not the core MemoryLeaseStore |
+
+Do not create a domain directory or target until a concrete implementation exists. New domains follow the same dependency direction and must document bounds, deletion, ownership and verification. Core synchronization currently means process-local revision locking/cache coherence; cross-device synchronization and reclaimable disk cache remain unimplemented. App-owned settings schemas remain in App, using the generic document store.
+
+See [Chat](Chat/README.md) for the moved journal contract and [Audio](Audio/README.md) for PCM contracts.

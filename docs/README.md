@@ -57,3 +57,9 @@ When a runtime contract changes, update the owning module README first, then the
 ## Canonical Action entry audit
 
 ✅ [ADR 0068](adr/0068-canonical-action-entrypoints.md) records the Action implementation audit and typed speech capability migration. ❌ Physical-device acceptance remains outstanding.
+
+## Storage core/domain layout
+
+✅ [ADR 0069](adr/0069-storage-core-domain-layout.md) records the Storage core/domain split and no-data-migration guarantee.
+
+❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.

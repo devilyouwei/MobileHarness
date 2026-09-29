@@ -31,3 +31,9 @@ flowchart LR
 ❌ Persistence, repeated playback and multi-consumer handles are unsupported. Physical-device latency and memory acceptance remain outstanding; model intermediate waveforms and player buffers are outside this cache.
 
 ✅ The production default matches the synthesis Agent’s 8 MiB per-request output limit: approximately 43.7 seconds of 48 kHz mono Float32 PCM. Memory is allocated as audio arrives, not reserved per handle. Increasing this from 2 MiB reduces overflow when MOSS runs ahead of playback; the 2048-frame cap, explicit failure policy and three-second empty-read timeout remain. ❌ This does not provide producer backpressure or guarantee arbitrarily long replies.
+
+## Storage domain organization
+
+✅ Audio remains a business storage domain compiled as StorageAudio. Generic streams and leases remain in the outer Storage core; sibling Chat compiles separately and introduces no Audio dependency.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

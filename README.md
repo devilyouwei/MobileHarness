@@ -191,7 +191,7 @@ Input routing uses explicit `publish` (configured subscriptions) or `send` (name
 | [ModelKit](MobileHarness/ModelKit/README.md) | Capability interfaces, providers and model lifecycle |
 | [PlatformKit](MobileHarness/PlatformKit/README.md) | Device I/O, permissions and platform boundaries |
 | [App](MobileHarness/App/README.md) / [UI](MobileHarness/UI/README.md) | Application composition, running sessions and workflows; separate pages, state and interaction interfaces |
-| [Storage](MobileHarness/Storage/README.md) | Bounded memory/PCM storage and durable settings/conversation documents; general media/memory persistence remains planned |
+| [Storage](MobileHarness/Storage/README.md) | Core cache/persistence/local synchronization with Audio and Chat domain storage; Image/Video/semantic Memory remain planned |
 | [Architecture Decisions](docs/adr/README.md) | Design rationale and contract changes |
 | [Roadmap](docs/Roadmap.md) | Implementation stages and outstanding acceptance work |
 

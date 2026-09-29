@@ -9,7 +9,7 @@ let package = Package(
             name: "HarnessKit",
             targets: [
                 "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
-                "Storage", "StorageAudio", "UI", "AppWorkflows", "BehaviorAssembly",
+                "Storage", "StorageChat", "StorageAudio", "UI", "AppWorkflows", "BehaviorAssembly",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
                 "PlatformKit",
@@ -37,7 +37,7 @@ let package = Package(
             name: "BehaviorAssembly", dependencies: ["AgentCore", "Actions", "Tools"],
             path: "MobileHarness/App/Composition/Behaviors", exclude: ["README.md"]),
         .target(
-            name: "UI", dependencies: ["AgentCore", "Storage"], path: "MobileHarness/UI",
+            name: "UI", dependencies: ["AgentCore", "StorageChat"], path: "MobileHarness/UI",
             exclude: [
                 "README.md", "Camera/README.md", "Components/README.md", "Conversation/README.md",
                 "Settings/README.md", "Diagnostics/README.md",
@@ -45,13 +45,13 @@ let package = Package(
         .target(
             name: "AppWorkflows",
             dependencies: [
-                "UI", "AgentCore", "Agents", "Storage", "ModelKit", "ModelKitDefaults", "ModelKitOpenAI",
+                "UI", "AgentCore", "Agents", "Storage", "StorageChat", "ModelKit", "ModelKitDefaults", "ModelKitOpenAI",
                 "PlatformKit",
             ],
             path: "MobileHarness/App/Workflows", exclude: ["README.md"]),
         .testTarget(name: "UITests", dependencies: ["UI"], exclude: ["README.md"]),
         .testTarget(
-            name: "AppWorkflowTests", dependencies: ["AppWorkflows", "UI", "Storage", "ModelKit"],
+            name: "AppWorkflowTests", dependencies: ["AppWorkflows", "UI", "Storage", "StorageChat", "ModelKit"],
             exclude: ["README.md"]),
         .target(
             name: "AgentCore", path: "MobileHarness/Agents/Core",
@@ -73,7 +73,7 @@ let package = Package(
             path: "MobileHarness/Actions",
             exclude: ["UI/README.md", "README.md", "Speech/README.md", "Runtime/README.md"]),
         .target(
-            name: "Agents", dependencies: ["AgentCore", "ModelKit", "Storage", "StorageAudio"],
+            name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageChat", "StorageAudio"],
             path: "MobileHarness/Agents",
             exclude: [
                 "Core", "SpeechSynthesis/README.md", "Assistant/README.md",
@@ -88,7 +88,10 @@ let package = Package(
             ]),
         .target(
             name: "Storage", path: "MobileHarness/Storage",
-            exclude: ["README.md", "Audio"]),
+            exclude: ["README.md", "Audio", "Chat"]),
+        .target(
+            name: "StorageChat", dependencies: ["Storage"],
+            path: "MobileHarness/Storage/Chat", exclude: ["README.md"]),
         .target(
             name: "StorageAudio", dependencies: ["Storage", "AgentCore", "ModelKit"],
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
@@ -176,7 +179,7 @@ let package = Package(
             dependencies: [
                 "BehaviorAssembly",
                 "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
-                "Storage", "StorageAudio",
+                "Storage", "StorageChat", "StorageAudio",
                 "PlatformKit",
             ],
             exclude: ["README.md"]),

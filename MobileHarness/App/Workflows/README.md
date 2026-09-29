@@ -29,3 +29,9 @@ History output remains raw stored data. Preview uses the existing Agent configur
 ✅ Shared history, protected settings persistence, unchanged title limits and model-switch rollback. Tests control title completion/cancellation and verify archive durability and operation admission.
 
 ❌ Cross-device sync, atomic Keychain-plus-file transactions, automatic orphan-credential collection, live-provider/title-quality acceptance and physical-device diagnostic acceptance.
+
+## Storage domain organization
+
+✅ ConversationHistoryWorkflow uses StorageChat; settings still use core LocalDocumentStore. AppWorkflows depends on both targets for their distinct roles.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

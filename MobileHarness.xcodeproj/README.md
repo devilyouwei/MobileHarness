@@ -30,3 +30,9 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ## Action implementation audit
 
 ✅ Canonical UIActions/SpeechActions namespaces, audioID-only Speak.swift and ActionAuthoringTests are navigation-only shared package sources; no duplicate App compilation.
+
+## Storage domain organization
+
+✅ Storage/Chat now owns the ConversationHistory.swift reference and README. SwiftPM compiles StorageChat separately; no duplicate App Sources membership is introduced.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

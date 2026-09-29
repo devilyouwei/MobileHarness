@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import Storage
+import StorageChat
 
 @MainActor @Observable
 public final class ConversationHistoryState {

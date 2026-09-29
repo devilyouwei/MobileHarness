@@ -183,3 +183,9 @@ flowchart LR
 ## Action runtime stage 2
 
 ✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and returns without inference or output emission. actionResults() exposes bounded retained history. ❌ Automatic retry/replanning based on a result is not implemented.
+
+## Storage domain organization
+
+✅ Assistant and title generation import StorageChat for conversation schemas/journal. Generic storage core no longer owns chat records; Agent behavior and persisted data remain unchanged.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

@@ -451,3 +451,11 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 ❌ 原生动画完成、设备资源迁移及真机验收仍是独立待办。既有行为路径、类别和调度语义不变，本轮不新增设备行为。
 
 验证：本次标准复核后全仓检查通过，169 项 IntegrationTests 通过，四个 iOS 模拟器 scheme 构建通过；工程引用与文档本地链接已核对。未进行本轮真机验收。
+
+## Storage core/domain layout
+
+✅ Storage 根目录保留通用内存缓存/租约、文档持久化和本地同步；聊天记录迁入 Chat/，独立 StorageChat target，Audio/ 保持业务目录。同步消费者 import、依赖与工程引用，不改变磁盘路径、格式和业务行为。见 [ADR 0069](adr/0069-storage-core-domain-layout.md)。
+
+❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.
+
+验证：Storage 目录调整后全仓检查及 169 项 IntegrationTests 通过，四个 iOS 模拟器 scheme 构建通过。聊天实现核对确认仅移动路径并新增核心 import，工程引用和文档链接有效；无需数据迁移，未进行本轮真机验收。

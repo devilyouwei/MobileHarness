@@ -78,3 +78,9 @@ The current lifecycle owners are VoiceSessionCoordinator, CameraCoordinator and 
 ## Canonical Action entry audit
 
 ✅ [ADR 0068](adr/0068-canonical-action-entrypoints.md) completes the current UI/Speech entry standard. Speech transport validation belongs to Actions; its host capability receives a typed UUID. Playback cleanup is joined before failure returns. ❌ No new device/animation functionality is implied.
+
+## Storage core/domain layout
+
+✅ Storage now separates generic mechanisms in its root from Audio and Chat domains. StorageChat depends on Storage; UI imports only shared chat values. Source relocation preserves journal data and runtime semantics. See [ADR 0069](adr/0069-storage-core-domain-layout.md).
+
+❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.

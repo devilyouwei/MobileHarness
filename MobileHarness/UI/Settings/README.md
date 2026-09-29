@@ -60,3 +60,9 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 ✅ Source location: `MobileHarness/UI/Settings`; compiled by `UI`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
 
 ✅ History receives ConversationHistoryState and ConversationHistoryControlling. ConversationHistoryWorkflow owns store access, archive/title ordering, errors and parser previews; the page imports only Storage value types and never receives ChatCapability or ConversationHistoryStore.
+
+## Storage domain organization
+
+✅ Conversation history views/state import StorageChat shared records. UI continues to receive operations through injected interfaces and never constructs a store.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

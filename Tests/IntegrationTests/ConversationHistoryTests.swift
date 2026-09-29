@@ -3,6 +3,7 @@ import Agents
 import Foundation
 import ModelKit
 import Storage
+import StorageChat
 import Testing
 
 private func journal(at url: URL) throws -> ConversationHistoryStore {

@@ -1,4 +1,5 @@
 import Foundation
+import Storage
 
 public enum ConversationHistoryError: Error, Equatable, Sendable {
     case busy, capacityExceeded, invalidRecord, missingTurn, emptyConversation

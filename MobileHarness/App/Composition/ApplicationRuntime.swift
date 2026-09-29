@@ -6,6 +6,7 @@ import Gateway
 import ModelKit
 import PlatformKit
 import Storage
+import StorageChat
 
 /// Root-owned communication assembly, available before voice models are ready.
 @MainActor

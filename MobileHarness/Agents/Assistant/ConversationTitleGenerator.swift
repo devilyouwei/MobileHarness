@@ -1,6 +1,6 @@
 import Foundation
 import ModelKit
-import Storage
+import StorageChat
 
 /// Title-only inference: never parses Action markup, changes context or executes model output.
 public enum ConversationTitleGenerator {

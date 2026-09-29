@@ -5,6 +5,9 @@
 	"objectVersion" = "60";
 	"archiveVersion" = "1";
 	"objects" = {
+        "A6F26E727295FA512333E192" = { "isa" = "PBXGroup"; "name" = "Chat"; "children" = ( "CD6000000000000000000001", "F390B1936FDDAFA9E4A6AB89", ); "sourceTree" = "<group>"; };
+        "F390B1936FDDAFA9E4A6AB89" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Storage/Chat/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+
         "436701E6D6BE2C28935A9F44" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/UI/UIActions.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "75DE9CB18DE5F54E4CAEA6A6" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/Speech/SpeechActions.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "6859CBD1BF28B99EECDE5B30" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/Speech/Speak.swift"; "sourceTree" = "SOURCE_ROOT"; };
@@ -83,7 +86,7 @@
 
         "CD6000000000000000000003" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "Tests/IntegrationTests/ConversationHistoryTests.swift"; "sourceTree" = "SOURCE_ROOT"; };
 
-        "CD6000000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/ConversationHistory.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "CD6000000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/Chat/ConversationHistory.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "CD6000000000000000000002" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Assistant/ConversationTitleGenerator.swift"; "sourceTree" = "SOURCE_ROOT"; };
 
 		"CD5900000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Settings/ConversationHistoryView.swift"; "sourceTree" = "SOURCE_ROOT"; };
@@ -119,7 +122,7 @@
 "CD5410000000000000000002" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Storage/MemoryLeaseStore.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "CD5410000000000000000003" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Storage/Audio/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 "CD5410000000000000000004" = { "isa" = "PBXGroup"; "children" = ("CD5400000000000000000002", "710A2F3A64A0F14DFEFC266A", "CD5410000000000000000003"); "name" = "Audio"; "sourceTree" = "<group>"; };
-"A8A737D86D439890A23BB48A" = { "isa" = "PBXGroup"; "children" = ("CD6000000000000000000001", "CD5570000000000000000001", "CD5410000000000000000001", "CD5410000000000000000002", "CD5410000000000000000004", "06700822D3F590057AD4BB38"); "name" = "Storage"; "sourceTree" = "<group>"; };
+"A8A737D86D439890A23BB48A" = { "isa" = "PBXGroup"; "children" = ("A6F26E727295FA512333E192", "CD5570000000000000000001", "CD5410000000000000000001", "CD5410000000000000000002", "CD5410000000000000000004", "06700822D3F590057AD4BB38"); "name" = "Storage"; "sourceTree" = "<group>"; };
 "2BF205610DB867B85B94B08B" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/SpeechSynthesis/SpeechSynthesisAgent.swift"; "sourceTree" = "SOURCE_ROOT"; };
 "9F306046D7455E79804EA05E" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Agents/SpeechSynthesis/SpeechSynthesis.agent.json"; "sourceTree" = "SOURCE_ROOT"; };
 "12F1D1CDFDECD985F6B7ACE1" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Agents/SpeechSynthesis/README.md"; "sourceTree" = "SOURCE_ROOT"; };

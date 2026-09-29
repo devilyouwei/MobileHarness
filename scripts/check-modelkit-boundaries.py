@@ -8,7 +8,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly'}
+FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageChat', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly'}
 errors = []
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
@@ -78,7 +78,7 @@ for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageAudio', 'Foundation'}
+agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'Foundation'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     if 'Core' in source.relative_to(ROOT / 'MobileHarness/Agents').parts:
         continue
@@ -88,7 +88,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
 agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
 for dependency in agent_target.get('dependencies', []):
     name = next(iter(dependency.values()))[0]
-    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageAudio'}:
+    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio'}:
         errors.append(f'Forbidden Agents dependency: {name}')
 # Storage core stays Foundation-only; media adapters may use the corresponding domain contracts.
 storage_target = next(t for t in package['targets'] if t['name'] == 'Storage')
@@ -98,6 +98,19 @@ for source in (ROOT / 'MobileHarness/Storage').glob('*.swift'):
     for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
         if imported != 'Foundation':
             errors.append(f'Forbidden Storage import {imported}: {source.relative_to(ROOT)}')
+# Business storage domains cannot be compiled into the generic core.
+if not {'Audio', 'Chat'}.issubset(set(storage_target.get('exclude', []))):
+    errors.append('Storage core must exclude business storage directories')
+chat_target = targets.get('StorageChat', {})
+if chat_target.get('path') != 'MobileHarness/Storage/Chat' or [next(iter(d.values()))[0] for d in chat_target.get('dependencies', [])] != ['Storage']:
+    errors.append('StorageChat must compile Storage/Chat and depend only on Storage')
+for source in (ROOT / 'MobileHarness/Storage/Chat').rglob('*.swift'):
+    for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+        if imported not in {'Foundation', 'Storage'}:
+            errors.append(f'Forbidden StorageChat import {imported}: {source.relative_to(ROOT)}')
+for path, directories, files in os.walk(ROOT / 'MobileHarness/Storage'):
+    if 'README.md' not in files:
+        errors.append(f'Missing Storage directory README: {Path(path).relative_to(ROOT)}')
 audio_target = next(t for t in package['targets'] if t['name'] == 'StorageAudio')
 audio_dependencies = [next(iter(d.values()))[0] for d in audio_target.get('dependencies', [])]
 if audio_dependencies != ['Storage', 'AgentCore', 'ModelKit']:
@@ -113,9 +126,9 @@ ui = targets.get('UI', {})
 if ui.get('path') != 'MobileHarness/UI':
     errors.append('UI must compile MobileHarness/UI')
 ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])]
-if ui_dependencies != ['AgentCore', 'Storage']:
-    errors.append('UI may depend only on shared AgentCore/Storage value contracts')
-allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit', 'AgentCore', 'Storage'}
+if ui_dependencies != ['AgentCore', 'StorageChat']:
+    errors.append('UI may depend only on shared AgentCore/StorageChat value contracts')
+allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit', 'AgentCore', 'StorageChat'}
 for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     content = source.read_text()
     for imported in re.findall(r'\bimport\s+(\w+)', content):

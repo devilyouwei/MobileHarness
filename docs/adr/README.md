@@ -104,3 +104,9 @@ These are **dated decision records**, including proposals and stages later repla
 ## Canonical Action entry audit
 
 ✅ [0068-canonical-action-entrypoints.md](0068-canonical-action-entrypoints.md) records canonical UI/Speech namespaces, entry signatures and typed audio handles. ❌ Device/animation follow-ups remain separate.
+
+## Storage core/domain layout
+
+✅ [0069-storage-core-domain-layout.md](0069-storage-core-domain-layout.md) separates Storage core mechanisms from Audio/Chat domain targets.
+
+❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.

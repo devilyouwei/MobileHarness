@@ -42,3 +42,9 @@ Purpose: verify contracts and application integration in separate test targets. 
 ## Action implementation audit
 
 ✅ IntegrationTests now includes the Action authoring audit regression cases; no physical-device acceptance is implied.
+
+## Storage domain organization
+
+✅ Storage core and domain tests retain existing root test locations; the source reorganization changes only the build/import map.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
