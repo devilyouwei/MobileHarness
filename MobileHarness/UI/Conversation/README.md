@@ -1,5 +1,8 @@
 # Conversation UI
 
+> Current status (2026-09-29): the user identified desktop simulator screen sharing as the cause of missing iPhone camera/microphone input. BLE settings and conversation binding are restored; receipt-admission and robot-only disconnect fixes remain. iPhone BLE acceptance without screen sharing is still pending; no causal claim is made about the earlier BLE failure.
+
+
 Purpose: display startup and conversation state through eyes, captions and spectra. Design goals: accessible user controls, observable readiness and no Agent/model/device ownership in views.
 
 | File | Responsibility |
@@ -37,3 +40,7 @@ flowchart LR
 Sources compile once in UI; page navigation does not create or destroy the voice runtime.
 
 ❌ Physical-device startup latency, layout/animation, accessibility/landscape and face-tracking acceptance; hand-driven gaze and additional character pages remain unimplemented.
+
+✅ ConversationView receives shared BluetoothSettingsState presentation values and displays real connected/motion-completion status alongside conversation. It receives no device service or motion closure; Agent outputs still pass through Gateway and Actions. ❌ The display is not an emergency-stop control or evidence of independent position measurement.
+
+✅ Connected but unverified robots display “机械臂已连接，控制待验证”; the conversation does not imply motion readiness from a radio connection alone.

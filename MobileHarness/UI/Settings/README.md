@@ -1,5 +1,8 @@
 # Settings
 
+> Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
+
+
 Purpose: present App configuration with accessible native SwiftUI controls. Design goals: secure credentials, explicit model selection and immediate application without restarting.
 
 | File | Responsibility |
@@ -66,3 +69,25 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 ✅ Conversation history views/state import StorageChat shared records. UI continues to receive operations through injected interfaces and never constructs a store.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+## Bluetooth devices
+
+✅ `BluetoothSettingsState` contains only UI values; `BluetoothControlling` is implemented by AppWorkflows. Settings → 蓝牙设备 uses native List sections for 我的设备 / 附近设备, searching/progress, explicit connect, verification, connected state, disconnect/cancel, and confirmed 忽略此设备. It displays permission/off/unsupported errors and offers a host-supplied system-settings action for permission denial. The page never imports CoreBluetooth or PlatformKit and never sends motor commands.
+
+✅ Up to 32 discovered rows and one remembered device; rows use peripheral identifiers for stable identity. Only supported NexArm devices appear. Leaving the page stops discovery but preserves the root-owned connection and any joined lifecycle cleanup. Device names/state and completion/error feedback come from the workflow; no simulated success is displayed. The system radio cannot be toggled by this app, so its actual state is shown rather than an imitation toggle.
+
+❌ iOS Settings pairing integration, audio accessories, automatic reconnection and background control are outside scope. UI rendering and physical-device acceptance are reported separately from workflow unit tests.
+
+✅ Bluetooth connection and control readiness are distinct: a missing AT32 version shows “蓝牙已连接，控制待验证” with “重新验证”. Version queries are read-only; the first successful verification then runs the connection indication described below. Disconnect and forget remain available. A green control indicator requires validated firmware and pose. ❌ Real iPhone control acceptance remains pending.
+
+✅ Connection explains whole-arm reset and the ID5 feedback gesture, shows “正在复位 / 提示…” while it runs, and enables control only after feedback completion. Cancel/disconnect remains available. Missing firmware does not animate or claim success. ❌ Physical-device presentation/motion acceptance pending.
+
+## Current NexArm compatibility presentation
+
+✅ After successful protocol/pose and connection-indication checks, the known missing-AT32 profile can show ready while device info truthfully displays “ESP32 1.0.2 · AT32 版本暂不可读”. The notice explains the compatibility checks. The connection footer describes whole-arm reset and ID5 about ±8° then center; the old pending-only behavior applies to earlier revisions. ❌ Actual iPhone reset/ID5 acceptance remains pending.
+
+## Current Bluetooth UX
+
+✅ User confirmed real iPhone conversation control. Connection status now follows service/pose and ID5 feedback validation, independently of firmware-version strings; AT32 version and its missing-read warning are removed. Nearby shows discovered BLE devices without name/service exclusion, sorts NexArm names first and explains that compatibility is checked after selection. Devices may be renamed. The old firmware retry button is removed.
+
+✅ The footer explains foreground automatic reconnection, no repeat gesture/reset during recovery, and manual disconnect disabling recovery. Explicit connection retains the reset/ID5 gesture. ❌ Physical verification of broad scanning and lock/unlock recovery remains pending; not all Bluetooth Classic devices are BLE-discoverable.

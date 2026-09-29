@@ -62,7 +62,7 @@ Audio and camera own their devices and cleanup. Capture delivery is bounded; aud
 - ✅ Microphone capture, speaker playback, PCM conversion and spectrum analysis.
 - ✅ Foreground camera capture, front/back selection, native preview and compact gray samples.
 - ✅ Shared permission contracts and an external-device transport interface.
-- ❌ Concrete BLE/network/robot transports, recording and additional hardware domains.
+- ❌ BLE/network transports, production robot control, recording and additional hardware domains.
 
 ## Issue record
 
@@ -70,3 +70,7 @@ Audio and camera own their devices and cleanup. Capture delivery is bounded; aud
 | --- | --- |
 | Open | Measure camera/audio coexistence, route-dependent playback latency and sustained thermal/power behavior on device. |
 | Open | Robot control requires device-side limits, stop acknowledgement and disconnect protection; iOS background execution cannot provide safety. |
+
+✅ [Connectivity/NexArm](Connectivity/NexArm/README.md) adds macOS USB diagnostics and bounded wrist motion and base sweeps. ❌ iPhone connectivity, production robot ownership and independent physical stop protection remain pending.
+
+✅ NexArmBluetooth provides a real CoreBluetooth transport for iOS/macOS with main-actor delegate ownership behind an actor API. ❌ BLE connectivity does not establish physical stop/watchdog behavior; no new third-party dependency.

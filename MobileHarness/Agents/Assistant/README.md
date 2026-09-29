@@ -3,7 +3,7 @@
 Purpose: send user input to ChatCapability, maintain bounded history and interpret generated output inside the Agent. Its local registry controls available capabilities; Gateway receives resolved calls.
 
 - ✅ AssistantAgent actor: 32 waiting inputs, 256 output envelopes and one generation worker; overflow fails explicitly.
-- ✅ Assistant.agent.json v5 exposes express under Display and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
+- ✅ Assistant.agent.json v5 exposes express under Display, shakeBase under Robot and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
 - ✅ Each turn owns AgentGenerator state. Natural text uses Assistant.mapText; explicit XML resolves only JSON Actions. Channel scopes override defaults without moving wait boundaries.
 - ✅ CapabilityContextBuilder includes JSON Action aliases/docs/parameters/examples only. Speech behavior is an English Agent-owned instruction; internal methods and native Tools never enter system context.
 - ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
@@ -189,3 +189,11 @@ flowchart LR
 ✅ Assistant and title generation import StorageChat for conversation schemas/journal. Generic storage core no longer owns chat records; Agent behavior and persisted data remain unchanged.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+## Supervised NexArm base Action
+
+✅ JSON is the only model registration: `<shakeBase cycles="1"/>` resolves to `NexArm.shakeBase` on Robot. Required integer `cycles` is 1...3; one cycle is origin → +2° → -2° → origin. No angle/speed parameters. All calls and completion receipts cross the Gateways. The domain handler validates arguments; the host binds a connected controller. The Mac USB integration harness exercises the real Assistant/parser with explicitly deterministic model output and test presentation.
+
+✅ iPhone binds the verified BLE profile through AppWorkflows. ❌ Unattended model motion and verified hardware stop/watchdog are unavailable; disconnected devices fail explicitly. Generation completion is not motion completion. Use only explicitly requested supervised motions; never automatically retry failures.
+
+✅ shakeBase documentation now identifies phone Settings → Bluetooth Devices and foreground/posture requirements. iPhone has a real BLE workflow binding. Terminal ActionResults enter the existing bounded inbox, and UI shows workflow completion independently of model prose. ❌ Receipt-driven follow-up model generation and arbitrary robot Actions are not introduced.

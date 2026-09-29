@@ -1,5 +1,8 @@
 # App Composition
 
+> Current status (2026-09-29): the user identified desktop simulator screen sharing as the cause of missing iPhone camera/microphone input. BLE settings and conversation binding are restored; receipt-admission and robot-only disconnect fixes remain. iPhone BLE acceptance without screen sharing is still pending; no causal claim is made about the earlier BLE failure.
+
+
 Purpose: construct the application graph and bind concrete services. Design goals: one explicit root, narrow injected dependencies, no hidden runtime lookup or duplicate model registrations.
 
 | File | Responsibility |
@@ -31,7 +34,7 @@ flowchart TD
 
 ## Action implementation validation
 
-✅ BehaviorAssembly constructs the eight domain-owned ActionDefinitions with finite/state kind and completion descriptions, then validates all four packaged Agents' assembled Action and Tool catalogs before creating the scheduler. Assistant, SpeechPerception and VisionPerception expose their own runtimeCapabilities assembly, so internal grants are not copied into App; synthesis uses its packaged catalog. Duplicate/invalid definitions and missing implementations throw from initialization without fallback. Completion descriptions acknowledge UI stale-update no-ops and distinguish target acceptance from animation completion.
+✅ BehaviorAssembly constructs the domain-owned ActionDefinitions with finite/state kind and completion descriptions, then validates all four packaged Agents' assembled Action and Tool catalogs before creating the scheduler. Assistant, SpeechPerception and VisionPerception expose their own runtimeCapabilities assembly, so internal grants are not copied into App; synthesis uses its packaged catalog. Duplicate/invalid definitions and missing implementations throw from initialization without fallback. Completion descriptions acknowledge UI stale-update no-ops and distinguish target acceptance from animation completion.
 
 ❌ These checks verify implementation coverage, not adapter correctness, activity ownership or physical-device completion. General dynamic registration/hot reload remains outside this stage.
 
@@ -48,3 +51,7 @@ flowchart TD
 ✅ ApplicationRuntime assembles LocalDocumentStore from Storage and ConversationHistoryStore from StorageChat. The physical journal URL, schema and single-owner lifetime are unchanged.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+✅ BehaviorAssembly requires a typed `shakeBase` binding. The iPhone root binds BluetoothWorkflow; the Mac diagnostic binds USB. Both fail explicitly when unavailable.
+
+✅ AppAssembly owns one BluetoothWorkflow and NexArmBluetooth for settings and conversation. Its quiesce callback joins VoiceSessionCoordinator cleanup before changing the device; ApplicationRuntime binds shakeBase to that same workflow and requests terminal ActionResults through InputGateway. ❌ No page-owned connection or unavailable success stub remains.

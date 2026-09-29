@@ -1,5 +1,8 @@
 # 实施计划
 
+> Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
+
+
 本页按日期保留实施里程碑和当时的验证记录；较早的“✅”描述反映该日期的实现，不代表当前模块仍按相同方式运行。当前能力以 [项目概览](../README.md) 和 [公开架构](Architecture.md) 为准，精确实现契约见[模块设计入口](../MobileHarness/README.md#part-ii--module-design)所链接的各模块 README。
 
 ## 当前待验收与后续方向
@@ -459,3 +462,63 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 ❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.
 
 验证：Storage 目录调整后全仓检查及 169 项 IntegrationTests 通过，四个 iOS 模拟器 scheme 构建通过。聊天实现核对确认仅移动路径并新增核心 import，工程引用和文档链接有效；无需数据迁移，未进行本轮真机验收。
+
+## NexArm USB diagnostic (2026-09-29)
+
+✅ Added a typed, opt-in NexArm wrist Action, macOS serial implementation, bounded binary decoder and fault-latched bounded motion controller. The diagnostic composes InputGateway and OutputGateway; Assistant JSON now declares `shakeBase(cycles: 1...3)` on Robot, exercised by the opt-in Mac USB test with deterministic generation. The iPhone binding explicitly fails as disconnected.
+
+❌ BLE/TCP, iPhone connection, autonomous motion, resource stop/lease integration and independent hardware watchdog acceptance remain pending. Validation: repository checks passed (177 IntegrationTests, hardware test skipped by default). The opt-in physical Action test passed separately: commanded +1 degree, encoder start 2036, estimated target 2047, reported completion 2043. This is controller telemetry acceptance, not exact-angle visual validation. See the connectivity README for earlier failed diagnostic attempts.
+
+✅ Final `scripts/build-ios.sh` passed all four unsigned simulator schemes using the full Xcode toolchain. Optional model evaluations were skipped; iPhone hardware/robot connectivity was not tested.
+
+✅ Base hardware acceptance: one cycle through real Assistant/parser/Gateways/Action on Mac USB, encoder 2114 → 2092 → 2133 → 2117. Deterministic test model output; operator observed rotation. An earlier attempt timed out and stopped without retry; subsequent read-only inspection found stable telemetry. The instrumented supervised rerun passed with unchanged motion bounds/tolerances. ❌ Exact physical-angle metrology and the cause of that earlier convergence timeout remain unverified.
+
+## Foreground iPhone NexArm BLE (2026-09-29)
+
+✅ Added actual CoreBluetooth FFE0/FFE1/FFE2 transport, bounded discovery/connect/exchange, settings device list/status/connect/disconnect/forget, one remembered-device record and root-owned connection lifetime. ApplicationRuntime binds Assistant shakeBase through BluetoothWorkflow with session quiescence and terminal ActionResults. Home displays actual motion status. No automatic reconnect or motion retry.
+
+✅ Native adapter queried version and pose on the real arm from Swift on Mac and confirmed disconnection. Deterministic full-chain tests cover workflow/UI state/Assistant/Gateway/Action/device boundaries, cancellation and failures. Signed iPhone build and simulator checks are tracked in the completion record.
+
+❌ Final iPhone interaction/voice-to-motion acceptance requires the physical phone and a supported stationary arm pose. Existing XY sweep rejects near-vertical poses and does not automatically reposition. Physical emergency stop/watchdog and TCP remain unimplemented.
+
+Validation (2026-09-29): `scripts/check.sh` passed (188 IntegrationTests; physical tests opt-in), and `scripts/build-ios.sh` passed all four simulator schemes. A signed Debug build installed and launched on the connected iPhone 17 Pro. The production BLE adapter read version/pose and disconnected on Mac; an earlier query attempt timed out, so repeated-radio stability is not established. iPhone settings interaction and real spoken-model-to-motion acceptance remain pending.
+
+2026-09-29 regression investigation: user reports iPhone BLE connection failure and missing camera/audio activity. Removed Bluetooth disconnect’s unrelated global voice teardown; repaired Vision ActionResult admission and added stage-specific BLE failures. Physical iPhone recovery/connection remains unverified.
+
+Regression validation: `scripts/check.sh` passed with 191 IntegrationTests, including three added regression checks. Signed iPhone build and all four simulator schemes passed. The repair build was installed and launched on the connected iPhone 17 Pro; physical camera/audio/BLE recovery remains pending user verification.
+
+Recovery build: restored the pre-BLE App composition, scene hooks, SettingsView and ConversationView; robot binding now explicitly throws disconnected. `scripts/check.sh` and all four `scripts/build-ios.sh` schemes passed. Signed recovery build installed and launched on iPhone. A debugger attach did not complete; no native camera/audio callback evidence was obtained, and the debugger was terminated before relaunch. User verification of recovery remains pending.
+
+User clarification: desktop simulator screen sharing caused the missing camera/audio input. Restore BLE App composition and UI while retaining the receipt admission and scoped disconnect corrections. Earlier I/O regression attribution to BLE was unconfirmed. BLE testing with sharing closed remains pending.
+
+2026-09-30: Mac reproduced the BLE write/query timeout without iPhone ownership. A longer diagnostic wait received ACK/version after about three seconds. Added a five-second exchange bound and up to four read-only queries for explicitly missing AT32 information; actual verified firmware is still required. A +2° BLE leg changed base feedback 2050→2027 but failed pitch convergence, so no remaining legs were sent. Larger single-step test and iPhone acceptance are tracked separately.
+
+Mac single-step diagnostic (2026-09-30, user explicitly requested larger movement): one 5° XY yaw command over BLE, duration 2000 ms. Start base 2027, final 1971 (~4.92°), three identical settled readings; other joints changed at most one count. Target XY [128,15], observed [129,15], Z/pitch/roll/claw unchanged. Disconnected afterward. This manual diagnostic bound the same Mac-local peripheral to its actually verified firmware earlier in the session; it did not change App firmware admission, production ±2° Action limits, or automatically repeat a motion. Two preceding attempts sent only version queries and no motion because current AT32 version was unavailable. This is single-step acceptance, not full sweep or iPhone acceptance.
+
+2026-09-30 verification: `scripts/check.sh` passed (193 IntegrationTests), all four `scripts/build-ios.sh` schemes passed, and the signed iPhone build succeeded. The first update installation failed with CoreDevice/RSD allocation; retry succeeded and the updated app launched on iPhone. iPhone BLE acceptance has not been established.
+
+2026-09-30 iPhone screenshot confirms missing AT32 version after BLE connects. ✅ Keep that connection, show control-pending state and support explicit bounded read-only revalidation; block Actions until actual firmware and pose validate. ❌ This corrects state handling but does not resolve persistent AT32 readout or establish iPhone physical control.
+
+Validation of readiness separation: `scripts/check.sh` passed (195 IntegrationTests), all four `scripts/build-ios.sh` schemes passed, and the signed iPhone build passed. Physical iPhone acceptance remains pending.
+
+Deployment is not yet confirmed: the first install attempt failed with Network.NWError 60; the retry did not establish a device connection. Requested an unlocked USB-connected iPhone before continuing. The phone must not be assumed to be running this readiness revision.
+
+2026-09-30: ✅ Added requested connection feedback: validated connection → one arm reset → ID5 about −2°/+2°/home → ready. Missing firmware performs no movement. Duplicate indication, overlap, background cancellation and uncertain feedback are bounded and covered by simulated tests. ❌ Real reset/ID5 direction and timing, persistent AT32 version readout, and iPhone end-to-end acceptance remain pending.
+
+Connection-indication validation: `scripts/check.sh` passed with 198 IntegrationTests and all four simulator schemes passed `scripts/build-ios.sh`. Physical reset/ID5/iPhone acceptance remains pending.
+
+Deployment update: signed connection-indication build succeeded, installed successfully on the connected iPhone 17 Pro, and launched with devicectl. The transport reported localNetwork. This supersedes the earlier readiness-build installation failure; physical robot connection/reset/ID5 acceptance still needs observation.
+
+2026-09-30 physical evidence and iPhone update: USB/BLE/USB comparison confirms the device-side BLE AT32-version defect; USB reports real 1.0.2 repeatedly. User observed a Bluetooth base step targeting 10°, feedback ~9.6°. ✅ Added explicit known-profile compatibility to iPhone with stationary pose validation, truthful missing-version text, unchanged Action constraints and one reset/ID5 ±8° connection gesture. ❌ iPhone reset/gesture and complete conversation physical acceptance remain pending; only the Mac single step has user-confirmed motion.
+
+Mac hardware follow-up: complete production compatibility → reset → ID5 ±8° → center sequence passed reported position convergence after correcting home tolerance units. Earlier uniform tolerance rejected a stable home 3 mm / 1.2° from nominal and stopped before ID5. iPhone acceptance remains pending.
+
+Latest compatibility/home-tolerance validation: `scripts/check.sh` passed (200 IntegrationTests), all four `scripts/build-ios.sh` schemes passed. Production Mac connection indication completed reset/ID5 ±8°/center with sampled convergence; iPhone physical acceptance remains pending.
+
+Deployment: the signed compatibility/home-tolerance build succeeded, installed on the connected iPhone 17 Pro and launched successfully. Mac BLE probe has exited. iPhone UI/connection gesture/conversation motion acceptance awaits the next physical test; do not infer it from installation.
+
+2026-09-30 user acceptance: ✅ The user confirmed the iPhone LLM conversation → mechanical-arm control chain works. New UX work removes normal AT32 queries/warnings, lists BLE devices without name/service filtering with NexArm priority, and restores the last verified connection on foreground/cold start without a reset, gesture or Action replay. Manual disconnect/forget and physical uncertainty disable recovery. ❌ Updated scan visibility and physical lock/unlock recovery timing remain pending; background control is not enabled.
+
+Bluetooth UX validation: `scripts/check.sh` passed with 204 IntegrationTests and all four simulator schemes passed `scripts/build-ios.sh`. Real-device discovery/recovery acceptance remains pending.
+
+Deployment of current Bluetooth UX: signed iPhone build succeeded; the update installed on iPhone 17 Pro and launched successfully. Scan visibility and lock/unlock recovery still await user observation. The earlier iPhone conversation-control acceptance remains recorded above.

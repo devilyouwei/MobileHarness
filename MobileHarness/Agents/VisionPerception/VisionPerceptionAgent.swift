@@ -99,21 +99,21 @@ public actor VisionPerceptionAgent: Agent {
     public func receive(_ input: AgentInput) throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID else { throw ImageInputError.wrongSession }
+        guard !input.metadata.expired else {
+            expiredInputs += 1
+            throw CommunicationError.expired
+        }
+        if case .actionResult(let result) = input.payload {
+            guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
+                result.owner.sessionID == input.sessionID
+            else { throw CommunicationError.unauthorized }
+            resultInbox.accept(result)
+            return
+        }
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
         guard lastSequence.map({ image.sequence > $0 }) ?? true,
             lastTimestamp.map({ image.timestamp >= $0 }) ?? true
         else { throw ImageInputError.outOfOrder }
-        guard !input.metadata.expired else {
-            if case .actionResult(let result) = input.payload {
-                guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
-                    result.owner.sessionID == input.sessionID
-                else { throw CommunicationError.unauthorized }
-                resultInbox.accept(result)
-                return
-            }
-            expiredInputs += 1
-            throw CommunicationError.expired
-        }
         lastSequence = image.sequence
         lastTimestamp = image.timestamp
         guard try filter.accepts(image) else { return }

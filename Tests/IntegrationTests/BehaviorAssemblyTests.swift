@@ -39,6 +39,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let endpoint = BehaviorEndpoint()
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint,
+        shakeBase: { _, _ in throw CancellationError() },
         capabilities: [
             AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
             SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities),

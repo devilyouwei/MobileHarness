@@ -5,6 +5,24 @@
 	"objectVersion" = "60";
 	"archiveVersion" = "1";
 	"objects" = {
+        "E7A079D7432FD6DE8C05ED50" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "Tests/IntegrationTests/NexArmBluetoothTests.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "C90B3407F53D85173E491948" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/App/Workflows/BluetoothWorkflow.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "443AB248753130A2C6BA3523" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Settings/BluetoothSettingsView.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "CE985697EE05A5CC6E315299" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Settings/BluetoothSettingsState.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "82FBEDE847B0D73B5D445BE3" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/NexArmBluetooth.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "A5C7D3B1DF4AD3BE3DE7FA7C" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/NexArmActionModule.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "6A97D387E15EEDCB2A672BFD" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/NexArmActions.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "12C719391D8590E272BA74F3" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/NudgeWrist.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "868B9CB1694A3A2C8860D4DC" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Actions/NexArm/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+        "B7EE91CBB680EBBAC27FE72E" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/ShakeBase.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "EA09BB1BE4A23A549E24FDD6" = { "isa" = "PBXGroup"; "name" = "NexArm"; "children" = ("A5C7D3B1DF4AD3BE3DE7FA7C", "6A97D387E15EEDCB2A672BFD", "12C719391D8590E272BA74F3", "B7EE91CBB680EBBAC27FE72E", "868B9CB1694A3A2C8860D4DC"); "sourceTree" = "<group>"; };
+        "0D20AE2B6A42D1F75E265D3F" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/NexArmController.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "7AEA66F127932B70DAB23505" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/NexArmProtocol.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "52CD11F77B660A7A7614B3FE" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/NexArmSerial.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "CEE1B981FE5B154B8403FBE8" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+        "C6B613BD19010882A375CEB9" = { "isa" = "PBXGroup"; "name" = "NexArm"; "children" = ("82FBEDE847B0D73B5D445BE3", "0D20AE2B6A42D1F75E265D3F", "7AEA66F127932B70DAB23505", "52CD11F77B660A7A7614B3FE", "CEE1B981FE5B154B8403FBE8"); "sourceTree" = "<group>"; };
+        "8AA84BE0F91EB4C7D12A8BB2" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "Tests/IntegrationTests/NexArmTests.swift"; "sourceTree" = "SOURCE_ROOT"; };
+
         "A6F26E727295FA512333E192" = { "isa" = "PBXGroup"; "name" = "Chat"; "children" = ( "CD6000000000000000000001", "F390B1936FDDAFA9E4A6AB89", ); "sourceTree" = "<group>"; };
         "F390B1936FDDAFA9E4A6AB89" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Storage/Chat/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 
@@ -61,7 +79,7 @@
 		"5DEBAA5278AF528714762076" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/App/Workflows/ConversationHistoryWorkflow.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"C58A2D1AD657909D2F46A21A" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/App/Workflows/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 		"615AA354402F6AC612872A13" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/App/Workflows/SpeechDiagnosticWorkflow.swift"; "sourceTree" = "SOURCE_ROOT"; };
-		"BE9FBF3493CAC685E7A5368B" = { "isa" = "PBXGroup"; "name" = "Workflows"; "children" = ( "B072D2BF43075DCB51C50665", "CD5300000000000000000002", "5DEBAA5278AF528714762076", "C58A2D1AD657909D2F46A21A", "CD5300000000000000000001", "615AA354402F6AC612872A13" , ); "sourceTree" = "<group>"; };
+		"BE9FBF3493CAC685E7A5368B" = { "isa" = "PBXGroup"; "name" = "Workflows"; "children" = ( "C90B3407F53D85173E491948", "B072D2BF43075DCB51C50665", "CD5300000000000000000002", "5DEBAA5278AF528714762076", "C58A2D1AD657909D2F46A21A", "CD5300000000000000000001", "615AA354402F6AC612872A13" , ); "sourceTree" = "<group>"; };
 		"116C0F1467639C0ACB510302" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Camera/CameraState.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"8A1B3368D88038C8C18C9CC6" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/UI/Camera/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 		"DD7210C231DAA55DF0A4F75C" = { "isa" = "PBXGroup"; "name" = "Camera"; "children" = ( "CA2600000000000000000002", "116C0F1467639C0ACB510302", "8A1B3368D88038C8C18C9CC6" , ); "sourceTree" = "<group>"; };
@@ -72,7 +90,7 @@
 		"0131B1D5D37C6FB1BA0FE9CD" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Settings/ConversationHistoryState.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"1AC685541FB433191454F9E6" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/UI/Settings/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 		"7EB31267FBE49272FC3BC45B" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Settings/SettingsState.swift"; "sourceTree" = "SOURCE_ROOT"; };
-		"B501F292B1A70325355A206E" = { "isa" = "PBXGroup"; "name" = "Settings"; "children" = ( "0131B1D5D37C6FB1BA0FE9CD", "CD5900000000000000000001", "1AC685541FB433191454F9E6", "7EB31267FBE49272FC3BC45B", "CD5300000000000000000003" , ); "sourceTree" = "<group>"; };
+		"B501F292B1A70325355A206E" = { "isa" = "PBXGroup"; "name" = "Settings"; "children" = ("443AB248753130A2C6BA3523", "CE985697EE05A5CC6E315299",  "0131B1D5D37C6FB1BA0FE9CD", "CD5900000000000000000001", "1AC685541FB433191454F9E6", "7EB31267FBE49272FC3BC45B", "CD5300000000000000000003" , ); "sourceTree" = "<group>"; };
 		"94F9DA2A017A3852C4439ADC" = { "isa" = "PBXBuildFile"; "fileRef" = "A7A4E649EE47AD3DE42B8193"; };
 		"EA42D215AB4056A9EF75ED13" = { "isa" = "PBXBuildFile"; "fileRef" = "616F5753C888A1B0BA5F0A1B"; };
 		"D774CAB97D356B4B909B1544" = { "isa" = "PBXBuildFile"; "fileRef" = "9BCF70B8ABE89B3E244D70FF"; };
@@ -671,7 +689,7 @@
 		};
 		"99FED1ADABBE3886D30ECC7C" = {
 			"isa" = "PBXGroup";
-			"children" = ("41690AF7DB7988CFE4E99472", "CD3900000000000000000006");
+			"children" = ( "C6B613BD19010882A375CEB9","41690AF7DB7988CFE4E99472", "CD3900000000000000000006");
 			"name" = "Connectivity";
 			"sourceTree" = "<group>";
 		};
@@ -755,7 +773,7 @@
 		};
 		"9F88A43768F705517862E8EF" = {
 			"isa" = "PBXGroup";
-			"children" = ( "D24307DA4A3792D454489A46",  "285185AD24BF8708736A1343",  "C6C19F2747BD919341CC821B", "19A0E33FD2F204FDEA0661D6", "CD6000000000000000000003", "F1FF0F32A8806E8E81CBE0AA", "CDC7D45FB1B22DA01F12FE26", "8BDCE2372B2D61E7ADF081BD", "285E0894385F3BC870A6A1A0", "49700296F5A58923C850A4CD", "1E3ADEFCCEC5C5BFBF3921E7", "E0C3CA15C95872AD373A420C", "654DE9B1AC6837ACEB545FD7", "E60F1414C69BE27E914EE52D", "F64FF8B74AF8D86090F7CDCD", "BD396405D8B0612EC21ACE35", "DA8B74AB2F3297D855E5B240");
+			"children" = ( "E7A079D7432FD6DE8C05ED50", "8AA84BE0F91EB4C7D12A8BB2", "D24307DA4A3792D454489A46",  "285185AD24BF8708736A1343",  "C6C19F2747BD919341CC821B", "19A0E33FD2F204FDEA0661D6", "CD6000000000000000000003", "F1FF0F32A8806E8E81CBE0AA", "CDC7D45FB1B22DA01F12FE26", "8BDCE2372B2D61E7ADF081BD", "285E0894385F3BC870A6A1A0", "49700296F5A58923C850A4CD", "1E3ADEFCCEC5C5BFBF3921E7", "E0C3CA15C95872AD373A420C", "654DE9B1AC6837ACEB545FD7", "E60F1414C69BE27E914EE52D", "F64FF8B74AF8D86090F7CDCD", "BD396405D8B0612EC21ACE35", "DA8B74AB2F3297D855E5B240");
 			"name" = "IntegrationTests";
 			"sourceTree" = "<group>";
 		};
@@ -821,7 +839,7 @@
 		};
 		"F208CFAE3553F14CF126E3D0" = {
 			"isa" = "PBXGroup";
-			"children" = ( "1DD0029FAB50DAA141CC12C8", "266787B79E76862365CF06A7", "3A7557335168B49891EA0E47", "CA17493E2CC99B2CB234FEB3", "3117FF8E7D74D276194DE9AC");
+			"children" = ( "EA09BB1BE4A23A549E24FDD6", "1DD0029FAB50DAA141CC12C8", "266787B79E76862365CF06A7", "3A7557335168B49891EA0E47", "CA17493E2CC99B2CB234FEB3", "3117FF8E7D74D276194DE9AC");
 			"name" = "Actions";
 			"sourceTree" = "<group>";
 		};
@@ -984,6 +1002,7 @@
 			"isa" = "XCBuildConfiguration";
 			"buildSettings" = {
 				"SUPPORTED_PLATFORMS" = "iphonesimulator";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
 				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
@@ -1003,6 +1022,7 @@
 			"isa" = "XCBuildConfiguration";
 			"buildSettings" = {
 				"SUPPORTED_PLATFORMS" = "iphonesimulator";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
 				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
@@ -1059,6 +1079,7 @@
 			"buildSettings" = {
                 "CODE_SIGN_ENTITLEMENTS" = "Config/MobileHarness.entitlements";
 				"SUPPORTED_PLATFORMS" = "iphoneos";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
 				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
@@ -1167,6 +1188,7 @@
 			"buildSettings" = {
                 "CODE_SIGN_ENTITLEMENTS" = "Config/MobileHarness.entitlements";
 				"SUPPORTED_PLATFORMS" = "iphoneos";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
 				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";

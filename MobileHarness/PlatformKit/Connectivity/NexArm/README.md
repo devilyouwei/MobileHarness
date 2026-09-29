@@ -1,0 +1,153 @@
+# NexArm connectivity
+
+> Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
+
+
+Purpose: communicate with the connected NexArm from macOS and verify supervised wrist/base motion. Design goals: public POSIX serial APIs, actor-owned lifetime, bounded parsing, no dependencies and motion only through explicit Actions or the user-requested connection indication.
+
+✅ `NexArmPacket` / `NexArmDecoder`: FF FF ID LEN CMD PAYLOAD CHECK framing; wrapping inverse-sum checksum; little-endian payloads. Decoder tolerates fragmented/coalesced packets and interleaved ESP32 text logs. RX buffer limit 4096 bytes, exchange input budget 16384 bytes; overflow throws. Maximum payload 253 bytes. Invalid frames/log noise are skipped; incomplete frames are retained. No device action is discarded or replayed.
+
+```mermaid
+flowchart TD
+    Call[Typed nudge] --> Admission[One active operation; reject busy / used / faulted]
+    Admission --> Version[Require ESP32 and AT32 1.0.2]
+    Version --> Baseline[Two stable six-joint samples]
+    Baseline --> Limit[Nonzero delta within 2 degrees; wrist target 1536...2560]
+    Limit --> Write[One 0x32 relative-pose write: roll only; duration 1000 ms]
+    Write --> Read[Read controller joint telemetry]
+    Read --> Check{Three samples within tolerance?}
+    Check -->|Yes| Finish[Record start / target / observed]
+    Check -->|Deadline or I/O error| Fault[Latch uncertain motion; never retry]
+```
+
+✅ `NexArmSerial` exists only on macOS. It opens an explicit `/dev/cu.usbserial-*` or `/dev/tty.usbserial-*` path exclusively at 1,000,000 baud, 8N1, nonblocking/no flow control; does not deliberately toggle DTR/RTS or set HUPCL. It uses Darwin's IOSSIOSPEED ioctl for the nonstandard baud rate. Serial opening can still have hardware-specific reset behavior. `close` releases the descriptor. Host owns and closes it after joined work.
+
+Each exchange has a one-second deadline, 10 ms polling, one write without retries and one active request; concurrent calls fail. Stale RX telemetry is flushed before sending, not outgoing actions. Reply ID, command, payload length and checksum must match. The documented serial format contains no request sequence ID; 0x0B can also be unsolicited. Success is based on observed convergence, not strict request/reply correlation.
+
+✅ `NexArmController` checks two all-joint samples within two counts, 150 ms apart. It sends a 0x32 relative-pose command changing only wrist roll, at most two degrees, with 1000 ms device interpolation; XYZ, pitch and claw deltas are zero. Current wrist and estimated encoder target must be within 1536...2560. It never changes torque or calibration. One committed motion per owner lifetime. After writing it consumes controller 0x0B telemetry (24 bytes: pose then six joint positions), then seeks three consecutive readings within six counts of the encoder target estimate and one degree of the requested roll, 100 ms apart, under a three-second settling deadline (an in-flight one-second exchange can extend this). Other joints must remain within eight counts. Encoder target is estimated from the start plus degrees × 4096/360; tolerance accounts for whole-degree pose quantization. Completion is reported convergence, not a velocity/physical-stop acknowledgment.
+
+The current device accepts version/voltage/coordinate queries but did not return direct servo-register reads during the preflight. Therefore this implementation uses the controller's reported positions. It does not infer velocity or independent physical clearance from them. A valid telemetry packet after writing is not a write acknowledgment; only target convergence completes the Action.
+
+Cancellation before commitment makes no write. A single retained Task joins the finite committed movement despite caller cancellation; it is always awaited, never detached or left running after handler return. Failure after a possible write latches faulted; caller must inspect the device before a new owner is created. Closing the port cannot stop a physical motor. This adapter intentionally does not conform to `ExternalDeviceTransport`, whose emergency-stop contract it cannot truthfully provide.
+
+❌ Autonomous operation, production resource takeover, physical emergency stop/watchdog validation, TCP, iPhone USB support, automatic reconnect/retry and arbitrary motion sequences remain unimplemented. BLE is implemented below. The one-shot bounded target is a diagnostic constraint, not a certified safety system.
+
+Sources: [NexArm motion protocol](https://wiki.hiwonder.com/projects/NexArm/en/esp32-version/docs/3_Motion_Control.html), [external controller integration](https://wiki.hiwonder.com/projects/NexArm/en/esp32-version/docs/6_External_Controller_Integration.html).
+
+## Reproduce
+
+Default checks never move hardware. With the arm stationary and wrist clear, explicitly select the connected port and run the opt-in test:
+
+```sh
+NEXARM_MOTION_TEST=1 NEXARM_PORT=/dev/cu.usbserial-110 swift test --filter nexArmUSBPhysicalAction
+```
+
+This executes one +1-degree wrist nudge, leaves the reached position in place and closes USB. Do not repeatedly rerun it as an automatic retry. Use a full Xcode toolchain for the root package's unrelated model dependencies.
+
+## Hardware validation — 2026-09-29
+
+✅ The final Swift integration test passed through InputGateway → OutputGateway → Action scheduler → NexArm Action → USB, with ESP32/AT32 1.0.2. One +1-degree relative-roll command: start 2036, estimated target 2047, observed completion 2043 counts; three readings met the configured tolerance. The observed shift is seven counts (~0.62 degrees), so this is protocol/telemetry acceptance, not proof of exactly one degree of physical travel. No other joint exceeded the eight-count deviation limit. The port was closed afterward.
+
+Earlier diagnostics: a harness finish-token error exited before motion commitment; after correcting the harness, a direct-register motion failed the deadline and was not retried. The operator saw no movement. Read-only inspection and the documented AT32 limitations motivated replacement with 0x32. The final implementation uses only the relative-pose command. No firmware, torque or calibration changes were made.
+
+✅ Repository checks passed with the full Xcode Swift 6.4 toolchain. The Command Line Tools-only attempt could not build the unrelated MLX Metal dependency; selecting Xcode per command resolved it without changing global tool settings. ❌ Independent visual accuracy, wireless and hardware-stop validation remain pending.
+
+✅ Final `scripts/build-ios.sh` passed all four unsigned simulator schemes. Default `scripts/check.sh` passed, including 177 IntegrationTests; hardware motion ran only in the separately enabled test.
+
+## Bounded base sweep
+
+✅ `shakeBase(cycles:)` accepts 1...3, shares capacity-one admission and fault state with wrist motion, and verifies firmware plus two stationary samples before movement. It rotates the original reported XY around the vertical axis by +2°, -2°, 0° per cycle; Z/pitch/roll/claw deltas remain zero. The known-working 0x32 IK command is used, so this is a base yaw trajectory with possible small corrections to other joints, not a direct servo-register command.
+
+Preflight requires XY radius 100...350 mm and base encoder 1580...2516. Per-leg relative X/Y is at most 26 mm each, with 1500 ms device interpolation. After waiting that duration, three samples 100 ms apart must be within 2 mm of target XY and within two reported units of unchanged remaining pose fields. Base endpoints must deviate 12...34 counts from origin; return must be within six counts. Base may never exceed 40 counts from origin and other joints may not exceed 16 counts in checked telemetry. The settling deadline is three seconds plus an in-flight exchange. Results retain at most nine base samples, replaced each call; there is no pending device queue.
+
+Every target is derived from the original XY to avoid accumulating cycle drift. Cancellation joins the committed finite leg, then exits before another write; it can leave the arm at a side endpoint. Failure latches uncertain state, with no retries or cleanup motion. Host close is not an emergency stop. ❌ No independent physical-clearance or zero-velocity proof.
+
+Mac USB test through real Assistant/parser/Gateways/Action (deterministic test model, no external model call):
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+NEXARM_BASE_TEST=1 NEXARM_PORT=/dev/cu.usbserial-110 NEXARM_CYCLES=1 \
+swift test --filter nexArmUSBPhysicalBaseAction
+```
+
+Change only NEXARM_CYCLES to 1, 2 or 3. Default checks never enable either hardware test. Keep the arm supervised and space clear for the small sweep; no iOS background execution is involved.
+
+✅ Base hardware validation (2026-09-29): one complete cycle, base encoder 2114 → 2092 → 2133 → 2117, real USB and successful ActionResult delivered to Assistant. The operator observed rotation. An earlier attempt timed out and latched failure; no automatic retry occurred. After read-only stable-pose inspection, an instrumented supervised run passed without relaxing any bound/tolerance. The original timeout cause remains unknown. Bounded diagnostics retain only baseline (12 integers), target (6), latest observation (12), and completed-leg count. Model generation was a deterministic fixture, not a live model.
+
+✅ Base extension final validation: scripts/check.sh passed (182 IntegrationTests, hardware tests skipped by default), and scripts/build-ios.sh passed all four unsigned simulator schemes with full Xcode. Physical acceptance ran separately and the USB port was closed.
+
+## iPhone and Mac BLE transport
+
+✅ `NexArmBluetooth` implements the same actor `NexArmLink` with CoreBluetooth. Its native delegate owns every CB object on MainActor; callers receive only Sendable snapshots, packets and errors. Bluetooth permission is requested only on explicit scan/connect. Discovery filters service FFE0 and NexArm names; the connected profile must expose writable FFE1 and notifying FFE2. Full UUIDs use the standard `0000xxxx-0000-1000-8000-00805F9B34FB` base. These characteristics and version/pose queries were verified against the real ESP32/AT32 1.0.2 arm from Swift on Mac.
+
+```mermaid
+sequenceDiagram
+    participant Settings as App BluetoothWorkflow
+    participant Link as NexArmBluetooth actor
+    participant BLE as MainActor CoreBluetooth delegate
+    participant Arm as NexArm
+    Settings->>Link: Scan / explicitly connect selected identifier
+    Link->>BLE: Permission / discovery / connect
+    BLE->>Arm: Discover FFE0, FFE1, FFE2; enable notifications
+    Arm-->>BLE: Notification subscription acknowledged
+    BLE-->>Settings: GATT connected (not yet motion-ready)
+    Settings->>Link: Version and pose queries
+    Link->>BLE: Single packet exchange
+    BLE->>Arm: FFE1 write with response
+    Arm-->>BLE: Write ACK + framed FFE2 response
+    BLE-->>Settings: Validated packet / failure
+    Settings->>Settings: Firmware and pose validation; enable Action binding
+```
+
+Bounds: up to 32 discovered devices (extra devices rejected with visible limit flag), 15-second scan, one connection attempt with 15-second deadline, one packet exchange with 5-second deadline and no pending request queue. Concurrent exchanges reject busy. Writes must fit `maximumWriteValueLength(.withResponse)`; no assumed MTU or unverified fragmentation. Decoder is bounded to 4096 bytes and one exchange to 16384 RX bytes. Both ATT write ACK and matching packet ID/command/length are required; neither is physical completion. Unsolicited telemetry outside a request is discarded, not saved as a reply for a later query.
+
+Snapshots use bufferingNewest(1), explicitly replacing presentation state only. Requests and terminal results use individually retained continuations, never that replaceable stream. Failure/cancellation/timeout closes the BLE connection, preventing ambiguous late replies from satisfying a new transaction. No automatic reconnect or command replay. Disconnect joins for up to three seconds, but keeps connection admission closed until CoreBluetooth confirms closure; a missing acknowledgment leaves an explicit disconnecting state. Bluetooth transport close cannot stop physical motion.
+
+✅ `NexArmBLEReply` has ACK/response ordering, fragmented frame, wrong identity and overflow tests. The app binds its root-owned workflow to the existing base Action; the USB diagnostic remains available.
+
+❌ TCP, general servo motion, independent stop/watchdog proof and continuous background robot control remain unsupported. iPhone runtime acceptance is recorded separately from Mac BLE communication and simulator builds.
+
+Validation (2026-09-29): `scripts/check.sh` passed (188 IntegrationTests; physical tests opt-in), and `scripts/build-ios.sh` passed all four simulator schemes. A signed Debug build installed and launched on the connected iPhone 17 Pro. The production BLE adapter read version/pose and disconnected on Mac; an earlier query attempt timed out, so repeated-radio stability is not established. iPhone settings interaction and real spoken-model-to-motion acceptance remain pending.
+
+✅ Connection errors retain the failing stage (connection, services, characteristics, notification setup, write acknowledgment or device reply), including through disconnect cleanup. OSLog diagnostics contain stage/error codes, not frame payloads or user content. ❌ The iPhone connection failure is under investigation; Mac success does not establish iPhone compatibility.
+
+✅ Mac BLE hardware diagnosis (2026-09-30): GATT connection/notifications worked, but a version query's ATT ACK and reply arrived after ~3 seconds. Official Nex_Arm source (`Ble_Ctrl.cpp`, `system_task_handle.cpp`, `AT32_OTA.cpp`, obtained via the linked vendor tutorial) executes the version handler in the BLE write callback and performs up to three internal UART reads with 50/500/300 ms waits. Its zero AT32 bytes mean query failure, not confirmed firmware 0.0.0. Competing UART readers are a possible explanation, not yet proven on the installed firmware.
+
+BLE exchange timeout is now five seconds. `verifyFirmware()` admits at most four read-only queries only for the exact `[1,0,2,0,0,0]` response; actual `[1,0,2,1,0,2]` is still required. Unknown versions fail immediately, transport errors are not retried, and no motion is repeated. Successful validation is retained only within the controller's live connection; hosts must discard the controller on disconnect. Exhaustion is reported separately as firmwareUnavailable.
+
+Physical base trace: first +2° leg moved from 2050 to 2027 counts, but pitch changed from 5 to 0 tenths of a degree, exceeding existing convergence tolerance. The Action faulted and issued no reverse/return leg. Full sweep acceptance remains pending; limits were not relaxed.
+
+Mac single-step diagnostic (2026-09-30, user explicitly requested larger movement): one 5° XY yaw command over BLE, duration 2000 ms. Start base 2027, final 1971 (~4.92°), three identical settled readings; other joints changed at most one count. Target XY [128,15], observed [129,15], Z/pitch/roll/claw unchanged. Disconnected afterward. This manual diagnostic bound the same Mac-local peripheral to its actually verified firmware earlier in the session; it did not change App firmware admission, production ±2° Action limits, or automatically repeat a motion. Two preceding attempts sent only version queries and no motion because current AT32 version was unavailable. This is single-step acceptance, not full sweep or iPhone acceptance.
+
+✅ User-requested connection indication uses `NexArmWritableLink.write` for ATT acknowledgment only; it does not fabricate a device completion reply. The connection owner calls `indicateConnection()` once after actual firmware validation. Vendor command 54 resets the whole arm to pose [200,0,200,0,0,0] over 2000 ms; this is not factory reset. After three stable home samples, command 51 addresses only ID5 at home−23, home+23, home encoder counts (about ±2°), using the vendor parameter 200 which `move_servo` converts to speed 100, not a guaranteed 200 ms duration. Each leg waits one second and then up to three seconds for three feedback samples within six counts; other joints must stay within eight counts. Each in-flight BLE request can extend settlement by up to five seconds. The controller rejects overlap and duplicate indication, faults on uncertain writes/settlement and joins committed legs on cancellation without sending an automatic rollback.
+
+```mermaid
+flowchart LR
+    Connect[Explicit connection + verified firmware] --> Reset[54: home once]
+    Reset --> Home[Three stable home samples]
+    Home --> ID5[51: ID5 -23 / +23 / center]
+    ID5 --> Check[Verify each leg before continuing]
+    Check --> Ready[Control ready]
+    Reset --> Fault[Uncertain feedback: stop further commands]
+    ID5 --> Fault
+```
+
+❌ Physical reset clearance, ID5 direction from the user's viewing position, servo response timing and iPhone motion acceptance remain unverified. This indication changes the whole-arm pose and must be done with clear space; no firmware admission is bypassed.
+
+## Current BLE compatibility policy (supersedes earlier strict-only BLE admission)
+
+✅ Physical USB/BLE/USB comparison confirmed actual firmware ESP32/AT32 1.0.2, ~52 ms USB version response versus BLE returning missing AT32 after ~2.7 s, with working BLE pose queries. A user-observed single +10° BLE base command settled at about 9.6°. Based on this evidence and the user's request to bring it to iPhone, the explicit `nexArm102BLE` policy accepts only exact [1,0,2,0,0,0] as the known missing-version case. Two valid stationary pose samples 200 ms apart are required: joints 0...4095 with ≤2-count drift, XY radius ≤450 mm, Z 50...600 mm, pitch within ±1800 tenths and roll/claw within ±180 degrees. It reports `ble102WithUnavailableAT32`, not a verified AT32 version. Unknown/nonzero unsupported versions and transport failures still reject. The default controller policy remains strict actual firmware verification. Compatibility is scoped to the live controller and discarded at disconnect; no cross-device version cache.
+
+✅ `verifyCompatibility()` distinguishes full firmware verification from the known BLE compatibility profile. App further requires persistence/current-link checks, stationary preflight and complete connection-indication feedback before marking ready. All existing Action posture/settlement limits remain. The requested ID5 indication now uses home−91 / home+91 / home counts (about ±8°), targets within 1536...2560 and maximum observed deviation 110 counts; other joints must stay within eight counts. Reset still occurs once; no retry of uncertain motion. This supersedes the earlier ±2° indication; the separate base Action remains ±2°.
+
+❌ Compatibility checks do not prove the unavailable AT32 version or collision clearance. Reset/ID5 and iPhone end-to-end physical acceptance remain pending; the earlier observed Mac single step does not establish these.
+
+Physical connection-indication validation (2026-09-30): the original home test used a uniform two-unit tolerance, mixing mm and tenths of degrees. Actual stable home was [200,1,197,-12,0,0], so that test stopped before ID5. Home convergence now uses XYZ within 5 mm, pitch within 20 tenths (2°), roll/claw within 2°, plus three consecutive stable joint samples (≤2-count change). A fresh preflight and complete run then verified reset, ID5 −8°/+8°/center with stable feedback; final wrist 2053 versus baseline 2052. No in-session motion retry or automatic fault recovery was added. The first failed run remained faulted and disconnected. iPhone execution still requires separate acceptance.
+
+## Current discovery and connection contract (2026-09-30 UX revision)
+
+✅ Discovery now uses `scanForPeripherals(withServices: nil)` and no name filter. Retain up to 128 device objects/rows per 15-second scan, reject excess with a visible limit notice; no pending command is discarded. NexArm-like names sort first, then RSSI and stable UUID. Renamed, unrelated and unnamed BLE advertisements remain visible. This covers discoverable BLE peripherals, not every Bluetooth Classic device. FFE0/FFE1/FFE2 are verified after selection, followed by validated NexArm pose packets; the service UUID/name alone is not a robot-type guarantee.
+
+✅ App selects `nexArmBLEProtocol`. It does not send the broken command-1 firmware query at all: two bounded stationary pose samples establish protocol compatibility, then explicit manual connection completes reset/ID5 feedback before ready. Unknown or missing firmware versions are no longer part of BLE admission or UI. The separate strict controller policy remains available for USB diagnostics. Current pose bounds, gesture limits, failure latching and bounded committed-leg joins remain unchanged.
+
+❌ Broad BLE discovery cannot guarantee that a peripheral advertises its name/services or that iOS discovers every nearby Bluetooth device; unsupported profiles remain rejected. OS background radio availability is not guaranteed.

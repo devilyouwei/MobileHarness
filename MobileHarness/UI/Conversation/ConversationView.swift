@@ -4,9 +4,11 @@
     @MainActor
     public struct ConversationView: View {
         @Bindable var state: ConversationState
+        @Bindable var robot: BluetoothSettingsState
         private let toggleVoice: () -> Void
-        public init(state: ConversationState, toggleVoice: @escaping () -> Void) {
+        public init(state: ConversationState, robot: BluetoothSettingsState, toggleVoice: @escaping () -> Void) {
             self.state = state
+            self.robot = robot
             self.toggleVoice = toggleVoice
         }
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -60,6 +62,22 @@
                         x: geometry.size.width / 2, y: geometry.size.height - min(120, geometry.size.height * 0.20)
                     )
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: state.voicePhase)
+
+                    if robot.phase == .connected || robot.motionStatus != nil {
+                        Label(
+                            robot.motionStatus
+                                ?? (robot.controlReady ? "\(robot.selected?.name ?? "机械臂") 已连接" : "机械臂已连接，控制待验证"),
+                            systemImage: robot.executing
+                                ? "arrow.triangle.2.circlepath" : "sensor.tag.radiowaves.forward.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(robot.error == nil ? Color.white.opacity(0.7) : Color.orange)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .frame(width: min(geometry.size.width - 56, 440))
+                        .position(x: geometry.size.width / 2, y: geometry.size.height - 38)
+                        .accessibilityIdentifier("conversation.robot.status")
+                    }
 
                     VoiceBars(
                         placement: .bottom, bands: state.microphoneSpectrum,

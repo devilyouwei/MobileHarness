@@ -1,5 +1,8 @@
 # MobileHarness Technical Design
 
+> Current status (2026-09-30): the user confirmed iPhone LLM conversation control of NexArm. Normal BLE connections now use protocol/gesture validation, discovery includes other BLE devices, and foreground recovery avoids repeated motion. Physical acceptance of the latest discovery/recovery UX is pending.
+
+
 ## Overview
 
 **MobileHarness** is a *multi-modal*, *multi-agent*, *bio-inspired* harness for mobile and embodied AI systems. Its architecture follows a continuous information-processing loop inspired by biological nervous systems: **Signal → Cognition → Action**.
@@ -157,6 +160,7 @@ MobileHarness/
 │   └── Output/             # Validation, routing, dispatch, scheduling, results and resources
 ├── Actions/                # One target: scheduled execution and behaviors
 │   ├── Runtime/            # ActionRegistry, ActionExecutor and invocation
+│   ├── NexArm/             # Supervised wrist diagnostic and Assistant base Action
 │   ├── Speech/             # Audio-ID playback and awaited completion
 │   └── UI/                 # Captions, voice state, expressions and turns
 ├── Tools/                  # One target: direct execution and functions
@@ -291,7 +295,7 @@ An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input
 
 Domain modules own behavior definitions, parameter validation and function bindings; Agent JSON owns available aliases/default Channels. App supplies typed execution capabilities through BehaviorAssembly. Shared physical resources must have coherent ownership across behavior functions.
 
-✅ Speech and UI behaviors, including `UI.express(emotion:)`. ❌ Photo-capture, robot, media and other device Actions; no separate smile Action is introduced.
+✅ Speech and UI behaviors, including `UI.express(emotion:)`, and [NexArm supervised USB Actions](Actions/NexArm/README.md), including Assistant base sweeps and opt-in wrist diagnostics. ✅ iPhone BLE settings/workflow binding is implemented. ❌ Photo-capture and media Actions remain pending.
 
 #### Actions/Runtime
 
@@ -666,3 +670,5 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 ✅ Outer Storage files implement reusable bounded memory/cache, persistence and local synchronization. Audio and Chat own their business contracts in separate subdirectories/targets; core never depends on domains. Chat moved without data migration. See [Storage layout](Storage/README.md) and [ADR 0069](../docs/adr/0069-storage-core-domain-layout.md).
 
 ❌ Image, Video and semantic Memory domains are planned only; no empty directories or placeholder APIs. MemoryLeaseStore is a generic RAM lease primitive, not semantic memory. Cross-device sync and general reclaimable disk cache remain unimplemented.
+
+✅ `PlatformKit/Connectivity/NexArm` owns the shared protocol/controller and macOS-only serial I/O in PlatformKit. Its diagnostic composition lives in root IntegrationTests; Assistant declares the bounded base Action; the iPhone root binds foreground BLE through BluetoothWorkflow, while the Mac diagnostic binds USB. See ADR 0070. ❌ TCP and general robot ownership/watchdog validation remain pending.

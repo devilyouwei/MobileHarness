@@ -36,3 +36,9 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Storage/Chat now owns the ConversationHistory.swift reference and README. SwiftPM compiles StorageChat separately; no duplicate App Sources membership is introduced.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+✅ NexArm Action, PlatformKit connectivity and diagnostic test sources are navigation-only references. SwiftPM owns compilation; the macOS serial implementation is excluded on iOS by conditional compilation. ❌ No iPhone robot binding is enabled.
+
+✅ ShakeBase.swift is navigation-only and compiled by the existing Actions package target; ❌ no duplicate App compilation or iPhone USB binding.
+
+✅ App configurations include NSBluetoothAlwaysUsageDescription; NexArmBluetooth, BluetoothWorkflow, settings UI and tests are SwiftPM-owned navigation references. No Bluetooth background mode is enabled. ❌ Simulator build success does not prove a Bluetooth radio connection.

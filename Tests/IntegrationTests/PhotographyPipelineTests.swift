@@ -508,3 +508,33 @@ private struct FailingSecondPose: PoseCapability {
     #expect(await output.next() == nil)
     await agent.stop()
 }
+
+@Test(.timeLimit(.minutes(1))) func visionAcceptsTerminalReceiptsWithoutBlockingFrameAdmission() async throws {
+    let session = UUID()
+    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    let manager = AgentManager()
+    try await manager.register(agent, sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
+    try await manager.start(.visionPerception)
+    let input = InputGateway(manager: manager)
+    let owner = ExecutionOwner(
+        agent: .visionPerception, incarnation: try await manager.identity(.visionPerception), sessionID: session)
+    let result = ActionResult(
+        executionID: UUID(), owner: owner, inputID: UUID(), turn: nil,
+        path: ActionPath(module: "UI", function: "moveEyes"),
+        status: .succeeded, effect: .contractCompleted, completion: .completed)
+    #expect(await input.deliverActionResult(result) == .accepted)
+    #expect(await agent.actionResults() == [result])
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(
+            AgentInput(
+                sessionID: session, payload: .actionResult(result),
+                metadata: InputMetadata(payload: .actionResult(result), source: "untrusted")))
+    }
+    var outputs = agent.outputs.makeAsyncIterator()
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(30, sequence: 1))))
+    _ = try #require(await outputs.next())
+    _ = try #require(await outputs.next())
+    #expect(await agent.status().lifecycle == .running)
+    try await manager.remove(.visionPerception)
+}

@@ -148,3 +148,5 @@ flowchart LR
 ## Action runtime stage 2
 
 ✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and returns without inference or output emission. actionResults() exposes bounded retained history. ❌ Automatic retry/replanning based on a result is not implemented.
+
+✅ Receipt regression: runtime ActionResult is validated and consumed before image-only admission, without advancing frame sequence or invoking pose inference. Tests exercise receipt delivery through InputGateway followed by a new frame. ❌ This does not establish camera hardware acceptance.

@@ -26,7 +26,30 @@
         "doc": "Smoothly change the procedural eye expression. clear returns to neutral. Never render an emoji as the expression. Does not modify captions or speech. The Assistant clears its previous expression on new user speech."
       }
     ],
-    "Speech": []
+    "Speech": [],
+    "Robot": [
+      {
+        "alias": "shakeBase",
+        "path": {
+          "module": "NexArm",
+          "function": "shakeBase"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete left/right/return cycles.",
+            "constraints": "Integer 1 through 3 only."
+          }
+        ],
+        "examples": [
+          "<shakeBase cycles=\"1\"/>",
+          "<shakeBase cycles=\"3\"/>"
+        ],
+        "doc": "On explicit user request, rotate the NexArm base gently: origin, left 2 degrees, right 2 degrees, origin, for each cycle. Fixed speed and small range; no other parameters. Requires NexArm connected in phone Settings > Bluetooth Devices (or a supervised Mac USB host). If disconnected, ask the user to connect in Settings. Keep the app foreground. The arm must be stationary with horizontal reach 100 to 350 mm; do not reset or reposition automatically. Completion requires controller feedback for every leg and return to origin. Do not claim completion from generation or admission. Stop on failure; never retry automatically."
+      }
+    ]
   },
   "tools": [
     {

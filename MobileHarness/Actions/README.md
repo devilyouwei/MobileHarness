@@ -10,7 +10,7 @@ This is the normative authoring standard for new Actions and deliberate migratio
 | --- | --- | --- |
 | Action | One permission-checked, scheduled behavior identified by `ActionPath(module:function:)`. It validates input, performs an effect and returns at its documented completion point. | `Speech.speak`, `UI.express`; an Action is not an Agent, thread, animation or Swift class. |
 | Action module | A cohesive behavior domain and stable path namespace, normally one directory under Actions. Today its name is also the scheduler's process-wide mutual-exclusion key. | `Speech`, `UI`; do not invent another module name to bypass exclusion. |
-| Swift target/module | A compilation and dependency boundary. | The single `Actions` target contains Runtime, Speech and UI. An Action module does not require a new Swift target. |
+| Swift target/module | A compilation and dependency boundary. | The single `Actions` target contains Runtime, Speech, UI and NexArm supervised Actions. An Action module does not require a new Swift target. |
 | Channel | An ordering lane selected by the Agent declaration or an allowed scope override. | `Display` is a Channel; `UI` is an Action module. Same-named Channels in different tasks do not share FIFO. |
 | Alias | An Agent-local model-visible name resolved inside Agents. | `express` resolves to `UI.express`; Runtime never resolves model aliases. |
 | Runtime service | An injected owner of mutable state, resources or ongoing work; it is not itself a model-callable Action. | `SpeechPlayback` owns playback/cache handling. Service methods are not implicitly registered. |
@@ -373,3 +373,7 @@ flowchart LR
 ```
 
 The earlier explicit single-definition binding example illustrates isolated construction; production bindings now belong to domain module lists. BehaviorAssembly in App/Composition/Behaviors is an independently compiled pure assembly target, not an application service. ❌ No reflection, implicit registration, permission expansion or generic string/Any effect dispatch. See [ADR 0067](../../docs/adr/0067-domain-owned-behavior-assembly.md).
+
+## NexArm diagnostic integration
+
+✅ [NexArm](NexArm/README.md) adds an opt-in wrist nudge and built-in `NexArm.shakeBase(cycles:)` with required typed host injection and controller feedback. ✅ iPhone foreground BLE binding is implemented. ❌ Autonomous motion and physical-stop proof remain unavailable.

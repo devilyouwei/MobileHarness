@@ -110,3 +110,17 @@ These are **dated decision records**, including proposals and stages later repla
 ✅ [0069-storage-core-domain-layout.md](0069-storage-core-domain-layout.md) separates Storage core mechanisms from Audio/Chat domain targets.
 
 ❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.
+
+✅ [0070 — NexArm USB diagnostic](0070-nexarm-usb-diagnostic.md): first bounded real-device Action, separate from production autonomous control. ❌ BLE/TCP and physical watchdog acceptance remain pending.
+
+✅ ADR 0070 extended with bounded Assistant base sweeps and typed host binding; ❌ hardware stop/watchdog remains unverified.
+
+✅ [0071 — iPhone NexArm BLE](0071-nexarm-iphone-ble.md): settings and root-owned BLE-to-Action chain. ❌ Unattended operation and physical stop/watchdog remain deferred.
+
+✅ ADR 0071 now records retained BLE connections with control admission closed when AT32 version is unavailable, and explicit read-only revalidation. ❌ Device-side readout stability remains unverified.
+
+✅ ADR 0071 includes one reset and bounded ID5 movement as explicit connection feedback, with joined cancellation and readiness only after position verification. ❌ Physical acceptance pending.
+
+✅ ADR 0071 revises the earlier strict BLE gate using physical USB/BLE evidence: named compatibility profile, stationary telemetry checks, missing-version disclosure, and one reset/ID5 ±8° indication. ❌ No claim of iPhone physical acceptance.
+
+✅ ADR 0071 includes the current BLE UX contract: no normal firmware query, name-independent discovery, one read-only recovery attempt on activation, persisted opt-out after manual disconnect/forget, and no motion replay.

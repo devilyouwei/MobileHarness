@@ -1,5 +1,8 @@
 # UI — Pages, State and User Controls
 
+> Current status (2026-09-29): the user identified desktop simulator screen sharing as the cause of missing iPhone camera/microphone input. BLE settings and conversation binding are restored; receipt-admission and robot-only disconnect fixes remain. iPhone BLE acceptance without screen sharing is still pending; no causal claim is made about the earlier BLE failure.
+
+
 Purpose: render application state and collect user intent. Design goals: MainActor UI isolation, independent compilation and previews, narrow operation interfaces and no model/device/service construction.
 
 UI covers SwiftUI views, observable page state, user interaction and the operation interfaces consumed by those pages. Files are grouped by feature; reusable visuals live in Components. Cross-module workflows and runtime ownership remain in [App](../App/README.md).
@@ -44,3 +47,5 @@ Pages can own short-lived rendering/load tasks and cancel their scoped operation
 ✅ UI depends on AgentCore and StorageChat shared values. Chat records moved from the generic Storage target to its domain subtarget; no storage service enters UI.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+✅ Settings includes independent Bluetooth device state/controls and native discovery/connection UI. Conversation optionally shows actual robot connection/action status from the same injected state. ❌ UI never owns a BLE connection, controller, Action registry or model service.

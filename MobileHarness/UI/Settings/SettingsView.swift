@@ -5,15 +5,20 @@
     @MainActor
     public struct SettingsView: View {
         @Bindable var settings: SettingsState
+        let bluetooth: BluetoothSettingsState
+        let bluetoothControls: any BluetoothControlling
         let history: ConversationHistoryState
         let historyControls: any ConversationHistoryControlling
         let save: () async -> Bool
 
         public init(
-            settings: SettingsState, history: ConversationHistoryState,
+            settings: SettingsState, bluetooth: BluetoothSettingsState, bluetoothControls: any BluetoothControlling,
+            history: ConversationHistoryState,
             historyControls: any ConversationHistoryControlling, save: @escaping () async -> Bool
         ) {
             self.settings = settings
+            self.bluetooth = bluetooth
+            self.bluetoothControls = bluetoothControls
             self.history = history
             self.historyControls = historyControls
             self.save = save
@@ -21,6 +26,16 @@
 
         public var body: some View {
             List {
+                NavigationLink {
+                    BluetoothSettingsView(state: bluetooth, controls: bluetoothControls)
+                } label: {
+                    HStack {
+                        Label("蓝牙设备", systemImage: "antenna.radiowaves.left.and.right")
+                        Spacer()
+                        Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline)
+                    }
+                }
+                .accessibilityIdentifier("settings.bluetooth.open")
                 NavigationLink {
                     CloudLLMSettingsView(settings: settings, save: save)
                 } label: {

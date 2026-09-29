@@ -110,8 +110,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
 @Test func bundledV5ConfigurationsSeparateModelCatalogFromInternalPermissions() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     #expect(config.agentID == .assistant)
-    #expect(config.capabilities.actions.map(\.alias) == ["express"])
-    #expect(config.capabilities.channels == ["Display", "Speech"])
+    #expect(config.capabilities.actions.map(\.alias) == ["express", "shakeBase"])
+    #expect(config.capabilities.channels == ["Display", "Robot", "Speech"])
     #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "runtimeInfo")
     let agent = try AssistantAgent(chat: FixedTextChat())
     let registry = agent.descriptor.capabilities
@@ -176,7 +176,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let registry = try AssistantAgent.runtimeCapabilities(config.capabilities)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
-    #expect(prompt.contains("AVAILABLE CHANNELS: Display, Speech"))
+    #expect(prompt.contains("AVAILABLE CHANNELS: Display, Robot, Speech"))
     #expect(prompt.contains("Action express: module=UI; default Channel=Display"))
     #expect(prompt.contains("Channel Speech — automatic audio playback"))
     #expect(prompt.contains("played on the independent Speech Channel"))

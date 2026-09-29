@@ -1,5 +1,6 @@
 import AgentCore
 import Agents
+import AppWorkflows
 import BehaviorAssembly
 import Foundation
 import Gateway
@@ -19,7 +20,7 @@ final class ApplicationRuntime {
     let actions: ChannelScheduler
     let resources: ResourceCoordinator
 
-    init(camera: AppleCamera) throws {
+    init(camera: AppleCamera, bluetooth: BluetoothWorkflow) throws {
         let root = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         var directory = root.appendingPathComponent("MobileHarness/Conversations", isDirectory: true)
@@ -49,6 +50,7 @@ final class ApplicationRuntime {
         self.resources = resources
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation,
+            shakeBase: { cycles, _ in try await bluetooth.shakeBase(cycles: cycles) },
             capabilities: [
                 AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
                 SpeechPerceptionAgent.runtimeCapabilities(
@@ -66,6 +68,7 @@ final class ApplicationRuntime {
         self.actions = actions
         output = OutputGateway(
             manager: manager, requests: input, tools: behaviors.tools, actions: actions, policy: policy,
+            actionFeedback: .terminal,
             observedContracts: ["speech.partial", "speech.final", "speech.phase"],
             observeEvent: { try await presentation.observe($0) }, sink: { await presentation.output($0) })
     }

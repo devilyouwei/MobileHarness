@@ -218,7 +218,7 @@ flowchart LR
 - ✅ Strict resource loading, local aliases, visible Action context and static event permissions.
 - ✅ Documented business-output boundary: messages and registered Action/Tool calls; Storage/ModelKit remain foundational capabilities.
 - ✅ Shared parsing, bounded processing, conversation-turn context and cancellation coverage.
-- ❌ Photographer camera-motion policy, tracking, media/control Agents and robot behavior. The future concept lives in [docs](../../docs/Photographer-Proposal.md), not an empty source directory.
+- ❌ Photographer camera-motion policy, tracking, media/control Agents and autonomous robot behavior. The future concept lives in [docs](../../docs/Photographer-Proposal.md), not an empty source directory.
 - ❌ Configuration hot reload, full executable value schemas, native Tool deltas and general request/reply.
 
 See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete configuration. Expression names and guidance are kept there and in Actions/UI, rather than copied into this standard.
