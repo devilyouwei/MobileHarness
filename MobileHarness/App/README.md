@@ -7,7 +7,8 @@ Purpose: host the application, assemble dependencies and coordinate application/
 ```text
 App/
 ├── MobileHarnessApp.swift   # Window host, navigation and scene events
-├── Composition/             # AppAssembly, model preparation, runtime/handler assembly
+├── Composition/             # AppAssembly, model preparation, runtime assembly
+│   ├── Behaviors/           # Independently compiled BehaviorAssembly
 │   ├── AppAssembly.swift
 │   ├── AppContainer.swift
 │   └── ApplicationRuntime.swift
@@ -32,7 +33,7 @@ App/
 
 ## Upstream and downstream
 
-The following arrows describe runtime flow. App imports UI; UI has no App dependency. Workflows compile in the separate AppWorkflows target, allowing their behavior to be tested without the executable. The rest of App compiles once in each Xcode application target.
+The following arrows describe runtime flow. App imports UI; UI has no App dependency. Workflows compile in the separate AppWorkflows target, allowing their behavior to be tested without the executable. Composition/Behaviors compiles in the separate BehaviorAssembly target; the remaining App sources compile once in each Xcode application target.
 
 ```mermaid
 flowchart LR
@@ -51,6 +52,52 @@ flowchart LR
     Adapters --> Platform[PlatformKit device operation]
     State --> Views
 ```
+
+## Internal composition
+
+App composes the running system; Agents compose task behavior. Solid arrows below mean construction or assembly, and dashed arrows mean capability injection or binding, not Swift imports. Runtime facilities are shared across sessions; voice/camera owners create and clean up their own running scopes. UI receives state and operations rather than owning those scopes.
+
+```mermaid
+flowchart TB
+    Root[AppAssembly: composition root] --> Runtime[ApplicationRuntime: shared infrastructure]
+    Root --> Container[AppContainer: voice capability preparation]
+    Root --> Camera[CameraCoordinator]
+    Root --> Workflows[Settings and history workflows]
+    Root --> State[UI state and injected operations]
+
+    Runtime --> Manager[AgentManager]
+    Runtime --> Gateways[InputGateway and OutputGateway]
+    Runtime --> Scheduler[ChannelScheduler]
+    Runtime --> Resources[ResourceCoordinator]
+    Runtime --> History[ConversationHistoryStore]
+    Runtime --> Bindings[RuntimePresentation: typed endpoints]
+    Runtime --> Behavior[BehaviorAssembly]
+    Catalogs[Actions and Tools: domain module catalogs] --> Behavior
+    Bindings -.->|Presentation / playback / pose capabilities| Behavior
+    Behavior --> Registries[ActionRegistry and ToolRegistry]
+    Registries -.->|Action registry| Scheduler
+    Registries -.->|Tool registry| Gateways
+    Scheduler -.-> Gateways
+    Resources -.->|Shared execution authority| Scheduler
+
+    Container --> Voice[VoiceSessionCoordinator]
+    Container --> Diagnostic[SpeechDiagnosticWorkflow]
+    Voice --> Speech[SpeechPerceptionAgent]
+    Voice --> Assistant[AssistantAgent: runtime factory]
+    Voice --> Synthesis[SpeechSynthesisAgent]
+    Voice --> Audio[SpeechAudioStore and SpeechPlayback]
+    Camera --> Session[VisionSession]
+    Session --> Vision[VisionPerceptionAgent]
+    Voice -.->|Bind whole voice endpoint| Bindings
+    Session -.->|Bind camera endpoint| Bindings
+
+    Models[ModelKitDefaults / ModelManager] -.->|Recognition / VAD / chat / synthesis| Container
+    Models -.->|Pose capability via session factory| Session
+    Platform[PlatformKit: AppleAudioIO / AppleCamera] -.->|Device services| Voice
+    Platform -.->|Device service| Camera
+```
+
+[ApplicationRuntime](Composition/ApplicationRuntime.swift) builds communication policy, shared storage and runtime services. [BehaviorAssembly](Composition/Behaviors/README.md) combines domain-owned Action/Tool modules with typed App capabilities and validates Agent implementation coverage before producers start. Agent declarations authorize calls; the registries bind their implementations. [AppContainer](Composition/AppContainer.swift) obtains model capabilities from the shared manager, while [Lifecycle](Lifecycle/README.md) owns Agent registration, pumps, cancellation and cleanup. Detailed lifetimes and completion boundaries remain below.
 
 ## Responsibilities and injection
 
@@ -86,3 +133,11 @@ Detailed contracts: [Composition](Composition/README.md), [Lifecycle](Lifecycle/
 ✅ Explicit application composition, shared journal/model services, typed role bindings, independent presentation compilation and preserved Gateway/Action authorization.
 
 ❌ Independent multi-window namespaces, background supervision, automatic recovery of non-cooperative handlers and physical-device acceptance of this refactor. Simulator/build success does not establish device interaction quality.
+
+## Action runtime stage 2
+
+✅ Composition and Lifecycle now share concrete camera resource ownership. Runtime feedback and resource cleanup remain independent of page lifetime. ❌ Physical-device takeover acceptance and audio/robot resource migration remain pending.
+
+## Domain-owned behavior assembly
+
+✅ The host binds capabilities through BehaviorAssembly instead of registering each Action/Tool. The pure assembly target lives at Composition/Behaviors; domain catalogs live in Actions/Tools. ❌ New device primitives or lifecycle changes still require host work.

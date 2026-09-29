@@ -1,5 +1,6 @@
 import Actions
 import AgentCore
+import StorageAudio
 
 /// Explicit implementation metadata for generic scheduler fixtures, not production registration.
 func testActionRegistry(handlers: [ActionPath: ActionHandler]) throws -> ActionRegistry {
@@ -8,4 +9,16 @@ func testActionRegistry(handlers: [ActionPath: ActionHandler]) throws -> ActionR
             ActionDefinition(
                 path: path, kind: .finite, completion: "Fixture acknowledgment completed.", handler: handler)
         })
+}
+
+// Tests enter speech through the same argument decoder as the registered production Action.
+extension SpeechPlayback {
+    func play(
+        _ invocation: ActionInvocation,
+        using playback: @escaping @Sendable (SpeechAudio, ActionInvocation) async throws -> Void
+    ) async throws {
+        try await SpeechActions.speak(invocation: invocation) { id, invocation in
+            try await self.play(audioID: id, invocation: invocation, using: playback)
+        }
+    }
 }

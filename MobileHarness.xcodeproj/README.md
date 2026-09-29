@@ -18,3 +18,15 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ❌ Build success does not establish microphone, playback, live-provider, model protocol, latency or sustained thermal acceptance. Independent multi-window runtime ownership remains unimplemented.
 
 ✅ Action runtime stage 1 sources, scheduling errors and contract tests are referenced in the existing navigator groups. SwiftPM still compiles the shared source directories; no duplicate source or new target was added. ❌ Physical-device acceptance remains separate.
+
+## Action runtime stage 2
+
+✅ Stage 2 shared result/lease/inbox, Gateway Results/Resources and integration test files appear in the navigator. SwiftPM retains sole compilation ownership of these shared sources. ❌ No new physical-device acceptance is implied.
+
+## Domain-owned behavior assembly
+
+✅ Action/Tool module catalogs, capability protocols, ToolDefinition and BehaviorAssembly sources/tests appear in the navigator. BehaviorAssembly compiles once through SwiftPM and is exported by HarnessKit; its source is not added to App Sources. ❌ No additional signing/device acceptance changes.
+
+## Action implementation audit
+
+✅ Canonical UIActions/SpeechActions namespaces, audioID-only Speak.swift and ActionAuthoringTests are navigation-only shared package sources; no duplicate App compilation.

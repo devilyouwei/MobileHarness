@@ -46,10 +46,22 @@ flowchart LR
 
 Follow the [Actions authoring standard](../README.md) for new code and planned migrations. `express`, `moveEyes`, `setTranscript` and `setVoiceState` set presentation state; `beginReplyTurn` and `finishTranscript` perform state transitions. `print` is a finite append operation whose text may persist. Completion is acceptance by the presentation policy, never animation completion; stale/duplicate updates can be intentional no-ops under the policy above.
 
-✅ Existing paths, semantic emotion values, turn/session checks and completion behavior are unchanged. ❌ UIActions is still declared in Print.swift, callback labels remain `present:`, and namespace/file/signature migration remains pending. Migrate these explicitly to the root standard with bindings and tests; do not treat the existing layout as the template for new domains. One-shot expression/restore behavior remains unimplemented.
+✅ UIActions is declared only in UIActions.swift. All seven entries use `invocation:using:` and match their registered path/file names. Typed arguments, error ownership, turn/session checks and completion behavior are preserved. One-shot expression/restore behavior remains unimplemented.
 
 ## Runtime stage 1 adoption
 
 ✅ Every UI Action now uses shared ActionArguments decoding and rejects unknown keys before effects. Text and parameterless/voice-state failures use `UIActions.PresentationError` in Types.swift; expression/gaze errors remain domain-owned. Byte limits, semantic values, callback completion, session/turn checks and cancellation are preserved. These are accepted-state acknowledgments, not animation completion.
 
-❌ UIActions namespace extraction and the `present:` → `using:` signature migration remain deliberate later work; no new expression or one-shot animation behavior is implemented.
+✅ Namespace extraction and `present:` → `using:` migration are complete. ❌ No one-shot animation behavior is implemented.
+
+## Domain-owned behavior assembly
+
+✅ UIActionModule owns all seven UI definitions, metadata and handler bindings. UIPresentationCapability exposes typed presentation effects; argument decoding and UIActions calls now stay inside this module. App adapters only accept typed values/context. ❌ One-shot animation acknowledgment remains pending.
+
+## Standard audit: repetition, lifetime and resources
+
+Every Action checks cancellation before parsing and after awaited presentation; a failure after commit does not roll back state. Session/turn/sequence acceptance is owned by the injected presentation endpoint. No Action starts a background task or maintains a queue. UI module exclusion lasts through handler return; no physical resource is declared.
+
+Setters replace current state until the next accepted update/session reset. Setting the same expression/gaze/voice state has no one-shot restart contract. print appends and is not intrinsically idempotent; repeated calls with fresh sequences append again. beginReplyTurn clears reply/expression once per turn; finishTranscript closes the turn, preventing late partials from reopening it. Their accepted duplicates may be no-ops, as described above. Default Channels remain Agent-owned, not UI implementation defaults.
+
+✅ ActionContractTests, BehaviorAssemblyTests and existing UI/turn tests cover argument rejection, completion and ordering. ❌ Animation/device completion is not established by these tests.

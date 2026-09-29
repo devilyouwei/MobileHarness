@@ -92,3 +92,15 @@ These are **dated decision records**, including proposals and stages later repla
 - [ADR 0064 — App and UI boundaries](0064-app-ui-boundaries.md): explicit composition, independently compiled pages and application workflows.
 
 ✅ [ADR 0065 — Action runtime contracts](0065-action-runtime-contracts.md): validated implementation metadata, startup coverage, consistent invocation, typed arguments, error separation and bounded diagnostics. ❌ Activity/resource ownership and full business Action style migration remain deferred.
+
+## 0066 — Action results and resources
+
+✅ [0066-action-results-resource-leases.md](0066-action-results-resource-leases.md) records bounded terminal feedback, typed activity completion, group leases/fences and the camera lifecycle integration. ❌ Durable feedback and all-device migration remain outstanding.
+
+## 0067 — Domain-owned behavior assembly
+
+✅ [0067-domain-owned-behavior-assembly.md](0067-domain-owned-behavior-assembly.md) records domain catalogs, typed capabilities and complete startup registry validation. ❌ Native capability additions still require host bindings.
+
+## Canonical Action entry audit
+
+✅ [0068-canonical-action-entrypoints.md](0068-canonical-action-entrypoints.md) records canonical UI/Speech namespaces, entry signatures and typed audio handles. ❌ Device/animation follow-ups remain separate.

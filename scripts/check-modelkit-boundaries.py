@@ -8,7 +8,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows'}
+FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly'}
 errors = []
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
@@ -130,6 +130,46 @@ for folder in ('App', 'UI'):
 for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
     if 'ApplicationRuntime.shared(' in source.read_text():
         errors.append(f'Hidden application runtime lookup: {source.relative_to(ROOT)}')
+# Domain libraries cannot reach back into application composition or concrete services.
+for root, allowed in [
+    ('Actions', {'Foundation', 'Synchronization', 'AgentCore', 'StorageAudio'}),
+    ('Tools', {'Foundation', 'AgentCore'}),
+    ('App/Composition/Behaviors', {'AgentCore', 'Actions', 'Tools'}),
+]:
+    for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
+        for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+            if imported not in allowed:
+                errors.append(f'Forbidden behavior-layer import {imported}: {source.relative_to(ROOT)}')
+# Behavior registration belongs to domain catalogs, not individual App call sites.
+behavior_target = targets.get('BehaviorAssembly', {})
+if behavior_target.get('path') != 'MobileHarness/App/Composition/Behaviors':
+    errors.append('BehaviorAssembly must compile the isolated composition directory')
+if [next(iter(d.values()))[0] for d in behavior_target.get('dependencies', [])] != ['AgentCore', 'Actions', 'Tools']:
+    errors.append('BehaviorAssembly may depend only on AgentCore, Actions and Tools')
+for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
+    content = source.read_text()
+    if re.search(r'\b(?:ActionDefinition|ToolDefinition)\s*\(|\.registerCompletion\s*\(', content):
+        errors.append(f'App contains per-function behavior registration: {source.relative_to(ROOT)}')
+    if re.search(r'\b(?:UIActions|UITools|SystemTools)\.[a-z]\w*\s*\(', content):
+        errors.append(f'App invokes a domain behavior helper: {source.relative_to(ROOT)}')
+    if re.search(r'\bActionPath\s*\(|\.register\s*\(\s*"', content):
+        errors.append(f'App contains a concrete behavior path: {source.relative_to(ROOT)}')
+# Action authoring: every declared domain path has a canonical namespace and entry file.
+for domain in (ROOT / 'MobileHarness/Actions').iterdir():
+    if not domain.is_dir() or domain.name == 'Runtime':
+        continue
+    namespace = domain / (domain.name + 'Actions.swift')
+    if not namespace.exists() or not re.search(r'public enum ' + domain.name + r'Actions\s*\{\s*\}', namespace.read_text()):
+        errors.append(f'Missing canonical Action namespace: {domain.name}')
+    for module in domain.glob('*ActionModule.swift'):
+        for module_name, function in re.findall(r'ActionPath\(module: "([^"]+)", function: "([^"]+)"\)', module.read_text()):
+            entry = domain / (function[0].upper() + function[1:] + '.swift')
+            if module_name != domain.name or not entry.exists():
+                errors.append(f'Missing canonical Action entry: {module_name}.{function}')
+                continue
+            pattern = r'public static func ' + function + r'\(\s*invocation: ActionInvocation,\s*using\s+'
+            if not re.search(pattern, entry.read_text()):
+                errors.append(f'Noncanonical Action signature: {entry.relative_to(ROOT)}')
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')

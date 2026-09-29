@@ -3,6 +3,7 @@ import AgentCore
 import Agents
 import CoreGraphics
 import Foundation
+import Gateway
 import OSLog
 import PlatformKit
 import UI
@@ -10,6 +11,15 @@ import UI
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
 @MainActor
 final class CameraCoordinator: CameraControlling, CameraOutputHandling {
+    static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
+    private let captureOwner: ExecutionOwner
+    private let makeRuntime: () throws -> ApplicationRuntime
+    private var resourceRuntime: ApplicationRuntime?
+    private var captureLease: ResourceLease?
+    private var leaseRenewal: Task<Void, Never>?
+    private var eventSequence: UInt64 = 0
+    private(set) var captureEvent: ActivityEvent?
+    private var recoverRequested = false
     let preview: CameraPreviewSource
     let state: CameraState
     private var gazeSequence: UInt64?
@@ -23,7 +33,12 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
     private var revision = 0
     private var worker: Task<Void, Never>?
 
-    init(camera: AppleCamera, state: CameraState, makeSession: @escaping () async throws -> VisionSession) {
+    init(
+        camera: AppleCamera, state: CameraState, makeRuntime: @escaping () throws -> ApplicationRuntime,
+        makeSession: @escaping () async throws -> VisionSession
+    ) {
+        self.captureOwner = ExecutionOwner(agent: Self.resourceOwnerID, incarnation: UUID(), sessionID: UUID())
+        self.makeRuntime = makeRuntime
         self.state = state
         self.makeSession = makeSession
         self.camera = camera
@@ -53,6 +68,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
     }
 
     func retry() {
+        recoverRequested = true
         failed = false
         state.message = nil
         reconcile()
@@ -151,6 +167,88 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
         state.skeleton = overlay
     }
 
+    private func recordCapture(_ state: ActivityEvent.State, id: UUID) {
+        eventSequence &+= 1
+        captureEvent = ActivityEvent(activityID: id, owner: captureOwner, state: state, sequence: eventSequence)
+    }
+
+    private func startCapture(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error> {
+        let runtime = try makeRuntime()
+        resourceRuntime = runtime
+        if recoverRequested {
+            recoverRequested = false
+            if await runtime.resources.snapshot()[.cameraCapture] == .faulted {
+                try await runtime.resources.recover([.cameraCapture])
+            }
+        }
+        let lease = try await runtime.resources.acquire(
+            resources: [.cameraCapture], owner: captureOwner, duration: .seconds(60)
+        ) {
+            await runtime.actions.cancel(resources: $0)
+        }
+        captureLease = lease
+        let camera = self.camera
+        do {
+            let frames = try await runtime.resources.run(resources: [.cameraCapture], owner: captureOwner, lease: lease)
+            {
+                let frames = try await camera.start(facing: facing)
+                guard await camera.isRunning() else { throw CameraError.unavailable }
+                return frames
+            }
+            recordCapture(.started, id: lease.id)
+            leaseRenewal = Task { [weak self] in
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(10)) } catch { return }
+                    guard let self, let current = self.captureLease, current.id == lease.id else { return }
+                    do {
+                        self.captureLease = try await runtime.resources.renew(
+                            current, owner: self.captureOwner, duration: .seconds(60))
+                    } catch {
+                        self.recordCapture(.revoked, id: lease.id)
+                        self.failed = true
+                        self.state.message = "相机控制已结束，请重试"
+                        self.reconcile()
+                        return
+                    }
+                }
+            }
+            return frames
+        } catch {
+            recordCapture(.failed, id: lease.id)
+            _ = await stopCapture()
+            throw error
+        }
+    }
+
+    /// Releasing an old lease never calls the device directly and cannot stop a replacement owner.
+    private func stopCapture() async -> Bool {
+        leaseRenewal?.cancel()
+        leaseRenewal = nil
+        guard let lease = captureLease, let runtime = resourceRuntime else { return true }
+        captureLease = nil
+        do {
+            try await runtime.resources.release(lease, owner: captureOwner)
+            recordCapture(.stopped, id: lease.id)
+            return true
+        } catch ResourceError.staleLease {
+            let current = await runtime.resources.snapshot()[.cameraCapture]
+            if current == .available
+                || {
+                    if case .leased = current { return true }
+                    return false
+                }()
+            {
+                recordCapture(.revoked, id: lease.id)
+                return true
+            }
+        } catch {}
+        recordCapture(.failed, id: lease.id)
+        failed = true
+        state.isVisible = false
+        state.message = "相机尚未确认停止，请重试"
+        return false
+    }
+
     private func applyLatestIntent() async {
         defer {
             worker = nil
@@ -158,19 +256,19 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
         }
         while true {
             let current = revision
-            await camera.stop()
+            guard await stopCapture() else { return }
             await visionTask?.value
             visionTask = nil
             guard current == revision else { continue }
             if !state.isEnabled || !foreground || failed {
-                await camera.stop()
+                _ = await stopCapture()
             } else {
                 let authorized = await AppleCamera.requestPermission()
                 // Permission prompts may suspend/deactivate the scene or outlive a user stop.
                 guard current == revision else { continue }
                 if authorized {
                     do {
-                        let frames = try await camera.start(facing: state.facing == .front ? .front : .back)
+                        let frames = try await startCapture(facing: state.facing == .front ? .front : .back)
                         let running = await camera.isRunning()
                         if current == revision {
                             state.isVisible = running
@@ -179,7 +277,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
                             if running { startVision(frames: frames) }
                         }
                     } catch {
-                        await camera.stop()
+                        _ = await stopCapture()
                         if current == revision {
                             state.message =
                                 (error as? CameraError) == .unavailable
@@ -187,7 +285,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
                         }
                     }
                 } else {
-                    await camera.stop()
+                    _ = await stopCapture()
                     if current == revision {
                         state.message = "请在设置中允许相机访问"
                         state.needsSettings = true

@@ -5,6 +5,8 @@ import Storage
 
 /// Model-backed assistant; concrete model selection belongs exclusively to the composition root.
 public actor AssistantAgent: Agent {
+    private var resultInbox = ActionResultInbox()
+    public func actionResults() -> [ActionResult] { resultInbox.results }
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
@@ -100,6 +102,13 @@ public actor AssistantAgent: Agent {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard descriptor.inputs.contains(input.payload.kind) else { throw HarnessError.unsupportedInput }
         guard !input.metadata.expired else { throw CommunicationError.expired }
+        if case .actionResult(let result) = input.payload {
+            guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
+                result.owner.sessionID == input.sessionID
+            else { throw CommunicationError.unauthorized }
+            resultInbox.accept(result)
+            return
+        }
         if case .observation(let observation) = input.payload {
             switch observation {
             case .transcript(_, final: true), .speechPhase: break
@@ -148,7 +157,8 @@ public actor AssistantAgent: Agent {
                     try beginReplyTurn(input)
                     emit(.control("agent.finished"), for: input)
                 } catch { emit(.control("assistant.error: \(error)"), for: input) }
-            case .image, .audio, .observation: break  // Rejected by the descriptor before admission.
+            // Unsupported input is rejected by the descriptor; receipts are handled before this switch.
+            case .image, .audio, .observation, .actionResult, .activityEvent: break
             case .event(let event):
                 activeInput = input
                 worker = Task { await self.emitImmediate("事件：\(event)", for: input) }

@@ -19,7 +19,6 @@ final class VisionSession {
         configuration: FrameChangeConfiguration, mirroredGaze: Bool,
         endpoint: any CameraOutputHandling
     ) async throws {
-        try await runtime.prepareTools()
         let manager = runtime.manager
         let input = runtime.input
         let responses = runtime.output

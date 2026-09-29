@@ -79,3 +79,7 @@ See [external input delivery](../../../Gateway/Input/README.md#external-input-ad
 ✅ Speech synthesis/cancel commands are newly generated work with a fresh 10-second admission deadline, preserving parent ID, root, hops, session and turn. They do not inherit the original input’s sensor-routing expiration; source identity/session validation and sender generation cancellation still apply. Forwarded perception observations continue to inherit the parent deadline. This prevents late generated segments from failing merely because the already-admitted input is older than 10 seconds.
 
 ✅ Source location: `MobileHarness/Agents/Core/Communication`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
+
+## Action runtime stage 2
+
+✅ The contract catalog includes runtime-only action.result/actionResult and activity.event/activityEvent inputs. JSON v5 shape is unchanged. Agent publication remains restricted to permitted observations; dedicated InputGateway methods bind these runtime messages to a specific owner incarnation/session. ❌ No generic activity subscription service.

@@ -2,7 +2,7 @@ extension UIActions {
     /// Replace the recognition caption; unlike UI.print, empty text is an explicit clear.
     public static func setTranscript(
         invocation: ActionInvocation,
-        present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
+        using present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let text: String

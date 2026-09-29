@@ -57,3 +57,22 @@ Tools owns no queue and bypasses Channel scheduling. VisionPerception retains th
 | Open | Measure skeleton presentation latency on a physical device. |
 
 ✅ ToolRegistry and ToolExecutor compile in this same Tools module under Runtime. Consumers import Tools; the separate runtime target is removed. ❌ The merge adds no Channel scheduling, timeout or implicit handler registration.
+
+## Action runtime stage 2
+
+✅ Tool resource metadata now supports the same Gateway ownership checks as Actions without joining Action queues. ❌ No automatic resource inference; device-facing Tools must declare actual resources.
+
+## Domain-owned registration
+
+✅ ToolModules.builtIn lists SystemToolModule and UIToolModule. Domains own ToolDefinition paths, resources and returning/completion handlers. BehaviorAssembly creates a complete ToolRegistry synchronously and validates both model-callable and internal Tool permissions. No App prepareTools task or per-function binding remains. UI.showPose receives the typed PosePresentationCapability and retains its no-feedback completion contract.
+
+```mermaid
+flowchart LR
+    Modules[Domain ToolModule definitions] --> Registry[Atomic bounded ToolRegistry construction]
+    Capability[Typed host capability] --> Modules
+    Agent[Agent tool permissions] --> Check[Reject missing implementations]
+    Registry --> Check
+    Check --> Dispatcher[Gateway ToolDispatcher]
+```
+
+Add functions in their domain modules; add domains in ToolModules. Existing capability operations allow implementation changes without App edits. ❌ New native primitives require explicit capability/adapter work. Dynamic registry mutation remains available for explicit isolated runtimes, not production startup.

@@ -16,21 +16,28 @@ public actor OutputGateway {
     private let actions: ActionDispatcher
     private let tools: ToolDispatcher
     private let sink: Sink
+    private let resources: ResourceCoordinator?
+    private let actionFeedback: ActionFeedback
+    private let lifecycleObserverID = UUID()
+    private var lifecycleBound = false
 
     public init(
         manager: AgentManager, requests: InputGateway, tools: ToolRegistry,
         actions: ChannelScheduler = ChannelScheduler(registry: ActionRegistry()),
         policy: CommunicationPolicy? = nil,
+        actionFeedback: ActionFeedback = .failuresOnly,
         observedContracts: Set<String> = [],
         observeEvent: (@Sendable (AgentInput) async throws -> Void)? = nil,
         sink: @escaping Sink
     ) {
         self.requests = requests
+        self.resources = actions.resourceCoordinator
+        self.actionFeedback = actionFeedback
         self.policy = policy
         self.observedContracts = observedContracts
         self.observeEvent = observeEvent
         self.manager = manager
-        self.tools = ToolDispatcher(registry: tools, input: requests)
+        self.tools = ToolDispatcher(registry: tools, input: requests, resources: actions.resourceCoordinator)
         self.actions = ActionDispatcher(executor: actions)
         self.sink = sink
     }
@@ -108,11 +115,64 @@ public actor OutputGateway {
             delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new })
     }
 
+    private func bindLifecycle() async throws {
+        guard !lifecycleBound else { return }
+        let scheduler = actions.executor
+        let resources = self.resources
+        try await manager.observeStops(id: lifecycleObserverID) { agent, incarnation in
+            async let jobs: Void = scheduler.cancel(agent: agent, incarnation: incarnation)
+            await resources?.close(agent: agent, incarnation: incarnation)
+            await jobs
+        }
+        lifecycleBound = true
+    }
+
+    private func executionOwner(_ envelope: OutputEnvelope) async throws -> ExecutionOwner {
+        try await bindLifecycle()
+        let identity = try await manager.identity(envelope.source)
+        try await manager.validate(envelope.source, incarnation: identity, sessionID: envelope.sessionID)
+        return ExecutionOwner(agent: envelope.source, incarnation: identity, sessionID: envelope.sessionID)
+    }
+
+    public func resourceControl(for source: AgentID, sessionID: UUID) async throws -> ResourceControl {
+        try await bindLifecycle()
+        guard let resources else { throw ResourceError.unknownResource }
+        let owner = ExecutionOwner(agent: source, incarnation: try await manager.identity(source), sessionID: sessionID)
+        try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
+        let manager = self.manager
+        let scheduler = actions.executor
+        return ResourceControl(
+            acquire: { ids, duration in
+                try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
+                let lease = try await resources.acquire(resources: ids, owner: owner, duration: duration) {
+                    await scheduler.cancel(resources: $0)
+                }
+                do {
+                    try Task.checkCancellation()
+                    try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
+                    return lease
+                } catch {
+                    do { try await resources.release(lease, owner: owner) } catch {}
+                    throw error
+                }
+            },
+            renew: { lease, duration in
+                try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
+                return try await resources.renew(lease, owner: owner, duration: duration)
+            },
+            release: { lease in try await resources.release(lease, owner: owner) })
+    }
+
     public func cancel(sessionID: UUID) async {
-        await actions.cancel(sessionID: sessionID)
+        async let cancelled: Void = actions.cancel(sessionID: sessionID)
+        await resources?.close(sessionID: sessionID)
+        await cancelled
     }
     public func shutdown() async {
-        await actions.shutdown()
+        async let cancelled: Void = actions.shutdown()
+        await resources?.shutdown()
+        await cancelled
+        await manager.removeStopObserver(lifecycleObserverID)
     }
 
     /// Admission is not playback completion. The terminal control joins accepted actions.
@@ -128,7 +188,12 @@ public actor OutputGateway {
         case .action(let token):
             do {
                 try Task.checkCancellation()
-                try await actions.dispatch(token, envelope: envelope)
+                let owner = try await executionOwner(envelope)
+                let required = try actions.executor.requiredResources(for: token.actionPath)
+                let lease = await resources?.lease(for: owner, resources: required)
+                try await actions.dispatch(
+                    token, envelope: envelope, owner: owner,
+                    feedback: descriptor.inputs.contains(.actionResult) ? actionFeedback : .none, lease: lease)
             } catch {
                 await actions.cancel(envelope)
                 throw error
@@ -139,7 +204,7 @@ public actor OutputGateway {
                 throw error
             }
         case .tool(let call):
-            try await tools.dispatch(call, envelope: envelope)
+            try await tools.dispatch(call, envelope: envelope, owner: executionOwner(envelope))
         case .finish:
             do { try await actions.finish(envelope) } catch {
                 await actions.cancel(envelope)

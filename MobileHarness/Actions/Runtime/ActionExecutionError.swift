@@ -5,5 +5,6 @@ public enum ActionExecutionError: Error, Equatable, Sendable {
     case duplicateDefinition(ActionPath)
     case invalidDefinition(ActionPath)
     case definitionCapacityExceeded
+    case invalidCompletion
     case invalidInvocation
 }

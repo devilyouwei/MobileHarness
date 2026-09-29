@@ -77,3 +77,7 @@ Compare the [internal direct admission lifecycle](../../Agents/Core/Communicatio
 SpeechPerception owns LiveSpeechInput and VoiceActivitySegmenter. VisionPerception owns FrameChangeFilter. Source normalization means protocol validation and metadata here, not inference or perceptual transformations.
 
 ❌ Dynamic subscriptions, model-based routing suggestions, remote inputs and physical sensor adapters remain future work. Future model-assisted routing runs in an Agent and supplies a validated selection; no model will be added to Gateway.
+
+## Action runtime stage 2
+
+✅ Dedicated deliverActionResult/deliverActivityEvent paths validate runtime payload, target incarnation/session and declared input contract, returning accepted/retry/closed. Public send/publish reject runtime feedback payloads. Existing bounded admission reports retry on capacity; stale owner returns closed. ❌ No durable feedback transport.

@@ -425,3 +425,29 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 ✅ 修复 MOSS 输入框误用 SwiftUI task 方法导致始终禁用的问题，改为读取运行/停止状态；恢复 camera.toggle 无障碍标识。各目录 README 按当前状态重整，修正相机工具栏位置、默认云模型、凭据表单范围、诊断模型选择/驻留、页面与应用任务生命周期等陈旧描述；历史记录与原始设计保留。
 
 验证：常规仓库检查和四个 iOS 模拟器构建通过；最终工程引用、源码编译归属与本地文档链接核对通过。模拟器已安装用于验证，但 Mac 锁屏使输入框手动编辑验收无法完成；未进行本轮真机交互验收。可选真实模型测试未启用。
+
+## Action runtime 第二阶段（2026-09-29）
+
+✅ 开始前已提交第一阶段及当前 App/UI 整理：`b991ba2`。第二阶段新增 typed completion、ActionResult/ActivityEvent、先预留容量再接纳的结果 outbox、消息重试与执行分离、实例/会话隔离及 Agent 有界回执历史。默认仅失败反馈，不自动触发模型。
+
+✅ 新增跨 Action、Tool 和宿主入口的资源仲裁；支持短期执行围栏、持久租约、整组抢占、过期/停止回收，以及清理失败/超时封锁。设备 stop 与旧任务 join 并行启动，确认清理完成后才授予新租约。摄像头采集已接入真实 AppleCamera 生命周期，未新增录像占位功能。见 [ADR 0066](adr/0066-action-results-resource-leases.md)。
+
+❌ 待完成：通用 activity registry 与事件 outbox、音频/机械臂资源迁移、设备 watchdog、持久化结果与跨重启恢复、逐 Action 执行期限、业务 Action 文件/签名统一及真机验收。当前表情仍以状态接受为完成点，不等待动画结束。
+
+验证：第二阶段新增 12 项生命周期测试，163 项 IntegrationTests 通过；`./scripts/check.sh` 全仓检查通过，`./scripts/build-ios.sh` 四个模拟器 scheme 构建通过。新增/修改文档的本地链接和工程引用检查通过。可选真实模型评测未启用，未进行本轮真机验收。
+
+## Action/Tool 模块装配迁移（2026-09-29）
+
+✅ 域模块拥有定义与函数绑定，Actions/Tools 各有显式内置模块清单。新增独立 BehaviorAssembly target；App 只注入类型化能力，删除逐项注册、prepareTools 异步初始化及适配器中的具体行为调用。启动时同时校验 Action 和 Tool 的模型/内部权限实现覆盖。新增边界检查和装配契约测试。见 [ADR 0067](adr/0067-domain-owned-behavior-assembly.md)。
+
+❌ 新设备能力/生命周期变化仍需适配器与宿主绑定；未顺带迁移全部旧业务文件/函数签名。第二阶段硬件与持久化待办保持不变。
+
+验证：完整仓库检查通过，含新增 4 项装配测试的 167 项 IntegrationTests 通过；四个 iOS 模拟器 scheme 构建通过。新增模块只由 SwiftPM 编译，Xcode 导航引用已同步。未进行本轮真机交互验收。
+
+## Action 实现标准复核（2026-09-29）
+
+✅ UI/Speech 命名空间、逐 Action 文件和 invocation:using: 签名已统一；Speech 参数在标准入口校验为 UUID，播放服务只接收类型化句柄。取消时缓存清理任务在失败返回前完成。文档清除已完成的迁移例外，并新增静态结构检查与契约测试。
+
+❌ 原生动画完成、设备资源迁移及真机验收仍是独立待办。既有行为路径、类别和调度语义不变，本轮不新增设备行为。
+
+验证：本次标准复核后全仓检查通过，169 项 IntegrationTests 通过，四个 iOS 模拟器 scheme 构建通过；工程引用与文档本地链接已核对。未进行本轮真机验收。

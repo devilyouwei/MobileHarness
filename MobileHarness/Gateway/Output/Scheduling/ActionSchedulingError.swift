@@ -1,4 +1,5 @@
 public enum ActionSchedulingError: Error, Equatable, Sendable {
+    case resultCapacityExceeded
     case channelCapacityExceeded(String)
     case channelCountExceeded
     case inputCapacityExceeded

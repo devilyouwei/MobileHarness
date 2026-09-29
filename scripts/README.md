@@ -49,3 +49,11 @@ flowchart LR
 ✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, remove standalone runtime targets and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
 
 ✅ Boundary checks enforce the independent UI target at MobileHarness/UI, shared value-only dependencies, no service construction/App coordinator references, explicit ApplicationRuntime injection, and README coverage in both App and UI directories.
+
+## Domain-owned behavior assembly
+
+✅ check-modelkit-boundaries.py enforces the BehaviorAssembly target map/dependencies and rejects individual ActionDefinition/ToolDefinition registrations, concrete ActionPath construction, string handler registrations and UIActions/UITools/SystemTools function invocation in App. Semantic type references remain permitted. ❌ Static source checks complement type checking/tests; they are not a general Swift semantic analyzer.
+
+## Action implementation audit
+
+✅ The Action standard check validates domain namespace files and checks each declared Action path has a matching invocation:using: entry file. It exempts Runtime infrastructure.

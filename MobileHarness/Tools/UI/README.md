@@ -17,3 +17,7 @@ flowchart LR
 
 ✅ One sequential App output consumer awaits each call; Tools/Runtime adds no queue or detached task. VisionPerception retains one latest pending skeleton, explicitly replacing older unconsumed UI.showPose state. Moving to Tool does not make presentation zero-cost or bypass MainActor scheduling.
 ❌ Generic Tool replacement and physical-device latency measurements are not implemented; coalescing is local to VisionPerception skeleton state. No physical device control belongs in this tool.
+
+## Domain-owned behavior assembly
+
+✅ UIToolModule owns UI.showPose registration, calls the existing validated UITools implementation and injects PosePresentationCapability. Completion still produces no ToolResult/model feedback. ❌ Native rendering and new presentation primitives remain host capabilities.

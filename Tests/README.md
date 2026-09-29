@@ -30,3 +30,15 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ UITests and AppWorkflowTests exercise form-save lifetime, archive-before-title, operation admission and cancellation/retry with controlled completion signals; they create no device or real model. ❌ Device interaction acceptance remains separate.
 
 ✅ IntegrationTests includes Action runtime stage 1 contract checks and preserves existing Channel/wait, speech and presentation regressions. ❌ Activity owners, resource leases and physical-device timing remain later acceptance.
+
+## Action runtime stage 2
+
+✅ IntegrationTests/ActionLifecycleTests adds stage-2 contract coverage for bounded Action feedback and resource leases/fences. ❌ Real-device lifetime/takeover tests remain separate.
+
+## Domain-owned behavior assembly
+
+✅ IntegrationTests depends on the pure BehaviorAssembly target to test module construction without compiling the iOS App. ❌ These tests do not validate native effects.
+
+## Action implementation audit
+
+✅ IntegrationTests now includes the Action authoring audit regression cases; no physical-device acceptance is implied.

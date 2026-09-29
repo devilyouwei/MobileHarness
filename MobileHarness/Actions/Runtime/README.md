@@ -6,6 +6,7 @@ Purpose: bind and execute declared Action implementations. Design goals: one con
 
 | File | Responsibility |
 | --- | --- |
+| ActionModule.swift | Explicit domain-owned definition catalog |
 | ActionDefinition.swift | Path, implementation kind, completion description and awaited handler |
 | ActionRegistry.swift | Immutable validated definitions and assembled capability coverage checks |
 | ActionInvocation.swift | Single-envelope call construction and execution identity |
@@ -16,15 +17,15 @@ Purpose: bind and execute declared Action implementations. Design goals: one con
 
 ## Registration and completion contracts
 
-App supplies an array of `ActionDefinition(path:kind:completion:handler:)` to throwing `ActionRegistry(definitions:)`. Arrays permit explicit duplicate detection; the former handlers dictionary initializer is removed. An explicit empty `ActionRegistry()` remains available for runtimes with no Actions. At most 256 definitions are admitted; excess throws. Path components use the existing 1–64-byte capability identifier grammar. Completion descriptions must be nonblank and at most 512 UTF-8 bytes. Invalid or duplicate definitions throw without overwriting or fallback.
+Domain ActionModule implementations supply ActionDefinition arrays to `ActionRegistry(modules:)` through BehaviorAssembly. Direct `ActionRegistry(definitions:)` remains available for explicit isolated assembly. Arrays permit explicit duplicate detection; the former handlers dictionary initializer is removed. An explicit empty `ActionRegistry()` remains available for runtimes with no Actions. At most 256 definitions are admitted; excess throws. Path components use the existing 1–64-byte capability identifier grammar. Completion descriptions must be nonblank and at most 512 UTF-8 bytes. Invalid or duplicate definitions throw without overwriting or fallback.
 
-`Kind` is `finite`, `state`, `activityStart`, `activityUpdate` or `activityStop`. It describes the implementation, not scheduling policy. All kinds retain `ActionHandler = @Sendable (ActionInvocation) async throws -> Void` and are awaited through their real acknowledgment. A description is a declared promise, not proof that an adapter implements it. Activity labels do not create an activity owner or authorize hardware.
+`Kind` is `finite`, `state`, `activityStart`, `activityUpdate` or `activityStop`. It describes the implementation, not scheduling policy. The stored `ActionCompletionHandler` is `@Sendable (ActionInvocation) async throws -> ActionCompletion`. The `completing:` initializer requires typed completion; the existing `handler:` Void adapter maps success to `.completed`. All handlers are awaited through their real acknowledgment. A description is a declared promise, not proof that an adapter implements it. Activity labels do not create an activity owner or authorize hardware.
 
 `validate(capabilities:)` checks every model-callable and code-owned internal Action path in an assembled CapabilityRegistry. It checks implementation coverage, not permission expansion or executable parameter schemas. App runs it before starting producers, reusing each Agent's own internal-capability assembler. JSON v5 remains the sole model-callable permission catalog; no metadata fields were added to it. See [App composition](../../App/Composition/README.md).
 
 ```mermaid
 flowchart LR
-    Definitions[App implementation definitions] --> Registry[Reject invalid / duplicate / excessive definitions]
+    Definitions[Domain implementation definitions] --> Registry[Reject invalid / duplicate / excessive definitions]
     JSON[Agent JSON model catalog] --> Capabilities[Agent-owned runtime capability assembly]
     Internal[Code-owned internal permissions] --> Capabilities
     Registry --> Check[Validate all declared Action paths]
@@ -59,7 +60,7 @@ Execution creates no additional work queue, timeout task or detached worker. The
 
 UI Actions now use these readers and translate decoding errors into their domain errors **before** invoking dependencies. Dependency and cancellation errors are not caught by that translation. `UIActions.PresentationError` owns invalid text and presentation-call errors; existing emotion/gaze errors remain domain-owned. Gateway still independently checks the Agent's permitted parameter-name set.
 
-Scheduling errors moved to `Gateway.ActionSchedulingError` (capacity, lifecycle and wait structure). `ActionExecutionError` contains missing handler, duplicate/invalid/excessive definitions and invalid invocation only. Runtime forwards original handler errors without converting them to success. No general ActionResult or automatic retry was added.
+Scheduling errors moved to `Gateway.ActionSchedulingError` (capacity, lifecycle and wait structure). `ActionExecutionError` contains missing handler, duplicate/invalid/excessive definitions and invalid invocation and completion-kind mismatch. Runtime forwards original handler errors without converting them to success. Stage 2 adds terminal ActionResult delivery through Gateway; only delivery retries, never Action effects.
 
 ## Diagnostic algorithm and limits
 
@@ -95,7 +96,22 @@ flowchart TD
 
 - ✅ Stage 1: implementation definitions, duplicate/metadata checks, assembled startup coverage, consistent invocation, typed arguments, error separation and bounded execution diagnostics.
 - ✅ Deterministic [contract tests](../../../Tests/IntegrationTests/ActionContractTests.swift) cover metadata, internal grants, malformed invocations/arguments, finite versus state completion, ID correlation, eviction, cleanup and effect uncertainty; existing scheduling tests remain in place.
-- ❌ Full domain namespace/file/signature migration; activity ownership, persistent resource leases, execution/cleanup deadlines, ActionResult feedback and hardware takeover remain later work.
+- ✅ Stage 2: typed completion, declared resource sets (maximum 8), trusted owner/feedback/lease invocation context; Gateway implements bounded feedback and resource arbitration.
+- ❌ Full domain namespace/file/signature migration, generic activity registry, per-Action execution deadlines and all-device resource migration remain later work.
 - ❌ Physical-device completion, animation and sustained-operation acceptance are not established by unit tests or simulator builds.
 
 See [authoring standard](../README.md), [scheduling](../../Gateway/Output/Scheduling/README.md) and [ADR 0065](../../../docs/adr/0065-action-runtime-contracts.md). Handler cooperation remains necessary for cleanup; this stage does not force interruption or introduce rollback.
+
+## Typed completion and resource declarations
+
+`ActionExecutor` rejects a completion incompatible with definition.kind: finite/state/activityUpdate return `.completed`; activityStart returns `.activityStarted(id)`; activityStop returns `.activityStopped(id)`. Use `completing:` for activity controls. The ID identifies ongoing work owned by an injected service, not the execution UUID. The executor validates the type, not actual hardware state or registry ownership.
+
+`ActionDefinition.resources` declares the resources used during this call; the scheduler checks at admission and fences execution through ResourceCoordinator. The invocation's ExecutionOwner is checked against envelope source/session; leases and non-none feedback require an owner. Gateway creates the trusted owner and lease context. Direct executor use is an internal/test API and does not arbitrate resources by itself. See [resources](../../Gateway/Output/Resources/README.md), [results](../../Gateway/Output/Results/README.md) and [ADR 0066](../../../docs/adr/0066-action-results-resource-leases.md).
+
+## Domain-owned behavior assembly
+
+✅ ActionModule owns an explicit definitions array. ActionRegistry(modules:) accepts at most 32 modules and 256 total definitions, then applies existing duplicate/metadata checks. No module initialization task or registration side effect is created. ❌ Runtime discovery and unbounded plugin catalogs are not supported.
+
+## Action implementation audit
+
+✅ Runtime remains infrastructure; no namespace-per-Action requirement applies to registry/executor/diagnostic services. Domain audit retains existing definition categories, resources and typed completion validation.

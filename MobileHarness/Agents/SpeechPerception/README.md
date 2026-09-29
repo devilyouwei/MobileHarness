@@ -98,3 +98,7 @@ Action/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, 
 `communication.publications` 仅包含上表三个 `speech.*` contract，typed payload、长度、触发时机和消费者均按“共享观测输出”表；它们不携带 PCM，也不作为 Agent `outputs` 流的 Action。`communication.sends = []`：SpeechPerception 不发送定向 Agent 消息；Assistant 接收 final/phase 是订阅广播，不是 send。JSON `actions / tools` 均为空；内部展示权限由代码声明，无 ToolResult 输入；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。
 
 ✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v5. ❌ Activity/resource ownership is not introduced.
+
+## Action runtime stage 2
+
+✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and returns without inference or output emission. actionResults() exposes bounded retained history. ❌ Automatic retry/replanning based on a result is not implemented.

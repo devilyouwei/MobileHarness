@@ -9,6 +9,11 @@
         "contract": "media.image",
         "version": 1,
         "kind": "image"
+      },
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
       }
     ],
     "subscriptions": [

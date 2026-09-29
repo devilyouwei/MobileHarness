@@ -32,6 +32,16 @@ public actor InputGateway {
             input.metadata.capturedAt.isFinite, input.metadata.capturedAt >= 0
         else { throw CommunicationError.invalidPayload }
         switch input.payload {
+        case .actionResult(let result):
+            guard result.owner.sessionID == input.sessionID, result.owner.agent.rawValue.utf8.count <= 64,
+                result.path.module.utf8.count <= 64, result.path.function.utf8.count <= 64,
+                (result.status == .succeeded) == (result.completion != nil),
+                (result.status == .succeeded) == (result.failure == nil)
+            else { throw CommunicationError.invalidPayload }
+        case .activityEvent(let event):
+            guard event.owner.sessionID == input.sessionID, event.owner.agent.rawValue.utf8.count <= 64,
+                event.sequence > 0
+            else { throw CommunicationError.invalidPayload }
         case .observation(let value): _ = try value.validatedSize()
         case .text(let value): guard value.utf8.count <= 4096 else { throw CommunicationError.invalidPayload }
         case .event(let value): guard value.utf8.count <= 16384 else { throw CommunicationError.invalidPayload }
@@ -39,13 +49,54 @@ public actor InputGateway {
         }
     }
     public func publish(_ input: AgentInput) async throws -> DeliveryReport {
+        try rejectRuntimePayload(input)
         guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
         return try await deliver(input, targets: destinations(for: input).map { ($0, nil) })
     }
     public func send(_ input: AgentInput, to target: AgentID) async throws -> DeliveryReport {
+        try rejectRuntimePayload(input)
         guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
         return try await deliver(input, targets: [(target, nil)])
     }
+    private func rejectRuntimePayload(_ input: AgentInput) throws {
+        switch input.payload {
+        case .actionResult, .activityEvent: throw CommunicationError.unauthorized
+        default: break
+        }
+    }
+
+    public func deliverActionResult(_ result: ActionResult) async -> ActionResultDelivery {
+        let input = AgentInput(
+            sessionID: result.owner.sessionID, payload: .actionResult(result),
+            metadata: InputMetadata(
+                payload: .actionResult(result), source: "runtime", rootID: result.inputID,
+                parentID: result.inputID), turn: result.turn)
+        return await deliverRuntime(input, owner: result.owner)
+    }
+
+    public func deliverActivityEvent(_ event: ActivityEvent) async -> ActionResultDelivery {
+        let input = AgentInput(sessionID: event.owner.sessionID, payload: .activityEvent(event))
+        return await deliverRuntime(input, owner: event.owner)
+    }
+
+    private func deliverRuntime(_ input: AgentInput, owner: ExecutionOwner) async -> ActionResultDelivery {
+        do {
+            try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
+            let agent = try await manager.agent(owner.agent)
+            guard agent.descriptor.inputs.contains(input.payload.kind),
+                policy?.accepts(input, target: owner.agent) ?? true
+            else { return .closed }
+        } catch { return .closed }
+        do {
+            let report = try await deliver(input, targets: [(owner.agent, owner.incarnation)])
+            if report.rejected.isEmpty { return .accepted }
+            do {
+                try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
+            } catch { return .closed }
+            return .retry
+        } catch CommunicationError.capacityExceeded { return .retry } catch { return .closed }
+    }
+
     private func deliver(_ input: AgentInput, targets: [(AgentID, UUID?)]) async throws -> DeliveryReport {
         try Task.checkCancellation()
         try validatePayload(input)

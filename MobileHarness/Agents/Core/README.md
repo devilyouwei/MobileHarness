@@ -81,3 +81,7 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ✅ Runtime registries separate model alias resolution from code-owned InternalAction/InternalTool permission checks. Generator text mapping is a bounded Agent-supplied callback. See [capabilities](Capability/README.md). ❌ Full JSON Schema/native Tool transport remain deferred.
 
 ✅ Physically owned by Agents/Core, compiled as the independent AgentCore target. The business Agents target excludes Core to prevent duplicate compilation and the Agents → StorageAudio → AgentCore dependency cycle. Core stays Foundation-only; importing Agents from Core is forbidden. ❌ Directory consolidation does not merge business policy into shared contracts.
+
+## Action runtime stage 2
+
+✅ Shared output values now include ActionResult, ActivityEvent, ExecutionOwner and ResourceLease/ResourceControl; Runtime owns bounded receipt history and stop observation. AgentCore still has no dependency on Gateway, concrete Agents or device services. ❌ Persistent receipt delivery belongs to future work.

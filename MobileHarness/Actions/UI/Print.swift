@@ -1,9 +1,9 @@
 import Foundation
 
-public enum UIActions {
+extension UIActions {
     public static func print(
         invocation: ActionInvocation,
-        present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
+        using present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let text: String

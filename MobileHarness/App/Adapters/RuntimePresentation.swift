@@ -5,7 +5,7 @@ import Tools
 
 @MainActor
 protocol VoiceOutputHandling: AnyObject, Sendable {
-    func speak(_ invocation: ActionInvocation) async throws
+    func play(audioID: UUID, invocation: ActionInvocation) async throws
     func present(_ text: String, invocation: ActionInvocation) throws
     func presentTranscript(_ text: String, invocation: ActionInvocation) throws
     func finishTranscript(invocation: ActionInvocation) throws
@@ -24,7 +24,7 @@ protocol CameraOutputHandling: AnyObject, Sendable {
 
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
 @MainActor
-final class RuntimePresentation {
+final class RuntimePresentation: UIPresentationCapability, SpeechPlaybackCapability, PosePresentationCapability {
     private weak var voice: (any VoiceOutputHandling)?
     private weak var camera: (any CameraOutputHandling)?
     func bindVoice(_ value: any VoiceOutputHandling) throws {
@@ -41,49 +41,41 @@ final class RuntimePresentation {
     func unbindCamera(_ value: any CameraOutputHandling) {
         if camera === value { camera = nil }
     }
-    func speak(_ invocation: ActionInvocation) async throws {
+    func play(audioID: UUID, invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try await voice.speak(invocation)
+        try await voice.play(audioID: audioID, invocation: invocation)
     }
-    func printText(_ invocation: ActionInvocation) async throws {
+    func present(_ text: String, invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try await UIActions.print(invocation: invocation) { try await voice.present($0, invocation: $1) }
+        try voice.present(text, invocation: invocation)
     }
-    func setTranscript(_ invocation: ActionInvocation) async throws {
+    func presentTranscript(_ text: String, invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try await UIActions.setTranscript(invocation: invocation) {
-            try await voice.presentTranscript($0, invocation: $1)
-        }
+        try voice.presentTranscript(text, invocation: invocation)
     }
-    func finishTranscript(_ invocation: ActionInvocation) async throws {
+    func finishTranscript(invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try await UIActions.finishTranscript(invocation: invocation) {
-            try await voice.finishTranscript(invocation: $0)
-        }
+        try voice.finishTranscript(invocation: invocation)
     }
-    func beginReplyTurn(_ invocation: ActionInvocation) async throws {
+    func beginReplyTurn(invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try await UIActions.beginReplyTurn(invocation: invocation) { try await voice.beginReplyTurn(invocation: $0) }
+        try voice.beginReplyTurn(invocation: invocation)
     }
-    func setVoiceState(_ invocation: ActionInvocation) async throws {
+    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try await UIActions.setVoiceState(invocation: invocation) {
-            try await voice.presentVoiceState($0, invocation: $1)
-        }
+        try voice.presentVoiceState(state, invocation: invocation)
     }
-    func express(_ invocation: ActionInvocation) async throws {
+    func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try await UIActions.express(invocation: invocation) { try await voice.presentExpression($0, invocation: $1) }
+        try voice.presentExpression(emotion, invocation: invocation)
     }
-    func moveEyes(_ invocation: ActionInvocation) async throws {
+    func present(_ target: UIActions.Gaze, invocation: ActionInvocation) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
-        try await UIActions.moveEyes(invocation: invocation) { try await camera.present($0, invocation: $1) }
+        try camera.present(target, invocation: invocation)
     }
-    func showPose(_ call: ToolCall, envelope: OutputEnvelope) async throws {
+    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
-        try await UITools.showPose(call: call, envelope: envelope) {
-            try await camera.present($0, sessionID: $1.sessionID)
-        }
+        try camera.present(overlay, sessionID: sessionID)
     }
     func observe(_ input: AgentInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }

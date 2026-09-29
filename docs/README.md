@@ -45,3 +45,15 @@ When a runtime contract changes, update the owning module README first, then the
 - [ADR 0064 — App and UI boundaries](adr/0064-app-ui-boundaries.md): explicit composition, independently compiled pages and application workflows.
 
 ✅ [ADR 0065](adr/0065-action-runtime-contracts.md) and [Actions/Runtime](../MobileHarness/Actions/Runtime/README.md) record the implemented Action contract stage and its limits. ❌ Ongoing activity owners, persistent resource enforcement and execution deadlines remain future work.
+
+## Action runtime stage 2
+
+✅ [ADR 0066](adr/0066-action-results-resource-leases.md) supersedes the stage-1 future-work entries for Action terminal feedback and resource arbitration. Detailed contracts live in Gateway/Output/Results and Resources. ❌ Durable feedback, generic activity management, audio/robot migration and hardware acceptance remain outstanding.
+
+## Behavior module assembly
+
+✅ [ADR 0067](adr/0067-domain-owned-behavior-assembly.md) and the BehaviorAssembly README describe ownership and extension rules. ❌ Automatic discovery and universal device capabilities are not supplied.
+
+## Canonical Action entry audit
+
+✅ [ADR 0068](adr/0068-canonical-action-entrypoints.md) records the Action implementation audit and typed speech capability migration. ❌ Physical-device acceptance remains outstanding.

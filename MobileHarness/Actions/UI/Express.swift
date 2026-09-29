@@ -10,7 +10,7 @@ extension UIActions {
 
     public static func express(
         invocation: ActionInvocation,
-        present: @escaping @Sendable (Emotion, ActionInvocation) async throws -> Void
+        using present: @escaping @Sendable (Emotion, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let emotion: Emotion

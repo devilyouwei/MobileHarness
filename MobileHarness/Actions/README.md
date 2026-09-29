@@ -18,7 +18,7 @@ This is the normative authoring standard for new Actions and deliberate migratio
 
 Actions differ from Tools by execution and feedback contracts, not by read/write or fast/slow behavior. A quick state setter can still be an Action when it needs Channel ordering. Tools bypass Action scheduling and must not become an alternate route around device ownership checks.
 
-Agents emit resolved calls through OutputGateway. App binds explicit handlers. Actions receives capability protocols or Sendable callbacks; it imports neither App, concrete Agents, Gateway, PlatformKit nor the Swift UI target. The current target depends on AgentCore and StorageAudio; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
+Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither App, concrete Agents, Gateway, PlatformKit nor the Swift UI target. The current target depends on AgentCore and StorageAudio; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
 
 ```mermaid
 flowchart LR
@@ -67,7 +67,7 @@ Every category has admission, execution and terminal success/failure/cancellatio
 - Start awaits activation and cleans up partial activation on failure/cancellation before ownership handoff. After handoff, cancellation of the completed call is not an implicit Stop. Session teardown must explicitly stop and join its activities.
 - Stop awaits termination and required cleanup/finalization. “Stop requested” must be named and documented as a weaker contract if a future API intentionally provides it. A file is not ready merely because capture stopped.
 - Release the command lane after Start; never wait there for the whole activity, which could prevent a queued Stop on the same lane from running. Persistent resource ownership is separate from this lane.
-- Later failures require bounded, correlated observations through InputGateway, rather than retroactively failing an already completed Start. Agent-originated messages still go through OutputGateway → InputGateway. A general ActionResult/activity-feedback framework is not implemented today.
+- Later failures require bounded, correlated observations through InputGateway, rather than retroactively failing an already completed Start. Agent-originated messages still go through OutputGateway → InputGateway. Stage 2 implements terminal ActionResult and a direct ActivityEvent route; a generic activity registry/event outbox remains outstanding.
 
 ```mermaid
 flowchart TD
@@ -84,7 +84,7 @@ flowchart TD
     Control -.-> Activity[Activity owner retains resources until termination]
 ```
 
-`<wait>` joins handler completion only. It does not upgrade a setter into “wait for animation/arrival,” and it does not wait for a started activity to end. Current module exclusion ends with the handler; persistent resource leases, physical takeover and activity supervision require separate implementation before these examples can control real hardware. Actor isolation alone does not guarantee ordering across suspension points.
+`<wait>` joins handler completion only. It does not upgrade a setter into “wait for animation/arrival,” and it does not wait for a started activity to end. Current module exclusion ends with the handler; persistent resource leases and group takeover are implemented in Gateway/Output/Resources. Each device must still integrate real stop acknowledgment and activity supervision before these examples can control hardware. Actor isolation alone does not guarantee ordering across suspension points.
 
 ## 3. Types, class policy and canonical signatures
 
@@ -99,11 +99,13 @@ Use a **caseless enum `<Module>Actions`** as the stateless namespace. Declare it
 | SwiftUI presentation state | MainActor-owned type in the separate UI target | App adapts Action values to UI values; Actions does not import SwiftUI. |
 | Reference identity required by an adapter | `final class` with justified isolation | Use only for an actual platform/reference constraint; no inheritance framework or unchecked Sendable shortcut. |
 
-The registry boundary remains exactly:
+The Void adapter boundary for finite/state/update handlers is:
 
 ```swift
 public typealias ActionHandler = @Sendable (ActionInvocation) async throws -> Void
 ```
+
+The stored registry handler is `ActionCompletionHandler`, returning `ActionCompletion`; activity start/stop use the typed `completing:` initializer.
 
 The standard Action-entry shape is:
 
@@ -117,7 +119,7 @@ public static func verb(
 
 For a parameterless Action, the callback is `@Sendable (ActionInvocation) async throws -> Void`. For a cohesive multi-operation dependency, use `using capability: any <Domain>Capability` instead; define the smallest Sendable protocol needed by real Actions. Do not create both a protocol and an equivalent closure wrapper without a need. Use `using` consistently; give the local name a concrete meaning such as `play`, `apply`, `start` or `stop`.
 
-`ActionInvocation` is the existing trusted call/context carrier. Do not add caller IDs, permissions, Channel names or service references to model parameters. A callback receives typed arguments and this context so the bound implementation can validate session/turn ownership. Public Action success remains `Void`; capability-internal handles do not become an undeclared Action return channel.
+`ActionInvocation` is the existing trusted call/context carrier. Do not add caller IDs, permissions, Channel names or service references to model parameters. A callback receives typed arguments and this context so the bound implementation can validate session/turn ownership. Finite/state/update helpers may return `Void`, adapted by the registry to `.completed`. Activity start/stop helpers return `ActionCompletion` carrying the activity ID through the typed terminal result; arbitrary capability values do not become an undeclared return channel.
 
 Entry order is consistent:
 
@@ -225,6 +227,9 @@ extension FaceActions {
 These parameterless commands use the trusted session identity to address one recording per session. The injected owner must reject a conflicting owner, bound the number of active sessions and retain the running capture independently of the Action. For this example, repeated Start for the same active owner and repeated Stop after confirmed termination are idempotent. Start success means capture is active; Stop success means capture has ended and the media writer has finalized. A failure must remain observable and must not be converted into “already stopped.” Concurrent transitions and lifecycle teardown need an explicit owner state machine; the entry wrappers below do not implement it.
 
 ```swift
+import Foundation
+import AgentCore
+
 public enum CameraActions {}
 
 extension CameraActions {
@@ -234,31 +239,33 @@ extension CameraActions {
 
     public static func startRecording(
         invocation: ActionInvocation,
-        using start: @escaping @Sendable (ActionInvocation) async throws -> Void
-    ) async throws {
+        using start: @escaping @Sendable (ActionInvocation) async throws -> UUID
+    ) async throws -> ActionCompletion {
         try Task.checkCancellation()
         guard invocation.call.parameters.isEmpty else {
             throw RecordingCommandError.unexpectedParameters
         }
-        try await start(invocation)
+        let id = try await start(invocation)
         try Task.checkCancellation()
+        return .activityStarted(id)
     }
 
     public static func stopRecording(
         invocation: ActionInvocation,
-        using stop: @escaping @Sendable (ActionInvocation) async throws -> Void
-    ) async throws {
+        using stop: @escaping @Sendable (ActionInvocation) async throws -> UUID
+    ) async throws -> ActionCompletion {
         try Task.checkCancellation()
         guard invocation.call.parameters.isEmpty else {
             throw RecordingCommandError.unexpectedParameters
         }
-        try await stop(invocation)
+        let id = try await stop(invocation)
         try Task.checkCancellation()
+        return .activityStopped(id)
     }
 }
 ```
 
-For a real module, place the two entries in StartRecording.swift and StopRecording.swift; their shared error belongs in Types.swift. An Update command uses typed validated arguments like the Set example, while preserving the activity's identity and ownership. A photo/file identifier would need an explicitly designed observation or returning Tool contract; these Void Actions do not secretly return one to the model.
+For a real module, place the two entries in StartRecording.swift and StopRecording.swift; their shared error belongs in Types.swift. An Update command uses typed validated arguments like the Set example, while preserving the activity's identity and ownership. A photo/file identifier would need an explicitly designed observation or returning Tool contract; the activity ID in ActionCompletion is not a media-file result.
 
 ### Explicit App binding
 
@@ -304,55 +311,65 @@ Tests should verify contracts rather than mirror the function body. For finite o
 
 Run `./scripts/check.sh` and, with full Xcode, `./scripts/build-ios.sh`; report unavailable checks explicitly. Builds and fake capabilities do not prove physical completion or device safety. Runtime-contract migrations require ADR and roadmap updates; Stage 1 runtime-contract changes are recorded in [ADR 0065](../../docs/adr/0065-action-runtime-contracts.md).
 
-## 7. Current implementation and migration exceptions
+## 7. Current implementation audit
 
-Current files (not the target layout above):
+✅ UI and Speech now follow the namespace/file/signature standard: UIActions.swift and SpeechActions.swift declare caseless namespaces, each registered function has a same-named file and an `invocation:using:` entry. UIActionModule and SpeechActionModule bind these entries; ActionModules owns the catalog. Runtime is infrastructure, not a callable domain, and does not need a RuntimeActions namespace.
 
-```text
-Actions/
-├── Runtime/
-│   ├── ActionDefinition.swift
-│   ├── ActionArguments.swift
-│   ├── ActionDiagnostics.swift
-│   ├── ActionRegistry.swift
-│   ├── ActionInvocation.swift
-│   ├── ActionExecutor.swift
-│   ├── ActionExecutionError.swift
-│   └── README.md
-├── Speech/
-│   ├── SpeechPlayback.swift
-│   └── README.md
-├── UI/
-│   ├── Types.swift
-│   ├── Print.swift
-│   ├── Express.swift
-│   ├── MoveEyes.swift
-│   ├── SetTranscript.swift
-│   ├── FinishTranscript.swift
-│   ├── BeginReplyTurn.swift
-│   ├── SetVoiceState.swift
-│   ├── ConversationPresentation.swift
-│   └── README.md
-└── README.md
+| Path | Kind / endpoint | Validation / dependency |
+| --- | --- | --- |
+| Speech.speak | finite / playback drained and single-use audio released | audioID only, UUID at most 36 UTF-8 bytes; typed playback capability |
+| UI.print | finite / accepted text append | nonblank text ≤2000 UTF-8 bytes; typed presentation |
+| UI.express | state / accepted expression target | exact Emotion enum; no animation acknowledgment |
+| UI.moveEyes | state / accepted gaze target | finite x/y in [-1,1] |
+| UI.setTranscript | state / transcript replacement | text ≤4096 UTF-8 bytes, empty clears |
+| UI.setVoiceState | state / accepted presentation phase | listening/hearing/processing |
+| UI.beginReplyTurn | state / turn initialized | no parameters |
+| UI.finishTranscript | state / transcript closed | no parameters |
+
+All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Shared PresentationError belongs in UI/Types.swift; per-action emotion/gaze values remain with their entries. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
+
+✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. Legacy names express/moveEyes are retained as published paths. Registry and resource contracts remain in Runtime/Gateway.
+
+❌ One-shot expression/restore, Camera/robot Actions, generic activity supervision, audio/robot resource integration and physical-device timing acceptance remain separate work. They are not implemented by renaming or wrapping an entry.
+
+## 8. Stage 2: results and resource ownership
+
+✅ The implementation registry now stores typed `ActionCompletion`. Finite/state/update implementations can keep the Void `handler:` adapter. Start and stop definitions must use `completing:` and return the ongoing service's activity ID:
+
+```swift
+ActionDefinition(
+    path: ActionPath(module: "Camera", function: "startCapture"),
+    kind: .activityStart, completion: "Capture started; service retains lifetime.",
+    resources: [.cameraCapture],
+    completing: { invocation in
+        let id = try await captureService.start(invocation: invocation)
+        return .activityStarted(id)
+    }
+)
 ```
 
-| Current implementation | Current category / completion | Migration exception or outstanding work |
-| --- | --- | --- |
-| `Speech.speak` → `SpeechPlayback.play(_:using:)` | Finite audio-ID playback; drain playback and release the single-use cache lease. | No SpeechActions namespace/Speak.swift entry yet. Keep the real actor's cache handling; add a standard entry only during migration. No hidden TTS. |
-| `UI.express` | State setting; MainActor accepts expression, not animation completion. | Existing name and `present:` callback; no one-shot smile/restore behavior. |
-| `UI.moveEyes` | State setting; accepts a normalized gaze target, not rendered arrival. | Existing name and `present:` callback; no physical motion. |
-| `UI.setTranscript`, `UI.setVoiceState` | State setting; accepted presentation update. | Current callbacks use `present:`; all UI entries now reject unknown keys locally. |
-| `UI.print` | Finite append operation; accepted text append, not animation completion. Appended text may persist. | UIActions namespace is declared in Print.swift; migrate declaration to UIActions.swift. Repeated content is not intrinsically idempotent. |
-| `UI.beginReplyTurn`, `UI.finishTranscript` | State transitions; accepted turn initialization or transcript closure. | Retain existing turn/sequence policy and parameterless validation. |
-| `ConversationPresentation` | Supporting bounded presentation acceptance policy, not an Action. | Stale/duplicate UI updates may intentionally be ignored; handler success does not prove an update was rendered. This explicit presentation policy is not permission to discard device Actions. |
+This is an authoring example with an injected service, not a registered production Camera Action. Resource ownership must be acquired through the bound ResourceControl before a protected start is admitted. A stop/release command must reach that control port without queuing behind the activity it is stopping. Return only after the declared acknowledgment; keep long-lived state/tasks in the injected actor. Register the same resource on every Action/Tool that uses it; direct host paths must call ResourceCoordinator.run. Resource names describe physical conflict domains, not module names.
 
-Preserve existing paths, permissions, parameter limits and cancellation behavior until a reviewed migration updates implementations, bindings, tests and domain documentation together. Do not make incidental renames while adding an unrelated Action. Current per-function error types, callback labels and namespace placement are acknowledged exceptions, not examples to copy into new modules.
+✅ Gateway reserves a result slot before admission, reports correlated terminal status through InputGateway and retries delivery without re-execution. Default feedback is failuresOnly for opted-in Agents; explicit terminal mode includes success. Current Agents retain bounded receipts without triggering model inference. ActivityEvent is separate from start/stop Action completion.
 
-- ✅ [Runtime](Runtime/README.md): explicit immutable registry, trusted invocation and awaited Void handlers; Gateway owns scheduling.
-- ✅ [Speech](Speech/README.md): audio-ID playback with bounded StorageAudio PCM, read-starvation failures and cleanup; synthesis belongs to SpeechSynthesisAgent.
-- ✅ [UI](UI/README.md): captions, expression/gaze targets and bounded turn/sequence acceptance. State effects may remain after the handler returns.
-- ✅ This document defines vocabulary, categories, Swift/file conventions and illustrative implementation patterns.
-- ✅ Runtime stage 1: validated ActionDefinition registration and startup coverage, consistent invocation/execution IDs, shared ActionArguments (adopted by UI), separated scheduling/domain errors and bounded scheduler diagnostics. See [Runtime](Runtime/README.md) for API limits and completion/effect semantics.
-- ❌ Existing code has not yet migrated fully to the namespace/file/signature standard.
-- ❌ Camera/robot Actions, one-shot expression completion, general activity supervision, persistent resource ownership and ActionResult feedback are not implemented.
-- ❌ Physical-device timing, animation and sustained-operation acceptance remain separate work.
+✅ Persistent resource leases are owner/instance/session-bound, expire unless renewed and support atomic group takeover. Cleanup failure/timeout keeps affected resources gated. Production camera capture uses the coordinator through App lifecycle. See [results](../Gateway/Output/Results/README.md), [resources](../Gateway/Output/Resources/README.md) and [ADR 0066](../../docs/adr/0066-action-results-resource-leases.md).
+
+❌ General activity registry/event subscriptions, audio/robot resource integration, device safety watchdogs, durable delivery remain outstanding. Camera capture is not video recording; current UI expressions remain state acceptance, without waiting for animation.
+
+## 9. Module-owned registration
+
+✅ Each domain implements ActionModule and owns its complete ActionDefinition list. ActionModules.builtIn is the explicit catalog. Add an Action by editing its implementation and domain module, then update Agent permissions only when it should be callable. Add a domain by editing ActionModules; do not add a registration in App. ActionRegistry(modules:) flattens and validates modules with bounds and duplicate rejection.
+
+UIActionModule receives UIPresentationCapability; SpeechActionModule receives SpeechPlaybackCapability. Typed capability protocols live beside the domain that consumes them, without App or concrete device imports. They are required initializer dependencies. UI parsing/validation stays in Actions; App implements semantic effects. A new behavior implemented using existing capability operations requires no App changes. A new native primitive or changed lifetime requires an explicit capability/adapter extension.
+
+```mermaid
+flowchart LR
+    Catalog[ActionModules: built-in modules] --> Modules[Domain definitions + handlers]
+    Capabilities[Host typed capabilities] --> Modules
+    Modules --> Registry[ActionRegistry: bounds / duplicate validation]
+    Permissions[Agent permissions] --> Coverage[Coverage validation in BehaviorAssembly]
+    Registry --> Coverage
+    Coverage --> Gateway[Gateway execution]
+```
+
+The earlier explicit single-definition binding example illustrates isolated construction; production bindings now belong to domain module lists. BehaviorAssembly in App/Composition/Behaviors is an independently compiled pure assembly target, not an application service. ❌ No reflection, implicit registration, permission expansion or generic string/Any effect dispatch. See [ADR 0067](../../docs/adr/0067-domain-owned-behavior-assembly.md).

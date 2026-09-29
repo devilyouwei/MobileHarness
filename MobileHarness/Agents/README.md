@@ -38,28 +38,66 @@ flowchart LR
 
 ## Internal structure and data flow
 
+Agents combine injected processing capabilities with explicit messages and executable calls. Solid arrows show capability use or runtime flow, not imports. Dashed arrows show validated configuration. Model/storage interfaces are used directly; communication and skill calls cross Gateway. The external subgraph is a boundary, not Agent-owned implementation.
+
 ```mermaid
-flowchart TD
-    JSON[Four Agent JSON v5 resources] --> Loader[AgentConfigurations]
-    Loader --> Config[AgentCore configuration validator]
-    Config --> Permissions[Capabilities and communication policy]
-    PCM[Admitted audio] --> Speech[SpeechPerception: VAD / ASR]
-    Speech --> Events[Speech observations via both gateways]
-    Events --> Assistant[Assistant: chat and generation parsers]
-    Assistant --> History[Storage: original inputs, raw output and request context]
-    History -->|Last ten completed rounds| Assistant
-    Assistant -->|Via OutputGateway and InputGateway| Synth[SpeechSynthesis: directed serial TTS]
-    Synth --> Cache[StorageAudio: audioID / PCM]
-    Assistant --> Calls[Resolved speech and UI Actions]
-    Speech --> Captions[Resolved transcript and voice-state Actions]
-    Frames[Admitted image] --> Vision[VisionPerception: change filter / pose]
-    Vision --> Pose[Pose observations via both gateways]
-    Vision --> Overlay[Resolved UI.showPose completion Tool]
-    Permissions -.-> Speech
-    Permissions -.-> Assistant
-    Permissions -.-> Synth
-    Permissions -.-> Vision
+flowchart TB
+    JSON[Four Agent JSON v5 resources] --> Loader[AgentConfigurations / AgentCore validation]
+    Loader --> Policy[Model-callable catalogs and communication policy]
+    Internal[Agent code: fixed internal permissions] --> Grants[Assembled runtime capabilities]
+    Policy --> Grants
+
+    subgraph Cognitive[Agent-owned state and processing]
+        Speech[SpeechPerception: segmentation / recognition]
+        Assistant[Assistant: context / generation / output parsing]
+        Synth[SpeechSynthesis: directed serial synthesis]
+        Vision[VisionPerception: frame filtering / pose interpretation]
+    end
+    Grants -.-> Speech
+    Grants -.-> Assistant
+    Grants -.-> Synth
+    Grants -.-> Vision
+
+    subgraph Capabilities[Injected model and storage interfaces]
+        VAD[VoiceActivityCapability]
+        ASR[SpeechRecognitionCapability]
+        Chat[ChatCapability]
+        TTS[SpeechSynthesisCapability]
+        Pose[PoseCapability]
+        History[ConversationHistoryStore]
+        Cache[SpeechAudioStore]
+    end
+    Speech --> VAD
+    Speech --> ASR
+    Assistant --> Chat
+    Assistant <-->|Records and context| History
+    Synth --> TTS
+    Synth -->|Write owned audio handles| Cache
+    Vision --> Pose
+
+    subgraph External[External communication and execution boundary]
+        Input[InputGateway]
+        Output[OutputGateway]
+        Actions[Scheduled Actions: speech / captions / expressions / gaze]
+        Tools[Direct Tools: pose display]
+        Endpoints[App-bound presentation and device endpoints]
+    end
+    Input -->|Admitted PCM| Speech
+    Input -->|Final speech / phase / ToolResult| Assistant
+    Input -->|Directed synthesis / cancellation| Synth
+    Input -->|Admitted image| Vision
+    Speech -->|Observations and transcript / voice-state Actions| Output
+    Assistant -->|Synthesis messages / resolved Actions / wait| Output
+    Vision -->|Pose observations / gaze Actions / display Tool| Output
+    Output -->|Validated internal messages| Input
+    Output --> Actions
+    Output --> Tools
+    Actions --> Endpoints
+    Tools --> Endpoints
+    Cache -->|Single-use checkout by speech playback| Endpoints
 ```
+
+The diagram groups current business paths; runtime control and ActionResult receipts use the same validated boundaries. Assistant requests synthesis by message, not by calling SpeechSynthesisAgent directly. Its audio-ID playback Action is scheduled separately from synthesis. App injects the same PCM store into synthesis and playback; the store is shared data, not a message transport. Model-callable registrations come from JSON; fixed text mapping and internal behavior remain code-owned.
 
 SpeechPerception owns one utterance across ASR segments. Assistant consumes final speech and speech onset, maps generated text through its code-owned text policy and retains bounded durable conversation history. VisionPerception performs one shared pose request per admitted frame and independently publishes pose state and displays skeletons. Photographer has no active implementation or packaged configuration.
 
@@ -207,3 +245,7 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ✅ Shared contracts/parsers are managed under Core in this directory. Package.swift compiles Core as AgentCore and the remaining business files as Agents; Core is excluded from the Agents target. This retains acyclic Gateway/StorageAudio dependencies while unifying source ownership. ❌ Core cannot import concrete Agents, model engines or UI.
 
 ✅ Action runtime stage 1 reuses Agent-owned runtimeCapabilities assemblers for startup handler coverage, including internal grants. JSON v5 and business output routing remain unchanged. ❌ Action kinds/completion metadata are implementation-side and must not be added as unsupported JSON fields.
+
+## Action runtime stage 2
+
+✅ Assistant, SpeechPerception and VisionPerception declare action.result in communication.inputs. They retain runtime receipts without scheduling a model call. JSON v5 model-callable actions/tools remain unchanged. ❌ Result-driven planning/recovery and activity subscriptions are not enabled.

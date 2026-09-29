@@ -35,22 +35,59 @@ flowchart LR
 
 ## Internal flow
 
+Gateway connects the Agent network to adapted external input, registered execution and feedback. The inner subgraph is Gateway-owned coordination; Agents own inboxes, and Actions/Tools own handlers. Arrows describe runtime flow rather than compilation dependencies. Semantic interpretation and fusion remain in Agents.
+
 ```mermaid
-flowchart TD
-    In[External input] --> Select[Static subscription or explicit destination]
-    Select --> ValidateIn[Validate envelope and identity]
-    InternalDelivery[OutputGateway selected target] --> ValidateIn
-    ValidateIn --> Inbox[Admit to Agent inbox]
-    Out[Agent output] --> ValidateOut[Validate source and permission]
-    ValidateOut --> Route{Output kind}
-    Route -->|Action / scheduling| Dispatch[ActionDispatcher admission]
-    Dispatch --> Queue[ChannelScheduler task tree]
-    Queue -->|Active Action only| Action[ActionExecutor]
-    Route -->|Tool| Tool[ToolDispatcher / ToolExecutor]
-    Tool -->|Non-nil result / explicit target| Select
-    Route -->|Event| Event[Bound port / InputGateway]
-    Route -->|Finish or cancel| Barrier[Join or cancel input Actions]
+flowchart TB
+    App[App adapters: external business input]
+    Agents[Agents: inboxes / state / decisions]
+    ActionRuntime[Actions/Runtime: await registered handler]
+    ToolRuntime[Tools/Runtime: await registered handler]
+    Endpoints[App-bound UI / device effect endpoints]
+
+    subgraph Gateway[Gateway internals]
+        Select[InputGateway: subscription or explicit target]
+        ValidateIn[Validate identity / session / contract / admission bounds]
+        Out[OutputGateway: validate source and permissions]
+        Route{Resolved output kind}
+        Dispatch[ActionDispatcher: bounded admission]
+        Queue[ChannelScheduler: task tree / Channel FIFO / wait / module exclusion]
+        Tool[ToolDispatcher: direct execution]
+        Event[Bound messaging port: metadata and target selection]
+        Barrier[Finish / cancel: join accepted Actions]
+        Resource[ResourceCoordinator: declared resource leases and fences]
+        Results[ActionResult delivery: bounded correlated feedback]
+        Return[Returning ToolResult: original Agent / session]
+
+        Select --> ValidateIn
+        Out --> Route
+        Route -->|Action / scheduling| Dispatch
+        Dispatch --> Queue
+        Route -->|Tool| Tool
+        Route -->|Internal event| Event
+        Event -->|Selected internal delivery| ValidateIn
+        Route -->|Finish / cancel| Barrier
+        Barrier --> Queue
+        Queue -.->|Resource validation and execution guard| Resource
+        Tool -.->|Declared resource guard| Resource
+        Queue -->|Terminal status under feedback policy| Results
+        Results -->|InputGateway result admission| ValidateIn
+        Tool -->|Non-nil result| Return
+        Return --> Select
+    end
+
+    App --> Select
+    ValidateIn -->|Prompt admission or rejection| Agents
+    Agents -->|Resolved calls / scheduling / control / messages| Out
+    Queue -->|Eligible Action| ActionRuntime
+    ActionRuntime -->|Completion / failure / cancellation| Queue
+    Tool --> ToolRuntime
+    ToolRuntime -->|Value or completion| Tool
+    ActionRuntime --> Endpoints
+    ToolRuntime --> Endpoints
 ```
+
+Declared resources are guarded around execution; Tools do not join Action queues. Resource declarations and registered handlers are supplied by App assembly. ActionResult delivery retries feedback without repeating an effect. Completion-only Tools produce no ToolResult. App lifecycle and UI workflows retain their typed host interfaces; this diagram covers Agent business communication and execution, not every application call.
 
 Input admission reports acceptance, not Agent processing completion. Action dispatch waits for queue admission; finish controls join admitted Actions. Tool dispatch awaits execution and any result delivery. App observers supervise runtime state and capture admission; they do not turn events into UI commands.
 
@@ -66,8 +103,9 @@ Each active task phase runs FIFO per Channel and shares process-wide Action-modu
 
 - ✅ Static JSON v5 subscriptions via publish and explicit directed delivery via send, source/session validation and admission receipts. No legacy router or implicit Assistant fallback remains.
 - ✅ Action scheduling, direct Tools, event transport and completion/cancellation barriers.
-- ❌ Request/reply, dynamic subscriptions, ActionResult feedback, priorities and preemption.
-- ❌ Enforced Channel locks and physical control arbitration; current lock metadata grants no ownership.
+- ✅ Bounded correlated ActionResult feedback and shared ownership checks for declared resources.
+- ❌ General request/reply, dynamic subscriptions, priorities and preemption.
+- ❌ Enforced Channel locks and all-device physical control arbitration; Channel lock metadata grants no ownership. Resource leases are a separate implemented authority, with camera capture as the first production integration.
 
 ## Issue record
 
@@ -79,3 +117,7 @@ Each active task phase runs FIFO per Channel and shares process-wide Action-modu
 ✅ ADR 0059 adds task-local nested wait groups. Ordinary Channel FIFO order is scoped to a task/active phase, while name capacities and module exclusion are process-wide. Typed scheduling directives pass through validation/routing/dispatch; no XML enters Gateway. ❌ Cross-task barriers and preemption remain unsupported.
 
 ✅ Consolidated Actions/Tools targets provide execution APIs; Gateway still cannot directly call concrete behavior helpers. Boundary checks enforce source imports and reject direct behavior symbols. ❌ Transitive linkage through Actions/StorageAudio does not authorize Gateway model inference.
+
+## Action runtime stage 2
+
+✅ Action terminal feedback returns through InputGateway with owner isolation; Output/Results owns bounded delivery, Output/Resources owns lease/fence arbitration across declared Action/Tool/host paths. ❌ No durable delivery or all-device resource coverage.

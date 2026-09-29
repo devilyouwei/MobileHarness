@@ -6,6 +6,8 @@ import ModelKit
 public actor VisionPerceptionAgent: Agent {
     private static let gaze = InternalAction(module: "UI", function: "moveEyes", channel: "Gaze", required: ["x", "y"])
     private static let overlay = InternalTool(path: "UI.showPose", required: ["payload"])
+    private var resultInbox = ActionResultInbox()
+    public func actionResults() -> [ActionResult] { resultInbox.results }
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
@@ -102,6 +104,13 @@ public actor VisionPerceptionAgent: Agent {
             lastTimestamp.map({ image.timestamp >= $0 }) ?? true
         else { throw ImageInputError.outOfOrder }
         guard !input.metadata.expired else {
+            if case .actionResult(let result) = input.payload {
+                guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
+                    result.owner.sessionID == input.sessionID
+                else { throw CommunicationError.unauthorized }
+                resultInbox.accept(result)
+                return
+            }
             expiredInputs += 1
             throw CommunicationError.expired
         }

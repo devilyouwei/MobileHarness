@@ -8,7 +8,7 @@ extension UIActions {
 
     public static func moveEyes(
         invocation: ActionInvocation,
-        present: @escaping @Sendable (Gaze, ActionInvocation) async throws -> Void
+        using present: @escaping @Sendable (Gaze, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let target: Gaze

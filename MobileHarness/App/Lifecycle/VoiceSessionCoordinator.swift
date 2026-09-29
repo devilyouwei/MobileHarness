@@ -62,13 +62,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
 
     func run() async {
         guard manager == nil else { return }
-        do {
-            try await runtime.prepareTools()
-        } catch {
-            presentationPhase = .failed
-            state.voiceStatus = "通信配置加载失败：\(error)"
-            return
-        }
         let manager = runtime.manager
         self.manager = manager
         let agent: Agents.AssistantAgent
@@ -405,9 +398,9 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard voiceGeneration == generation else { return }
         handlingTurn = false
     }
-    func speak(_ invocation: ActionInvocation) async throws {
+    func play(audioID: UUID, invocation: ActionInvocation) async throws {
         guard let speechPlayback else { throw CommunicationError.scopeClosed }
-        try await speechPlayback.play(invocation) { [weak self] stream, invocation in
+        try await speechPlayback.play(audioID: audioID, invocation: invocation) { [weak self] stream, invocation in
             guard let self else { throw CancellationError() }
             try await self.play(stream, envelope: invocation.envelope)
         }

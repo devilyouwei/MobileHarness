@@ -9,7 +9,8 @@ Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter C
 - ✅ Resolved ActionCall/ToolCall inputs and runtime control notifications. Raw text and FunctionToken events are not accepted.
 - ✅ Task-local Channel FIFO and nested wait groups, bounded admission and process-wide module exclusion. Different channels may run concurrently when modules permit; main is an ordinary channel.
 - ✅ Imports the unified Actions module for Runtime APIs and App-registered handlers; never directly invokes concrete behavior helpers.
-- ❌ Unified ActionResult-to-Signal feedback, priorities, preemption and general resource declarations.
+- ✅ Typed ActionResult feedback and declared resource leases/fences; details below.
+- ❌ Priority scheduling and generic activity subscriptions.
 
 Keep this README synchronized with current interfaces, bounds and ✅/❌ status.
 
@@ -61,3 +62,7 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Actions and typed wait boundaries enter one task-local execution tree. beginWait joins parent-prefix work; endWait seals the group, and its completed subtree releases the parent continuation. Gateway cancels the task on validation, Action/boundary admission or terminal finish errors. All envelopes must be supplied in order by the output pump. ❌ Concurrent callers for the same task have no implicit ordering guarantee.
 
 ✅ ADR 0065 adds implementation-contract registration, invocation consistency and scheduler diagnostics; OutputGateway still validates Agent permissions and joins work only at finish. The default no-Action scheduler uses an explicit empty registry. ❌ Diagnostic snapshots are not Agent-facing results or activity/resource ownership.
+
+## Action runtime stage 2
+
+✅ Stage 2 adds Results/ActionResultLedger and Resources/ResourceCoordinator. OutputGateway binds owner context and ResourceControl to current Agent identity/session, derives the shared coordinator from its scheduler, and wires lifecycle cleanup. Cancellation starts device stop and scheduler join together. ❌ Priority scheduling and generic activity subscriptions remain outstanding.

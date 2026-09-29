@@ -9,7 +9,7 @@ let package = Package(
             name: "HarnessKit",
             targets: [
                 "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
-                "Storage", "StorageAudio", "UI", "AppWorkflows",
+                "Storage", "StorageAudio", "UI", "AppWorkflows", "BehaviorAssembly",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
                 "PlatformKit",
@@ -33,6 +33,9 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.1.0"),
     ],
     targets: [
+        .target(
+            name: "BehaviorAssembly", dependencies: ["AgentCore", "Actions", "Tools"],
+            path: "MobileHarness/App/Composition/Behaviors", exclude: ["README.md"]),
         .target(
             name: "UI", dependencies: ["AgentCore", "Storage"], path: "MobileHarness/UI",
             exclude: [
@@ -62,7 +65,8 @@ let package = Package(
             path: "MobileHarness/Gateway",
             exclude: [
                 "Input/README.md", "Output/Dispatch/README.md", "Output/README.md",
-                "Output/Routing/README.md", "Output/Scheduling/README.md", "Output/Validation/README.md", "README.md",
+                "Output/Routing/README.md", "Output/Scheduling/README.md", "Output/Validation/README.md",
+                "Output/Resources/README.md", "Output/Results/README.md", "README.md",
             ]),
         .target(
             name: "Actions", dependencies: ["AgentCore", "StorageAudio"],
@@ -170,6 +174,7 @@ let package = Package(
         .testTarget(
             name: "IntegrationTests",
             dependencies: [
+                "BehaviorAssembly",
                 "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
                 "Storage", "StorageAudio",
                 "PlatformKit",

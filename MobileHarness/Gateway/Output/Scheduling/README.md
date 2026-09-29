@@ -167,3 +167,7 @@ Before enabling locks, test:
 ✅ The scheduler actor owns the bounded ActionDiagnostics ring: 256 records by default (configuration 1–4096), oldest-record overwrite with an explicit eviction counter. It records admitted/started and terminal succeeded/failed/cancelled transitions; queued cancellation is notStarted and running failure/cancellation conservatively has unknown effects. No parameters/errors/media are retained. Terminal records follow handler cleanup. `diagnosticSnapshot()` is a bounded chronological copy, not a stream or new queue. Diagnostic eviction never discards Actions. Full algorithm and lifecycle limits are in [Runtime](../../../Actions/Runtime/README.md).
 
 ❌ Persistent resources, activity ownership, execution/cleanup deadlines and Agent-facing ActionResult remain unimplemented; ADR 0065 does not change the future Channel ownership proposal above.
+
+## Action runtime stage 2
+
+✅ Stage 2 reserves bounded feedback slots before enqueue, stores typed completion and performs delivery after releasing lane/module. Resource declarations add execution fences; cancel(resources:) and cancel(agent:incarnation:) cancel/join owning inputs. Session/shutdown closes matching receipts. ❌ Feedback delivery is not part of finish barrier and does not prove exactly-once processing. See sibling Results and Resources READMEs for algorithms and limits.

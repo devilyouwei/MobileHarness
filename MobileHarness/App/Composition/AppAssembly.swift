@@ -11,6 +11,7 @@ import UI
 final class AppAssembly {
     private(set) var container: AppContainer?
     @ObservationIgnored private var runtimeValue: ApplicationRuntime?
+    @ObservationIgnored private let cameraDevice = AppleCamera()
     @ObservationIgnored private let resources = Bundle.main.bundleURL.appendingPathComponent("Models")
     @ObservationIgnored private lazy var settingsWorkflow = SettingsWorkflow(
         resources: resources,
@@ -20,13 +21,19 @@ final class AppAssembly {
         operations: settingsWorkflow, initial: SettingsWorkflow.initial)
     @ObservationIgnored lazy var camera = makeCamera()
     private func makeCamera() -> CameraCoordinator {
-        let device = AppleCamera()
-        return CameraCoordinator(camera: device, state: CameraState()) { [weak self] in
-            guard let self else { throw CancellationError() }
-            let models = try await ModelKitDefaults.manager(resources: self.resources)
-            let pose = try await models.get(.pose, load: false)
-            return try VisionSession(runtime: self.runtime(), pose: pose)
-        }
+        let device = cameraDevice
+        return CameraCoordinator(
+            camera: device, state: CameraState(),
+            makeRuntime: { [weak self] in
+                guard let self else { throw CancellationError() }
+                return try self.runtime()
+            },
+            makeSession: { [weak self] in
+                guard let self else { throw CancellationError() }
+                let models = try await ModelKitDefaults.manager(resources: self.resources)
+                let pose = try await models.get(.pose, load: false)
+                return try VisionSession(runtime: self.runtime(), pose: pose)
+            })
     }
     @ObservationIgnored lazy var history = makeHistory()
     private func makeHistory() -> ConversationHistoryWorkflow {
@@ -51,7 +58,7 @@ final class AppAssembly {
     }
     private func runtime() throws -> ApplicationRuntime {
         if let runtimeValue { return runtimeValue }
-        let runtime = try ApplicationRuntime()
+        let runtime = try ApplicationRuntime(camera: cameraDevice)
         runtimeValue = runtime
         return runtime
     }

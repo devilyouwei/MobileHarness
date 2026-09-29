@@ -7,13 +7,27 @@ public struct ActionRegistry: Sendable {
 
     public init() { definitions = [:] }
 
+    public init(modules: [any ActionModule]) throws {
+        guard modules.count <= 32 else { throw ActionExecutionError.definitionCapacityExceeded }
+        var definitions: [ActionDefinition] = []
+        for module in modules {
+            let additions = module.definitions
+            guard additions.count <= 256 - definitions.count else {
+                throw ActionExecutionError.definitionCapacityExceeded
+            }
+            definitions.append(contentsOf: additions)
+        }
+        try self.init(definitions: definitions)
+    }
+
     public init(definitions: [ActionDefinition]) throws {
         guard definitions.count <= 256 else { throw ActionExecutionError.definitionCapacityExceeded }
         var entries: [ActionPath: ActionDefinition] = [:]
         for definition in definitions {
             guard Self.validName(definition.path.module), Self.validName(definition.path.function),
                 !definition.completion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                definition.completion.utf8.count <= 512
+                definition.completion.utf8.count <= 512, definition.resources.count <= 8,
+                definition.resources.allSatisfy({ Self.validName($0.rawValue) })
             else { throw ActionExecutionError.invalidDefinition(definition.path) }
             guard entries[definition.path] == nil else {
                 throw ActionExecutionError.duplicateDefinition(definition.path)
@@ -28,7 +42,7 @@ public struct ActionRegistry: Sendable {
         return definition
     }
 
-    public func handler(for path: ActionPath) throws -> ActionHandler {
+    public func handler(for path: ActionPath) throws -> ActionCompletionHandler {
         try definition(for: path).handler
     }
 

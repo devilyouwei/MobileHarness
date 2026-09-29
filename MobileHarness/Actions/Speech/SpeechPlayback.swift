@@ -1,37 +1,39 @@
 import AgentCore
 import Foundation
 import StorageAudio
+import Synchronization
 
-/// Playback and handle validation only. Synthesis belongs to SpeechSynthesisAgent.
+/// Typed audio checkout, playback and cleanup only. Synthesis belongs to SpeechSynthesisAgent.
 public actor SpeechPlayback {
     private let store: SpeechAudioStore
     public init(store: SpeechAudioStore) { self.store = store }
-    private func handle(_ invocation: ActionInvocation) throws -> (UUID, SpeechAudioStore.Owner) {
-        guard invocation.call.parameters.count == 1,
-            let value = invocation.call.parameters["audioID"], let id = UUID(uuidString: value)
-        else { throw SpeechAudioError.missingAudio }
-        return (
-            id,
-            .init(
-                source: invocation.envelope.source, session: invocation.envelope.sessionID,
-                input: invocation.envelope.inputID)
-        )
-    }
     public func play(
-        _ invocation: ActionInvocation,
+        audioID id: UUID, invocation: ActionInvocation,
         using playback: @escaping @Sendable (SpeechAudio, ActionInvocation) async throws -> Void
     ) async throws {
-        let (id, owner) = try handle(invocation)
+        try Task.checkCancellation()
+        let owner = SpeechAudioStore.Owner(
+            source: invocation.envelope.source, session: invocation.envelope.sessionID,
+            input: invocation.envelope.inputID)
         let audio = try await store.checkout(id, owner: owner)
+        let cancellation = Mutex<Task<Void, Never>?>(nil)
         do {
             try await withTaskCancellationHandler {
                 try await playback(audio, invocation)
                 try Task.checkCancellation()
             } onCancel: {
-                Task { try? await self.store.cancel(id, owner: owner) }
+                cancellation.withLock { task in
+                    task = Task {
+                        do { try await self.store.cancel(id, owner: owner) } catch {
+                            await self.store.fail(id, error: error)
+                        }
+                    }
+                }
             }
             try await store.release(id, owner: owner)
         } catch {
+            let cleanup = cancellation.withLock { $0 }
+            await cleanup?.value
             await store.fail(id, error: error)
             throw error
         }

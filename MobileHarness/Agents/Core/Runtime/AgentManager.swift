@@ -4,6 +4,15 @@ public actor AgentManager {
     private var identities: [AgentID: UUID] = [:]
     private var sessions: [AgentID: UUID] = [:]
     private var registry = AgentRegistry()
+    private var stopObservers: [UUID: @Sendable (AgentID, UUID) async -> Void] = [:]
+
+    public func observeStops(id: UUID, observer: @escaping @Sendable (AgentID, UUID) async -> Void) throws {
+        if stopObservers[id] != nil { return }
+        guard stopObservers.count < 4 else { throw CommunicationError.capacityExceeded }
+        stopObservers[id] = observer
+    }
+
+    public func removeStopObserver(_ id: UUID) { stopObservers[id] = nil }
     public init() {}
     public func register(_ agent: any Agent, sessionID: UUID? = nil) throws {
         try registry.register(agent)
@@ -28,8 +37,15 @@ public actor AgentManager {
         guard sessions[id].map({ $0 == sessionID }) ?? true else { throw CommunicationError.scopeClosed }
     }
     public func stop(_ id: AgentID) async throws {
-        identities[id] = nil
-        await (try agent(id)).stop()
+        let identity = identities.removeValue(forKey: id)
+        let target = try agent(id)
+        let observers = Array(stopObservers.values)
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await target.stop() }
+            if let identity {
+                for observer in observers { group.addTask { await observer(id, identity) } }
+            }
+        }
     }
     public func remove(_ id: AgentID) async throws {
         try await stop(id)
@@ -38,8 +54,7 @@ public actor AgentManager {
     }
     public func stopAll() async {
         for agent in registry.all {
-            identities[agent.descriptor.id] = nil
-            await agent.stop()
+            do { try await stop(agent.descriptor.id) } catch {}
         }
     }
 }

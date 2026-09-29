@@ -10,6 +10,8 @@ public actor SpeechPerceptionAgent: Agent {
         module: "UI", function: "setVoiceState", channel: "Display", required: ["state"])
     private static let finishTranscript = InternalAction(
         module: "UI", function: "finishTranscript", channel: "Transcript")
+    private var resultInbox = ActionResultInbox()
+    public func actionResults() -> [ActionResult] { resultInbox.results }
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
@@ -112,6 +114,13 @@ public actor SpeechPerceptionAgent: Agent {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID else { throw CommunicationError.scopeClosed }
         guard !input.metadata.expired else { throw CommunicationError.expired }
+        if case .actionResult(let result) = input.payload {
+            guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
+                result.owner.sessionID == input.sessionID
+            else { throw CommunicationError.unauthorized }
+            resultInbox.accept(result)
+            return
+        }
         guard case .audio(let audio) = input.payload else { throw HarnessError.unsupportedInput }
         // Capture is deliberately gated while recognizing/replying; no new utterance is admitted.
         guard !awaitingReply else { throw CapabilityError.inputBusy }

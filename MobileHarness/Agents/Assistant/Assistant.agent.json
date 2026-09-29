@@ -70,6 +70,11 @@
         "contract": "speech.phase",
         "version": 1,
         "kind": "observation"
+      },
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
       }
     ],
     "subscriptions": [

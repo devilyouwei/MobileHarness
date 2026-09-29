@@ -233,3 +233,11 @@ Local user settings now use Storage-backed cached persistence in the application
 ✅ Function Token output supports nested `<wait>...</wait>` execution groups. Wait joins earlier parent work and all internal Actions while preserving ordinary Channel concurrency; it does not block unrelated Agent tasks. See [scheduling](MobileHarness/Gateway/Output/Scheduling/README.md). ❌ Physical-device acceptance of the new coordination behavior is pending.
 
 ✅ Settings → 对话历史 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](MobileHarness/UI/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.
+
+## Action runtime migration
+
+✅ Stage 2 adds bounded Action execution feedback and shared resource ownership, with camera capture as the first production integration. See [ADR 0066](docs/adr/0066-action-results-resource-leases.md) and [roadmap](docs/Roadmap.md). ❌ Other hardware mappings, durable delivery and physical-device acceptance remain pending.
+
+## Behavior module ownership
+
+✅ Actions/Tools now own explicit behavior catalogs; App binds typed capabilities through the independently tested BehaviorAssembly target. See [ADR 0067](docs/adr/0067-domain-owned-behavior-assembly.md). ❌ New native capabilities can still require App adaptation.

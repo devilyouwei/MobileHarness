@@ -1,7 +1,7 @@
 extension UIActions {
     public static func finishTranscript(
         invocation: ActionInvocation,
-        present: @escaping @Sendable (ActionInvocation) async throws -> Void
+        using present: @escaping @Sendable (ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         do { try ActionArguments(invocation.call.parameters).validateAllowedKeys([]) } catch {

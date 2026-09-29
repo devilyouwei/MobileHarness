@@ -9,6 +9,11 @@
         "contract": "media.audio",
         "version": 1,
         "kind": "audio"
+      },
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
       }
     ],
     "subscriptions": [
