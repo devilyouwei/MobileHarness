@@ -65,7 +65,7 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .actionCall(call))
     await #expect(throws: UIActions.GazeError.invalidTarget) {
-        try await UIActions.moveEyes(invocation: ActionInvocation(envelope: envelope, call: call)) { _, _ in
+        try await UIActions.moveEyes(invocation: ActionInvocation(envelope: envelope)) { _, _ in
             Issue.record("Invalid gaze reached presentation")
         }
     }
@@ -77,7 +77,7 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
     let envelope = OutputEnvelope(
         source: .visionPerception,
         input: AgentInput(sessionID: UUID(), payload: .text("test")), output: .actionCall(call))
-    let invocation = ActionInvocation(envelope: envelope, call: call)
+    let invocation = try ActionInvocation(envelope: envelope)
     try await UIActions.moveEyes(invocation: invocation) { target, _ in
         #expect(target.x == -1 && target.y == 1)
     }

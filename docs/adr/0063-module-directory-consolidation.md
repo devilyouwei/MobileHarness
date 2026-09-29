@@ -2,6 +2,8 @@
 
 Status: Accepted, 2026-09-28.
 
+The App/Views location and shared App compilation decision below is superseded by [ADR 0064](0064-app-ui-boundaries.md). Actions/Tools and Agents/Core decisions remain current.
+
 ## Decision
 
 - Move ActionRuntime to Actions/Runtime and compile registries, execution and behaviors in the single Actions target. Consumers import Actions.

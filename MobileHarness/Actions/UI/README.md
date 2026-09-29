@@ -38,6 +38,18 @@ flowchart LR
 
 ❌ Device timing/animation acceptance remains manual. This policy does not provide durable delivery or synchronize speech with every displayed character.
 
-✅ UI.express now supplies a validated `UIActions.Emotion` value, never an emoji or glyph. Missing/unknown values still fail. SwiftUI pose definitions belong to App/Views, not Actions. Completion means presentation state accepted the target, not that the visual interpolation finished. See ADR 0046.
+✅ UI.express now supplies a validated `UIActions.Emotion` value, never an emoji or glyph. Missing/unknown values still fail. SwiftUI pose definitions belong to the separate [UI module](../../UI/README.md). App converts the emotion into UI state through injected handlers; Actions has no UI target dependency. Completion means presentation state accepted the target, not that the visual interpolation finished. See ADR 0046.
 
 ✅ `MoveEyes.swift` / `UI.moveEyes(x:y:)` validates two finite numbers in [-1,1] before invoking a typed Gaze callback. Negative is left/up, positive right/down; zero centers. VisionPerception code declares its internal UI.moveEyes permission on the Gaze Channel. Cancellation is checked before/after presentation. Success accepts a target, not animation completion. No physical motion or new dependency. ❌ Animation appearance requires device acceptance.
+
+## Authoring standard and current exceptions
+
+Follow the [Actions authoring standard](../README.md) for new code and planned migrations. `express`, `moveEyes`, `setTranscript` and `setVoiceState` set presentation state; `beginReplyTurn` and `finishTranscript` perform state transitions. `print` is a finite append operation whose text may persist. Completion is acceptance by the presentation policy, never animation completion; stale/duplicate updates can be intentional no-ops under the policy above.
+
+✅ Existing paths, semantic emotion values, turn/session checks and completion behavior are unchanged. ❌ UIActions is still declared in Print.swift, callback labels remain `present:`, and namespace/file/signature migration remains pending. Migrate these explicitly to the root standard with bindings and tests; do not treat the existing layout as the template for new domains. One-shot expression/restore behavior remains unimplemented.
+
+## Runtime stage 1 adoption
+
+✅ Every UI Action now uses shared ActionArguments decoding and rejects unknown keys before effects. Text and parameterless/voice-state failures use `UIActions.PresentationError` in Types.swift; expression/gaze errors remain domain-owned. Byte limits, semantic values, callback completion, session/turn checks and cancellation are preserved. These are accepted-state acknowledgments, not animation completion.
+
+❌ UIActions namespace extraction and the `present:` → `using:` signature migration remain deliberate later work; no new expression or one-shot animation behavior is implemented.

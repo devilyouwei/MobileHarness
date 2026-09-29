@@ -1,73 +1,20 @@
-# Xcode application project
+# Xcode Application Project
 
-Purpose: build and sign the iOS composition root and maintain the existing UI-only simulator and model validation schemes.
+Purpose: build/sign the iOS application host and maintain physical-device, simulator and explicit model-validation schemes. Design goals: one source owner per target, matching navigation paths and no duplicate package compilation in App.
 
-✅ Physical MobileHarness links ModelKitQwen35 from the optional local model package; model sources remain in their package targets rather than being duplicated in the App target.
-✅ Both app targets include the Debug-only Qwen/ASR validation view; normal launches retain conversation UI.
-✅ Platform file lists govern model resource staging. The simulator retains explicit unavailable ASR and chat behavior.
-❌ A successful build does not establish live microphone, sustained thermal, or model protocol quality acceptance.
+## Source ownership
 
-✅ The navigator references FunctionTokenParser.swift and FunctionTokenParserTests.swift; shared sources remain compiled by SwiftPM.
+- ✅ MobileHarness and MobileHarnessSimulator compile App/MobileHarnessApp.swift, Composition, Lifecycle and Adapters.
+- ✅ The root HarnessKit product supplies shared runtime modules, the independent UI target and AppWorkflows. Xcode navigates these sources without adding them to either App Sources phase. Model SDK adapters remain separate package targets.
+- ✅ UI owns iOS pages/components and portable presentation state/operation interfaces. AppWorkflows owns history, configuration and explicit speech/chat diagnostics. Native preview/image/value adapters compile with App.
+- ✅ App source membership includes CurrentChatCapability; ChatDiagnosticWorkflow is package-owned navigation only. VoiceSessionCoordinator, VisionSession, ApplicationRuntime and UI component file references match their current responsibilities.
+- ✅ Shared configuration, entitlements and privacy declarations retain their existing values. Local signing remains in ignored Config/Local.xcconfig.
+- ✅ Platform input/output file lists govern local model staging. The physical profile uses Nemotron, Qwen3.5, Silero, YOLO and MOSS; legacy Kokoro is not packaged. Simulator local models report unavailable; explicitly configured cloud chat remains supported.
 
-✅ The navigator references ActionCall.swift; AgentCore owns the shared resolved Action invocation type.
+## Validation
 
-✅ The App bundles Nemotron, Qwen3.5-2B, Silero and diagnostic Kokoro from flat local directories. Audio8/ONNX targets and runtime manifest references are absent. Pre-build cleanup prevents stale generated model files from surviving a model selection change.
+✅ scripts/check.sh validates source/target boundaries, tests and project metadata. scripts/build-ios.sh builds the simulator App plus the ModelKitRuntime/Nemotron/Silero schemes. The MobileHarness scheme provides signed physical-device builds; installation and interaction acceptance are separate actions.
 
-✅ Shared source navigation uses OperationAdmission. Model acquisition and lifecycle composition belong to ModelKitRuntime; no resolver or convenience capability bundle is required.
+❌ Build success does not establish microphone, playback, live-provider, model protocol, latency or sustained thermal acceptance. Independent multi-window runtime ownership remains unimplemented.
 
-✅ The optional language product is ModelKitQwen35; native CoreAI graph targets support Nemotron and Kokoro.
-
-✅ Both App targets consume the single root Swift package. The physical target explicitly links its ModelKitQwen35 product; ModelKit has no separate package reference. Management and Backends navigation follow the physical source directories.
-
-✅ ModelKit/Core owns AudioFrame/AudioFormat and ImageFrame for RGB or retained native image data. PlatformKit owns device I/O; App adapts the data. ❌ Model-level video sessions remain unimplemented.
-
-✅ App resolves ModelKitDefaults through the root project product; default assembly selects providers internally. No App source directly imports model adapters.
-
-✅ Both App targets compile CameraCoordinator and CameraBackground; PlatformKit compiles AppleCamera from root Package.swift. The shared configuration declares camera usage.
-
-✅ PhotographySession compiles in both App targets; Photographer source and v3 JSON appear in navigation, with the JSON compiled once through the Agents SwiftPM resource declaration.
-
-✅ PlatformKit navigation follows Audio, Vision, Connectivity and Core, including all camera sources and domain READMEs. SwiftPM remains the sole compiler of shared platform sources.
-
-
-
-✅ Navigation includes SpeechPerception/VisionPerception and communication contracts; actual Agent sources and JSON resources compile through the single root Swift package. No duplicate App resource copies.
-
-✅ SetTranscript.swift is referenced for navigation; the Actions SwiftPM target owns its compilation.
-
-✅ Removed the display-only Photographer source/configuration from navigation and packaging. VisionPerception owns the existing showPose registration; App handlers remain explicit.
-
-✅ UI ClearReply / SetVoiceState references are navigator-only; shared compilation remains in Actions.
-
-✅ Tool navigation includes Tools/UI/ShowPose.swift and its README. SwiftPM compiles it in Tools; App keeps the explicit completion handler.
-
-✅ BeginReplyTurn, FinishTranscript and ConversationPresentation are Actions package sources referenced by the navigator; ClearReply is replaced by atomic beginReplyTurn.
-
-✅ AudioSpectrum.swift is present in Xcode navigation and compiled only by the existing PlatformKit SwiftPM target.
-
-✅ Removed obsolete Input/Routing navigator entries; Gateway input routing is implemented by InputGateway and shared CommunicationPolicy, with no duplicate source references.
-
-✅ Communication navigation replaces Bus: AgentMessaging, CommunicationPolicy and PerceptionInput are compiled once by AgentCore through SwiftPM. InternalSignalBus has been removed.
-
-✅ Navigator includes MoveEyes.swift and FaceGazeTracker.swift; shared implementations remain in the existing Actions and Agents SwiftPM targets.
-
-✅ OpenAI-compatible adapter sources are navigable under Language/LLM/OpenAI; SwiftPM alone compiles ModelKitOpenAI. ❌ Live-provider acceptance is not implied by building.
-
-✅ Navigator includes the FluidAudio backend source; root Package.swift owns its compilation. Device staging now selects pinned Kokoro Core ML resources and license; no old Kokoro CoreAI weights are copied.
-
-✅ AppSettings, CloudSettingsStore and SettingsView are compiled by both App targets. The settings UI uses the existing ModelKitOpenAI product dependency through Defaults. ❌ Build success alone does not validate user credentials.
-
-
-
-✅ Storage, StorageAudio and SpeechSynthesis Agent navigation entries map to root Swift package sources; the HarnessKit product exposes both storage targets. ❌ No signing or device installation changes in this migration.
-
-✅ Removed the obsolete Actions/Speech/Speak.swift reference after migrating its remaining test consumers.
-
-✅ Removed the obsolete Action preparation protocol and its navigator reference; current playback and cache references remain mapped to shared package sources.
-
-✅ SpeechPlayback.swift replaces the old pipeline filename in the navigator; no compatibility alias or duplicate source remains.
-
-
-✅ MossValidation replaces the Kokoro diagnostic scheme and uses the default MOSS provider. ❌ Device synthesis and playback acceptance remain pending.
-
-✅ Both App targets compile LLMRawOutputView; GenerationTrace is navigator-only and compiled once by the existing AgentCore package target. ❌ Build success does not establish live-model Function Token compliance.
+✅ Action runtime stage 1 sources, scheduling errors and contract tests are referenced in the existing navigator groups. SwiftPM still compiles the shared source directories; no duplicate source or new target was added. ❌ Physical-device acceptance remains separate.

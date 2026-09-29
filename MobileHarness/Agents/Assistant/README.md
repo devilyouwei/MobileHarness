@@ -8,14 +8,17 @@ Purpose: send user input to ChatCapability, maintain bounded history and interpr
 - ✅ CapabilityContextBuilder includes JSON Action aliases/docs/parameters/examples only. Speech behavior is an English Agent-owned instruction; internal methods and native Tools never enter system context.
 - ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
 - ✅ /status resolves runtimeInfo. Tool results and event descriptions are escaped before text interpretation.
-- ✅ Limits: 4 KiB user text, 2000-byte generated text, 256 output tokens, 30 s generation deadline and at most 120 ActionCalls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
+- ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 ActionCalls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
 - ✅ Cancellation bypasses full/paused inbox admission, joins the worker and discards incomplete parsing state.
-- ❌ Native model tool deltas, persistent state, restart and long-running background execution. ToolCallParser exists, but ChatCapability produces text/completion events.
+- ❌ Native model tool deltas, durable inbox/runtime checkpoints, restart and long-running background execution. ToolCallParser exists, but ChatCapability produces text/completion events.
 
 ```mermaid
 flowchart TD
     Input[AgentInput] --> Queue[Bounded inbox and single worker]
-    Queue --> Model[ChatCapability and bounded history]
+    Queue -->|Persist input and request context| History[Storage ConversationHistoryStore]
+    History -->|Last ten completed rounds| Model[ChatCapability]
+    Queue --> Model
+    Model -->|Persist raw fragments before parsing| History
     Model --> Parser[AgentGenerator]
     Parser --> Events[Ordered Actions and wait boundaries]
     Events --> Calls[Resolved ActionCall]
@@ -44,7 +47,7 @@ ChatCapability is a required dependency; tests inject FixedTextChat from Integra
 
 1. `receive` checks lifecycle and payload, appends an input, and starts draining when running.
 2. Pausing stops admission-to-execution transitions, but does not cancel an already running generation. Resume drains queued inputs.
-3. Generation consumes Chat events, parses them and emits resolved output envelopes. The output stream buffers 256 envelopes with `bufferingOldest`; the consumer is AppLifecycleCoordinator. Failed yields mark the Agent failed, clear the inbox, cancel generation and close the stream. This plain AsyncStream does not transmit a thrown error; the coordinator checks final Agent status.
+3. Generation consumes Chat events, parses them and emits resolved output envelopes. The output stream buffers 256 envelopes with `bufferingOldest`; the consumer is App's VoiceSessionCoordinator. Failed yields mark the Agent failed, clear the inbox, cancel generation and close the stream. This plain AsyncStream does not transmit a thrown error; the coordinator checks final Agent status.
 4. `assistant.cancel` bypasses the inbox, even when full or paused, removes the selected session's waiting inputs and awaits cancellation of its active worker. Stop clears waiting inputs and joins the worker before closing outputs; durable history is retained.
 
 Successful outputs already consumed are not rolled back. There is no automatic retry, durable inbox or priority scheduling. FIFO uses Array append/removeFirst; removal shifts remaining entries, with cost bounded by the configured capacity.

@@ -19,7 +19,7 @@ Arrows show runtime flow through App-supplied handlers.
 ```mermaid
 flowchart LR
     Agents -->|Resolved ToolCall| Gateway[OutputGateway]
-    Gateway --> Runtime[ToolExecution]
+    Gateway --> Runtime[Tools/Runtime]
     App -.->|Handler and service bindings| Runtime
     Runtime --> Tools
     Tools -->|Injected presentation callback| Views

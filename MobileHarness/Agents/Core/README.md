@@ -24,10 +24,13 @@ Arrows mean compile-time dependency on shared contracts; AgentCore does not impo
 ```mermaid
 flowchart TD
     App --> AgentCore
+    AppWorkflows -->|Messages and parser traces| AgentCore
+    UI -->|PoseOverlay values only| AgentCore
     Agents --> AgentCore
     Gateway --> AgentCore
     Actions --> AgentCore
     Tools --> AgentCore
+    StorageAudio -->|Agent identity and ownership| AgentCore
     AgentCore --> Foundation
 ```
 

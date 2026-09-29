@@ -34,7 +34,7 @@ flowchart LR
 
 ✅ Boundary checks restrict Agent imports/dependencies to AgentCore/base ModelKit/Storage/StorageAudio/Foundation and reject presentation assignments in the speech Signal observer. This static check complements protocol tests; it is not a full semantic proof of arbitrary callback purity.
 
-✅ Signal-observer checks also guard the Action-owned presentationPhase field.
+✅ Signal-observer checks target App/Lifecycle/VoiceSessionCoordinator.swift and also guard the Action-owned presentationPhase field.
 
 ✅ download-kokoro.py provisions the pinned FluidAudio Core ML graph/lexicon profile. Optional per-file URLs support the separately pinned BERT vocabulary; inference does not download. Boundary checks allow FluidAudio only through its dedicated backend target.
 
@@ -47,3 +47,5 @@ flowchart LR
 ✅ Agent boundary validation now allows Foundation-only Storage for the shared conversation journal. ModelKit remains independent of Storage and business modules.
 
 ✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, remove standalone runtime targets and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
+
+✅ Boundary checks enforce the independent UI target at MobileHarness/UI, shared value-only dependencies, no service construction/App coordinator references, explicit ApplicationRuntime injection, and README coverage in both App and UI directories.

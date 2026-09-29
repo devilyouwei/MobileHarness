@@ -9,7 +9,7 @@ let package = Package(
             name: "HarnessKit",
             targets: [
                 "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
-                "Storage", "StorageAudio",
+                "Storage", "StorageAudio", "UI", "AppWorkflows",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
                 "PlatformKit",
@@ -33,6 +33,23 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.1.0"),
     ],
     targets: [
+        .target(
+            name: "UI", dependencies: ["AgentCore", "Storage"], path: "MobileHarness/UI",
+            exclude: [
+                "README.md", "Camera/README.md", "Components/README.md", "Conversation/README.md",
+                "Settings/README.md", "Diagnostics/README.md",
+            ]),
+        .target(
+            name: "AppWorkflows",
+            dependencies: [
+                "UI", "AgentCore", "Agents", "Storage", "ModelKit", "ModelKitDefaults", "ModelKitOpenAI",
+                "PlatformKit",
+            ],
+            path: "MobileHarness/App/Workflows", exclude: ["README.md"]),
+        .testTarget(name: "UITests", dependencies: ["UI"], exclude: ["README.md"]),
+        .testTarget(
+            name: "AppWorkflowTests", dependencies: ["AppWorkflows", "UI", "Storage", "ModelKit"],
+            exclude: ["README.md"]),
         .target(
             name: "AgentCore", path: "MobileHarness/Agents/Core",
             exclude: [

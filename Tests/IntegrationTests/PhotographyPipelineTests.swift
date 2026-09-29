@@ -194,7 +194,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let input = InputGateway(manager: manager, policy: policy)
     let recorder = OverlayRecorder()
     let actions = ChannelScheduler(
-        registry: ActionRegistry(handlers: [
+        registry: try testActionRegistry(handlers: [
             ActionPath(module: "UI", function: "moveEyes"): { invocation in
                 try await UIActions.moveEyes(invocation: invocation) { target, _ in
                     #expect(target.x == 0 && target.y == 0)
@@ -319,7 +319,7 @@ private struct CrowdPose: PoseCapability {
         return
     }
     #expect(gazeEnvelope.sequence == 1 && gazeEnvelope.sessionID == session)
-    try await UIActions.moveEyes(invocation: ActionInvocation(envelope: gazeEnvelope, call: gazeCall)) { gaze, _ in
+    try await UIActions.moveEyes(invocation: ActionInvocation(envelope: gazeEnvelope)) { gaze, _ in
         #expect(abs(gaze.x) < 0.001 && gaze.y > 0)
     }
     await agent.stop()

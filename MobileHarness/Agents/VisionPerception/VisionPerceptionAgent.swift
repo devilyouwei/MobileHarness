@@ -47,8 +47,7 @@ public actor VisionPerceptionAgent: Agent {
             id: configuration.agentID, name: "VisionPerception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.actionCall, .toolCall, .control],
-            capabilities: try configuration.capabilities.adding(
-                internalActions: [Self.gaze], internalTools: [Self.overlay]))
+            capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.filter = FrameChangeFilter(configuration: try sampling ?? FrameChangeConfiguration())
         self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
         self.pose = pose
@@ -58,6 +57,10 @@ public actor VisionPerceptionAgent: Agent {
         outputs = stream.stream
         continuation = stream.continuation
     }
+    public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
+        try model.adding(internalActions: [gaze], internalTools: [overlay])
+    }
+
     public func bind(_ port: AgentMessaging) throws {
         guard lifecycle == .registered, self.port == nil else { throw HarnessError.invalidTransition }
         self.port = port

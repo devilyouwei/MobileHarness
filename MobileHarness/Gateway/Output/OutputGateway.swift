@@ -19,7 +19,7 @@ public actor OutputGateway {
 
     public init(
         manager: AgentManager, requests: InputGateway, tools: ToolRegistry,
-        actions: ChannelScheduler = ChannelScheduler(registry: ActionRegistry(handlers: [:])),
+        actions: ChannelScheduler = ChannelScheduler(registry: ActionRegistry()),
         policy: CommunicationPolicy? = nil,
         observedContracts: Set<String> = [],
         observeEvent: (@Sendable (AgentInput) async throws -> Void)? = nil,

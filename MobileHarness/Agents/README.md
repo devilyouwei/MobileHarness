@@ -19,12 +19,16 @@ Each implemented Agent has `<AgentName>.agent.json`, an actor implementation and
 
 ## Upstream and downstream
 
-Arrows show runtime data flow; Agents never call concrete Actions or Tools.
+Arrows show runtime data flow; Agents never call concrete Actions or Tools. Compile-time dependencies are `AgentCore` (contracts, permissions and parsers), `ModelKit` (capability protocols), `Storage` (conversation history) and `StorageAudio` (shared PCM handles). App injects the production services; neither storage service delivers Agent messages.
 
 ```mermaid
 flowchart LR
     App -.->|Capability injection and lifecycle| Agents
     Input[InputGateway] -->|AgentInput and ToolResult| Agents
+    Agents -->|Read context and persist turns| Storage[Storage ConversationHistoryStore]
+    Storage -->|Last ten completed rounds| Agents
+    Agents -->|Register and write synthesized PCM| Audio[StorageAudio SpeechAudioStore]
+    Audio -->|Scoped audioID checkout| Playback[Actions/Speech]
     Agents -->|Inference| ModelKit
     ModelKit -->|Typed results| Agents
     Agents -->|Resolved calls and typed events| Output[OutputGateway]
@@ -42,7 +46,9 @@ flowchart TD
     PCM[Admitted audio] --> Speech[SpeechPerception: VAD / ASR]
     Speech --> Events[Speech observations via both gateways]
     Events --> Assistant[Assistant: chat and generation parsers]
-    Assistant --> Synth[SpeechSynthesis: directed serial TTS]
+    Assistant --> History[Storage: original inputs, raw output and request context]
+    History -->|Last ten completed rounds| Assistant
+    Assistant -->|Via OutputGateway and InputGateway| Synth[SpeechSynthesis: directed serial TTS]
     Synth --> Cache[StorageAudio: audioID / PCM]
     Assistant --> Calls[Resolved speech and UI Actions]
     Speech --> Captions[Resolved transcript and voice-state Actions]
@@ -199,3 +205,5 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ✅ Assistant receives a shared Storage journal from App; ten completed rounds form current context, while failed/cancelled raw records remain inspectable. Voice sessions no longer determine conversation boundaries. New conversation archives the current context explicitly. Title inference is metadata-only and never generates dispatched Actions. ❌ Persistent Action execution/replay is not introduced.
 
 ✅ Shared contracts/parsers are managed under Core in this directory. Package.swift compiles Core as AgentCore and the remaining business files as Agents; Core is excluded from the Agents target. This retains acyclic Gateway/StorageAudio dependencies while unifying source ownership. ❌ Core cannot import concrete Agents, model engines or UI.
+
+✅ Action runtime stage 1 reuses Agent-owned runtimeCapabilities assemblers for startup handler coverage, including internal grants. JSON v5 and business output routing remain unchanged. ❌ Action kinds/completion metadata are implementation-side and must not be added as unsupported JSON fields.

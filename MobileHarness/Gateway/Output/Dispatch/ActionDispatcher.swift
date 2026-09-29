@@ -8,8 +8,10 @@ struct ActionDispatcher: Sendable {
     let executor: ChannelScheduler
 
     func dispatch(_ token: ActionCall, envelope: OutputEnvelope) async throws {
-        try await executor.enqueue(
-            path: token.actionPath, invocation: ActionInvocation(envelope: envelope, call: token))
+        guard case .actionCall(let call) = envelope.output, call == token else {
+            throw ActionExecutionError.invalidInvocation
+        }
+        try await executor.enqueue(invocation: ActionInvocation(envelope: envelope))
     }
 
     func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {

@@ -1,0 +1,39 @@
+# Conversation UI
+
+Purpose: display startup and conversation state through eyes, captions and spectra. Design goals: accessible user controls, observable readiness and no Agent/model/device ownership in views.
+
+| File | Responsibility |
+| --- | --- |
+| ConversationState.swift | MainActor phase, transcript, reply, expression, spectra and readiness/activity values; VoicePhase and EyeExpression are UI types |
+| ConversationView.swift | Ready conversation, startup/error/retry display, common atmosphere and explicitly labeled visual preview |
+
+## Upstream and downstream
+
+App owns ConversationState and injects a voice-toggle operation. [VoiceSessionCoordinator](../../App/Lifecycle/README.md) runs the Agent/input/output sessions and applies accepted updates. Views render state and forward intent; they never start inference or recording directly.
+
+```mermaid
+flowchart LR
+    App[App preparation and voice lifecycle] --> State[ConversationState]
+    State --> View[ConversationView / startup view]
+    View -->|Injected toggle / retry| App
+    Agents --> Gateway[OutputGateway]
+    Gateway --> Actions[Actions runtime]
+    Actions -->|App handlers with session/turn checks| State
+    Device[Actual audio telemetry] --> App
+```
+
+✅ Startup eyes are noninteractive while models prepare; progress, errors and retry remain visible. After preparation and Agent registration, tapping the eye region starts voice; tapping again stops recording/playback. No automatic microphone startup occurs. Entering Settings stops voice without destroying the root-owned runtime. Background/interruption/route cleanup belongs to App.
+
+✅ SpeechPerception Actions set/close recognition captions and phase; Assistant Actions begin replies, append captions and change expressions. OutputGateway is always crossed. Speech signals control capture admission/logging only. User/OS lifecycle resets and actual audio telemetry are App-owned state updates. Session/turn/sequence checks reject stale output.
+
+✅ Recognition and reply share the lower caption slot. FadingCaption shows the last 320 characters, retains stable prefixes and fades revised suffixes over about 400 ms; VoiceOver receives the full text. Raw model history belongs to the durable journal, not a Gateway display buffer. Final recognition closes its caption, replies remain until the next onset, and actual playback selects the speaking phase independently of caption timing.
+
+✅ Navy translucent atmosphere preserves the injected camera background. Blue procedural eyes sit at 40% of content height; each is 21% of face width with a 19% gap and a 600 pt face-width cap. Production receives 32-band microphone FFT values at the bottom and playback FFT values below the estimated island edge. Component geometry and motion live in [Components](../Components/README.md).
+
+✅ Camera-owned normalized gaze reaches both startup and ready eyes through the environment. Expression, gaze and phase remain separate inputs. VoiceOver, Dynamic Type and Reduce Motion are supported.
+
+✅ `ConversationVisualPreview` and Xcode Preview contain synthetic numeric bands only, with a simulated-frequency slider, phase toggle and semantic-expression picker. No audio is generated or played. Debug `-conversation-preview` bypasses camera/microphone/model startup; add `-preview-speaking` to start its reply state. Release ignores the preview launch flag.
+
+Sources compile once in UI; page navigation does not create or destroy the voice runtime.
+
+❌ Physical-device startup latency, layout/animation, accessibility/landscape and face-tracking acceptance; hand-driven gaze and additional character pages remain unimplemented.

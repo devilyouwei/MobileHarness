@@ -87,4 +87,8 @@ These are **dated decision records**, including proposals and stages later repla
 
 ✅ [0062 — Optional output-token budgets](0062-default-chat-output-budget.md): provider defaults for Assistant, bounded local context and backward-compatible history records. ❌ Live-provider acceptance remains separate.
 
-✅ [0063 — Module directory consolidation](0063-module-directory-consolidation.md): Actions/Tools each own Runtime; Agents owns Core; App owns Views. Foundational AgentCore compilation remains independent. ❌ No behavior change or new device acceptance is implied.
+✅ [0063 — Module directory consolidation](0063-module-directory-consolidation.md): Actions/Tools each own Runtime; Agents owns Core with independent AgentCore compilation. Its former App/Views ownership is superseded by ADR 0064's sibling UI module. ❌ No behavior change or new device acceptance is implied.
+
+- [ADR 0064 — App and UI boundaries](0064-app-ui-boundaries.md): explicit composition, independently compiled pages and application workflows.
+
+✅ [ADR 0065 — Action runtime contracts](0065-action-runtime-contracts.md): validated implementation metadata, startup coverage, consistent invocation, typed arguments, error separation and bounded diagnostics. ❌ Activity/resource ownership and full business Action style migration remain deferred.

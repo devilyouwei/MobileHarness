@@ -11,11 +11,15 @@ extension UIActions {
         present: @escaping @Sendable (Gaze, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        guard let rawX = invocation.call.parameters["x"], let x = Double(rawX),
-            let rawY = invocation.call.parameters["y"], let y = Double(rawY),
-            x.isFinite, y.isFinite, (-1...1).contains(x), (-1...1).contains(y)
-        else { throw GazeError.invalidTarget }
-        try await present(Gaze(x: x, y: y), invocation)
+        let target: Gaze
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["x", "y"])
+            target = try Gaze(
+                x: arguments.requiredFiniteDouble("x", range: -1...1),
+                y: arguments.requiredFiniteDouble("y", range: -1...1))
+        } catch { throw GazeError.invalidTarget }
+        try await present(target, invocation)
         try Task.checkCancellation()
     }
 }

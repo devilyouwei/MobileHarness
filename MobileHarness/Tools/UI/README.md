@@ -2,6 +2,8 @@
 
 Purpose: immediate presentation capabilities invoked through Tools/Runtime. Design goals: bounded payloads, explicit completion, no Channel queue, and session-safe injected UI services.
 
+This directory compiles within Tools. The separate [UI module](../../UI/README.md) owns pages and display state; App binds the callback that updates CameraState. Tools depends only on AgentCore and does not import UI.
+
 ✅ UITools.showPose validates at most 3000 UTF-8 bytes and six COCO-17 skeletons, then awaits atomic replacement through the App callback. Empty people clears the overlay. The handler returns Void; no ToolResult is created or fed back to the Agent. Errors and cancellation propagate to the dispatch caller. CameraCoordinator keeps session and increasing-sequence checks on MainActor.
 
 ```mermaid

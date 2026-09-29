@@ -32,3 +32,9 @@ Replaced the standalone raw-output diagnostic with current/past conversation bro
 ## Agent JSON v5 — 2026-09-28
 
 Replaced redundant flat Agent declarations with version/id and Channel-grouped callable Actions. Internal speech, captions, transcript, gaze and overlay behavior now uses code-owned permissions with no model aliases. Tools retain a standard OpenAI function envelope. Shared generation accepts an Agent-owned text mapping, preserving speech/wait order and history previews. See ADR 0061.
+
+## 2026-09-29 — App/UI ownership audit
+
+Aligned source names with current ownership: ApplicationRuntime, VoiceSessionCoordinator, VisionSession, CameraConversationSurface, CompanionEyes, SpeechDiagnosticState and ChatValidationView. App/Adapters owns the current-chat binding wrapper; App/Workflows owns Debug chat diagnostic execution. Removed duplicate retained assembly values, the one-method AgentBootstrap wrapper, unused imports/errors and the obsolete legacy configuration writer while preserving migration reads and verified deletion.
+
+Fixed the MOSS editor's stale task comparison, which resolved to SwiftUI's task modifier and always disabled editing. Restored the camera toggle's existing accessibility identifier. Module READMEs now describe the actual toolbar placement, state/workflow ownership, selected chat binding, model residency and editable credential scope; earlier historical names in this log and ADRs remain dated evidence. See [ADR 0064](adr/0064-app-ui-boundaries.md).

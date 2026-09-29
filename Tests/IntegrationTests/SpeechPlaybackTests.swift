@@ -42,9 +42,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
         parameters: ["audioID": request.audioID.uuidString])
     return (
         request.audioID, .init(source: AgentID(rawValue: source), session: session, input: parent.id),
-        ActionInvocation(
-            envelope: OutputEnvelope(
-                source: AgentID(rawValue: source), input: parent, output: .actionCall(call), sequence: 1), call: call)
+        ActionInvocation(source: AgentID(rawValue: source), input: parent, call: call, sequence: 1)
     )
 }
 @Test(.timeLimit(.minutes(1))) func synthesisFIFOIsIndependentOfPlaybackAndSupportsMultipleAgents() async throws {

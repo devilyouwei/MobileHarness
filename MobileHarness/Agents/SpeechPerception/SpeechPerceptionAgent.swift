@@ -46,13 +46,15 @@ public actor SpeechPerceptionAgent: Agent {
             id: configuration.agentID, name: "Speech Perception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.actionCall, .control],
-            capabilities: try configuration.capabilities.adding(internalActions: [
-                Self.transcript, Self.voiceState, Self.finishTranscript,
-            ]))
+            capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(32))
         outputs = stream.stream
         continuation = stream.continuation
     }
+    public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
+        try model.adding(internalActions: [transcript, voiceState, finishTranscript])
+    }
+
     public func bind(_ port: AgentMessaging) throws {
         guard lifecycle == .registered, self.port == nil else { throw HarnessError.invalidTransition }
         self.port = port

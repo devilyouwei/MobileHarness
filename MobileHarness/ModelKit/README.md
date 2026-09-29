@@ -26,14 +26,15 @@ ModelKit/
 
 ## Upstream and downstream
 
-Arrows show requests and results. Neither Gateway nor PlatformKit calls into the model layer directly.
+Arrows show inference requests and results. Neither Gateway nor PlatformKit calls into the model layer directly. StorageAudio also imports base ModelKit for AudioFrame values; it never invokes inference. This type dependency does not make ModelKit depend on StorageAudio.
 
 ```mermaid
 flowchart LR
     App -->|Resource root and lifecycle| Assembly[Defaults / ModelManager]
     Assembly -->|Capability handles| App
     Agents -->|Speech, chat and pose requests| Capabilities[ModelKit capabilities]
-    Diagnostics[Explicit App diagnostics] --> Capabilities
+    Diagnostics[AppWorkflows explicit diagnostics] --> Capabilities
+    Titles[AppWorkflows via ConversationTitleGenerator] -->|Archived title generation| Capabilities
     Capabilities --> Adapters[Concrete adapters]
     Adapters --> Engines[MLX / CoreAI / Core ML / Apple speech]
     Engines -->|Tokens, scores, joints or PCM| Adapters

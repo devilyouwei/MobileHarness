@@ -19,3 +19,7 @@ flowchart LR
 ✅ Removed the obsolete text-to-synthesis Speak.swift helper. Speech failure, playback cancellation and text-boundary tests now exercise SpeechSynthesisAgent plus audioID playback; there is no legacy synthesis implementation in Actions.
 
 ❌ Persistent/repeatable audio and real iPhone latency, Bluetooth and sustained playback acceptance remain outstanding.
+
+## Authoring standard and current exception
+
+Under the [Actions authoring standard](../README.md), `Speech.speak` is a finite operation: completion includes playback drain and audio-lease release. Its current Swift entry is the actor method `SpeechPlayback.play(_:using:)`, not a canonical `SpeechActions.speak(invocation:using:)` entry in Speak.swift. ✅ The actor's existing playback/cache ownership remains implemented. ❌ Namespace/file/signature migration is pending; do not recreate the removed text-to-synthesis helper or change the audioID-only contract while applying this standard.

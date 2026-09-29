@@ -4,7 +4,9 @@ extension UIActions {
         present: @escaping @Sendable (ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        guard invocation.call.parameters.isEmpty else { throw ActionExecutionError.invalidCall }
+        do { try ActionArguments(invocation.call.parameters).validateAllowedKeys([]) } catch {
+            throw PresentationError.invalidCall
+        }
         try await present(invocation)
         try Task.checkCancellation()
     }

@@ -39,7 +39,7 @@ flowchart LR
 
 | 接收方式 | contract / version / kind | source / topic | 处理 |
 | --- | --- | --- | --- |
-| 静态订阅 | `media.image / 1 / image` | `phone.camera / media.image` | `AgentInput.payload = .image(ImageInput)`，来自 App PhotographySession 的摄像帧适配，经 InputGateway 路由。匹配 session、严格递增 sequence、非倒退 timestamp，并检查接纳期限。 |
+| 静态订阅 | `media.image / 1 / image` | `phone.camera / media.image` | `AgentInput.payload = .image(ImageInput)`，来自 App VisionSession 的摄像帧适配，经 InputGateway 路由。匹配 session、严格递增 sequence、非倒退 timestamp，并检查接纳期限。 |
 | 初始化注入，不是业务消息 | `PoseCapability`、`resolveImage`、`FrameChangeConfiguration` | App | 能力执行一次姿态推理，resolver 将传输附件转换为 ModelKit ImageFrame；筛帧配置控制 3% 阈值及 App 默认 100ms 新帧刷新。 |
 | 生命周期，不是订阅 | `bind / start / pause / resume / stop` | App / AgentManager | 注入消息端口、管理两条有界 worker；没有外部指令或 ToolResult 输入。 |
 
@@ -58,7 +58,7 @@ RGB 路径为正向、未镜像 RGB8，宽高各 1...640，字节数必须为 wi
 
 ```mermaid
 flowchart LR
-    Camera[PlatformKit camera] --> App[PhotographySession: gray64 + attachment]
+    Camera[PlatformKit camera] --> App[VisionSession: gray64 + attachment]
     App -->|media.image| IG[InputGateway]
     IG --> Filter[VisionPerception: frame admission]
     Filter --> Latest[One active + newest pending frame]
@@ -142,3 +142,5 @@ flowchart LR
     Action --> Scene[Active camera session / sequence check]
     Scene --> Eyes[Native spring / stable eye shapes]
 ```
+
+✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v5. ❌ Activity/resource ownership is not introduced.

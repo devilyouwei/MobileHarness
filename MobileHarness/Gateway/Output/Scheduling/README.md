@@ -157,3 +157,13 @@ Before enabling locks, test:
 - ❌ Alternative-channel and Tool-route enforcement.
 - ❌ Timeout, failed cleanup, owner loss, release and no stale replay.
 - ❌ Capacity limits, full-queue control access and unchanged unlocked scheduling.
+
+## Action contract stage 1
+
+✅ `enqueue(invocation:)` derives the path from the validated invocation and returns a newly assigned execution UUID after admission. Each admission is a new execution, including reuse of a submitted invocation. The same ID reaches the handler and diagnostic records. Immutable implementation definitions describe kind/completion; all handlers still use identical scheduling and awaited completion. No category bypasses a lane or a wait.
+
+✅ Capacity, input lifecycle and wait errors now belong to `ActionSchedulingError.swift` in Gateway. Runtime lookup/definition/invocation failures remain ActionExecutionError. Completion errors still cancel the owning input and preserve its original error.
+
+✅ The scheduler actor owns the bounded ActionDiagnostics ring: 256 records by default (configuration 1–4096), oldest-record overwrite with an explicit eviction counter. It records admitted/started and terminal succeeded/failed/cancelled transitions; queued cancellation is notStarted and running failure/cancellation conservatively has unknown effects. No parameters/errors/media are retained. Terminal records follow handler cleanup. `diagnosticSnapshot()` is a bounded chronological copy, not a stream or new queue. Diagnostic eviction never discards Actions. Full algorithm and lifecycle limits are in [Runtime](../../../Actions/Runtime/README.md).
+
+❌ Persistent resources, activity ownership, execution/cleanup deadlines and Agent-facing ActionResult remain unimplemented; ADR 0065 does not change the future Channel ownership proposal above.

@@ -2,6 +2,10 @@
 
 Purpose: share bounded single-use PCM handles between synthesis Agents and scheduled playback without either depending on the other. This target adapts ModelKit `AudioFrame` and AgentCore identity to the Foundation-only Storage primitives; it performs no inference, routing or device I/O.
 
+## Upstream and downstream
+
+Compile-time dependencies are `Storage` (bounded streams and leases), `AgentCore` (source/session/input ownership), and `ModelKit` (AudioFrame values only). There is no model inference dependency. Direct consumers are Agents, Actions and App. App creates one shared SpeechAudioStore, injects it into SpeechSynthesisAgent and SpeechPlayback, and owns input/session cancellation and shutdown. SpeechSynthesisAgent writes frames; scheduled SpeechPlayback checks out and releases a handle, then forwards PCM to the App-injected player. Store completion is distinct from physical playback completion.
+
 ## Design goals
 
 - Preserve the existing audioID, ownership, cancellation and playback timing contract while moving shared storage under `Storage/`.

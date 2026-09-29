@@ -69,7 +69,7 @@ MobileHarness takes inspiration from how human intelligence connects perception,
 | Optional cloud chat | OpenAI-compatible provider selection and local credential storage; real-provider acceptance pending |
 | Speech and captions | MOSS-TTS-Nano Core ML Mandarin/English TTS (beta), sequential playback and progressive reply captions |
 | Camera | Foreground preview, front/back switching and local YOLO26n-Pose perception |
-| Presentation | Recognition captions, semantic eye expressions, audio spectrum and skeleton overlay |
+| UI | Recognition captions, semantic eye expressions, audio spectrum and skeleton overlay |
 | Agent runtime | JSON v5 capability declarations, static subscriptions, directed events and session isolation |
 | Execution | Function Token parsing, Channel scheduling, Action/Tool validation and cancellation |
 
@@ -190,7 +190,8 @@ Input routing uses explicit `publish` (configured subscriptions) or `send` (name
 | [Agents](MobileHarness/Agents/README.md) | Agent authoring, JSON declarations and input/output conventions |
 | [ModelKit](MobileHarness/ModelKit/README.md) | Capability interfaces, providers and model lifecycle |
 | [PlatformKit](MobileHarness/PlatformKit/README.md) | Device I/O, permissions and platform boundaries |
-| [Storage](MobileHarness/Storage/README.md) | Bounded process-local storage and PCM adapter; disk and persistent storage remain planned |
+| [App](MobileHarness/App/README.md) / [UI](MobileHarness/UI/README.md) | Application composition, running sessions and workflows; separate pages, state and interaction interfaces |
+| [Storage](MobileHarness/Storage/README.md) | Bounded memory/PCM storage and durable settings/conversation documents; general media/memory persistence remains planned |
 | [Architecture Decisions](docs/adr/README.md) | Design rationale and contract changes |
 | [Roadmap](docs/Roadmap.md) | Implementation stages and outstanding acceptance work |
 
@@ -208,7 +209,7 @@ Good contributions include reproducible device reports, focused fixes, test cove
 
 ## Security and Privacy
 
-The current implementation processes voice and camera inputs on-device and requires no cloud inference API key. This is the current deployment, not a local-only architectural constraint. Future cloud requests will require explicit data-transfer and credential policies. Model provisioning downloads artifacts separately from runtime inference. Microphone and camera access require platform permission.
+The default configuration processes voice and camera inputs on-device and requires no cloud inference API key. Enabling cloud chat in Settings sends chat requests, including the selected conversation context, to the configured provider; speech recognition, synthesis and camera perception remain local. Credentials are stored in the device Keychain, while settings and conversation history use local documents. Model provisioning downloads artifacts separately from runtime inference. Microphone and camera access require platform permission.
 
 Do not commit or post credentials, signing settings, model weights, user recordings or other private media. Consult [SECURITY.md](SECURITY.md) before reporting sensitive issues; a private reporting channel has not yet been configured. Future physical-device control requires independent hardware protections and must not rely on iOS background execution.
 
@@ -218,7 +219,7 @@ Do not commit or post credentials, signing settings, model weights, user recordi
 
 MobileHarness builds on the work behind Apple frameworks, MLX, Qwen, Nemotron, Silero, MOSS-TTS-Nano, Kokoro and Ultralytics YOLO. Dependencies and model artifacts retain their own licenses and redistribution conditions. The configured YOLO26 pose artifact declares AGPL-3.0; model notices are documented with the [resource profiles](MobileHarness/Resources/Models/README.md).
 
-✅ Optional third-party cloud text chat supports configurable HTTPS Base URL, API key and model through the same ModelKit capability as local Qwen. See [cloud adapter](MobileHarness/ModelKit/Language/LLM/OpenAI/README.md). ❌ Live-provider acceptance and configuration UI remain pending.
+✅ Settings includes optional cloud text chat configuration for HTTPS Base URL, API key and model through the same ModelKit capability as local Qwen. See [cloud adapter](MobileHarness/ModelKit/Language/LLM/OpenAI/README.md). ❌ Live-provider acceptance remains pending.
 
 
 
@@ -231,4 +232,4 @@ Local user settings now use Storage-backed cached persistence in the application
 
 ✅ Function Token output supports nested `<wait>...</wait>` execution groups. Wait joins earlier parent work and all internal Actions while preserving ordinary Channel concurrency; it does not block unrelated Agent tasks. See [scheduling](MobileHarness/Gateway/Output/Scheduling/README.md). ❌ Physical-device acceptance of the new coordination behavior is pending.
 
-✅ Settings → 对话历史 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](MobileHarness/App/Views/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.
+✅ Settings → 对话历史 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](MobileHarness/UI/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.

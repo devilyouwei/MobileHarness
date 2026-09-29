@@ -14,10 +14,11 @@ public actor ChannelScheduler {
         func get() throws { if case .failure(let error) = self { throw error } }
     }
     struct Job: Sendable {
-        let id = UUID()
+        var id: UUID { invocation.executionID }
         let sequence: UInt64
         let phase: Int
-        let path: ActionPath
+        let kind: ActionDefinition.Kind
+        var path: ActionPath { invocation.call.actionPath }
         let invocation: ActionInvocation
         var inputKey: InputKey { InputKey(source: invocation.envelope.source, inputID: invocation.envelope.inputID) }
     }
@@ -88,63 +89,70 @@ public actor ChannelScheduler {
     private var isShutdown = false
     private var sequence: UInt64 = 0
     private var busyModules: Set<String> = []
+    private var diagnostics: ActionDiagnostics
+
+    public func diagnosticSnapshot() -> ActionDiagnostics.Snapshot { diagnostics.snapshot() }
 
     public init(
         registry: ActionRegistry, capacityPerChannel: Int = 32, maximumTrackedInputs: Int = 64,
-        maximumChannels: Int = 16
+        maximumChannels: Int = 16, diagnosticCapacity: Int = 256
     ) {
         precondition(capacityPerChannel > 0 && maximumTrackedInputs > 0 && maximumChannels > 0)
         self.registry = registry
+        self.diagnostics = ActionDiagnostics(capacity: diagnosticCapacity)
         self.capacityPerChannel = capacityPerChannel
         self.maximumTrackedInputs = maximumTrackedInputs
         self.maximumChannels = maximumChannels
     }
     private func state(for envelope: OutputEnvelope) throws -> InputState {
         try Task.checkCancellation()
-        guard !isShutdown else { throw ActionExecutionError.shutdown }
+        guard !isShutdown else { throw ActionSchedulingError.shutdown }
         let key = InputKey(source: envelope.source, inputID: envelope.inputID)
         if let state = inputs[key] {
-            guard state.sessionID == envelope.sessionID else { throw ActionExecutionError.inputSessionMismatch }
+            guard state.sessionID == envelope.sessionID else { throw ActionSchedulingError.inputSessionMismatch }
             if let error = state.failure { throw error }
-            guard !state.finishing && !state.cancelling else { throw ActionExecutionError.inputClosing }
+            guard !state.finishing && !state.cancelling else { throw ActionSchedulingError.inputClosing }
             return state
         }
-        guard inputs.count < maximumTrackedInputs else { throw ActionExecutionError.inputCapacityExceeded }
+        guard inputs.count < maximumTrackedInputs else { throw ActionSchedulingError.inputCapacityExceeded }
         let state = InputState(sessionID: envelope.sessionID)
         inputs[key] = state
         return state
     }
     /// Returns after admission, never after execution. All dormant jobs count toward capacity.
-    public func enqueue(path: ActionPath, invocation: ActionInvocation) throws {
+    @discardableResult
+    public func enqueue(invocation submitted: ActionInvocation) throws -> UUID {
+        let invocation = try ActionInvocation(envelope: submitted.envelope)
         try Task.checkCancellation()
-        guard !isShutdown else { throw ActionExecutionError.shutdown }
-        _ = try registry.handler(for: path)
-        guard path == invocation.call.actionPath else { throw ActionExecutionError.invalidCall }
+        guard !isShutdown else { throw ActionSchedulingError.shutdown }
+        let definition = try registry.definition(for: invocation.call.actionPath)
         let channel = invocation.call.channel
         guard channelCounts[channel] != nil || channelCounts.count < maximumChannels else {
-            throw ActionExecutionError.channelCountExceeded
+            throw ActionSchedulingError.channelCountExceeded
         }
         guard channelCounts[channel, default: 0] < capacityPerChannel else {
-            throw ActionExecutionError.channelCapacityExceeded(channel)
+            throw ActionSchedulingError.channelCapacityExceeded(channel)
         }
         let state = try state(for: invocation.envelope)
-        guard state.acceptedActions < 120 else { throw ActionExecutionError.taskActionLimitExceeded }
+        guard state.acceptedActions < 120 else { throw ActionSchedulingError.taskActionLimitExceeded }
         state.acceptedActions += 1
         state.pending += 1
         channelCounts[channel, default: 0] += 1
         sequence += 1
         state.phases[state.writePhase].lanes[channel, default: Channel()].queued.append(
-            Job(sequence: sequence, phase: state.writePhase, path: path, invocation: invocation))
+            Job(sequence: sequence, phase: state.writePhase, kind: definition.kind, invocation: invocation))
+        diagnostics.record(invocation, kind: definition.kind, phase: .admitted, effect: .notStarted)
         startEligibleChannels()
+        return invocation.executionID
     }
     public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) throws {
         let key = InputKey(source: envelope.source, inputID: envelope.inputID)
-        if directive == .endWait, inputs[key] == nil { throw ActionExecutionError.invalidSchedule }
+        if directive == .endWait, inputs[key] == nil { throw ActionSchedulingError.invalidSchedule }
         let state = try state(for: envelope)
         switch directive {
         case .beginWait:
             guard state.groups.count <= 32, state.stack.count <= 8 else {
-                throw ActionExecutionError.waitGroupLimitExceeded
+                throw ActionSchedulingError.waitGroupLimitExceeded
             }
             let parent = state.stack.last!
             state.phases[state.writePhase].closed = true
@@ -156,7 +164,7 @@ public actor ChannelScheduler {
             state.stack.append(child)
             state.writePhase = phase
         case .endWait:
-            guard state.stack.count > 1 else { throw ActionExecutionError.invalidSchedule }
+            guard state.stack.count > 1 else { throw ActionSchedulingError.invalidSchedule }
             state.phases[state.writePhase].closed = true
             let child = state.stack.removeLast()
             state.groups[child].closed = true
@@ -175,10 +183,10 @@ public actor ChannelScheduler {
             try Task.checkCancellation()
             return
         }
-        guard !state.finishing else { throw ActionExecutionError.duplicateFinish }
+        guard !state.finishing else { throw ActionSchedulingError.duplicateFinish }
         state.finishing = true
         if state.stack.count != 1 {
-            state.failure = state.failure ?? ActionExecutionError.invalidSchedule
+            state.failure = state.failure ?? ActionSchedulingError.invalidSchedule
             cancelJobs(key: key)
         } else {
             state.phases[state.writePhase].closed = true
@@ -226,18 +234,21 @@ public actor ChannelScheduler {
             busyModules.insert(job.path.module)
             let task = Task {
                 let outcome: Outcome
+                var started = false
                 do {
                     try Task.checkCancellation()
+                    started = true
+                    self.diagnostics.record(job.invocation, kind: job.kind, phase: .started, effect: .unknown)
                     try await ActionExecutor(registry: registry).execute(job.invocation)
                     try Task.checkCancellation()
                     outcome = .success
                 } catch { outcome = .failure(error) }
-                self.completed(job, outcome: outcome)
+                self.completed(job, outcome: outcome, started: started)
             }
             state.phases[job.phase].lanes[channel]?.running = Running(job: job, task: task)
         }
     }
-    private func completed(_ job: Job, outcome: Outcome) {
+    private func completed(_ job: Job, outcome: Outcome, started: Bool) {
         guard let state = inputs[job.inputKey],
             state.phases[job.phase].lanes[job.invocation.call.channel]?.running?.job.id == job.id
         else { return }
@@ -245,6 +256,14 @@ public actor ChannelScheduler {
         busyModules.remove(job.path.module)
         decrementChannel(job.invocation.call.channel, by: 1)
         state.pending -= 1
+        switch outcome {
+        case .success:
+            diagnostics.record(job.invocation, kind: job.kind, phase: .succeeded, effect: .contractCompleted)
+        case .failure(let error):
+            diagnostics.record(
+                job.invocation, kind: job.kind, phase: error is CancellationError ? .cancelled : .failed,
+                effect: started ? .unknown : .notStarted)
+        }
         if case .failure(let error) = outcome {
             state.failure = state.failure ?? error
             cancelJobs(key: job.inputKey)
@@ -269,7 +288,11 @@ public actor ChannelScheduler {
         guard let state = inputs[key] else { return }
         for phase in state.phases.indices {
             for name in Array(state.phases[phase].lanes.keys) {
-                let count = state.phases[phase].lanes[name]?.queued.count ?? 0
+                let queued = state.phases[phase].lanes[name]?.queued ?? []
+                for job in queued {
+                    diagnostics.record(job.invocation, kind: job.kind, phase: .cancelled, effect: .notStarted)
+                }
+                let count = queued.count
                 state.pending -= count
                 decrementChannel(name, by: count)
                 state.phases[phase].lanes[name]?.queued.removeAll()

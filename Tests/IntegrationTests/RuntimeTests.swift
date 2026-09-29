@@ -139,7 +139,7 @@ private actor Recorder {
     try await tools.register("runtimeInfo") { _ in "runtime healthy" }
     let recorder = Recorder()
     let actions = ChannelScheduler(
-        registry: ActionRegistry(handlers: [
+        registry: try testActionRegistry(handlers: [
             ActionPath(module: "Speech", function: "speak"): { _ in },
             ActionPath(module: "UI", function: "print"): { _ in },
         ]))
@@ -183,7 +183,7 @@ private actor Recorder {
         output: .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
     await #expect(throws: (any Error).self) { try await missing.dispatch(envelope) }
     let actions = ChannelScheduler(
-        registry: ActionRegistry(handlers: [
+        registry: try testActionRegistry(handlers: [
             ActionPath(module: "UI", function: "express"): { _ in await recorder.act() }
         ]))
     let responses = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry(), actions: actions) {
@@ -255,7 +255,7 @@ private actor Recorder {
     try await manager.register(AssistantAgent(chat: FixedTextChat()))
     let recorder = Recorder()
     let scheduler = ChannelScheduler(
-        registry: ActionRegistry(handlers: [
+        registry: try testActionRegistry(handlers: [
             ActionPath(module: "UI", function: "express"): { _ in await recorder.act() }
         ]))
     let gateway = OutputGateway(
@@ -274,7 +274,7 @@ private actor Recorder {
     #expect(await recorder.actions == 2)
     let malformed = AgentInput(sessionID: UUID(), payload: .text("malformed"))
     try await gateway.dispatch(OutputEnvelope(source: .assistant, input: malformed, output: .scheduling(.beginWait)))
-    await #expect(throws: ActionExecutionError.invalidSchedule) {
+    await #expect(throws: ActionSchedulingError.invalidSchedule) {
         try await gateway.dispatch(
             OutputEnvelope(source: .assistant, input: malformed, output: .control("assistant.finished")))
     }

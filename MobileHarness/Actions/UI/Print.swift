@@ -6,9 +6,12 @@ public enum UIActions {
         present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        guard let text = invocation.call.parameters["text"], text.utf8.count <= 2_000,
-            !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        else { throw ActionExecutionError.invalidText }
+        let text: String
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["text"])
+            text = try arguments.requiredString("text", maximumUTF8Bytes: 2000, allowBlank: false)
+        } catch { throw PresentationError.invalidText }
         try await present(text, invocation)
         try Task.checkCancellation()
     }

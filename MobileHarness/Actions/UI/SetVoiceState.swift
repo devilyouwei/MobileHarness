@@ -5,9 +5,12 @@ extension UIActions {
         present: @escaping @Sendable (VoiceState, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        guard let value = invocation.call.parameters["state"], let state = VoiceState(rawValue: value) else {
-            throw ActionExecutionError.invalidCall
-        }
+        let state: VoiceState
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["state"])
+            state = try arguments.requiredEnum("state", as: VoiceState.self)
+        } catch { throw PresentationError.invalidCall }
         try await present(state, invocation)
         try Task.checkCancellation()
     }

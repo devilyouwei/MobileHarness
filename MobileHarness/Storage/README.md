@@ -10,16 +10,27 @@ Purpose: provide one project-wide home for transient and durable data used by mu
 - Keep storage values independent of ModelKit media types and SwiftUI. Domain adapters convert audio frames, images or structured memories at the boundary. App assembles and injects one service where sharing is required.
 - Persist large media as bounded files with metadata/indexes rather than forcing all bytes into a database row. A future database may support durable metadata and memory queries; no engine or third-party library is selected yet.
 
+## Upstream and downstream
+
+The base `Storage` target depends only on Foundation. Its direct production consumers are App/AppWorkflows (settings and history assembly/operations), Agents (Assistant history and title values), and StorageAudio (bounded PCM primitives). Actions depends on StorageAudio rather than importing Storage. UI imports conversation record values only; its pages receive state/operation interfaces rather than a store. These arrows show runtime use, not reverse imports into Storage.
+
 ```mermaid
 flowchart LR
-    App[App composition] -. inject .-> Storage[Storage service]
-    Agents[Agents] -. scoped read/write .-> Storage
-    Actions[Actions] -. scoped read/write .-> Storage
-    Storage --> Memory[Bounded memory]
-    Storage --> Cache[Reclaimable cache]
-    Storage --> Durable[Persistent records and files]
-    Audio[StorageAudio PCM adapter] --> Memory
+    App[App settings and composition] --> Documents[LocalDocumentStore]
+    App -.->|Inject same history service| Assistant[Assistant]
+    App -.->|Inject history workflow| Views[UI/Settings]
+    Views -->|User operations| Workflow[AppWorkflows]
+    Assistant -->|Context and raw turn persistence| History[ConversationHistoryStore]
+    Workflow -->|Inspect, archive, title and delete| History
+    History --> Documents
+    Documents --> Disk[Bounded protected JSON and cached snapshot]
+    Synth[SpeechSynthesisAgent] --> Audio[StorageAudio PCM adapter]
+    Playback[Actions/Speech] -->|Checkout and release| Audio
+    Audio --> Memory[MemoryLeaseStore and BoundedMemoryStream]
 ```
+
+Generic persistent media files and reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage.
+
 
 ## Local cache and persistence synchronization
 
@@ -55,7 +66,7 @@ sequenceDiagram
 
 ## Conversation journal
 
-✅ ConversationHistoryStore is the Foundation-only domain store for current and archived conversations. App provides one LocalDocumentStore<ConversationArchive> and injects that owner into Assistant and the history UI. A nil document explicitly selects volatile storage for tests, never production fallback. The versioned payload stores original user text, exact request messages, model label/options, received text fragments, generation status/finish reason/error and optional execution error. Credentials and media are not recorded. Current title is computed from the latest original user input; only archived conversations have a generated summary title.
+✅ ConversationHistoryStore is the Foundation-only domain store for current and archived conversations. App provides one LocalDocumentStore<ConversationArchive> and injects that owner into Assistant and the history application workflow. A nil document explicitly selects volatile storage for tests, never production fallback. The versioned payload stores original user text, exact request messages, model label/options, received text fragments, generation status/finish reason/error and optional execution error. Credentials and media are not recorded. Current title is computed from the latest original user input; only archived conversations have a generated summary title.
 
 | Bound | Policy |
 | --- | --- |

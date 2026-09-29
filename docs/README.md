@@ -40,4 +40,8 @@ When a runtime contract changes, update the owning module README first, then the
 
 ✅ [ADR 0062](adr/0062-default-chat-output-budget.md) documents optional output budgets and default-provider behavior.
 
-✅ [模块目录整合](adr/0063-module-directory-consolidation.md) 记录 Runtime 子目录、Agents/Core 编译边界和 App/Views 的当前归属。
+✅ [模块目录整合](adr/0063-module-directory-consolidation.md) 记录 Runtime 子目录、Agents/Core 编译边界及当时的 App/Views 归属；页面后续迁到独立 UI 模块，见 ADR 0064。
+
+- [ADR 0064 — App and UI boundaries](adr/0064-app-ui-boundaries.md): explicit composition, independently compiled pages and application workflows.
+
+✅ [ADR 0065](adr/0065-action-runtime-contracts.md) and [Actions/Runtime](../MobileHarness/Actions/Runtime/README.md) record the implemented Action contract stage and its limits. ❌ Ongoing activity owners, persistent resource enforcement and execution deadlines remain future work.

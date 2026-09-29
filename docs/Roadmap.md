@@ -11,6 +11,16 @@
 - ✅ 嵌套 wait、任务内阶段/Channel FIFO 与模块互斥已实现；当前契约见[调度 README](../MobileHarness/Gateway/Output/Scheduling/README.md)，历史模块 FIFO 和共享 Channel 描述已由 [ADR 0059](adr/0059-structured-wait-scheduling.md) 取代。
 - ❌ 新版 wait 的真实模型输出质量、嵌套等待/取消和语音字幕真机交互验收仍待完成。
 
+## Action runtime standard — stage 1 (2026-09-29)
+
+✅ Implemented ActionDefinition registration with kind/completion descriptions and duplicate/metadata limits; App startup validates model-callable and code-owned internal Action coverage using Agent-owned assemblers. Consistent invocation construction removes duplicate call/path inputs and assigns a new ID per admitted execution. UI adopts shared argument readers, and scheduling/presentation errors leave Actions/Runtime. The scheduler retains bounded, payload-free execution diagnostics with explicit eviction and conservative post-cancellation effect status. See [ADR 0065](adr/0065-action-runtime-contracts.md).
+
+✅ Added deterministic contract coverage for registration, invocation, decoding, finite versus state completion, diagnostic correlation/overflow and cleanup/cancellation. Existing Channel/wait scheduling and valid business behavior remain intact.
+
+❌ Next: explicitly migrate existing Action namespaces/files/signatures; implement the first concrete continuous-activity owner and then shared resource ownership/teardown, deadlines and Agent-facing feedback as needed. Activity metadata alone is not implementation. Device animation, playback timing and sustained operation still require physical acceptance.
+
+Validation: `scripts/check.sh` passed, including 151 IntegrationTests (9 new contract tests), and `scripts/build-ios.sh` passed all four unsigned simulator schemes. README examples passed Swift 6 type checking and repository formatting; local Action documentation links and diff whitespace checks passed. Opt-in real-model evaluations remained skipped; no fresh physical-device acceptance was performed.
+
 ## 历史实施计划与里程碑
 
 依据原始技术方案与当前产品优先级，P1 首先接入必备模型与能力封装。模型通过统一能力协议解耦，Runtime 只同步补齐真实调用闭环所需的最小功能。详细目录与职责见 [ModelKit 设计](../MobileHarness/ModelKit/README.md)。本表为实施顺序，不是已完成清单。
@@ -365,7 +375,7 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 
 ✅ 设置新增独立 LLM 测试页：复用已保存模型、Assistant 提示词和 JSON，展示完整接收原文、分片、结束原因、解析错误及解析出的 Action/Channel，可显式导出。解析失败继续收集；取消、传输失败、token 上限和保留上限均明确标记。生产 Agent/Gateway 契约未改变。
 
-❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../MobileHarness/App/Views/Diagnostics/README.md)。
+❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../MobileHarness/UI/Diagnostics/README.md)。
 
 
 ## Structured wait scheduling (2026-09-28)
@@ -394,6 +404,24 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 
 ## 模块目录整合
 
-✅ Actions/Runtime 与行为实现统一编译为 Actions；Tools 同理。AgentCore 移入 Agents/Core，保留独立核心编译边界；Experience 移入 App/Views。同步 SwiftPM、Xcode、import、边界检查和技术文档，核心链路及功能保持原样。见 [ADR 0063](adr/0063-module-directory-consolidation.md)。❌ 本轮不新增功能，也不代表新的真机交互验收。
+✅ Actions/Runtime 与行为实现统一编译为 Actions；Tools 同理。AgentCore 移入 Agents/Core，保留独立核心编译边界；本阶段 Experience 移入 App/Views，后续由 ADR 0064 调整为独立 UI 模块。同步 SwiftPM、Xcode、import、边界检查和技术文档，核心链路及功能保持原样。见 [ADR 0063](adr/0063-module-directory-consolidation.md)。❌ 本轮不新增功能，也不代表新的真机交互验收。
 
 目录整合验证：完整仓库检查通过（142 个 IntegrationTests），完整 Xcode 下四个模拟器目标构建通过。194 个 Swift 实现文件除 import/格式外无变化；未新增本地文档断链。本轮未安装真机。
+
+## App 与 UI 职责拆分（2026-09-29）
+
+✅ App 分为 Composition、Lifecycle、Workflows 和 Adapters；页面迁到独立 UI target。页面状态/操作协议不引用 App 协调器；历史归档与标题、配置事务、诊断设备工作移入可独立测试的 AppWorkflows。ApplicationRuntime 由根装配持有并显式注入；语音和相机各绑定完整的类型化呈现接口。原有双 Gateway、wait 调度、音频完成与取消清理顺序保留。见 [ADR 0064](adr/0064-app-ui-boundaries.md)。
+
+✅ 页面层目录与编译模块统一命名为 UI，包含页面、状态与交互接口，按功能分组。SwiftPM、Xcode、import、UITests、边界检查、目录说明和依赖图均使用该名称；Actions/UI 与 Tools/UI 继续归属行为模块。
+
+❌ 本轮真机交互与持续运行验收尚未进行；构建与可控替身测试不能代替真机验收。多窗口独立运行空间仍未实现。
+
+验证：职责拆分阶段新增 5 项页面状态/历史工作流测试，并在模拟器安装、启动标注为视觉演示的页面。统一 UI 命名后，`./scripts/check.sh` 再次通过，完整 Xcode 下 `./scripts/build-ios.sh` 的四个 scheme 再次构建通过；源码核对确认此次命名调整只改变模块引用和 import 顺序。未在此次命名调整后重新安装模拟器或真机，也未进行真实模型交互验收。
+
+## App / UI 实现与文档复核（2026-09-29）
+
+✅ 按实际职责整理 ApplicationRuntime、VoiceSessionCoordinator、VisionSession 与 UI 组件文件名；移除单方法 AgentBootstrap 包装、AppContainer 重复持有字段、无用 import/错误分支及旧格式配置写入路径，保留读取、校验和迁移后删除。当前聊天绑定适配器归入 Adapters，Debug 聊天诊断执行归入 Workflows；AppAssembly 统一传入资源目录。
+
+✅ 修复 MOSS 输入框误用 SwiftUI task 方法导致始终禁用的问题，改为读取运行/停止状态；恢复 camera.toggle 无障碍标识。各目录 README 按当前状态重整，修正相机工具栏位置、默认云模型、凭据表单范围、诊断模型选择/驻留、页面与应用任务生命周期等陈旧描述；历史记录与原始设计保留。
+
+验证：常规仓库检查和四个 iOS 模拟器构建通过；最终工程引用、源码编译归属与本地文档链接核对通过。模拟器已安装用于验证，但 Mac 锁屏使输入框手动编辑验收无法完成；未进行本轮真机交互验收。可选真实模型测试未启用。

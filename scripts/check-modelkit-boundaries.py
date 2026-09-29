@@ -8,7 +8,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit'}
+FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows'}
 errors = []
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
@@ -103,11 +103,33 @@ audio_dependencies = [next(iter(d.values()))[0] for d in audio_target.get('depen
 if audio_dependencies != ['Storage', 'AgentCore', 'ModelKit']:
     errors.append('StorageAudio must depend only on Storage, AgentCore and ModelKit')
 # Speech signal observation is runtime admission/logging, never a UI-command side channel.
-coordinator = (ROOT / 'MobileHarness/App/AppLifecycleCoordinator.swift').read_text()
-observer = coordinator.split('private func observeSpeech(', 1)[1].split('private func resumeListening(', 1)[0]
+coordinator = (ROOT / 'MobileHarness/App/Lifecycle/VoiceSessionCoordinator.swift').read_text()
+observer = coordinator.split('func observeSpeech(', 1)[1].split('private func resumeListening(', 1)[0]
 for field in ('voicePhase', 'presentationPhase', 'voiceStatus', 'audioLevel', 'expression', 'expressionID', 'assistantReply', 'liveTranscript'):
     if re.search(r'\b' + field + r'\s*=', observer):
         errors.append(f'Signal observer modifies UI field: {field}')
+# UI is independently compiled and can consume shared values, never App services.
+ui = targets.get('UI', {})
+if ui.get('path') != 'MobileHarness/UI':
+    errors.append('UI must compile MobileHarness/UI')
+ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])]
+if ui_dependencies != ['AgentCore', 'Storage']:
+    errors.append('UI may depend only on shared AgentCore/Storage value contracts')
+allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit', 'AgentCore', 'Storage'}
+for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
+    content = source.read_text()
+    for imported in re.findall(r'\bimport\s+(\w+)', content):
+        if imported not in allowed_ui:
+            errors.append(f'Forbidden UI import {imported}: {source.relative_to(ROOT)}')
+    if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|ConversationHistoryStore|LocalDocumentStore|MemoryLeaseStore)\b', content):
+        errors.append(f'UI uses a runtime/service implementation: {source.relative_to(ROOT)}')
+for folder in ('App', 'UI'):
+    for path, directories, files in os.walk(ROOT / 'MobileHarness' / folder):
+        if 'README.md' not in files:
+            errors.append(f'Missing directory README: {Path(path).relative_to(ROOT)}')
+for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
+    if 'ApplicationRuntime.shared(' in source.read_text():
+        errors.append(f'Hidden application runtime lookup: {source.relative_to(ROOT)}')
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')

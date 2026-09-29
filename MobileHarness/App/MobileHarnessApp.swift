@@ -1,13 +1,15 @@
+import AppWorkflows
 import SwiftUI
+import UI
 
 @main
 @MainActor
 struct MobileHarnessApp: App {
-    @State private var camera = CameraCoordinator()
+    @State private var assembly = AppAssembly()
+    private var camera: CameraCoordinator { assembly.camera }
+    private var container: AppContainer? { assembly.container }
     @Environment(\.scenePhase) private var scenePhase
-    @State private var settings = AppSettings()
     @State private var showingSettings = false
-    @State private var container: AppContainer?
     @State private var startupError: String?
     @State private var startupStatus = "正在准备…"
     @State private var startupAttempt = 0
@@ -21,35 +23,27 @@ struct MobileHarnessApp: App {
                         startupContent
                     } else {
                         CameraConversationSurface(
-                            camera: camera,
+                            camera: camera.state, controls: camera,
                             openSettings: {
                                 container?.lifecycle.stopVoice()
                                 showingSettings = true
                             }
-                        ) { startupContent }
+                        ) {
+                            CameraPreviewAdapter(
+                                source: camera.preview,
+                                facing: camera.state.facing == .front ? .front : .back, skeleton: camera.state.skeleton)
+                        } content: {
+                            startupContent
+                        }
                     }
                 }
                 .navigationTitle("首页")
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(isPresented: $showingSettings) {
                     SettingsView(
-                        settings: settings,
-                        makeChat: {
-                            try await settings.restore()
-                            await container?.lifecycle.beginSettingsChange()
-                            defer { container?.lifecycle.endSettingsChange() }
-                            try Task.checkCancellation()
-                            return try await AppContainer.diagnosticChat()
-                        },
-                        loadHistory: {
-                            await container?.lifecycle.beginSettingsChange()
-                            defer { container?.lifecycle.endSettingsChange() }
-                            return try ApplicationRuntime.shared().conversations
-                        }
+                        settings: assembly.settings, history: assembly.history.state, historyControls: assembly.history
                     ) {
-                        let applied = await settings.save(
-                            beginChange: { await container?.lifecycle.beginSettingsChange() },
-                            endChange: { container?.lifecycle.endSettingsChange() })
+                        let applied = await assembly.settings.save()
                         if applied, container == nil {
                             startupError = nil
                             startupStatus = "正在准备…"
@@ -70,10 +64,13 @@ struct MobileHarnessApp: App {
                 if !isVisualPreview && !isDiagnostic { camera.setForeground(scenePhase == .active && !showing) }
             }
             .onChange(of: scenePhase) { _, phase in
-                if !isVisualPreview && !isDiagnostic { camera.setForeground(phase == .active && !showingSettings) }
+                if !isVisualPreview && !isDiagnostic {
+                    camera.setForeground(phase == .active && !showingSettings)
+                    if phase == .background { container?.lifecycle.stopVoice(message: "已进入后台，轻触重新开始") }
+                }
             }
             .task(id: container.map { ObjectIdentifier($0) }) {
-                if let container, !isDiagnostic { await container.conversation.run() }
+                if let container, !isDiagnostic { await container.lifecycle.run() }
             }
             .task(id: startupAttempt) {
                 if !isVisualPreview { await prepare() }
@@ -114,10 +111,7 @@ struct MobileHarnessApp: App {
     private func prepare() async {
         guard container == nil, startupError == nil else { return }
         do {
-            try await settings.restore()
-            let prepared = try await AppContainer { startupStatus = $0 }
-            try Task.checkCancellation()
-            container = prepared
+            try await assembly.prepare { startupStatus = $0 }
         } catch is CancellationError {
             // A disappearing scene must not publish a partially prepared container.
         } catch { startupError = String(describing: error) }
@@ -126,7 +120,7 @@ struct MobileHarnessApp: App {
     private func content(_ container: AppContainer) -> some View {
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-qwen35-validation") {
-                container.makeQwen35ValidationView()
+                container.makeChatValidationView()
             } else {
                 standardContent(container)
             }
@@ -139,7 +133,7 @@ struct MobileHarnessApp: App {
         if ProcessInfo.processInfo.arguments.contains("-moss-benchmark") {
             container.makeMossValidationView()
         } else {
-            ConversationView(runtime: container.conversation)
+            ConversationView(state: container.conversation, toggleVoice: container.lifecycle.toggleVoice)
         }
     }
 

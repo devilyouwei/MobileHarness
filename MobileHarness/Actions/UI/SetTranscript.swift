@@ -5,9 +5,12 @@ extension UIActions {
         present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        guard let text = invocation.call.parameters["text"], text.utf8.count <= 4096 else {
-            throw ActionExecutionError.invalidText
-        }
+        let text: String
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["text"])
+            text = try arguments.requiredString("text", maximumUTF8Bytes: 4096, allowBlank: true)
+        } catch { throw PresentationError.invalidText }
         try await present(text, invocation)
         try Task.checkCancellation()
     }
