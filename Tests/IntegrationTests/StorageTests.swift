@@ -2,6 +2,24 @@ import Foundation
 import Storage
 import Testing
 
+@Test func memoryHandleExpiryRemainsOptInForOtherDomains() async throws {
+    let store = MemoryLeaseStore<String>(
+        capacity: 3, queueTTL: .milliseconds(20), readyTTL: .milliseconds(20), errorTTL: .seconds(1),
+        onRemove: { _, _ in })
+    let owner = StorageOwner(namespace: "documents", source: "editor", session: UUID(), input: UUID())
+    let queued = UUID()
+    let ready = UUID()
+    try await store.register(queued, owner: owner, value: "queued", cancel: {})
+    try await store.register(ready, owner: owner, value: "ready", cancel: {})
+    _ = try await store.begin(ready)
+    await store.complete(ready)
+    try await Task.sleep(for: .milliseconds(40))
+    for id in [queued, ready] {
+        await #expect(throws: StorageError.expired) { try await store.validate(id, owner: owner) }
+    }
+    await store.shutdown()
+}
+
 @Test func boundedMemoryStreamUsesBytesAndSingleReaderWithoutAudioTypes() async throws {
     let stream = BoundedMemoryStream<Data>(maximumBytes: 4, maximumItems: 2, waitTimeout: .seconds(1)) {
         $0.count

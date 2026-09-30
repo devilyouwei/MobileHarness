@@ -151,7 +151,10 @@ public struct NexArmArrivalTracker: Sendable {
         self.jointTarget = jointTarget
         self.final = final
         self.started = started
-        earliestObservation = started.advanced(by: .milliseconds(minimumObservationMilliseconds))
+        // Stable early feedback can describe a stationary start or an intermediate plateau
+        // while firmware still owns the trajectory. Never hand off before its nominal end.
+        earliestObservation = started.advanced(
+            by: .milliseconds(max(durationMilliseconds, minimumObservationMilliseconds)))
         let segmentDeadline = started.advanced(by: Self.completionBudget(durationMilliseconds: durationMilliseconds))
         deadline = min(segmentDeadline, actionDeadline ?? segmentDeadline)
         lastFeedback = started

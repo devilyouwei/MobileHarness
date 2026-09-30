@@ -217,7 +217,7 @@ public actor ChannelScheduler {
             Job(
                 sequence: sequence, phase: state.writePhase, kind: definition.kind, resources: definition.resources,
                 invocation: invocation))
-        executionLedger.admit(invocation, kind: definition.kind)
+        executionLedger.admit(invocation, definition: definition)
         publishExecutions()
         diagnostics.record(invocation, kind: definition.kind, phase: .admitted, effect: .notStarted)
         startEligibleChannels()

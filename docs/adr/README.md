@@ -158,3 +158,15 @@ These are **dated decision records**, including proposals and stages later repla
 - [0083 — Unified Action execution presentation](0083-action-execution-presentation.md): bounded scheduler snapshots, root-owned UI projection and honest cancellation/completion states.
 
 - ✅ [0084 — LLM output buffering](0084-llm-output-buffering.md): unbounded pending-event count for finite chat generation; other queue policies remain. ❌ Device acceptance pending.
+
+- ✅ [0085 — Reply-owned speech audio](0085-reply-owned-speech-audio.md): no queued/ready PCM expiry; completion/interruption cleanup follows the reply owner. ❌ Physical-device acceptance remains pending.
+
+✅ ADR 0070 now records retirement of the unused wrist diagnostic Action; direct controller diagnostics remain outside the Agent capability catalog.
+
+- [0086 — Domain-owned Action display metadata](0086-action-display-metadata.md): self-described execution records, subscription-only Workflow and generic UI presentation.
+
+✅ ADR 0082 extends the earlier head handoff protection to all conversation trajectory segments; ❌ physical celebration/dance jitter acceptance remains pending.
+
+- ✅ [0087 — Producer-owned speech deadline](0087-speech-producer-deadline.md): PCM reads follow producer completion/failure/cancellation without a default three-second cutoff; synthesis and hardware deadlines remain. ❌ Audible device acceptance remains pending.
+
+- ✅ [0088 — Settings-matched NexArm Cartesian playback](0088-nexarm-settings-matched-playback.md): shared finite plan/cadence, final-home observation and retained whole-Action exclusion; ❌ physical phone acceptance pending.

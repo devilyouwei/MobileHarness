@@ -193,3 +193,18 @@ flowchart LR
 ## Action and Tool presentation boundary
 
 ✅ Failed executions capture error.localizedDescription at the throw boundary and publish it in the bounded execution record. ToolCalls never enter this ledger; all admitted Actions do. ❌ No per-module/source visibility rules exist.
+
+## Domain-owned execution names
+
+✅ Admission copies displayName from the validated implementation definition into ActionExecutionRecord; transitions and retained history preserve it. The scheduler does not resolve Agent aliases, localize strings or emit UI commands. Full snapshots retain initial-state delivery, bufferingNewest(1), at most eight observers, bounded active records and the existing terminal-history limit. A slow observer can miss intermediate transitions but receives complete retained state; this is not an audit event log.
+
+```mermaid
+flowchart LR
+    Domain[Domain definition: name / kind / handler] --> Admit[Validated admission]
+    Admit --> Record[Execution record: copied name + runtime facts]
+    Record --> Snapshot[Versioned bounded snapshot]
+    Snapshot --> App[Root subscription]
+    App --> UI[Generic presentation]
+```
+
+✅ The unfamiliar-action integration test observes a new domain through the real scheduler and Workflow into UI without mappings. ❌ Metadata adds no queue, new execution result or automatic recovery policy. See ADR 0086.

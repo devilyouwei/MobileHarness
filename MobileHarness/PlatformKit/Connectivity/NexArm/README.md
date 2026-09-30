@@ -1,9 +1,9 @@
 # NexArm connectivity
 
-> Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
+> Current status (2026-09-30): Cartesian conversation gestures now share Settings packets/cadence and verify final home only; see the current playback contract below. Head gestures retain calibrated per-segment observation. Phone acceptance of the jitter repair is pending.
 
 
-Purpose: communicate with the connected NexArm from macOS and verify supervised wrist/base motion. Design goals: public POSIX serial APIs, actor-owned lifetime, bounded parsing, no dependencies and motion only through explicit Actions or the user-requested connection indication.
+Purpose: communicate with the connected NexArm from macOS and verify supervised wrist/base motion. Design goals: public POSIX serial APIs, actor-owned lifetime, bounded parsing, no dependencies and motion through production Actions, user-requested controls or explicitly enabled controller diagnostic tests.
 
 ✅ `NexArmPacket` / `NexArmDecoder`: FF FF ID LEN CMD PAYLOAD CHECK framing; wrapping inverse-sum checksum; little-endian payloads. Decoder tolerates fragmented/coalesced packets and interleaved ESP32 text logs. RX buffer limit 4096 bytes, exchange input budget 16384 bytes; overflow throws. Maximum payload 253 bytes. Invalid frames/log noise are skipped; incomplete frames are retained. No device action is discarded or replayed.
 
@@ -39,10 +39,10 @@ Sources: [NexArm motion protocol](https://wiki.hiwonder.com/projects/NexArm/en/e
 Default checks never move hardware. With the arm stationary and wrist clear, explicitly select the connected port and run the opt-in test:
 
 ```sh
-NEXARM_MOTION_TEST=1 NEXARM_PORT=/dev/cu.usbserial-110 swift test --filter nexArmUSBPhysicalAction
+NEXARM_MOTION_TEST=1 NEXARM_PORT=/dev/cu.usbserial-110 swift test --filter nexArmUSBPhysicalWristDiagnostic
 ```
 
-This executes one +1-degree wrist nudge, leaves the reached position in place and closes USB. Do not repeatedly rerun it as an automatic retry. Use a full Xcode toolchain for the root package's unrelated model dependencies.
+This directly invokes the controller without an Agent or diagnostic Action. It executes one +1-degree wrist nudge, leaves the reached position in place and closes USB. Do not repeatedly rerun it as an automatic retry. Use a full Xcode toolchain for the root package's unrelated model dependencies.
 
 ## Hardware validation — 2026-09-29
 
@@ -242,11 +242,11 @@ flowchart LR
 
 ❌ Wireless delivery and physical arrival are not established by local send admission. Optional NEXARM_SETTINGS_TEST validates the shared frame plan on USB, separate from default tests.
 
-## Channel observation and host watchdog (current)
+## Observed head segments and earlier Cartesian watchdog
 
 ✅ BLE continuously decodes FFE2 notifications even without a pending request; a bounded4096-byte decoder and one latest valid24-byte pose replace old telemetry. Serial observation sessions drain incoming bytes without waiting for replies (16KiB per drain). `NexArmObservableLink` fences each segment; live settings takeover or disconnect invalidates the owner. Both transports use the same controller arrival tracker.
 
-✅ Channel motion is admitted without a response wait (bounded1s backpressure admission), then observations begin immediately, without sleeping nominal motion duration. Push updates are preferred;200ms of silence triggers a query, no more than one per200ms. No response continuation or accumulating query queue. Two seconds without valid feedback returns feedbackTimeout; every segment also has a hard nominal-duration+3s deadline. Target convergence and encoder stability must span200ms (body) /300ms (final), with unchanged pose tolerances. Single samples, wall-clock waiting alone and bursts of same-time packets cannot complete an action. Completed pose feeds UI directly without an extra blocking query. No automatic motion replay.
+✅ Channel motion is admitted without a response wait (bounded1s backpressure admission), then observations begin immediately. Arrival cannot release the next segment before a fresh converged sample at or after the nominal motion duration. Push updates are preferred;200ms of silence triggers a query, no more than one per200ms. No response continuation or accumulating query queue. Two seconds without valid feedback returns feedbackTimeout; every segment also has a hard nominal-duration+3s deadline. Target convergence and encoder stability must span200ms (body) /300ms (final), with unchanged pose tolerances. Single samples, wall-clock waiting alone and bursts of same-time packets cannot complete an action. Completed pose feeds UI directly without an extra blocking query. No automatic motion replay.
 
 ```mermaid
 flowchart LR
@@ -290,3 +290,47 @@ flowchart LR
 ```
 
 ❌ iPhone BLE conversation acceptance remains separate from USB acceptance.
+
+## Earlier all-segment trajectory handoff
+
+✅ The arrival tracker enforces the nominal duration for every conversation segment, including Cartesian preparation/body/ending and native head sweeps. An optional minimum observation interval can lengthen this gate but cannot shorten it. Early target/stable samples still feed observation and watchdogs; elapsed wall time alone cannot complete a segment. Fresh convergence after the gate and the existing 200/300 ms encoder-stability window are both required. The capacity-one controller, bounded latest telemetry, query policy, timeout budgets, cancellation join and independent new-request policy remain unchanged.
+
+```mermaid
+flowchart LR
+    Send[Admit one finite segment] --> Observe[Continuously observe position and stability]
+    Observe --> Gate{Nominal duration elapsed and fresh stable arrival?}
+    Gate -->|No| Observe
+    Gate -->|Yes| Next[Next segment or complete Action]
+    Observe -->|Silence or segment deadline| Fail[Report uncertainty without replay]
+```
+
+❌ The user's reported celebration/dance stall and apparent motor2 oscillation still require iPhone BLE verification. Regression telemetry intentionally reaches targets early to catch overlapping trajectory writes; it does not simulate mechanics or prove the physical root cause. No servo speed, torque, pose tolerance or settings playback changes.
+
+## Settings-matched Cartesian Channel playback (current)
+
+Purpose: preserve the Settings motion sequence that the user reports is smooth during repeated celebration/dance, while retaining whole-Action scheduling and honest completion. This section supersedes earlier per-waypoint observation and home→ready→body→ready→home contracts **for Cartesian presets only**. No cause of motor2 oscillation is asserted from simulated tests.
+
+✅ `settingsTestFrames()` and Channel `performGesture()` use one `cartesianPlaybackFrames(repetitions:)` factory for base sway, wave, tilt, look-around, celebrate and dance. Single-cycle CMD8 packets are byte-identical: ready400ms, body800ms each, home600ms. Channel repetitions repeat only the body1...3 times (tilt once); maximum20 frames. Controller actor admits one operation and rejects overlap; the plan is immutable, with no additional queue. Settings retains its latest-request replacement; Channel never silently replaces admitted Actions.
+
+```mermaid
+flowchart TD
+    Settings[Settings latest test] --> Plan[Shared Cartesian frame factory]
+    Channel[Channel Action with NexArm exclusion] --> Plan
+    Plan --> Send[One CMD8 admission]
+    Send --> Clock[Nominal duration from successful admission]
+    Clock -->|More frames and no cancellation| Send
+    Clock -->|Final duration elapsed in Channel| Observe[Fresh home observation]
+    Observe -->|Stable home| Done[Complete Action and release exclusion]
+    Observe -->|Silence2s or deadline3s| Fail[Unknown result; no replay]
+    Clock -->|Cancellation| Stop[Join current frame; stop unsent frames]
+```
+
+✅ Production BLE/USB retain a single observation session across the plan, fencing Settings takeover/disconnect. Motion sends use the same native no-response transport as Settings on BLE. There are **no position queries, telemetry-based corrections or intermediate arrival waits during playback**, including the final600ms home movement. One admitted motion is never resent. Backpressure retries only an unadmitted packet every25ms for at most1s. A late admission delays the following frame's deadline rather than causing a burst of overdue targets. Compatibility validation still occurs once per controller before motion.
+
+Final observation begins after the final nominal duration. Pre-observation telemetry is excluded, and fresh push updates get200ms before CMD11 query fallback at most5Hz. Success requires home XYZ within5mm, pitch/roll/claw within2°, and all six encoders within2counts of an anchor over300ms of received feedback. Final silence2s and observation3s remain independent deadlines; the fixed total budget is the sum of nominal frame durations plus1s admission per frame plus3s final observation (single dance:16.8s; maximum three-cycle dance:38.4s). Host wakeup delays can extend practical timing; generic legacy links also retain bounded in-flight write/exchange delays.
+
+Cancellation is checked between frames; a retained task joins the in-flight frame's bounded admission/duration and final observation if entered, then no remaining frame is sent. Cancellation never issues an automatic rollback or torque command. Send/observation errors release the session and report uncertainty; new explicit requests retain ADR0080 admission policy. Completion means submitted playback plus observed home, **not proof of intermediate waypoint arrival or a physical stop**. No physical safety claim depends on iOS staying active.
+
+✅ Nod/shake retain their calibrated home/ready/native/home path and per-segment observation, because native servo centers and Cartesian handoff need measured preparation. Tests compare exact Cartesian packet arrays and cadence, prohibit queries before final duration, reject cached-only completion and blocked admission, and hold another scheduled NexArm Action until final home is confirmed across different Channels.
+
+❌ Physical phone acceptance after this repair and device-side emergency-stop/watchdog validation remain outstanding. The user's smooth Settings result is comparative evidence, not measured controller timing. See [ADR0088](../../../../docs/adr/0088-nexarm-settings-matched-playback.md).

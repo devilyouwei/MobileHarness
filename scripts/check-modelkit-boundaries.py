@@ -167,22 +167,70 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'App invokes a domain behavior helper: {source.relative_to(ROOT)}')
     if re.search(r'\bActionPath\s*\(|\.register\s*\(\s*"', content):
         errors.append(f'App contains a concrete behavior path: {source.relative_to(ROOT)}')
-# Action authoring: every declared domain path has a canonical namespace and entry file.
-for domain in (ROOT / 'MobileHarness/Actions').iterdir():
+# Action authoring: cohesive entry files, recursively discovered support registrations.
+# This is a source convention check; Swift and assembly tests validate semantic binding.
+actions_root = ROOT / 'MobileHarness/Actions'
+for folder, directories, files in os.walk(actions_root):
+    if 'README.md' not in files:
+        errors.append(f'Missing Action directory README: {Path(folder).relative_to(ROOT)}')
+for domain in actions_root.iterdir():
     if not domain.is_dir() or domain.name == 'Runtime':
         continue
-    namespace = domain / (domain.name + 'Actions.swift')
-    if not namespace.exists() or not re.search(r'public enum ' + domain.name + r'Actions\s*\{\s*\}', namespace.read_text()):
+    namespace_name = domain.name + 'Actions'
+    namespace = domain / (namespace_name + '.swift')
+    if not namespace.exists() or not re.search(r'public enum ' + namespace_name + r'\s*\{', namespace.read_text()):
         errors.append(f'Missing canonical Action namespace: {domain.name}')
-    for module in domain.glob('*ActionModule.swift'):
-        for module_name, function in re.findall(r'ActionPath\(module: "([^"]+)", function: "([^"]+)"\)', module.read_text()):
-            entry = domain / (function[0].upper() + function[1:] + '.swift')
-            if module_name != domain.name or not entry.exists():
-                errors.append(f'Missing canonical Action entry: {module_name}.{function}')
-                continue
-            pattern = r'public static func ' + function + r'\(\s*invocation: ActionInvocation,\s*using\s+'
-            if not re.search(pattern, entry.read_text()):
-                errors.append(f'Noncanonical Action signature: {entry.relative_to(ROOT)}')
+    sources = {source: source.read_text() for source in domain.rglob('*.swift')}
+    entries = {}
+    for source, content in sources.items():
+        # Only direct domain entry files participate; support types are not callable entries.
+        if source.parent != domain:
+            continue
+        if not re.search(r'(?:public enum|extension) ' + namespace_name + r'\s*\{', content):
+            errors.append(f'Action entry file lacks domain namespace: {source.relative_to(ROOT)}')
+        for function in re.findall(r'public static func (\w+)\(\s*invocation: ActionInvocation,\s*using\s+', content):
+            entries.setdefault(function, []).append(source)
+    for source, content in sources.items():
+        for module_name, function in re.findall(r'ActionPath\(module: "([^"]+)", function: "([^"]+)"\)', content):
+            if source.parent != domain / 'Support':
+                errors.append(f'Action registration must live in domain Support: {source.relative_to(ROOT)}')
+            if module_name != domain.name or len(entries.get(function, [])) != 1:
+                errors.append(f'Missing or ambiguous canonical Action entry: {module_name}.{function}')
+# Tool authoring uses the same domain/Support boundary without imposing Action signatures.
+tools_root = ROOT / 'MobileHarness/Tools'
+for folder, directories, files in os.walk(tools_root):
+    if 'README.md' not in files:
+        errors.append(f'Missing Tool directory README: {Path(folder).relative_to(ROOT)}')
+for domain in tools_root.iterdir():
+    if not domain.is_dir() or domain.name == 'Runtime':
+        continue
+    namespace_name = domain.name + 'Tools'
+    namespace = domain / (namespace_name + '.swift')
+    if not namespace.exists() or not re.search(r'public enum ' + namespace_name + r'\s*\{', namespace.read_text()):
+        errors.append(f'Missing canonical Tool namespace: {domain.name}')
+    sources = {source: source.read_text() for source in domain.rglob('*.swift')}
+    entries = {}
+    for source, content in sources.items():
+        if source.parent != domain:
+            continue
+        if not re.search(r'(?:public enum|extension) ' + namespace_name + r'\s*\{', content):
+            errors.append(f'Tool entry file lacks domain namespace: {source.relative_to(ROOT)}')
+        for function in re.findall(r'public static func (\w+)\(', content):
+            entries.setdefault(function, []).append(source)
+    for source, content in sources.items():
+        for path in re.findall(r'ToolDefinition\(\s*path: "([^"]+)"', content):
+            if source.parent != domain / 'Support':
+                errors.append(f'Tool registration must live in domain Support: {source.relative_to(ROOT)}')
+            # Preserve the original System path; new domains use qualified names.
+            if path == 'runtimeInfo':
+                module, function = 'System', 'runtimeInfo'
+            elif '.' in path:
+                module, function = path.rsplit('.', 1)
+            else:
+                module, function = '', path
+            if module != domain.name or len(entries.get(function, [])) != 1:
+                errors.append(f'Missing or ambiguous canonical Tool entry: {path}')
+
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')

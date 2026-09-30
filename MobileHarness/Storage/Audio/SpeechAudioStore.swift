@@ -20,18 +20,18 @@ public final class SpeechAudioStore: Sendable {
 
     private let handles: MemoryLeaseStore<SpeechAudio>
     private let audioBytes: Int
-    private let waitTimeout: Duration
+    private let waitTimeout: Duration?
 
     public init(
         capacity: Int = 32, audioBytes: Int = 8_388_608,
-        queueTTL: Duration = .seconds(60), readyTTL: Duration = .seconds(60),
-        errorTTL: Duration = .seconds(30), waitTimeout: Duration = .seconds(3)
+        errorTTL: Duration = .seconds(30), waitTimeout: Duration? = nil
     ) {
-        precondition(audioBytes > 0 && waitTimeout > .zero)
+        precondition(audioBytes > 0)
+        precondition(waitTimeout.map { $0 > .zero } ?? true)
         self.audioBytes = audioBytes
         self.waitTimeout = waitTimeout
         handles = MemoryLeaseStore(
-            capacity: capacity, queueTTL: queueTTL, readyTTL: readyTTL, errorTTL: errorTTL
+            capacity: capacity, queueTTL: nil, readyTTL: nil, errorTTL: errorTTL
         ) { audio, error in await audio.fail(error) }
     }
 

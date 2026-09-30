@@ -6,10 +6,14 @@ Implements functions reached through ToolCalls. The goal is reusable behavior wi
 
 ```text
 Tools/
-├── Runtime/                 # Registry and direct execution
-├── System/RuntimeInfo.swift  # Fixed configuration description
-├── UI/ShowPose.swift         # Validate and replace the skeleton overlay
-└── README.md                # Module boundary and status
+├── Runtime/                 # Definitions, catalog, registry, invocation and executor
+├── System/
+│   ├── SystemTools.swift    # Callable system entries
+│   └── Support/             # Domain registration
+├── UI/
+│   ├── UITools.swift        # Callable presentation entries
+│   └── Support/             # Registration, capabilities, types and turn policy
+└── README.md
 ```
 
 ## Upstream and downstream
@@ -46,7 +50,7 @@ Tools owns no queue and bypasses Channel scheduling. VisionPerception retains th
 ## Feature status
 
 - ✅ [System](System/README.md): fixed runtime information.
-- ✅ [UI](UI/README.md): bounded skeleton display as a completion-only Tool.
+- ✅ [UI](UI/README.md): seven completion-only presentation functions.
 - ❌ Search, storage, network, memory and other model/device tools.
 - ❌ Live model/device health reporting.
 
@@ -80,3 +84,13 @@ Add functions in their domain modules; add domains in ToolModules. Existing capa
 ## Action and Tool presentation boundary
 
 ✅ UI completion tools now cover reply append, transcript replacement/closure, turn reset, voice state, gaze and pose. ToolModules injects both UIUpdateCapability and PosePresentationCapability. ❌ Model-selected expression remains an Action pending native model Tool transport.
+
+## Source organization standard
+
+✅ Group related public entry functions in `<Domain>Tools.swift`; do not create a file for every verb. Keep domain roots for callable entries and documentation. Place registration, injected capability protocols, data/error types and supporting policies under `Support/`. Small capability contracts live with their module; independently meaningful state policies retain their own file. Public Swift symbols remain accessible across the Tools target regardless of folder.
+
+Runtime owns shared execution contracts and `ToolModules` (the built-in domain catalog). Register new functions in their domain module; only adding a domain changes the catalog. No function-name mapping belongs in App or UI.
+
+✅ Preserve existing API shapes: UI updates accept `ToolInvocation` and an injected callback; `showPose(call:envelope:present:)` retains its existing pose callback, and `SystemTools.runtimeInfo(_:)` retains its returning signature and unqualified registered path `runtimeInfo`. Folder organization does not change permissions, error handling or feedback.
+
+❌ Native model Tool transport, additional domains and live health reporting remain future work. Do not create empty domain scaffolding.

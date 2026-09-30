@@ -88,7 +88,8 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(throws: HarnessError.queueFull) { try ToolRegistry(modules: Array(repeating: tool, count: 33)) }
     let action = FixtureActionModule(definitions: [
         ActionDefinition(
-            path: ActionPath(module: "Fixture", function: "apply"), kind: .state, completion: "Committed.",
+            path: ActionPath(module: "Fixture", function: "apply"), displayName: "测试动作", kind: .state,
+            completion: "Committed.",
             handler: { _ in })
     ])
     #expect(throws: ActionExecutionError.duplicateDefinition(ActionPath(module: "Fixture", function: "apply"))) {
@@ -102,7 +103,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let resource = ResourceID(rawValue: "fixture.output")
     let action = FixtureActionModule(definitions: [
         ActionDefinition(
-            path: path, kind: .state, completion: "Expression accepted.", resources: [resource],
+            path: path, displayName: "测试动作", kind: .state, completion: "Expression accepted.", resources: [resource],
             handler: {
                 try await endpoint.presentExpression(.smile, invocation: $0)
             })

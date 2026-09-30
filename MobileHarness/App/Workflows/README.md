@@ -181,7 +181,7 @@ flowchart LR
 
 ## Unified Action presentation
 
-✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, maps shared AgentCore execution snapshots into UI presentation values, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. Success follows finite/state/activity completion semantics; cancellation pending is distinct from terminal cancellation. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Settings test commands remain outside channel execution history and retain send-only acknowledgments.
+✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, forwards shared AgentCore execution snapshots unchanged to UI state, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. UI computes status from finite/state/activity completion semantics; Workflow contains no presentation mapping. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Settings test commands remain outside channel execution history and retain send-only acknowledgments.
 
 ```mermaid
 flowchart LR
@@ -198,8 +198,14 @@ flowchart LR
 
 ## Action and Tool presentation boundary
 
-✅ ActionActivityWorkflow projects every scheduled Action without module/source filtering and displays its captured failureDescription directly. Unknown errors use Swift localizedDescription; domain LocalizedError owns readable wording. Conversation history dry-run output labels Tool events explicitly. ❌ No duplicate error-message table is maintained.
+✅ ActionActivityWorkflow forwards every scheduled Action without module/source filtering; UI displays its captured failureDescription directly. Unknown errors use Swift localizedDescription; domain LocalizedError owns readable wording. Conversation history dry-run output labels Tool events explicitly. ❌ No duplicate error-message table is maintained.
 
 ## Head gestures
 
 ✅ Settings exposes nod and shakeHead through the existing latest-only send path; Action history uses 点头/摇头 names. Channel execution still awaits completion; Settings still does not. ❌ No old command is replayed on reconnection.
+
+✅ Action titles come from registration metadata carried in execution records, including unfamiliar paths; there is no Workflow title fallback table.
+
+## Observation ownership
+
+✅ ActionActivityWorkflow owns only subscription lifetime, forwarding and observation-unavailable handling. It does not inspect ActionPath, translate Channels, infer failure codes or format statuses. Deinitialization cancels its retained task; page lifetime never owns this observation. UI receives AgentCore record values without importing Actions/Gateway. ❌ This stream is not a new OutputGateway command or Agent message; see ADR 0086.

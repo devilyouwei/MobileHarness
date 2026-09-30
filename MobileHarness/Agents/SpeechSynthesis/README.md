@@ -10,7 +10,7 @@ flowchart LR
     Inbox --> Worker[One serial synthesis worker]
     Worker --> Model[SpeechSynthesisCapability]
     Model --> Store[StorageAudio PCM store]
-    Store -->|failure / expiry / cancellation| Worker
+    Store -->|failure / reply cleanup / cancellation| Worker
 ```
 
 ## 输入、订阅与输出契约
@@ -46,3 +46,5 @@ PCM 格式在一项请求内保持一致，帧 sequence 严格递增，流必须
 ❌ File output, retry, priority, replay and hardware performance acceptance remain outside this implementation.
 
 ✅ Synthesis and cache failures use the shared SpeechAudioError type; scheduled consumption belongs to SpeechPlayback.
+
+✅ Pending and completed-unclaimed audio uses reply-owned lifetime without queue/ready TTL. App clears remaining source/input handles after reply completion/cancellation, and session handles on interruption. Per-request synthesis execution timeout is unchanged and is not a cache expiry. ❌ Long-sequence physical-device acceptance remains pending.

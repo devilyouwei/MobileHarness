@@ -48,3 +48,9 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 ## Action and Tool presentation boundary
 
 ✅ ActionExecutionRecord carries a bounded512-character failureDescription captured from the thrown error. Failure codes remain optional machine metadata; frontend text is not selected from a per-Action error catalog. ❌ Error objects and call parameters are not retained.
+
+## Self-described execution observation
+
+✅ ActionExecutionRecord carries an immutable displayName copied from its validated ActionDefinition at admission. This is a shared String value with no Actions, App or UI dependency. Producers provide the name; consumers never resolve domain paths into display titles. The existing bounded, versioned snapshots still carry raw Channel identity and generic execution/completion facts.
+
+❌ Execution observation remains separate from ActionResult delivery and permission declarations; metadata does not grant execution rights. See ADR 0086.

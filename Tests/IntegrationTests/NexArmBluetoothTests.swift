@@ -304,7 +304,7 @@ func bluetoothSettingsConnectionPersistsAcrossNavigationAndAssistantExecutes() a
     #expect(workflow.state.phase == .connected)
     #expect(await link.disconnects == 0)
     try await runNexArmAssistantAction(cycles: 1) { try await workflow.shakeBase(cycles: $0) }
-    #expect(await link.writes == 7)
+    #expect(await link.writes == 5)
     #expect(workflow.state.motionStatus == "已完成左右晃动 1 次并回位")
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -400,7 +400,7 @@ func bluetoothUnknownMotionKeepsConnectionAndRecoversWithoutReplay() async throw
     #expect(workflow.state.error == nil)
     #expect(await link.writes == 1)
     try await workflow.shakeBase(cycles: 1)
-    #expect(await link.writes == 8)
+    #expect(await link.writes == 6)
     #expect(await link.connects == 1)
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -494,7 +494,7 @@ func bluetoothPoseProtocolConnectsWithoutFirmwareQueriesAndAssistantExecutes() a
     await workflow.waitUntilIdle()
     #expect(await link.feedbackCommands.count == 4)
     try await runNexArmAssistantAction(cycles: 1) { try await workflow.shakeBase(cycles: $0) }
-    #expect(await link.writes == 7)
+    #expect(await link.writes == 5)
     #expect(await link.versionReads == 0)
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -1013,8 +1013,8 @@ func bluetoothResetRetiresPendingObservationWithoutClosingLiveControls() async t
     workflow.connect(link.id)
     await workflow.waitUntilIdle()
     await link.holdTelemetry()
-    let action = Task { try await workflow.performGesture(.wave, repetitions: 3) }
-    try await until(attempts: 500) { await link.waitingForPose }
+    let action = Task { try await workflow.performGesture(.wave, repetitions: 1) }
+    try await until(attempts: 700) { await link.waitingForPose }
     workflow.tryAction(.reset)
     try await until { await link.liveCommands.contains { $0.command == 54 } }
     await workflow.waitUntilIdle()
@@ -1118,7 +1118,7 @@ func bluetoothNewPresetIgnoresPreviousFailureAndMissingOldFeedback() async throw
     await #expect(throws: BluetoothWorkflowError.unverified) {
         try await workflow.performGesture(.tiltLeft, repetitions: 1)
     }
-    #expect(await link.writes == before + 1)
+    #expect(await link.writes == before + 3)
     #expect(workflow.state.controlReady && !workflow.state.executing)
     #expect(await link.connects == 1)
     workflow.disconnect()

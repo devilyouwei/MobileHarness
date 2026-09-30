@@ -19,18 +19,21 @@ flowchart LR
     Adapter --> Audio[SpeechAudio adapter]
     Audio --> Stream[Storage BoundedMemoryStream]
     Action[SpeechPlayback] -->|checkout / release| Adapter
-    Stream -->|next with 3-second starvation limit| Player[Continuous player]
+    Reply[App reply owner] --> Barrier[Gateway joins all reply Actions]
+    Barrier -->|retire remaining source/input handles| Adapter
+    Stop[Voice interruption] -->|cancel session handles| Adapter
+    Stream -->|next awaits producer / completion / failure| Player[Continuous player]
 ```
 
 ✅ 32 live handles, 8 MiB PCM per handle (256 MiB aggregate upper bound), 2048 queued frames per handle, no files. Overflow explicitly fails synthesis; consumed frames are released immediately. The serial synthesis worker is never held waiting for a playback reader.
 
-✅ Ownership is source Agent + session + originating input, converted to a `speech.pcm` Storage scope. One checkout per UUID. Queued requests expire after 60 seconds; completed unclaimed PCM expires after 60 seconds. A checked-out handle suspends completed-cache expiration until release/cancel. Empty reads fail after 3 seconds, including midstream starvation.
+✅ Ownership is source Agent + session + originating input, converted to a `speech.pcm` Storage scope. One checkout per UUID. Queued and completed-unclaimed audio have no time-based expiry. Their lifetime belongs to the originating reply (source Agent + input ID) within the voice session. App retires remaining handles only after the reply completion/cancellation barrier; interruption cancels the whole voice session. Playback still releases each consumed segment immediately. Empty reads have no independent deadline by default: they wait for PCM, completion, producer failure or cancellation. SpeechSynthesisAgent retains its 60-second execution deadline. An explicit waitTimeout remains available to callers that need a read deadline.
 
-✅ Completion, cancellation and error release PCM immediately. At most 128 terminal records retain errors for 30 seconds. The adapter translates general Storage failures to the existing `SpeechAudioError` cases, so Agent and Action behavior remains stable.
+✅ Playback completion, reply/session cleanup, cancellation and error release PCM immediately; synthesis completion alone retains unplayed PCM. At most 128 terminal records retain errors for 30 seconds. The adapter translates general Storage failures to the existing `SpeechAudioError` cases, so Agent and Action behavior remains stable.
 
 ❌ Persistence, repeated playback and multi-consumer handles are unsupported. Physical-device latency and memory acceptance remain outstanding; model intermediate waveforms and player buffers are outside this cache.
 
-✅ The production default matches the synthesis Agent’s 8 MiB per-request output limit: approximately 43.7 seconds of 48 kHz mono Float32 PCM. Memory is allocated as audio arrives, not reserved per handle. Increasing this from 2 MiB reduces overflow when MOSS runs ahead of playback; the 2048-frame cap, explicit failure policy and three-second empty-read timeout remain. ❌ This does not provide producer backpressure or guarantee arbitrarily long replies.
+✅ The production default matches the synthesis Agent’s 8 MiB per-request output limit: approximately 43.7 seconds of 48 kHz mono Float32 PCM. Memory is allocated as audio arrives, not reserved per handle. Increasing this from 2 MiB reduces overflow when MOSS runs ahead of playback; the 2048-frame cap, explicit failure policy remain; empty reads follow the producer lifecycle. ❌ This does not provide producer backpressure or guarantee arbitrarily long replies.
 
 ## Storage domain organization
 

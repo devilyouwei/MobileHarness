@@ -30,3 +30,9 @@ flowchart LR
 ✅ App awaits each Tool on its sequential output consumer. There is no Channel wait or detached task. A wait scope applies only to ActionCalls; Tools do not become barrier members. MainActor scheduling can still take time. VisionPerception's two-entry newest output buffer explicitly coalesces only replaceable gaze/skeleton state, counting replacements; reply chunks are never coalesced.
 
 ❌ No generic Tool replacement, physical device control or native model Tool transport is added. Model-selected expression remains the scheduled UI.express Action by explicit product choice. Physical display latency still requires device acceptance.
+
+## Source layout
+
+✅ `UITools.swift` groups the seven callable presentation entries. `Support/UIToolModule.swift` owns registrations and typed host capability contracts; `Support/UIToolTypes.swift` owns nested value/error types. `Support/ConversationPresentation.swift` retains the bounded turn/sequence acceptance policy as a separate cohesive implementation. See [Support](Support/README.md).
+
+❌ This organization adds no rendering acknowledgement, queue or native model Tool transport.

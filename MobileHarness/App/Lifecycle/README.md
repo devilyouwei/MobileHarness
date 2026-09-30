@@ -17,6 +17,8 @@ flowchart LR
     Producers --> Gateways[InputGateway / OutputGateway]
     Gateways --> Execution[Action and Tool execution]
     Execution --> Endpoint[Session-fenced effect methods]
+    Execution --> Done[Reply completion or cancellation barrier]
+    Done --> Retire[Retire remaining source/input audio]
     Endpoint --> State[UI state / platform playback]
     Stop[Stop or replacement] --> Close[Stop and join producers]
     Close --> Cancel[Cancel audio and executors; await cleanup]
@@ -44,3 +46,5 @@ flowchart LR
 ## Action and Tool presentation boundary
 
 ✅ Caption append, full transcript replacement, voice phase and gaze endpoints consume ToolInvocation. The existing session/turn acceptance policy remains; expression and audio keep scheduled Action contexts. ❌ No audio/recognition errors are inserted into the Action panel.
+
+✅ VoiceSessionCoordinator retires source/input audio after successful dispatch of reply completion/error controls, when Gateway has joined the corresponding Actions. Dispatch failure also retires that input; voice interruption still stops the producer before cancelling all audio in that session. Pending/ready PCM has no wall-clock expiry. The voice session spans multiple replies; current voice admission allows one reply through playback at a time, while cache ownership still isolates other sources and inputs. ❌ Generation completion alone is not playback completion, and this does not add barge-in or multi-reply UI.

@@ -40,7 +40,7 @@ Generic persistent media files and reclaimable disk caches remain planned; the c
 - `save(_:expecting:)` rereads the durable revision, rejects stale writers, atomically replaces the file and then updates the cache. A nil expected revision requires an absent file. Failed writes leave the cache unchanged.
 - A process-wide lock protects revision comparison and replacement across instances, including different payload types. This is local synchronization, not cross-process locking or cross-device replication. App assembles one owner per settings file. External edits are noticed by refresh or the next save; no filesystem watcher is installed.
 - Envelope version 1 is independent of the consumer payload version. Invalid JSON, unsupported envelopes and nonregular files fail explicitly; corrupt data is never silently reset. iOS writes use complete file protection. App controls backup and credential policies.
-- App settings are the first durable consumer. PCM remains transient and retains its existing expiry and capacity rules.
+- App settings are the first durable consumer. PCM remains transient with explicit reply/session-owned retention and bounded capacity; it does not expire merely while waiting for playback.
 
 ```mermaid
 sequenceDiagram
@@ -94,3 +94,7 @@ Storage/                         # Storage target: reusable storage mechanisms o
 Do not create a domain directory or target until a concrete implementation exists. New domains follow the same dependency direction and must document bounds, deletion, ownership and verification. Core synchronization currently means process-local revision locking/cache coherence; cross-device synchronization and reclaimable disk cache remain unimplemented. App-owned settings schemas remain in App, using the generic document store.
 
 See [Chat](Chat/README.md) for the moved journal contract and [Audio](Audio/README.md) for PCM contracts.
+
+✅ MemoryLeaseStore accepts nil queueTTL/readyTTL for owner-managed values: no expiration task is armed for that state. Explicit durations retain generic queued/completed expiry for other domains. StorageAudio always selects nil for both; error tombstones remain bounded and expire separately. ❌ This adds no persistence or automatic eviction of live reply audio.
+
+✅ BoundedMemoryStream accepts an optional read timeout. A nil timeout creates no reader timer; producer finish/failure and cancellation still resolve the reader. StorageAudio uses this producer-owned policy so synthesis pauses do not discard PCM. Explicit durations still fail stalled reads. ❌ This does not guarantee real-time production.

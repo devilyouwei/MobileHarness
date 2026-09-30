@@ -7,7 +7,8 @@ func testActionRegistry(handlers: [ActionPath: ActionHandler]) throws -> ActionR
     try ActionRegistry(
         definitions: handlers.map { path, handler in
             ActionDefinition(
-                path: path, kind: .finite, completion: "Fixture acknowledgment completed.", handler: handler)
+                path: path, displayName: "测试动作", kind: .finite, completion: "Fixture acknowledgment completed.",
+                handler: handler)
         })
 }
 

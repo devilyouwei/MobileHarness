@@ -3,6 +3,7 @@ import AgentCore
 import AppWorkflows
 import Foundation
 import Testing
+import UI
 
 @testable import Gateway
 
@@ -41,8 +42,12 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let armPath = ActionPath(module: "NexArm", function: "dance")
     let speechPath = ActionPath(module: "Speech", function: "speak")
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: armPath, kind: .finite, completion: "Fixture gate.") { _ in await arm.wait() },
-        ActionDefinition(path: speechPath, kind: .finite, completion: "Fixture gate.") { _ in await speech.wait() },
+        ActionDefinition(path: armPath, displayName: "测试动作", kind: .finite, completion: "Fixture gate.") { _ in
+            await arm.wait()
+        },
+        ActionDefinition(path: speechPath, displayName: "测试动作", kind: .finite, completion: "Fixture gate.") { _ in
+            await speech.wait()
+        },
     ])
     let scheduler = ChannelScheduler(registry: registry)
     let stream = try await scheduler.observeExecutions()
@@ -75,7 +80,8 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let path = ActionPath(module: "NexArm", function: "dance")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
-            ActionDefinition(path: path, kind: .finite, completion: "Committed fixture is joined.") { _ in
+            ActionDefinition(path: path, displayName: "测试动作", kind: .finite, completion: "Committed fixture is joined.")
+            { _ in
                 await gate.wait()
             }
         ]))
@@ -105,12 +111,14 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let input = AgentInput(sessionID: UUID(), payload: .event("bounds"))
     let path = ActionPath(module: "Fixture", function: "work")
     let active = observationCall(path, input: input, channel: "Robot")
-    ledger.admit(active, kind: .finite)
+    let definition = ActionDefinition(
+        path: path, displayName: "测试动作", kind: .finite, completion: "Fixture completed.", handler: { _ in })
+    ledger.admit(active, definition: definition)
     ledger.transition(active.executionID, to: .running)
     var lastID = UUID()
     for _ in 0..<20 {
         let job = observationCall(path, input: input, channel: "Speech")
-        ledger.admit(job, kind: .finite)
+        ledger.admit(job, definition: definition)
         ledger.transition(job.executionID, to: .succeeded, completion: .completed)
         lastID = job.executionID
     }
@@ -129,7 +137,8 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let path = ActionPath(module: "NexArm", function: "dance")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
-            ActionDefinition(path: path, kind: .finite, completion: "Failure fixture.") { _ async throws -> Void in
+            ActionDefinition(path: path, displayName: "测试动作", kind: .finite, completion: "Failure fixture.") {
+                _ async throws -> Void in
                 throw BluetoothWorkflowError.feedbackTimeout
             }
         ]))
@@ -149,4 +158,29 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let end = await iterator.next()
     #expect(final?.records.first?.phase == .failed)
     #expect(end == nil)
+}
+
+@Test @MainActor func unfamiliarActionDisplaysItsRegisteredNameThroughTheWholeObservationPath() async throws {
+    // Explicit test-only behavior: no device, model or media access.
+    let path = ActionPath(module: "NewDomain", function: "newOperation")
+    let registry = try ActionRegistry(definitions: [
+        ActionDefinition(path: path, displayName: "新领域操作", kind: .finite, completion: "Fixture acknowledged.") { _ in }
+    ])
+    let scheduler = ChannelScheduler(registry: registry)
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    workflow.start { try await scheduler.observeExecutions() }
+    let input = AgentInput(sessionID: UUID(), payload: .event("metadata fixture"))
+    let id = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "CustomLane"))
+    try await scheduler.finish(inputID: input.id)
+    let snapshot = await scheduler.executionSnapshot()
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while state.revision != snapshot.revision, ContinuousClock.now < deadline { await Task.yield() }
+    let item = try #require(state.items.first { $0.id == id })
+    #expect(item.title == "新领域操作")
+    #expect(item.channelTitle == "CustomLane")
+    #expect(item.status == "已完成")
+    #expect(snapshot.records.first?.displayName == "新领域操作")
+    #expect(await scheduler.resultSnapshot().isEmpty)
+    await scheduler.shutdown()
 }

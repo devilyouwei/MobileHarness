@@ -8,7 +8,7 @@ public enum StorageError: Error, Equatable, Sendable {
 public actor BoundedMemoryStream<Element: Sendable> {
     private let maximumBytes: Int
     private let maximumItems: Int
-    private let waitTimeout: Duration
+    private let waitTimeout: Duration?
     private let size: @Sendable (Element) -> Int
     private var items: [Element] = []
     private var bytes = 0
@@ -18,10 +18,11 @@ public actor BoundedMemoryStream<Element: Sendable> {
     private var reader: CheckedContinuation<Element?, Error>?
 
     public init(
-        maximumBytes: Int, maximumItems: Int, waitTimeout: Duration,
+        maximumBytes: Int, maximumItems: Int, waitTimeout: Duration?,
         size: @escaping @Sendable (Element) -> Int
     ) {
-        precondition(maximumBytes > 0 && maximumItems > 0 && waitTimeout > .zero)
+        precondition(maximumBytes > 0 && maximumItems > 0)
+        precondition(waitTimeout.map { $0 > .zero } ?? true)
         self.maximumBytes = maximumBytes
         self.maximumItems = maximumItems
         self.waitTimeout = waitTimeout
@@ -58,11 +59,13 @@ public actor BoundedMemoryStream<Element: Sendable> {
         guard reader == nil else { throw StorageError.duplicate }
         let id = UUID()
         readerID = id
-        let deadline = Task {
-            do { try await Task.sleep(for: waitTimeout) } catch { return }
-            if self.readerID == id, self.reader != nil { self.fail(StorageError.timedOut) }
+        let deadline = waitTimeout.map { timeout in
+            Task {
+                do { try await Task.sleep(for: timeout) } catch { return }
+                if self.readerID == id, self.reader != nil { self.fail(StorageError.timedOut) }
+            }
         }
-        defer { deadline.cancel() }
+        defer { deadline?.cancel() }
         return try await withTaskCancellationHandler {
             try check()
             return try await withCheckedThrowingContinuation { reader = $0 }

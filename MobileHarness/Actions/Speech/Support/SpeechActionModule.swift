@@ -1,4 +1,10 @@
 import AgentCore
+import Foundation
+
+/// Session-owned playback of an already decoded handle, including checkout, drain and cleanup.
+public protocol SpeechPlaybackCapability: Sendable {
+    func play(audioID: UUID, invocation: ActionInvocation) async throws
+}
 
 public struct SpeechActionModule: ActionModule {
     private let playback: any SpeechPlaybackCapability
@@ -6,7 +12,7 @@ public struct SpeechActionModule: ActionModule {
     public var definitions: [ActionDefinition] {
         [
             ActionDefinition(
-                path: ActionPath(module: "Speech", function: "speak"), kind: .finite,
+                path: ActionPath(module: "Speech", function: "speak"), displayName: "朗读回复", kind: .finite,
                 completion: "Playback drained and audio lease released.",
                 handler: { [playback] invocation in
                     try await SpeechActions.speak(invocation: invocation) {

@@ -16,9 +16,9 @@ struct ActionExecutionLedger {
         self.terminalCapacity = terminalCapacity
     }
 
-    mutating func admit(_ invocation: ActionInvocation, kind: ActionDefinition.Kind) {
+    mutating func admit(_ invocation: ActionInvocation, definition: ActionDefinition) {
         let semantics: ActionExecutionRecord.Semantics
-        switch kind {
+        switch definition.kind {
         case .finite: semantics = .finite
         case .state: semantics = .state
         case .activityStart: semantics = .activityStart
@@ -26,7 +26,8 @@ struct ActionExecutionLedger {
         case .activityStop: semantics = .activityStop
         }
         records[invocation.executionID] = ActionExecutionRecord(
-            id: invocation.executionID, path: invocation.call.actionPath, source: invocation.envelope.source,
+            id: invocation.executionID, path: invocation.call.actionPath, displayName: definition.displayName,
+            source: invocation.envelope.source,
             sessionID: invocation.envelope.sessionID, inputID: invocation.envelope.inputID,
             channel: invocation.call.channel, semantics: semantics)
         order.append(invocation.executionID)

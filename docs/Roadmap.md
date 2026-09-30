@@ -643,3 +643,65 @@ Validation: `scripts/check.sh` passed with full Xcode selected, including the un
 ❌ BLE conversation acceptance on the new phone build remains pending.
 
 Validation for the handoff correction: `scripts/check.sh` passed (257 IntegrationTests plus the remaining package suites), and `scripts/build-ios.sh` passed all four simulator schemes. Hardware results above were captured before the final transport timestamp boundary correction; that correction preserves synchronous telemetry and passed the push-only observation regression.
+
+## Cohesive Action source organization (2026-09-30)
+
+✅ Consolidated short entries and complete error contracts; introduced domain Support directories for non-callable registration/interfaces/types/services, and moved the built-in catalog into Runtime. Replaced one-verb-per-file enforcement with recursive definition/entry checks; SwiftPM README exclusions and Xcode navigation follow the new layout. Public paths, parameters, opt-in diagnostics and runtime contracts are unchanged.
+
+Validation: `scripts/check.sh` passed with full Xcode selected, including formatting, boundary checks, package tests and project metadata; `scripts/build-ios.sh` passed all four unsigned simulator schemes. The first check overlapped an independently edited audio-store initializer/test pair and failed to compile; rerunning after that pair was updated passed. All public static entry signatures/bodies and registered definition arguments were compared against the pre-migration sources and preserved. Xcode navigation covers all 24 Action source/README files exactly once.
+
+❌ Optional real-model and physical-device tests remained skipped. This migration adds no hardware behavior or physical acceptance.
+
+## Reply-owned speech audio (2026-09-30)
+
+✅ Removed queued/ready PCM wall-clock expiry; normal reply termination joins Actions before clearing remaining input-owned audio. Interruption/error cleanup and per-source/input isolation remain explicit. See [ADR 0085](adr/0085-reply-owned-speech-audio.md).
+
+❌ Physical-device delayed playback and long choreography acceptance remain pending.
+
+Reply-audio validation: `scripts/check.sh` passed with full Xcode, including queued/ready audio retained for 61 seconds, completion-barrier cleanup, reply/session isolation and explicit generic TTL regressions. `scripts/build-ios.sh` passed all four unsigned simulator schemes. No phone installation or physical playback acceptance was performed.
+
+## Remove unused diagnostic Action (2026-09-30)
+
+✅ Removed NexArmDiagnostics, its nudgeWrist registration/NudgeError, activity title and synthetic diagnostic Agent/Gateway fixture. Direct controller tests and the opt-in USB wrist diagnostic remain; production Agent-used actions and permissions are unchanged. Action sources now total fifteen Swift files.
+
+Validation: `scripts/check.sh` passed, including all package suites and 259 IntegrationTests; `scripts/build-ios.sh` passed all four unsigned simulator schemes. Production Action/Agent/App sources contain no retired diagnostic capability references.
+
+❌ No physical hardware or optional real-model acceptance is performed by this cleanup.
+
+## Action presentation decoupling (2026-09-30)
+
+✅ Required displayName metadata flows from domain registrations into immutable execution records. Removed Action/Channel/status mapping from ActionActivityWorkflow; UI derives generic presentation from records and retains raw Channel names. Added metadata validation and unfamiliar-domain observation regression coverage. See ADR 0086.
+
+Validation: `scripts/check.sh` passed with full Xcode selected, including 260 IntegrationTests, 10 AppWorkflowTests and all remaining package suites; `scripts/build-ios.sh` passed all four unsigned simulator schemes. The unfamiliar-domain test traverses real registration, scheduler, Workflow and UI state without a name/channel mapping.
+
+❌ Optional real-model/device tests remained skipped; real-phone visual acceptance and richer localization remain pending.
+
+## Cohesive Tool source organization (2026-09-30)
+
+✅ Consolidated seven UI entries, separated domain Support, and moved the built-in catalog into Runtime (19 Swift files to 11). Updated source conventions, SwiftPM exclusions and Xcode navigation. Public call paths, signatures, validation, registration and execution semantics are preserved.
+
+❌ Optional real-model/device acceptance is outside this source-only migration.
+
+Validation: `scripts/check.sh` passed with full Xcode selected (formatting, boundary checks, package tests and project metadata); `scripts/build-ios.sh` passed all four unsigned simulator schemes. Compared all nine public static functions (eight Tool entries plus the catalog), all five nested UI value/error declarations, registrations, runtime contracts and conversation policy against pre-migration sources. Xcode navigation covers all 17 Tool source/README files exactly once. Optional physical-device and real-model tests remained skipped.
+
+## Conversation trajectory handoff correction (2026-09-30)
+
+✅ Extended nominal-duration handoff protection to every NexArm conversation segment after a user report of celebration/dance stalls and apparent motor2 oscillation. Regression coverage includes complete celebration/dance sequences with early target telemetry, fresh arrival gating and unchanged watchdog behavior. Existing independent-request recovery policy remains.
+
+❌ iPhone BLE reproduction and visual motor2 verification are pending; automated fixtures cannot establish whether this explains all observed jitter.
+
+Validation: `scripts/check.sh` passed with Xcode Swift 6.4, including the complete celebration/dance telemetry regressions. `scripts/build-ios.sh` passed all four unsigned simulator schemes. Physical tests and opt-in model evaluations were not enabled; no hardware commands were issued.
+
+## TTS playback truncation (2026-09-30)
+
+✅ Removed the default three-second empty-PCM read deadline that could stop playback and discard remaining audio while synthesis was still running. Regression coverage includes delayed first audio and delayed continuation through the real synthesis/cache/Action path. Synthesis execution and hardware completion retain their own deadlines. ❌ iPhone audible continuity and thermal-load acceptance remain pending; slower-than-real-time synthesis may still cause audible pauses. See [ADR 0087](adr/0087-speech-producer-deadline.md).
+
+## Settings-matched Cartesian motion (2026-09-30)
+
+✅ Following user confirmation of smooth repeated Settings celebration/dance, unified their Cartesian frame factory and nominal cadence with Channel playback. Removed Channel-only preparation/ending poses, motion-time queries and intermediate arrival waits. Final fresh stable home still gates Action completion and the next NexArm Action; head gestures retain their calibrated path. See [ADR0088](adr/0088-nexarm-settings-matched-playback.md).
+
+❌ Phone BLE jitter acceptance and intermediate physical-path verification remain pending; final home is not proof of every waypoint.
+
+Validation: `scripts/check.sh` passed (267 IntegrationTests plus other package suites); `scripts/build-ios.sh` passed all four unsigned simulator schemes. The signed Debug physical-device build succeeded. Hardware motion tests and opt-in model evaluations were not run.
+
+Deployment: installed the signed Debug build on the connected iPhone17Pro and verified its process after launch. The first installation attempt lost the phone installation-service connection; a retry succeeded. Visual celebration/dance jitter acceptance remains with the operator.

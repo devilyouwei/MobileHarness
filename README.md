@@ -250,3 +250,5 @@ Local user settings now use Storage-backed cached persistence in the application
 ✅ An opt-in macOS USB [NexArm Action](MobileHarness/Actions/NexArm/README.md) now supports supervised hardware validation through the gateways. ✅ Assistant declares `shakeBase(cycles: 1...3)` for supervised Mac USB sweeps; the hardware test supplies the real binding and deterministic model output. ✅ iPhone settings and foreground BLE binding are implemented. ❌ TCP, unattended robot safety and full physical acceptance remain pending.
 
 ✅ iPhone Settings → 蓝牙设备 now scans NexArm, verifies/connects, remembers one device, disconnects and forgets. Return to conversation to request “让底座左右晃动一次”; supported posture and finite-motion bounds still apply. [BLE lifecycle and limits](MobileHarness/PlatformKit/Connectivity/NexArm/README.md) distinguish implementation/tests from physical acceptance.
+
+✅ Action implementations now group related entries, with registration, types and services in domain Support directories. See the [Action authoring standard](MobileHarness/Actions/README.md); public behavior and runtime contracts are unchanged.

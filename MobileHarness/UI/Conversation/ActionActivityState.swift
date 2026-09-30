@@ -4,9 +4,24 @@ import Observation
 
 public struct ActionActivityItem: Identifiable, Equatable, Sendable {
     public let execution: ActionExecutionRecord
-    public let title: String
-    public let channelTitle: String
-    public let status: String
+    public var title: String { execution.displayName }
+    public var channelTitle: String { execution.channel }
+    public var status: String {
+        switch execution.phase {
+        case .queued: "等待执行"
+        case .running: "正在执行"
+        case .cancelling: "正在取消"
+        case .cancelled: execution.startedAt == nil ? "执行前已取消" : "已取消"
+        case .succeeded:
+            switch execution.completion {
+            case .activityStarted: "已启动"
+            case .activityStopped: "已结束"
+            default:
+                execution.semantics == .state || execution.semantics == .activityUpdate ? "已设置" : "已完成"
+            }
+        case .failed: execution.failureDescription ?? "执行未完成"
+        }
+    }
     public var id: UUID { execution.id }
     public var channel: String { execution.channel }
     public var isActive: Bool { !execution.isTerminal }
@@ -21,14 +36,12 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
         case .cancelled: "minus.circle"
         }
     }
-    public init(execution: ActionExecutionRecord, title: String, channelTitle: String, status: String) {
+    public init(execution: ActionExecutionRecord) {
         self.execution = execution
-        self.title = title
-        self.channelTitle = channelTitle
-        self.status = status
     }
 }
 
+/// Display aggregation by exact channel name; not a cross-task execution lane.
 public struct ActionChannelSummary: Identifiable {
     public let item: ActionActivityItem
     public let additionalRunning: Int
@@ -46,12 +59,12 @@ public final class ActionActivityState {
     private var dismissed: Set<UUID> = []
 
     public init() {}
-    public func replace(revision: UInt64, items: [ActionActivityItem], evictedCount: UInt64) {
+    public func replace(revision: UInt64, records: [ActionExecutionRecord], evictedCount: UInt64) {
         guard self.revision == nil || revision > self.revision! else { return }
         self.revision = revision
-        self.items = items
+        self.items = records.map(ActionActivityItem.init)
         self.evictedCount = evictedCount
-        dismissed.formIntersection(Set(items.map(\.id)))
+        dismissed.formIntersection(Set(records.map(\.id)))
         observationUnavailable = false
     }
     public func dismiss(_ id: UUID) {

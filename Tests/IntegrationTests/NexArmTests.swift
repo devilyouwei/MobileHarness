@@ -74,36 +74,10 @@ private actor NexArmFixture: NexArmLink {
     }
 }
 
-private func nexArmInvocation(_ parameters: [String: String]) -> ActionInvocation {
-    ActionInvocation(
-        source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("diagnostic")),
-        call: ActionCall(
-            actionPath: ActionPath(module: "NexArm", function: "nudgeWrist"), channel: "Arm", parameters: parameters))
-}
-
-@Test func nexArmActionRejectsInvalidParametersBeforeEffects() async throws {
-    for parameters in [
-        ["degrees": "0"], ["degrees": "3"], ["degrees": "-3"], ["degrees": "nan"], [:],
-        ["degrees": "1", "speed": "1000"],
-    ] {
-        await #expect(throws: NexArmActions.NudgeError.invalidDelta) {
-            try await NexArmActions.nudgeWrist(invocation: nexArmInvocation(parameters)) { _, _ in
-                Issue.record("Invalid input reached the device")
-            }
-        }
-    }
-}
-
 @Test func nexArmMotionVerifiesAndAllowsOnlyOneNudge() async throws {
     let link = NexArmFixture()
     let controller = NexArmController(link: link)
-    let assembly = try BehaviorAssembly(
-        actionModules: [
-            NexArmActionModule { delta, _ in
-                try await controller.nudgeWrist(delta: delta)
-            }
-        ], toolModules: [], capabilities: [])
-    try await ActionExecutor(registry: assembly.actions).execute(nexArmInvocation(["degrees": "1"]))
+    try await controller.nudgeWrist(delta: 1)
     #expect(await controller.lastMotion?.start == 2110)
     #expect(await controller.lastMotion?.observed == 2121)
     await #expect(throws: NexArmError.alreadyUsed) { try await controller.nudgeWrist(delta: 1) }
@@ -132,92 +106,22 @@ private func nexArmInvocation(_ parameters: [String: String]) -> ActionInvocatio
     #expect(await link.writes == 1)
 }
 
-/// Diagnostic fixture only: no model generation and no production Agent capability changes.
-private actor NexArmDiagnosticAgent: Agent {
-    nonisolated let descriptor: AgentDescriptor
-    nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
-    private(set) var accepted: AgentInput?
-    private(set) var result: ActionResult?
-    init() throws {
-        descriptor = AgentDescriptor(
-            id: .assistant, name: "NexArm supervised diagnostic", inputs: [.event, .actionResult],
-            outputs: [.actionCall, .control],
-            capabilities: try CapabilityRegistry(internalActions: [
-                InternalAction(module: "NexArm", function: "nudgeWrist", channel: "Arm", required: ["degrees"])
-            ]))
-    }
-    func start() {}
-    func pause() {}
-    func resume() {}
-    func stop() {}
-    func status() -> AgentStatus {
-        AgentStatus(lifecycle: .running, queuedInputs: 0, processedInputs: accepted == nil ? 0 : 1)
-    }
-    func receive(_ input: AgentInput) throws {
-        if case .actionResult(let value) = input.payload {
-            result = value
-            return
-        }
-        guard accepted == nil else { throw HarnessError.queueFull }
-        accepted = input
-    }
-}
-
-private func runNexArmGatewayDiagnostic(link: any NexArmLink) async throws -> NexArmController.Motion {
-    let controller = NexArmController(link: link)
-    let manager = AgentManager()
-    let agent = try NexArmDiagnosticAgent()
-    let session = UUID()
-    try await manager.register(agent, sessionID: session)
-    let input = InputGateway(manager: manager)
-    let assembly = try BehaviorAssembly(
-        actionModules: [
-            NexArmActionModule { delta, _ in
-                try await controller.nudgeWrist(delta: delta)
-            }
-        ], toolModules: [], capabilities: [agent.descriptor.capabilities])
-    let scheduler = ChannelScheduler(registry: assembly.actions, capacityPerChannel: 1, maximumTrackedInputs: 1)
-    let output = OutputGateway(
-        manager: manager, requests: input, tools: assembly.tools, actions: scheduler,
-        actionFeedback: .terminal, sink: { _ in })
-    do {
-        let external = AgentInput(sessionID: session, payload: .event("supervised one-degree wrist nudge"))
-        let delivery = try await input.send(external, to: .assistant)
-        #expect(delivery.rejected.isEmpty)
-        let accepted = try #require(await agent.accepted)
-        let call = ActionCall(
-            actionPath: ActionPath(module: "NexArm", function: "nudgeWrist"), channel: "Arm",
-            parameters: ["degrees": "1"])
-        try await output.dispatch(OutputEnvelope(source: .assistant, input: accepted, output: .actionCall(call)))
-        try await output.dispatch(
-            OutputEnvelope(source: .assistant, input: accepted, output: .control("agent.finished"), sequence: 1))
-        let motion = try #require(await controller.lastMotion)
-        #expect(abs(motion.observed - motion.target) <= 6)
-        await output.shutdown()
-        await link.close()
-        return motion
-    } catch {
-        print(
-            "NEXARM diagnostic failure: target=\(String(describing: await controller.attemptedTarget)) observed=\(String(describing: await controller.lastObserved)) cause=\(String(describing: await controller.lastFailure))"
-        )
-        await output.shutdown()
-        await link.close()
-        throw error
-    }
-}
-@Test func nexArmGatewayDiagnosticAwaitsActionCompletion() async throws {
-    let link = NexArmFixture()
-    let motion = try await runNexArmGatewayDiagnostic(link: link)
-    #expect(motion.observed == 2121)
-    #expect(await link.writes == 1)
-}
 #if os(macOS)
     @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_MOTION_TEST"] == "1"))
-    func nexArmUSBPhysicalAction() async throws {
+    func nexArmUSBPhysicalWristDiagnostic() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
         let serial = try NexArmSerial(path: path)
-        let motion = try await runNexArmGatewayDiagnostic(link: serial)
-        print("NEXARM PHYSICAL WRIST: start=\(motion.start) target=\(motion.target) observed=\(motion.observed)")
+        let controller = NexArmController(link: serial)
+        do {
+            try await controller.nudgeWrist(delta: 1)
+            let motion = try #require(await controller.lastMotion)
+            #expect(abs(motion.observed - motion.target) <= 6)
+            print("NEXARM PHYSICAL WRIST: start=\(motion.start) target=\(motion.target) observed=\(motion.observed)")
+            await serial.close()
+        } catch {
+            await serial.close()
+            throw error
+        }
     }
 #endif
 
@@ -284,7 +188,12 @@ private actor NexArmBaseFixture: NexArmLink {
         [:], ["cycles": "0"], ["cycles": "4"], ["cycles": "1.5"], ["cycles": "-1"], ["cycles": "1", "degrees": "90"],
     ] {
         await #expect(throws: NexArmActions.ShakeError.invalidCycles) {
-            try await NexArmActions.shakeBase(invocation: nexArmInvocation(parameters)) { _, _ in
+            let invocation = ActionInvocation(
+                source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("test")),
+                call: ActionCall(
+                    actionPath: ActionPath(module: "NexArm", function: "shakeBase"), channel: "Robot",
+                    parameters: parameters))
+            try await NexArmActions.shakeBase(invocation: invocation) { _, _ in
                 Issue.record("Invalid cycle request reached hardware")
             }
         }
@@ -332,11 +241,11 @@ private struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionDefinition] {
         ["express", "beginReplyTurn", "print"].map {
             ActionDefinition(
-                path: ActionPath(module: "UI", function: $0), kind: .state,
+                path: ActionPath(module: "UI", function: $0), displayName: "测试动作", kind: .state,
                 completion: "Test presentation accepted.", handler: { _ in })
         } + [
             ActionDefinition(
-                path: ActionPath(module: "Speech", function: "speak"), kind: .finite,
+                path: ActionPath(module: "Speech", function: "speak"), displayName: "测试动作", kind: .finite,
                 completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") })
         ]
     }
@@ -535,7 +444,7 @@ private actor GestureArmFixture: NexArmWritableLink {
         writeRelease = nil
     }
     func write(_ packet: NexArmPacket) async throws {
-        guard commands.count < 22 else { throw NexArmError.overflow }
+        guard commands.count < 40 else { throw NexArmError.overflow }
         if packet.command == 3 && (packet.id == 4 || packet.id == 5) && packet.payload.count == 8 {
             commands.append(packet)
             if emulateCartesianOwnership && ContinuousClock.now < cartesianUntil {
@@ -646,27 +555,27 @@ func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) as
     case .wave:
         function = "waveWrist"
         parameters = "count='1'"
-        expectedFrames = 8
+        expectedFrames = 6
     case .tiltLeft:
         function = "tiltWrist"
         parameters = "direction='left'"
-        expectedFrames = 5
+        expectedFrames = 3
     case .tiltRight:
         function = "tiltWrist"
         parameters = "direction='right'"
-        expectedFrames = 5
+        expectedFrames = 3
     case .lookAround:
         function = "lookAround"
         parameters = "cycles='1'"
-        expectedFrames = 7
+        expectedFrames = 5
     case .celebrate:
         function = "celebrate"
         parameters = "cycles='1'"
-        expectedFrames = 8
+        expectedFrames = 6
     case .dance:
         function = "dance"
         parameters = "cycles='1'"
-        expectedFrames = 10
+        expectedFrames = 8
     }
     try await runNexArmAssistantMarkup(
         "<wait><\(function) \(parameters)/></wait>", function: function,
@@ -692,7 +601,7 @@ func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) as
     let commands = await fixture.commands
     #expect(commands.count == expectedFrames)
     let positions = await fixture.reached
-    #expect(positions.first == [200, 0, 200, 0, 0, 0])
+    #expect(positions.first == [200, 0, gesture.motorID == nil ? 240 : 200, 0, 0, 0])
     #expect(positions.last == [200, 0, 200, 0, 0, 0])
     if let motor = gesture.motorID {
         #expect(commands.dropFirst(2).dropLast().allSatisfy { $0.id == motor && $0.command == 3 })
@@ -719,7 +628,7 @@ func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) as
     await fixture.releaseWrite()
     await #expect(throws: CancellationError.self) { try await task.value }
     #expect(await fixture.commands.count == 1)
-    #expect(await fixture.pose == [200, 0, 200, 0, 0, 0])  // Only preparation was committed.
+    #expect(await fixture.pose == [200, 0, 240, 0, 0, 0])  // Only Settings-style ready was committed.
 }
 
 @Test(arguments: [false, true])
@@ -729,11 +638,12 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
     let controller = NexArmController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     await #expect(throws: NexArmError.uncertainMotion) { try await controller.performGesture(.dance, repetitions: 3) }
     await #expect(throws: NexArmError.uncertainMotion) { try await controller.performGesture(.wave, repetitions: 1) }
-    #expect(await fixture.commands.count == 2)
+    let failedWrites = disturb ? 26 : 2
+    #expect(await fixture.commands.count == failedWrites)
     #expect(await controller.motionFailure == (disturb ? .completionTimeout : .sending))
     await fixture.configure()
     try await controller.performGesture(.tiltLeft, repetitions: 1)
-    #expect(await fixture.commands.count == 7)
+    #expect(await fixture.commands.count == failedWrites + 3)
     #expect(await fixture.pose == [200, 0, 200, 0, 0, 0])
     #expect(await controller.lastFailure == nil)
 }
@@ -755,20 +665,20 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
     await #expect(throws: NexArmError.uncertainMotion) {
         try await controller.performGesture(.wave, repetitions: 1)
     }
-    #expect(await fixture.commands.count == 1)
+    #expect(await fixture.commands.count == 6)
     let sample = try await controller.recoverState()
     #expect(sample.joints[4] == 2700)
-    #expect(await fixture.commands.count == 1)  // Read-only recovery does not replay the failed wave.
+    #expect(await fixture.commands.count == 6)  // Read-only recovery does not replay the failed wave.
     await fixture.configure()
     try await controller.performGesture(.tiltLeft, repetitions: 1)
-    #expect(await fixture.commands.count == 6)
+    #expect(await fixture.commands.count == 9)
 }
 
 @Test func nexArmGestureMaximumRepetitionsRemainBoundedAndDoNotAccumulateOffset() async throws {
     let fixture = GestureArmFixture()
     let controller = NexArmController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     try await controller.performGesture(.dance, repetitions: 3)
-    #expect(await fixture.commands.count == 22)
+    #expect(await fixture.commands.count == 20)
     #expect(await fixture.pose == [200, 0, 200, 0, 0, 0])
 }
 
@@ -785,15 +695,15 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
 
 }
 
-@Test func nexArmGestureMissedBodyWaypointCannotBeHiddenByReturningHome() async throws {
+@Test func nexArmGestureMissingFinalHomeFailsAfterTimedPlayback() async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(ignoreFrom: 3)
     let controller = NexArmController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     await #expect(throws: NexArmError.uncertainMotion) {
         try await controller.performGesture(.wave, repetitions: 1)
     }
-    // Preparation and ready succeeded, but body did not move: stop before remaining body/home.
-    #expect(await fixture.commands.count == 3)
+    // Timed body playback does not claim intermediate arrival; a missed final home still fails.
+    #expect(await fixture.commands.count == 6)
     #expect(await fixture.pose != [200, 0, 200, 0, 0, 0])
 }
 
@@ -805,7 +715,7 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
     #expect(reached.contains { $0[1] == -100 })
     #expect(reached.contains { $0[1] == 100 })
     #expect(reached.last == [200, 0, 200, 0, 0, 0])
-    #expect(await fixture.commands.count == 7)
+    #expect(await fixture.commands.count == 5)
     #expect(
         await fixture.commands.dropFirst().dropLast().allSatisfy {
             $0.command == 8 && $0.payload.suffix(2) == [0x20, 0x03]
@@ -915,9 +825,9 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
     let controller = NexArmController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     try await controller.performGesture(.dance, repetitions: 1)
     #expect(await fixture.pose == [200, 0, 197, -7, 0, 0])
-    #expect(await fixture.commands.count == 10)
+    #expect(await fixture.commands.count == 8)
     // Absolute targets remain exact even though feedback has the measured 9mm / 2.2° bias.
-    #expect(await fixture.commands.first?.payload.prefix(8) == [0, 0, 200, 0, 0, 0, 200, 0])
+    #expect(await fixture.commands.first?.payload.prefix(8) == [0, 0, 200, 0, 0, 0, 240, 0])
     #expect(await fixture.commands.last?.payload.prefix(8) == [0, 0, 200, 0, 0, 0, 200, 0])
 }
 
@@ -978,14 +888,14 @@ func nexArmTiltKeepsReadyHeightAndCompletesItsReturn(_ gesture: NexArmGesture) a
     let controller = NexArmController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     try await controller.performGesture(gesture, repetitions: 1)
     let commands = await fixture.commands
-    #expect(commands.count == 5)
+    #expect(commands.count == 3)
     let values = commands.map { packet in
         stride(from: 0, to: 12, by: 2).map {
             Int(Int16(bitPattern: UInt16(packet.payload[$0]) | UInt16(packet.payload[$0 + 1]) << 8))
         }
     }
-    #expect(values.map { $0[3] } == [200, 240, 240, 240, 200])
-    #expect(values[2][4] == (gesture == .tiltLeft ? 40 : -40))
+    #expect(values.map { $0[3] } == [240, 240, 200])
+    #expect(values[1][4] == (gesture == .tiltLeft ? 40 : -40))
     #expect(values.last == [0, 200, 0, 200, 0, 0])
 }
 

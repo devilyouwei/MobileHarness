@@ -123,3 +123,17 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ NexArm head preparation now matches the other presets’ intermediate arrival contract; regression tests retain strict final-home verification. Actual phone measurements for the reported timeout remain unavailable.
 
 ✅ [NexArm physical acceptance](NexArm_Physical_Acceptance.md) now includes reproduced head no-motion failure, a controlled handoff experiment, and successful nod/shake closed-loop USB evidence. ❌ USB results do not substitute for phone BLE conversation acceptance.
+
+✅ [Action authoring](../MobileHarness/Actions/README.md) now specifies cohesive entry files and non-callable Support directories. This is source organization only; runtime contracts and historical ADRs remain unchanged.
+
+✅ [ADR 0085](adr/0085-reply-owned-speech-audio.md) records reply-owned speech cache retention and post-Action cleanup. ❌ Physical-device long-sequence acceptance remains pending.
+
+✅ ADR 0070 records removal of the unused diagnostic Action while retaining direct device tests and production Action coverage.
+
+- ✅ [ADR 0086](adr/0086-action-display-metadata.md) removes centralized Action UI maps through domain-owned metadata and generic state rendering.
+
+✅ ADR 0082 now records the all-segment nominal-duration gate and celebration/dance regression coverage. ❌ The reported motor2 oscillation remains pending physical iPhone BLE acceptance.
+
+✅ [ADR 0087](adr/0087-speech-producer-deadline.md) documents producer-owned PCM waits and regression coverage for delayed synthesis. ❌ Physical playback acceptance remains pending.
+
+✅ [ADR0088](adr/0088-nexarm-settings-matched-playback.md) records Settings-matched Cartesian Channel playback and final-home completion. The user reports the phone symptom resolved. [Physical acceptance](NexArm_Physical_Acceptance.md) records five supervised USB dance comparisons: intermediate waits alone reproduced motor2 jitter and timeout; queries or extra frames alone did not. ❌ Underlying servo holding-loop causes, isolated celebration and endurance remain unverified.

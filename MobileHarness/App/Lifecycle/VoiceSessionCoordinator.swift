@@ -102,7 +102,16 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                 guard output.sessionID == voiceGeneration else { continue }
                 do {
                     let task = Task {
-                        do { try await responses.dispatch(output) } catch {
+                        do {
+                            try await responses.dispatch(output)
+                            // Dispatch joins Action completion/cancellation. Only then retire this reply's audio.
+                            if case .control(let state) = output.output,
+                                state == "assistant.finished" || state == "agent.finished"
+                                    || state.hasPrefix("assistant.error:") || state.hasPrefix("agent.error:")
+                            {
+                                await audioStore.cancel(inputID: output.inputID, source: output.source)
+                            }
+                        } catch {
                             await audioStore.cancel(inputID: output.inputID, source: output.source)
                             throw error
                         }

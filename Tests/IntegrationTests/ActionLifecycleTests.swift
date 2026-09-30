@@ -105,7 +105,8 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     let input = InputGateway(manager: manager)
     let counter = LifecycleCounter()
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: lifecyclePath, kind: .finite, completion: "Effect completed.") { _ in
+        ActionDefinition(path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Effect completed.") {
+            _ in
             await counter.increment()
         }
     ])
@@ -162,7 +163,7 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     let releaseDelivery = LifecycleGate()
     let counter = LifecycleCounter()
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: lifecyclePath, kind: .state, completion: "State committed.") { _ in
+        ActionDefinition(path: lifecyclePath, displayName: "测试动作", kind: .state, completion: "State committed.") { _ in
             await counter.increment()
         }
     ])
@@ -191,7 +192,7 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     let activityID = UUID()
     let registry = try ActionRegistry(definitions: [
         ActionDefinition(
-            path: lifecyclePath, kind: .activityStart, completion: "Capture active.",
+            path: lifecyclePath, displayName: "测试动作", kind: .activityStart, completion: "Capture active.",
             completing: { _ in
                 .activityStarted(activityID)
             })
@@ -260,7 +261,10 @@ private actor RevocationDevice {
     let device = RevocationDevice()
     let resources = try lifecycleResources { await device.stop() }
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: lifecyclePath, kind: .finite, completion: "Device stopped.", resources: [armResource]) {
+        ActionDefinition(
+            path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Device stopped.",
+            resources: [armResource]
+        ) {
             _ in
             try await device.perform()
         }
@@ -380,7 +384,10 @@ private actor RevocationDevice {
     let device = RevocationDevice()
     let resources = try lifecycleResources { await device.stop() }
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: lifecyclePath, kind: .finite, completion: "Device stopped.", resources: [armResource]) {
+        ActionDefinition(
+            path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Device stopped.",
+            resources: [armResource]
+        ) {
             _ in
             try await device.perform()
         }
@@ -401,7 +408,7 @@ private actor RevocationDevice {
 @Test func activityCompletionMustMatchItsRegisteredKind() async throws {
     let registry = try ActionRegistry(definitions: [
         ActionDefinition(
-            path: lifecyclePath, kind: .finite, completion: "Finite operation.",
+            path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Finite operation.",
             completing: { _ in
                 .activityStarted(UUID())
             })

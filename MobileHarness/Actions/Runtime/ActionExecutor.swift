@@ -1,5 +1,14 @@
 import AgentCore
 
+public enum ActionExecutionError: Error, Equatable, Sendable {
+    case missingHandler(ActionPath)
+    case duplicateDefinition(ActionPath)
+    case invalidDefinition(ActionPath)
+    case definitionCapacityExceeded
+    case invalidCompletion
+    case invalidInvocation
+}
+
 public struct ActionExecutor: Sendable {
     private let registry: ActionRegistry
     public init(registry: ActionRegistry) { self.registry = registry }

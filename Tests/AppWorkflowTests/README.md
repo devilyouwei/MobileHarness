@@ -19,3 +19,5 @@ Purpose: test cross-module history operations using the real journal and a contr
 ## Action and Tool presentation boundary
 
 ✅ Presentation tests require every scheduled Action regardless of module/source, and verify arbitrary thrown descriptions display without a per-Action error mapping. ❌ Fixtures do not assert physical motion.
+
+✅ ActionActivityItem now owns generic presentation directly; Workflow tests inject only shared records. Tests cover verb-independent cancellation/completion wording, exact case-sensitive unknown Channel names and display aggregation of concurrent work from different tasks. No production Action-name map is duplicated by the tests. ❌ Native visual/device acceptance remains separate.

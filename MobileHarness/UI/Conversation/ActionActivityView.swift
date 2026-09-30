@@ -151,23 +151,22 @@
                         conversation.isReady = true
                         conversation.voicePhase = .idle
                         conversation.assistantReply = "好的，我会先跳舞，再向你挥手。"
-                        let examples: [(String, String, ActionExecutionRecord.Phase, String)] = [
-                            ("Robot", "跳舞", .running, "正在执行"),
-                            ("Robot", "挥手", .queued, "等待执行"),
-                            ("Speech", "朗读回复", .cancelling, "正在结束当前动作"),
-                            ("Robot", "庆祝", .failed, "动作参数无效"),
+                        let examples: [(String, String, ActionExecutionRecord.Phase)] = [
+                            ("Robot", "跳舞", .running),
+                            ("Robot", "挥手", .queued),
+                            ("Speech", "朗读回复", .cancelling),
+                            ("Robot", "庆祝", .failed),
                         ]
                         state.replace(
                             revision: 1,
-                            items: examples.map { channel, title, phase, status in
-                                let record = ActionExecutionRecord(
+                            records: examples.map { channel, title, phase in
+                                ActionExecutionRecord(
                                     id: UUID(), path: ActionPath(module: "Fixture", function: "preview"),
+                                    displayName: title,
                                     source: .assistant, sessionID: UUID(), inputID: UUID(), channel: channel,
-                                    semantics: .finite, phase: phase, endedAt: phase == .failed ? .now : nil)
-                                return ActionActivityItem(
-                                    execution: record, title: title,
-                                    channelTitle: channel == "Robot" ? "机械臂" : (channel == "Speech" ? "语音" : "画面"),
-                                    status: status)
+                                    semantics: .finite, phase: phase, endedAt: phase == .failed ? .now : nil,
+                                    failureDescription: phase == .failed ? "动作参数无效" : nil)
+
                             }, evictedCount: 0)
                     }
             }

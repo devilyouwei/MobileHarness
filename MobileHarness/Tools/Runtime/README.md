@@ -7,6 +7,8 @@ Registers and executes resolved ToolCalls. The goal is explicit completion and f
 ```text
 Runtime/
 ├── ToolDefinition.swift # Domain definition and module contract
+├── ToolModules.swift    # Explicit built-in domain catalog
+├── ToolInvocation.swift # Call plus trusted output context
 ├── ToolRegistry.swift  # Actor-owned handlers; rejects duplicate paths
 ├── ToolExecutor.swift  # Execute and select result or completion semantics
 └── README.md           # Module contract and status

@@ -56,10 +56,12 @@ flowchart LR
 
 ## Action implementation audit
 
-✅ The Action standard check validates domain namespace files and checks each declared Action path has a matching invocation:using: entry file. It exempts Runtime infrastructure.
+✅ The Action standard check recursively scans domain sources, requires Support-owned definitions and exactly one matching invocation:using: entry in domain-root files, and checks README coverage. Related entries may share a namespace file; registrations are checked regardless of filename. Runtime infrastructure is exempt from callable-domain checks. Swift and assembly tests validate semantic binding.
 
 ## Storage domain organization
 
 ✅ Boundary checks enforce Storage core exclusion of Audio/Chat, StorageChat → Storage dependency, Foundation/Storage-only chat imports and Storage directory READMEs. UI may use StorageChat values only.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+✅ Tool authoring checks now recursively discover domain registrations, require each registered path to have one domain entry, keep registration in Support, and require directory READMEs. The existing unqualified `runtimeInfo` path is explicit. ❌ Source checks do not replace Swift semantic validation.

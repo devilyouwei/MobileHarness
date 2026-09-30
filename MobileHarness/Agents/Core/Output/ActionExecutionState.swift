@@ -10,6 +10,8 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     }
     public let id: UUID
     public let path: ActionPath
+    /// Copied from the registered definition at admission, not resolved by presentation.
+    public let displayName: String
     public let source: AgentID
     public let sessionID: UUID
     public let inputID: UUID
@@ -25,13 +27,15 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     public var isTerminal: Bool { phase == .succeeded || phase == .failed || phase == .cancelled }
 
     public init(
-        id: UUID, path: ActionPath, source: AgentID, sessionID: UUID, inputID: UUID, channel: String,
+        id: UUID, path: ActionPath, displayName: String, source: AgentID, sessionID: UUID, inputID: UUID,
+        channel: String,
         semantics: Semantics, phase: Phase = .queued, admittedAt: Date = .now, startedAt: Date? = nil,
         endedAt: Date? = nil, failure: Failure? = nil, completion: ActionCompletion? = nil,
         failureDescription: String? = nil
     ) {
         self.id = id
         self.path = path
+        self.displayName = displayName
         self.source = source
         self.sessionID = sessionID
         self.inputID = inputID

@@ -9,3 +9,5 @@ Settings uses a shared, finite gesture frame factory: fixed ready pose400ms, exi
 UI action buttons stay available on a validated connection, and reports only sent/interrupted state. Page exit/background/disconnect cancel pending steps. Channel admission/feedback/cancellation semantics are unchanged. The existing live-session fence still retires obsolete pending observations.
 
 ✅ Tests cover immediate first send, no telemetry, replacing active/blocked sequences, reset discarding old endings, and unchanged channel completion. ❌ No new claim of verified physical arrival or device-side emergency stop.
+
+The instruction to keep Channel playback unchanged is superseded by the user-approved comparison repair in [ADR0088](0088-nexarm-settings-matched-playback.md). Settings itself retains its submission-only completion and latest-request replacement.

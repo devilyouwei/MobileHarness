@@ -20,3 +20,15 @@ flowchart LR
 ```
 
 The Action owns no task or queue. App rejects outdated sessions and turns; stale updates may complete as no-ops. Repeating the same expression sets the same target, without a one-shot restart contract. New user speech clears expression through the immediate beginReplyTurn Tool. No physical resource is declared.
+
+## Source organization
+
+| File | Responsibility |
+| --- | --- |
+| UIActions.swift | Canonical express entry and validation |
+| Support/UIActionTypes.swift | Emotion and ExpressionError, retaining UIActions nested names |
+| Support/UIActionModule.swift | Definition and UIPresentationCapability injection interface |
+
+✅ Only the entry lives in the domain root; support declarations are not separate callable Actions. ❌ No rendering or animation lifecycle is added.
+
+✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.

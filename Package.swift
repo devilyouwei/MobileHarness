@@ -72,7 +72,10 @@ let package = Package(
         .target(
             name: "Actions", dependencies: ["AgentCore", "StorageAudio"],
             path: "MobileHarness/Actions",
-            exclude: ["UI/README.md", "README.md", "Speech/README.md", "Runtime/README.md", "NexArm/README.md"]),
+            exclude: [
+                "README.md", "Runtime/README.md", "NexArm/README.md", "NexArm/Support/README.md",
+                "Speech/README.md", "Speech/Support/README.md", "UI/README.md", "UI/Support/README.md",
+            ]),
         .target(
             name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageChat", "StorageAudio"],
             path: "MobileHarness/Agents",
@@ -98,7 +101,10 @@ let package = Package(
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
             name: "Tools", dependencies: ["AgentCore"], path: "MobileHarness/Tools",
-            exclude: ["README.md", "System/README.md", "UI/README.md", "Runtime/README.md"]),
+            exclude: [
+                "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
+                "Runtime/README.md",
+            ]),
         .target(
             name: "ModelKit", path: "MobileHarness/ModelKit",
             exclude: [

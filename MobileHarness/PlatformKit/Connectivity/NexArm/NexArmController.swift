@@ -406,52 +406,68 @@ public actor NexArmController {
             try await performHeadGesture(gesture, repetitions: repetitions, writer: writer)
             return
         }
-        // Targets are fixed Cartesian poses. Factory/example encoder positions are not calibration.
-        let home = NexArmGesture.home
-        let ready = NexArmGesture.ready
-        let targets = [home, ready] + (0..<repetitions).flatMap { _ in gesture.frames } + [ready, home]
-        guard targets.count <= 22, targets.allSatisfy(NexArmGesture.validPose)
-        else { throw NexArmError.invalidMotion }
-        let durations = targets.indices.map { $0 == 0 ? 3000 : ($0 == targets.count - 1 ? 1200 : 800) }
-        // Sum segment budgets once: repeated arrival checks must not consume the ending's allowance.
-        // The deadline remains fixed, and each segment still fails independently on silence/timeout.
-        let actionBudget = durations.reduce(Duration.zero) {
-            $0 + NexArmArrivalTracker.completionBudget(durationMilliseconds: $1)
-        }
-        let actionDeadline = ContinuousClock.now.advanced(by: actionBudget)
-        for (index, target) in targets.enumerated() {
-            try Task.checkCancellation()
-            guard ContinuousClock.now < actionDeadline else {
-                motionFailure = .completionTimeout
-                faulted = true
-                lastFailure = "action deadline"
-                throw NexArmError.uncertainMotion
+        try await performCartesianPlayback(gesture.cartesianPlaybackFrames(repetitions: repetitions), writer: writer)
+    }
+
+    /// Same finite packets and cadence as Settings; only the final home is observed.
+    private func performCartesianPlayback(_ frames: [NexArmGesture.TestFrame], writer: any NexArmWritableLink)
+        async throws
+    {
+        let observable = writer as? any NexArmObservableLink
+        let session = try await observable?.beginObservation()
+        // One bounded plan, at most 20 frames; allow one second of admission per frame
+        // and three seconds for final observation. No catch-up or motion replay.
+        let budget = frames.reduce(Duration.seconds(3)) { $0 + .milliseconds($1.milliseconds + 1000) }
+        let deadline = ContinuousClock.now.advanced(by: budget)
+        do {
+            for (index, frame) in frames.enumerated() {
+                try Task.checkCancellation()
+                guard ContinuousClock.now < deadline else {
+                    motionFailure = .completionTimeout
+                    throw NexArmError.timeout
+                }
+                let final = index == frames.count - 1
+                // Cancellation joins this one finite frame, not the remainder of the plan.
+                let leg = Task {
+                    motionFailure = .sending
+                    if let observable, let session {
+                        let admissionDeadline = min(deadline, ContinuousClock.now.advanced(by: .seconds(1)))
+                        while true {
+                            guard ContinuousClock.now < admissionDeadline else { throw NexArmError.timeout }
+                            if try await observable.sendObserved(frame.packet, session: session) { break }
+                            try await Task.sleep(for: .milliseconds(25))
+                        }
+                    } else {
+                        try await writer.write(frame.packet)
+                    }
+                    // Anchor each duration to this admission, like Settings. A delayed write
+                    // never causes subsequent targets to be emitted in a catch-up burst.
+                    try await Task.sleep(for: .milliseconds(frame.milliseconds))
+                    if final {
+                        let began = ContinuousClock.now
+                        let baseline: UInt64
+                        if let observable, let session {
+                            baseline = try await observable.latestObservation(after: 0, session: session)?.sequence ?? 0
+                        } else {
+                            baseline = 0
+                        }
+                        try await awaitArrival(
+                            target: NexArmGesture.home, milliseconds: 0, final: true,
+                            started: began, observable: observable, session: session, sequence: baseline,
+                            actionDeadline: deadline, initialQueryDelayMilliseconds: 200)
+                    }
+                }
+                try await leg.value
+                try Task.checkCancellation()
             }
-            let final = index == targets.count - 1
-            // Fixed approach does not require old feedback or a stationary recovery sample.
-            let milliseconds = durations[index]
-            // Vendor move/reset uses CMD8: pitch, X, Y, Z, roll, claw, duration.
-            // CMD50 increments the device's commanded pose, not this host's measured pose.
-            let values = [target[3], target[0], target[1], target[2], target[4], target[5], milliseconds]
-            let packet = try NexArmPacket(
-                command: 8,
-                payload: values.flatMap { value -> [UInt8] in
-                    let bits = UInt16(bitPattern: Int16(value))
-                    return [UInt8(bits & 255), UInt8(bits >> 8)]
-                })
-            let leg = Task {
-                try await observeGestureLeg(
-                    writer: writer, packet: packet, target: target,
-                    milliseconds: milliseconds, final: final, actionDeadline: actionDeadline)
-            }
-            do { _ = try await leg.value } catch {
-                if error is CancellationError { throw error }
-                faulted = true
-                lastFailure = String(describing: error)
-                throw NexArmError.uncertainMotion
-            }
+            if let observable, let session { await observable.endObservation(session) }
             motionFailure = nil
-            try Task.checkCancellation()
+        } catch {
+            if let observable, let session { await observable.endObservation(session) }
+            if error is CancellationError { throw error }
+            faulted = true
+            lastFailure = String(describing: error)
+            throw NexArmError.uncertainMotion
         }
     }
 
@@ -549,14 +565,14 @@ public actor NexArmController {
         target: [Int], milliseconds: Int, final: Bool, started: ContinuousClock.Instant,
         observable: (any NexArmObservableLink)?, session: UUID?, sequence initialSequence: UInt64,
         actionDeadline: ContinuousClock.Instant, jointTarget: [Int]? = nil,
-        minimumObservationMilliseconds: Int = 0
+        minimumObservationMilliseconds: Int = 0, initialQueryDelayMilliseconds: Int = 0
     ) async throws {
         var tracker = NexArmArrivalTracker(
             target: target, final: final, started: started, durationMilliseconds: milliseconds,
             actionDeadline: actionDeadline, jointTarget: jointTarget,
             minimumObservationMilliseconds: minimumObservationMilliseconds)
         var sequence = initialSequence
-        var nextQuery = started
+        var nextQuery = started.advanced(by: .milliseconds(initialQueryDelayMilliseconds))
         var lastReceipt = started.advanced(by: .seconds(-1))
         while true {
             switch tracker.outcome(at: .now) {
@@ -639,7 +655,7 @@ public enum NexArmGesture: Sendable, CaseIterable {
         case .dance: "小舞蹈"
         }
     }
-    /// Settings-only open-loop test sequence. Timings are trajectory durations, not feedback waits.
+    /// Finite native playback frame; durations define cadence, not observed arrival.
     public struct TestFrame: Sendable {
         public let packet: NexArmPacket
         public let milliseconds: Int
@@ -649,7 +665,15 @@ public enum NexArmGesture: Sendable, CaseIterable {
             return [try Self.homeFrame(milliseconds: 800)] + (try headFrames(center: NexArmJogPlanner.home))
                 + [try Self.homeFrame(milliseconds: 800)]
         }
-        let poses = [Self.ready] + frames + [Self.home]
+        return try cartesianPlaybackFrames(repetitions: 1)
+    }
+    /// Shared by Settings and scheduled Cartesian Actions; only their completion policy differs.
+    fileprivate func cartesianPlaybackFrames(repetitions: Int) throws -> [TestFrame] {
+        guard motorID == nil, (1...3).contains(repetitions),
+            (self != .tiltLeft && self != .tiltRight) || repetitions == 1
+        else { throw NexArmError.invalidMotion }
+        let poses = [Self.ready] + (0..<repetitions).flatMap { _ in frames } + [Self.home]
+        guard poses.count <= 20, poses.allSatisfy(Self.validPose) else { throw NexArmError.invalidMotion }
         return try poses.enumerated().map { index, pose in
             let duration = index == 0 ? 400 : (index == poses.count - 1 ? 600 : 800)
             let values = [pose[3], pose[0], pose[1], pose[2], pose[4], pose[5], duration]

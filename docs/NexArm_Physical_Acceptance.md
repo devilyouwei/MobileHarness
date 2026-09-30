@@ -122,3 +122,29 @@ The user paused phone control and confirmed clear space. Production `NexArmContr
 The combined test took22.287s including verification and inter-action gaps. Local evidence logs: `/tmp/head-physical-diagnosis.log`, `/tmp/head-physical-handoff-probe2.log`, `/tmp/head-physical-handoff-fixed.log` (ephemeral, not repository artifacts). Both final samples met existing strict home tolerances. No automatic reset/replay was used on failure. This establishes shared-controller USB behavior; BLE radio delivery and phone conversation acceptance remain separate.
 
 Validation for the handoff correction: `scripts/check.sh` passed (257 IntegrationTests plus the remaining package suites), and `scripts/build-ios.sh` passed all four simulator schemes. Hardware results above were captured before the final transport timestamp boundary correction; that correction preserves synchronous telemetry and passed the push-only observation regression.
+
+## Motor2 jitter: supervised single-factor USB comparison
+
+The user first confirmed that Settings was smooth, then confirmed that the Settings-matched Channel repair eliminated the reported phone symptom. For causal diagnosis the user stopped phone control and cleared the workspace. Strict firmware compatibility and two stationary position reads passed before the USB dance trials. No production code, firmware, gains, calibration or device settings were changed during this comparison.
+
+`NexArmCausalTests.nexArmUSBPhysicalCausalTrial` runs a single opt-in trial. A uses the actual repaired controller. B/C use identical Settings packets and durations; D/E use the former extra home/ready frames and their durations. Variant timing polls at50ms (actual timed body intervals828–846ms versus A803–817ms), so these are controlled behavioral comparisons, not cycle-exact firmware experiments. A read-only20ms serial drain records incoming feedback; actual push samples arrive approximately every200ms. A failed run sends no subsequent motion and does not automatically return home.
+
+| Trial | Changed behavior | Motion packets / motion-time CMD11 queries | User observation | Completion |
+| --- | --- | --- | --- | --- |
+| A | Current production playback | 8 / 0 | No jitter | Stable home,7.263s |
+| B2 | Add former query fallback only | 8 / 8 | No jitter | Stable home,6.879s |
+| C | Add intermediate arrival/stability waits only | 3 / 0 | Same jitter and incomplete action | Segment3 timed out,6.653s |
+| D | Add former preparation/ending frames and durations only | 10 / 0 | No jitter | Stable home,11.956s |
+| E | Former waits, queries and extra frames together | 10 / 10 | Same jitter | Stable home,18.420s |
+
+The initial B run sent all8 packets/8 queries but was not visually rated. Its immediate post-duration home assertion read an earlier approach sample and failed (Y9mm); a separate read-only check confirmed stable home. The harness was corrected to allow up to3s for fresh stable final-home observations after playback. B2 was repeated at the user's explicit request and passed. This correction did not alter any motion packet or intermediate playback policy. Table durations include preflight/postflight and are not directly comparable motion-only timings.
+
+In C, segment3 commanded `[pitch0, X173, Y100, Z220, roll40, claw0, duration800ms]`. With **zero motion-time queries**, motor2 readings after the nominal duration repeatedly alternated around2191–2199 (e.g.2191,2199,2192,2198,2195,2193,2198,2192,2199,2192,2199,2192,2199). The pose remained within the intermediate position envelope, but encoder stability was not maintained. The800ms segment plus3s convergence budget expired; the controller then deliberately withheld the remaining frames. E exhibited the same2191–2199 holding fluctuation, with one800ms body segment stretched to3003ms before the next command. After C, a separately selected supervised3000ms home command passed the stable-home check; D subsequently completed and left the device at home.
+
+**Supported conclusion:** for this dance on this hardware, intermediate feedback-gated holding is sufficient to reproduce the jitter and timeout without queries or extra frames. Queries and extra frames individually did not reproduce the symptom in these runs. This was not a later Channel action overwriting an unfinished action: a single isolated USB gesture reproduced it. The wait condition prolongs exposure to a hunting pose and can block progression; it does not itself send alternating motor targets. Continuous nominal playback avoids that intermediate hold and retains final-home verification.
+
+**Limits:** these trials do not identify the underlying firmware/servo control-loop, load, friction or backlash contribution to holding oscillation, establish absence of BLE-specific problems, or independently isolate celebration. No gain/deceleration/filter change was tested or justified by these results. Encoder feedback at approximately5Hz cannot characterize high-frequency vibration; visible jitter ratings above are the user's observations. This is a single-factor diagnostic series, not endurance certification.
+
+Local evidence logs (ephemeral): `/tmp/nexarm-causal-A-dance.log`, `/tmp/nexarm-causal-B-dance.log`, `/tmp/nexarm-causal-B2-dance.log`, `/tmp/nexarm-causal-C-dance.log`, `/tmp/nexarm-causal-D-dance.log`, `/tmp/nexarm-causal-E-dance.log`, `/tmp/nexarm-causal-post-B.log`, `/tmp/nexarm-causal-home.log`.
+
+Validation: `scripts/check.sh` passed with full Xcode selected (269 IntegrationTests plus other package suites); `scripts/build-ios.sh` passed all four simulator schemes. An initial check without `DEVELOPER_DIR` selected Command Line Tools and could not find the Metal compiler; the full-Xcode rerun passed. Only diagnostic tests/documentation were added in this investigation; the installed phone repair was not changed.

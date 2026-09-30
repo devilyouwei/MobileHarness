@@ -24,11 +24,15 @@ flowchart TD
     Gate -->|No| Fail["Throw execution error"]
     Gate -->|Yes| Plan["NexArmController: validate compatibility and build fixed poses"]
     Plan -->|Compatibility or target validation fails| Fail
-    Plan -->|Cartesian preset| Frames["home → ready → body × repetitions → ready → home"]
+    Plan -->|Cartesian preset| Frames["ready400ms → body800ms × repetitions → home600ms"]
     Plan -->|Nod or shake| Head["home → ready → native motor sweeps / center → home"]
     Head --> Handoff["Before native writes: fresh converged feedback after ready trajectory duration"]
     Handoff --> Loop
-    Frames --> Loop["Send and await arrival for each segment; see below"]
+    Frames --> Timed["Send on nominal deadlines without motion-time queries"]
+    Timed --> Final["After home duration, await fresh stable home"]
+    Final --> Success
+    Final -->|Unconfirmed home| Fail
+    Loop["Observe each head segment"]
     Loop -->|All segments pass| Success["Update observed pose; UI reports completion and home return"]
     Loop -->|Send failure, feedback timeout, arrival timeout or invalid feedback| Fail
     Success --> Return["Callback and Action return; check cancellation again"]
@@ -50,53 +54,30 @@ flowchart TD
 
 Device feedback and Action feedback serve different purposes: device packets establish observed arrival, while `ActionResult` describes the execution outcome. Gateway defaults to `failuresOnly` and enables feedback only for Agents accepting `actionResult`. Terminal results pass through InputGateway; current Agents retain them in history without automatically starting a model turn. Result messages have bounded delivery retries; **device Actions are never replayed by those retries**. Rejected admission has no execution terminal message. A running failure cancels the owning input’s remaining scheduled work; a previous unconfirmed pose does not lock out a new explicit invocation. See [result delivery](../../Gateway/Output/Results/README.md).
 
-### Segment submission, observation and arrival detection
+### Cartesian playback and final arrival
+
+Cartesian presets and Settings share one frame factory: ready400ms → body800ms × repetitions → home600ms. Single-cycle packets are byte-identical. Only Settings replaces unsent plans on a new click; Channel preserves admitted Actions and holds NexArm exclusion until playback, final observation and cleanup finish.
 
 ```mermaid
 flowchart TD
-    Start["Enter segment; check cancellation and fixed overall deadline"] --> Session["Begin observation session; capture previous telemetry sequence"]
-    Session --> Send["Submit absolute pose CMD8 once; do not await write response"]
-    Send -->|Transport temporarily not writable| Admission{"Within the 1-second admission deadline?"}
-    Admission -->|Yes; retry admission after 25ms| Send
-    Admission -->|No| SendFail["Send failure; end this invocation"]
-    Send -->|Transport accepts command| Observe["Observe new telemetry immediately; no initial motion-duration sleep"]
-    Push["Continuous BLE notification decoding / nonblocking USB reads"] --> Cache["Bounded decoder and latest valid position sample"]
-    Cache --> Observe
-    Observe --> Limits{"No valid feedback for 2s, or segment / overall deadline reached?"}
-    Limits -->|Yes| Timeout["Return feedback or arrival timeout; do not resend motion"]
-    Limits -->|No| Sample["About every 50ms, consume a new sequence received after submission started"]
-    Sample --> Quiet{"At least 200ms since last feedback?"}
-    Quiet -->|Yes| Query["Attempt CMD11 at most once per 200ms; do not await individual reply"]
-    Query --> Observe
-    Quiet -->|No| Target{"Pose within tolerance and encoder stability window satisfied?"}
-    Target -->|No| Observe
-    Target -->|Yes| Arrived["Confirm segment arrival; end observation session"]
-    Arrived --> More{"Another segment remains?"}
-    More -->|Yes; check cancellation again| Start
-    More -->|No| Complete["Complete choreography and home return"]
-    Invalid["Invalid feedback / disconnect / invalidated session"] --> End["End observation session; propagate error or cancellation"]
-    SendFail --> End
-    Timeout --> End
+    Plan[Shared finite Cartesian frames] --> Send[Admit one CMD8; bounded 1s backpressure]
+    Send --> Time[Wait frame duration from actual admission]
+    Time --> More{More frames?}
+    More -->|Yes; caller still active| Send
+    More -->|No| Observe[Fresh final-home feedback; query only now]
+    Observe --> Stable[Home tolerance plus 300ms encoder stability]
+    Stable --> Done[Return Action; release NexArm exclusion]
+    Observe -->|2s silence or 3s deadline| Fail[Unknown result; no replay]
+    Time -->|Caller cancelled| Cancel[Stop unsent frames after joined current frame]
 ```
 
-This diagram describes production BLE/USB observation. Protocol compatibility is checked before building the fixed choreography; validated connections reuse that result. Transport acceptance of a Bluetooth write means local submission, not physical arrival. Valid position packets contain a 24-byte CMD11 payload with pose and six encoder values. Only the latest telemetry is retained; replacing telemetry never discards an Action.
+Capacity is one active controller operation and one immutable plan of at most20 frames (three dance cycles); competing calls reject busy. Each admitted packet is sent once. Transport backpressure retries only an unadmitted packet, every25ms for at most1s. Next-frame timing starts at actual admission; late wakeups never emit catch-up bursts. No per-frame position queries, error compensation or intermediate-arrival waits occur. The final nominal duration is joined before starting observation; older telemetry cannot establish final completion. Push feedback gets200ms before query fallback (at most5Hz). Final XYZ tolerance is5mm, pitch/roll/claw2°, with all six encoders stable within2counts for300ms. Silence2s and final observation3s are independent limits; a fixed total deadline sums nominal durations,1s admission per frame and3s final observation. Legacy links retain their own bounded write/exchange delay.
 
-| Check or deadline | Current implementation |
-| --- | --- |
-| Cartesian preset sequence | At most 22 segments; initial home 3000ms, final home 1200ms, all others 800ms each |
-| Head sequence | Home800ms → ready800ms → five native targets per cycle (750ms nominal each) → home1200ms; at most18 segments |
-| Cartesian-to-servo handoff | Ready arrival requires a fresh sample at/after its800ms trajectory duration; telemetry and watchdogs continue during the interval |
-| Head body arrival | All six encoders within16counts of measured-ready joints plus the active motor offset; same fresh stability window |
-| XYZ arrival tolerance | Each axis ≤15mm for intermediate poses; ≤5mm at final home |
-| Angle tolerance | Pitch ≤4° intermediate and ≤2° final; roll/claw both ≤2° |
-| Stability | All six encoder values remain within 2 counts of a stable anchor; received samples span 200ms intermediate or 300ms final |
-| Stability window reset | Leaving pose tolerance clears the window; leaving the encoder anchor restarts it; one packet or elapsed wall time alone cannot confirm completion |
-| Feedback watchdog | No valid feedback for 2 consecutive seconds → result unknown; end the wait |
-| Segment arrival deadline | Commanded segment duration + 3s; continuing feedback cannot extend it indefinitely |
-| Fixed overall deadline | Sum each segment’s duration + 3s once at action start; never renew it during playback; a single 10-segment dance has a 40.6s upper bound |
-| State after completion | Reuse the last observed pose for UI updates without an additional blocking query |
+✅ Completion means the finite plan was submitted and final home was observed, **not** proof that every intermediate waypoint was reached. Cancellation joins the current finite frame (and final observation if already entered), then prevents later frames without sending a rollback. Takeover/disconnect invalidates the observation token. UI receives the final measured pose, without an extra query.
 
-❌ The current firmware protocol has no action ID, device sample sequence/timestamp, or reliable completion event. Arrival is inferred from received pose and stability; this cannot prove strict command-to-response causality or detect repeated stale device samples. Host watchdogs are not a hardware emergency stop or firmware link-loss protection.
+Head gestures retain calibrated home/ready preparation, native motor4/5 trajectories and per-segment observation. Their Cartesian-to-servo handoff still requires fresh arrival after nominal duration; the independent watchdogs and final-home tolerance remain. See the [controller contract](../../PlatformKit/Connectivity/NexArm/README.md#settings-matched-cartesian-channel-playback-current).
+
+❌ Physical BLE confirmation of the jitter repair, intermediate trajectory tracking and device-side stop/watchdog remain outstanding.
 
 ### Cancellation, manual takeover and failure cleanup
 
@@ -104,8 +85,8 @@ This diagram describes production BLE/USB observation. Protocol compatibility is
 flowchart TD
     Interrupt["Interruption / cancellation request"] --> Kind{"Which stage or entry point?"}
     Kind -->|Queued or before committing the current segment| Before["Cancel unexecuted work; send no new motion segment"]
-    Kind -->|Conversation cancelled after segment commitment| Join["Cancel outer task; join current segment observation task"]
-    Join --> Bound["Return after current segment arrival, timeout or error"]
+    Kind -->|Conversation cancelled after segment commitment| Join["Cancel outer task; join current finite frame"]
+    Join --> Bound["Return after frame duration; join final observation if entered"]
     Bound --> Stop["Cancellation check prevents all later segments, including home ending"]
     Kind -->|Settings new test / slider / reset| Takeover["Update control revision; cancel old task; beginLiveControl invalidates old observation session"]
     Takeover --> New["New control takes over; old task cannot send later segments or overwrite new UI"]
@@ -125,33 +106,11 @@ flowchart TD
 
 ✅ Physical USB testing verified all seven performance presets, 50 segment arrival checks, and final home returns; see [physical acceptance](../../../docs/NexArm_Physical_Acceptance.md). This validates the controller shared with iPhone. ❌ Bluetooth transport performance, repeated-cycle endurance, and physical emergency stopping require separate acceptance.
 
-Implementation entry points: [domain Actions](NexArmGestureActionModule.swift), [composition bindings](../../App/Composition/ApplicationRuntime.swift), [Workflow](../../App/Workflows/BluetoothWorkflow.swift), [controller](../../PlatformKit/Connectivity/NexArm/NexArmController.swift), and [arrival tracker](../../PlatformKit/Connectivity/NexArm/NexArmProtocol.swift).
+Implementation entry points: [domain Actions](NexArmActions.swift), [composition bindings](../../App/Composition/ApplicationRuntime.swift), [Workflow](../../App/Workflows/BluetoothWorkflow.swift), [controller](../../PlatformKit/Connectivity/NexArm/NexArmController.swift), and [arrival tracker](../../PlatformKit/Connectivity/NexArm/NexArmProtocol.swift).
 
-## Earlier USB diagnostic: nudgeWrist
+## USB diagnostic ownership
 
-✅ `NexArm.nudgeWrist(degrees:)` / `NexArmActions.nudgeWrist` is a finite Action. Required `degrees` is a nonzero integer from -2 through 2 in degrees; unknown keys fail before effects. The injected callback must enforce device availability, absolute limits and the completion contract. `NexArmActionModule` registers it explicitly through BehaviorAssembly's module-list initializer.
-
-```mermaid
-flowchart LR
-    Host[Supervised diagnostic host] --> Input[InputGateway]
-    Input --> Agent[Diagnostic fixture: fixed internal permission]
-    Agent --> Output[OutputGateway]
-    Output --> Scheduler[ChannelScheduler: Arm / NexArm exclusion]
-    Scheduler --> Action[NexArm.nudgeWrist]
-    Action --> Binding[Host-injected typed callback]
-    Binding --> Controller[PlatformKit NexArmController]
-    Controller --> USB[Mac USB serial]
-    USB --> Feedback[Controller-reported joint positions]
-    Feedback --> Controller
-```
-
-The wrist capability is opt-in and absent from Assistant JSON. The hardware test supplies the explicit composition binding and exercises InputGateway → OutputGateway → scheduler → Action. No business Agent is added. No Action-local queue; ordinary scheduler bounds apply. The test uses one Channel slot and one tracked input. Device owner admission is capacity one, with immediate `busy` rejection and one wrist nudge maximum per controller lifetime; bounded base sweeps can be requested again after successful completion.
-
-Completion means three consecutive controller-reported wrist positions within six counts of the encoder target estimate and one degree of the reported roll target, with no other joint changing by more than eight counts from the stable baseline. This is device telemetry evidence, not independent visual verification or a zero-velocity measurement. The adapter currently supports only the observed ESP32/AT32 1.0.2 pair. Exact transport, cancellation and hardware limits are in [Connectivity/NexArm](../../PlatformKit/Connectivity/NexArm/README.md).
-
-Cancellation before commitment emits no motion. After commitment the bounded device target is allowed to settle and its join is awaited before cancellation returns. No reverse movement or torque-off is used as cleanup. Uncertain completion latches the owner faulted and blocks further motion. It does not claim an emergency stop. This documented diagnostic exception is unsuitable for unattended robot use.
-
-❌ TCP bindings, unattended autonomous operation, shared resource lease/physical-stop integration and device-side watchdog validation remain pending. No simulated success, fallback, motion retry, firmware flashing, calibration or torque enabling is supplied.
+✅ No production Agent uses the former nudgeWrist Action. Its Action entry, registration, error type and test-only Agent were removed. Supervised wrist diagnostics call PlatformKit's controller directly from root tests; production Actions contain only the eight Agent-used entries. See [controller diagnostics](../../PlatformKit/Connectivity/NexArm/README.md).
 
 ## Earlier USB diagnostic: Assistant base sweep
 
@@ -175,7 +134,7 @@ The supervised Mac test binds real USB; its model output and UI are deterministi
 
 ## Current phone performance actions
 
-✅ App maps base sway and the five typed entertainment entries to fixed physical home → ready → body → ready → home. Home XYZ=[200,0,200]mm; ready height240mm; pitch/claw0°. Native absolute CMD8 interpolation replaces nominal encoder targets and per-servo writes. Body segments last800ms. Parameters and Robot channel registrations remain unchanged, and all effects share NexArm module exclusion.
+✅ App maps base sway and the five typed entertainment entries to the shared Settings Cartesian frame plan: ready → body → home. Home XYZ=[200,0,200]mm; ready height240mm; pitch/claw0°. Native absolute CMD8 interpolation replaces nominal encoder targets and per-servo writes. Body segments last800ms. Parameters and Robot channel registrations remain unchanged, and all effects share NexArm module exclusion.
 
 | Entry | Required parameter | Body around fixed pose |
 | --- | --- | --- |
@@ -186,19 +145,9 @@ The supervised Mac test binds real USB; its model output and UI are deterministi
 | celebrate | cycles1...3 | Yaw±20°, roll up to45°, height220...270mm |
 | dance | cycles1...3 | Yaw±30°, roll±40°, height220...260mm |
 
-✅ Device IK owns joint calibration. Host sends fixed absolute Cartesian targets; each new explicit request uses a fixed3000ms approach without requiring old motion feedback. Up to22 finite waypoints, no action-local queue. Arrival uses physical pose tolerances and time-spanning stable feedback:200ms for intermediate poses and300ms for final home, not a fixed count of three samples. Cancellation joins the committed waypoint, never automatically returns or replays; explicit reset fences remaining writes. Reset itself does not require a completion response.
+✅ Device IK owns joint calibration. Cartesian presets use the shared400/800/600ms plan and final-home observation described above; no initial3000ms home command, extra ending-ready pose or per-waypoint arrival gate remains. Head gestures keep their separate calibrated transition. See [ADR 0088](../../../docs/adr/0088-nexarm-settings-matched-playback.md).
 
-```mermaid
-flowchart LR
-    JSON[Agent Robot aliases] --> Gateway[OutputGateway / NexArm exclusion]
-    Gateway --> Workflow[Root-owned workflow]
-    Workflow --> Preset[Fixed calibrated physical poses]
-    Preset --> CMD8[Whole-arm absolute interpolation]
-    CMD8 --> Feedback[Observed pose / final stability]
-    Feedback --> Preset
-```
-
-Earlier ±2° base text above describes the retained USB diagnostic only and is superseded for phone UI/conversation bindings. `NexArmTypes.swift` remains the documented filename exception to avoid duplicate Swift basenames. ❌ Complete physical motion quality/clearance acceptance remains pending; prior base primitive success and simulated tests do not establish it.
+Earlier ±2° base text above describes the retained USB diagnostic only and is superseded for phone UI/conversation bindings. `Support/NexArmTypes.swift` uses a domain-qualified name to avoid duplicate Swift basenames. ❌ Complete physical motion quality/clearance acceptance remains pending; prior base primitive success and simulated tests do not establish it.
 
 ✅ All seven phone performance presets passed through the same controller on USB hardware; see [physical acceptance](../../../docs/NexArm_Physical_Acceptance.md). Intermediate arrival allows15mm /4° pitch, final home5mm /2° with stable feedback. ❌ iPhone transport timing and visual quality are separate acceptance.
 
@@ -217,3 +166,17 @@ Earlier ±2° base text above describes the retained USB diagnostic only and is 
 ## Head channel handoff correction
 
 ✅ `nodHead` and `shakeHead` keep their existing Action/Channel completion contract. Their shared controller now establishes home then a distinct ready pose before native servo sweeps, and observes fresh arrival after the ready trajectory's800ms duration before switching command modes. The final home differs from the Cartesian planner's last target. USB acceptance completed both full eight-segment sequences with unchanged strict completion thresholds. ❌ The phone conversation must still be accepted on the installed build.
+
+## Source organization
+
+| File | Responsibility |
+| --- | --- |
+| NexArmActions.swift | Eight production entry points, grouped in one stateless namespace |
+| Support/NexArmTypes.swift | Requests, gestures, directions and complete nested error contracts |
+| Support/NexArmActionModules.swift | Gesture and base registration types |
+
+✅ Production NexArmActions names and both production module types remain unchanged. The unused NexArmActionModule diagnostic registration and NudgeError were removed; no Agent declarations or built-in registrations needed changing.
+
+❌ No new trajectory, validation default, queue or physical completion guarantee is added by source consolidation.
+
+✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.

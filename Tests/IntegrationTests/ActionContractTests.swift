@@ -51,7 +51,8 @@ private func contractDefinition(
     path: ActionPath = contractPath, kind: ActionDefinition.Kind = .finite,
     handler: @escaping ActionHandler = { _ in }
 ) -> ActionDefinition {
-    ActionDefinition(path: path, kind: kind, completion: "Fixture operation acknowledged.", handler: handler)
+    ActionDefinition(
+        path: path, displayName: "测试动作", kind: kind, completion: "Fixture operation acknowledged.", handler: handler)
 }
 
 @Test func actionDefinitionsRejectDuplicatesInvalidMetadataAndMissingGrants() throws {
@@ -62,7 +63,17 @@ private func contractDefinition(
     for completion in [" ", String(repeating: "x", count: 513)] {
         #expect(throws: ActionExecutionError.invalidDefinition(contractPath)) {
             try ActionRegistry(definitions: [
-                ActionDefinition(path: contractPath, kind: .finite, completion: completion, handler: { _ in })
+                ActionDefinition(
+                    path: contractPath, displayName: "测试动作", kind: .finite, completion: completion, handler: { _ in })
+            ])
+        }
+    }
+    for displayName in ["", " \n", String(repeating: "界", count: 86)] {
+        #expect(throws: ActionExecutionError.invalidDefinition(contractPath)) {
+            try ActionRegistry(definitions: [
+                ActionDefinition(
+                    path: contractPath, displayName: displayName, kind: .finite,
+                    completion: "Fixture acknowledged.", handler: { _ in })
             ])
         }
     }

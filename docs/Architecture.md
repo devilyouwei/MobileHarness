@@ -164,3 +164,29 @@ NexArm entertainment Actions use one typed host binding and the existing root-ow
 ✅ LLM output buffering is decoupled from consumer speed: cloud/local chat retain pending events without a count cap and drain them in order after generation. Generation/response bounds and downstream execution limits remain. See [ADR 0084](adr/0084-llm-output-buffering.md).
 
 Head gestures cross from Cartesian trajectory control to native motor control. The shared NexArm controller keeps observing while requiring a fresh arrival sample after the ready trajectory duration before that handoff; strict final arrival and bounded watchdogs remain. A distinct ready target precedes native writes so the ending home is a new Cartesian request. See the [physical acceptance evidence](NexArm_Physical_Acceptance.md) and [controller contract](../MobileHarness/PlatformKit/Connectivity/NexArm/README.md).
+
+## Cohesive Action files (2026-09-30)
+
+✅ Related short Action entries now share domain files. Non-callable registrations, capability interfaces, types and resource services live in domain Support subdirectories; shared infrastructure remains in Actions/Runtime. Public symbols, paths, permissions, completion and scheduling contracts remain unchanged. The [Action standard](../MobileHarness/Actions/README.md) owns source-layout rules.
+
+❌ This source reorganization adds no device behavior or runtime contract.
+
+✅ Speech PCM lifetime now follows its originating reply: no queued/ready cache expiry. After Gateway joins all reply Actions, App clears remaining source/input audio; interruption closes session audio. Played segments release immediately. See [ADR 0085](adr/0085-reply-owned-speech-audio.md).
+
+✅ The unused NexArm wrist diagnostic Action and test-only Agent have been removed. Hardware diagnostics use direct controller tests; the eight production NexArm Actions retain their existing Agent/Gateway path. Runtime ActionDiagnostics remains scheduler-owned execution history, not a callable diagnostic Action. See ADR 0070.
+
+## Domain-owned Action display metadata
+
+✅ ActionDefinition owns a validated human-readable name, copied into shared execution records at admission. Root Workflow forwards scheduler snapshots; UI computes generic statuses/styles and preserves exact Channel names. Neither Workflow nor UI enumerates concrete Actions. Observation is separate from Agent outputs and ActionResult delivery. See [ADR 0086](adr/0086-action-display-metadata.md).
+
+❌ This does not add localization resources, durable audit delivery or per-device progress.
+
+## Tool source organization
+
+✅ Tool entries are grouped by domain, with non-entry registration/interfaces/types/policy under domain Support and the built-in catalog under Runtime. Tools remains one independent target depending only on AgentCore; direct returning/completion execution, cancellation and InputGateway feedback contracts are unchanged. ❌ This source migration adds no scheduler, live health probe or native model Tool transport.
+
+✅ Conversation NexArm completion now requires a fresh stable arrival after each segment’s nominal trajectory duration, extending the head-only handoff protection to whole-arm gestures. Observation and watchdogs remain active throughout. See the [controller contract](../MobileHarness/PlatformKit/Connectivity/NexArm/README.md#all-segment-trajectory-handoff) and ADR 0082. ❌ Reported celebration/dance motor2 oscillation requires physical BLE acceptance.
+
+Speech playback now waits for synthesis progress without an independent PCM read timeout. The synthesis Agent retains its 60-second execution deadline; failures, cancellation, capacity bounds and hardware drain watchdogs remain explicit. See [ADR 0087](adr/0087-speech-producer-deadline.md).
+
+✅ NexArm Cartesian conversation gestures now share Settings frame generation and nominal playback timing, then observe final home before releasing whole-Action ownership. Intermediate waypoint arrival is no longer part of their completion contract; head gestures retain calibrated per-segment control. See [ADR0088](adr/0088-nexarm-settings-matched-playback.md). ❌ Physical jitter acceptance is pending.
