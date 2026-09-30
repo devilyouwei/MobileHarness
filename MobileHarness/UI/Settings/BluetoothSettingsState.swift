@@ -15,6 +15,10 @@ public struct BluetoothDeviceRow: Identifiable, Sendable, Equatable {
 }
 @MainActor
 public protocol BluetoothControlling: AnyObject {
+    func refreshDevice() async
+    func tryAction(_ action: BluetoothArmAction)
+    func setMotorVelocity(id: Int, value: Double)
+    func stopMotorControl()
     func openPage()
     func closePage()
     func scan()
@@ -23,6 +27,23 @@ public protocol BluetoothControlling: AnyObject {
     func disconnect()
     func forget()
     func openSystemSettings()
+}
+
+public enum BluetoothArmAction: String, CaseIterable, Identifiable, Sendable {
+    case shakeBase, wave, tiltLeft, tiltRight, lookAround, celebrate, dance, reset
+    public var id: Self { self }
+    public var title: String {
+        switch self {
+        case .shakeBase: "底座晃动"
+        case .wave: "挥手"
+        case .tiltLeft: "向左歪头"
+        case .tiltRight: "向右歪头"
+        case .lookAround: "左右张望"
+        case .celebrate: "庆祝"
+        case .dance: "小舞蹈"
+        case .reset: "重置姿态"
+        }
+    }
 }
 
 /// Presentation values only; AppWorkflows owns discovery, connections, persistence and motion.
@@ -39,6 +60,15 @@ public final class BluetoothSettingsState {
     public var notice: String?
     public var motionStatus: String?
     public var executing = false
+    public var refreshing = false
+    public var jogging = false
+    public var testing = false
+    public var resetting = false
+    public var joints: [Int] = []
+    public var pose: [Int] = []
+    public var sampledAt: Date?
+    public var canControl: Bool { controlReady && !executing && !refreshing && !jogging && !resetting }
+
     public init() {}
     public var controlReady: Bool { phase == .connected && controlValidated }
     public var connectionBusy: Bool {

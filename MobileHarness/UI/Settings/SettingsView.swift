@@ -30,7 +30,7 @@
                     BluetoothSettingsView(state: bluetooth, controls: bluetoothControls)
                 } label: {
                     HStack {
-                        Label("蓝牙设备", systemImage: "antenna.radiowaves.left.and.right")
+                        Label("蓝牙外设", systemImage: "antenna.radiowaves.left.and.right")
                         Spacer()
                         Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline)
                     }

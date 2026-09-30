@@ -28,7 +28,7 @@ public struct NexArmBaseActionModule: ActionModule {
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "shakeBase"), kind: .finite,
                 completion:
-                    "Every left/right/origin leg converges in controller telemetry; final base returns within six counts."
+                    "Every fixed left/right waypoint converges in controller telemetry; the performance finishes at its fixed home pose."
             ) { [move] invocation in
                 try await NexArmActions.shakeBase(invocation: invocation, using: move)
             }

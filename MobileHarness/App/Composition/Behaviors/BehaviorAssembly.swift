@@ -11,11 +11,13 @@ public struct BehaviorAssembly: Sendable {
         presentation: any UIPresentationCapability,
         playback: any SpeechPlaybackCapability,
         pose: any PosePresentationCapability,
+        gesture: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void,
         shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
         capabilities: [CapabilityRegistry]
     ) throws {
         try self.init(
-            actionModules: ActionModules.builtIn(presentation: presentation, playback: playback, shakeBase: shakeBase),
+            actionModules: ActionModules.builtIn(
+                presentation: presentation, playback: playback, gesture: gesture, shakeBase: shakeBase),
             toolModules: ToolModules.builtIn(presentation: pose), capabilities: capabilities)
     }
 

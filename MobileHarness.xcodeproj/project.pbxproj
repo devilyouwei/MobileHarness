@@ -5,6 +5,13 @@
 	"objectVersion" = "60";
 	"archiveVersion" = "1";
 	"objects" = {
+        "5920AC1924744DCB843B2A3D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/NexArmTypes.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "B3E74A76561511B2578340E6" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/WaveWrist.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "1F17CD2C63831A946B3FEC74" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/TiltWrist.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "2ECE118C6CB6692BC2FDDE2E" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/LookAround.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "EC09A03D6E31E21340D89C63" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/Celebrate.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "AC3A2F2ECDC34B4F6C93AD1D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/Dance.swift"; "sourceTree" = "SOURCE_ROOT"; };
+        "A1F6114BFA0535283ECC3672" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/NexArmGestureActionModule.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "E7A079D7432FD6DE8C05ED50" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "Tests/IntegrationTests/NexArmBluetoothTests.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "C90B3407F53D85173E491948" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/App/Workflows/BluetoothWorkflow.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "443AB248753130A2C6BA3523" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Settings/BluetoothSettingsView.swift"; "sourceTree" = "SOURCE_ROOT"; };
@@ -15,7 +22,7 @@
         "12C719391D8590E272BA74F3" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/NudgeWrist.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "868B9CB1694A3A2C8860D4DC" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Actions/NexArm/README.md"; "sourceTree" = "SOURCE_ROOT"; };
         "B7EE91CBB680EBBAC27FE72E" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Actions/NexArm/ShakeBase.swift"; "sourceTree" = "SOURCE_ROOT"; };
-        "EA09BB1BE4A23A549E24FDD6" = { "isa" = "PBXGroup"; "name" = "NexArm"; "children" = ("A5C7D3B1DF4AD3BE3DE7FA7C", "6A97D387E15EEDCB2A672BFD", "12C719391D8590E272BA74F3", "B7EE91CBB680EBBAC27FE72E", "868B9CB1694A3A2C8860D4DC"); "sourceTree" = "<group>"; };
+        "EA09BB1BE4A23A549E24FDD6" = { "isa" = "PBXGroup"; "name" = "NexArm"; "children" = ("5920AC1924744DCB843B2A3D", "B3E74A76561511B2578340E6", "1F17CD2C63831A946B3FEC74", "2ECE118C6CB6692BC2FDDE2E", "EC09A03D6E31E21340D89C63", "AC3A2F2ECDC34B4F6C93AD1D", "A1F6114BFA0535283ECC3672", "A5C7D3B1DF4AD3BE3DE7FA7C", "6A97D387E15EEDCB2A672BFD", "12C719391D8590E272BA74F3", "B7EE91CBB680EBBAC27FE72E", "868B9CB1694A3A2C8860D4DC"); "sourceTree" = "<group>"; };
         "0D20AE2B6A42D1F75E265D3F" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/NexArmController.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "7AEA66F127932B70DAB23505" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/NexArmProtocol.swift"; "sourceTree" = "SOURCE_ROOT"; };
         "52CD11F77B660A7A7614B3FE" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/PlatformKit/Connectivity/NexArm/NexArmSerial.swift"; "sourceTree" = "SOURCE_ROOT"; };

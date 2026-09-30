@@ -377,3 +377,7 @@ The earlier explicit single-definition binding example illustrates isolated cons
 ## NexArm diagnostic integration
 
 ✅ [NexArm](NexArm/README.md) adds an opt-in wrist nudge and built-in `NexArm.shakeBase(cycles:)` with required typed host injection and controller feedback. ✅ iPhone foreground BLE binding is implemented. ❌ Autonomous motion and physical-stop proof remain unavailable.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ NexArm now adds waveWrist, tiltWrist, lookAround, celebrate and dance as typed finite Actions, alongside shakeBase. The domain owns registration and per-verb validation; all share NexArm exclusion. See [contracts](NexArm/README.md). ❌ New gesture sequences await physical acceptance.

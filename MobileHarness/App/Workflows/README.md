@@ -98,3 +98,83 @@ stateDiagram-v2
 ```
 
 ❌ No guaranteed background connection/control, automatic retry after physical uncertainty, queued-motion replay or OS-level headset pairing integration. Updated real-device lock/unlock acceptance remains pending.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ BluetoothWorkflow shares one runMotion lifecycle for base sweeps and all entertainment presets: foreground/connection validation, capacity-one admission, execution status, cancellation join, fault latching and reconnect policy. No page-owned motion work or separate gesture queue. ❌ Newly added gesture sequences await iPhone physical acceptance.
+
+## Peripheral detail operations
+
+✅ BluetoothControlling exposes measured refresh, typed preset/reset requests and individual motor adjustments. Manual requests use a capacity-one retained task with explicit busy rejection, sharing runMotion and the same controller with conversation Actions. Read refresh reserves the connection-operation slot; it cannot interleave with motion. Commands survive page navigation, while disconnect/background fences admission and joins committed work. Successful connect/motion refreshes measured UI values; disconnect clears them. No command queue or replay is added.
+
+```mermaid
+flowchart LR
+    Details[Peripheral details: typed UI intent] --> Manual[Root workflow manual slot]
+    Actions[Conversation via Gateways and Actions] --> Motion[Shared motion admission]
+    Manual --> Motion
+    Motion --> Controller[NexArm controller]
+    Controller --> Feedback[Measured pose and six encoder values]
+    Feedback --> State[UI values and sample timestamp]
+```
+
+Manual operations are explicit host device controls, like connection/reset, not Agent outputs; conversation inputs and Agent outputs retain their Gateway route. ❌ Real-device slider/reset acceptance remains pending. See ADR 0073.
+
+## Unconfirmed motion recovery (current)
+
+✅ An unconfirmed Action/manual movement releases the busy state but retains the connected controller and reconnect preference. It reports “动作未确认完成，可刷新状态或继续操作”. Refresh or the next explicit operation invokes read-only recovery; no old Action or remaining gesture legs are replayed. Actual transport disconnect still follows native link state. This supersedes the earlier workflow policy of discarding the controller and requiring reconnection after every uncertain completion.
+
+❌ An arm still moving or unreadable cannot accept another motor write; the request returns an error and remains retryable on the same connection. Physical acceptance remains separate.
+
+## Complete peripheral cleanup and transport recovery
+
+✅ Connecting clears visible discovery immediately; only a fresh explicit scan can repopulate rows after connect/forget/disconnect. The selected retry target remains available even after a failed connection clears discovery. Forget joins cleanup, clears native discovery/selection/failure, saves an empty device record with reconnect disabled, and clears UI identity, telemetry, motion text and errors. Failed cleanup/persistence stays visible. Delayed snapshots cannot repopulate a retired scan.
+
+✅ Connection protocol validation and the feedback gesture are separate. A motion-level indication failure retains the live verified connection and controller; the next explicit operation/read recovers stationary telemetry without repeating reset. If the verified connection is actually lost (including request timeout), one foreground read-only reconnect attempt joins previous work. Failure does not loop; no reset, gesture or pending command is replayed. Manual disconnect/forget/background fence this recovery. Successful connection clears old errors. This supersedes the earlier once-per-foreground-only recovery and gesture-required-for-readiness policies.
+
+```mermaid
+flowchart TD
+    Scan[Named discoveries only] --> Select[Select peripheral]
+    Select --> Clear[Stop scan and clear discoveries]
+    Clear --> Verify[Read-only protocol validation]
+    Verify --> Indicate[Optional connection gesture]
+    Indicate --> Ready[Live connection: no old error]
+    Indicate -->|Motion unconfirmed, transport live| Recover[Retain owner; read-only recovery before next command]
+    Ready -->|Transport lost| Retry[One reconnect, no motion replay]
+    Retry --> Ready
+    Retry -->|Failed| Failed[Visible failure; no retry loop]
+    Ready --> Forget[Join disconnect and clear native + saved + UI state]
+```
+
+❌ New physical BLE timeout/recovery and forget acceptance remain pending. App-owned cleanup is distinct from system pairing/unpairing.
+
+## Continuous manual control and reset priority
+
+✅ Root-owned liveTask consumes six replaceable normalized intent slots at 30 ms deadline cadence; there is no physical-command backlog. Wire targets advance only when the native no-response transport admits a packet; fractional planner state can advance without a duplicate write. Elapsed time is capped, and I/O time is included in the tick deadline. Congestion does not accumulate elapsed travel or old finger positions; two seconds without admission fails visibly. Release/page exit clears intent; background/disconnect cancels the worker. Play admission remains separate and completion-based.
+
+✅ Manual takeover cancels the current preset owner, changes a revision fence, then opens a native streaming session before sending. Native fencing prevents future writes by the old owner; its existing request is retired, so waiting for an old response cannot prevent reset or close a live stream. Old task/refresh completions cannot overwrite current UI. Reset has priority over the next jog frame and sends CMD54 without waiting for old physical settlement; old task cleanup remains joined. Repeated pending reset taps coalesce as the same desired state. No old motion is replayed.
+
+✅ Jog starts from latest measured/commanded targets, without requesting fresh telemetry. After explicit reset the planner uses the vendor's nominal home targets as estimates, never reported measurements. Only sampled values populate UI positions. Presets still recover and verify telemetry when subsequently invoked. ❌ A final accepted finite target can finish after release; iOS suspension/link close are not an emergency-stop guarantee.
+
+✅ Preset failure details now distinguish command delivery, missing position feedback and joints short of target. The manual-action wrapper preserves those details instead of overwriting them with a generic message. Reset remains a priority fire-and-observe-later command; no reset completion ACK is required. ❌ Physical replacement-preset acceptance remains pending.
+
+✅ Phone UI and conversational shakeBase now bind the same fixed `.baseSway` performance (±30°,800ms body legs); neither calls the retained ±2° USB diagnostic. All presets use physical pose completion and remain interruptible by live reset. ❌ Physical acceptance remains pending.
+
+✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
+
+## Settings test control (current)
+
+✅ Settings Play uses native CMD8 writeWithoutResponse without telemetry/ATT completion waits. Fixed ready400ms → body800ms per frame → home600ms, maximum8 frames. These are cancellable playback deadlines, not arrival gates. One latest test slot replaces all unsent old frames; no command backlog. New Play/reset/jog can take over within the30ms worker cadence (subject to native transport admission). Buttons remain enabled while connected. Native congestion retains only the latest request, fails visibly after2s, and never replays skipped old frames. Page exit/background/disconnect discard unsent test frames. UI says sent, never physically completed. Conversation/channel performGesture retains its existing feedback-based contract.
+
+```mermaid
+flowchart LR
+    Click[Settings click] --> Replace[Replace unsent test plan]
+    Replace --> Live[Native writeWithoutResponse]
+    Live --> Clock[Cancellable frame deadline]
+    Clock --> Live
+    Next[New click / reset / jog] --> Replace
+    Channel[Conversation channel] --> Feedback[Existing completion-based controller]
+```
+
+❌ Wireless delivery and physical arrival are not established by local send admission. Optional NEXARM_SETTINGS_TEST validates the shared frame plan on USB, separate from default tests.
+
+✅ Channel completion now reports distinct no-feedback and total-deadline failures. Completion uses the controller's last confirmed observation without a redundant status query. A failed await does not automatically replay motion; settings immediate tests keep their separate live path. ❌ Host timeout does not imply physical stop.

@@ -151,3 +151,116 @@ Physical connection-indication validation (2026-09-30): the original home test u
 ✅ App selects `nexArmBLEProtocol`. It does not send the broken command-1 firmware query at all: two bounded stationary pose samples establish protocol compatibility, then explicit manual connection completes reset/ID5 feedback before ready. Unknown or missing firmware versions are no longer part of BLE admission or UI. The separate strict controller policy remains available for USB diagnostics. Current pose bounds, gesture limits, failure latching and bounded committed-leg joins remain unchanged.
 
 ❌ Broad BLE discovery cannot guarantee that a peripheral advertises its name/services or that iOS discovers every nearby Bluetooth device; unsupported profiles remain rejected. OS background radio availability is not guaranteed.
+
+## NexArm entertainment skills — calibrated pose path (current)
+
+✅ All phone performance actions, including base sway, use fixed Cartesian home [200,0,200,0,0,0], ready [200,0,240,0,0,0], body and home ending. Units are XYZ millimetres, pitch tenths of a degree, roll/claw degrees. Base sway yaw ±30°, look-around ±35°, wave/tilt roll ±40°, celebration roll up to45° and height220...270mm, dance yaw ±30°/roll ±40° and height220...260mm. Repeat only the body, at most22 targets. Home/ready/ending are independent of previous manual posture.
+
+✅ Current preset transport is native absolute CMD8, the command used internally by vendor reset/move. Wire order: pitch, X, Y, Z, roll, claw, duration (seven little-endian Int16 values). Body transitions800ms, initial approach1200...3000ms and final home1200ms. The firmware's CMD50 increments its internal commanded pose; adding host-measured deltas caused drift and is no longer used for fixed presets. The older supervised USB ±2° diagnostic retains its historical CMD50 path; phone base sway uses `.baseSway`.
+
+✅ USB physical evidence established raised-pose errors of9–11mm and2.2–2.9° during diagnosis. Performance waypoints now accept XYZ≤15mm, pitch≤4°, roll/claw≤2°; final home remains XYZ≤5mm and all angles≤2°, plus three stable joint observations (≤2-count drift). This is performance-level arrival, not precision positioning. No corrective replay follows failure. Pose validity, one-owner admission and reset fencing remain.
+
+✅ `NexArmSerial` and `NexArmBluetoothLink` both implement `NexArmWritableLink`; the same `NexArmController.performGesture` builds packets and verifies completion. Serial `write` means all bytes accepted locally, BLE means ATT admission/acknowledgment; neither claims physical completion. Serial is exclusive, has no queue/retry, and rejects partial writes. No Mac-specific motion algorithm exists.
+
+```mermaid
+flowchart LR
+    Phone[iPhone workflow] --> Controller[Shared NexArmController.performGesture]
+    Mac[Opt-in Mac physical test] --> Controller
+    Controller --> Link[NexArmWritableLink]
+    Link --> Serial[NexArmSerial / USB]
+    Link --> BLE[NexArmBluetoothLink / CoreBluetooth]
+    Serial --> Arm[Same physical arm]
+    BLE --> Arm
+    Arm --> Feedback[Pose / stable home verification]
+    Feedback --> Controller
+```
+
+✅ All seven production presets passed on the connected USB arm using the shared function on2026-09-30, in60.024s total; wrist wave reached−40°/+40°, base sway−30.0°/+29.7°, look-around−34.8°/+34.8°. Final XYZ was [200,±1,197...198]mm. See [physical acceptance record](../../../../docs/NexArm_Physical_Acceptance.md) for limits and reproduction. ❌ This does not validate iPhone BLE latency, subjective visual fluidity, collision clearance or an emergency-stop/watchdog guarantee.
+
+## Explicit peripheral controls
+
+✅ readState returns six measured encoders and six pose fields. resetPosition reuses the existing CMD54 home settlement without the connection wrist gesture and can be explicitly repeated. moveMotor accepts IDs 1...6, absolute targets 1536...2560 and at most 91 counts from a fresh stationary sample; fixed speed parameter 200. It verifies unchanged other joints (≤8 counts), a moving-joint envelope ≤110 counts, target tolerance ≤6 counts and three stable samples. A committed leg uses the existing one-second wait / three-second settlement deadline plus bounded transport exchanges. Failed writes/settlement latch uncertainty, and cancellation joins the committed leg without rollback.
+
+❌ These conservative software bounds are not calibrated per-motor mechanical limits or collision protection; physical six-motor acceptance and device-side watchdog remain outstanding. No full-travel slider is exposed.
+
+## Read-only recovery of uncertain completion
+
+✅ recoverState reserves the existing capacity-one controller slot. After uncertain motion it requires three valid pose/joint samples, 150 ms apart, with every joint within two counts of the first sample, before clearing the motion fault. Invalid pose, movement, cancellation and transport errors leave the fault set. Recovery sends only position queries, never motion, reset or rollback. Ordinary direct motion methods still reject a fault until this explicit recovery succeeds; BLE workflow invokes it on refresh/next user operation.
+
+❌ Stationary feedback does not retroactively establish the prior target was reached. Physical clearance and hardware emergency stop are unchanged limitations.
+
+## Discovery and forget lifecycle (current)
+
+✅ Discovery normalizes advertised/cached names and drops empty/placeholder names before retaining peripherals; named devices retain the existing NexArm-first ordering and 128-device bound. Connection captures its selected peripheral, stops the native scan and clears discovered rows/references. clearDiscovery resets rows, overflow state and retained discoveries without breaking the active peripheral. forgetDevice requires confirmed disconnection, then clears selected identity and native failure state as well. Late discovery callbacks are rejected after scanning stops.
+
+✅ Request timeout still closes the transport: this protocol has no transaction identifiers, so reusing it could accept late replies for a new request. Native error messages describe the failed step without unconditionally prescribing manual reconnection. The App layer owns one read-only reconnect attempt, never command replay.
+
+❌ App forget cannot erase iOS-managed pairing keys or the operating system's CoreBluetooth cache; system accessory unpairing remains in Settings → Bluetooth. No private APIs are used.
+
+## Live servo streaming (current)
+
+✅ NexArmJogPlanner retains vendor joint ranges and a 4% dead zone. At a 30 ms nominal cadence it shapes squared stick displacement into velocity (maximum 600 encoder counts/s), acceleration (1800 counts/s²) and jerk (12000 counts/s³). Integration uses elapsed time capped at 60 ms, with finite 60 ms look-ahead goals. Duplicate integer goals are omitted while fractional integration continues. Release clears velocity and retains the last finite target; no automatic home movement. These are command estimates, not measured positions.
+
+✅ Live packets use the vendor HX_30HM `write_pos_ex` format: servo ID 1...6, command 3, registers starting at 41, acceleration setting 30, position, zero PWM, speed 1...600. CMD51 previously ran whole-arm `update_status` on every small movement and commanded twice the integration speed, causing repeated arrival/stopping and unnecessary telemetry. Native live admission allows only this position-write shape and reset; arbitrary configuration writes remain rejected.
+
+✅ BLE live sessions require the characteristic's writeWithoutResponse property and check canSendWriteWithoutResponse plus native MTU. No application/ATT response or arrival is awaited; admission is not completion. One UUID session fences stale senders. Ordinary requests are fenced while streaming; takeover retires an existing request continuation/timer without closing BLE, ignores old data and consumes any retired ATT write acknowledgment separately. On exit, a 150 ms quiet interval drains unsolicited stream feedback before ordinary request/observation work resumes. The wire format has no transaction ID; telemetry remains sampled observation, not causal proof of a particular command. Actual transport failures still terminate the link.
+
+```mermaid
+flowchart LR
+    Touch[Six latest direction/speed intents] --> Tick[30 ms root worker]
+    Tick --> Plan[Acceleration and jerk shaping + finite look-ahead]
+    Plan --> Flow{Native transport ready?}
+    Flow -->|No| Retain[Do not advance targets; latest intent replaces old]
+    Flow -->|Yes| BLE[Write without response]
+    BLE --> Estimate[Advance commanded estimate only]
+    Release[Release / view exit] --> Zero[Zero intent; no return motion]
+    Reset[Explicit reset] --> Fence[Retire old request; fence old command owner]
+    Fence --> Home[Priority CMD54; no completion claim]
+```
+
+Implementation was checked against the downloaded official Nex_Arm archive: system_task_handle.cpp PS3_SERVO_MIN/MAX/HOME and PS3_SERVO_REPEAT_INTERVAL, Robot_Arm.cpp move_servo, and Ble_Ctrl.cpp PROPERTY_WRITE_NR. The chassis motor-stop opcode does not stop these six servos and is intentionally not used. ✅ All six motors passed shared-planner USB motion/hold checks (see docs/NexArm_Physical_Acceptance.md). ❌ No emergency-stop ACK, device watchdog or BLE physical cadence acceptance; release stops future finite targets, not an already committed physical movement.
+
+✅ Left/right tilt uses the arm’s own frame (stand behind the arm facing its forward direction): left is yaw +12° / roll +40°, right is yaw −12° / roll −40°. Both retain ready height240mm and fixed start/end poses. UI and conversation share this mapping; raw motor sliders remain signed joint controls. ❌ Physical directional naming is based on user correction; no new visual acceptance is claimed.
+
+✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
+
+✅ Tilt presets keep the ready height240mm while yaw/roll change, removing the extra260mm lift that could miss the15mm XYZ arrival threshold and prevent the ending from running. Arrival tolerances are unchanged; unconfirmed motion still does not claim completion. ❌ USB acceptance cannot establish concurrent phone-control behavior.
+
+## Settings test control (current)
+
+✅ Settings Play uses native CMD8 writeWithoutResponse without telemetry/ATT completion waits. Fixed ready400ms → body800ms per frame → home600ms, maximum8 frames. These are cancellable playback deadlines, not arrival gates. One latest test slot replaces all unsent old frames; no command backlog. New Play/reset/jog can take over within the30ms worker cadence (subject to native transport admission). Buttons remain enabled while connected. Native congestion retains only the latest request, fails visibly after2s, and never replays skipped old frames. Page exit/background/disconnect discard unsent test frames. UI says sent, never physically completed. Conversation/channel performGesture retains its existing feedback-based contract.
+
+```mermaid
+flowchart LR
+    Click[Settings click] --> Replace[Replace unsent test plan]
+    Replace --> Live[Native writeWithoutResponse]
+    Live --> Clock[Cancellable frame deadline]
+    Clock --> Live
+    Next[New click / reset / jog] --> Replace
+    Channel[Conversation channel] --> Feedback[Existing completion-based controller]
+```
+
+❌ Wireless delivery and physical arrival are not established by local send admission. Optional NEXARM_SETTINGS_TEST validates the shared frame plan on USB, separate from default tests.
+
+## Channel observation and host watchdog (current)
+
+✅ BLE continuously decodes FFE2 notifications even without a pending request; a bounded4096-byte decoder and one latest valid24-byte pose replace old telemetry. Serial observation sessions drain incoming bytes without waiting for replies (16KiB per drain). `NexArmObservableLink` fences each segment; live settings takeover or disconnect invalidates the owner. Both transports use the same controller arrival tracker.
+
+✅ Channel motion is admitted without a response wait (bounded1s backpressure admission), then observations begin immediately, without sleeping nominal motion duration. Push updates are preferred;200ms of silence triggers a query, no more than one per200ms. No response continuation or accumulating query queue. Two seconds without valid feedback returns feedbackTimeout; every segment also has a hard nominal-duration+3s deadline. Target convergence and encoder stability must span200ms (body) /300ms (final), with unchanged pose tolerances. Single samples, wall-clock waiting alone and bursts of same-time packets cannot complete an action. Completed pose feeds UI directly without an extra blocking query. No automatic motion replay.
+
+```mermaid
+flowchart LR
+    BLE[FFE2 continuous notifications] --> Cache[Bounded decoder and latest pose]
+    Serial[Nonblocking serial receive] --> Cache
+    Cache --> Tracker[Target and stable-time tracker]
+    Quiet[No new feedback for200ms] --> Query[One query at most each200ms]
+    Query --> Cache
+    Tracker --> Success[Observed arrival]
+    Silence[No feedback2s] --> Unknown[Result unknown; release await]
+    Deadline[Nominal duration plus3s] --> Failure[Not arrived; release await]
+    Manual[Settings takeover] --> Cancel[Invalidate observation session]
+```
+
+❌ These are host watchdogs, not firmware safety watchdogs or stop acknowledgments. The protocol has no action ID or device sample sequence/timestamp: receipt freshness and observed convergence cannot prove strict causal completion or distinguish repeated cached device samples. Generic legacy links retain bounded exchange fallback; production BLE/USB implement observation sessions. Settings open-loop timing remains unchanged.
+
+✅ The fixed whole-action deadline equals the sum of each segment’s nominal duration plus its3s settling/observation allowance; starting later segments cannot extend it. Dance has10 segments and a40.6s upper bound, while2s silence and nominal+3s per-segment failures still exit earlier. A single3s allowance for the entire sequence previously cut dance at leg8 before its return frames. This bounds the complete channel await as well as each segment.

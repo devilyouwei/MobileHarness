@@ -3,7 +3,7 @@
 Purpose: send user input to ChatCapability, maintain bounded history and interpret generated output inside the Agent. Its local registry controls available capabilities; Gateway receives resolved calls.
 
 - ✅ AssistantAgent actor: 32 waiting inputs, 256 output envelopes and one generation worker; overflow fails explicitly.
-- ✅ Assistant.agent.json v5 exposes express under Display, shakeBase under Robot and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
+- ✅ Assistant.agent.json v5 exposes express under Display, six NexArm actions under Robot and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
 - ✅ Each turn owns AgentGenerator state. Natural text uses Assistant.mapText; explicit XML resolves only JSON Actions. Channel scopes override defaults without moving wait boundaries.
 - ✅ CapabilityContextBuilder includes JSON Action aliases/docs/parameters/examples only. Speech behavior is an English Agent-owned instruction; internal methods and native Tools never enter system context.
 - ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
@@ -197,3 +197,17 @@ flowchart LR
 ✅ iPhone binds the verified BLE profile through AppWorkflows. ❌ Unattended model motion and verified hardware stop/watchdog are unavailable; disconnected devices fail explicitly. Generation completion is not motion completion. Use only explicitly requested supervised motions; never automatically retry failures.
 
 ✅ shakeBase documentation now identifies phone Settings → Bluetooth Devices and foreground/posture requirements. iPhone has a real BLE workflow binding. Terminal ActionResults enter the existing bounded inbox, and UI shows workflow completion independently of model prose. ❌ Receipt-driven follow-up model generation and arbitrary robot Actions are not introduced.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ Robot now exposes waveWrist(count), tiltWrist(direction), lookAround(cycles), celebrate(cycles) and dance(cycles), alongside shakeBase. JSON v5 alone lists model permissions. Docs distinguish motion geometry, finite completion, foreground/connection requirements and no automatic retry; examples use structured wait. Choose a gesture when the user requests robot motion/performance, not on every ordinary chat reply. ❌ No new receipt-driven model recovery or implicit motion on reconnect.
+
+✅ Robot gesture descriptions now specify fixed preparation/body/home, larger coordinated angles and all-six-servo poses including grip. JSON v5 aliases and parameter schemas are unchanged. ❌ Physical choreography acceptance remains pending.
+
+✅ Robot docs now describe the phone base Action as ±30° and all performances as fixed Cartesian home/ready/body/home with800ms body interpolation. Joint calibration belongs to the device; no model-callable registry changes. ❌ Physical performance acceptance remains pending.
+
+✅ NexArm left/right means the arm’s own frame, viewed from behind facing forward. The tiltWrist description now matches the shared controller: left positive yaw/roll, right negative yaw/roll. ❌ Observer-relative directions are not a separate action mode.
+
+✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
+
+✅ TiltWrist keeps ready height240mm with yaw±12° / roll±40° and its fixed return sequence; there is no extra260mm lift. ❌ Precise Cartesian positioning is not promised.

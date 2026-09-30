@@ -672,3 +672,7 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 ❌ Image, Video and semantic Memory domains are planned only; no empty directories or placeholder APIs. MemoryLeaseStore is a generic RAM lease primitive, not semantic memory. Cross-device sync and general reclaimable disk cache remain unimplemented.
 
 ✅ `PlatformKit/Connectivity/NexArm` owns the shared protocol/controller and macOS-only serial I/O in PlatformKit. Its diagnostic composition lives in root IntegrationTests; Assistant declares the bounded base Action; the iPhone root binds foreground BLE through BluetoothWorkflow, while the Mac diagnostic binds USB. See ADR 0070. ❌ TCP and general robot ownership/watchdog validation remain pending.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ NexArm entertainment adds WaveWrist.swift, TiltWrist.swift, LookAround.swift, Celebrate.swift, Dance.swift and NexArmGestureActionModule.swift under Actions/NexArm. Shared NexArmTypes.swift is a compiler-driven filename exception to Types.swift (UI/Types.swift is in the same Actions target). Existing target/module layout and independent UI remain unchanged. ❌ New full gesture physical acceptance is pending.

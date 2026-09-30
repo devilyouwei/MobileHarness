@@ -522,3 +522,81 @@ Deployment: the signed compatibility/home-tolerance build succeeded, installed o
 Bluetooth UX validation: `scripts/check.sh` passed with 204 IntegrationTests and all four simulator schemes passed `scripts/build-ios.sh`. Real-device discovery/recovery acceptance remains pending.
 
 Deployment of current Bluetooth UX: signed iPhone build succeeded; the update installed on iPhone 17 Pro and launched successfully. Scan visibility and lock/unlock recovery still await user observation. The earlier iPhone conversation-control acceptance remains recorded above.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ Added five real device-bound NexArm entertainment Actions and Assistant registrations, with fixed base/wrist presets and verified finite-leg completion. ❌ New full gesture sequences require physical iPhone acceptance; unattended operation and device-side stop/watchdog remain outstanding. See [ADR 0072](adr/0072-nexarm-entertainment-skills.md).
+
+Validation (2026-09-30): `scripts/check.sh` passed, including 212 IntegrationTests; `scripts/build-ios.sh` passed all four simulator schemes. Real-model evaluation remained opt-in/skipped. New gesture sequences used explicit telemetry simulators and have not received fresh physical acceptance.
+
+## 蓝牙外设详情（2026-09-30）
+
+✅ 简化列表文案，自动连接说明放到蓝牙状态下方；已连接设备可进入详情。展示实测末端位置、六个电机位置及更新时间；支持现有全部预设动作、独立重置及逐电机松手提交滑块。手动操作与对话动作共享容量一的执行与断连清理，不积压命令。见 ADR 0073。
+
+❌ 六电机真实机械活动范围、重置/滑块真机体验仍待验收；当前每次最多约 8°，位置区间 1536...2560，不开放全行程控制。
+
+Validation: `scripts/check.sh` passed, including 215 IntegrationTests; `scripts/build-ios.sh` passed all four unsigned simulator schemes. Optional model evaluations remained skipped. No physical arm commands or iPhone installation were performed in this change.
+
+## 动作未确认后的体验修复（2026-09-30）
+
+✅ 动作未确认不再强制丢弃仍连接的控制器或要求重连。释放执行状态，保留失败提示；刷新或下一次明确操作先读取三次静止反馈，通过后继续。未完成的动作和剩余步骤不会自动重放。真正断连仍按蓝牙连接状态处理。
+
+❌ 机械臂仍在移动或反馈不可读时不会发送新动作；真机体验待验收。
+
+Recovery validation: `scripts/check.sh` passed (217 IntegrationTests), all four simulator schemes passed `scripts/build-ios.sh`, and a follow-up arrival-timeout test confirmed read-only recovery and a new explicit gesture on the same controller. No physical motion was sent by these checks.
+
+## 蓝牙连接与列表清理补全（2026-09-30）
+
+✅ 隐藏无名设备；连接停止扫描并清空原生与页面发现列表；忽略清除设备身份、重连偏好、位置、动作与旧错误，迟到扫描事件不能重新填充列表。连接提示动作失败与连接握手分离；真实通信超时仍关闭旧通道，并最多自动进行一次不带动作的恢复，不重复复位/动作。
+
+❌ App 不能清除系统蓝牙配对密钥；耳机等系统配对由 iOS 设置管理。新版本真机扫描/超时/忽略体验待验收。
+
+Lifecycle validation: `scripts/check.sh` passed with 221 IntegrationTests, all four simulator schemes passed `scripts/build-ios.sh`, and the signed iPhone build passed with explicit bundle version `2026093003`. Device installation and physical acceptance are tracked separately.
+
+Deployment confirmed: installed on iPhone 17 Pro over localNetwork; a fresh device app query returned bundle version `2026093003`, and app launch succeeded. Physical arm interaction/scan/recovery acceptance remains pending; no physical arm test commands were sent during this change.
+
+## 六舵机回弹式连续控制（2026-09-30）
+
+✅ 六个控件始终显示；按住拖动连续发送，幅度决定方向/速度，松手回中不归位。移除每次 8° 和单次滑块等待回执路径，保留厂商各舵机机械行程范围。BLE 无响应写入受原生流控约束，六个最新输入不积压轨迹。预设 Play 保留完成确认；重置优先接管、取消旧等待和后续步骤。
+
+❌ 真机手感、持续 BLE 吞吐和实际停止距离待验收；已发出的有限目标可能在松手后完成。详见 ADR 0074。
+
+Validation: `scripts/check.sh` passed with 223 IntegrationTests; `scripts/build-ios.sh` passed all four simulator schemes. Simulated live tests include throttled round-robin delivery across all six motors, no-feedback control, release and pending-query reset takeover. Physical joystick feel, stopping distance and radio throughput remain unverified.
+
+Deployment: signed iPhone build passed; installed on iPhone 17 Pro, a fresh app query confirmed bundle version `2026093004`, and launch succeeded. No physical motor commands were issued during implementation/testing; real joystick feel and motion acceptance remain pending.
+
+✅ 2026-09-30: replace relative tiny single-joint entertainment gestures with fixed six-joint preparation/body/home choreography, larger coordinated motion, proportional speeds and native acceleration. ❌ Physical clearance, visual smoothness and iPhone timing acceptance remain pending; see ADR 0075.
+
+Validation for ADR 0075: `scripts/check.sh` passed, including 225 IntegrationTests; `scripts/build-ios.sh` passed all four simulator schemes. Signed iPhone build 2026093005 succeeded. Opt-in real-model checks remained skipped; physical choreography acceptance remains pending.
+
+Device delivery: iPhone installation completed and CoreDevice app inventory confirmed bundle `dev.mobileharness.app`, build `2026093005`. Installation is not physical motion acceptance.
+
+✅ 2026-09-30 compatibility repair: retire raw broadcast preset writes, use controller CMD51 for each joint without per-joint completion waits, and retain specific delivery/feedback/target failure messages. ❌ Physical root-cause confirmation and replacement choreography acceptance remain pending.
+
+Validation: `scripts/check.sh` passed with226 IntegrationTests, including reset-without-completion-ACK → next preset and recovery/failure-detail regressions. All four `scripts/build-ios.sh` simulator schemes passed. Opt-in physical/model tests were not run.
+
+Device delivery: signed build2026093006 installed; CoreDevice inventory confirmed the installed version. Automatic launch was denied because the iPhone was locked. Physical motion was not tested.
+
+✅ 2026-09-30: address user-reported ID3 target failure by removing factory/example encoder goals from preset preparation/completion. Use device IK and fixed physical poses via CMD50; phone base sway becomes±30°/800ms rather than±2°/1500ms. ❌ Physical acceptance still pending.
+
+Validation: `scripts/check.sh` passed, including 227 IntegrationTests. `scripts/build-ios.sh` passed all four simulator schemes. Tests include a differing ID3 home calibration, absolute physical target consistency, ±30°/800ms base performance and reset interruption. Opt-in physical/model tests were not run.
+
+Device delivery: signed build2026093007 installed; CoreDevice app inventory confirmed2026093007 on the iPhone. This confirms deployment, not physical motion acceptance.
+
+✅ 2026-09-30: Mac serial physical debugging completed for all seven production presets, using the same function as iPhone. Added serial write capability, native absolute pose commands and measured performance tolerances; see NexArm_Physical_Acceptance.md. ❌ iPhone transport latency and subjective fluidity remain to be assessed.
+
+Verification: required repository checks passed (229 IntegrationTests; opt-in physical/model tests skipped by default), all four simulator schemes built successfully, and signed iPhone build2026093008 succeeded. The separate explicitly enabled real USB run passed all seven presets in60.024s.
+
+Device delivery: signed build2026093008 installed; CoreDevice inventory confirmed that exact version on the iPhone. USB shared-controller acceptance is complete; BLE timing remains a separate device check.
+
+✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](adr/0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
+
+✅ [ADR 0080](adr/0080-nexarm-independent-motion-results.md): explicit preset admission no longer depends on previous completion/recovery feedback. New actions retain their own completion checks. ❌ Physical failure recovery acceptance remains pending.
+
+✅ Tilt return repair keeps ready height240mm while preserving arm-relative yaw±12°/roll±40° and unchanged arrival thresholds. Both complete USB sequences passed; see [physical acceptance](NexArm_Physical_Acceptance.md). ❌ Phone BLE acceptance remains pending.
+
+✅ [ADR0081](adr/0081-settings-immediate-test-control.md) separates immediate preemptible settings tests from unchanged completion-based channel actions. ❌ Settings send status does not assert physical completion.
+
+✅ [ADR0082](adr/0082-nexarm-observation-watchdogs.md) adds continuous pose reception, notification-first channel completion, limited query fallback and independent silence/total deadlines. Settings live tests remain unchanged. ❌ Device-side watchdog and action-ID completion require firmware support.
+
+✅ Dance timeout correction: the fixed overall channel deadline sums all per-segment motion and settling budgets, preserving2s feedback silence and per-segment limits. Previously one shared3s margin truncated a healthy multi-frame dance before its ending. Settings playback and pose tolerances are unchanged.

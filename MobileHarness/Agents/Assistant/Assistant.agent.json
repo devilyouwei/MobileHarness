@@ -47,7 +47,107 @@
           "<shakeBase cycles=\"1\"/>",
           "<shakeBase cycles=\"3\"/>"
         ],
-        "doc": "On explicit user request, rotate the NexArm base gently: origin, left 2 degrees, right 2 degrees, origin, for each cycle. Fixed speed and small range; no other parameters. Requires NexArm connected in phone Settings > Bluetooth Devices (or a supervised Mac USB host). If disconnected, ask the user to connect in Settings. Keep the app foreground. The arm must be stationary with horizontal reach 100 to 350 mm; do not reset or reposition automatically. Completion requires controller feedback for every leg and return to origin. Do not claim completion from generation or admission. Stop on failure; never retry automatically."
+        "doc": "Perform a complete base sway with fixed preparation, base yaw -30/+30/center degrees, and fixed ending. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+      },
+      {
+        "alias": "waveWrist",
+        "path": {
+          "module": "NexArm",
+          "function": "waveWrist"
+        },
+        "parameters": [
+          {
+            "name": "count",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          }
+        ],
+        "examples": [
+          "<wait><waveWrist count=\"1\"/></wait>"
+        ],
+        "doc": "Wave hello/goodbye with yaw +/-12 degrees and roll +/-40 degrees, twice per cycle. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+      },
+      {
+        "alias": "tiltWrist",
+        "path": {
+          "module": "NexArm",
+          "function": "tiltWrist"
+        },
+        "parameters": [
+          {
+            "name": "direction",
+            "valueType": "string",
+            "required": true,
+            "description": "Tilt direction relative to the arm.",
+            "constraints": "Exactly left or right."
+          }
+        ],
+        "examples": [
+          "<wait><tiltWrist direction=\"left\"/></wait>"
+        ],
+        "doc": "Tilt with yaw12 and roll40 degrees to the selected side, keeping the ready height240mm without an extra lift. Left/right always use the arm's own frame, as if standing behind it facing forward: left uses positive yaw and roll; right uses negative yaw and roll. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+      },
+      {
+        "alias": "lookAround",
+        "path": {
+          "module": "NexArm",
+          "function": "lookAround"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          }
+        ],
+        "examples": [
+          "<wait><lookAround cycles=\"1\"/></wait>"
+        ],
+        "doc": "Look around with yaw -35/+35/center degrees and roll +/-15 degrees. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+      },
+      {
+        "alias": "celebrate",
+        "path": {
+          "module": "NexArm",
+          "function": "celebrate"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          }
+        ],
+        "examples": [
+          "<wait><celebrate cycles=\"1\"/></wait>"
+        ],
+        "doc": "Celebrate with yaw +/-20 degrees, roll up to +/-45 degrees and height220...270mm. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+      },
+      {
+        "alias": "dance",
+        "path": {
+          "module": "NexArm",
+          "function": "dance"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          }
+        ],
+        "examples": [
+          "<wait><dance cycles=\"1\"/></wait>"
+        ],
+        "doc": "Dance with yaw +/-30 degrees, roll +/-40 degrees and height220...260mm. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
       }
     ]
   },

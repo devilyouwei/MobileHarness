@@ -55,3 +55,7 @@ flowchart TD
 ✅ BehaviorAssembly requires a typed `shakeBase` binding. The iPhone root binds BluetoothWorkflow; the Mac diagnostic binds USB. Both fail explicitly when unavailable.
 
 ✅ AppAssembly owns one BluetoothWorkflow and NexArmBluetooth for settings and conversation. Its quiesce callback joins VoiceSessionCoordinator cleanup before changing the device; ApplicationRuntime binds shakeBase to that same workflow and requests terminal ActionResults through InputGateway. ❌ No page-owned connection or unavailable success stub remains.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ ApplicationRuntime explicitly maps typed NexArm gesture requests to PlatformKit presets and the shared BluetoothWorkflow. Domain registration remains in Actions; callable permissions remain in Assistant JSON. ❌ New complete gestures await device acceptance.

@@ -124,3 +124,33 @@ These are **dated decision records**, including proposals and stages later repla
 ✅ ADR 0071 revises the earlier strict BLE gate using physical USB/BLE evidence: named compatibility profile, stationary telemetry checks, missing-version disclosure, and one reset/ID5 ±8° indication. ❌ No claim of iPhone physical acceptance.
 
 ✅ ADR 0071 includes the current BLE UX contract: no normal firmware query, name-independent discovery, one read-only recovery attempt on activation, persisted opt-out after manual disconnect/forget, and no motion replay.
+
+## NexArm entertainment skills (2026-09-30)
+
+- ✅ [0072 — NexArm entertainment skills](0072-nexarm-entertainment-skills.md): bounded presets, typed bindings, terminal feedback and no replay. ❌ Physical sequence acceptance pending.
+
+- ✅ [0073 — Peripheral detail controls](0073-peripheral-detail-controls.md): root-owned manual actions, sampled telemetry and bounded six-motor adjustments. ❌ Physical acceptance pending.
+
+✅ ADR 0073 amendment: preserve live Bluetooth connection after uncertain motion, with bounded read-only recovery and no replay. ❌ Physical acceptance pending.
+
+✅ ADR 0073 lifecycle amendment separates connection indication from protocol readiness, adds bounded native-link recovery and defines complete App-owned discovery/forget cleanup. ❌ Physical acceptance pending.
+
+- ✅ [0074 — NexArm live jog](0074-nexarm-live-jog.md): spring-return speed controls, bounded native no-response admission and priority reset. ❌ Physical acceptance pending.
+
+- ✅ [0075 — Fixed NexArm choreography](0075-nexarm-fixed-choreography.md): complete absolute presets and synchronized servo transitions; ❌ physical acceptance pending.
+
+- ✅ [0076 — NexArm controller preset transport](0076-nexarm-controller-preset-transport.md): use established CMD51 and preserve failure details; ❌ physical confirmation pending.
+
+- ✅ [0077 — Calibrated NexArm pose choreography](0077-nexarm-calibrated-pose-choreography.md): fixed physical poses, device IK and large/fast phone base sway; ❌ physical acceptance pending.
+
+- ✅ [0078 — Shared NexArm physical validation](0078-nexarm-shared-physical-validation.md): identical controller over USB/BLE, absolute pose commands and physical evidence; ❌ BLE timing/visual acceptance separate.
+
+✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
+
+✅ [0080 — Independent NexArm motion results](0080-nexarm-independent-motion-results.md) removes prior-result locks from new explicit preset requests; ❌ physical failure recovery acceptance remains pending.
+
+✅ [0081 — Settings immediate test control](0081-settings-immediate-test-control.md) records latest-request replacement without feedback waits; ❌ delivery is not completion.
+
+✅ [0082 — NexArm observation watchdogs](0082-nexarm-observation-watchdogs.md) bounds channel await without query-response blocking; ❌ no device-side stop guarantee.
+
+✅ ADR0082 clarifies whole-action budget composition after isolated USB dance reproduction: sum per-segment allowances without extending the fixed deadline during playback.

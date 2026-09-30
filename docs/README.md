@@ -77,3 +77,39 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ Revised ADR 0071 records physical USB/BLE evidence and explicit NexArm 1.0.2 compatibility for missing AT32 version, with truthful presentation and ID5 ±8° connection feedback. ❌ iPhone motion acceptance remains pending.
 
 ✅ ADR 0071 now records user-confirmed iPhone conversation control, firmware-independent BLE protocol validation, broad BLE discovery and read-only foreground recovery. ❌ Updated physical discovery/lock-screen UX acceptance remains pending.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ [ADR 0072](adr/0072-nexarm-entertainment-skills.md) records finite NexArm entertainment skills, typed host bindings and cancellation/failure limits. ❌ Full physical sequence acceptance remains pending.
+
+## Peripheral detail controls
+
+✅ [ADR 0073](adr/0073-peripheral-detail-controls.md) records Bluetooth peripheral details, shared manual-motion admission and measured telemetry. ❌ Physical six-motor acceptance remains pending.
+
+✅ ADR 0073 now distinguishes unconfirmed motion from transport failure and documents read-only recovery without forced reconnection. ❌ Physical recovery acceptance remains pending.
+
+✅ ADR 0073 now covers complete Bluetooth discovery/forget cleanup and one-shot read-only recovery after native transport loss. ❌ System accessory unpairing is outside the App's CoreBluetooth controls.
+
+✅ [ADR 0074 — NexArm live jog](adr/0074-nexarm-live-jog.md) separates streaming manual intents from completion-based presets and records reset preemption. ❌ Physical acceptance pending.
+
+✅ [Fixed NexArm choreography](adr/0075-nexarm-fixed-choreography.md) records absolute gesture targets, synchronous servo packets and feedback/cancellation semantics. ❌ Physical acceptance remains pending.
+
+✅ [NexArm preset transport compatibility](adr/0076-nexarm-controller-preset-transport.md) records the replacement of raw servo broadcasts and clarified reset/feedback semantics. ❌ Physical confirmation remains pending.
+
+✅ [Calibrated NexArm pose choreography](adr/0077-nexarm-calibrated-pose-choreography.md) distinguishes physical pose from example encoder counts and unifies phone performance transport. ❌ Full physical acceptance remains pending.
+
+✅ [NexArm USB physical acceptance](NexArm_Physical_Acceptance.md) records seven real-arm results, failed diagnoses and reproducible shared-controller testing. [ADR0078](adr/0078-nexarm-shared-physical-validation.md) owns the resulting contract. ❌ USB does not establish BLE timing.
+
+✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](adr/0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
+
+✅ [ADR 0080](adr/0080-nexarm-independent-motion-results.md): explicit preset admission no longer depends on previous completion/recovery feedback. New actions retain their own completion checks. ❌ Physical failure recovery acceptance remains pending.
+
+✅ Tilt return repair keeps ready height240mm while preserving arm-relative yaw±12°/roll±40° and unchanged arrival thresholds. Both complete USB sequences passed; see [physical acceptance](NexArm_Physical_Acceptance.md). ❌ Phone BLE acceptance remains pending.
+
+✅ [ADR0081](adr/0081-settings-immediate-test-control.md) separates immediate preemptible settings tests from unchanged completion-based channel actions. ❌ Settings send status does not assert physical completion.
+
+✅ [ADR0082](adr/0082-nexarm-observation-watchdogs.md) adds continuous pose reception, notification-first channel completion, limited query fallback and independent silence/total deadlines. Settings live tests remain unchanged. ❌ Device-side watchdog and action-ID completion require firmware support.
+
+✅ ADR0082 clarifies whole-action budget composition after isolated USB dance reproduction: sum per-segment allowances without extending the fixed deadline during playback.
+
+✅ NexArm physical acceptance records a full isolated USB channel run after2026093015: all7 presets/50 segments completed observed arrival and home return in68.073s. BLE and repeated-cycle acceptance remain separate.

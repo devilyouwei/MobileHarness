@@ -10,6 +10,16 @@ public struct NexArmBluetoothDevice: Sendable, Equatable, Identifiable {
     public let id: UUID
     public let name: String
     public let rssi: Int
+    public static func discoveryName(advertised: String?, cached: String?) -> String? {
+        for value in [advertised, cached] {
+            if let name = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+                !name.isEmpty, name != "未命名设备"
+            {
+                return String(name.prefix(64))
+            }
+        }
+        return nil
+    }
     public static func discoveryOrder(_ lhs: Self, _ rhs: Self) -> Bool {
         func preferred(_ name: String) -> Bool {
             name.lowercased().filter { $0.isLetter || $0.isNumber }.contains("nexarm")
@@ -42,12 +52,17 @@ public protocol NexArmBluetoothLink: NexArmWritableLink {
     func status() async -> NexArmBluetoothSnapshot
     func scan() async throws
     func stopScan() async
+    func beginLiveControl() async throws -> UUID
+    func sendLive(_ packet: NexArmPacket, session: UUID) async throws -> Bool
+    func endLiveControl(_ session: UUID) async
+    func clearDiscovery() async
+    func forgetDevice() async throws
     func connect(_ id: UUID) async throws
     func disconnect() async
 }
 
 /// Actor-facing transport; CoreBluetooth objects never leave their main-actor delegate owner.
-public actor NexArmBluetooth: NexArmBluetoothLink {
+public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
     public nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
     private let driver: Task<NexArmBLEDriver, Never>
     public init() {
@@ -55,9 +70,24 @@ public actor NexArmBluetooth: NexArmBluetoothLink {
         updates = pair.stream
         driver = Task { @MainActor in NexArmBLEDriver(updates: pair.continuation) }
     }
+    public func beginObservation() async throws -> UUID { try await driver.value.beginObservation() }
+    public func sendObserved(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+        try await driver.value.sendObserved(packet, session: session)
+    }
+    public func latestObservation(after sequence: UInt64, session: UUID) async throws -> NexArmTelemetry? {
+        try await driver.value.latestObservation(after: sequence, session: session)
+    }
+    public func endObservation(_ session: UUID) async { await driver.value.endObservation(session) }
     public func status() async -> NexArmBluetoothSnapshot { await driver.value.status() }
     public func scan() async throws { try await driver.value.scan() }
     public func stopScan() async { await driver.value.stopScan() }
+    public func beginLiveControl() async throws -> UUID { try await driver.value.beginLiveControl() }
+    public func sendLive(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+        try await driver.value.sendLive(packet, session: session)
+    }
+    public func endLiveControl(_ session: UUID) async { await driver.value.endLiveControl(session) }
+    public func clearDiscovery() async { await driver.value.clearDiscovery() }
+    public func forgetDevice() async throws { try await driver.value.forgetDevice() }
     public func connect(_ id: UUID) async throws { try await driver.value.connect(id) }
     public func disconnect() async { await driver.value.disconnect() }
     public func close() async { await disconnect() }
@@ -78,10 +108,10 @@ enum NexArmBluetoothStep: String {
     case writing = "发送设备指令"
     case response = "等待设备回复"
     func failure(_ error: any Error) -> String {
-        if error as? NexArmError == .timeout { return "\(rawValue)超时，请重新连接" }
+        if error as? NexArmError == .timeout { return "\(rawValue)超时" }
         if error as? NexArmBluetoothError == .incompatibleService { return "\(rawValue)失败：蓝牙服务不兼容" }
         let native = error as NSError
-        return "\(rawValue)失败（\(native.domain) \(native.code)），请重新连接"
+        return "\(rawValue)失败（\(native.domain) \(native.code)）"
     }
 }
 
@@ -111,6 +141,37 @@ struct NexArmBLEReply {
 private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerDelegate,
     @preconcurrency CBPeripheralDelegate
 {
+    private var telemetry = NexArmTelemetryCache()
+    private var observationID: UUID?
+    func beginObservation() throws -> UUID {
+        guard snapshot.phase == .connected, let tx, rx?.isNotifying == true else { throw NexArmError.disconnected }
+        guard liveControlID == nil, request == nil, observationID == nil else { throw NexArmError.busy }
+        guard tx.properties.contains(.writeWithoutResponse) else { throw NexArmBluetoothError.incompatibleService }
+        let token = UUID()
+        observationID = token
+        return token
+    }
+    func sendObserved(_ packet: NexArmPacket, session: UUID) throws -> Bool {
+        try Task.checkCancellation()
+        guard observationID == session, liveControlID == nil else { throw CancellationError() }
+        guard snapshot.phase == .connected, let peripheral, let tx else { throw NexArmError.disconnected }
+        guard packet.id == 255,
+            (packet.command == 11 && packet.payload.isEmpty) || (packet.command == 8 && packet.payload.count == 14)
+        else { throw NexArmError.invalidPacket }
+        guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withoutResponse) else {
+            throw NexArmBluetoothError.packetTooLarge
+        }
+        guard peripheral.canSendWriteWithoutResponse else { return false }
+        peripheral.writeValue(Data(packet.bytes), for: tx, type: .withoutResponse)
+        return true
+    }
+    func latestObservation(after sequence: UInt64, session: UUID) throws -> NexArmTelemetry? {
+        guard observationID == session, liveControlID == nil else { throw CancellationError() }
+        guard snapshot.phase == .connected else { throw NexArmError.disconnected }
+        guard let latest = telemetry.latest, latest.sequence > sequence else { return nil }
+        return latest
+    }
+    func endObservation(_ session: UUID) { if observationID == session { observationID = nil } }
     private static let service = CBUUID(string: "FFE0")
     private static let transmit = CBUUID(string: "FFE1")
     private static let receive = CBUUID(string: "FFE2")
@@ -134,6 +195,9 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     private var requestID: UUID?
     private var reply: NexArmBLEReply?
     private var requestTimer: Task<Void, Never>?
+    private var liveControlID: UUID?
+    private var retiredWriteAcknowledgment = false
+    private var liveDrainUntil: ContinuousClock.Instant?
     private var disconnectTask: Task<Void, Never>?
 
     init(updates: AsyncStream<NexArmBluetoothSnapshot>.Continuation) {
@@ -182,6 +246,20 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         snapshot.scanning = false
         publish()
     }
+    func clearDiscovery() {
+        stopScan()
+        snapshot.devices = []
+        snapshot.discoveryLimitReached = false
+        peripherals = [:]
+        publish()
+    }
+    func forgetDevice() throws {
+        guard snapshot.phase == .disconnected, peripheral == nil else { throw NexArmError.busy }
+        clearDiscovery()
+        snapshot.selected = nil
+        snapshot.failure = nil
+        publish()
+    }
     func connect(_ id: UUID) async throws {
         try Task.checkCancellation()
         guard snapshot.phase == .disconnected, connection == nil, disconnectTask == nil else { throw NexArmError.busy }
@@ -196,6 +274,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         selected.delegate = self
         snapshot.selected =
             snapshot.devices.first { $0.id == id } ?? .init(id: id, name: selected.name ?? "未命名设备", rssi: 0)
+        clearDiscovery()
         step = .connecting
         snapshot.phase = .connecting
         snapshot.failure = nil
@@ -220,6 +299,43 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         }
         try Task.checkCancellation()
     }
+    func beginLiveControl() throws -> UUID {
+        observationID = nil
+        guard snapshot.phase == .connected, let tx else { throw NexArmError.disconnected }
+        guard tx.properties.contains(.writeWithoutResponse) else { throw NexArmBluetoothError.incompatibleService }
+        let token = UUID()
+        liveControlID = token
+        // Retire an old observation instead of allowing its timeout to close a live jog.
+        // Its late data is ignored while manual control owns the channel.
+        if let pending = request {
+            retiredWriteAcknowledgment = !(reply?.acknowledged ?? true)
+            requestTimer?.cancel()
+            requestTimer = nil
+            request = nil
+            requestID = nil
+            reply = nil
+            pending.resume(throwing: CancellationError())
+        }
+        return token
+    }
+    func sendLive(_ packet: NexArmPacket, session: UUID) throws -> Bool {
+        try Task.checkCancellation()
+        guard liveControlID == session else { throw CancellationError() }
+        guard snapshot.phase == .connected, let peripheral, let tx else { throw NexArmError.disconnected }
+        guard packet.isLiveControl else { throw NexArmError.invalidPacket }
+        guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withoutResponse) else {
+            throw NexArmBluetoothError.packetTooLarge
+        }
+        guard peripheral.canSendWriteWithoutResponse else { return false }
+        peripheral.writeValue(Data(packet.bytes), for: tx, type: .withoutResponse)
+        return true  // Local transport admission only; no device-completion claim.
+    }
+    func endLiveControl(_ session: UUID) {
+        if liveControlID == session {
+            liveControlID = nil
+            liveDrainUntil = .now.advanced(by: .milliseconds(150))
+        }
+    }
     func write(_ packet: NexArmPacket) async throws {
         _ = try await perform(
             packet, replyID: packet.id, replyCommand: packet.command, replyCount: 0, acknowledgmentOnly: true)
@@ -235,6 +351,13 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         acknowledgmentOnly: Bool
     ) async throws -> NexArmPacket {
         try Task.checkCancellation()
+        guard liveControlID == nil, observationID == nil else { throw CancellationError() }
+        if let liveDrainUntil, ContinuousClock.now < liveDrainUntil {
+            try await Task.sleep(until: liveDrainUntil, clock: .continuous)
+        }
+        try Task.checkCancellation()
+        guard liveControlID == nil, observationID == nil else { throw CancellationError() }
+        guard !retiredWriteAcknowledgment else { throw NexArmError.busy }
         guard snapshot.phase == .connected, let peripheral, let tx, rx?.isNotifying == true else {
             throw NexArmError.disconnected
         }
@@ -298,6 +421,11 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         disconnectTask = nil
     }
     private func failPending(_ error: any Error) {
+        observationID = nil
+        telemetry = NexArmTelemetryCache()
+        liveControlID = nil
+        retiredWriteAcknowledgment = false
+        liveDrainUntil = nil
         connectionTimer?.cancel()
         connectionTimer = nil
         requestTimer?.cancel()
@@ -333,6 +461,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         tx = nil
         rx = nil
         snapshot.phase = .disconnected
+        snapshot.selected = nil
         if let error, snapshot.failure == nil { snapshot.failure = step.failure(error) }
         publish()
     }
@@ -358,7 +487,11 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         rssi signal: NSNumber
     ) {
         guard snapshot.scanning else { return }
-        let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? ""
+        guard
+            let name = NexArmBluetoothDevice.discoveryName(
+                advertised: advertisementData[CBAdvertisementDataLocalNameKey] as? String, cached: peripheral.name
+            )
+        else { return }
         guard peripherals[peripheral.identifier] != nil || peripherals.count < 128 else {
             snapshot.discoveryLimitReached = true
             publish()
@@ -368,7 +501,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         snapshot.devices.removeAll { $0.id == peripheral.identifier }
         snapshot.devices.append(
             .init(
-                id: peripheral.identifier, name: name.isEmpty ? "未命名设备" : String(name.prefix(64)), rssi: signal.intValue
+                id: peripheral.identifier, name: name, rssi: signal.intValue
             ))
         snapshot.devices.sort(by: NexArmBluetoothDevice.discoveryOrder)
         publish()
@@ -427,7 +560,13 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         connection.resume()
     }
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard self.peripheral === peripheral, characteristic === tx, request != nil else { return }
+        guard self.peripheral === peripheral, characteristic === tx else { return }
+        if retiredWriteAcknowledgment {
+            retiredWriteAcknowledgment = false
+            if let error { fail(error) }
+            return
+        }
+        guard request != nil else { return }
         if let error {
             fail(error)
             return
@@ -437,12 +576,13 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         finishReply()
     }
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard self.peripheral === peripheral, characteristic === rx, request != nil else { return }
+        guard self.peripheral === peripheral, characteristic === rx else { return }
         guard error == nil, let data = characteristic.value else {
             fail(error ?? NexArmError.invalidPacket)
             return
         }
         do {
+            try telemetry.receive(Array(data))
             try reply?.receive(Array(data))
             finishReply()
         } catch { fail(error) }

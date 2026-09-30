@@ -21,3 +21,7 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ❌ New physical capabilities or lifecycle changes still require host adapter/binding changes. No automatic reflection, plugin discovery, generic Any command bus or hardware construction. Domain signatures not involved in registration retain documented migration exceptions.
 
 ✅ The built-in Action catalog includes the domain-owned NexArm base definition; host availability failures propagate. ❌ Assembly creates no USB device or robot lifetime.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ Built-in assembly now also requires the typed NexArm GestureRequest callback and includes the domain-owned entertainment module. No optional success fallback or string dispatch is introduced. ❌ Assembly does not validate physical clearance.

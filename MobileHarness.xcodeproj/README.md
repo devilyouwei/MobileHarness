@@ -42,3 +42,7 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ ShakeBase.swift is navigation-only and compiled by the existing Actions package target; ❌ no duplicate App compilation or iPhone USB binding.
 
 ✅ App configurations include NSBluetoothAlwaysUsageDescription; NexArmBluetooth, BluetoothWorkflow, settings UI and tests are SwiftPM-owned navigation references. No Bluetooth background mode is enabled. ❌ Simulator build success does not prove a Bluetooth radio connection.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ Navigator references include the five new NexArm verb files, NexArmGestureActionModule and NexArmTypes. Swift package targets compile the shared sources; no duplicate source copies or signing settings added. ❌ Physical gesture acceptance remains separate from builds.

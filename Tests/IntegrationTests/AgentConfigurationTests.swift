@@ -110,7 +110,10 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
 @Test func bundledV5ConfigurationsSeparateModelCatalogFromInternalPermissions() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     #expect(config.agentID == .assistant)
-    #expect(config.capabilities.actions.map(\.alias) == ["express", "shakeBase"])
+    #expect(
+        config.capabilities.actions.map(\.alias) == [
+            "express", "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance",
+        ])
     #expect(config.capabilities.channels == ["Display", "Robot", "Speech"])
     #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "runtimeInfo")
     let agent = try AssistantAgent(chat: FixedTextChat())

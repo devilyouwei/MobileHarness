@@ -50,6 +50,18 @@ final class ApplicationRuntime {
         self.resources = resources
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation,
+            gesture: { request, _ in
+                let gesture: NexArmGesture
+                switch request.gesture {
+                case .wave: gesture = .wave
+                case .tiltLeft: gesture = .tiltLeft
+                case .tiltRight: gesture = .tiltRight
+                case .lookAround: gesture = .lookAround
+                case .celebrate: gesture = .celebrate
+                case .dance: gesture = .dance
+                }
+                try await bluetooth.performGesture(gesture, repetitions: request.repetitions)
+            },
             shakeBase: { cycles, _ in try await bluetooth.shakeBase(cycles: cycles) },
             capabilities: [
                 AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
