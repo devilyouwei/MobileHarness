@@ -59,3 +59,9 @@ flowchart TD
 ## NexArm entertainment skills (2026-09-30)
 
 ✅ ApplicationRuntime explicitly maps typed NexArm gesture requests to PlatformKit presets and the shared BluetoothWorkflow. Domain registration remains in Actions; callable permissions remain in Assistant JSON. ❌ New complete gestures await device acceptance.
+
+✅ ApplicationRuntime creates and retains the unified ActionActivityWorkflow before model preparation, injecting ChannelScheduler's bounded full-snapshot observation stream. AppContainer exposes its UI state to ConversationView. This subscription survives page navigation and remains independent of Agent result delivery; no UI-to-Gateway dependency is added. ❌ Per-device progress callbacks and durable presentation history are not implemented.
+
+## Head gestures
+
+✅ The explicit gesture binding maps nod and shakeHead to the shared controller. No transport-specific choreography is duplicated. ❌ Hardware acceptance is separate from registration.

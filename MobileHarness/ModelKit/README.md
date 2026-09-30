@@ -66,7 +66,7 @@ flowchart LR
     Provider --> Lease[Acquire one model operation lease]
     Lease --> Load[Shared resource load if needed]
     Load --> Run[Adapter preprocessing / inference / postprocessing]
-    Run --> Result[Bounded events or typed result]
+    Run --> Result[Adapter-policy events or typed result]
     Result --> Cleanup[Finish or cancel and join cleanup]
     Cleanup --> Release[Release lease]
 ```
@@ -76,7 +76,7 @@ flowchart LR
 - ModelKitDefaults owns fixed registrations and default bindings. Production uses one process-wide manager; construction/registration require ModelAssembly SPI for internal assembly and isolated tests.
 - ModelManager retains provider identity. `get` acquires a typed capability; deferred acquisition need not load weights. Unload releases resources without replacing the handle. Shutdown is terminal.
 - Each model permits one active operation. Overlap fails with `inputBusy`; there is no waiting inference queue or cross-model scheduler. A lease ends after cleanup, not merely after cancellation is requested.
-- Core owns bounded AudioFrame/ImageFrame data and single-consumer InferenceSession streams. Default stream limits are 64 events and 4096 estimated bytes per event; adapters can set explicit alternatives. Oversize or overflow fails rather than dropping model output.
+- Core owns bounded AudioFrame/ImageFrame data and single-consumer InferenceSession streams. Default stream limits are 64 events and 4096 estimated bytes per event; adapters can set explicit alternatives. Cloud/local LLM adapters use no event-count cap, with generation/response bounds retained. Other streams remain bounded; oversize or bounded-stream overflow fails rather than dropping model output.
 - ModelManager defaults allow 32 registrations, four concurrent factories/loaders and 32 construction/load waiters per model/resource; excess work is rejected. Unload waits for active work; shutdown cancels and joins it.
 - Session cancellation cannot retract delivered output. Adapters must cooperate and retain admission until backend cleanup completes. Device capture and playback stay in PlatformKit.
 

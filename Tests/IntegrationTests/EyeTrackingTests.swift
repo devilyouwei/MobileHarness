@@ -2,6 +2,7 @@ import Actions
 import AgentCore
 import Foundation
 import Testing
+import Tools
 
 @testable import Agents
 
@@ -64,8 +65,8 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
     let call = ActionCall(actionPath: valid.actionPath, channel: valid.channel, parameters: parameters)
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .actionCall(call))
-    await #expect(throws: UIActions.GazeError.invalidTarget) {
-        try await UIActions.moveEyes(invocation: ActionInvocation(envelope: envelope)) { _, _ in
+    await #expect(throws: UITools.GazeError.invalidTarget) {
+        try await UITools.moveEyes(invocation: uiToolInvocation(ActionInvocation(envelope: envelope))) { _, _ in
             Issue.record("Invalid gaze reached presentation")
         }
     }
@@ -78,10 +79,10 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
         source: .visionPerception,
         input: AgentInput(sessionID: UUID(), payload: .text("test")), output: .actionCall(call))
     let invocation = try ActionInvocation(envelope: envelope)
-    try await UIActions.moveEyes(invocation: invocation) { target, _ in
+    try await UITools.moveEyes(invocation: uiToolInvocation(invocation)) { target, _ in
         #expect(target.x == -1 && target.y == 1)
     }
     await #expect(throws: CancellationError.self) {
-        try await UIActions.moveEyes(invocation: invocation) { _, _ in throw CancellationError() }
+        try await UITools.moveEyes(invocation: uiToolInvocation(invocation)) { _, _ in throw CancellationError() }
     }
 }

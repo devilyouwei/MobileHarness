@@ -6,7 +6,7 @@ The “Complete lifecycle” section defines the current production flow. The ea
 
 ## Complete lifecycle (current channel Actions)
 
-✅ Six model-callable entries cover seven gestures; `tiltWrist` distinguishes left and right through its direction argument. The Agent resolves aliases to `NexArm.*`; OutputGateway receives resolved calls and validates permissions and parameter names. Domain Actions then validate argument types, values, and unknown fields before any device effects.
+✅ Eight model-callable entries cover nine gestures; `tiltWrist` distinguishes left and right through its direction argument. The Agent resolves aliases to `NexArm.*`; OutputGateway receives resolved calls and validates permissions and parameter names. Domain Actions then validate argument types, values, and unknown fields before any device effects.
 
 ```mermaid
 flowchart TD
@@ -24,7 +24,10 @@ flowchart TD
     Gate -->|No| Fail["Throw execution error"]
     Gate -->|Yes| Plan["NexArmController: validate compatibility and build fixed poses"]
     Plan -->|Compatibility or target validation fails| Fail
-    Plan -->|Valid| Frames["home → ready → body × repetitions → ready → home"]
+    Plan -->|Cartesian preset| Frames["home → ready → body × repetitions → ready → home"]
+    Plan -->|Nod or shake| Head["home → ready → native motor sweeps / center → home"]
+    Head --> Handoff["Before native writes: fresh converged feedback after ready trajectory duration"]
+    Handoff --> Loop
     Frames --> Loop["Send and await arrival for each segment; see below"]
     Loop -->|All segments pass| Success["Update observed pose; UI reports completion and home return"]
     Loop -->|Send failure, feedback timeout, arrival timeout or invalid feedback| Fail
@@ -80,7 +83,10 @@ This diagram describes production BLE/USB observation. Protocol compatibility is
 
 | Check or deadline | Current implementation |
 | --- | --- |
-| Fixed sequence | At most 22 segments; initial home 3000ms, final home 1200ms, all others 800ms each |
+| Cartesian preset sequence | At most 22 segments; initial home 3000ms, final home 1200ms, all others 800ms each |
+| Head sequence | Home800ms → ready800ms → five native targets per cycle (750ms nominal each) → home1200ms; at most18 segments |
+| Cartesian-to-servo handoff | Ready arrival requires a fresh sample at/after its800ms trajectory duration; telemetry and watchdogs continue during the interval |
+| Head body arrival | All six encoders within16counts of measured-ready joints plus the active motor offset; same fresh stability window |
 | XYZ arrival tolerance | Each axis ≤15mm for intermediate poses; ≤5mm at final home |
 | Angle tolerance | Pitch ≤4° intermediate and ≤2° final; roll/claw both ≤2° |
 | Stability | All six encoder values remain within 2 counts of a stable anchor; received samples span 200ms intermediate or 300ms final |
@@ -197,3 +203,17 @@ Earlier ±2° base text above describes the retained USB diagnostic only and is 
 ✅ All seven phone performance presets passed through the same controller on USB hardware; see [physical acceptance](../../../docs/NexArm_Physical_Acceptance.md). Intermediate arrival allows15mm /4° pitch, final home5mm /2° with stable feedback. ❌ iPhone transport timing and visual quality are separate acceptance.
 
 ✅ A previous unconfirmed preset does not block the next explicit invocation; only the current invocation waits for completion. ❌ No automatic motion retry or physical stop guarantee.
+
+✅ Argument validation failures expose localized explanations and the shared `invalidArguments` observation code. A DanceError is raised before the device callback, so an existing Bluetooth connection can remain healthy and Settings can still operate. Malformed or out-of-range repetition values remain rejected before motion; no silent clamping or retry is introduced.
+
+## Head gestures
+
+✅ nodHead(cycles) and shakeHead(cycles) are finite, model-callable gestures with required integer1...3, localized argument errors and cancellation propagation. Their bodies address motor4 and motor5 respectively; the controller establishes fixed home and ready poses, performs two large sweeps per cycle, centers, and observes stable home. ✅ USB acceptance passed both head sequences; ❌ iPhone BLE conversation acceptance remains pending.
+
+## Head preparation gate correction
+
+✅ Head preparation now uses the same intermediate arrival contract as all other presets (XYZ15mm, pitch4deg, roll/claw2deg, fresh stable feedback for200ms). Previously it incorrectly selected final-home tolerances before sending any motor4/5 body command. A stationary approach within the normal intermediate envelope could therefore time out without visible movement. Encoder-based body completion and strict final home (XYZ5mm, pitch/roll/claw2deg,300ms fresh stability) remain unchanged. Regression fixtures reproduce a Z-10mm/pitch-3deg preparation and require both gestures to execute; the same error at the ending must still fail. ❌ This fixture establishes the code-path defect, not the exact physical measurements of the reported phone run.
+
+## Head channel handoff correction
+
+✅ `nodHead` and `shakeHead` keep their existing Action/Channel completion contract. Their shared controller now establishes home then a distinct ready pose before native servo sweeps, and observes fresh arrival after the ready trajectory's800ms duration before switching command modes. The final home differs from the Cartesian planner's last target. USB acceptance completed both full eight-segment sequences with unchanged strict completion thresholds. ❌ The phone conversation must still be accepted on the installed build.

@@ -4,12 +4,9 @@ import ModelKit
 
 /// Streaming perception only. Device capture and playback remain composition-owned.
 public actor SpeechPerceptionAgent: Agent {
-    private static let transcript = InternalAction(
-        module: "UI", function: "setTranscript", channel: "Transcript", required: ["text"])
-    private static let voiceState = InternalAction(
-        module: "UI", function: "setVoiceState", channel: "Display", required: ["state"])
-    private static let finishTranscript = InternalAction(
-        module: "UI", function: "finishTranscript", channel: "Transcript")
+    private static let transcript = InternalTool(path: "UI.setTranscript", required: ["text"])
+    private static let voiceState = InternalTool(path: "UI.setVoiceState", required: ["state"])
+    private static let finishTranscript = InternalTool(path: "UI.finishTranscript")
     private var resultInbox = ActionResultInbox()
     public func actionResults() -> [ActionResult] { resultInbox.results }
     public nonisolated let descriptor: AgentDescriptor
@@ -47,14 +44,14 @@ public actor SpeechPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Speech Perception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.actionCall, .control],
+            outputs: [.toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(32))
         outputs = stream.stream
         continuation = stream.continuation
     }
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
-        try model.adding(internalActions: [transcript, voiceState, finishTranscript])
+        try model.adding(internalTools: [transcript, voiceState, finishTranscript])
     }
 
     public func bind(_ port: AgentMessaging) throws {
@@ -153,14 +150,14 @@ public actor SpeechPerceptionAgent: Agent {
         guard lifecycle == .running || lifecycle == .paused else { throw CancellationError() }
         // Presentation is bounded separately from the complete shared transcription.
         let call = try Self.transcript.call(["text": String(text.suffix(320))])
-        try emit(.actionCall(call), input: input)
-        // Release scheduler input tracking after this ordered display update completes.
+        try emit(.toolCall(call), input: input)
+        // Close output bookkeeping after this immediate display update completes.
         try emit(.control("agent.finished"), input: input)
     }
     private func presentPhase(_ phase: SpeechPhase, input: AgentInput) throws {
         let state = phase == .processing ? "processing" : phase == .speaking ? "hearing" : "listening"
         let call = try Self.voiceState.call(["state": state])
-        try emit(.actionCall(call), input: input)
+        try emit(.toolCall(call), input: input)
         try emit(.control("agent.finished"), input: input)
     }
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
@@ -242,8 +239,8 @@ public actor SpeechPerceptionAgent: Agent {
                     _ = try await port.publish(.speechPhase(.processing), parent: input)
                     let text = try await turn.finish()
                     try Task.checkCancellation()
-                    let close = try Self.finishTranscript.call()
-                    try emit(.actionCall(close), input: input)
+                    let close = try Self.finishTranscript.call([:])
+                    try emit(.toolCall(close), input: input)
                     try emit(.control("agent.finished"), input: input)
                     if text.isEmpty {
                         try await segmenter.reset()

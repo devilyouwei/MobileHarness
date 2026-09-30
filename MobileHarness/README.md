@@ -481,7 +481,7 @@ Syntax, escaping, nesting, bounds and malformed-stream behavior are defined in [
 | Execution         | OutputGateway → ChannelScheduler → Actions/Runtime        | OutputGateway → Tools/Runtime directly                    |
 | Ordering          | Task-local Channel FIFO; nested wait joins; global module exclusion | Caller awaits handler; no Channel queue                  |
 | Completion        | Handler completion and per-input finish barrier           | Value feedback or Void completion, fixed by registration |
-| Current examples  | Speech.speak, UI.print, UI.express                        | runtimeInfo, UI.showPose                          |
+| Current examples  | Speech.speak, UI.express                        | runtimeInfo, UI.print, UI.setTranscript, UI.moveEyes, UI.showPose |
 
 Both are validated executable outputs, and either may have side effects. Their distinction is execution/feedback semantics, not simply “write versus read.” Returning Tools re-enter InputGateway with ToolResult; Void Tools do not. Actions can return correlated terminal feedback under the policy described in [Action feedback and resource ownership](#action-feedback-and-resource-ownership). Typed internal observations use a separate messaging port, not either generation protocol.
 
@@ -599,7 +599,7 @@ ConversationTurn carries an ID and session-local ordinal through input, observat
 | Reply completed             | Empty                             | Retain until next utterance                          |
 | Stop / background / failure | Clear and invalidate session      | Clear and invalidate session                         |
 
-Eye gaze reuses pose facial landmarks and emits the code-owned `UI.moveEyes` Action within the camera session. [ADR 0049](../docs/adr/0049-perception-eye-gaze.md) records bounded presentation replacement and per-Action completion; smoothness and crossing-face behavior still require device acceptance.
+Eye gaze reuses pose facial landmarks and emits the code-owned immediate `UI.moveEyes` Tool within the camera session. [ADR 0049](../docs/adr/0049-perception-eye-gaze.md) records the earlier gaze design; ADR0083 migrates it to immediate Tool completion with the same bounded replacement policy; smoothness and crossing-face behavior still require device acceptance.
 
 Vision freshness uses separate bounded inference, publication and display paths, allowing a slow subscriber to coexist with fresh local visualization. The configured maximum refresh interval avoids change-filter starvation when new frames exist; it does not guarantee inference FPS. Details: [App](App/README.md), [ADR 0043](../docs/adr/0043-conversation-turn-presentation.md) and [VisionPerception](Agents/VisionPerception/README.md).
 
@@ -676,3 +676,9 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 ## NexArm entertainment skills (2026-09-30)
 
 ✅ NexArm entertainment adds WaveWrist.swift, TiltWrist.swift, LookAround.swift, Celebrate.swift, Dance.swift and NexArmGestureActionModule.swift under Actions/NexArm. Shared NexArmTypes.swift is a compiler-driven filename exception to Types.swift (UI/Types.swift is in the same Actions target). Existing target/module layout and independent UI remain unchanged. ❌ New full gesture physical acceptance is pending.
+
+## Action and Tool presentation boundary
+
+✅ Immediate UI updates use Tools/UI; Actions/UI now contains only scheduled expression. The Action panel follows the ActionCall/ToolCall boundary rather than module filters. CallArguments lives in Agents/Core/Capability and shared generation preserves mixed Action/Tool events. See ADR0083. ❌ Native model Tool output remains pending; expression intentionally remains an Action.
+
+✅ LLM output streams have no pending-fragment count cap. Cloud response byte/time limits and local generation token limits remain; other queues keep their own policies. See [ADR 0084](../docs/adr/0084-llm-output-buffering.md). ❌ Long-reply device acceptance remains pending.

@@ -18,16 +18,16 @@ private func generator() throws -> AgentGenerator {
     for split in 0...data.count {
         var parser = try generator()
         let actual = try parser.append(data.prefix(split)) + parser.append(data.dropFirst(split)) + parser.finish()
-        #expect(actual == expected, "UTF-8 split \(split)")
+        #expect(normalizeToolIDs(actual) == normalizeToolIDs(expected), "UTF-8 split \(split)")
     }
     var bytewise = try generator()
     var actual: [GenerationEvent] = []
     for byte in data { actual += try bytewise.append(Data([byte])) }
     actual += try bytewise.finish()
-    #expect(actual == expected)
+    #expect(normalizeToolIDs(actual) == normalizeToolIDs(expected))
     #expect(
         expected.compactMap(\.actionCall).map(\.channel) == [
-            "Speech", "Display", "Speech", "Speech", "Speech", "Display", "Speech", "Speech", "Speech", "Display",
+            "Speech", "Speech", "Speech", "Display", "Speech", "Speech",
         ])
     #expect(expected[2].actionCall?.parameters["text"] == "你好 & 世界")
     #expect(expected[5].actionCall?.parameters["emotion"] == "a>b \"引号\"")
@@ -97,7 +97,7 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
     var other = AgentGenerator(
         capabilities: camera,
         textMapping: { text, channel in
-            [try camera.resolveAction("say", parameters: ["text": text], channel: channel)]
+            [.action(try camera.resolveAction("say", parameters: ["text": text], channel: channel))]
         })
     let calls = try other.append("hello") + other.finish()
     #expect(
@@ -117,7 +117,7 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
     var xmlTool = AgentGenerator(
         capabilities: camera,
         textMapping: { text, channel in
-            [try camera.resolveAction("say", parameters: ["text": text], channel: channel)]
+            [.action(try camera.resolveAction("say", parameters: ["text": text], channel: channel))]
         })
     #expect(throws: GenerationError.unknownCapability) { try xmlTool.append("<lookup query='x'/>") }
     var forbidden = try generator()
@@ -152,12 +152,14 @@ private struct MarkupChat: ChatCapability {
         let output = try #require(await outputs.next()).output
         if case .actionCall(let call) = output {
             calls.append(call)
+        } else if case .toolCall(let tool) = output {
+            #expect(tool.toolPath == "UI.print")
         } else {
             #expect(output == .control("assistant.finished"))
         }
     }
-    #expect(calls.map(\.channel) == ["Speech", "Speech", "Speech", "Speech", "Display"])
-    #expect(calls[2].actionPath.function == "express")
+    #expect(calls.map(\.channel) == ["Speech", "Speech", "Speech"])
+    #expect(calls[1].actionPath.function == "express")
     let result = ToolResult(callID: UUID(), value: "<express emotion='smile'/>")
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .toolResult(result)))
     let literal = try #require(await outputs.next()).output
@@ -206,8 +208,8 @@ private func generationTrace() throws -> GenerationTrace {
     calls += try expected.finish()
     #expect(trace.raw == fragments.joined())
     #expect(trace.fragments == fragments)
-    #expect(trace.events == calls)
-    #expect(trace.calls.map(\.channel) == ["Speech", "Display", "Speech", "Speech", "Speech", "Speech", "Display"])
+    #expect(normalizeToolIDs(trace.events) == normalizeToolIDs(calls))
+    #expect(trace.calls.map(\.channel) == ["Speech", "Speech", "Speech", "Speech"])
     #expect(trace.parserError == nil)
     #expect(trace.finished)
 }
@@ -266,20 +268,19 @@ private func generationTrace() throws -> GenerationTrace {
     let calls = expected.compactMap(\.actionCall)
     #expect(
         calls.map(\.channel) == [
-            "Speech", "Display", "Speech", "Speech", "Speech", "Speech", "Speech", "Speech", "Speech", "Speech",
-            "Display",
+            "Speech", "Speech", "Speech", "Speech", "Speech", "Speech",
         ])
     for split in 0...bytes.count {
         var incremental = try generator()
         let actual =
             try incremental.append(bytes.prefix(split)) + incremental.append(bytes.dropFirst(split))
             + incremental.finish()
-        #expect(actual == expected)
+        #expect(normalizeToolIDs(actual) == normalizeToolIDs(expected))
     }
     var trace = try generationTrace()
     try trace.append(source)
     trace.finish()
-    #expect(trace.events == expected)
+    #expect(normalizeToolIDs(trace.events) == normalizeToolIDs(expected))
     #expect(trace.raw == source)
 }
 
@@ -328,7 +329,7 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
         received == [
             .scheduling(.beginWait),
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "你好。"])),
-            .actionCall(expectedActionCall(name: "print", parameters: ["text": "你好。"])),
+            expectedPrint("你好。"),
             .scheduling(.endWait), .scheduling(.beginWait),
             .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])),
             .scheduling(.endWait), .control("assistant.finished"),

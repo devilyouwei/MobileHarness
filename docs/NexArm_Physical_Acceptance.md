@@ -105,3 +105,20 @@ User confirmed phone operation was stopped. Ran `NEXARM_PRESETS_TEST=1 NEXARM_PO
 ✅ All7 presets and50 segments completed observed arrival; each performed its ending/home and passed an additional final read. Final pitch/roll/claw were−1.1°/0°/−2° for every preset. Whole test including reads/gaps68.073s. No feedback/completion timeout occurred. Source trace: `/tmp/nexarm-all-closed-loop.log` (temporary; table preserves results). Times vary with starting pose and settling; these are observed timings, not a fixed playback duration.
 
 ❌ This single-pass USB run does not establish wireless transport performance, repeated-cycle endurance, or physical stop on interruption. Settings intentionally does not await completion and is outside this closed-loop acceptance.
+
+## Head actions: command-mode handoff — 2026-09-30
+
+The user paused phone control and confirmed clear space. Production `NexArmController` ran over `/dev/cu.usbserial-110`, with strict compatibility validation and no firmware/calibration changes.
+
+1. Original path: home CMD8 requested3000ms at0.070s. Stable home feedback released it early; motor4 target857 was sent at0.449s. Encoder4 stayed1237 throughout the3.75s motor deadline. Completion timeout reproduced.
+2. Controlled experiment: defer native writes until the preceding Cartesian duration elapsed. Motor4 executed all five targets, demonstrating the early handoff problem. Ending home reused the same Cartesian target and stayed at XYZ196/1/194, pitch-2.1deg, so strict completion correctly failed. This supports a firmware trajectory/remembered-target interaction; firmware implementation was not inspected.
+3. Corrected production path: home800ms, ready800ms, five observed motor targets, home1200ms. Require fresh converged telemetry after the ready duration before native writes; no arbitrary3s delay, no tolerance relaxation.
+
+| Action | Observed segments | Final XYZ mm | Pitch / roll / claw | Result |
+| --- | --- | --- | --- | --- |
+| Nod (motor4) | 8 | 200 / 1 / 198 | -0.9deg / 0deg / 0deg | PASS |
+| Shake (motor5) | 8 | 200 / 1 / 198 | -0.9deg / 0deg / 1deg | PASS |
+
+The combined test took22.287s including verification and inter-action gaps. Local evidence logs: `/tmp/head-physical-diagnosis.log`, `/tmp/head-physical-handoff-probe2.log`, `/tmp/head-physical-handoff-fixed.log` (ephemeral, not repository artifacts). Both final samples met existing strict home tolerances. No automatic reset/replay was used on failure. This establishes shared-controller USB behavior; BLE radio delivery and phone conversation acceptance remain separate.
+
+Validation for the handoff correction: `scripts/check.sh` passed (257 IntegrationTests plus the remaining package suites), and `scripts/build-ios.sh` passed all four simulator schemes. Hardware results above were captured before the final transport timestamp boundary correction; that correction preserves synchronous telemetry and passed the push-only observation regression.

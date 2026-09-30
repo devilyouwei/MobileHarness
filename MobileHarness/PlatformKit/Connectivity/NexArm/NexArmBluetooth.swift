@@ -155,8 +155,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         try Task.checkCancellation()
         guard observationID == session, liveControlID == nil else { throw CancellationError() }
         guard snapshot.phase == .connected, let peripheral, let tx else { throw NexArmError.disconnected }
-        guard packet.id == 255,
-            (packet.command == 11 && packet.payload.isEmpty) || (packet.command == 8 && packet.payload.count == 14)
+        guard packet.isObservedControl
         else { throw NexArmError.invalidPacket }
         guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withoutResponse) else {
             throw NexArmBluetoothError.packetTooLarge

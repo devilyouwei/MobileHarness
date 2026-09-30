@@ -9,6 +9,20 @@ public struct NexArmGestureActionModule: ActionModule {
     public var definitions: [ActionDefinition] {
         [
             ActionDefinition(
+                path: ActionPath(module: "NexArm", function: "nodHead"), kind: .finite,
+                completion:
+                    "Observed home preparation, repeated single-motor sweep with encoder arrival, and observed stable home ending."
+            ) { [perform] invocation in
+                try await NexArmActions.nodHead(invocation: invocation, using: perform)
+            },
+            ActionDefinition(
+                path: ActionPath(module: "NexArm", function: "shakeHead"), kind: .finite,
+                completion:
+                    "Observed home preparation, repeated single-motor sweep with encoder arrival, and observed stable home ending."
+            ) { [perform] invocation in
+                try await NexArmActions.shakeHead(invocation: invocation, using: perform)
+            },
+            ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "waveWrist"), kind: .finite,
                 completion:
                     "Fixed Cartesian preparation, coordinated choreography and home ending; each pose is observed and final home settles in three telemetry samples."

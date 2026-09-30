@@ -8,7 +8,7 @@ Purpose: send user input to ChatCapability, maintain bounded history and interpr
 - ✅ CapabilityContextBuilder includes JSON Action aliases/docs/parameters/examples only. Speech behavior is an English Agent-owned instruction; internal methods and native Tools never enter system context.
 - ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
 - ✅ /status resolves runtimeInfo. Tool results and event descriptions are escaped before text interpretation.
-- ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 ActionCalls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
+- ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 generated Action/Tool calls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
 - ✅ Cancellation bypasses full/paused inbox admission, joins the worker and discards incomplete parsing state.
 - ❌ Native model tool deltas, durable inbox/runtime checkpoints, restart and long-running background execution. ToolCallParser exists, but ChatCapability produces text/completion events.
 
@@ -20,8 +20,8 @@ flowchart TD
     Queue --> Model
     Model -->|Persist raw fragments before parsing| History
     Model --> Parser[AgentGenerator]
-    Parser --> Events[Ordered Actions and wait boundaries]
-    Events --> Calls[Resolved ActionCall]
+    Parser --> Events[Ordered Actions, Tools and wait boundaries]
+    Events --> Calls[Resolved ActionCall / ToolCall]
     Events -->|beginWait / endWait in order| Stream
     Calls -->|speech text| Synthesis[Directed SpeechSynthesisAgent]
     Synthesis -->|admitted audioID| Playback[Speech.speak audioID]
@@ -61,7 +61,7 @@ flowchart LR
     Synth -->|audioID admitted| Out
     Out -->|App transport pump| Gateway[OutputGateway validation]
     Gateway --> Runtime[Action / Tool runtime]
-    Runtime --> UI[UI Actions via injected handlers]
+    Runtime --> UI[Expression Action and UI Tools via injected handlers]
     Cancel[Cancel or stop] -->|clear and join| Chat
 ```
 
@@ -75,9 +75,9 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ JSON v5 subscribes to speech.final and user.text; final transcript uses the same conversation path as text. Inputs expire before dequeue, never during a started reply. Partial transcripts cannot enter Assistant.
 
-✅ JSON v5 also subscribes to speech.phase. Speech onset emits UI.beginReplyTurn once per turn on Display, followed by agent.finished to release Action tracking; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
+✅ JSON v5 also subscribes to speech.phase. Speech onset emits UI.beginReplyTurn once per turn as an immediate Tool, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
 
-✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Action exists if onset was missed. Every output has a monotonically increasing source sequence; text/expression survive normal reply completion until the next turn.
+✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Tool exists if onset was missed. Every output has a monotonically increasing source sequence; text/expression survive normal reply completion until the next turn.
 
 
 ## 输入、订阅与输出契约
@@ -103,8 +103,8 @@ flowchart LR
     IG --> A[Assistant]
     A -->|ordinary text or final| Chat[ChatCapability]
     Chat -->|text deltas| Parser[AgentGenerator]
-    Parser --> Events[Ordered Actions and wait boundaries]
-    Events --> Calls[Resolved ActionCall]
+    Parser --> Events[Ordered Actions, Tools and wait boundaries]
+    Events --> Calls[Resolved ActionCall / ToolCall]
     Events -->|beginWait / endWait in order| OG2
     Calls -->|speech text| Synthesis[Directed speech.synthesize]
     Synthesis -->|audioID| Play[Resolved Speech.speak audioID]
@@ -211,3 +211,11 @@ flowchart LR
 ✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
 
 ✅ TiltWrist keeps ready height240mm with yaw±12° / roll±40° and its fixed return sequence; there is no extra260mm lift. ❌ Precise Cartesian positioning is not promised.
+
+## Action and Tool presentation boundary
+
+✅ beginReplyTurn and per-sentence print are code-owned immediate Tools; speech playback and model-selected expression remain scheduled Actions. Text mapping returns ordered GenerationEvents: speech Action followed by caption Tool. Captions append sentence chunks, never full accumulated replies, and do not inherit channel scopes. The same 120-call/256-output bounds cover both kinds. ❌ Native model Tool generation is unchanged.
+
+## Head gestures
+
+✅ JSON v5 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Tool presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.

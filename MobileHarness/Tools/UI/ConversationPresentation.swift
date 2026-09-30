@@ -16,7 +16,7 @@ public struct ConversationPresentation: Sendable {
         envelope.turn != nil && envelope.turn == turn
     }
 
-    /// Caller first validates active session. Only onset-related Actions can advance the turn.
+    /// Caller first validates active session. Only onset-related updates can advance the turn.
     public mutating func accept(_ envelope: OutputEnvelope, update: Update) -> Bool {
         guard let incoming = envelope.turn, incoming.ordinal > 0, envelope.sequence > 0 else { return false }
         let speech = update == .transcript || update == .finishTranscript || update == .voiceState

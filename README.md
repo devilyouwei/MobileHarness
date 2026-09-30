@@ -180,7 +180,7 @@ Run the repository checks from its root:
 
 `check.sh` checks module boundaries, provisioning tests, Swift formatting, Swift tests and project metadata. `build-ios.sh` builds four unsigned simulator schemes and requires full Xcode. Optional real-model evaluations require their documented local artifacts and opt-in settings.
 
-Shared sources are mapped into independently tested targets by root `Package.swift`; tests live in root `Tests/`. SwiftUI state is MainActor-isolated and runtime state is actor-owned. Every queue must document its bound and overflow policy.
+Shared sources are mapped into independently tested targets by root `Package.swift`; tests live in root `Tests/`. SwiftUI state is MainActor-isolated and runtime state is actor-owned. Every queue must document its capacity policy. Finite LLM output streams explicitly have no pending-event count cap; other queues retain their documented bounds and overflow policies (see [ADR 0084](docs/adr/0084-llm-output-buffering.md)).
 
 Input routing uses explicit `publish` (configured subscriptions) or `send` (named target); there is no default-Agent router. See [ADR 0047](docs/adr/0047-explicit-input-routing.md).
 

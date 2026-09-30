@@ -49,7 +49,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     #expect(
         await speechRequests.restored(answer.map(\.output)) == [
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "模型回答"])),
-            .actionCall(expectedActionCall(name: "print", parameters: ["text": "模型回答"])),
+            expectedPrint("模型回答"),
             .control("assistant.finished"),
         ])
     try await agent.receive(AgentInput(sessionID: session, payload: .text("continue")))
@@ -217,8 +217,8 @@ private struct LongReplyChat: ChatCapability {
     var captions = ""
     for await envelope in agent.outputs {
         switch envelope.output {
-        case .actionCall(let call) where call.actionPath == ActionPath(module: "UI", function: "print"):
-            captions += call.parameters["text"] ?? ""
+        case .toolCall(let call) where call.toolPath == "UI.print":
+            captions += call.arguments["text"] ?? ""
         case .control(let message):
             #expect(message == "assistant.finished")
             await agent.stop()

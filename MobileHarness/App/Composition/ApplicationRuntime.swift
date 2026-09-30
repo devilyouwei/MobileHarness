@@ -8,6 +8,7 @@ import ModelKit
 import PlatformKit
 import Storage
 import StorageChat
+import UI
 
 /// Root-owned communication assembly, available before voice models are ready.
 @MainActor
@@ -18,6 +19,7 @@ final class ApplicationRuntime {
     let output: OutputGateway
     let presentation: RuntimePresentation
     let actions: ChannelScheduler
+    let actionActivity: ActionActivityWorkflow
     let resources: ResourceCoordinator
 
     init(camera: AppleCamera, bluetooth: BluetoothWorkflow) throws {
@@ -53,6 +55,8 @@ final class ApplicationRuntime {
             gesture: { request, _ in
                 let gesture: NexArmGesture
                 switch request.gesture {
+                case .nod: gesture = .nod
+                case .shakeHead: gesture = .shakeHead
                 case .wave: gesture = .wave
                 case .tiltLeft: gesture = .tiltLeft
                 case .tiltRight: gesture = .tiltRight
@@ -78,6 +82,8 @@ final class ApplicationRuntime {
         self.input = input
         self.presentation = presentation
         self.actions = actions
+        actionActivity = ActionActivityWorkflow(state: ActionActivityState())
+        actionActivity.start { try await actions.observeExecutions() }
         output = OutputGateway(
             manager: manager, requests: input, tools: behaviors.tools, actions: actions, policy: policy,
             actionFeedback: .terminal,

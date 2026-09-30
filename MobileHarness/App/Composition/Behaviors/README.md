@@ -25,3 +25,7 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ## NexArm entertainment skills (2026-09-30)
 
 ✅ Built-in assembly now also requires the typed NexArm GestureRequest callback and includes the domain-owned entertainment module. No optional success fallback or string dispatch is introduced. ❌ Assembly does not validate physical clearance.
+
+## Action and Tool presentation boundary
+
+✅ BehaviorAssembly binds immediate UI tools separately from UI.express and Speech Actions; startup validation checks the updated internal grants. ❌ There is no module/source-specific Action visibility filter.

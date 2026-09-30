@@ -154,3 +154,7 @@ These are **dated decision records**, including proposals and stages later repla
 ✅ [0082 — NexArm observation watchdogs](0082-nexarm-observation-watchdogs.md) bounds channel await without query-response blocking; ❌ no device-side stop guarantee.
 
 ✅ ADR0082 clarifies whole-action budget composition after isolated USB dance reproduction: sum per-segment allowances without extending the fixed deadline during playback.
+
+- [0083 — Unified Action execution presentation](0083-action-execution-presentation.md): bounded scheduler snapshots, root-owned UI projection and honest cancellation/completion states.
+
+- ✅ [0084 — LLM output buffering](0084-llm-output-buffering.md): unbounded pending-event count for finite chat generation; other queue policies remain. ❌ Device acceptance pending.

@@ -146,3 +146,7 @@ Detailed contracts: [Composition](Composition/README.md), [Lifecycle](Lifecycle/
 ✅ The host binds capabilities through BehaviorAssembly instead of registering each Action/Tool. The pure assembly target lives at Composition/Behaviors; domain catalogs live in Actions/Tools. ❌ New device primitives or lifecycle changes still require host work.
 
 ✅ App root now runs a Bluetooth state observer independently of settings-page lifetime, propagates foreground changes, and injects settings controls/status plus the Action callback from one workflow. BLE permission is requested only when the user opens discovery/connects. ❌ No Bluetooth background execution mode or physical-stop promise is added.
+
+✅ The home screen receives root-owned ActionActivityState alongside conversation and connection state. Channel execution summaries/history replace the robot-only motion-status label; Settings continues to own its manual-test presentation. ❌ Runtime observation is process-local and does not establish physical device completion beyond each Action's contract.
+
+✅ Debug-only `-actions-preview` renders the actual conversation/status components with explicitly labeled synthetic records for parallel, queued, cancelling and failed states; it bypasses models, camera, audio and Bluetooth startup. Release ignores the flag. ❌ Preview data is not execution acceptance.

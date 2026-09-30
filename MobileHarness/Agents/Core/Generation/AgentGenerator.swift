@@ -3,7 +3,7 @@ import Foundation
 /// Shared model-output interpreter. It owns one parser and sentence buffer per generation.
 public struct AgentGenerator: Sendable {
     private let capabilities: CapabilityRegistry
-    public typealias TextMapping = @Sendable (String, String?) throws -> [ActionCall]
+    public typealias TextMapping = @Sendable (String, String?) throws -> [GenerationEvent]
     private let mapTextCalls: TextMapping?
     private var parser = FunctionTokenParser()
     private var sentences = SentenceFunctionBuffer()
@@ -84,7 +84,7 @@ public struct AgentGenerator: Sendable {
             let calls = try mapTextCalls(chunk, textChannel)
             guard !calls.isEmpty, calls.count <= 8 else { throw GenerationError.limitExceeded }
             try reserve(calls.count)
-            output += calls.map { .action($0) }
+            output += calls
         }
         return output
     }

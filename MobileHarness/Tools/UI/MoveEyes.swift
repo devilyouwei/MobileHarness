@@ -1,4 +1,6 @@
-extension UIActions {
+import AgentCore
+
+extension UITools {
     /// Screen-space target: -1 left/up, +1 right/down; zero looks straight ahead.
     public struct Gaze: Sendable, Equatable {
         public let x: Double
@@ -7,13 +9,13 @@ extension UIActions {
     public enum GazeError: Error, Equatable, Sendable { case invalidTarget }
 
     public static func moveEyes(
-        invocation: ActionInvocation,
-        using present: @escaping @Sendable (Gaze, ActionInvocation) async throws -> Void
+        invocation: ToolInvocation,
+        using present: @escaping @Sendable (Gaze, ToolInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let target: Gaze
         do {
-            let arguments = ActionArguments(invocation.call.parameters)
+            let arguments = CallArguments(invocation.call.arguments)
             try arguments.validateAllowedKeys(["x", "y"])
             target = try Gaze(
                 x: arguments.requiredFiniteDouble("x", range: -1...1),

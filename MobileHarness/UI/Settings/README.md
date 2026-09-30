@@ -127,3 +127,7 @@ flowchart LR
 ```
 
 ❌ Wireless delivery and physical arrival are not established by local send admission. Optional NEXARM_SETTINGS_TEST validates the shared frame plan on USB, separate from default tests.
+
+## Head gestures
+
+✅ BluetoothArmAction exposes 点头 and 摇头 as typed settings intents; the existing list discovers them through CaseIterable. UI owns no motor implementation. ❌ Physical arrival is not inferred from a Settings send.

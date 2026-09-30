@@ -102,3 +102,7 @@ Action/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, 
 ## Action runtime stage 2
 
 ✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and returns without inference or output emission. actionResults() exposes bounded retained history. ❌ Automatic retry/replanning based on a result is not implemented.
+
+## Action and Tool presentation boundary
+
+✅ Transcript preview, finish and voice phase are internal ToolCalls without channels. setTranscript replaces the current preview tail (up to320 characters), including explicit empty clears; it is not a delta append. The bounded output stream fails on overflow instead of dropping transcript/closure events. ❌ Recognition model behavior is unchanged.

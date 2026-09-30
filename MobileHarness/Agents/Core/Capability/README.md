@@ -30,3 +30,7 @@ The configuration permits at most 128 capabilities; assembly applies the same bo
 No Channel is implicitly main or blocking. DefaultChannel remains an internal runtime property derived from the JSON group, not a redundant JSON field. Text mapping is not part of AgentConfiguration: AgentGenerator receives an optional code-owned callback, and Assistant provides synthesis/playback/caption behavior. See [Agent standard](../../README.md) for complete schema rules and [Generation](../Generation/README.md) for streaming limits.
 
 ✅ Source location: `MobileHarness/Agents/Core/Capability`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
+
+## Action and Tool presentation boundary
+
+✅ CallArguments provides shared, bounded transport decoding for Action and Tool domains. Actions retains the ActionArguments compatibility name; Tools has no Actions dependency. ❌ Domain-specific defaults/meaning remain outside this decoder.

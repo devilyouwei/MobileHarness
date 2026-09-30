@@ -600,3 +600,46 @@ Device delivery: signed build2026093008 installed; CoreDevice inventory confirme
 ✅ [ADR0082](adr/0082-nexarm-observation-watchdogs.md) adds continuous pose reception, notification-first channel completion, limited query fallback and independent silence/total deadlines. Settings live tests remain unchanged. ❌ Device-side watchdog and action-ID completion require firmware support.
 
 ✅ Dance timeout correction: the fixed overall channel deadline sums all per-segment motion and settling budgets, preserving2s feedback silence and per-segment limits. Previously one shared3s margin truncated a healthy multi-frame dance before its ending. Settings playback and pose tolerances are unchanged.
+
+
+## Unified Action execution presentation — 2026-09-30
+
+✅ Current changes were checkpointed as04b8dca before this implementation. Added a scheduler-owned versioned snapshot stream, bounded terminal history, cancelling state, structured presentation failures and root-owned UI adaptation. Home shows multiple channel summaries, queued counts, transient success and persistent failures, with recent execution details. See [ADR0083](adr/0083-action-execution-presentation.md).
+
+❌ Device stage progress, durable per-conversation history and physical-phone presentation/accessibility acceptance remain pending. Settings open-loop tests remain separate from verified channel completion.
+
+Validation: `scripts/check.sh` passed, including249 IntegrationTests and the4 new presentation workflow tests; all four `scripts/build-ios.sh` simulator schemes passed. Signed iPhone build2026093016 succeeded. The actual home components were visually checked on an iPhone18 Pro simulator with explicitly labeled synthetic data. This does not claim physical-device interaction or live Action acceptance.
+
+Installation: iPhone app inventory confirmed build2026093016 after retrying a Mac CoreDevice RSD connection failure. No live robot movement or conversation run was performed for this presentation-only acceptance.
+
+✅ Follow-up to ADR0083: hide internal UI/perception execution records, keep scheduled device/playback Actions, adopt native iOS Liquid Glass, and report NexArm argument failures without misleading Bluetooth or speech-engine errors. The reported DanceError identifies parameter validation before device execution; exact failing input requires the phone journal.
+
+Validation of visibility/glass/error follow-up: `scripts/check.sh` passed (250 IntegrationTests, including the no-device-effect argument failure check, and5 ActionActivity workflow tests); all four simulator schemes and signed iPhone build2026093017 succeeded. Phone journal retrieval failed with CoreDevice connection/RSD errors; the exact malformed parameter value from the reported invocation is not yet verified.
+
+Deployment: CoreDevice reported successful installation of the signed2026093017 package. Subsequent journal access disconnected immediately; the malformed dance value remains unverified. No physical motion was triggered for this fix.
+
+### Action / Tool presentation boundary correction
+
+✅ Every scheduled Action is observable; there are no module/source filters. Fixed UI updates are completion-only Tools with explicit append/replacement semantics; model expression remains an Action. Failure descriptions come from the thrown error, bounded in the scheduler snapshot, while machine codes remain metadata. See [ADR0083](adr/0083-action-execution-presentation.md). ❌ Native model Tool output and physical-phone visual acceptance remain separate follow-up work.
+
+### Single-motor head gestures
+
+✅ Nod and head shake use a calibrated-home preparation and native motor4/5 trajectories. Channel arrival checks encoders with the same freshness/deadline policy; Settings remains send-only with bounded nominal targets. The shared transport admits only the new bounded motor command. ❌ Physical acceptance of these added gestures remains pending. See [NexArm](../MobileHarness/PlatformKit/Connectivity/NexArm/README.md).
+
+✅ Head gesture preparation corrected to use the existing intermediate-pose arrival contract instead of final-home tolerance. Body encoder verification, watchdogs and strict home ending remain intact. Regression covers both passing preparation and failing final home; physical reproduction remains pending.
+
+## LLM output buffering (2026-09-30)
+
+✅ Removed the 128-event backlog limit from cloud/local LLM sessions. Other streams remain bounded; finite reply generation, response byte limits, event validation and cancellation are preserved. Added delayed-consumer regression coverage. See [ADR 0084](adr/0084-llm-output-buffering.md).
+
+❌ Physical-device all-expression replay and sustained conversation acceptance remain pending.
+
+Validation: `scripts/check.sh` passed with full Xcode selected, including the unbounded-session and delayed-consumer cloud regressions. `scripts/build-ios.sh` passed all four unsigned simulator schemes. The initial Command Line Tools run could not locate Metal; selecting installed Xcode resolved it. Optional real-model/device acceptance was not performed.
+
+## Head command-mode handoff correction (2026-09-30)
+
+✅ USB reproduced the reported no-motion timeout: a3000ms Cartesian preparation was considered complete after≈0.38s and the native motor target never moved. A controlled delayed handoff restored movement but exposed an unchanged Cartesian ending target that did not correct position. The shared controller now uses home800ms→ready800ms→native sweeps/center→home1200ms, with fresh arrival after the ready duration required before command-mode handoff. Both head sequences passed all16 physical segments and strict final-home validation. Encoder/pose tolerances were not widened.
+
+❌ BLE conversation acceptance on the new phone build remains pending.
+
+Validation for the handoff correction: `scripts/check.sh` passed (257 IntegrationTests plus the remaining package suites), and `scripts/build-ios.sh` passed all four simulator schemes. Hardware results above were captured before the final transport timestamp boundary correction; that correction preserves synchronous telemetry and passed the push-only observation regression.

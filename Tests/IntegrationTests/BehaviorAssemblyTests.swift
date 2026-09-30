@@ -6,19 +6,21 @@ import Foundation
 import Testing
 import Tools
 
-private actor BehaviorEndpoint: UIPresentationCapability, SpeechPlaybackCapability, PosePresentationCapability {
+private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
+    PosePresentationCapability
+{
     private(set) var emotion: UIActions.Emotion?
     private(set) var pose: PoseOverlay?
     func play(audioID: UUID, invocation: ActionInvocation) async throws {}
-    func present(_ text: String, invocation: ActionInvocation) async throws {}
-    func presentTranscript(_ text: String, invocation: ActionInvocation) async throws {}
-    func finishTranscript(invocation: ActionInvocation) async throws {}
-    func beginReplyTurn(invocation: ActionInvocation) async throws {}
-    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ActionInvocation) async throws {}
+    func present(_ text: String, invocation: ToolInvocation) async throws {}
+    func presentTranscript(_ text: String, invocation: ToolInvocation) async throws {}
+    func finishTranscript(invocation: ToolInvocation) async throws {}
+    func beginReplyTurn(invocation: ToolInvocation) async throws {}
+    func presentVoiceState(_ state: UITools.VoiceState, invocation: ToolInvocation) async throws {}
     func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
         self.emotion = emotion
     }
-    func present(_ target: UIActions.Gaze, invocation: ActionInvocation) async throws {}
+    func present(_ target: UITools.Gaze, invocation: ToolInvocation) async throws {}
     func present(_ overlay: PoseOverlay, sessionID: UUID) async throws { pose = overlay }
 }
 

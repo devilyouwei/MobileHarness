@@ -193,15 +193,13 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     await second.start()
     let input = InputGateway(manager: manager, policy: policy)
     let recorder = OverlayRecorder()
-    let actions = ChannelScheduler(
-        registry: try testActionRegistry(handlers: [
-            ActionPath(module: "UI", function: "moveEyes"): { invocation in
-                try await UIActions.moveEyes(invocation: invocation) { target, _ in
-                    #expect(target.x == 0 && target.y == 0)
-                }
-            }
-        ]), maximumTrackedInputs: 1)
+    let actions = ChannelScheduler(registry: try testActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
     let tools = ToolRegistry()
+    try await tools.registerCompletion("UI.moveEyes") { call, envelope in
+        try await UITools.moveEyes(invocation: ToolInvocation(call: call, envelope: envelope)) { target, _ in
+            #expect(target.x == 0 && target.y == 0)
+        }
+    }
     try await tools.registerCompletion("UI.showPose") { call, envelope in
         try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
             #expect(overlay.people.isEmpty)
@@ -274,9 +272,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let registry = agent.descriptor.capabilities
     #expect(
         registry.permits(
-            ActionCall(
-                actionPath: .init(module: "UI", function: "moveEyes"),
-                channel: "Gaze", parameters: ["x": "0", "y": "0"])))
+            ToolCall(toolPath: "UI.moveEyes", arguments: ["x": "0", "y": "0"])))
     #expect(registry.permits(ToolCall(toolPath: "UI.showPose", arguments: ["payload": "{}"])))
 }
 
@@ -314,12 +310,12 @@ private struct CrowdPose: PoseCapability {
         #expect(overlay.people[0][0] == PoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
     }
     let gazeEnvelope = try #require(await stream.next())
-    guard case .actionCall(let gazeCall) = gazeEnvelope.output else {
+    guard case .toolCall(let gazeCall) = gazeEnvelope.output else {
         Issue.record("Missing gaze Action after the skeleton")
         return
     }
     #expect(gazeEnvelope.sequence == 1 && gazeEnvelope.sessionID == session)
-    try await UIActions.moveEyes(invocation: ActionInvocation(envelope: gazeEnvelope)) { gaze, _ in
+    try await UITools.moveEyes(invocation: ToolInvocation(call: gazeCall, envelope: gazeEnvelope)) { gaze, _ in
         #expect(abs(gaze.x) < 0.001 && gaze.y > 0)
     }
     await agent.stop()
@@ -454,7 +450,7 @@ private actor BlockedPosePublication {
             return
         }
         try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in #expect(overlay.sequence == i) }
-        guard case .actionCall = try #require(await displays.next()).output else {
+        guard case .toolCall = try #require(await displays.next()).output else {
             Issue.record("Missing gaze Action")
             return
         }

@@ -63,3 +63,7 @@ There is no execution queue, replay or automatic serialization of independent ca
 ## Domain-owned behavior assembly
 
 ✅ ToolDefinition separates returning and completion handlers and retains resource declarations. ToolModule provides explicit definitions. ToolRegistry(modules:capabilities:) builds atomically: maximum 32 modules, 128 definitions, 128 capability catalogs, 8 resources/definition, 1–64-byte identifier grammar. Duplicate/invalid entries or missing model/internal Tool paths throw before the registry is exposed. Existing dynamic register methods remain for isolated/explicit runtimes and validate the same identifiers; production uses complete construction. ❌ No asynchronous module discovery or automatic permission grants.
+
+## Action and Tool presentation boundary
+
+✅ ToolInvocation carries the validated ToolCall and trusted OutputEnvelope to immediate typed endpoints; it has no channel/execution state. ❌ Tools do not participate in Channel wait groups.

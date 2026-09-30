@@ -13,6 +13,7 @@ final class AppContainer {
     private var memoryWarnings: Task<Void, Never>?
     let lifecycle: VoiceSessionCoordinator
     let conversation: ConversationState
+    let actionActivity: ActionActivityState
     private let diagnostic: SpeechDiagnosticWorkflow
 
     func makeMossValidationView() -> MossValidationView {
@@ -34,6 +35,7 @@ final class AppContainer {
         resources: URL, runtime: ApplicationRuntime, modelName: @escaping @Sendable () async throws -> String,
         progress: @MainActor (String) -> Void
     ) async throws {
+        actionActivity = runtime.actionActivity.state
         let models = try await ModelKitDefaults.manager(resources: resources)
         // Resolve stable capability handles before preparing the conversation models.
         let recognition = try await models.get(.recognition, load: false)

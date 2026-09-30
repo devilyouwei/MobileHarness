@@ -30,11 +30,13 @@ public protocol BluetoothControlling: AnyObject {
 }
 
 public enum BluetoothArmAction: String, CaseIterable, Identifiable, Sendable {
-    case shakeBase, wave, tiltLeft, tiltRight, lookAround, celebrate, dance, reset
+    case shakeBase, nod, shakeHead, wave, tiltLeft, tiltRight, lookAround, celebrate, dance, reset
     public var id: Self { self }
     public var title: String {
         switch self {
         case .shakeBase: "底座晃动"
+        case .nod: "点头"
+        case .shakeHead: "摇头"
         case .wave: "挥手"
         case .tiltLeft: "向左歪头"
         case .tiltRight: "向右歪头"

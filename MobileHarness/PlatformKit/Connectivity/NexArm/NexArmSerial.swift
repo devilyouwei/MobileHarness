@@ -22,8 +22,7 @@
             try Task.checkCancellation()
             guard observationID == session else { throw CancellationError() }
             guard fd >= 0 else { throw NexArmError.disconnected }
-            guard packet.id == 255,
-                (packet.command == 11 && packet.payload.isEmpty) || (packet.command == 8 && packet.payload.count == 14)
+            guard packet.isObservedControl
             else { throw NexArmError.invalidPacket }
             try send(packet)
             return true

@@ -238,7 +238,7 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ✅ SpeechSynthesisAgent is an independent JSON v5 directed service with one FIFO model worker. Agents may additionally depend on StorageChat for durable conversation records and StorageAudio for the shared audio cache; they still cannot depend on Actions, Gateway, PlatformKit or concrete engines. Assistant binds a messaging port and sends text before emitting audioID playback. ❌ Hardware timing acceptance remains pending.
 
 
-✅ An Agent interpreting wait markup must declare OutputKind.scheduling and forward the entire GenerationEvent sequence through OutputGateway. SchedulingDirective is typed runtime coordination, not an extra business Action or message. Preserve directive order across speech preparation and substitutions; never forward only ActionCalls. Assistant's output buffer is 256 events, including at most 120 generated Actions and 64 wait edges. Wait is local to the originating task; native Tools and directed speech synthesis requests do not become wait members. ❌ Cross-task coordination is not implied.
+✅ An Agent interpreting wait markup must declare OutputKind.scheduling and forward the entire GenerationEvent sequence through OutputGateway. SchedulingDirective is typed runtime coordination, not an extra business Action or message. Preserve directive order across speech preparation and substitutions; never forward only ActionCalls. Assistant's output buffer is 256 events, including at most 120 generated Action/Tool calls and 64 wait edges. Wait is local to the originating task; native Tools and directed speech synthesis requests do not become wait members. ❌ Cross-task coordination is not implied.
 
 ✅ Assistant receives a shared StorageChat journal from App; ten completed rounds form current context, while failed/cancelled raw records remain inspectable. Voice sessions no longer determine conversation boundaries. New conversation archives the current context explicitly. Title inference is metadata-only and never generates dispatched Actions. ❌ Persistent Action execution/replay is not introduced.
 
@@ -255,3 +255,7 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete config
 ✅ Agents depends on StorageChat for conversation storage and StorageAudio for speech media. Both domains reuse Storage core; concrete model/device boundaries remain unchanged.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+## Scheduled versus immediate presentation
+
+✅ Fixed captions, recognition text/closure, voice phase, gaze and turn initialization are code-owned completion-only Tools. Replies append sentence chunks; recognition previews replace the full current value. Every scheduled Action remains visible, including model-selected expression. ❌ Native model Tool deltas remain deferred, so expression intentionally retains its JSON Action registration.

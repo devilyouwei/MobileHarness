@@ -8,6 +8,7 @@ import ModelKit
 import OSLog
 import PlatformKit
 import StorageAudio
+import Tools
 import UI
 
 @MainActor
@@ -123,7 +124,9 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                 } catch is CancellationError {
                     if Task.isCancelled { throw CancellationError() }
                 } catch {
-                    stopVoice(message: "语音处理失败：\(error.localizedDescription)")
+                    stopVoice(
+                        message: (error is any ActionExecutionFailureProviding ? "动作未完成：" : "语音处理失败：")
+                            + error.localizedDescription)
                     record("处理失败：\(String(describing: error))")
                     await cleanupTask?.value
                     do {
@@ -447,21 +450,21 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         session == voiceGeneration
     }
 
-    func presentTranscript(_ text: String, invocation: ActionInvocation) throws {
+    func presentTranscript(_ text: String, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.envelope, update: .transcript) else { return }
         state.liveTranscript = text
     }
 
-    func finishTranscript(invocation: ActionInvocation) throws {
+    func finishTranscript(invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.envelope, update: .finishTranscript) else { return }
         state.liveTranscript = ""
     }
 
-    func beginReplyTurn(invocation: ActionInvocation) throws {
+    func beginReplyTurn(invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.envelope, update: .beginReply) else { return }
@@ -469,7 +472,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         state.expression = nil
     }
 
-    func presentVoiceState(_ voiceState: UIActions.VoiceState, invocation: ActionInvocation) throws {
+    func presentVoiceState(_ voiceState: UITools.VoiceState, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
         if conversationPresentation.isCurrent(invocation.envelope), conversationPresentation.transcriptClosed,
@@ -499,7 +502,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         state.expression = emotion == .clear ? nil : EyeExpression(emotion)
     }
 
-    func present(_ text: String, invocation: ActionInvocation) throws {
+    func present(_ text: String, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.envelope, update: .reply) else { return }

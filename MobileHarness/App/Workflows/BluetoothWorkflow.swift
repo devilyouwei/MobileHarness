@@ -1,3 +1,4 @@
+import AgentCore
 import Foundation
 import PlatformKit
 import Storage
@@ -17,8 +18,20 @@ public struct BluetoothDeviceRecord: Codable, Sendable {
         self.automaticallyReconnect = automaticallyReconnect
     }
 }
-public enum BluetoothWorkflowError: LocalizedError, Sendable, Equatable {
+public enum BluetoothWorkflowError: LocalizedError, Sendable, Equatable, ActionExecutionFailureProviding {
     case disconnected, busy, background, posture, unverified, controlNotReady, feedbackTimeout, completionTimeout
+    public var actionExecutionFailure: ActionExecutionRecord.Failure {
+        switch self {
+        case .disconnected: .disconnected
+        case .busy: .busy
+        case .background: .background
+        case .posture: .invalidPose
+        case .unverified: .unconfirmed
+        case .controlNotReady: .controlNotReady
+        case .feedbackTimeout: .feedbackTimeout
+        case .completionTimeout: .completionTimeout
+        }
+    }
     public var errorDescription: String? {
         switch self {
         case .disconnected: "机械臂未连接，请到设置 → 蓝牙外设连接 NexArm"
@@ -544,6 +557,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
             let gesture: NexArmGesture
             switch action {
             case .shakeBase: gesture = .baseSway
+            case .nod: gesture = .nod
+            case .shakeHead: gesture = .shakeHead
             case .wave: gesture = .wave
             case .tiltLeft: gesture = .tiltLeft
             case .tiltRight: gesture = .tiltRight

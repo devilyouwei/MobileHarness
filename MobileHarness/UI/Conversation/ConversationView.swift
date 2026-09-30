@@ -5,10 +5,15 @@
     public struct ConversationView: View {
         @Bindable var state: ConversationState
         @Bindable var robot: BluetoothSettingsState
+        @Bindable var activity: ActionActivityState
         private let toggleVoice: () -> Void
-        public init(state: ConversationState, robot: BluetoothSettingsState, toggleVoice: @escaping () -> Void) {
+        public init(
+            state: ConversationState, robot: BluetoothSettingsState, activity: ActionActivityState,
+            toggleVoice: @escaping () -> Void
+        ) {
             self.state = state
             self.robot = robot
+            self.activity = activity
             self.toggleVoice = toggleVoice
         }
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -59,25 +64,10 @@
                     }
                     .frame(width: min(geometry.size.width - 56, 440), height: min(120, geometry.size.height * 0.20))
                     .position(
-                        x: geometry.size.width / 2, y: geometry.size.height - min(120, geometry.size.height * 0.20)
+                        x: geometry.size.width / 2,
+                        y: geometry.size.height - (activity.items.isEmpty ? 120 : 240)
                     )
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: state.voicePhase)
-
-                    if robot.phase == .connected || robot.motionStatus != nil {
-                        Label(
-                            robot.motionStatus
-                                ?? (robot.controlReady ? "\(robot.selected?.name ?? "机械臂") 已连接" : "机械臂已连接，控制待验证"),
-                            systemImage: robot.executing
-                                ? "arrow.triangle.2.circlepath" : "sensor.tag.radiowaves.forward.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(robot.error == nil ? Color.white.opacity(0.7) : Color.orange)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                        .frame(width: min(geometry.size.width - 56, 440))
-                        .position(x: geometry.size.width / 2, y: geometry.size.height - 38)
-                        .accessibilityIdentifier("conversation.robot.status")
-                    }
 
                     VoiceBars(
                         placement: .bottom, bands: state.microphoneSpectrum,
@@ -97,6 +87,22 @@
                         y: replySpectrumY(in: geometry)
                     )
                     .opacity(state.voicePhase == .speaking ? 1 : 0)
+                    VStack {
+                        Spacer(minLength: 0)
+                        if !activity.items.isEmpty || activity.observationUnavailable {
+                            ActionActivityView(state: activity)
+                        } else if robot.phase == .connected {
+                            Label(
+                                robot.controlReady ? "\(robot.selected?.name ?? "机械臂") 已连接" : "机械臂已连接，控制待验证",
+                                systemImage: "sensor.tag.radiowaves.forward.fill"
+                            )
+                            .font(.caption).foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
+                    .frame(width: min(geometry.size.width - 40, 440))
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+
                 }
             }
             .preferredColorScheme(.dark)
@@ -163,7 +169,8 @@
                     .multilineTextAlignment(.center)
                     .frame(width: min(geometry.size.width - 56, 440))
                     .position(
-                        x: geometry.size.width / 2, y: geometry.size.height - min(120, geometry.size.height * 0.20))
+                        x: geometry.size.width / 2,
+                        y: geometry.size.height - min(120, geometry.size.height * 0.20))
                 }
             }
             .preferredColorScheme(.dark)

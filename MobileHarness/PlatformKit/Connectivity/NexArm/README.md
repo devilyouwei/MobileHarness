@@ -264,3 +264,29 @@ flowchart LR
 ❌ These are host watchdogs, not firmware safety watchdogs or stop acknowledgments. The protocol has no action ID or device sample sequence/timestamp: receipt freshness and observed convergence cannot prove strict causal completion or distinguish repeated cached device samples. Generic legacy links retain bounded exchange fallback; production BLE/USB implement observation sessions. Settings open-loop timing remains unchanged.
 
 ✅ The fixed whole-action deadline equals the sum of each segment’s nominal duration plus its3s settling/observation allowance; starting later segments cannot extend it. Dance has10 segments and a40.6s upper bound, while2s silence and nominal+3s per-segment failures still exit earlier. A single3s allowance for the entire sequence previously cut dance at leg8 before its return frames. This bounds the complete channel await as well as each segment.
+
+## Head gestures
+
+✅ Head gestures establish fixed Cartesian home and a distinct ready pose, then command only motor4 (nod, ±380 counts≈33°) or motor5 (shake, ±500 counts≈44°), with two sweeps and center per cycle. Native CMD3 register41 uses acceleration30, speed1400counts/s. Channel control derives the center from measured ready pose, checks all six encoders within16counts and stable fresh feedback, and finishes with strict Cartesian home verification; the existing silence/segment/action watchdogs remain. Settings uses nominal home centers after a finite home approach and sends the same bounded body packets without feedback waits. These nominal targets are not reported as calibration measurements. Both serial and BLE observation allow only the bounded head-motor packet shape in addition to existing CMD8/11. ❌ Settings from unusual starting poses and visual fluidity require physical acceptance.
+
+## Head preparation gate correction
+
+✅ Head preparation now uses the same intermediate arrival contract as all other presets (XYZ15mm, pitch4deg, roll/claw2deg, fresh stable feedback for200ms). Previously it incorrectly selected final-home tolerances before sending any motor4/5 body command. A stationary approach within the normal intermediate envelope could therefore time out without visible movement. Encoder-based body completion and strict final home (XYZ5mm, pitch/roll/claw2deg,300ms fresh stability) remain unchanged. Regression fixtures reproduce a Z-10mm/pitch-3deg preparation and require both gestures to execute; the same error at the ending must still fail. ❌ This fixture establishes the code-path defect, not the exact physical measurements of the reported phone run.
+
+## Cartesian-to-servo handoff (physical correction)
+
+✅ Head channel sequences now use home800ms → ready800ms → native motor sweeps/center → home1200ms. The ready-to-servo transition requires fresh converged telemetry received after the commanded800ms trajectory duration, while continuing observation and both watchdogs. It does not sleep blindly or relax encoder/pose thresholds. Timing starts at the successful transport admission attempt, preserving telemetry received synchronously during that write. The distinct ready target also makes the ending home a new Cartesian target after native servo writes. Settings remains send-only.
+
+USB experiments reproduced the original failure: home3000ms was declared arrived after≈0.38s, and the next motor4 target857 remained at1237 until timeout. Delaying the native handoff made all five motor segments execute, but an identical Cartesian home target did not correct the ending pose. The new home→ready→native→home plan passed all16 segments across nod and shake; see [physical evidence](../../../../docs/NexArm_Physical_Acceptance.md). These observations support retained Cartesian trajectory/target state in firmware; firmware internals were not inspected.
+
+```mermaid
+flowchart LR
+    Home[Home approach 800ms] --> Ready[Distinct ready pose 800ms]
+    Ready --> Gate[Fresh arrival after trajectory duration]
+    Gate --> Servo[Five native motor targets per cycle]
+    Servo --> End[Distinct home target 1200ms]
+    End --> Verify[Strict observed home]
+    Gate --> Watchdog[Silence and completion deadlines remain active]
+```
+
+❌ iPhone BLE conversation acceptance remains separate from USB acceptance.

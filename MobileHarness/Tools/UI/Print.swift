@@ -1,14 +1,15 @@
+import AgentCore
 import Foundation
 
-extension UIActions {
+extension UITools {
     public static func print(
-        invocation: ActionInvocation,
-        using present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
+        invocation: ToolInvocation,
+        using present: @escaping @Sendable (String, ToolInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let text: String
         do {
-            let arguments = ActionArguments(invocation.call.parameters)
+            let arguments = CallArguments(invocation.call.arguments)
             try arguments.validateAllowedKeys(["text"])
             text = try arguments.requiredString("text", maximumUTF8Bytes: 2000, allowBlank: false)
         } catch { throw PresentationError.invalidText }

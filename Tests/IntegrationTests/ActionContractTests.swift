@@ -98,7 +98,8 @@ private func contractDefinition(
     let catalogs = [assistant, speech, vision, synthesis]
     let paths = Set(catalogs.flatMap { $0.actions.map(\.path) + $0.internalActions.map(\.path) })
     #expect(paths.contains(ActionPath(module: "Speech", function: "speak")))
-    #expect(paths.contains(ActionPath(module: "UI", function: "moveEyes")))
+    #expect(!paths.contains(ActionPath(module: "UI", function: "moveEyes")))
+    #expect(vision.internalTools.contains { $0.path == "UI.moveEyes" })
     let registry = try ActionRegistry(definitions: paths.map { contractDefinition(path: $0) })
     for catalog in catalogs { try registry.validate(capabilities: catalog) }
 }

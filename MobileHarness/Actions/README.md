@@ -318,15 +318,9 @@ Run `./scripts/check.sh` and, with full Xcode, `./scripts/build-ios.sh`; report 
 | Path | Kind / endpoint | Validation / dependency |
 | --- | --- | --- |
 | Speech.speak | finite / playback drained and single-use audio released | audioID only, UUID at most 36 UTF-8 bytes; typed playback capability |
-| UI.print | finite / accepted text append | nonblank text ≤2000 UTF-8 bytes; typed presentation |
 | UI.express | state / accepted expression target | exact Emotion enum; no animation acknowledgment |
-| UI.moveEyes | state / accepted gaze target | finite x/y in [-1,1] |
-| UI.setTranscript | state / transcript replacement | text ≤4096 UTF-8 bytes, empty clears |
-| UI.setVoiceState | state / accepted presentation phase | listening/hearing/processing |
-| UI.beginReplyTurn | state / turn initialized | no parameters |
-| UI.finishTranscript | state / transcript closed | no parameters |
 
-All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Shared PresentationError belongs in UI/Types.swift; per-action emotion/gaze values remain with their entries. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
+All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Fixed caption/gaze/recognition presentation now belongs to Tools/UI, including PresentationError and gaze values. Expression remains here. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
 
 ✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. Legacy names express/moveEyes are retained as published paths. Registry and resource contracts remain in Runtime/Gateway.
 
@@ -381,3 +375,7 @@ The earlier explicit single-definition binding example illustrates isolated cons
 ## NexArm entertainment skills (2026-09-30)
 
 ✅ NexArm now adds waveWrist, tiltWrist, lookAround, celebrate and dance as typed finite Actions, alongside shakeBase. The domain owns registration and per-verb validation; all share NexArm exclusion. See [contracts](NexArm/README.md). ❌ New gesture sequences await physical acceptance.
+
+## Immediate presentation migration
+
+✅ UIActionModule now registers only model-selected expression. Fixed caption append, transcript replacement/closure, voice phase, gaze and turn initialization moved to Tools/UI with typed ToolInvocation and shared CallArguments. Every remaining Action is displayed without per-path filters. ❌ Native model Tool output remains pending; expression retains scheduling by product choice.

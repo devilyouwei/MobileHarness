@@ -178,3 +178,28 @@ flowchart LR
 ❌ Wireless delivery and physical arrival are not established by local send admission. Optional NEXARM_SETTINGS_TEST validates the shared frame plan on USB, separate from default tests.
 
 ✅ Channel completion now reports distinct no-feedback and total-deadline failures. Completion uses the controller's last confirmed observation without a redundant status query. A failed await does not automatically replay motion; settings immediate tests keep their separate live path. ❌ Host timeout does not imply physical stop.
+
+## Unified Action presentation
+
+✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, maps shared AgentCore execution snapshots into UI presentation values, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. Success follows finite/state/activity completion semantics; cancellation pending is distinct from terminal cancellation. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Settings test commands remain outside channel execution history and retain send-only acknowledgments.
+
+```mermaid
+flowchart LR
+    Root[ApplicationRuntime] --> Subscription[Injected scheduler snapshot stream]
+    Subscription --> Workflow[ActionActivityWorkflow]
+    Workflow --> State[ActionActivityState]
+    State --> Home[Channel summaries]
+    State --> History[Recent execution sheet]
+```
+
+❌ No synthetic progress percentages, device-specific stage callbacks, durable execution history or automatic action retry. Stream subscription failures appear as unavailable presentation without stopping Actions.
+
+✅ Product execution history projects every scheduled Action without module/source filtering. Fixed presentation updates execute as immediate Tools and never enter scheduler observation; model expression remains a visible Action.
+
+## Action and Tool presentation boundary
+
+✅ ActionActivityWorkflow projects every scheduled Action without module/source filtering and displays its captured failureDescription directly. Unknown errors use Swift localizedDescription; domain LocalizedError owns readable wording. Conversation history dry-run output labels Tool events explicitly. ❌ No duplicate error-message table is maintained.
+
+## Head gestures
+
+✅ Settings exposes nod and shakeHead through the existing latest-only send path; Action history uses 点头/摇头 names. Channel execution still awaits completion; Settings still does not. ❌ No old command is replayed on reconnection.

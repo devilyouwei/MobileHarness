@@ -6,11 +6,11 @@ import Tools
 @MainActor
 protocol VoiceOutputHandling: AnyObject, Sendable {
     func play(audioID: UUID, invocation: ActionInvocation) async throws
-    func present(_ text: String, invocation: ActionInvocation) throws
-    func presentTranscript(_ text: String, invocation: ActionInvocation) throws
-    func finishTranscript(invocation: ActionInvocation) throws
-    func beginReplyTurn(invocation: ActionInvocation) throws
-    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ActionInvocation) throws
+    func present(_ text: String, invocation: ToolInvocation) throws
+    func presentTranscript(_ text: String, invocation: ToolInvocation) throws
+    func finishTranscript(invocation: ToolInvocation) throws
+    func beginReplyTurn(invocation: ToolInvocation) throws
+    func presentVoiceState(_ state: UITools.VoiceState, invocation: ToolInvocation) throws
     func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws
     func observeSpeech(_ input: AgentInput)
     func show(_ envelope: OutputEnvelope)
@@ -18,13 +18,15 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
 
 @MainActor
 protocol CameraOutputHandling: AnyObject, Sendable {
-    func present(_ target: UIActions.Gaze, invocation: ActionInvocation) throws
+    func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws
     func present(_ overlay: PoseOverlay, sessionID: UUID) throws
 }
 
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
 @MainActor
-final class RuntimePresentation: UIPresentationCapability, SpeechPlaybackCapability, PosePresentationCapability {
+final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
+    PosePresentationCapability
+{
     private weak var voice: (any VoiceOutputHandling)?
     private weak var camera: (any CameraOutputHandling)?
     func bindVoice(_ value: any VoiceOutputHandling) throws {
@@ -45,23 +47,23 @@ final class RuntimePresentation: UIPresentationCapability, SpeechPlaybackCapabil
         guard let voice else { throw CommunicationError.scopeClosed }
         try await voice.play(audioID: audioID, invocation: invocation)
     }
-    func present(_ text: String, invocation: ActionInvocation) async throws {
+    func present(_ text: String, invocation: ToolInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.present(text, invocation: invocation)
     }
-    func presentTranscript(_ text: String, invocation: ActionInvocation) async throws {
+    func presentTranscript(_ text: String, invocation: ToolInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.presentTranscript(text, invocation: invocation)
     }
-    func finishTranscript(invocation: ActionInvocation) async throws {
+    func finishTranscript(invocation: ToolInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.finishTranscript(invocation: invocation)
     }
-    func beginReplyTurn(invocation: ActionInvocation) async throws {
+    func beginReplyTurn(invocation: ToolInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.beginReplyTurn(invocation: invocation)
     }
-    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ActionInvocation) async throws {
+    func presentVoiceState(_ state: UITools.VoiceState, invocation: ToolInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.presentVoiceState(state, invocation: invocation)
     }
@@ -69,7 +71,7 @@ final class RuntimePresentation: UIPresentationCapability, SpeechPlaybackCapabil
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.presentExpression(emotion, invocation: invocation)
     }
-    func present(_ target: UIActions.Gaze, invocation: ActionInvocation) async throws {
+    func present(_ target: UITools.Gaze, invocation: ToolInvocation) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(target, invocation: invocation)
     }

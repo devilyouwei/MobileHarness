@@ -106,6 +106,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
                     depth += 1
                     return prefix + "<wait>"
                 case .scheduling(.endWait): return prefix + "</wait>"
+                case .tool(let call): return prefix + "[Tool] \(call.toolPath) \(call.arguments)"
                 case .action(let call): return prefix + "[\(call.channel)] \(call.actionPath) \(call.parameters)"
                 }
             }

@@ -402,6 +402,10 @@ public actor NexArmController {
         lastFailure = nil
         motionFailure = nil
         _ = try await requireCompatibility()
+        if gesture.motorID != nil {
+            try await performHeadGesture(gesture, repetitions: repetitions, writer: writer)
+            return
+        }
         // Targets are fixed Cartesian poses. Factory/example encoder positions are not calibration.
         let home = NexArmGesture.home
         let ready = NexArmGesture.ready
@@ -451,9 +455,61 @@ public actor NexArmController {
         }
     }
 
+    private func performHeadGesture(_ gesture: NexArmGesture, repetitions: Int, writer: any NexArmWritableLink)
+        async throws
+    {
+        // First establish calibrated home. Never interpret a previous arbitrary posture as the neutral head.
+        let durations =
+            [800, 800] + Array(repeating: NexArmGesture.headFrameMilliseconds, count: repetitions * 5) + [1200]
+        let budget = durations.reduce(Duration.zero) {
+            $0 + NexArmArrivalTracker.completionBudget(durationMilliseconds: $1)
+        }
+        let deadline = ContinuousClock.now.advanced(by: budget)
+        func run(
+            _ frame: NexArmGesture.TestFrame, target: [Int] = NexArmGesture.home,
+            joints: [Int]? = nil, final: Bool = false, handoff: Bool = false
+        ) async throws {
+            try Task.checkCancellation()
+            let leg = Task {
+                try await self.observeGestureLeg(
+                    writer: writer, packet: frame.packet, target: target,
+                    milliseconds: frame.milliseconds, final: final, actionDeadline: deadline, jointTarget: joints,
+                    minimumObservationMilliseconds: handoff ? frame.milliseconds : 0)
+            }
+            try await leg.value
+            try Task.checkCancellation()
+        }
+        do {
+            // Keep the Cartesian planner's last target distinct from the ending home.
+            // Native servo writes do not update its remembered Cartesian target.
+            try await run(NexArmGesture.homeFrame(milliseconds: 800))
+            try await run(
+                NexArmGesture.poseFrame(NexArmGesture.ready, milliseconds: 800),
+                target: NexArmGesture.ready, handoff: true)
+            let center = cachedJoints
+            let frames = try gesture.headFrames(center: center)
+            for _ in 0..<repetitions {
+                for frame in frames {
+                    var target = center
+                    guard let id = gesture.motorID else { throw NexArmError.invalidMotion }
+                    target[id - 1] = Int(frame.packet.payload[2]) | Int(frame.packet.payload[3]) << 8
+                    try await run(frame, joints: target)
+                }
+            }
+            try await run(NexArmGesture.homeFrame(milliseconds: 1200), final: true)
+            motionFailure = nil
+        } catch {
+            if error is CancellationError { throw error }
+            faulted = true
+            lastFailure = String(describing: error)
+            throw NexArmError.uncertainMotion
+        }
+    }
+
     private func observeGestureLeg(
         writer: any NexArmWritableLink, packet: NexArmPacket, target: [Int], milliseconds: Int, final: Bool,
-        actionDeadline: ContinuousClock.Instant
+        actionDeadline: ContinuousClock.Instant, jointTarget: [Int]? = nil,
+        minimumObservationMilliseconds: Int = 0
     ) async throws {
         if let observable = writer as? any NexArmObservableLink {
             let session = try await observable.beginObservation()
@@ -461,16 +517,19 @@ public actor NexArmController {
                 let baseline = try await observable.latestObservation(after: 0, session: session)?.sequence ?? 0
                 motionFailure = .sending
                 let admissionDeadline = min(actionDeadline, ContinuousClock.now.advanced(by: .seconds(1)))
-                let sentAt = ContinuousClock.now
+                var sentAt = ContinuousClock.now
                 while true {
                     guard ContinuousClock.now < admissionDeadline else { throw NexArmError.timeout }
+                    // A transport may synchronously receive telemetry during admission.
+                    sentAt = .now
                     if try await observable.sendObserved(packet, session: session) { break }
                     try await Task.sleep(for: .milliseconds(25))
                 }
                 try await awaitArrival(
                     target: target, milliseconds: milliseconds, final: final,
                     started: sentAt, observable: observable, session: session, sequence: baseline,
-                    actionDeadline: actionDeadline)
+                    actionDeadline: actionDeadline, jointTarget: jointTarget,
+                    minimumObservationMilliseconds: minimumObservationMilliseconds)
                 await observable.endObservation(session)
             } catch {
                 await observable.endObservation(session)
@@ -481,18 +540,21 @@ public actor NexArmController {
             try await writer.write(packet)
             try await awaitArrival(
                 target: target, milliseconds: milliseconds, final: final,
-                started: .now, observable: nil, session: nil, sequence: 0, actionDeadline: actionDeadline)
+                started: .now, observable: nil, session: nil, sequence: 0, actionDeadline: actionDeadline,
+                jointTarget: jointTarget, minimumObservationMilliseconds: minimumObservationMilliseconds)
         }
     }
 
     private func awaitArrival(
         target: [Int], milliseconds: Int, final: Bool, started: ContinuousClock.Instant,
         observable: (any NexArmObservableLink)?, session: UUID?, sequence initialSequence: UInt64,
-        actionDeadline: ContinuousClock.Instant
+        actionDeadline: ContinuousClock.Instant, jointTarget: [Int]? = nil,
+        minimumObservationMilliseconds: Int = 0
     ) async throws {
         var tracker = NexArmArrivalTracker(
             target: target, final: final, started: started, durationMilliseconds: milliseconds,
-            actionDeadline: actionDeadline)
+            actionDeadline: actionDeadline, jointTarget: jointTarget,
+            minimumObservationMilliseconds: minimumObservationMilliseconds)
         var sequence = initialSequence
         var nextQuery = started
         var lastReceipt = started.advanced(by: .seconds(-1))
@@ -563,11 +625,13 @@ public actor NexArmController {
 
 /// Presets own their mechanical meaning; callers cannot supply arbitrary joint positions or speed.
 public enum NexArmGesture: Sendable, CaseIterable {
-    case baseSway, wave, tiltLeft, tiltRight, lookAround, celebrate, dance
+    case baseSway, nod, shakeHead, wave, tiltLeft, tiltRight, lookAround, celebrate, dance
 
     public var displayName: String {
         switch self {
         case .baseSway: "底座晃动"
+        case .nod: "点头"
+        case .shakeHead: "摇头"
         case .wave: "挥手"
         case .tiltLeft, .tiltRight: "歪头"
         case .lookAround: "左右张望"
@@ -581,6 +645,10 @@ public enum NexArmGesture: Sendable, CaseIterable {
         public let milliseconds: Int
     }
     public func settingsTestFrames() throws -> [TestFrame] {
+        if motorID != nil {
+            return [try Self.homeFrame(milliseconds: 800)] + (try headFrames(center: NexArmJogPlanner.home))
+                + [try Self.homeFrame(milliseconds: 800)]
+        }
         let poses = [Self.ready] + frames + [Self.home]
         return try poses.enumerated().map { index, pose in
             let duration = index == 0 ? 400 : (index == poses.count - 1 ? 600 : 800)
@@ -593,6 +661,44 @@ public enum NexArmGesture: Sendable, CaseIterable {
                 })
             return TestFrame(packet: packet, milliseconds: duration)
         }
+    }
+    fileprivate static let headFrameMilliseconds = 750
+    public var motorID: Int? {
+        switch self {
+        case .nod: 4
+        case .shakeHead: 5
+        default: nil
+        }
+    }
+    /// Two obvious back-and-forth sweeps, then center. Firmware acceleration smooths each reversal.
+    public func headFrames(center: [Int]) throws -> [TestFrame] {
+        guard let id = motorID, center.count == 6 else { throw NexArmError.invalidMotion }
+        let amplitude = id == 4 ? 380 : 500  // About +/-33 and +/-44 degrees (4096 counts/revolution).
+        return try [-amplitude, amplitude, -amplitude, amplitude, 0].map { offset in
+            let target = center[id - 1] + offset
+            guard NexArmJogPlanner.limits[id - 1].contains(target) else { throw NexArmError.invalidMotion }
+            let speed = 1400
+            return TestFrame(
+                packet: try NexArmPacket(
+                    id: UInt8(id), command: 3,
+                    payload: [
+                        41, 30, UInt8(target & 255), UInt8(target >> 8), 0, 0,
+                        UInt8(speed & 255), UInt8(speed >> 8),
+                    ]), milliseconds: Self.headFrameMilliseconds)
+        }
+    }
+    fileprivate static func homeFrame(milliseconds: Int) throws -> TestFrame {
+        return try poseFrame(home, milliseconds: milliseconds)
+    }
+    fileprivate static func poseFrame(_ pose: [Int], milliseconds: Int) throws -> TestFrame {
+        let values = [pose[3], pose[0], pose[1], pose[2], pose[4], pose[5], milliseconds]
+        return TestFrame(
+            packet: try NexArmPacket(
+                command: 8,
+                payload: values.flatMap { value -> [UInt8] in
+                    let bits = UInt16(bitPattern: Int16(value))
+                    return [UInt8(bits & 255), UInt8(bits >> 8)]
+                }), milliseconds: milliseconds)
     }
     fileprivate static func validPose(_ pose: [Int]) -> Bool {
         pose.count == 6 && hypot(Double(pose[0]), Double(pose[1])) <= 450
@@ -609,6 +715,7 @@ public enum NexArmGesture: Sendable, CaseIterable {
             return [Int((200 * cos(angle)).rounded()), Int((200 * sin(angle)).rounded()), height, 0, roll, 0]
         }
         switch self {
+        case .nod, .shakeHead: return []  // These use calibrated single-motor frames, never Cartesian body frames.
         case .baseSway: return [pose(-30, 0), pose(30, 0), pose(0, 0)]
         case .wave: return [pose(-12, -40), pose(12, 40), pose(-12, -40), pose(12, 40)]
         // Left/right are the arm’s own directions, as viewed from behind facing forward.

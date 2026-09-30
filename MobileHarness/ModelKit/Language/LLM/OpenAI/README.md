@@ -1,6 +1,6 @@
 # OpenAI-compatible cloud chat
 
-Purpose: implement third-party cloud text generation behind the same `ChatCapability`, `ChatRequest`, `ChatEvent` and cancellable `InferenceSession` used by local Qwen. Design goals: independent adapter target, no business dependencies, explicit configuration, bounded streaming and managed lifecycle.
+Purpose: implement third-party cloud text generation behind the same `ChatCapability`, `ChatRequest`, `ChatEvent` and cancellable `InferenceSession` used by local Qwen. Design goals: independent adapter target, no business dependencies, explicit configuration, complete reply buffering and managed lifecycle.
 
 ✅ `ModelKitOpenAI` uses Foundation URLSession; no new third-party package. HTTPS Base URL includes the provider's API prefix (for example `https://provider.example/v1`); the adapter appends `chat/completions`. Key, model and timeout are supplied by the host. Uses Bearer authorization when the supplied key is nonempty and Chat Completions `stream`, `messages`, `temperature`, `max_tokens` fields. Providers must support these fields and SSE text deltas.
 
@@ -24,18 +24,18 @@ flowchart LR
     Validate --> Lease[ModelResource single operation]
     Lease --> Network[Ephemeral URLSession]
     Network --> Frame[Bounded byte and SSE decoder]
-    Frame --> Events[Bounded InferenceSession]
+    Frame --> Events[InferenceSession - no event-count cap]
     Events --> Consumer[ChatCapability consumer]
-    Events -->|cancel or overflow| Cancel[Cancel worker and HTTP]
+    Events -->|cancel or error| Cancel[Cancel worker and HTTP]
     Cancel --> Release[Release resource lease]
     Network -->|finish or error| Release
 ```
 
-✅ Requests: at most 64 messages, 64 KiB text and at most 32768 explicitly requested output tokens (omitted by default). No inference waiting queue; overlap fails `inputBusy`. SSE line/event: 64 KiB, cumulative response: 8 MiB. Output: 128 events × 65568 estimated bytes. Exceeding limits fails explicitly, never drops text silently. CR/LF/CRLF, fragmented UTF-8, comments and multiline data fields are supported.
+✅ Requests: at most 64 messages, 64 KiB text and at most 32768 explicitly requested output tokens (omitted by default). No inference waiting queue; overlap fails `inputBusy`. SSE line/event: 64 KiB, cumulative response: 8 MiB. Output: no pending-event count limit; each event retains the 65568 estimated-byte limit. Slow consumers do not cause bufferOverflow; normal finish drains all accepted fragments in order. Exceeding limits fails explicitly, never drops text silently. CR/LF/CRLF, fragmented UTF-8, comments and multiline data fields are supported.
 
 ✅ `stop` and `length` map to the shared finish reasons. A finish reason is required; premature EOF or `[DONE]` fails. The HTTP request ends on the terminal choice; trailing usage is not exposed. Unsupported native tools, refusal and finish reasons fail explicitly. Errors do not expose provider bodies, URLs or credentials. No automatic retry/fallback; partial text may already have reached the consumer.
 
-✅ One ephemeral session per active request, no cookie/cache persistence, no redirects (including same-host redirects). Timeouts are 1–600 seconds (default 60), including total resource duration. Cancellation, overflow and manager shutdown cancel the worker; the request is invalidated before releasing admission. Local unload/reload and terminal manager shutdown use the same ModelResource contract.
+✅ One ephemeral session per active request, no cookie/cache persistence, no redirects (including same-host redirects). Timeouts are 1–600 seconds (default 60), including total resource duration. Cancellation, stream failure and manager shutdown cancel the worker; the request is invalidated before releasing admission. Local unload/reload and terminal manager shutdown use the same ModelResource contract.
 
 ❌ Cloud ASR/TTS/vision/judge, native tools, Responses API, retry and live-provider acceptance. Text-only compatibility is intentional; unsupported modalities are not advertised.
 

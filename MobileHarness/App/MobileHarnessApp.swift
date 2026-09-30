@@ -18,7 +18,7 @@ struct MobileHarnessApp: App {
             NavigationStack {
                 Group {
                     if isVisualPreview {
-                        ConversationVisualPreview()
+                        visualPreview
                     } else if isDiagnostic {
                         startupContent
                     } else {
@@ -87,9 +87,23 @@ struct MobileHarnessApp: App {
         }
     }
 
+    @ViewBuilder
+    private var visualPreview: some View {
+        #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-actions-preview") {
+                ActionActivityVisualPreview()
+            } else {
+                ConversationVisualPreview()
+            }
+        #else
+            EmptyView()
+        #endif
+    }
+
     private var isVisualPreview: Bool {
         #if DEBUG
             ProcessInfo.processInfo.arguments.contains("-conversation-preview")
+                || ProcessInfo.processInfo.arguments.contains("-actions-preview")
         #else
             false
         #endif
@@ -143,7 +157,7 @@ struct MobileHarnessApp: App {
             container.makeMossValidationView()
         } else {
             ConversationView(
-                state: container.conversation, robot: assembly.bluetooth.state,
+                state: container.conversation, robot: assembly.bluetooth.state, activity: container.actionActivity,
                 toggleVoice: container.lifecycle.toggleVoice)
         }
     }

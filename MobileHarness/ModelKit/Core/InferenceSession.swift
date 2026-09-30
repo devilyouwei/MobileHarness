@@ -1,15 +1,18 @@
 import Foundation
 import Synchronization
 
-/// A conservative memory bound: capacity × maximum estimated bytes per event.
+/// Event admission policy. A nil capacity lets finite-generation adapters retain all pending events.
 public struct StreamLimits: Equatable, Sendable {
-    public let capacity: Int
+    public let capacity: Int?
     public let maximumEventBytes: Int
 
-    public init(capacity: Int = 64, maximumEventBytes: Int = 4096) throws {
-        guard capacity > 0, maximumEventBytes > 0,
-            !capacity.multipliedReportingOverflow(by: maximumEventBytes).overflow
-        else { throw CapabilityError.invalidRequest("Invalid stream limits") }
+    public init(capacity: Int? = 64, maximumEventBytes: Int = 4096) throws {
+        guard maximumEventBytes > 0 else { throw CapabilityError.invalidRequest("Invalid stream limits") }
+        if let capacity {
+            guard capacity > 0, !capacity.multipliedReportingOverflow(by: maximumEventBytes).overflow else {
+                throw CapabilityError.invalidRequest("Invalid stream limits")
+            }
+        }
         self.capacity = capacity
         self.maximumEventBytes = maximumEventBytes
     }
@@ -40,7 +43,9 @@ public final class InferenceSession<Event: Sendable>: Sendable {
         estimatedBytes: @escaping @Sendable (Event) -> Int,
         onTermination: @escaping @Sendable (SessionTermination) -> Void = { _ in }
     ) -> (session: InferenceSession<Event>, emitter: InferenceEmitter<Event>) {
-        let pair = AsyncThrowingStream<Event, Error>.makeStream(bufferingPolicy: .bufferingOldest(limits.capacity))
+        let policy: AsyncThrowingStream<Event, Error>.Continuation.BufferingPolicy =
+            limits.capacity.map { .bufferingOldest($0) } ?? .unbounded
+        let pair = AsyncThrowingStream<Event, Error>.makeStream(bufferingPolicy: policy)
         let storage = SessionStorage(
             continuation: pair.continuation, capacity: limits.capacity, onTermination: onTermination)
         pair.continuation.onTermination = { termination in
@@ -144,11 +149,11 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         var capacityWaiter: CheckedContinuation<Void, Error>?
     }
     private let state: Mutex<State>
-    private let capacity: Int
+    private let capacity: Int?
     private let onTermination: @Sendable (SessionTermination) -> Void
 
     init(
-        continuation: AsyncThrowingStream<Event, Error>.Continuation, capacity: Int,
+        continuation: AsyncThrowingStream<Event, Error>.Continuation, capacity: Int?,
         onTermination: @escaping @Sendable (SessionTermination) -> Void
     ) {
         self.capacity = capacity
@@ -175,7 +180,7 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         do {
             return try state.withLock { state in
                 guard let continuation = state.continuation else { throw CapabilityError.sessionClosed }
-                guard state.outstanding < capacity else { throw CapabilityError.bufferOverflow }
+                if let capacity, state.outstanding >= capacity { throw CapabilityError.bufferOverflow }
                 state.outstanding += 1
                 return continuation
             }
@@ -199,7 +204,7 @@ private final class SessionStorage<Event: Sendable>: Sendable {
             try await withCheckedThrowingContinuation { (waiter: CheckedContinuation<Void, Error>) in
                 let result: Result<Void, Error>? = state.withLock { state in
                     guard state.continuation != nil else { return .failure(CapabilityError.sessionClosed) }
-                    if state.outstanding < capacity { return .success(()) }
+                    guard let capacity, state.outstanding >= capacity else { return .success(()) }
                     guard state.capacityWaiter == nil else { return .failure(CapabilityError.bufferOverflow) }
                     state.capacityWaiter = waiter
                     return nil

@@ -112,13 +112,14 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(config.agentID == .assistant)
     #expect(
         config.capabilities.actions.map(\.alias) == [
-            "express", "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance",
+            "express", "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance", "nodHead",
+            "shakeHead",
         ])
     #expect(config.capabilities.channels == ["Display", "Robot", "Speech"])
     #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "runtimeInfo")
     let agent = try AssistantAgent(chat: FixedTextChat())
     let registry = agent.descriptor.capabilities
-    #expect(registry.internalActions.count == 3)
+    #expect(registry.internalActions.count == 1 && registry.internalTools.count == 2)
     #expect(
         registry.permits(
             ActionCall(
@@ -192,7 +193,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(!prompt.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) })
     var generator = AgentGenerator(capabilities: registry, textMapping: AssistantAgent.mapText)
     let events = try generator.append("<wait>Hello.</wait><express emotion='smile'/>") + generator.finish()
-    #expect(events.compactMap(\.actionCall).map(\.actionPath.function) == ["speak", "print", "express"])
+    #expect(events.compactMap(\.actionCall).map(\.actionPath.function) == ["speak", "express"])
     #expect(events[0] == .scheduling(.beginWait))
     #expect(events[3] == .scheduling(.endWait))
 }
@@ -272,9 +273,10 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
             capabilities: model,
             textMapping: { _, _ in
                 Array(
-                    repeating: ActionCall(
-                        actionPath: .init(module: "UI", function: "print"),
-                        channel: "Display", parameters: ["text": "Hi"]), count: count)
+                    repeating: GenerationEvent.action(
+                        ActionCall(
+                            actionPath: .init(module: "UI", function: "print"),
+                            channel: "Display", parameters: ["text": "Hi"])), count: count)
             })
         #expect(throws: GenerationError.limitExceeded) { try invalid.append("Hi<wait></wait>") }
         #expect(throws: GenerationError.closed) { try invalid.finish() }

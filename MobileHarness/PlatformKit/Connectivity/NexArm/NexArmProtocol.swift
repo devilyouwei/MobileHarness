@@ -18,7 +18,20 @@ public struct NexArmPacket: Equatable, Sendable {
         self.payload = payload
     }
     /// Narrow live-control allowlist: finite servo positions, bounded settings poses, or explicit reset.
+    public var isObservedControl: Bool {
+        (id == 255 && ((command == 11 && payload.isEmpty) || (command == 8 && payload.count == 14)))
+            || isHeadControl
+    }
+    private var isHeadControl: Bool {
+        guard id == 4 || id == 5, command == 3, payload.count == 8,
+            payload[0] == 41, payload[1] == 30, payload[4] == 0, payload[5] == 0
+        else { return false }
+        let position = Int(payload[2]) | Int(payload[3]) << 8
+        let speed = Int(payload[6]) | Int(payload[7]) << 8
+        return NexArmJogPlanner.limits[Int(id) - 1].contains(position) && speed == 1400
+    }
     public var isLiveControl: Bool {
+        if isHeadControl { return true }
         if id == 255 && command == 54 { return payload.count == 2 }
         if id == 255 && command == 8 && payload.count == 14 {
             let v = stride(from: 0, to: 14, by: 2).map {
@@ -121,19 +134,24 @@ public struct NexArmArrivalTracker: Sendable {
         .milliseconds(durationMilliseconds + 3000)
     }
     private let target: [Int]
+    private let jointTarget: [Int]?
     private let final: Bool
     private let started: ContinuousClock.Instant
     private let deadline: ContinuousClock.Instant
+    private let earliestObservation: ContinuousClock.Instant
     private var lastFeedback: ContinuousClock.Instant
     private var stableSince: ContinuousClock.Instant?
     private var anchor: [Int]?
     public init(
         target: [Int], final: Bool, started: ContinuousClock.Instant, durationMilliseconds: Int,
-        actionDeadline: ContinuousClock.Instant? = nil
+        actionDeadline: ContinuousClock.Instant? = nil, jointTarget: [Int]? = nil,
+        minimumObservationMilliseconds: Int = 0
     ) {
         self.target = target
+        self.jointTarget = jointTarget
         self.final = final
         self.started = started
+        earliestObservation = started.advanced(by: .milliseconds(minimumObservationMilliseconds))
         let segmentDeadline = started.advanced(by: Self.completionBudget(durationMilliseconds: durationMilliseconds))
         deadline = min(segmentDeadline, actionDeadline ?? segmentDeadline)
         lastFeedback = started
@@ -143,10 +161,14 @@ public struct NexArmArrivalTracker: Sendable {
             return
         }
         lastFeedback = time
-        let arrived =
+        let poseArrived =
             zip(pose.prefix(3), target.prefix(3)).allSatisfy { abs($0 - $1) <= (final ? 5 : 15) }
             && abs(pose[3] - target[3]) <= (final ? 20 : 40)
             && abs(pose[4] - target[4]) <= 2 && abs(pose[5] - target[5]) <= 2
+        let arrived =
+            jointTarget.map { target in
+                target.count == 6 && zip(joints, target).allSatisfy { abs($0 - $1) <= 16 }
+            } ?? poseArrived
         guard arrived else {
             stableSince = nil
             anchor = nil
@@ -160,7 +182,11 @@ public struct NexArmArrivalTracker: Sendable {
         if time >= deadline { return .completionTimeout }
         if time - lastFeedback >= .seconds(2) { return .feedbackTimeout }
         // Only received samples can advance the stable window, never wall-clock waiting alone.
-        if let stableSince, lastFeedback - stableSince >= .milliseconds(final ? 300 : 200) { return .arrived }
+        if lastFeedback >= earliestObservation, let stableSince,
+            lastFeedback - stableSince >= .milliseconds(final ? 300 : 200)
+        {
+            return .arrived
+        }
         return .waiting
     }
 }

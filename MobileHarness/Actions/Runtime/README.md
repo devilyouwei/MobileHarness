@@ -115,3 +115,7 @@ See [authoring standard](../README.md), [scheduling](../../Gateway/Output/Schedu
 ## Action implementation audit
 
 ✅ Runtime remains infrastructure; no namespace-per-Action requirement applies to registry/executor/diagnostic services. Domain audit retains existing definition categories, resources and typed completion validation.
+
+## Action and Tool presentation boundary
+
+✅ ActionArguments now aliases AgentCore.CallArguments, allowing immediate Tools to share argument validation without a dependency on Actions. ❌ No scheduling behavior changes.
