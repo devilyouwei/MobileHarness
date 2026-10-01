@@ -8,6 +8,7 @@ import UI
 
 /// Explicit simulation. Default tests never create a CoreBluetooth manager or move physical hardware.
 private actor BluetoothArmFixture: NexArmBluetoothLink {
+    var ik = NexArmTestIK()
     nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
     private let emit: AsyncStream<NexArmBluetoothSnapshot>.Continuation
     nonisolated let id = UUID()
@@ -153,24 +154,34 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     func write(_ packet: NexArmPacket) throws {
         guard liveSession == nil else { throw CancellationError() }
         guard snapshot.phase == .connected else { throw NexArmError.disconnected }
-        if packet.command == 8 {
-            writes += 1
+        if packet.isArmControl {
+            let intent = try ik.intent(packet)
+            let isReset = intent.payload[6] == 200 && (feedbackCommands.isEmpty || resetHeight != 197)
+            if isReset {
+                feedbackCommands.append(packet)
+                if loseLinkOnFeedback {
+                    loseLinkOnFeedback = false
+                    loseConnection()
+                    throw NexArmError.timeout
+                }
+            }
+            if !isReset { writes += 1 }
             if loseLinkOnMotion {
                 loseLinkOnMotion = false
                 loseConnection()
                 throw NexArmError.timeout
             }
             if failMotion || failFeedback { throw NexArmError.timeout }
-            let p = packet.payload
+            let p = intent.payload
             let target = stride(from: 0, to: 12, by: 2).map {
                 Int(Int16(bitPattern: UInt16(p[$0]) | UInt16(p[$0 + 1]) << 8))
             }
             x = target[1]
             y = target[2]
-            z = target[3]
+            z = isReset ? resetHeight : target[3]
             pitch = target[0]
             roll = target[4]
-            claw = target[5]
+            // Arm motion preserves independently measured claw state.
             wrist = 2048 + roll * 11
             return
         }
@@ -204,6 +215,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     {
         guard liveSession == nil else { throw CancellationError() }
         guard snapshot.phase == .connected else { throw NexArmError.disconnected }
+        if packet.command == 7 { return try ik.reply(packet) }
         if packet.command == 1 {
             versionReads += 1
             if let reportedVersion { return try NexArmPacket(command: 1, payload: reportedVersion) }
@@ -291,7 +303,7 @@ func bluetoothSettingsConnectionPersistsAcrossNavigationAndAssistantExecutes() a
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .connected)
     #expect(workflow.state.remembered?.id == link.id)
-    #expect(await link.feedbackCommands.map(\.command) == [54, 51, 51, 51])
+    #expect(await link.feedbackCommands.map(\.command) == [131, 51, 51, 51])
     #expect(
         await link.feedbackCommands.dropFirst().map { Int($0.payload[1]) | Int($0.payload[2]) << 8 } == [
             1957, 2139, 2048,
@@ -487,7 +499,7 @@ func bluetoothPoseProtocolConnectsWithoutFirmwareQueriesAndAssistantExecutes() a
     #expect(workflow.state.controlReady)
     #expect(workflow.state.notice == "已连接，可以返回对话控制机械臂")
     #expect(await link.versionReads == 0)
-    #expect(await link.feedbackCommands.map(\.command) == [54, 51, 51, 51])
+    #expect(await link.feedbackCommands.map(\.command) == [131, 51, 51, 51])
     #expect(await link.writes == 0)
     workflow.openPage()
     workflow.closePage()
@@ -537,7 +549,7 @@ func bluetoothBackgroundJoinsConnectionResetWithoutStartingWristOrDeclaringReady
     #expect(workflow.state.phase == .indicating && !workflow.state.controlReady)
     workflow.setForeground(false)
     await workflow.waitUntilIdle()
-    #expect(await link.feedbackCommands.map(\.command) == [54])
+    #expect(await link.feedbackCommands.map(\.command) == [131])
     #expect(workflow.state.phase == .idle && !workflow.state.controlReady)
     #expect(await link.status().phase == .disconnected)
     observer.cancel()
@@ -569,11 +581,11 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     #expect(workflow.state.motionStatus == "连接提示动作未确认完成")
     workflow.openPage()
     await workflow.waitUntilIdle()
-    #expect(await link.feedbackCommands.map(\.command) == [54])
+    #expect(await link.feedbackCommands.map(\.command) == [131])
     await link.configure()
     await workflow.refreshDevice()
     #expect(workflow.state.joints.count == 6)
-    #expect(await link.feedbackCommands.map(\.command) == [54])
+    #expect(await link.feedbackCommands.map(\.command) == [131])
     #expect(await link.writes == 0)
     #expect(await link.connects == 1)
     observer.cancel()
@@ -608,7 +620,7 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     let controller = NexArmController(link: link)
     await #expect(throws: NexArmError.uncertainMotion) { try await controller.indicateConnection() }
     await #expect(throws: NexArmError.uncertainMotion) { try await controller.indicateConnection() }
-    #expect(await link.feedbackCommands.map(\.command) == [54])
+    #expect(await link.feedbackCommands.map(\.command) == [131])
     await link.close()
 }
 
@@ -816,7 +828,7 @@ func bluetoothLiveBackpressureDoesNotAccumulateCommandsAndResetPreemptsPreset() 
     try await until { await link.writes >= 1 }
     let before = ContinuousClock.now
     workflow.tryAction(.reset)
-    try await until { await link.liveCommands.contains { $0.command == 54 } }
+    try await until { await link.liveCommands.contains { $0.isArmControl } }
     #expect(ContinuousClock.now - before < .seconds(1))
     await workflow.waitUntilIdle()
     await #expect(throws: CancellationError.self) { try await action.value }
@@ -994,7 +1006,7 @@ func bluetoothConnectionGestureTransportTimeoutRecoversWithoutRepeatingReset() a
     #expect(workflow.state.controlReady)
     #expect(workflow.state.error == nil)
     #expect(await link.connects == 2)
-    #expect(await link.feedbackCommands.map(\.command) == [54])
+    #expect(await link.feedbackCommands.map(\.command) == [131])
     workflow.disconnect()
     await workflow.waitUntilIdle()
     observer.cancel()
@@ -1016,7 +1028,7 @@ func bluetoothResetRetiresPendingObservationWithoutClosingLiveControls() async t
     let action = Task { try await workflow.performGesture(.wave, repetitions: 1) }
     try await until(attempts: 700) { await link.waitingForPose }
     workflow.tryAction(.reset)
-    try await until { await link.liveCommands.contains { $0.command == 54 } }
+    try await until { await link.liveCommands.contains { $0.isArmControl } }
     await workflow.waitUntilIdle()
     await #expect(throws: CancellationError.self) { try await action.value }
     workflow.setMotorVelocity(id: 4, value: 1)
@@ -1050,7 +1062,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     await link.configure()
     workflow.tryAction(.reset)  // The fixture emits no reset completion response.
     await workflow.waitUntilIdle()
-    #expect(await link.liveCommands.contains { $0.command == 54 })
+    #expect(await link.liveCommands.contains { $0.isArmControl })
     #expect(workflow.state.controlReady)
     try await workflow.performGesture(.wave, repetitions: 1)
     #expect(workflow.state.error == nil)
@@ -1150,9 +1162,9 @@ func bluetoothSettingsTestsSendImmediatelyWithoutTelemetryAndNewClickPreempts() 
     await workflow.waitUntilIdle()
     let packets = await link.liveCommands
     #expect(packets.count == 4)  // Retired wave start, then new start/body/end; no stale wave body.
-    #expect(packets.allSatisfy { $0.command == 8 && $0.isLiveControl })
-    let roll = Int(Int16(bitPattern: UInt16(packets[2].payload[8]) | UInt16(packets[2].payload[9]) << 8))
-    #expect(roll == -40)
+    #expect(packets.allSatisfy { $0.isArmControl && $0.isLiveControl })
+    let wristTarget = Int(packets[2].payload[36]) | Int(packets[2].payload[37]) << 8
+    #expect(wristTarget == 2048 - 40 * 11)
     #expect(await link.poseReads == reads)
     #expect(await link.writes == 0)  // No ACK-based preset path.
     #expect(workflow.state.error == nil && !workflow.state.testing)
@@ -1183,7 +1195,7 @@ func bluetoothSettingsCongestionRetainsOnlyLatestTestAndResetCancelsEnding() asy
     workflow.tryAction(.reset)
     await workflow.waitUntilIdle()
     let commands = await link.liveCommands
-    #expect(commands.map(\.command) == [8, 54])
+    #expect(commands.map(\.command) == [131, 131])
     try await Task.sleep(for: .milliseconds(900))
     #expect(await link.liveCommands == commands)
     #expect(!workflow.state.testing && workflow.state.error == nil)

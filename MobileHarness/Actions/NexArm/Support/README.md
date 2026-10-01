@@ -20,3 +20,7 @@ flowchart LR
 ✅ Registrations own each operation's required displayName alongside its handler and completion contract. Execution records carry this value; no App or UI switch enumerates domain actions. ❌ This is human-readable metadata, not model permission or a SwiftUI dependency.
 
 ✅ Cartesian Action completion metadata now describes Settings-matched timed playback and fresh final-home observation. Head entries retain calibrated per-segment completion. ❌ Final home does not prove intermediate waypoint arrival.
+
+✅ Performance completion metadata now explicitly describes arm-only arrival, excluding claw angle/motor6. Cartesian and native head completion still await the owning controller. ❌ No gripper-completion or grasp-success guarantee is added.
+
+✅ Performance completion metadata now states arm-only output: gripper commands and gripper convergence are excluded from every gesture. ❌ Dedicated grasp completion remains a separate future capability.

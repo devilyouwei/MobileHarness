@@ -1,5 +1,7 @@
 # NexArm — Robot Arm Actions and Lifecycle
 
+> Current outbound contract (ADR0090): all arm actions and home write only explicitly listed motors1–5. Older CMD8/CMD54 descriptions below are historical; geometry intents must be compiled before transport. The gripper is excluded from both commands and completion.
+
 Purpose: declare finite robot arm Actions, validate arguments, and execute device behavior through typed callbacks injected by App. Design goals: keep Actions independent of Bluetooth and serial implementations, await actual completion, bound queues and execution deadlines, and report failures and interruptions accurately.
 
 The “Complete lifecycle” section defines the current production flow. The earlier USB diagnostic sections retain their separate constraints and do not describe current phone performance behavior.
@@ -71,13 +73,29 @@ flowchart TD
     Time -->|Caller cancelled| Cancel[Stop unsent frames after joined current frame]
 ```
 
-Capacity is one active controller operation and one immutable plan of at most20 frames (three dance cycles); competing calls reject busy. Each admitted packet is sent once. Transport backpressure retries only an unadmitted packet, every25ms for at most1s. Next-frame timing starts at actual admission; late wakeups never emit catch-up bursts. No per-frame position queries, error compensation or intermediate-arrival waits occur. The final nominal duration is joined before starting observation; older telemetry cannot establish final completion. Push feedback gets200ms before query fallback (at most5Hz). Final XYZ tolerance is5mm, pitch/roll/claw2°, with all six encoders stable within2counts for300ms. Silence2s and final observation3s are independent limits; a fixed total deadline sums nominal durations,1s admission per frame and3s final observation. Legacy links retain their own bounded write/exchange delay.
+Capacity is one active controller operation and one immutable plan of at most20 frames (three dance cycles); competing calls reject busy. Each admitted packet is sent once. Transport backpressure retries only an unadmitted packet, every25ms for at most1s. Next-frame timing starts at actual admission; late wakeups never emit catch-up bursts. No per-frame position queries, error compensation or intermediate-arrival waits occur. The final nominal duration is joined before starting observation; older telemetry cannot establish final completion. Push feedback gets200ms before query fallback (at most5Hz). Final XYZ tolerance is5mm and pitch/roll2°, with arm encoders1–5 stable within2counts for300ms; claw completion is excluded. Silence2s and final observation3s are independent limits; a fixed total deadline sums nominal durations,1s admission per frame and3s final observation. Legacy links retain their own bounded write/exchange delay.
 
 ✅ Completion means the finite plan was submitted and final home was observed, **not** proof that every intermediate waypoint was reached. Cancellation joins the current finite frame (and final observation if already entered), then prevents later frames without sending a rollback. Takeover/disconnect invalidates the observation token. UI receives the final measured pose, without an extra query.
 
 Head gestures retain calibrated home/ready preparation, native motor4/5 trajectories and per-segment observation. Their Cartesian-to-servo handoff still requires fresh arrival after nominal duration; the independent watchdogs and final-home tolerance remain. See the [controller contract](../../PlatformKit/Connectivity/NexArm/README.md#settings-matched-cartesian-channel-playback-current).
 
-❌ Physical BLE confirmation of the jitter repair, intermediate trajectory tracking and device-side stop/watchdog remain outstanding.
+✅ The user reports the installed phone repair eliminated the symptom. Supervised USB dance comparisons reproduced jitter and timeout with intermediate stability waits alone, but not with queries or extra frames alone; see [physical evidence](../../../docs/NexArm_Physical_Acceptance.md#motor2-jitter-supervised-single-factor-usb-comparison). ❌ Underlying servo holding-loop causes, isolated celebration, endurance, intermediate trajectory tracking and device-side stop/watchdog remain unverified.
+
+### Authoring NexArm Actions: avoid these patterns
+
+The jitter repair belongs primarily to **PlatformKit**, in `NexArmController.performCartesianPlayback` and the shared Cartesian frame factory. `NexArmActions` owns typed argument validation and awaits the injected whole-gesture callback. `Support/NexArmActionModules` declares the completion contract; App binds the callback to its long-lived Workflow. Gateway retains whole-Action Channel ordering and NexArm exclusion. Do not move device timing or transport access into the Action handler.
+
+| Avoid | Required approach / reason |
+| --- | --- |
+| Loop over Cartesian waypoints in an Action and await stable pose after each one | Submit one typed gesture to the device owner. Continuous presets advance on nominal durations; only final home is verified. Holding a hunting intermediate pose can prolong jitter until the stability gate times out. |
+| Treat `try await perform(...)` as the source of the jitter and remove it | Keep this whole-operation await through final observation and cleanup. Returning early would release exclusion while the device is still active. |
+| Use unjoined `Task`/`Task.detached`, an Action-local command queue, or split the gesture into independently scheduled waypoint Actions | Keep one finite operation and one device owner. Gateway owns Action scheduling; the controller owns the bounded frame plan. |
+| Add arbitrary settling sleeps, replay a sent packet on missing feedback, or burst overdue frames to catch up | Reuse the controller's bounded admission and deadlines. Only a packet not yet admitted may retry; uncertainty must propagate without automatic motion replay. |
+| Copy Settings' latest-request replacement into Channel execution, or return success immediately after a write | Channel preserves admitted Actions and awaits fresh stable final home. Settings has a separate manual takeover/submission-only contract. |
+| Remove all observation gates, including native head preparation/handoff | Nod/shake require measured calibration and Cartesian-to-servo handoff. The continuous Cartesian fix is not a blanket rule for all robot operations. |
+| Assume posture queries caused the jitter, or independently poll the transport from an Action | Queries alone did not reproduce this USB symptom. Passive feedback and bounded query fallback belong to PlatformKit; current Cartesian playback queries only during final observation. This is not proof that arbitrary query rates are harmless. |
+
+✅ Preserve cancellation checks around the awaited callback, propagate errors, and keep completion metadata honest: submitted Cartesian frames plus observed final home do not prove every intermediate waypoint was reached. Regression tests must cover shared Settings packets/cadence, fresh final feedback, exclusion across Channels and no automatic motion replay. ❌ Simulated tests cannot establish physical smoothness; new trajectories or completion-policy changes require separate supervised hardware acceptance.
 
 ### Cancellation, manual takeover and failure cleanup
 
@@ -98,7 +116,7 @@ flowchart TD
     Cleanup --> Result["Return cancellation or failure; no rollback or automatic replay"]
 ```
 
-**Ordinary conversation cancellation is not an immediate physical stop.** Cancelling a Swift task does not withdraw an already committed segment; its segment and overall deadlines still apply. Cancellation does not automatically send home; reset requires a new explicit operation. Settings reset sends CMD54 without awaiting a reset-completion reply or claiming confirmed home arrival. Reconnection does not replay the original Action. Physical effects after execution failure or cancellation are conservatively reported as unknown.
+**Ordinary conversation cancellation is not an immediate physical stop.** Cancelling a Swift task does not withdraw an already committed segment; its segment and overall deadlines still apply. Cancellation does not automatically send home; reset requires a new explicit operation. Settings reset sends an arm-only synchronous home target without awaiting a completion reply or claiming confirmed home arrival. Reconnection does not replay the original Action. Physical effects after execution failure or cancellation are conservatively reported as unknown.
 
 ### Settings tests and acceptance boundaries
 
@@ -180,3 +198,13 @@ Earlier ±2° base text above describes the retained USB diagnostic only and is 
 ❌ No new trajectory, validation default, queue or physical completion guarantee is added by source consolidation.
 
 ✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
+
+## Arm completion scope (2026-10-01)
+
+✅ Performance gestures verify XYZ, pitch, roll and stability of motors1–5. Claw angle and motor6 stability are excluded from both Cartesian final-home and head preparation/native/final gates: these Actions do not promise gripper completion. Existing packets (including their claw field), timing, arm tolerances, fresh-feedback requirements, cancellation and deadlines are unchanged. A dedicated gripper Action must declare its own completion scope; do not copy this exclusion into gripper operations. This supersedes references above to all-six-encoder performance completion. ❌ This does not repair or calibrate a gripper, verify grasping, or establish physical emergency stopping. See [ADR0089](../../../docs/adr/0089-nexarm-arm-completion-scope.md).
+
+## Gripper exclusion for every arm action and home
+
+✅ All performance Actions and return-home operations control only motors1–5. PlatformKit now compiles pose geometry using read-only device IK into explicitly addressed arm-only packets; merely excluding the claw from arrival checks is insufficient. Action authors must use the injected whole-operation callback, must not send six-axis CMD8/CMD50/CMD54, and must not copy the current claw angle into an arm action. Explicit manual gripper control remains separate. Settings and Channel share the compiler, with no intermediate Cartesian stability waits. See [ADR0090](../../../docs/adr/0090-nexarm-arm-only-motion-packets.md).
+
+❌ A dedicated grasp Action with its own completion contract is not implemented.

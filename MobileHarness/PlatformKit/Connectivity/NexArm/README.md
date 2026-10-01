@@ -1,6 +1,8 @@
 # NexArm connectivity
 
-> Current status (2026-09-30): Cartesian conversation gestures now share Settings packets/cadence and verify final home only; see the current playback contract below. Head gestures retain calibrated per-segment observation. Phone acceptance of the jitter repair is pending.
+> Current outbound contract (ADR0090): all arm actions and home write only explicitly listed motors1–5. Older CMD8/CMD54 descriptions below are historical; geometry intents must be compiled before transport. The gripper is excluded from both commands and completion.
+
+> Current status (2026-09-30): Cartesian conversation gestures share Settings packets/cadence and verify final home only; see the current playback contract below. Head gestures retain calibrated per-segment observation. The user reports the phone symptom resolved; supervised USB dance comparisons isolate intermediate stability waits as sufficient to reproduce jitter and timeout. Endurance and underlying holding-loop causes remain unverified.
 
 
 Purpose: communicate with the connected NexArm from macOS and verify supervised wrist/base motion. Design goals: public POSIX serial APIs, actor-owned lifetime, bounded parsing, no dependencies and motion through production Actions, user-requested controls or explicitly enabled controller diagnostic tests.
@@ -308,6 +310,16 @@ flowchart LR
 
 ## Settings-matched Cartesian Channel playback (current)
 
+### Ownership and regression traps
+
+✅ PlatformKit owns frame construction, transport admission, nominal timing, observation sessions, query fallback and physical completion interpretation. Actions validate typed requests and await the injected whole-operation callback; their registration metadata describes the result. App owns bindings/lifecycle and Gateway owns Channel/module exclusion. See [Action authoring pitfalls](../../../Actions/NexArm/README.md#authoring-nexarm-actions-avoid-these-patterns).
+
+Do not reintroduce intermediate `awaitArrival` calls or fixed settling pauses into continuous Cartesian playback. USB single-factor dance trials reproduced motor2 hunting and timeout with stability waits and **zero motion-time queries**; query-only and extra-frame-only trials were smooth. The wait prolongs holding at a hunting pose and can prevent progression; it does not issue alternating targets. This evidence does not identify the underlying servo/firmware/load cause. Do not remove the whole-Action await, final-home gate, or native head calibration/handoff gates as a workaround.
+
+During Cartesian playback, BLE notifications continue updating the bounded latest-telemetry cache, but the controller does not inspect intermediate convergence or actively query; an observation session is ownership fencing, not a continuous arrival watchdog. After the final nominal duration, exclude older feedback and require fresh stable home. Query only when fresh notifications are quiet for200ms, after the initial200ms grace, at most5Hz. Preserve final silence2s and observation3s bounds. The normal controller has no diagnostic20ms sampler; that sampler belongs only to the supervised USB causal test. Query restoration is not required by the causal result and must not create a second owner or unbounded polling work.
+
+✅ The user reports the installed phone repair resolved the symptom; [supervised USB evidence](../../../../docs/NexArm_Physical_Acceptance.md#motor2-jitter-supervised-single-factor-usb-comparison) separates waits, queries and extra frames. ❌ Isolated celebration, endurance and the underlying holding-loop cause remain unverified. No PID, deceleration, torque or filter change was tested.
+
 Purpose: preserve the Settings motion sequence that the user reports is smooth during repeated celebration/dance, while retaining whole-Action scheduling and honest completion. This section supersedes earlier per-waypoint observation and home→ready→body→ready→home contracts **for Cartesian presets only**. No cause of motor2 oscillation is asserted from simulated tests.
 
 ✅ `settingsTestFrames()` and Channel `performGesture()` use one `cartesianPlaybackFrames(repetitions:)` factory for base sway, wave, tilt, look-around, celebrate and dance. Single-cycle CMD8 packets are byte-identical: ready400ms, body800ms each, home600ms. Channel repetitions repeat only the body1...3 times (tilt once); maximum20 frames. Controller actor admits one operation and rejects overlap; the plan is immutable, with no additional queue. Settings retains its latest-request replacement; Channel never silently replaces admitted Actions.
@@ -327,10 +339,34 @@ flowchart TD
 
 ✅ Production BLE/USB retain a single observation session across the plan, fencing Settings takeover/disconnect. Motion sends use the same native no-response transport as Settings on BLE. There are **no position queries, telemetry-based corrections or intermediate arrival waits during playback**, including the final600ms home movement. One admitted motion is never resent. Backpressure retries only an unadmitted packet every25ms for at most1s. A late admission delays the following frame's deadline rather than causing a burst of overdue targets. Compatibility validation still occurs once per controller before motion.
 
-Final observation begins after the final nominal duration. Pre-observation telemetry is excluded, and fresh push updates get200ms before CMD11 query fallback at most5Hz. Success requires home XYZ within5mm, pitch/roll/claw within2°, and all six encoders within2counts of an anchor over300ms of received feedback. Final silence2s and observation3s remain independent deadlines; the fixed total budget is the sum of nominal frame durations plus1s admission per frame plus3s final observation (single dance:16.8s; maximum three-cycle dance:38.4s). Host wakeup delays can extend practical timing; generic legacy links also retain bounded in-flight write/exchange delays.
+Final observation begins after the final nominal duration. Pre-observation telemetry is excluded, and fresh push updates get200ms before CMD11 query fallback at most5Hz. Success requires home XYZ within5mm, pitch/roll within2°, and arm encoders1–5 within2counts of an anchor over300ms of received feedback; claw completion is excluded. Final silence2s and observation3s remain independent deadlines; the fixed total budget is the sum of nominal frame durations plus1s admission per frame plus3s final observation (single dance:16.8s; maximum three-cycle dance:38.4s). Host wakeup delays can extend practical timing; generic legacy links also retain bounded in-flight write/exchange delays.
 
 Cancellation is checked between frames; a retained task joins the in-flight frame's bounded admission/duration and final observation if entered, then no remaining frame is sent. Cancellation never issues an automatic rollback or torque command. Send/observation errors release the session and report uncertainty; new explicit requests retain ADR0080 admission policy. Completion means submitted playback plus observed home, **not proof of intermediate waypoint arrival or a physical stop**. No physical safety claim depends on iOS staying active.
 
 ✅ Nod/shake retain their calibrated home/ready/native/home path and per-segment observation, because native servo centers and Cartesian handoff need measured preparation. Tests compare exact Cartesian packet arrays and cadence, prohibit queries before final duration, reject cached-only completion and blocked admission, and hold another scheduled NexArm Action until final home is confirmed across different Channels.
 
-❌ Physical phone acceptance after this repair and device-side emergency-stop/watchdog validation remain outstanding. The user's smooth Settings result is comparative evidence, not measured controller timing. See [ADR0088](../../../../docs/adr/0088-nexarm-settings-matched-playback.md).
+❌ Repeated-cycle BLE endurance and device-side emergency-stop/watchdog validation remain outstanding. User-reported phone smoothness and the USB comparisons above do not establish every intermediate trajectory or firmware control-loop behavior. See [ADR0088](../../../../docs/adr/0088-nexarm-settings-matched-playback.md).
+
+## Arm-only performance arrival (2026-10-01)
+
+✅ `NexArmArrivalTracker` retains strict six-axis behavior by default. Only the performance controller selects `includeClaw: false`: Cartesian pose gates still check XYZ/pitch/roll; native head targets and stability check motors1–5. Claw angle and motor6 stability cannot block these arm gestures. All six feedback values remain decoded/validated and exposed; outbound packets, gripper targets, nominal timing, calibrated head handoff, arm thresholds and deadlines are unchanged. Earlier all-six-encoder performance text is superseded by this scope.
+
+USB reproduced a celebration that sent all six frames and reached arm home but timed out with claw−6° against the unrelated0°±2° predicate. The same predicate can reject head preparation before its native sweeps. See [ADR0089](../../../../docs/adr/0089-nexarm-arm-completion-scope.md). ✅ Regression tests distinguish default strict behavior, arm-only Cartesian/native completion and retained arm stability/deadline gates. ❌ No gripper calibration/obstruction diagnosis or verified grasp completion is claimed.
+
+## Arm-only packets (current, supersedes outbound CMD8/CMD54 descriptions above)
+
+Purpose: arm gestures and home must not control the gripper. ✅ `NexArmArmPlan` prepares bounded device IK (CMD7, at most64 entries per connection), validates returned arm targets, and compiles Settings/Channel geometry into one48-byte synchronous packet listing only motors1–5. Native head/wrist/base diagnostics address their selected arm motor. Reset and connection home use this compiler; no whole-device reset is sent. Speeds are bounded1...1400 with acceleration30. This changes Cartesian interpolation to joint-space endpoint movement; nominal cadence and final observation remain as documented.
+
+✅ Live/observed allowlists reject CMD8/CMD54 and malformed or motor6-containing sync packets. `settingsTestFrames()` returns geometry intents: **always compile before sending**. Never “preserve” the gripper by copying its current angle into a six-axis command. Only the explicit manual motor6 control may address it. Preparation happens before live playback; failed IK/MTU validation cannot fall back to whole-device motion. Connection readiness, reset and action completion ignore motor6 stability while retaining full feedback validation. Settings estimates preserve its encoder value and remain distinct from measured feedback.
+
+```mermaid
+flowchart LR
+    Geometry[Shared gesture geometry] --> IK[Read-only device IK before motion]
+    IK --> Cache[Validated connection-local targets bounded64]
+    Cache --> Compiler[Arm-only compiler]
+    Compiler --> Sync[One synchronous write listing IDs1–5]
+    Sync --> Cadence[Nominal cadence with no intermediate waits]
+    Cadence --> Observe[Fresh arm-only final completion]
+```
+
+✅ USB home/celebration/dance acceptance and unit regressions; see [ADR0090](../../../../docs/adr/0090-nexarm-arm-only-motion-packets.md). ❌ BLE endurance and load-dependent trajectory quality still require acceptance.

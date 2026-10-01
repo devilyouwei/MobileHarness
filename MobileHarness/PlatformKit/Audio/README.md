@@ -22,13 +22,13 @@ Keep this README and stream continuity tests current when changing audio code. C
 
 The AVAudioEngine tap produces microphone frames into a 64-element `AsyncThrowingStream` using `bufferingOldest`; the App capture task consumes them. Tap requests are 1024 samples, but actual callback size is validated separately (1...8192 samples). Sequence numbers are allocated under a mutex. When yield reports a dropped frame, the stream finishes with `AudioIOError.overflow`; the pipeline must stop rather than continue with an unnoticed gap. This stream is not a fixed-duration buffer because hardware sample rate/frame size vary. `stopCapture` removes the tap, stops the engine and finishes the stream.
 
-Playback admits one active stream, with at most three scheduled buffers of up to 262,144 mono samples each. Capacity suspension supplies backpressure; final completion awaits all dataPlayedBack callbacks. Tokens fence stale callbacks, cancellation wakes capacity/drain waiters, and queued-duration-plus-three-second watchdogs bound missing hardware completion. There is no audio mixing or simultaneous playback of different Actions.
+Playback admits one active stream, with at most three scheduled buffers of up to 262,144 mono samples each. Capacity suspension supplies backpressure; final completion awaits all dataPlayedBack callbacks. Tokens fence stale callbacks, cancellation wakes capacity/drain waiters, and queued-duration-plus-three-second watchdogs bound missing hardware completion. This watchdog starts when a PCM buffer is scheduled; it does not time an empty upstream PCM read. There is no audio mixing or simultaneous playback of different Actions.
 
 ```mermaid
 flowchart LR
     Tap[Audio callback] -->|yield| Frames[64-frame stream]
     Frames -->|for await| Capture[App capture loop]
-    Action[Speech Action] -->|await play| Player[One scheduled PCM buffer]
+    Action[Speech Action] -->|await play| Player[At most three scheduled PCM buffers]
     Player -->|played back / timeout / cancel| Action
 ```
 

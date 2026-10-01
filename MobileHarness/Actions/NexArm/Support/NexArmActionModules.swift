@@ -11,49 +11,49 @@ public struct NexArmGestureActionModule: ActionModule {
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "nodHead"), displayName: "点头", kind: .finite,
                 completion:
-                    "Observed home preparation, repeated single-motor sweep with encoder arrival, and observed stable home ending."
+                    "Observed arm-home preparation, repeated single-motor sweep with arm encoder arrival, and observed stable arm-home ending; the gripper is neither commanded nor part of completion."
             ) { [perform] invocation in
                 try await NexArmActions.nodHead(invocation: invocation, using: perform)
             },
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "shakeHead"), displayName: "摇头", kind: .finite,
                 completion:
-                    "Observed home preparation, repeated single-motor sweep with encoder arrival, and observed stable home ending."
+                    "Observed arm-home preparation, repeated single-motor sweep with arm encoder arrival, and observed stable arm-home ending; the gripper is neither commanded nor part of completion."
             ) { [perform] invocation in
                 try await NexArmActions.shakeHead(invocation: invocation, using: perform)
             },
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "waveWrist"), displayName: "挥手", kind: .finite,
                 completion:
-                    "Settings-matched timed Cartesian playback, followed by fresh stable final-home telemetry; intermediate waypoints are not individually verified."
+                    "Settings-matched timed arm-only playback without gripper commands, followed by fresh stable final arm-home telemetry; intermediate waypoints are not individually verified."
             ) { [perform] invocation in
                 try await NexArmActions.waveWrist(invocation: invocation, using: perform)
             },
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "tiltWrist"), displayName: "歪头", kind: .finite,
                 completion:
-                    "Settings-matched timed Cartesian playback, followed by fresh stable final-home telemetry; intermediate waypoints are not individually verified."
+                    "Settings-matched timed arm-only playback without gripper commands, followed by fresh stable final arm-home telemetry; intermediate waypoints are not individually verified."
             ) { [perform] invocation in
                 try await NexArmActions.tiltWrist(invocation: invocation, using: perform)
             },
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "lookAround"), displayName: "左右张望", kind: .finite,
                 completion:
-                    "Settings-matched timed Cartesian playback, followed by fresh stable final-home telemetry; intermediate waypoints are not individually verified."
+                    "Settings-matched timed arm-only playback without gripper commands, followed by fresh stable final arm-home telemetry; intermediate waypoints are not individually verified."
             ) { [perform] invocation in
                 try await NexArmActions.lookAround(invocation: invocation, using: perform)
             },
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "celebrate"), displayName: "庆祝", kind: .finite,
                 completion:
-                    "Settings-matched timed Cartesian playback, followed by fresh stable final-home telemetry; intermediate waypoints are not individually verified."
+                    "Settings-matched timed arm-only playback without gripper commands, followed by fresh stable final arm-home telemetry; intermediate waypoints are not individually verified."
             ) { [perform] invocation in
                 try await NexArmActions.celebrate(invocation: invocation, using: perform)
             },
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "dance"), displayName: "跳舞", kind: .finite,
                 completion:
-                    "Settings-matched timed Cartesian playback, followed by fresh stable final-home telemetry; intermediate waypoints are not individually verified."
+                    "Settings-matched timed arm-only playback without gripper commands, followed by fresh stable final arm-home telemetry; intermediate waypoints are not individually verified."
             ) { [perform] invocation in
                 try await NexArmActions.dance(invocation: invocation, using: perform)
             },
@@ -70,7 +70,7 @@ public struct NexArmBaseActionModule: ActionModule {
             ActionDefinition(
                 path: ActionPath(module: "NexArm", function: "shakeBase"), displayName: "底座晃动", kind: .finite,
                 completion:
-                    "Bounded base sequence with observed final position; production Cartesian playback shares Settings frames and verifies stable final home."
+                    "Bounded base sequence with observed final position; production Cartesian playback shares Settings frames and verifies stable final arm home, excluding claw completion."
             ) { [move] invocation in
                 try await NexArmActions.shakeBase(invocation: invocation, using: move)
             }

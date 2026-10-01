@@ -12,13 +12,15 @@ flowchart LR
     Player --> Done[Hardware drain then release]
 ```
 
-✅ Production `Speech.speak` accepts only `audioID`. SpeechActions.speak validates the audio ID; SpeechPlayback validates source/session/input ownership and obtains a single-consumer lease only when scheduled. Initial and intermediate empty PCM reads wait for synthesis progress; producer failure or cancellation wakes the reader immediately. The synthesis Agent retains its 60-second execution deadline. Actual playback completion releases cached PCM. Cancellation propagates to the individual synthesis job; input/session cancellation handles pending jobs too.
+✅ Production `Speech.speak` accepts only `audioID`. SpeechActions.speak validates the audio ID; SpeechPlayback validates source/session/input ownership and obtains a single-consumer lease only when scheduled. Initial and intermediate empty PCM reads wait for synthesis progress; producer failure or cancellation wakes the reader immediately. Production reads have no independent first-frame or midstream deadline. The synthesis Agent retains its 60-second deadline from execution start, excluding its queue time; speak therefore has no fixed total PCM-wait timeout. Frames leave Storage as the player reads them; actual playback completion releases the single-use handle. Cancellation propagates to the individual synthesis job; input/session cancellation handles pending jobs too.
 
-✅ Gateway has no speech preparation or prevalidation stage. The App output consumer releases remaining source/input audio after reply completion/error dispatch has joined Actions, and when dispatch fails; session teardown cancels session audio, and runtime teardown closes the store. Pending audio does not expire while waiting for its Action. SpeechPlayback owns only the scheduled playback operation; its error/cancellation path releases the current audio ID.
+✅ Gateway has no speech preparation or prevalidation stage. The App output consumer releases remaining source/input audio after reply completion/error dispatch has joined Actions, and when dispatch fails; session teardown cancels session audio, and runtime teardown closes the store. Pending audio does not expire while waiting for its Action. The reply owner is the originating source/input, not the whole multi-turn voice session. Generation completion alone does not release unplayed audio. The hardware watchdog is separate: each scheduled buffer allows queued audio duration plus three seconds for playback completion. SpeechPlayback owns only the scheduled playback operation; its error/cancellation path releases the current audio ID.
 
 ✅ Removed the obsolete text-to-synthesis helper. SpeechActions.swift now contains only the audioID playback Action. Speech failure, playback cancellation and text-boundary tests now exercise SpeechSynthesisAgent plus audioID playback; there is no legacy synthesis implementation in Actions.
 
 ❌ Persistent/repeatable audio and real iPhone latency, Bluetooth and sustained playback acceptance remain outstanding.
+
+超时通过共享 audioID 的缓存失败传到等待中的或下一次 PCM 读取，再沿播放调用链抛回 Action；Agent 不直接通知或调用 Action。计时边界、尚未播放时的终态错误保留及清理顺序见 [合成执行超时与错误传递](../../Agents/SpeechSynthesis/README.md#synthesis-timeout-propagation)。
 
 ## Authoring standard
 
@@ -32,7 +34,7 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 
 ✅ SpeechActionModule owns Speech.speak metadata and binds SpeechPlaybackCapability. Session-owned playback still owns audio checkout/drain/release; no new playback actor or queue is created. Adding behavior using this existing capability changes the module, not App registration. ❌ New playback primitives may require capability/adapter changes.
 
-✅ ActionAuthoringTests exercises invalid/extra/oversized arguments before effects, typed UUID handoff, original dependency errors and cancellation after an effect. Existing SpeechPlaybackTests and VoiceTests exercise drain, starvation and cancellation using the canonical Action decoder. ❌ Real-device completion remains separately validated.
+✅ ActionAuthoringTests exercises invalid/extra/oversized arguments before effects, typed UUID handoff, original dependency errors and cancellation after an effect. Existing SpeechPlaybackTests and VoiceTests exercise hardware-drain handoff, delayed first/midstream PCM beyond the former three-second limit, explicit opt-in read deadlines, synthesis execution timeout and cancellation using the canonical Action decoder. ❌ Real-device completion remains separately validated.
 
 ## Source organization
 

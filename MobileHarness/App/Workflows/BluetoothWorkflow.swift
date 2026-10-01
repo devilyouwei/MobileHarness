@@ -62,6 +62,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private var motion: Task<Void, any Error>?
     private var liveTask: Task<Void, Never>?
     private var motorInputs = Array(repeating: 0.0, count: 6)
+    private var armPlan: NexArmArmPlan?
     private var jogPlanner: NexArmJogPlanner?
     private var resetRequested = false
     private var controlRevision = UUID()
@@ -257,6 +258,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.scanning = false
         state.joints = []
         jogPlanner = nil
+        armPlan = nil
         state.pose = []
         state.sampledAt = nil
         state.controlValidated = false
@@ -306,8 +308,10 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.error = nil
         state.notice = nil
         _ = try await candidate.verifyCompatibility()
+        let preparedPlan = try await candidate.prepareArmControl()
         try Task.checkCancellation()
         guard foreground, token == generation else { throw CancellationError() }
+        armPlan = preparedPlan
         reconnectEnabled = true
         try await remember(device)
         let ready = await link.status()
@@ -351,6 +355,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             }
             if !indicationUnconfirmed { state.motionStatus = "连接提示已完成" }
         }
+        armPlan = preparedPlan
         reconnectEnabled = true
         try await remember(device)
         try Task.checkCancellation()
@@ -391,6 +396,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         controller = nil
         state.joints = []
         jogPlanner = nil
+        armPlan = nil
         state.pose = []
         state.sampledAt = nil
         state.controlValidated = false
@@ -567,7 +573,10 @@ public final class BluetoothWorkflow: BluetoothControlling {
             case .dance: gesture = .dance
             case .reset: return
             }
-            do { testFrames = try gesture.settingsTestFrames() } catch {
+            do {
+                guard let armPlan, let jogPlanner else { throw NexArmError.invalidMotion }
+                testFrames = try armPlan.compile(gesture.settingsTestFrames(), from: jogPlanner.targets.map { Int($0) })
+            } catch {
                 state.error = Self.message(error)
                 return
             }
@@ -639,13 +648,15 @@ public final class BluetoothWorkflow: BluetoothControlling {
                         throw CancellationError()
                     }
                     if resetRequested {
-                        let packet = try NexArmPacket(command: 54, payload: [0xD0, 0x07])
+                        guard let armPlan, let planner = jogPlanner else { throw NexArmError.invalidMotion }
+                        let packet = try armPlan.home(from: planner.targets.map { Int($0) }).packet
                         let submittedID = testID
                         if try await link.sendLive(packet, session: token) {
                             guard submittedID == testID else { continue }
                             resetRequested = false
                             state.resetting = false
-                            jogPlanner = try NexArmJogPlanner(positions: NexArmJogPlanner.home)
+                            jogPlanner = try NexArmJogPlanner(
+                                positions: NexArmArmPlan.applying(packet, to: planner.targets.map { Int($0) }))
                             state.motionStatus = "已发送重置指令"
                             stalledSince = nil
                         } else {
@@ -656,12 +667,16 @@ public final class BluetoothWorkflow: BluetoothControlling {
                             let submittedID = testID
                             if try await link.sendLive(frame.packet, session: token) {
                                 if submittedID == testID {
+                                    guard let planner = jogPlanner else { throw NexArmError.invalidMotion }
+                                    jogPlanner = try NexArmJogPlanner(
+                                        positions: NexArmArmPlan.applying(
+                                            frame.packet, to: planner.targets.map { Int($0) }))
                                     testFrames.removeFirst()
                                     testDue = .now.advanced(by: .milliseconds(frame.milliseconds))
                                     if testFrames.isEmpty {
                                         state.testing = false
                                         state.motionStatus = "已发送\(testLabel)全部指令"
-                                        jogPlanner = try NexArmJogPlanner(positions: NexArmJogPlanner.home)
+
                                     }
                                 }
                                 stalledSince = nil

@@ -53,8 +53,11 @@ private func telemetryPacket(_ pose: [Int]) throws -> NexArmPacket {
 
 /// Simulated notification-capable device; no real Bluetooth/serial use.
 private actor ObservableArmFixture: NexArmObservableLink {
+    var ik = NexArmTestIK()
     enum Mode { case push, queryOnly, silent, cachedOnly }
     var mode: Mode
+    var independentClaw = false
+    func offsetClaw() { independentClaw = true }
     var cache = NexArmTelemetryCache()
     var session: UUID?
     var pose = [200, 0, 200, 0, 0, 0]
@@ -80,17 +83,19 @@ private actor ObservableArmFixture: NexArmObservableLink {
     func endObservation(_ token: UUID) { if session == token { session = nil } }
     func sendObserved(_ packet: NexArmPacket, session token: UUID) throws -> Bool {
         guard session == token else { throw CancellationError() }
-        if packet.command == 8 {
+        if packet.isArmControl {
+            let intent = try ik.intent(packet)
             if let blockedUntil, ContinuousClock.now < blockedUntil { return false }
             guard packets.count < 40 else { throw NexArmError.overflow }
             packets.append(packet)
             sentAt.append(.now)
             if let trajectoryEnds, ContinuousClock.now < trajectoryEnds { earlyHandoffs += 1 }
-            let duration = Int(packet.payload[12]) | Int(packet.payload[13]) << 8
+            let values = ik.words(intent.payload)
+            let duration = values[3] == 200 ? 600 : (values[1] == 200 && values[2] == 0 && values[4] == 0 ? 400 : 800)
             trajectoryEnds = .now.advanced(by: .milliseconds(duration))
             writes += 1
             let v = stride(from: 0, to: 12, by: 2).map {
-                Int(Int16(bitPattern: UInt16(packet.payload[$0]) | UInt16(packet.payload[$0 + 1]) << 8))
+                Int(Int16(bitPattern: UInt16(intent.payload[$0]) | UInt16(intent.payload[$0 + 1]) << 8))
             }
             pose = [v[1], v[2], v[3], v[0], v[4], v[5]]
             if mode == .push || mode == .cachedOnly { try publish() }
@@ -105,7 +110,16 @@ private actor ObservableArmFixture: NexArmObservableLink {
         return true
     }
     private func publish() throws {
-        try cache.receive(telemetryPacket(pose).bytes)
+        var reported = pose
+        if independentClaw { reported[5] = -6 }
+        var payload = try telemetryPacket(reported).payload
+        if independentClaw {
+            // An unrelated gripper can move while the five arm joints are stable.
+            let encoder = (cache.latest?.sequence ?? 0).isMultiple(of: 2) ? 1977 : 2000
+            payload[22] = UInt8(encoder & 255)
+            payload[23] = UInt8(encoder >> 8)
+        }
+        try cache.receive(NexArmPacket(command: 11, payload: payload).bytes)
         lastPush = .now
     }
     func latestObservation(after sequence: UInt64, session token: UUID) throws -> NexArmTelemetry? {
@@ -115,11 +129,66 @@ private actor ObservableArmFixture: NexArmObservableLink {
         return latest
     }
     func exchange(_ packet: NexArmPacket, replyID: UInt8, replyCommand: UInt8, replyCount: Int) throws -> NexArmPacket {
-        #expect(packet.command == 1)  // Compatibility only; completion never uses a blocking exchange.
+        if packet.command == 7 { return try ik.reply(packet) }
+        if packet.command == 11 { return try telemetryPacket(pose) }
+        #expect(packet.command == 1)  // Exchanges are preparation-only, never during playback.
         return try NexArmPacket(command: 1, payload: [1, 0, 2, 1, 0, 2])
     }
     func write(_ packet: NexArmPacket) throws { throw NexArmError.invalidPacket }
     func close() { session = nil }
+}
+
+@Test func nexArmPerformanceCompletionDoesNotRequireClawConvergence() async throws {
+    let link = ObservableArmFixture(.push)
+    await link.offsetClaw()
+    let controller = NexArmController(link: link)
+    try await controller.performGesture(.tiltLeft, repetitions: 1)
+    #expect(await link.writes == 3)
+    #expect(await controller.latestState.pose[5] == -6)
+    #expect(await controller.motionFailure == nil)
+}
+
+@Test(arguments: [false, true])
+func nexArmArmOnlyArrivalRetainsPoseJointAndDeadlineGates(nativeTarget: Bool) {
+    let start = ContinuousClock.now
+    let pose = [200, 0, 200, 0, 0, 0]
+    let joints = [2048, 2087, 1198, 1238, 2048, 2048]
+    func make(includeClaw: Bool = false) -> NexArmArrivalTracker {
+        NexArmArrivalTracker(
+            target: pose, final: true, started: start, durationMilliseconds: 0,
+            jointTarget: nativeTarget ? joints : nil, includeClaw: includeClaw)
+    }
+    var arm = make()
+    var strict = make(includeClaw: true)
+    var measured = pose
+    measured[5] = -6
+    for n in 0...3 {
+        var movingClaw = joints
+        movingClaw[5] = 1977 + n * 10
+        let time = start.advanced(by: .milliseconds(n * 100))
+        arm.observe(pose: measured, joints: movingClaw, at: time)
+        strict.observe(pose: measured, joints: movingClaw, at: time)
+    }
+    #expect(arm.outcome(at: start.advanced(by: .milliseconds(300))) == .arrived)
+    #expect(strict.outcome(at: start.advanced(by: .milliseconds(300))) == .waiting)
+    for axis in 0..<5 {
+        var unstable = make()
+        for n in 0...3 {
+            var moved = joints
+            moved[axis] += n * 4
+            unstable.observe(pose: measured, joints: moved, at: start.advanced(by: .milliseconds(n * 100)))
+        }
+        #expect(unstable.outcome(at: start.advanced(by: .milliseconds(300))) == .waiting)
+    }
+    var missed = make()
+    var outside = measured
+    outside[0] += 6
+    var outsideJoints = joints
+    outsideJoints[3] += 17
+    for n in 0...30 {
+        missed.observe(pose: outside, joints: outsideJoints, at: start.advanced(by: .milliseconds(n * 100)))
+    }
+    #expect(missed.outcome(at: start.advanced(by: .seconds(3))) == .completionTimeout)
 }
 
 @Test(arguments: [NexArmGesture.tiltLeft, .celebrate, .dance])
@@ -128,7 +197,8 @@ func nexArmChannelReusesSettingsPacketsAndCadenceBeforeFinalObservation(_ gestur
     let controller = NexArmController(link: link)
     let began = ContinuousClock.now
     try await controller.performGesture(gesture, repetitions: 1)
-    let frames = try gesture.settingsTestFrames()
+    let plan = try await controller.prepareArmControl()
+    let frames = try plan.compile(gesture.settingsTestFrames(), from: NexArmJogPlanner.home)
     #expect(ContinuousClock.now - began >= .milliseconds(frames.reduce(0) { $0 + $1.milliseconds }))
     #expect(await link.packets == frames.map(\.packet))
     let times = await link.sentAt

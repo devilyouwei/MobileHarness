@@ -170,3 +170,7 @@ These are **dated decision records**, including proposals and stages later repla
 - ✅ [0087 — Producer-owned speech deadline](0087-speech-producer-deadline.md): PCM reads follow producer completion/failure/cancellation without a default three-second cutoff; synthesis and hardware deadlines remain. ❌ Audible device acceptance remains pending.
 
 - ✅ [0088 — Settings-matched NexArm Cartesian playback](0088-nexarm-settings-matched-playback.md): shared finite plan/cadence, final-home observation and retained whole-Action exclusion; ❌ physical phone acceptance pending.
+
+- ✅ [0089: NexArm arm completion scope](0089-nexarm-arm-completion-scope.md) excludes unrelated gripper state from performance completion while retaining strict generic tracking.
+
+- ✅ [0090 — NexArm arm-only motion packets](0090-nexarm-arm-only-motion-packets.md): read-only device IK, explicit motors1–5, gripper-independent reset and Settings estimates. ❌ Loaded-arm/BLE endurance acceptance.

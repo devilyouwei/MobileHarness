@@ -502,7 +502,7 @@ flowchart LR
     Advance --> Tree
 ```
 
-Channel queues are task-local; equal names across Agents do not impose cross-task FIFO. Resource exclusion is process-wide. A wait affects one Agent/session/input, never unrelated tasks. finish seals root input and joins accepted work; errors cancel that task's tree and cooperative running work. No queued device action is silently discarded on capacity exhaustion. Speech prefetch remains outside this schedule and retains cache deadlines.
+Channel queues are task-local; equal names across Agents do not impose cross-task FIFO. Resource exclusion is process-wide. A wait affects one Agent/session/input, never unrelated tasks. finish seals root input and joins accepted work; errors cancel that task's tree and cooperative running work. No queued device action is silently discarded on capacity exhaustion. Speech synthesis remains outside this schedule, with a per-job execution deadline and reply-owned unplayed cache lifetime; pending/ready audio has no expiry timer.
 
 ✅ Bounded nested wait groups, streaming execution, local FIFO, global module exclusion and cancellation barriers. ❌ Priority, preemption, rollback and cross-task synchronization. Exact capacities and failure fencing belong in [Scheduling](Gateway/Output/Scheduling/README.md); protocol rules belong in [Generation](Agents/Core/Generation/README.md). ADR 0059 records this change.
 
@@ -546,11 +546,12 @@ sequenceDiagram
     OG->>IG: validate and deliver
     IG->>S: receive request
     S->>C: reserve audioID for source / session / input
+    S->>S: enqueue in bounded FIFO; start if worker idle
     S-->>IG: admitted
     IG-->>OG: delivery receipt
     OG-->>A: admission receipt
     par Synthesis path
-        S->>M: synthesize text and locale
+        S->>M: when FIFO worker starts, synthesize with 60 s execution deadline
         loop ordered audio events
             M-->>S: PCM frame or finished
             S->>C: append frame / complete audioID
@@ -564,7 +565,7 @@ sequenceDiagram
         C-->>P: single-use PCM stream
         loop as frames become available
             P->>C: read next frame
-            C-->>P: PCM or explicit failure
+            C-->>P: PCM when available; otherwise await producer / failure / cancellation
             P->>H: play PCM
         end
         H-->>P: playback drained
@@ -574,11 +575,17 @@ sequenceDiagram
     end
 ```
 
-The Agent waits for **request admission**, not synthesis completion, before emitting `Speech.speak(audioID)`. SpeechSynthesisAgent processes admitted requests in its own serial FIFO and does not inspect Channels; the Gateway's ChannelScheduler independently decides when Actions/Runtime invokes playback. App injects the process-wide ModelKit synthesis capability and one shared audio store into synthesis and playback. The current capability uses the MOSS-TTS-Nano adapter over Core ML; `StorageAudio` adapts PCM and owner identity to the general `Storage` memory primitives. Playback may consume PCM before synthesis finishes, but only as frames arrive: an empty initial or intermediate read waits for the producer, its failure or cancellation. The synthesis Agent owns the 60-second per-request execution deadline; playback does not impose an additional three-second read deadline. MOSS produces native 80 ms audio blocks after prompt prefill; neither block duration nor streaming guarantees a three-second first-audio deadline.
+The Agent waits for **request admission**, not synthesis completion, before emitting `Speech.speak(audioID)`. SpeechSynthesisAgent processes admitted requests in its own serial FIFO and does not inspect Channels; the Gateway's ChannelScheduler independently decides when Actions/Runtime invokes playback. The worker starts the next request after synthesis completes, without waiting for playback.
 
-[ADR 0055](../docs/adr/0055-synthesis-agent-audio-handles.md) and [ADR 0056](../docs/adr/0056-storage-audio-migration.md) record the synthesis/playback split and shared-cache ownership.
+App injects the process-wide ModelKit synthesis capability and one shared audio store into synthesis and playback. The current capability uses the MOSS-TTS-Nano adapter over Core ML; `StorageAudio` adapts PCM and owner identity to the general `Storage` memory primitives.
 
-Successful Action completion means the player has drained and the single-use cache lease has been released. Pending/ready audio has no wall-clock expiry; the reply owner retires unused handles after all Actions complete or the reply is interrupted. Synthesis/cache errors, a missing handle or synthesis execution timeout fail playback explicitly; cancellation and dispatch failure release the owning audio. No audio file, re-synthesis or Channel-driven synthesis reorder is involved. [Assistant](Agents/Assistant/README.md) owns current semantic segmentation; [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Speech playback](Actions/Speech/README.md), [MOSS](ModelKit/Speech/TTS/MossNano/README.md) and [PlatformKit Audio](PlatformKit/Audio/README.md) own their detailed limits and implementation contracts.
+Playback may consume PCM before synthesis finishes, but only as frames arrive: an empty initial or intermediate read waits for the producer, its failure or cancellation. The synthesis Agent owns the 60-second deadline from worker execution start, excluding FIFO queue time. It is neither a cache lifetime nor a total timeout measured from speak checkout; production initial and intermediate PCM reads have no independent deadline. The platform separately bounds scheduled-buffer hardware completion by queued audio duration plus three seconds. MOSS produces native 80 ms audio blocks after prompt prefill; neither block duration nor streaming guarantees a three-second first-audio deadline.
+
+[ADR 0055](../docs/adr/0055-synthesis-agent-audio-handles.md) and [ADR 0056](../docs/adr/0056-storage-audio-migration.md) record the synthesis/playback split. [ADR 0085](../docs/adr/0085-reply-owned-speech-audio.md) and [ADR 0087](../docs/adr/0087-speech-producer-deadline.md) supersede their cache-expiry and PCM-read-timeout policies.
+
+Successful Action completion means the player has drained and the single-use cache lease has been released. Each consumed frame leaves Storage on read; already consumed audio is not preserved for replay. The reply lifetime is one source/input within a voice session, not the full multi-turn session or durable conversation history. Pending/ready audio has no wall-clock expiry; the reply owner retires unused handles after all Actions complete, or during reply error/interruption cleanup. LLM generation completion alone does not release unplayed audio. Synthesis/cache errors, a missing handle or synthesis execution timeout fail playback explicitly; cancellation and dispatch failure release the owning audio. No audio file, re-synthesis or Channel-driven synthesis reorder is involved. [Assistant](Agents/Assistant/README.md) owns current semantic segmentation; [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Speech playback](Actions/Speech/README.md), [MOSS](ModelKit/Speech/TTS/MossNano/README.md) and [PlatformKit Audio](PlatformKit/Audio/README.md) own their detailed limits and implementation contracts.
+
+The synthesis deadline fails the shared audioID; pending or subsequent PCM reads throw, and playback propagates the failure to the Action. This is shared-cache error propagation, not a direct Agent-to-Action callback. See [synthesis timeout propagation](Agents/SpeechSynthesis/README.md#synthesis-timeout-propagation) for timing, cancellation and terminal-error retention.
 
 ### Session, Turn and UI Boundaries
 
@@ -696,3 +703,7 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 ✅ Tools follows the domain layout used by Actions: `System/SystemTools.swift` and `UI/UITools.swift` contain callable functions; domain `Support/` contains registration, injected protocols, types and policy. `Runtime/ToolModules.swift` owns the built-in catalog alongside definition/invocation/registry/executor contracts. See [Tools](Tools/README.md). ❌ Native model Tool transport remains outstanding.
 
 ✅ Cartesian NexArm Channel Actions now share the Settings frame factory and nominal cadence, with no motion-time queries or per-waypoint arrival gates. Whole-Action scheduling waits for fresh stable final home; head gestures retain calibrated per-segment control. See [controller contract](PlatformKit/Connectivity/NexArm/README.md#settings-matched-cartesian-channel-playback-current) and ADR0088. ❌ Phone jitter acceptance remains pending.
+
+### NexArm gripper-independent arm output (ADR0090)
+
+✅ PlatformKit prepares device IK before playback and compiles pose intents into bounded synchronous writes listing motors1–5 only. Settings/Channel/reset/connection indication share this arm-only contract; explicit manual motor6 control remains independent. No raw six-axis CMD8/CMD54 fallback. Settings estimates preserve the gripper, and final completion observes only arm axes. See [ADR0090](../docs/adr/0090-nexarm-arm-only-motion-packets.md). ❌ BLE endurance and loaded-arm trajectory acceptance remain separate.

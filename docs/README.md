@@ -137,3 +137,9 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ [ADR 0087](adr/0087-speech-producer-deadline.md) documents producer-owned PCM waits and regression coverage for delayed synthesis. ❌ Physical playback acceptance remains pending.
 
 ✅ [ADR0088](adr/0088-nexarm-settings-matched-playback.md) records Settings-matched Cartesian Channel playback and final-home completion. The user reports the phone symptom resolved. [Physical acceptance](NexArm_Physical_Acceptance.md) records five supervised USB dance comparisons: intermediate waits alone reproduced motor2 jitter and timeout; queries or extra frames alone did not. ❌ Underlying servo holding-loop causes, isolated celebration and endurance remain unverified.
+
+✅ TTS documentation audit (2026-09-30): Agent admission/FIFO, Speech.speak scheduling, producer-owned waits, hardware completion and per-reply PCM cleanup are aligned across module READMEs and the technical plan. Historical MOSS measurements are preserved with the old read deadline explicitly labeled historical. ❌ These documentation corrections do not establish the cause of reported repetition or abnormal speech.
+
+✅ [ADR0089](adr/0089-nexarm-arm-completion-scope.md) documents arm-only performance completion after reproducing a claw-offset-induced timeout. ❌ This is not gripper calibration or grasp verification.
+
+✅ [ADR0090 — Arm-only motion packets](adr/0090-nexarm-arm-only-motion-packets.md) documents gripper exclusion from all arm motion and home writes. ❌ BLE endurance remains pending.

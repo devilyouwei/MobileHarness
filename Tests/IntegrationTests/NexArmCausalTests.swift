@@ -5,7 +5,7 @@ import Testing
 #if os(macOS)
     /// Supervised, opt-in comparisons only. Never selected by ordinary repository checks.
     private enum CausalTrial: String {
-        case preflight, home, baseline, queries, wait, extra, legacy
+        case preflight, ik, home, baseline, queries, wait, extra, legacy
         var waitsForEachPose: Bool { self == .wait || self == .legacy }
         var queriesDuringMotion: Bool { self == .queries || self == .legacy }
         var addsLegacyFrames: Bool { self == .extra || self == .legacy }
@@ -81,7 +81,7 @@ import Testing
         }
         func write(_ packet: NexArmPacket) async throws {
             try await serial.write(packet)
-            if packet.command == 8 {
+            if packet.isArmControl || (packet.command == 3 && packet.id <= 5) {
                 leg += 1
                 try record("motion", values: packetValues(packet))
             }
@@ -110,7 +110,7 @@ import Testing
             if let sampleFailure { throw sampleFailure }
             let admitted = try await serial.sendObserved(packet, session: session)
             if admitted {
-                if packet.command == 8 {
+                if packet.isArmControl || (packet.command == 3 && packet.id <= 5) {
                     leg += 1
                     try record("motion", values: packetValues(packet))
                 } else if packet.command == 11 {
@@ -236,23 +236,29 @@ import Testing
             }
             try #require(
                 hypot(Double(second.pose[0]), Double(second.pose[1])) <= 450 && (50...600).contains(second.pose[2]))
-            if trial == .home {
-                let home = try #require(causalFrames(gesture, trial: .baseline).last).retimed(3000)
-                try await link.write(home.packet)
-                try await Task.sleep(for: .milliseconds(3200))
+            if trial == .ik {
+                // Vendor CMD_IKINE_RESULT_GET calculates targets without driving servos.
+                let home = try #require(causalFrames(gesture, trial: .baseline).last)
+                let reply = try await link.exchange(
+                    NexArmPacket(command: 7, payload: home.packet.payload),
+                    replyID: 255, replyCommand: 7, replyCount: 24)
+                print("CAUSAL IK bytes=\(reply.payload)")
+            } else if trial == .home {
+                try await controller.resetPosition()
             } else if trial == .baseline {
                 try await controller.performGesture(gesture, repetitions: 1)
             } else if trial != .preflight {
-                try await runCausalVariant(trial, gesture: gesture, link: link)
+                // Historical six-axis causal variants remain data-only; never move the gripper.
+                throw NexArmError.invalidMotion
             }
-            if trial != .preflight {
+            if trial != .preflight && trial != .ik {
                 // A finite target duration does not guarantee that the next serial receipt
                 // is fresh or already settled. Observe final home for up to three seconds.
                 // These read-only queries occur after playback and never replay movement.
                 let start = ContinuousClock.now
                 var finalTracker = NexArmArrivalTracker(
                     target: [200, 0, 200, 0, 0, 0], final: true, started: start,
-                    durationMilliseconds: 0, actionDeadline: start.advanced(by: .seconds(3)))
+                    durationMilliseconds: 0, actionDeadline: start.advanced(by: .seconds(3)), includeClaw: false)
                 while true {
                     let sample = try await controller.readState()
                     finalTracker.observe(pose: sample.pose, joints: sample.joints, at: .now)

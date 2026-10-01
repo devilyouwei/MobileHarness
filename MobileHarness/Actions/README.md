@@ -47,6 +47,8 @@ Every category has admission, execution and terminal success/failure/cancellatio
 
 ### Finite operations
 
+**Await the whole operation, not an invented completion gate for every internal step.** Actions validate arguments and `try await` the injected capability through its documented completion and cleanup. Device trajectory timing, feedback sampling and control-mode handoffs belong to PlatformKit. Do not implement a second per-waypoint stability loop, arbitrary settling sleeps, command replay, or a device queue inside an Action. Do not start an unjoined `Task` and return early: that releases Channel/module exclusion before the effect has finished. Nominal trajectory durations may schedule internal frames, but do not by themselves establish whole-operation success. NexArm Cartesian playback verifies fresh final home; native head gestures retain their measured handoff and segment gates. See [NexArm authoring pitfalls](NexArm/README.md#authoring-nexarm-actions-avoid-these-patterns) before adding robot Actions.
+
 - Await the actual promised endpoint: speaker drain, gesture completion, saved photo, or device-reported arrival within documented tolerance. Enqueuing work or closing an XML tag is not completion.
 - Keep retries, waits and buffers bounded. A duration estimate or `Task.sleep` is not evidence of physical/animation completion; await the owning capability's acknowledgment.
 - Cancellation stops owned work and joins cleanup before releasing execution resources. Already visible/physical effects are not automatically rolled back.

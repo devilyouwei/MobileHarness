@@ -8,7 +8,38 @@ import PlatformKit
 import Testing
 import Tools
 
-private actor NexArmFixture: NexArmLink {
+/// Deliberately simple IK fixture; does not model physical kinematics.
+struct NexArmTestIK {
+    var intents: [[Int]: NexArmPacket] = [:]
+    mutating func reply(_ request: NexArmPacket) throws -> NexArmPacket {
+        let v = words(request.payload)
+        let pose = [v[1], v[2], v[3], v[0], v[4], v[5]]
+        let joints = [2048 + v[2], 2087, 1225 + v[3] - 200, 1238, 2048 + v[4] * 11]
+        intents[joints] = try NexArmPacket(command: 8, payload: request.payload)
+        return try NexArmPacket(
+            command: 7,
+            payload: (pose + joints + [2048]).flatMap {
+                let bits = UInt16(bitPattern: Int16($0))
+                return [UInt8(bits & 255), UInt8(bits >> 8)]
+            })
+    }
+    func intent(_ packet: NexArmPacket) throws -> NexArmPacket {
+        guard packet.isArmControl else { throw NexArmError.invalidPacket }
+        let joints = (0..<5).map { index in
+            let offset = 2 + index * 8
+            return Int(packet.payload[offset + 2]) | Int(packet.payload[offset + 3]) << 8
+        }
+        guard let intent = intents[joints] else { throw NexArmError.invalidPacket }
+        return intent
+    }
+    func words(_ payload: [UInt8]) -> [Int] {
+        stride(from: 0, to: payload.count, by: 2).map {
+            Int(Int16(bitPattern: UInt16(payload[$0]) | UInt16(payload[$0 + 1]) << 8))
+        }
+    }
+}
+
+private actor NexArmFixture: NexArmWritableLink {
     var position = 2110
     var writes = 0
     var roll = 5
@@ -26,20 +57,17 @@ private actor NexArmFixture: NexArmLink {
         if packet.command == 1 {
             return try NexArmPacket(command: 1, payload: wrongFirmware ? [0, 0, 0, 0, 0, 0] : [1, 0, 2, 1, 0, 2])
         }
-        if packet.command == 0x32 {
-            writes += 1
-            if failWrite { throw NexArmError.timeout }
-            #expect(packet.id == 255)
-            #expect(Array(packet.payload.prefix(8)) == Array(repeating: 0, count: 8))
-            #expect(Array(packet.payload.suffix(4)) == [0, 0, 0xE8, 0x03])
-            let delta = Int(Int16(bitPattern: UInt16(packet.payload[8]) | UInt16(packet.payload[9]) << 8))
-            roll += delta
-            position += Int((Double(delta) * 4096 / 360).rounded())
-            return try telemetry()
-        }
         #expect(packet.command == 11)
         position += speed * 10
         return try telemetry()
+    }
+    func write(_ packet: NexArmPacket) throws {
+        #expect(packet.id == 5 && packet.command == 3)
+        writes += 1
+        if failWrite { throw NexArmError.timeout }
+        let target = Int(packet.payload[2]) | Int(packet.payload[3]) << 8
+        roll += Int((Double(target - position) * 360 / 4096).rounded())
+        position = target
     }
     private func telemetry() throws -> NexArmPacket {
         var p = [UInt8](repeating: 0, count: 24)
@@ -142,7 +170,7 @@ private actor NexArmFixture: NexArmLink {
 }
 
 /// Controller simulation for base tests only; no hardware is touched by default checks.
-private actor NexArmBaseFixture: NexArmLink {
+private actor NexArmBaseFixture: NexArmWritableLink {
     private var x = 270
     private var y = 0
     private var base = 2048
@@ -160,18 +188,6 @@ private actor NexArmBaseFixture: NexArmLink {
         if packet.command == 1 {
             return try NexArmPacket(command: 1, payload: wrongFirmware ? [0, 0, 0, 0, 0, 0] : [1, 0, 2, 1, 0, 2])
         }
-        if packet.command == 0x32 {
-            writes += 1
-            if fail { throw NexArmError.timeout }
-            #expect(Array(packet.payload[4..<12]) == Array(repeating: 0, count: 8))
-            #expect(Array(packet.payload.suffix(2)) == [220, 5])
-            let values = stride(from: 0, to: 4, by: 2).map {
-                Int(Int16(bitPattern: UInt16(packet.payload[$0]) | UInt16(packet.payload[$0 + 1]) << 8))
-            }
-            x += values[0]
-            y += values[1]
-            base = 2048 - Int((atan2(Double(y), Double(x)) * 4096 / (2 * .pi)).rounded())
-        }
         readCount += 1
         let values = [x, y, 350, -180, 0, -35, base + (moving ? readCount * 10 : 0), 2048, 2048, 2048, 2048, 1647]
         let payload = values.flatMap { value -> [UInt8] in
@@ -179,6 +195,15 @@ private actor NexArmBaseFixture: NexArmLink {
             return [UInt8(bits & 255), UInt8(bits >> 8)]
         }
         return try NexArmPacket(command: 11, payload: payload)
+    }
+    func write(_ packet: NexArmPacket) throws {
+        #expect(packet.id == 1 && packet.command == 3)
+        writes += 1
+        if fail { throw NexArmError.timeout }
+        base = Int(packet.payload[2]) | Int(packet.payload[3]) << 8
+        let angle = Double(2048 - base) * 2 * .pi / 4096
+        x = Int((270 * cos(angle)).rounded())
+        y = Int((270 * sin(angle)).rounded())
     }
     func close() {}
 }
@@ -340,7 +365,7 @@ private func runNexArmAssistantMarkup(
     let link = NexArmBaseFixture()
     let sweep = try await runNexArmAssistantBase(link: link, cycles: 2)
     #expect(sweep.cycles == 2)
-    #expect(sweep.observed == [2026, 2070, 2048, 2026, 2070, 2048])
+    #expect(sweep.observed == [2025, 2071, 2048, 2025, 2071, 2048])
     #expect(await link.writes == 6)
 }
 
@@ -399,6 +424,8 @@ private actor NexArmFirmwareFixture: NexArmLink {
 
 /// Telemetry simulator only: never opens Bluetooth or serial hardware.
 private actor GestureArmFixture: NexArmWritableLink {
+    private var ik = NexArmTestIK()
+    func intents() throws -> [NexArmPacket] { try commands.filter { $0.isArmControl }.map { try ik.intent($0) } }
     private(set) var joints = [2048, 2087, 1225, 1238, 2048, 2048]
     private(set) var pose = [197, 0, 196, -12, 0, 0]
     private(set) var reached: [[Int]] = []
@@ -459,8 +486,7 @@ private actor GestureArmFixture: NexArmWritableLink {
             }
             return
         }
-        guard packet.id == 255, packet.command == 8, packet.payload.count == 14
-        else { throw NexArmError.invalidPacket }
+        let intent = try ik.intent(packet)
         commands.append(packet)
         if holdFirst && commands.count == 1 {
             await withCheckedContinuation {
@@ -475,10 +501,10 @@ private actor GestureArmFixture: NexArmWritableLink {
         if failWrite { throw NexArmError.timeout }
         if !ignoreTarget && (ignoreFromWrite.map { commands.count < $0 } ?? true) {
             let values = stride(from: 0, to: 12, by: 2).map {
-                Int(Int16(bitPattern: UInt16(packet.payload[$0]) | UInt16(packet.payload[$0 + 1]) << 8))
+                Int(Int16(bitPattern: UInt16(intent.payload[$0]) | UInt16(intent.payload[$0 + 1]) << 8))
             }
             let target = [values[1], values[2], values[3], values[0], values[4], values[5]]
-            if emulateCartesianOwnership {
+            if packet.command == 8 && emulateCartesianOwnership {
                 let duration = Int(packet.payload[12]) | Int(packet.payload[13]) << 8
                 cartesianUntil = .now.advanced(by: .milliseconds(duration))
                 if cartesianTarget == target { return }
@@ -500,6 +526,7 @@ private actor GestureArmFixture: NexArmWritableLink {
         if disturbOtherJoint { pose[2] += 20 }
     }
     func exchange(_ packet: NexArmPacket, replyID: UInt8, replyCommand: UInt8, replyCount: Int) throws -> NexArmPacket {
+        if packet.command == 7 { return try ik.reply(packet) }
         guard packet.command == 11 else { throw NexArmError.invalidPacket }
         let values = pose + joints
         return try NexArmPacket(
@@ -612,7 +639,7 @@ func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) as
     }
     #expect(await fixture.joints[2] == 1225)  // Calibration mismatch must not block completed motion.
     if gesture.motorID == nil {
-        #expect(commands.dropFirst().dropLast().allSatisfy { $0.payload.suffix(2) == [0x20, 0x03] })
+        #expect(commands.dropFirst().dropLast().allSatisfy { $0.isArmControl })
     }
 
 }
@@ -718,7 +745,7 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
     #expect(await fixture.commands.count == 5)
     #expect(
         await fixture.commands.dropFirst().dropLast().allSatisfy {
-            $0.command == 8 && $0.payload.suffix(2) == [0x20, 0x03]
+            $0.isArmControl
         })
 }
 
@@ -751,13 +778,13 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
         }
         func beginObservation() async throws -> UUID { try await serial.beginObservation() }
         func sendObserved(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
-            if packet.command == 8 {
+            if packet.isArmControl {
                 leg += 1
                 let values = stride(from: 0, to: packet.payload.count - 1, by: 2).map {
                     Int(Int16(bitPattern: UInt16(packet.payload[$0]) | UInt16(packet.payload[$0 + 1]) << 8))
                 }
                 print(
-                    "OBSERVED MOTION leg=\(leg) elapsed=\(ContinuousClock.now - started) pitch/XYZ/roll/claw/ms=\(values)"
+                    "OBSERVED MOTION leg=\(leg) elapsed=\(ContinuousClock.now - started) sync-arm-payload=\(values)"
                 )
             }
             if packet.command == 3 && packet.payload.count == 8 {
@@ -827,8 +854,8 @@ func nexArmGestureFailureStopsSequenceButNextExplicitRequestCanStart(_ disturb: 
     #expect(await fixture.pose == [200, 0, 197, -7, 0, 0])
     #expect(await fixture.commands.count == 8)
     // Absolute targets remain exact even though feedback has the measured 9mm / 2.2° bias.
-    #expect(await fixture.commands.first?.payload.prefix(8) == [0, 0, 200, 0, 0, 0, 240, 0])
-    #expect(await fixture.commands.last?.payload.prefix(8) == [0, 0, 200, 0, 0, 0, 200, 0])
+    #expect(try await fixture.intents().first?.payload.prefix(8) == [0, 0, 200, 0, 0, 0, 240, 0])
+    #expect(try await fixture.intents().last?.payload.prefix(8) == [0, 0, 200, 0, 0, 0, 200, 0])
 }
 
 #if os(macOS)
@@ -889,7 +916,7 @@ func nexArmTiltKeepsReadyHeightAndCompletesItsReturn(_ gesture: NexArmGesture) a
     try await controller.performGesture(gesture, repetitions: 1)
     let commands = await fixture.commands
     #expect(commands.count == 3)
-    let values = commands.map { packet in
+    let values = try await fixture.intents().map { packet in
         stride(from: 0, to: 12, by: 2).map {
             Int(Int16(bitPattern: UInt16(packet.payload[$0]) | UInt16(packet.payload[$0 + 1]) << 8))
         }
@@ -908,7 +935,9 @@ func nexArmTiltKeepsReadyHeightAndCompletesItsReturn(_ gesture: NexArmGesture) a
             _ = try await controller.verifyCompatibility()
             for gesture in [NexArmGesture.tiltLeft, .tiltRight] {
                 let began = ContinuousClock.now
-                for frame in try gesture.settingsTestFrames() {
+                let plan = try await controller.prepareArmControl()
+                let state = try await controller.readState()
+                for frame in try plan.compile(gesture.settingsTestFrames(), from: state.joints) {
                     print("SETTINGS SEND \(gesture) elapsed=\(ContinuousClock.now - began)")
                     try await link.write(frame.packet)
                     try await Task.sleep(for: .milliseconds(frame.milliseconds))
@@ -951,7 +980,8 @@ func headSettingsUseOnlyRequestedMotorWithLargeFiniteSweeps(_ gesture: NexArmGes
     let frames = try gesture.settingsTestFrames()
     #expect(frames.count == 7)
     #expect(frames.first?.packet.command == 8 && frames.last?.packet.command == 8)
-    #expect(frames.allSatisfy { $0.packet.isLiveControl })
+    #expect(frames.dropFirst().dropLast().allSatisfy { $0.packet.isLiveControl })
+    #expect(frames.first?.packet.isLiveControl == false)  // Geometry must be compiled before sending.
     let body = Array(frames.dropFirst().dropLast())
     #expect(body.allSatisfy { $0.packet.id == motor && $0.packet.isObservedControl })
     let targets = body.map { Int($0.packet.payload[2]) | Int($0.packet.payload[3]) << 8 }
@@ -1004,7 +1034,7 @@ func headEndingStillRequiresStrictObservedHome(_ gesture: NexArmGesture) async t
         try await controller.performGesture(gesture, repetitions: 1)
     }
     #expect(await fixture.commands.filter { $0.command == 3 }.count == 5)
-    #expect(await fixture.commands.last?.command == 8)
+    #expect(await fixture.commands.last?.isArmControl == true)
     #expect(await controller.motionFailure == .completionTimeout)
 }
 
@@ -1036,4 +1066,62 @@ func headHandoffWaitsForCartesianTrajectoryAndEndsAtDistinctTarget(_ gesture: Ne
     #expect(tracker.outcome(at: start.advanced(by: .milliseconds(900))) == .waiting)
     tracker.observe(pose: pose, joints: joints, at: start.advanced(by: .milliseconds(900)))
     #expect(tracker.outcome(at: start.advanced(by: .milliseconds(900))) == .arrived)
+}
+
+@Test func nexArmAllPresetsCompileToArmOnlyTargetsAndRejectWholeDeviceCommands() throws {
+    var fixture = NexArmTestIK()
+    var plan = NexArmArmPlan()
+    for gesture in NexArmGesture.allCases {
+        for frame in try gesture.settingsTestFrames() where frame.packet.command == 8 {
+            try plan.insert(frame, reply: fixture.reply(NexArmPacket(command: 7, payload: frame.packet.payload)))
+            #expect(!frame.packet.isLiveControl && !frame.packet.isObservedControl)
+        }
+    }
+    var measured = NexArmJogPlanner.home
+    measured[5] = 1647
+    for gesture in NexArmGesture.allCases {
+        let frames = try plan.compile(gesture.settingsTestFrames(), from: measured)
+        for frame in frames {
+            let packet = frame.packet
+            #expect(packet.isLiveControl && packet.isObservedControl)
+            if packet.isArmControl {
+                let ids: [UInt8] = (0..<5).map { packet.payload[2 + $0 * 8] }
+                #expect(ids == [1, 2, 3, 4, 5])
+                var injected = packet.payload
+                injected[34] = 6
+                let bad = try NexArmPacket(id: 254, command: 131, payload: injected)
+                #expect(!bad.isLiveControl && !bad.isObservedControl)
+            } else {
+                #expect(packet.command == 3 && (4...5).contains(packet.id))
+            }
+        }
+    }
+    #expect(try plan.home(from: measured).packet.isArmControl)
+    #expect(try !NexArmPacket(command: 54, payload: [0xD0, 0x07]).isLiveControl)
+    // A deliberately selected manual gripper jog remains available independently.
+    let manual = try NexArmJogPlanner(positions: measured).proposal(id: 6, deflection: 1)
+    #expect(manual?.id == 6)
+    var otherClaw = measured
+    otherClaw[5] = 2600
+    #expect(
+        try plan.compile(NexArmGesture.dance.settingsTestFrames(), from: measured).map(\.packet)
+            == plan.compile(NexArmGesture.dance.settingsTestFrames(), from: otherClaw).map(\.packet))
+    #expect(throws: NexArmError.invalidMotion) {
+        try NexArmArmPlan().compile(NexArmGesture.dance.settingsTestFrames(), from: measured)
+    }
+}
+
+@Test func nexArmIKValidationFailsBeforeMotionForWrongPoseOrInvalidArmJoint() throws {
+    let frame = try #require(NexArmGesture.dance.settingsTestFrames().first)
+    var fixture = NexArmTestIK()
+    let response = try fixture.reply(NexArmPacket(command: 7, payload: frame.packet.payload))
+    for index in [0, 12] {
+        var bytes = response.payload
+        bytes[index] = 255
+        bytes[index + 1] = 127
+        var plan = NexArmArmPlan()
+        #expect(throws: NexArmError.invalidMotion) {
+            try plan.insert(frame, reply: NexArmPacket(command: 7, payload: bytes))
+        }
+    }
 }

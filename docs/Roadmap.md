@@ -705,3 +705,11 @@ Validation: `scripts/check.sh` passed with Xcode Swift 6.4, including the comple
 Validation: `scripts/check.sh` passed (267 IntegrationTests plus other package suites); `scripts/build-ios.sh` passed all four unsigned simulator schemes. The signed Debug physical-device build succeeded. Hardware motion tests and opt-in model evaluations were not run.
 
 Deployment: installed the signed Debug build on the connected iPhone17Pro and verified its process after launch. The first installation attempt lost the phone installation-service connection; a retry succeeded. Visual celebration/dance jitter acceptance remains with the operator.
+
+### 2026-10-01: NexArm completion scope
+
+✅ USB reproduced final-home timeout with valid arm home but claw−6°. Performance completion now excludes claw angle/motor6 while preserving arm thresholds, timing, head handoff and bounded deadlines; generic trackers remain strict. ❌ Gripper calibration/obstruction diagnosis and dedicated grasp completion remain outside this fix. See ADR0089 and physical acceptance for measured validation.
+
+### NexArm arm-only output, 2026-10-01
+
+✅ Read-only device IK plus shared five-motor synchronous compilation removes gripper writes from gestures, home/reset and connection indication; manual gripper remains independent. ✅ USB home/celebration/dance passed with claw unchanged. ❌ Long-duration BLE and loaded-arm trajectory acceptance remain pending; joint-space endpoint timing replaces firmware Cartesian interpolation (ADR0090).

@@ -1,5 +1,7 @@
 # App Workflows
 
+> Current outbound contract (ADR0090): all arm actions and home write only explicitly listed motors1–5. Older CMD8/CMD54 descriptions below are historical; geometry intents must be compiled before transport. The gripper is excluded from both commands and completion.
+
 > Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
 
 
@@ -209,3 +211,9 @@ flowchart LR
 ## Observation ownership
 
 ✅ ActionActivityWorkflow owns only subscription lifetime, forwarding and observation-unavailable handling. It does not inspect ActionPath, translate Channels, infer failure codes or format statuses. Deinitialization cancels its retained task; page lifetime never owns this observation. UI receives AgentCore record values without importing Actions/Gateway. ❌ This stream is not a new OutputGateway command or Agent message; see ADR 0086.
+
+## Arm-only NexArm dispatch
+
+✅ Connection verification prepares the bounded PlatformKit IK table before enabling control. Settings tests and reset compile geometry with the same `NexArmArmPlan` used by Channel Actions; only motors1–5 are written. Command estimates update addressed arm joints after admission and preserve motor6, including interrupted tests and return home. Disconnect/reconnect discards the table. Explicit manual motor6 control remains independent.
+
+❌ BLE endurance remains separate from supervised USB acceptance. See [ADR0090](../../../docs/adr/0090-nexarm-arm-only-motion-packets.md); never restore CMD54 or send geometry intents as raw CMD8.

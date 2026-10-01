@@ -17,10 +17,22 @@ public struct NexArmPacket: Equatable, Sendable {
         self.command = command
         self.payload = payload
     }
-    /// Narrow live-control allowlist: finite servo positions, bounded settings poses, or explicit reset.
+    /// Motion allowlists reject whole-device Cartesian/reset commands that can write the gripper.
     public var isObservedControl: Bool {
-        (id == 255 && ((command == 11 && payload.isEmpty) || (command == 8 && payload.count == 14)))
-            || isHeadControl
+        (id == 255 && command == 11 && payload.isEmpty) || isArmControl || isHeadControl
+    }
+    public var isArmControl: Bool {
+        guard id == 254, command == 131, payload.count == 42, payload[0] == 41, payload[1] == 7 else { return false }
+        for index in 0..<5 {
+            let start = 2 + index * 8
+            guard payload[start] == UInt8(index + 1), payload[start + 1] == 30,
+                payload[start + 4] == 0, payload[start + 5] == 0
+            else { return false }
+            let target = Int(payload[start + 2]) | Int(payload[start + 3]) << 8
+            let speed = Int(payload[start + 6]) | Int(payload[start + 7]) << 8
+            guard NexArmJogPlanner.limits[index].contains(target), (1...1400).contains(speed) else { return false }
+        }
+        return true
     }
     private var isHeadControl: Bool {
         guard id == 4 || id == 5, command == 3, payload.count == 8,
@@ -31,16 +43,7 @@ public struct NexArmPacket: Equatable, Sendable {
         return NexArmJogPlanner.limits[Int(id) - 1].contains(position) && speed == 1400
     }
     public var isLiveControl: Bool {
-        if isHeadControl { return true }
-        if id == 255 && command == 54 { return payload.count == 2 }
-        if id == 255 && command == 8 && payload.count == 14 {
-            let v = stride(from: 0, to: 14, by: 2).map {
-                Int(Int16(bitPattern: UInt16(payload[$0]) | UInt16(payload[$0 + 1]) << 8))
-            }
-            return v[0] == 0 && hypot(Double(v[1]), Double(v[2])) <= 450
-                && (50...600).contains(v[3]) && abs(v[4]) <= 45 && v[5] == 0
-                && (400...800).contains(v[6])
-        }
+        if isHeadControl || isArmControl { return true }
         guard (1...6).contains(id), command == 3, payload.count == 8,
             payload[0] == 41, payload[1] == 30, payload[4] == 0, payload[5] == 0
         else { return false }
@@ -135,6 +138,7 @@ public struct NexArmArrivalTracker: Sendable {
     }
     private let target: [Int]
     private let jointTarget: [Int]?
+    private let includeClaw: Bool
     private let final: Bool
     private let started: ContinuousClock.Instant
     private let deadline: ContinuousClock.Instant
@@ -145,10 +149,11 @@ public struct NexArmArrivalTracker: Sendable {
     public init(
         target: [Int], final: Bool, started: ContinuousClock.Instant, durationMilliseconds: Int,
         actionDeadline: ContinuousClock.Instant? = nil, jointTarget: [Int]? = nil,
-        minimumObservationMilliseconds: Int = 0
+        minimumObservationMilliseconds: Int = 0, includeClaw: Bool = true
     ) {
         self.target = target
         self.jointTarget = jointTarget
+        self.includeClaw = includeClaw
         self.final = final
         self.started = started
         // Stable early feedback can describe a stationary start or an intermediate plateau
@@ -167,18 +172,19 @@ public struct NexArmArrivalTracker: Sendable {
         let poseArrived =
             zip(pose.prefix(3), target.prefix(3)).allSatisfy { abs($0 - $1) <= (final ? 5 : 15) }
             && abs(pose[3] - target[3]) <= (final ? 20 : 40)
-            && abs(pose[4] - target[4]) <= 2 && abs(pose[5] - target[5]) <= 2
+            && abs(pose[4] - target[4]) <= 2 && (!includeClaw || abs(pose[5] - target[5]) <= 2)
+        let observedJoints = Array(joints.prefix(includeClaw ? 6 : 5))
         let arrived =
             jointTarget.map { target in
-                target.count == 6 && zip(joints, target).allSatisfy { abs($0 - $1) <= 16 }
+                target.count == 6 && zip(observedJoints, target).allSatisfy { abs($0 - $1) <= 16 }
             } ?? poseArrived
         guard arrived else {
             stableSince = nil
             anchor = nil
             return
         }
-        if let anchor, zip(joints, anchor).allSatisfy({ abs($0 - $1) <= 2 }) { return }
-        anchor = joints
+        if let anchor, zip(observedJoints, anchor).allSatisfy({ abs($0 - $1) <= 2 }) { return }
+        anchor = observedJoints
         stableSince = time
     }
     public func outcome(at time: ContinuousClock.Instant) -> Outcome {

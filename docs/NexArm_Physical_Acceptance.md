@@ -148,3 +148,47 @@ In C, segment3 commanded `[pitch0, X173, Y100, Z220, roll40, claw0, duration800m
 Local evidence logs (ephemeral): `/tmp/nexarm-causal-A-dance.log`, `/tmp/nexarm-causal-B-dance.log`, `/tmp/nexarm-causal-B2-dance.log`, `/tmp/nexarm-causal-C-dance.log`, `/tmp/nexarm-causal-D-dance.log`, `/tmp/nexarm-causal-E-dance.log`, `/tmp/nexarm-causal-post-B.log`, `/tmp/nexarm-causal-home.log`.
 
 Validation: `scripts/check.sh` passed with full Xcode selected (269 IntegrationTests plus other package suites); `scripts/build-ios.sh` passed all four simulator schemes. An initial check without `DEVELOPER_DIR` selected Command Line Tools and could not find the Metal compiler; the full-Xcode rerun passed. Only diagnostic tests/documentation were added in this investigation; the installed phone repair was not changed.
+
+## 2026-10-01: arm arrival incorrectly depended on gripper completion
+
+The user reported frequent timeout messages, sometimes after apparent home and often with incomplete gestures, and explicitly stopped phone control and authorized supervised control. Read-only USB preflight measured stable XYZ[200,1,198], pitch−1.0°, roll0°, claw−6°, motor6≈1977. No gripper mechanics or calibration diagnosis was established.
+
+An unmodified production celebration sent all six CMD8 frames, including the home target at3.916s. It then failed at7.571s. Fifteen final-window samples kept claw−6° while XYZ[199,1,197], pitch−1.6°...−1.2°, roll0°...1° met arm tolerances. The strict claw0°±2° predicate alone was sufficient to prevent completion. No missed motion frame, loss of feedback or premature whole-action deadline was observed in this run. Head preparation also used the same claw predicate; the old head failure was inferred from code rather than re-executed on hardware.
+
+After selecting arm-only arrival for performance gestures (ADR0089), all outbound packets and durations remained unchanged. Claw stayed−6° throughout these single-cycle USB runs:
+
+| Gesture | Sent segments | Final arm XYZ mm | Pitch / roll | Result |
+| --- | --- | --- | --- | --- |
+| Celebrate | 6 | 199 / 1 / 197 | −1.2° / 0° | PASS,5.658s including checks |
+| Nod | 8 | 199 / 0 / 197 | −1.1° / 0° | PASS |
+| Shake head | 8 | 200 / 0 / 197 | −1.2° / 0° | PASS |
+| Dance | 8 | 200 / 1 / 197 | −1.1° / 0° | PASS,7.053s including checks |
+
+Nod and shake combined took23.870s. The arm ended at home and serial sessions closed. No torque, calibration, PID or firmware setting was modified. These results establish one concrete false-completion dependency and successful shared-controller USB recovery; they do not prove that every reported phone timeout had that cause or establish BLE endurance.
+
+Ephemeral logs: `/tmp/nexarm-oct1-preflight.log`, `/tmp/nexarm-oct1-celebrate.log`, `/tmp/nexarm-oct1-celebrate-fixed.log`, `/tmp/nexarm-oct1-head-fixed.log`, `/tmp/nexarm-oct1-dance-fixed.log`. The new signed iPhone build uses build number2026100101 to distinguish it from previous0.1.0(1) installations.
+
+Validation: full-Xcode `scripts/check.sh` passed (271 IntegrationTests plus other suites), all four `scripts/build-ios.sh` simulator schemes passed, and the signed iPhone build passed. No default check enables physical motion tests. Logs: `/tmp/nexarm-claw-check.log`, `/tmp/nexarm-claw-ios.log`, `/tmp/nexarm-claw-device-build-final.log`.
+
+Device deployment succeeded over Wi-Fi and a separate app-info read verified `dev.mobileharness.app` version0.1.0, build2026100101, installation434621C0-6841-4CC6-9B6B-E9504572FA28. Evidence: `/tmp/nexarm-claw-final-install.json`, `/tmp/nexarm-claw-installed-verified.json`. Installation alone does not establish post-fix phone BLE motion acceptance; the four motion runs above used USB. The app was not launched automatically after installation.
+
+## Arm-only command acceptance (2026-10-01, ADR0090)
+
+User requirement: no gesture or home operation may control the gripper. Phone control was stopped and supervised USB control authorized. No firmware, calibration, torque or gripper setting was changed.
+
+Official firmware source exposes calculation-only CMD7 and raw servo broadcast passthrough (ID254/instruction131). Read-only home IK returned arm joints[2048,2088,1198,1238,2048]. Production now compiles all geometric frames into synchronous writes listing IDs1–5; no motor6 entry, CMD8/CMD50 motion or CMD54 reset is emitted. This changes firmware Cartesian interpolation to bounded joint-space endpoint movement, so earlier smoothness reports cannot automatically certify this version.
+
+| Trial | Result | Final arm XYZ / pitch / roll | Gripper feedback |
+| --- | --- | --- | --- |
+| Arm-only home | PASS, one synchronous write | [200,1,197]mm / −1.1° /0° | −6°; encoder1976–1977 |
+| Celebration | PASS, all6 frames plus fresh stable home | [199,1,197]mm / −1.1° /0° | −6° throughout; encoder1976–1978 |
+| Dance | PASS, all8 frames plus fresh stable home | [199,1,197]mm / −1.1° /0° | −6° throughout; encoder1976–1978 |
+| Nod and shake head | PASS,16 segments total,23.275s | Final shake[200,1,198]mm / −0.9° /0° | −6°; final encoder1977 |
+
+Logs: `/tmp/nexarm-armonly-home.log`, `/tmp/nexarm-armonly-celebrate.log`, `/tmp/nexarm-armonly-dance.log`, `/tmp/nexarm-armonly-head.log`. Celebration telemetry confirms actual intermediate arm movement rather than merely observing an already-home arm. Gripper encoder noise is not evidence of a commanded movement; transmitted packet scope is independently checked.
+
+✅ All trials completed without replay or recovery motion. ❌ Visual smoothness confirmation, phone BLE conversation acceptance of this packet change and endurance are separate from these USB completion results. The home test first invocation omitted its required gesture environment argument and stopped before opening the device; the corrected explicit invocation performed the single recorded home.
+
+✅ Settings compiled playback also passed left/right tilt over USB (5.088s), with final XYZ[199,−1,197]mm, pitch−1.1°, roll0°, claw−6° (`/tmp/nexarm-armonly-settings.log`). `scripts/check.sh` passed, including273 IntegrationTests; `scripts/build-ios.sh` passed all four schemes. Signed iPhone build2026100102 succeeded; installation verification is recorded below when complete.
+
+Installation: signed artifact Info.plist reports `0.1.0 (2026100102)`. The first wireless installation failed with a remote-device connection error. Retry succeeded: `/tmp/nexarm-armonly-install-retry.json` reports `outcome=success`, bundle `dev.mobileharness.app`, installed container `E1896609-2B97-4593-A2FB-B221013E7100`, database sequence2088. Before installation, the phone reported build2026100101. After installation, both normal and exact-bundle/all-app listing calls returned successful but empty app arrays, so **independent device version readback is unavailable**, not verified. The CLI exposes no supported app-bundle file read domain here; no app data or signing settings were altered to work around that. The new app was not automatically launched.

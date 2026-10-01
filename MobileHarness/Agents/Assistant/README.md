@@ -33,7 +33,7 @@ flowchart TD
     Cancel --> Parser
 ```
 
-Speech and captions use different default channels and can run concurrently. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
+Speech is a scheduled Action on its default or explicit Channel; captions are immediate Tools without a Channel and may update while speech is queued or playing. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
 
 ## Configuration and initialization
 
@@ -122,21 +122,21 @@ flowchart LR
 
 | 输出类别 | 调用路径 / Channel | 数据、触发与接收者 |
 | --- | --- | --- |
-| Action | `Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.speak(audioID)`。 |
-| Action | `Speech.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用原 say 的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
-| Action | `UI.print / Display` | 同样的 text 参数，追加回复字幕；与 say 来自同一段自然文本。 |
+| Agent 内部分段事件（尚未发送） | `Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.speak(audioID)`。 |
+| Action | `Speech.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用该文本段的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
+| 无返回值 Tool | `UI.print`，无 Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
 | Action | `express → UI.express / Display` | `parameters["emotion"]` 为 `clear / smile / happy / laugh / thinking / surprised / sad / love / angry / scared / playful`，设置或清除表情。 |
-| Action | `UI.beginReplyTurn / Display` | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
+| 无返回值 Tool | `UI.beginReplyTurn`，无 Channel | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
 | 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。目前不是模型原生 Tool streaming。 |
-| control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。 |
-| control | `agent.finished` | speaking 阶段的展示 Action 完成屏障，释放该输入的 Action 跟踪。 |
+| control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
+| control | `agent.finished` | speaking 阶段的输入完成通知（初始化展示通过 Tool 执行），释放该输入的 Action 跟踪。 |
 | control | `assistant.error: …` | 生成、解析、即时输出等失败；输出流溢出会直接进入 failed 并关闭流，不能保证再塞入错误消息。 |
 
 Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再额外声明 `main`；跨轨同步使用 wait。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
 
 ### Publish / send 数据标准
 
-`communication.publications = []`：Assistant 不广播共享观测。`communication.sends` 只允许以下两种定向消息，目标均为 `speechSynthesis`，均通过 `AgentMessaging.send(message, parent: input, to:)` 经 OutputGateway → InputGateway。发送端身份由绑定端口确定为 `assistant`；parent 是触发该段回复的输入，保留 session/turn/因果链。send 的回执只确认接纳，不等待模型合成或播放。
+`communication.publications = []`：Assistant 不广播共享观测。`communication.sends` 只允许以下两种定向消息，目标均为 `speechSynthesis`，均通过 `AgentMessaging.send(message, parent: input, to:)` 经 OutputGateway → InputGateway。发送端身份由绑定端口确定为 `assistant`；parent 是触发该段回复的输入，保留 session/turn/因果链。send 的回执只确认接纳，不等待模型合成或播放。每段独立创建 audioID；合成 FIFO 与 Action Channel 独立推进，前段未播放完时后段仍可合成。没有自动重发或播放重试。
 
 | contract / version / kind | typed payload 与字段标准 | 时机与失败语义 |
 | --- | --- | --- |
