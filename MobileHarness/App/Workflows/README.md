@@ -183,7 +183,7 @@ flowchart LR
 
 ## Unified Action presentation
 
-✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, forwards shared AgentCore execution snapshots unchanged to UI state, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. UI computes status from finite/state/activity completion semantics; Workflow contains no presentation mapping. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Settings test commands remain outside channel execution history and retain send-only acknowledgments.
+✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, projects AgentCore execution observations into UI-owned display values, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. ActionActivityPresentation maps finite/state/activity semantics and bounded report details into UI display fields. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Settings test commands remain outside channel execution history and retain send-only acknowledgments.
 
 ```mermaid
 flowchart LR
@@ -210,7 +210,7 @@ flowchart LR
 
 ## Observation ownership
 
-✅ ActionActivityWorkflow owns only subscription lifetime, forwarding and observation-unavailable handling. It does not inspect ActionPath, translate Channels, infer failure codes or format statuses. Deinitialization cancels its retained task; page lifetime never owns this observation. UI receives AgentCore record values without importing Actions/Gateway. ❌ This stream is not a new OutputGateway command or Agent message; see ADR 0086.
+✅ ActionActivityWorkflow owns only subscription lifetime, forwarding and observation-unavailable handling. It does not inspect ActionPath, translate Channels, infer failure codes or format statuses. Deinitialization cancels its retained task; page lifetime never owns this observation. UI receives its own display values without importing Actions/Gateway. ❌ This stream is not a new OutputGateway command or Agent message; see ADR 0086.
 
 ## Arm-only NexArm dispatch
 
@@ -237,3 +237,5 @@ flowchart LR
 ✅ NexArm motor movement timeout maps to `timedOut`, separately from stable `targetNotReached`; reports preserve both. Default arrival tolerances and deadline calculations remain in Actions/NexArm, shared by Settings and Channel.
 
 ✅ NexArm presentation handles only currently produced motion-failure cases; obsolete pose/query failure branches were removed with the retired diagnostic APIs.
+
+✅ SpeechPlayback adapts stored-audio ownership; ConversationPresentation owns Agent-specific turn acceptance. ActionActivityPresentation maps execution observations into UI-owned ActionActivityItem values, including all bounded failure details.

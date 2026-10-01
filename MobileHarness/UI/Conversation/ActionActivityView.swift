@@ -1,5 +1,4 @@
 #if os(iOS)
-    import AgentCore
     import SwiftUI
 
     /// Compact multi-channel status with a read-only execution history sheet.
@@ -158,7 +157,7 @@
                         conversation.isReady = true
                         conversation.voicePhase = .idle
                         conversation.assistantReply = "好的，我会先跳舞，再向你挥手。"
-                        let examples: [(String, String, ActionExecutionRecord.Phase)] = [
+                        let examples: [(String, String, ActionActivityItem.Execution.Phase)] = [
                             ("Robot", "跳舞", .running),
                             ("Robot", "挥手", .queued),
                             ("Speech", "朗读回复", .cancelling),
@@ -167,12 +166,13 @@
                         state.replace(
                             revision: 1,
                             records: examples.map { channel, title, phase in
-                                ActionExecutionRecord(
-                                    id: UUID(), path: ActionPath(module: "Fixture", function: "preview"),
-                                    displayName: title,
-                                    source: .assistant, sessionID: UUID(), inputID: UUID(), channel: channel,
-                                    semantics: .finite, phase: phase, endedAt: phase == .failed ? .now : nil,
-                                    failureDescription: phase == .failed ? "动作参数无效" : nil)
+                                ActionActivityItem(
+                                    id: UUID(), title: title, channel: channel,
+                                    status: phase == .failed ? "动作参数无效" : "演示状态",
+                                    issueDescriptions: [], symbol: "circle",
+                                    execution: .init(
+                                        phase: phase, admittedAt: .now,
+                                        startedAt: nil, endedAt: phase == .failed ? .now : nil))
 
                             }, evictedCount: 0)
                     }

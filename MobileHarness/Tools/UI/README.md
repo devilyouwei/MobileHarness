@@ -1,6 +1,6 @@
 # UI Tools
 
-Purpose: immediate presentation effects through OutputGateway and Tools/Runtime. Design goals: explicit text semantics, bounded arguments, session/turn validation and no Channel scheduling. Tools depends only on AgentCore; App supplies typed endpoints and UI owns display state.
+Purpose: immediate presentation effects through OutputGateway and Tools/Runtime. Design goals: explicit text semantics, bounded arguments, session/turn validation and no Channel scheduling. Tools owns its execution contracts; App supplies typed endpoints and UI owns display state.
 
 | Tool | State operation | Argument contract |
 | --- | --- | --- |
@@ -12,9 +12,9 @@ Purpose: immediate presentation effects through OutputGateway and Tools/Runtime.
 | UI.moveEyes | Replace current gaze target | Finite x/y in [-1,1]; negative left/up |
 | UI.showPose | Replace all skeletons; empty people clears | <=3000 UTF-8 bytes, <=6 COCO-17 skeletons |
 
-✅ UIToolModule owns completion-only definitions. UIUpdateCapability and PosePresentationCapability expose typed effects; ToolInvocation retains the trusted envelope. CallArguments decodes keys and values without a dependency on Actions. Cancellation is checked before and after each effect. Completion means state accepted, not animation/rendering finished; no ToolResult is generated.
+✅ UIToolModule owns completion-only definitions. UIUpdateCapability and PosePresentationCapability expose typed effects; ToolInvocation retains opaque host correlation. ToolArguments decodes keys and values without a dependency on Actions. Cancellation is checked before and after each effect. Completion means state accepted, not animation/rendering finished; no ToolResult is generated.
 
-✅ ConversationPresentation retains one turn, closed-transcript/reply flags and at most six sequence entries. App first validates the active session. It rejects old turns, same-ordinal conflicting IDs, wrong sources and non-increasing sequences. Reply/expression require beginReplyTurn. Fresh print sequences append; duplicate sequences never append twice. Only speech updates or Assistant beginReplyTurn can advance the turn. The scheduled expression Action uses this same acceptance policy.
+✅ AppWorkflows.ConversationPresentation retains one turn, closed-transcript/reply flags and at most six sequence entries. App first validates the active session. It rejects old turns, same-ordinal conflicting IDs, wrong sources and non-increasing sequences. Reply/expression require beginReplyTurn. Fresh print sequences append; duplicate sequences never append twice. Only speech updates or Assistant beginReplyTurn can advance the turn. The scheduled expression Action uses this same acceptance policy.
 
 ```mermaid
 flowchart LR
@@ -33,8 +33,10 @@ flowchart LR
 
 ## Source layout
 
-✅ `UITools.swift` groups the seven callable presentation entries. `Support/UIToolModule.swift` owns registrations and typed host capability contracts; `Support/UIToolTypes.swift` owns nested value/error types. `Support/ConversationPresentation.swift` retains the bounded turn/sequence acceptance policy as a separate cohesive implementation. See [Support](Support/README.md).
+✅ `UITools.swift` groups the seven callable presentation entries. `Support/UIToolModule.swift` owns registrations and typed host capability contracts; `Support/UIToolTypes.swift` owns nested value/error types. `App/Workflows/ConversationPresentation.swift` retains the bounded turn/sequence acceptance policy as a separate cohesive implementation. See [Support](Support/README.md).
 
 ❌ This organization adds no rendering acknowledgement, queue or native model Tool transport.
 
 ✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
+
+✅ ToolPoseOverlay is the tool-owned decoded payload. App converts it to the UI overlay value. Conversation source/turn acceptance belongs to AppWorkflows, not Tools.

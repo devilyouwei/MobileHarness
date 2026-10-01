@@ -15,9 +15,9 @@ public struct ExecutionOwner: Hashable, Sendable {
 
 public enum ActionFeedback: Sendable { case none, failuresOnly, terminal }
 
-public enum ActionCompletion: Equatable, Sendable {
+public enum AgentActionCompletion: Equatable, Sendable {
     case completed
-    case report(ActionReport)
+    case report(AgentActionReport)
     case activityStarted(UUID)
     case activityStopped(UUID)
 }
@@ -34,16 +34,16 @@ public struct ActionResult: Sendable, Equatable {
     public let path: ActionPath
     public let status: Status
     public let effect: Effect
-    public let completion: ActionCompletion?
+    public let completion: AgentActionCompletion?
     public let failure: Failure?
-    public var report: ActionReport? {
+    public var report: AgentActionReport? {
         if case .report(let report) = completion { return report }
         return nil
     }
 
     public init(
         executionID: UUID, owner: ExecutionOwner, inputID: UUID, turn: ConversationTurn?, path: ActionPath,
-        status: Status, effect: Effect, completion: ActionCompletion? = nil, failure: Failure? = nil
+        status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil
     ) {
         self.executionID = executionID
         self.owner = owner

@@ -79,8 +79,8 @@ private func lifecycleOwner(_ agent: AgentID = .assistant) -> ExecutionOwner {
 private func lifecycleInvocation(
     owner: ExecutionOwner, path: ActionPath = lifecyclePath, lease: ResourceLease? = nil,
     feedback: ActionFeedback = .terminal
-) throws -> ActionInvocation {
-    try ActionInvocation(
+) throws -> ScheduledAction {
+    try ScheduledAction(
         envelope: OutputEnvelope(
             source: owner.agent, input: AgentInput(sessionID: owner.sessionID, payload: .event("test")),
             output: .actionCall(ActionCall(actionPath: path, channel: "Ordered"))),
@@ -347,7 +347,9 @@ private actor RevocationDevice {
     let input = InputGateway(manager: manager)
     let tools = ToolRegistry()
     let count = LifecycleCounter()
-    try await tools.registerCompletion("move", resources: [armResource]) { _, _ in await count.increment() }
+    try await tools.registerCompletion("move", resources: [ToolResource(rawValue: armResource.rawValue)]) { _, _ in
+        await count.increment()
+    }
     let output = OutputGateway(
         manager: manager, requests: input, tools: tools,
         actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })

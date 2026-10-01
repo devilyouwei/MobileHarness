@@ -9,3 +9,5 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ❌ Native rendering, navigation gestures and physical-device layout/animation acceptance.
 
 ✅ Composed Action history tests preserve all child issue descriptions beyond the compact summary. ❌ Real-device accessibility and long-history visual acceptance remain outstanding.
+
+✅ Action-result translation tests moved to AppWorkflowTests, matching the App-owned mapping boundary.

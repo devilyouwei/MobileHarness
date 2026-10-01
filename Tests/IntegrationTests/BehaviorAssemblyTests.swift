@@ -10,7 +10,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     PosePresentationCapability
 {
     private(set) var emotion: UIActions.Emotion?
-    private(set) var pose: PoseOverlay?
+    private(set) var pose: ToolPoseOverlay?
     func play(audioID: UUID, invocation: ActionInvocation) async throws {}
     func present(_ text: String, invocation: ToolInvocation) async throws {}
     func presentTranscript(_ text: String, invocation: ToolInvocation) async throws {}
@@ -21,7 +21,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
         self.emotion = emotion
     }
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) async throws {}
-    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws { pose = overlay }
+    func present(_ overlay: ToolPoseOverlay, sessionID: UUID) async throws { pose = overlay }
 }
 
 private struct FixtureActionModule: ActionModule {
@@ -58,14 +58,14 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(await endpoint.emotion == .smile)
     let tool = ToolCall(toolPath: "runtimeInfo", arguments: [:])
     let result = try await ToolExecutor(registry: assembly.tools).execute(
-        tool, envelope: behaviorInvocation("express").envelope)
+        tool, envelope: behaviorInvocation("express").testEnvelope)
     #expect(result?.callID == tool.id)
     #expect(result?.isError == false)
     let show = ToolCall(
         toolPath: "UI.showPose", arguments: ["payload": "{\"sequence\":1,\"timestamp\":0,\"rotation\":0,\"people\":[]}"]
     )
     let completion = try await ToolExecutor(registry: assembly.tools).execute(
-        show, envelope: behaviorInvocation("express").envelope)
+        show, envelope: behaviorInvocation("express").testEnvelope)
     #expect(completion == nil)
     #expect(await endpoint.pose?.people.isEmpty == true)
 }
@@ -79,20 +79,20 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 
 @Test func behaviorModulesRejectDuplicatesInvalidPathsAndExcessCapacity() throws {
     let tool = FixtureToolModule(definitions: [ToolDefinition(path: "fixture", handler: { _ in "ok" })])
-    #expect(throws: HarnessError.duplicateHandler) { try ToolRegistry(modules: [tool, tool]) }
+    #expect(throws: ToolRegistryError.duplicateHandler) { try ToolRegistry(modules: [tool, tool]) }
     #expect(throws: ToolRegistrationError.invalidDefinition("bad path")) {
         try ToolRegistry(modules: [
             FixtureToolModule(definitions: [ToolDefinition(path: "bad path", handler: { _ in "" })])
         ])
     }
-    #expect(throws: HarnessError.queueFull) { try ToolRegistry(modules: Array(repeating: tool, count: 33)) }
+    #expect(throws: ToolRegistryError.queueFull) { try ToolRegistry(modules: Array(repeating: tool, count: 33)) }
     let action = FixtureActionModule(definitions: [
         ActionDefinition(
             path: ActionPath(module: "Fixture", function: "apply"), displayName: "测试动作", kind: .state,
             completion: "Committed.",
             handler: { _ in })
     ])
-    #expect(throws: ActionExecutionError.duplicateDefinition(ActionPath(module: "Fixture", function: "apply"))) {
+    #expect(throws: ActionExecutionError.duplicateDefinition(ActionIdentifier(module: "Fixture", function: "apply"))) {
         try ActionRegistry(modules: [action, action])
     }
 }
@@ -110,19 +110,19 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     ])
     let tool = FixtureToolModule(definitions: [
         ToolDefinition(
-            path: "Fixture.read", resources: [resource],
+            path: "Fixture.read", resources: [ToolResource(rawValue: resource.rawValue)],
             handler: { _ in
                 await endpoint.emotion?.rawValue ?? "clear"
             })
     ])
     let assembly = try BehaviorAssembly(actionModules: [action], toolModules: [tool], capabilities: [])
-    #expect(try assembly.actions.definition(for: path).resources == [resource])
-    #expect(await assembly.tools.resources(for: "Fixture.read") == [resource])
+    #expect(try assembly.actions.definition(for: path).resources == [ActionResource(rawValue: resource.rawValue)])
+    #expect(await assembly.tools.resources(for: "Fixture.read") == [ToolResource(rawValue: resource.rawValue)])
     let invocation = ActionInvocation(
         source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
         call: ActionCall(actionPath: path, channel: "main"))
     try await ActionExecutor(registry: assembly.actions).execute(invocation)
     let result = try await ToolExecutor(registry: assembly.tools).execute(
-        ToolCall(toolPath: "Fixture.read", arguments: [:]), envelope: invocation.envelope)
+        ToolCall(toolPath: "Fixture.read", arguments: [:]), envelope: invocation.testEnvelope)
     #expect(result?.value == "smile")
 }

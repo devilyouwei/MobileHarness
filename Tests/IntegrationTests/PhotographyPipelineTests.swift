@@ -196,12 +196,12 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let actions = ChannelScheduler(registry: try testActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
     let tools = ToolRegistry()
     try await tools.registerCompletion("UI.moveEyes") { call, envelope in
-        try await UITools.moveEyes(invocation: ToolInvocation(call: call, envelope: envelope)) { target, _ in
+        try await UITools.moveEyes(invocation: ToolInvocation(call: call, context: envelope)) { target, _ in
             #expect(target.x == 0 && target.y == 0)
         }
     }
     try await tools.registerCompletion("UI.showPose") { call, envelope in
-        try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
+        try await UITools.showPose(call: call, context: envelope) { overlay, _ in
             #expect(overlay.people.isEmpty)
             await recorder.record(overlay.sequence)
         }
@@ -255,7 +255,9 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     )
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
     await #expect(throws: UITools.PoseError.invalidPayload) {
-        try await UITools.showPose(call: call, envelope: envelope) { _, _ in Issue.record("Invalid pose reached UI") }
+        try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { _, _ in
+            Issue.record("Invalid pose reached UI")
+        }
     }
     let point = PoseOverlay.Joint(x: 2500, y: 7500, confidence: 1000)
     #expect(point.sensorPoint(rotation: 0).x == 0.25)
@@ -304,10 +306,10 @@ private struct CrowdPose: PoseCapability {
         return
     }
     #expect((call.arguments["payload"]?.utf8.count ?? Int.max) <= 3000)
-    try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
+    try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
         #expect(overlay.people.count == 6)
         #expect(overlay.people.allSatisfy { $0.count == 17 })
-        #expect(overlay.people[0][0] == PoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
+        #expect(overlay.people[0][0] == ToolPoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
     }
     let gazeEnvelope = try #require(await stream.next())
     guard case .toolCall(let gazeCall) = gazeEnvelope.output else {
@@ -343,7 +345,7 @@ private struct CrowdPose: PoseCapability {
         Issue.record("Missing tool")
         return
     }
-    try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in
+    try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
         #expect(overlay.sequence == 9)
     }
     await agent.stop()
@@ -449,7 +451,9 @@ private actor BlockedPosePublication {
             Issue.record("Missing tool")
             return
         }
-        try await UITools.showPose(call: call, envelope: envelope) { overlay, _ in #expect(overlay.sequence == i) }
+        try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+            #expect(overlay.sequence == i)
+        }
         guard case .toolCall = try #require(await displays.next()).output else {
             Issue.record("Missing gaze Action")
             return

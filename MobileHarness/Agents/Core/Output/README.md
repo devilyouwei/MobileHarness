@@ -62,3 +62,5 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
 ✅ `ActionReport.executionFailure` retains an execution-level timeout alongside all child entries. Its status is failed/partialFailure even when deadline cleanup cancelled an in-flight child; explicit user cancellation remains cancelled.
+
+✅ ActionCall/ToolCall describe Agent intent; Gateway translates them to independent execution requests. AgentActionCompletion/AgentActionReport are delivery values, not execution interfaces. Action execution error protocols and argument readers now belong to Actions/Tools.

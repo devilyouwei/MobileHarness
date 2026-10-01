@@ -1,5 +1,6 @@
 import Actions
 import AgentCore
+import AppWorkflows
 import StorageAudio
 
 /// Explicit implementation metadata for generic scheduler fixtures, not production registration.

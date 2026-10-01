@@ -27,3 +27,5 @@ public static func nodHead(invocation: ActionInvocation, using perform: @escapin
 ```
 
 The domain Support catalog calls `NexArmActions.nodHeadDefinition(handler: ...)` or `completing: ...`. The attribute generates metadata factories, not dependency injection or argument validation. `@Tool(path: "UI.print", title: "print", resources: [])` generates matching Tool factories. Ordinary constructors remain available for runtime-built definitions and tests.
+
+✅ Action factories now construct ActionIdentifier from Actions/Contracts. Tool factories consume Tools-owned definitions; no runtime Agent dependency is generated.

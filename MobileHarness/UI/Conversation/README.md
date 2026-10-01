@@ -47,7 +47,7 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 
 ## Unified channel execution display
 
-✅ `ActionActivityState` receives whole shared execution snapshots forwarded by AppWorkflows. The home footer replaces the robot-only motion label with up to3 channel summaries plus an overflow/history link; concurrent channels retain separate rows. Same-channel parallel work and queued work show counts. Nonfailure terminal summaries hide after3s while history remains available; failures persist until dismissed or superseded by a newer execution in that channel. Dismissal never removes runtime records or cancels Actions. Newer revisions replace older state; dismissed IDs are bounded by retained records.
+✅ `ActionActivityState` receives complete UI-owned display snapshots projected by AppWorkflows. The home footer replaces the robot-only motion label with up to3 channel summaries plus an overflow/history link; concurrent channels retain separate rows. Same-channel parallel work and queued work show counts. Nonfailure terminal summaries hide after3s while history remains available; failures persist until dismissed or superseded by a newer execution in that channel. Dismissal never removes runtime records or cancels Actions. Newer revisions replace older state; dismissed IDs are bounded by retained records.
 
 ✅ `ActionActivityView` exposes a read-only sheet containing all retained active records and the latest100 terminal records, using definition-provided names, exact Channel strings, generic statuses and timestamps without execution IDs or raw arguments; errors display the bounded thrown description. Cancellation pending says “正在取消”; terminal cancellation says “执行前已取消” or “已取消” based on whether execution started; completed settings/state/activity operations do not claim physical completion. Connection readiness remains a separate fallback label, and Settings send-only tests do not feed this Action display. Views own only presentation selection and a wall-clock auto-hide refresh; long-lived observation remains in App. Dynamic Type, VoiceOver labels and system sheet controls are retained; no motion animation is required.
 
@@ -63,7 +63,7 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 
 ## Generic Action presentation
 
-✅ ActionActivityItem stores only its immutable execution record; title, channelTitle, status and symbol are computed. Names come from record.displayName, Channel names remain case-sensitive and unchanged, and phase/completion determine generic wording. Failure descriptions pass through with a generic fallback. No path-to-title, channel-to-device or error-type catalog exists in UI or Workflow.
+✅ ActionActivityItem stores UI-owned display fields and phase/timestamps. AppWorkflows derives title, status, symbol and issue descriptions from runtime observations. Channel names remain case-sensitive and unchanged; no action-path title catalog is needed.
 
 ✅ Summaries aggregate exact Channel names for display across tasks; additionalRunning explicitly represents concurrent work. This is not a shared FIFO or resource-ownership boundary. Version checks, bounded dismissals, three-second success hiding and failure retention remain unchanged. Synthetic previews use the same record-driven presenter.
 
@@ -71,8 +71,10 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 
 ## Composed Action outcomes
 
-✅ ActionActivityItem consumes AgentCore ActionReport only. History shows partial failure counts and an expandable list of every retained leaf problem, with motor/target/feedback where provided. No device or Gateway imports are added.
+✅ History displays partial-failure counts and every retained leaf problem supplied by App, including motor/target/feedback details. UI imports no Action result types.
 
 ❌ Execution retention remains bounded to the runtime history; this is not persistent audit storage.
 
-✅ Action details show whole-execution timeout separately from preserved child issues. UI consumes only AgentCore report values and does not import Action/device policy.
+✅ Action details show whole-execution timeout separately from child issues, using the display strings supplied by App.
+
+✅ ActionActivityItem and its Execution fields are UI-owned display data. AppWorkflows converts runtime observations and result details before state replacement. The action panel imports neither execution modules nor Agent result types.

@@ -23,14 +23,14 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     public var endedAt: Date?
     public var failure: Failure?
     public var failureDescription: String?
-    public var completion: ActionCompletion?
+    public var completion: AgentActionCompletion?
     public var isTerminal: Bool { phase == .succeeded || phase == .failed || phase == .cancelled }
 
     public init(
         id: UUID, path: ActionPath, displayName: String, source: AgentID, sessionID: UUID, inputID: UUID,
         channel: String,
         semantics: Semantics, phase: Phase = .queued, admittedAt: Date = .now, startedAt: Date? = nil,
-        endedAt: Date? = nil, failure: Failure? = nil, completion: ActionCompletion? = nil,
+        endedAt: Date? = nil, failure: Failure? = nil, completion: AgentActionCompletion? = nil,
         failureDescription: String? = nil
     ) {
         self.id = id
@@ -60,9 +60,4 @@ public struct ActionExecutionSnapshot: Sendable {
         self.records = records
         self.evictedCount = evictedCount
     }
-}
-
-/// Optional machine-readable failure classification; presentation uses the thrown error description.
-public protocol ActionExecutionFailureProviding: Error {
-    var actionExecutionFailure: ActionExecutionRecord.Failure { get }
 }

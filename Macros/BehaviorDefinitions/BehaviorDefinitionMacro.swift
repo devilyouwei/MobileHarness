@@ -25,7 +25,7 @@ public struct BehaviorDefinitionMacro: PeerMacro {
                 throw MacroError.missingMetadata
             }
             let metadata = """
-                path: ActionPath(module: \(module), function: "\(name)"), displayName: \(title),
+                path: ActionIdentifier(module: \(module), function: "\(name)"), displayName: \(title),
                 kind: \(kind), completion: \(completion),
                 resolvingResources: \(values["resources"] ?? "nil"),
                 estimatingDuration: \(values["timeout"] ?? "nil")
@@ -49,13 +49,13 @@ public struct BehaviorDefinitionMacro: PeerMacro {
         return [
             DeclSyntax(
                 stringLiteral: """
-                    public static func \(name)Definition(handler: @escaping ToolRegistry.Handler) -> ToolDefinition {
+                    public static func \(name)Definition(handler: @escaping ToolHandler) -> ToolDefinition {
                         ToolDefinition(path: \(path), displayName: \(title), resources: \(values["resources"] ?? "[]"), handler: handler)
                     }
                     """),
             DeclSyntax(
                 stringLiteral: """
-                    public static func \(name)Definition(completing handler: @escaping ToolRegistry.CompletionHandler) -> ToolDefinition {
+                    public static func \(name)Definition(completing handler: @escaping ToolCompletionHandler) -> ToolDefinition {
                         ToolDefinition(path: \(path), displayName: \(title), resources: \(values["resources"] ?? "[]"), completing: handler)
                     }
                     """),

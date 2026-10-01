@@ -1,6 +1,7 @@
 import Actions
 import AgentCore
 import Agents
+import AppWorkflows
 import Foundation
 import Gateway
 import ModelKit
@@ -115,7 +116,7 @@ private func preparedSpeech(
         ]))
     let tools = ToolRegistry()
     try await tools.registerCompletion("UI.print") { call, envelope in
-        try await UITools.print(invocation: ToolInvocation(call: call, envelope: envelope)) { text, _ in
+        try await UITools.print(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
             await probe.displayed(text)
         }
     }
@@ -203,7 +204,7 @@ private func preparedSpeech(
         manager: manager, requests: InputGateway(manager: manager),
         tools: ToolRegistry(), actions: actions
     ) { _ in }
-    try await responses.dispatch(invocation.envelope)
+    try await responses.dispatch(invocation.testEnvelope)
     var iterator = entered.stream.makeAsyncIterator()
     _ = await iterator.next()
     await store.cancel(sessionID: input.sessionID)
@@ -435,16 +436,16 @@ private actor EndpointVADSession: VoiceActivitySession {
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
     let tools = ToolRegistry()
     try await tools.registerCompletion("UI.setVoiceState") { call, envelope in
-        try await UITools.setVoiceState(invocation: ToolInvocation(call: call, envelope: envelope)) { _, _ in }
+        try await UITools.setVoiceState(invocation: ToolInvocation(call: call, context: envelope)) { _, _ in }
     }
     try await tools.registerCompletion("UI.finishTranscript") { call, envelope in
-        try await UITools.finishTranscript(invocation: ToolInvocation(call: call, envelope: envelope)) { _ in
+        try await UITools.finishTranscript(invocation: ToolInvocation(call: call, context: envelope)) { _ in
             await captions.displayed("")
         }
     }
     try await tools.registerCompletion("UI.setTranscript") { call, envelope in
-        #expect(envelope.source == .speechPerception && envelope.sessionID == session)
-        try await UITools.setTranscript(invocation: ToolInvocation(call: call, envelope: envelope)) { text, _ in
+        #expect(envelope.source == AgentID.speechPerception.rawValue && envelope.sessionID == session)
+        try await UITools.setTranscript(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
             await captions.displayed(text)
         }
     }
@@ -559,7 +560,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
     let tools = ToolRegistry()
     try await tools.registerCompletion("UI.beginReplyTurn") { call, envelope in
-        try await UITools.beginReplyTurn(invocation: ToolInvocation(call: call, envelope: envelope)) { _ in
+        try await UITools.beginReplyTurn(invocation: ToolInvocation(call: call, context: envelope)) { _ in
             await probe.displayed("reply and expression cleared atomically")
         }
     }

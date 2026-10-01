@@ -30,8 +30,8 @@ private actor ObservationGate {
     }
 }
 
-private func observationCall(_ path: ActionPath, input: AgentInput, channel: String) -> ActionInvocation {
-    ActionInvocation(source: .assistant, input: input, call: ActionCall(actionPath: path, channel: channel))
+private func observationCall(_ path: ActionPath, input: AgentInput, channel: String) -> ScheduledAction {
+    ScheduledAction(source: .assistant, input: input, call: ActionCall(actionPath: path, channel: channel))
 }
 
 @Test(.timeLimit(.minutes(1))) func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()

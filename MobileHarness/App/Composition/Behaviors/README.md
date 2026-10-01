@@ -29,3 +29,5 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ## Action and Tool presentation boundary
 
 ✅ BehaviorAssembly binds immediate UI tools separately from UI.express and Speech Actions; startup validation checks the updated internal grants. ❌ There is no module/source-specific Action visibility filter.
+
+✅ Assembly validates Agent permissions against module-owned definitions, translating Action paths and checking Tool availability before producers start. Registries themselves do not depend on Agent capability catalogs.

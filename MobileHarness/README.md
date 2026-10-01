@@ -199,13 +199,13 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 | --- | --- | --- |
 | `App/` excluding the two subtargets below | Xcode App targets | Composition root; see [App](App/README.md) for bindings |
 | `App/Composition/Behaviors/` | BehaviorAssembly | AgentCore, Actions, Tools |
-| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, StorageChat, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit, Actions |
+| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, StorageChat, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit, Actions, Tools, StorageAudio |
 | `UI/` | UI | AgentCore, StorageChat; shared values only |
 | `Agents/Core/` | AgentCore | None |
 | `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio |
 | `Gateway/` | Gateway | AgentCore, Actions, Tools; execution uses Runtime APIs only |
-| `Actions/` including `Runtime/` | Actions | AgentCore, StorageAudio, PlatformKit; BehaviorDefinitions at compile time |
-| `Tools/` including `Runtime/` | Tools | AgentCore; BehaviorDefinitions at compile time |
+| `Actions/` including `Contracts/` and `Runtime/` | Actions | PlatformKit; BehaviorDefinitions at compile time |
+| `Tools/` including `Contracts/` and `Runtime/` | Tools | BehaviorDefinitions at compile time |
 | `Storage/` excluding `Audio/` and `Chat/` | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
 | `Storage/Audio/` | StorageAudio | Storage, AgentCore, ModelKit |
@@ -223,7 +223,7 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 - **Behavior ownership and host bindings are separate.** Actions/Tools include their Runtime APIs; domain modules own implementations. BehaviorAssembly validates their coverage against Agent permissions, and App supplies concrete capabilities. Injected UI/device callbacks do not introduce reverse imports.
 - **Platform Core is documentation only.** Current adapters check authorization directly. Unused permission/transport placeholders were removed; shared contracts require real consumers before implementation.
 - **Foundations remain independent.** ModelKit and PlatformKit have no dependency on each other or on business Agents. StorageAudio bridges media and storage contracts; it replaced the former SpeechRuntime cache owner ([ADR 0056](../docs/adr/0056-storage-audio-migration.md)). UI accesses shared values, not runtime/model/device services.
-- **Compile-time behavior metadata:** root `Macros/BehaviorDefinitions` is a SwiftSyntax-only host plugin. Actions/Runtime and Tools/Runtime declare `@Action`/`@Tool`; domain entries carry metadata and Support catalogs bind factories explicitly. This is build tooling, not a new runtime business layer (ADR0094).
+- **Compile-time behavior metadata:** root `Macros/BehaviorDefinitions` is a SwiftSyntax-only host plugin. Actions/Contracts and Tools/Contracts declare `@Action`/`@Tool`; domain entries carry metadata and Support catalogs bind factories explicitly. This is build tooling, not a new runtime business layer (ADR0094).
 - **One source has one compilation owner per target.** Do not recreate `Packages/HarnessKit/Sources`, duplicate sources or add empty future-domain implementations. Directory migrations must update Package.swift, Xcode navigation and affected READMEs together. Unimplemented domains stay in the [Roadmap](../docs/Roadmap.md).
 
 Source consolidation and App/UI separation are recorded in [ADR 0063](../docs/adr/0063-module-directory-consolidation.md) and [ADR 0064](../docs/adr/0064-app-ui-boundaries.md). Their dated migration checks are retained in the [Roadmap](../docs/Roadmap.md).

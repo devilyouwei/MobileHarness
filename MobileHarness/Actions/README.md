@@ -8,17 +8,17 @@ This is the normative authoring standard for new Actions and deliberate migratio
 
 | Term | Definition | Example / boundary |
 | --- | --- | --- |
-| Action | One permission-checked, scheduled behavior identified by `ActionPath(module:function:)`. It validates input, performs an effect and returns at its documented completion point. | `Speech.speak`, `UI.express`; an Action is not an Agent, thread, animation or Swift class. |
+| Action | One permission-checked, scheduled behavior identified by `ActionIdentifier(module:function:)`. It validates input, performs an effect and returns at its documented completion point. | `Speech.speak`, `UI.express`; an Action is not an Agent, thread, animation or Swift class. |
 | Action module | A cohesive behavior domain and stable path namespace, normally one directory under Actions. Today its name is also the scheduler's process-wide mutual-exclusion key. | `Speech`, `UI`; do not invent another module name to bypass exclusion. |
 | Swift target/module | A compilation and dependency boundary. | The single `Actions` target contains Runtime, Speech, UI and NexArm supervised Actions. An Action module does not require a new Swift target. |
 | Channel | An ordering lane selected by the Agent declaration or an allowed scope override. | `Display` is a Channel; `UI` is an Action module. Same-named Channels in different tasks do not share FIFO. |
 | Alias | An Agent-local model-visible name resolved inside Agents. | `express` resolves to `UI.express`; Runtime never resolves model aliases. |
-| Runtime service | An injected owner of mutable state, resources or ongoing work; it is not itself a model-callable Action. | `SpeechPlayback` owns playback/cache handling. Service methods are not implicitly registered. |
+| Runtime service | An injected owner of mutable state, resources or ongoing work; it is not itself a model-callable Action. | `AppWorkflows.SpeechPlayback` owns playback/cache handling. Service methods are not implicitly registered. |
 | Effect lifetime | How long the resulting state, resource or activity exists after a command returns. | A facial expression may remain after its Action completes. |
 
 Actions differ from Tools by execution and feedback contracts, not by read/write or fast/slow behavior. A quick state setter can still be an Action when it needs Channel ordering. Tools bypass Action scheduling and must not become an alternate route around device ownership checks.
 
-Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither App, concrete Agents, Gateway nor the Swift UI target. NexArm/Support additionally consumes the foundational PlatformKit protocol SDK, with no reverse dependency (ADR0093). The runtime target depends on AgentCore, StorageAudio and PlatformKit, with a separate compile-time macro plugin; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
+Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither AgentCore, App, concrete Agents, Gateway nor the Swift UI target. NexArm/Support additionally consumes the foundational PlatformKit protocol SDK, with no reverse dependency (ADR0093). The runtime target depends on PlatformKit, with a separate compile-time macro plugin; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
 
 ```mermaid
 flowchart LR
@@ -65,7 +65,7 @@ Every category has admission, execution and terminal success/failure/cancellatio
 ### Activity control
 
 - The ongoing activity must have an explicit actor/lifecycle owner retained independently of an Action call or UI page. App assembles this owner and its capabilities. A handler may delegate activation to that owner; it must not create an unowned `Task` and return success.
-- Document activity identity (including owner/session), states, resource ownership, capacity, repeat-start/update/stop policy and who may stop it. If only one activity per session is supported, say so and reject conflicting starts. Do not silently coalesce device commands.
+- Document activity identity (including host ownership/session), states, resource ownership, capacity, repeat-start/update/stop policy and who may stop it. If only one activity per session is supported, say so and reject conflicting starts. Do not silently coalesce device commands.
 - Start awaits activation and cleans up partial activation on failure/cancellation before ownership handoff. After handoff, cancellation of the completed call is not an implicit Stop. Session teardown must explicitly stop and join its activities.
 - Stop awaits termination and required cleanup/finalization. “Stop requested” must be named and documented as a weaker contract if a future API intentionally provides it. A file is not ready merely because capture stopped.
 - Release the command lane after Start; never wait there for the whole activity, which could prevent a queued Stop on the same lane from running. Persistent resource ownership is separate from this lane.
@@ -121,7 +121,7 @@ public static func verb(
 
 For a parameterless Action, the callback is `@Sendable (ActionInvocation) async throws -> Void`. For a cohesive multi-operation dependency, use `using capability: any <Domain>Capability` instead; define the smallest Sendable protocol needed by real Actions. Do not create both a protocol and an equivalent closure wrapper without a need. Use `using` consistently; give the local name a concrete meaning such as `play`, `apply`, `start` or `stop`.
 
-`ActionInvocation` is the existing trusted call/context carrier. Do not add caller IDs, permissions, Channel names or service references to model parameters. A callback receives typed arguments and this context so the bound implementation can validate session/turn ownership. Finite/state/update helpers may return `Void`, adapted by the registry to `.completed`. Activity start/stop helpers return `ActionCompletion` carrying the activity ID through the typed terminal result; arbitrary capability values do not become an undeclared return channel.
+`ActionInvocation` carries an ActionRequest, opaque host context and a report store. Gateway retains Agent identity validation and scheduling leases. Do not add caller IDs, permissions, Channel names or service references to model parameters. A callback receives typed arguments and this context so the bound implementation can validate session/turn ownership. Finite/state/update helpers may return `Void`, adapted by the registry to `.completed`. Activity start/stop helpers return `ActionCompletion` carrying the activity ID through the typed terminal result; arbitrary capability values do not become an undeclared return channel.
 
 Entry order is consistent:
 
@@ -141,7 +141,8 @@ Implemented module layout (create only files with real responsibilities):
 ```text
 Actions/
 ├── README.md
-├── Runtime/                       # Reusable execution contracts and built-in catalog
+├── Contracts/                     # Module-owned calls, context, metadata and results
+├── Runtime/                       # Execution, composition and built-in catalog
 │   ├── ActionModules.swift
 │   └── README.md
 └── <Module>/
@@ -238,7 +239,6 @@ These parameterless commands use the trusted session identity to address one rec
 
 ```swift
 import Foundation
-import AgentCore
 
 public enum CameraActions {}
 
@@ -327,7 +327,7 @@ Run `./scripts/check.sh` and, with full Xcode, `./scripts/build-ios.sh`; report 
 | Speech.speak | finite / playback drained and single-use audio released | audioID only, UUID at most 36 UTF-8 bytes; typed playback capability |
 | UI.express | state / accepted expression target | exact Emotion enum; no animation acknowledgment |
 
-All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Fixed caption/gaze/recognition presentation now belongs to Tools/UI, including PresentationError and gaze values. Expression remains here. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
+All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Fixed caption/gaze/recognition presentation now belongs to Tools/UI, including PresentationError and gaze values. Expression remains here. Speech reports SpeechActionError.missingAudio for malformed audio identifiers. AppWorkflows.SpeechPlayback is a typed host adapter, not the Action entry, and joins cancellation cleanup before returning a failure.
 
 ✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. The expression path remains UI.express; immediate UI.moveEyes belongs to Tools. Registry and resource contracts remain in Runtime/Gateway.
 
@@ -339,7 +339,7 @@ All entries reject undeclared keys, check cancellation before validation and aft
 
 ```swift
 ActionDefinition(
-    path: ActionPath(module: "Camera", function: "startCapture"), displayName: "startCapture",
+    path: ActionIdentifier(module: "Camera", function: "startCapture"), displayName: "startCapture",
     kind: .activityStart, completion: "Capture started; service retains lifetime.",
     resources: [.cameraCapture],
     completing: { invocation in
@@ -385,7 +385,7 @@ The earlier explicit single-definition binding example illustrates isolated cons
 
 ## Immediate presentation migration
 
-✅ UIActionModule now registers only model-selected expression. Fixed caption append, transcript replacement/closure, voice phase, gaze and turn initialization moved to Tools/UI with typed ToolInvocation and shared CallArguments. Every remaining Action is displayed without per-path filters. ❌ Native model Tool output remains pending; expression retains scheduling by product choice.
+✅ UIActionModule now registers only model-selected expression. Fixed caption append, transcript replacement/closure, voice phase, gaze and turn initialization moved to Tools/UI with typed ToolInvocation and shared ActionArguments. Every remaining Action is displayed without per-path filters. ❌ Native model Tool output remains pending; expression retains scheduling by product choice.
 
 ## Cohesive source organization
 

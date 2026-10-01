@@ -161,14 +161,12 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'Hidden application runtime lookup: {source.relative_to(ROOT)}')
 # Domain libraries cannot reach back into application composition or concrete services.
 for root, allowed in [
-    ('Actions', {'Foundation', 'Synchronization', 'AgentCore', 'StorageAudio'}),
-    ('Tools', {'Foundation', 'AgentCore'}),
+    ('Actions', {'Foundation', 'Synchronization', 'PlatformKit', 'ModelKit'}),
+    ('Tools', {'Foundation', 'PlatformKit', 'ModelKit'}),
     ('App/Composition/Behaviors', {'AgentCore', 'Actions', 'Tools'}),
 ]:
     for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
-            if imported == 'PlatformKit' and source.is_relative_to(ROOT / 'MobileHarness/Actions/NexArm/Support'):
-                continue  # NexArm execution consumes the foundational device protocol SDK (ADR0093).
             if imported not in allowed:
                 errors.append(f'Forbidden behavior-layer import {imported}: {source.relative_to(ROOT)}')
 # Behavior registration belongs to domain catalogs, not individual App call sites.
@@ -199,7 +197,7 @@ for folder, directories, files in os.walk(actions_root):
     if 'README.md' not in files:
         errors.append(f'Missing Action directory README: {Path(folder).relative_to(ROOT)}')
 for domain in actions_root.iterdir():
-    if not domain.is_dir() or domain.name == 'Runtime':
+    if not domain.is_dir() or domain.name in {'Runtime', 'Contracts'}:
         continue
     namespace_name = domain.name + 'Actions'
     namespace = domain / (namespace_name + '.swift')
@@ -235,7 +233,7 @@ for folder, directories, files in os.walk(tools_root):
     if 'README.md' not in files:
         errors.append(f'Missing Tool directory README: {Path(folder).relative_to(ROOT)}')
 for domain in tools_root.iterdir():
-    if not domain.is_dir() or domain.name == 'Runtime':
+    if not domain.is_dir() or domain.name in {'Runtime', 'Contracts'}:
         continue
     namespace_name = domain.name + 'Tools'
     namespace = domain / (namespace_name + '.swift')
@@ -274,6 +272,12 @@ if macro is None or macro['type'] != 'macro' or macro.get('path') != 'Macros/Beh
     errors.append('BehaviorDefinitions must remain a compile-time macro target')
 elif any(next(iter(d.values()))[0] not in {'SwiftCompilerPlugin', 'SwiftSyntax', 'SwiftSyntaxBuilder', 'SwiftSyntaxMacros'} for d in macro.get('dependencies', [])):
     errors.append('BehaviorDefinitions may depend only on SwiftSyntax compiler libraries')
+
+for module in ('Actions', 'Tools'):
+    dependency_names = {next(iter(d.values()))[0] for d in targets[module].get('dependencies', [])}
+    forbidden = {'AgentCore', 'Agents', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'StorageAudio', 'Tools' if module == 'Actions' else 'Actions'}
+    if dependency_names & forbidden:
+        errors.append(f'{module} has reverse execution dependencies: {dependency_names & forbidden}')
 
 if errors:
     raise SystemExit('\n'.join(errors))

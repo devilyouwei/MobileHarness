@@ -1,4 +1,3 @@
-import AgentCore
 import Foundation
 
 extension NexArmActions {
@@ -30,19 +29,19 @@ extension NexArmActions {
     public enum NodHeadError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidRepetitions
         public var errorDescription: String? { "点头次数必须是 1 到 3 的整数" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum ShakeHeadError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidRepetitions
         public var errorDescription: String? { "摇头次数必须是 1 到 3 的整数" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum WaveWristError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidRepetitions
         public var errorDescription: String? { "挥手次数必须是 1 到 3 的整数" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum TiltDirection: String, Sendable { case left, right }
@@ -50,31 +49,31 @@ extension NexArmActions {
     public enum TiltWristError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidDirection
         public var errorDescription: String? { "歪头方向必须是左或右" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum LookAroundError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidRepetitions
         public var errorDescription: String? { "张望次数必须是 1 到 3 的整数" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum CelebrateError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidRepetitions
         public var errorDescription: String? { "庆祝次数必须是 1 到 3 的整数" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum DanceError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidRepetitions
         public var errorDescription: String? { "跳舞次数必须是 1 到 3 的整数" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum ShakeError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidCycles
         public var errorDescription: String? { "晃动次数必须是 1 到 3 的整数" }
-        public var actionExecutionFailure: ActionExecutionRecord.Failure { .invalidArguments }
+        public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
 }

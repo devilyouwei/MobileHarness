@@ -22,7 +22,7 @@ private func authoringInvocation(_ parameters: [String: String]) -> ActionInvoca
         [:], ["audioID": "invalid"], ["audioID": id.uuidString, "text": "hidden synthesis"],
         ["audioID": String(repeating: "a", count: 37)],
     ] {
-        await #expect(throws: SpeechAudioError.missingAudio) {
+        await #expect(throws: SpeechActionError.missingAudio) {
             try await SpeechActions.speak(invocation: authoringInvocation(parameters)) { id, _ in await probe.accept(id)
             }
         }

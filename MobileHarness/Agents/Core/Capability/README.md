@@ -34,3 +34,5 @@ No Channel is implicitly main or blocking. DefaultChannel remains an internal ru
 ## Action and Tool presentation boundary
 
 ✅ CallArguments provides shared, bounded transport decoding for Action and Tool domains. Actions retains the ActionArguments compatibility name; Tools has no Actions dependency. ❌ Domain-specific defaults/meaning remain outside this decoder.
+
+✅ Capability permissions remain Agent-owned. Execution argument readers live separately in Actions/Contracts and Tools/Contracts; the unused AgentCore reader was removed.

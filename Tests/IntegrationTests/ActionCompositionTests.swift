@@ -17,7 +17,7 @@ private actor CompositionCounter {
     ])
     let composition = try ActionComposition(
         .sequence([
-            .action("pose", [ResourceID(rawValue: "nexarm.motor.3")], maximumResults: 2) { .report(first) },
+            .action("pose", [ActionResource(rawValue: "nexarm.motor.3")], maximumResults: 2) { .report(first) },
             .repeated(
                 2,
                 .action("next", []) {
@@ -32,11 +32,11 @@ private actor CompositionCounter {
     #expect(report.entries.compactMap(\.code) == [.targetNotReached, .feedbackLost])
     #expect(report.entries[0].observed == 1418)
     #expect(await counter.count == 2)
-    #expect(composition.resources == [ResourceID(rawValue: "nexarm.motor.3")])
+    #expect(composition.resources == [ActionResource(rawValue: "nexarm.motor.3")])
 }
 
 @Test func compositionRejectsOverlappingParallelMotorsAndExcessResultsBeforeEffects() throws {
-    let resource = ResourceID(rawValue: "nexarm.motor.4")
+    let resource = ActionResource(rawValue: "nexarm.motor.4")
     let leaf = ActionComposition.Node.action("move", [resource]) { .completed }
     #expect(throws: ActionComposition.ConfigurationError.self) {
         try ActionComposition(.parallel([leaf, leaf]))
@@ -69,7 +69,7 @@ private actor CompositionCounter {
         let envelope = OutputEnvelope(
             source: .assistant, input: input,
             output: .actionCall(ActionCall(actionPath: path, channel: "Robot", parameters: ["first": String(first)])))
-        try await scheduler.enqueue(invocation: ActionInvocation(envelope: envelope, owner: owner, feedback: .terminal))
+        try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))
     }
     try await scheduler.finish(inputID: input.id)
     await scheduler.finishResultDelivery()
@@ -77,7 +77,7 @@ private actor CompositionCounter {
     let results = await scheduler.resultSnapshot().compactMap(\.result)
     #expect(results.count == 2)
     #expect(results.first?.status == .partialFailure)
-    #expect(results.first?.report == report)
+    #expect(results.first?.report?.entries.map(\.code?.rawValue) == report.entries.map(\.code?.rawValue))
     #expect(results.last?.status == .succeeded)
 }
 

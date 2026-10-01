@@ -1,14 +1,13 @@
-import AgentCore
 import Foundation
 
 public struct ToolDefinition: Sendable {
     public let path: String
     public let displayName: String
-    public let resources: Set<ResourceID>
-    public let entry: ToolRegistry.Entry
+    public let resources: Set<ToolResource>
+    public let entry: ToolEntry
     public init(
-        path: String, displayName: String? = nil, resources: Set<ResourceID> = [],
-        handler: @escaping ToolRegistry.Handler
+        path: String, displayName: String? = nil, resources: Set<ToolResource> = [],
+        handler: @escaping ToolHandler
     ) {
         self.path = path
         self.displayName = displayName ?? path
@@ -16,8 +15,8 @@ public struct ToolDefinition: Sendable {
         self.entry = .returning(handler)
     }
     public init(
-        path: String, displayName: String? = nil, resources: Set<ResourceID> = [],
-        completing: @escaping ToolRegistry.CompletionHandler
+        path: String, displayName: String? = nil, resources: Set<ToolResource> = [],
+        completing: @escaping ToolCompletionHandler
     ) {
         self.path = path
         self.displayName = displayName ?? path
@@ -33,4 +32,11 @@ public enum ToolRegistrationError: Error, Equatable, Sendable {
 
 public protocol ToolModule: Sendable {
     var definitions: [ToolDefinition] { get }
+}
+
+public typealias ToolHandler = @Sendable (ToolRequest) async throws -> String
+public typealias ToolCompletionHandler = @Sendable (ToolRequest, ToolExecutionContext) async throws -> Void
+public enum ToolEntry: Sendable {
+    case returning(ToolHandler)
+    case completion(ToolCompletionHandler)
 }

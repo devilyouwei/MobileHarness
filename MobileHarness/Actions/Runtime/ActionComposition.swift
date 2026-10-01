@@ -1,11 +1,10 @@
-import AgentCore
 import Foundation
 
 /// Validated finite tree; children inherit the root's resource fence, never reacquire it.
 public struct ActionComposition: Sendable {
     public indirect enum Node: Sendable {
         case action(
-            String, Set<ResourceID>, maximumResults: Int = 1, budget: ActionExecutionBudget? = nil,
+            String, Set<ActionResource>, maximumResults: Int = 1, budget: ActionExecutionBudget? = nil,
             @Sendable () async throws -> ActionCompletion)
         case sequence([Node])
         case parallel([Node])
@@ -14,14 +13,14 @@ public struct ActionComposition: Sendable {
     }
     public enum ConfigurationError: Error { case limit, overlappingResources, invalidDelay }
     private let root: Node
-    public let resources: Set<ResourceID>
+    public let resources: Set<ActionResource>
     public init(_ root: Node) throws {
         let validated = try Self.validate(root, depth: 0)
         guard validated.count <= 256, validated.resources.count <= 8 else { throw ConfigurationError.limit }
         self.root = root
         resources = validated.resources
     }
-    private static func validate(_ node: Node, depth: Int) throws -> (count: Int, resources: Set<ResourceID>) {
+    private static func validate(_ node: Node, depth: Int) throws -> (count: Int, resources: Set<ActionResource>) {
         guard depth <= 8 else { throw ConfigurationError.limit }
         switch node {
         case .action(let name, let resources, let budget, _, _):
@@ -40,7 +39,7 @@ public struct ActionComposition: Sendable {
         case .sequence(let children), .parallel(let children):
             guard children.count <= 256 else { throw ConfigurationError.limit }
             var count = 0
-            var resources: Set<ResourceID> = []
+            var resources: Set<ActionResource> = []
             for child in children {
                 let v = try validate(child, depth: depth + 1)
                 if case .parallel = node, !resources.isDisjoint(with: v.resources) {

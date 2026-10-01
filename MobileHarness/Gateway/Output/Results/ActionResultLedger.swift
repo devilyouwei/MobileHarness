@@ -11,7 +11,7 @@ struct ActionResultLedger {
         let state: DeliveryState
     }
     private struct Entry {
-        let invocation: ActionInvocation
+        let invocation: ScheduledAction
         let order: UInt64
         var result: ActionResult?
         var attempts = 0
@@ -29,20 +29,20 @@ struct ActionResultLedger {
         self.capacity = capacity
     }
 
-    func checkCapacity(_ invocation: ActionInvocation) throws {
+    func checkCapacity(_ invocation: ScheduledAction) throws {
         guard invocation.feedback != .none else { return }
         guard invocation.owner != nil else { throw ActionExecutionError.invalidInvocation }
         guard entries.count < capacity else { throw ActionSchedulingError.resultCapacityExceeded }
     }
 
-    mutating func reserve(_ invocation: ActionInvocation) {
+    mutating func reserve(_ invocation: ScheduledAction) {
         guard invocation.feedback != .none else { return }
         order &+= 1
         entries[invocation.executionID] = Entry(invocation: invocation, order: order)
     }
 
     mutating func complete(
-        _ invocation: ActionInvocation, status: ActionResult.Status, effect: ActionResult.Effect,
+        _ invocation: ScheduledAction, status: ActionResult.Status, effect: ActionResult.Effect,
         completion: ActionCompletion? = nil, failure: ActionResult.Failure? = nil
     ) {
         guard var entry = entries[invocation.executionID], let owner = invocation.owner else { return }
@@ -53,7 +53,7 @@ struct ActionResultLedger {
         entry.result = ActionResult(
             executionID: invocation.executionID, owner: owner, inputID: invocation.envelope.inputID,
             turn: invocation.envelope.turn, path: invocation.call.actionPath,
-            status: status, effect: effect, completion: completion, failure: failure)
+            status: status, effect: effect, completion: completion?.agentValue, failure: failure)
         entry.deadline = .now.advanced(by: .seconds(10))
         entries[invocation.executionID] = entry
     }

@@ -225,16 +225,16 @@ private actor Recorder {
     let call = ToolCall(toolPath: "UI.showPose")
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
     try await registry.registerCompletion("UI.showPose") { received, origin in
-        #expect(received == call)
+        #expect(received == call.executionRequest)
         #expect(origin.sessionID == input.sessionID)
-        #expect(origin.source == .visionPerception)
+        #expect(origin.source == AgentID.visionPerception.rawValue)
     }
     #expect(try await ToolExecutor(registry: registry).execute(call, envelope: envelope) == nil)
-    await #expect(throws: HarnessError.duplicateHandler) {
+    await #expect(throws: ToolRegistryError.duplicateHandler) {
         try await registry.register("UI.showPose") { _ in "unexpected" }
     }
     try await registry.register("value") { _ in "" }
-    await #expect(throws: HarnessError.duplicateHandler) {
+    await #expect(throws: ToolRegistryError.duplicateHandler) {
         try await registry.registerCompletion("value") { _, _ in }
     }
     let value = ToolCall(toolPath: "value")

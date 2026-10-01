@@ -1,7 +1,7 @@
 import Foundation
 
 /// Transport decoding only. Domain meaning, permissions and defaults belong to each behavior.
-public struct CallArguments: Sendable {
+public struct ActionArguments: Sendable {
     public enum ValidationError: Error, Equatable, Sendable {
         case invalidKeys
         case missing(String)

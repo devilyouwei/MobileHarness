@@ -151,21 +151,23 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
     }
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
-        guard visionSession == invocation.envelope.sessionID, foreground, state.isEnabled, state.isVisible else {
+        guard visionSession == invocation.context.sessionID, foreground, state.isEnabled, state.isVisible else {
             throw CancellationError()
         }
-        guard gazeSequence.map({ invocation.envelope.sequence > $0 }) ?? true else { return }
-        gazeSequence = invocation.envelope.sequence
+        guard gazeSequence.map({ invocation.context.sequence > $0 }) ?? true else { return }
+        gazeSequence = invocation.context.sequence
         state.gaze = CGSize(width: target.x, height: target.y)
     }
 
-    func present(_ overlay: PoseOverlay, sessionID: UUID) throws {
+    func present(_ overlay: ToolPoseOverlay, sessionID: UUID) throws {
         try Task.checkCancellation()
         guard visionSession == sessionID, foreground, state.isEnabled, state.isVisible else {
             throw CancellationError()
         }
         guard state.skeleton.map({ overlay.sequence > $0.sequence }) ?? true else { throw ImageInputError.outOfOrder }
-        state.skeleton = overlay
+        state.skeleton = PoseOverlay(
+            sequence: overlay.sequence, timestamp: overlay.timestamp, rotation: overlay.rotation,
+            people: overlay.people.map { $0.map { PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) } })
     }
 
     private func recordCapture(_ state: ActivityEvent.State, id: UUID) {

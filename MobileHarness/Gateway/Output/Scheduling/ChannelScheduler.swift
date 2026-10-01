@@ -20,7 +20,7 @@ public actor ChannelScheduler {
         let kind: ActionDefinition.Kind
         let resources: Set<ResourceID>
         var path: ActionPath { invocation.call.actionPath }
-        let invocation: ActionInvocation
+        let invocation: ScheduledAction
         var inputKey: InputKey { InputKey(source: invocation.envelope.source, inputID: invocation.envelope.inputID) }
     }
     struct Running {
@@ -184,8 +184,8 @@ public actor ChannelScheduler {
     }
     /// Returns after admission, never after execution. All dormant jobs count toward capacity.
     @discardableResult
-    public func enqueue(invocation submitted: ActionInvocation) async throws -> UUID {
-        let invocation = try ActionInvocation(
+    public func enqueue(invocation submitted: ScheduledAction) async throws -> UUID {
+        let invocation = try ScheduledAction(
             envelope: submitted.envelope, owner: submitted.owner, feedback: submitted.feedback, lease: submitted.lease)
         try Task.checkCancellation()
         guard !isShutdown else { throw ActionSchedulingError.shutdown }
@@ -358,9 +358,9 @@ public actor ChannelScheduler {
                         let executor = ActionExecutor(registry: registry)
                         completion = try await resources.run(
                             resources: job.resources, owner: job.invocation.owner, lease: job.invocation.lease
-                        ) { try await executor.execute(job.invocation) }
+                        ) { try await executor.execute(job.invocation.execution) }
                     } else {
-                        completion = try await ActionExecutor(registry: registry).execute(job.invocation)
+                        completion = try await ActionExecutor(registry: registry).execute(job.invocation.execution)
                     }
                     try Task.checkCancellation()
                     outcome = .success(completion)
@@ -409,7 +409,7 @@ public actor ChannelScheduler {
                 failure: status == .succeeded ? nil : .operationFailed,
                 failureDescription: description)
             resultLedger.complete(
-                job.invocation, status: status,
+                job.invocation, status: status.agentValue,
                 effect: status == .succeeded ? .contractCompleted : .unknown, completion: completion,
                 failure: status == .succeeded ? nil : (status == .cancelled ? .cancelled : .handlerFailed))
             diagnostics.record(
@@ -422,7 +422,7 @@ public actor ChannelScheduler {
                 job.id, to: error is CancellationError ? .cancelled : .failed, completion: .report(report),
                 failure: error is CancellationError
                     ? nil
-                    : ((error as? any ActionExecutionFailureProviding)?.actionExecutionFailure
+                    : ((error as? any ActionExecutionFailureProviding)?.actionExecutionFailure.observationFailure
                         ?? (error is ResourceError ? .resourceUnavailable : .operationFailed)),
                 failureDescription: error is CancellationError ? nil : error.localizedDescription)
             resultLedger.complete(

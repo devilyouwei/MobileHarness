@@ -192,3 +192,5 @@ These are **dated decision records**, including proposals and stages later repla
 - [0094 — Arrival profiles and behavior macros](0094-arrival-profiles-and-behavior-macros.md): immediate fresh arrival, per-motor tolerances, cooperative budgets and compile-time metadata.
 
 - [0095 — Remove retired device and behavior code](0095-remove-retired-device-and-behavior-code.md): production cleanup, historical test isolation and consistent native admission.
+
+- [0096 — Behavior-owned execution contracts](0096-behavior-owned-contracts.md)

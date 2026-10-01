@@ -105,7 +105,8 @@ private enum MacroFixture {
         }
         return .completed
     })
-    let call = ActionCall(actionPath: action.path, channel: "Fixture")
+    let call = ActionCall(
+        actionPath: ActionPath(module: action.path.module, function: action.path.function), channel: "Fixture")
     #expect(action.displayName == "Generated action")
     #expect(try action.requiredResources(for: call) == [.init(rawValue: "fixture")])
     let invocation = ActionInvocation(
@@ -174,9 +175,11 @@ private enum MacroFixture {
     let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: UUID())
     let input = AgentInput(sessionID: owner.sessionID, payload: .event("deadline"))
     for quick in [false, true] {
-        let call = ActionCall(actionPath: action.path, channel: "Fixture", parameters: ["quick": String(quick)])
+        let call = ActionCall(
+            actionPath: ActionPath(module: action.path.module, function: action.path.function), channel: "Fixture",
+            parameters: ["quick": String(quick)])
         let envelope = OutputEnvelope(source: .assistant, input: input, output: .actionCall(call))
-        try await scheduler.enqueue(invocation: ActionInvocation(envelope: envelope, owner: owner, feedback: .terminal))
+        try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))
     }
     try await scheduler.finish(inputID: input.id)
     await scheduler.finishResultDelivery()

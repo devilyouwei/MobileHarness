@@ -161,3 +161,5 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ [ADR0094](adr/0094-arrival-profiles-and-behavior-macros.md) records fresh-arrival completion, measured profiles, dynamic budgets and Action/Tool macros. Bounded hardware evidence lives in [measurements](measurements/README.md).
 
 ✅ [ADR0095](adr/0095-remove-retired-device-and-behavior-code.md) records removal of unused device placeholders and isolation of retired Action diagnostics.
+
+- [Behavior-owned execution contracts](adr/0096-behavior-owned-contracts.md): module ownership and upstream translation.

@@ -7,7 +7,7 @@ import UI
 private func activityRecord(
     id: UUID = UUID(), channel: String = "Robot", phase: ActionExecutionRecord.Phase = .running,
     semantics: ActionExecutionRecord.Semantics = .finite, at time: Date = .now,
-    failure: ActionExecutionRecord.Failure? = nil, completion: ActionCompletion? = nil
+    failure: ActionExecutionRecord.Failure? = nil, completion: AgentActionCompletion? = nil
 ) -> ActionExecutionRecord {
     ActionExecutionRecord(
         id: id, path: ActionPath(module: "NexArm", function: "dance"), displayName: "跳舞", source: .assistant,
@@ -137,4 +137,28 @@ private func activityRecord(
     #expect(Set(summaries.map(\.id)) == ["CustomLane", "customlane"])
     #expect(summaries.first { $0.id == "CustomLane" }?.additionalRunning == 1)
     #expect(summaries.first { $0.id == "CustomLane" }?.item.channelTitle == "CustomLane")
+}
+
+extension ActionActivityState {
+    func replace(revision: UInt64, records: [ActionExecutionRecord], evictedCount: UInt64) {
+        replace(revision: revision, records: records.map(ActionActivityItem.init), evictedCount: evictedCount)
+    }
+}
+
+@Test @MainActor func composedActionIssuesRemainVisibleBeyondSummary() throws {
+    let report = try AgentActionReport(entries: [
+        .init(path: "one", status: .failed, code: .targetNotReached, motor: 3, target: 1443, observed: 1418),
+        .init(path: "two", status: .failed, code: .feedbackLost, motor: 4),
+        .init(path: "three", status: .succeeded),
+    ])
+    let item = ActionActivityItem(
+        execution: ActionExecutionRecord(
+            id: UUID(),
+            path: ActionPath(module: "NexArm", function: "dance"), displayName: "跳舞", source: .assistant,
+            sessionID: UUID(), inputID: UUID(), channel: "Robot", semantics: .finite, phase: .failed,
+            completion: .report(report)))
+    #expect(item.status == "部分完成 · 2项问题")
+    #expect(item.issueDescriptions.count == 2)
+    #expect(item.issueDescriptions[0].contains("1418"))
+    #expect(item.issueDescriptions[1].contains("未收到位置反馈"))
 }

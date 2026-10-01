@@ -1,5 +1,3 @@
-import AgentCore
-
 @attached(peer, names: suffixed(Definition))
-public macro Tool(path: String, title: String, resources: Set<ResourceID> = []) =
+public macro Tool(path: String, title: String, resources: Set<ToolResource> = []) =
     #externalMacro(module: "BehaviorDefinitions", type: "BehaviorDefinitionMacro")

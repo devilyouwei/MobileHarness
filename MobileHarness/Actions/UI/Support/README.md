@@ -20,3 +20,5 @@ flowchart LR
 ✅ Entry attributes own displayName and completion metadata; the Support catalog binds handlers. Execution records carry this value; no App or UI switch enumerates domain actions. ❌ This is human-readable metadata, not model permission or a SwiftUI dependency.
 
 ✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
+
+✅ Presentation capability contracts consume module-owned Action context, without importing UI or AgentCore.

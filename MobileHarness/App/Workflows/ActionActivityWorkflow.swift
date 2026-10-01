@@ -19,7 +19,7 @@ public final class ActionActivityWorkflow {
                 for await snapshot in stream {
                     guard !Task.isCancelled else { return }
                     state.replace(
-                        revision: snapshot.revision, records: snapshot.records,
+                        revision: snapshot.revision, records: snapshot.records.map(ActionActivityItem.init),
                         evictedCount: snapshot.evictedCount)
                 }
             } catch {

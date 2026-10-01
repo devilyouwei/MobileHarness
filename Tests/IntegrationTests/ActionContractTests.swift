@@ -57,11 +57,11 @@ private func contractDefinition(
 
 @Test func actionDefinitionsRejectDuplicatesInvalidMetadataAndMissingGrants() throws {
     let definition = contractDefinition()
-    #expect(throws: ActionExecutionError.duplicateDefinition(contractPath)) {
+    #expect(throws: ActionExecutionError.duplicateDefinition(contractPath.executionIdentifier)) {
         try ActionRegistry(definitions: [definition, definition])
     }
     for completion in [" ", String(repeating: "x", count: 513)] {
-        #expect(throws: ActionExecutionError.invalidDefinition(contractPath)) {
+        #expect(throws: ActionExecutionError.invalidDefinition(contractPath.executionIdentifier)) {
             try ActionRegistry(definitions: [
                 ActionDefinition(
                     path: contractPath, displayName: "测试动作", kind: .finite, completion: completion, handler: { _ in })
@@ -69,7 +69,7 @@ private func contractDefinition(
         }
     }
     for displayName in ["", " \n", String(repeating: "界", count: 86)] {
-        #expect(throws: ActionExecutionError.invalidDefinition(contractPath)) {
+        #expect(throws: ActionExecutionError.invalidDefinition(contractPath.executionIdentifier)) {
             try ActionRegistry(definitions: [
                 ActionDefinition(
                     path: contractPath, displayName: displayName, kind: .finite,
@@ -78,7 +78,7 @@ private func contractDefinition(
         }
     }
     let malformed = ActionPath(module: "bad module", function: "perform")
-    #expect(throws: ActionExecutionError.invalidDefinition(malformed)) {
+    #expect(throws: ActionExecutionError.invalidDefinition(malformed.executionIdentifier)) {
         try ActionRegistry(definitions: [contractDefinition(path: malformed)])
     }
     #expect(throws: ActionExecutionError.definitionCapacityExceeded) {
@@ -90,10 +90,10 @@ private func contractDefinition(
     ])
     try registry.validate(capabilities: model)
     let missing = InternalAction(module: "Fixture", function: "missing", channel: "Ordered")
-    #expect(throws: ActionExecutionError.missingHandler(missing.path)) {
+    #expect(throws: ActionExecutionError.missingHandler(missing.path.executionIdentifier)) {
         try registry.validate(capabilities: model.adding(internalActions: [missing]))
     }
-    #expect(throws: ActionExecutionError.missingHandler(contractPath)) {
+    #expect(throws: ActionExecutionError.missingHandler(contractPath.executionIdentifier)) {
         try ActionRegistry().validate(capabilities: model)
     }
     #expect(try registry.definition(for: contractPath).kind == .finite)
@@ -123,8 +123,8 @@ private func contractDefinition(
     let call = ActionCall(actionPath: contractPath, channel: "Ordered", parameters: ["count": "2"])
     let invocation = try ActionInvocation(
         envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call), sequence: 7))
-    #expect(invocation.call == call)
-    #expect(invocation.envelope.inputID == input.id && invocation.envelope.sequence == 7)
+    #expect(invocation.call == call.executionRequest)
+    #expect(invocation.testEnvelope.inputID == input.id && invocation.testEnvelope.sequence == 7)
 }
 
 @Test func argumentReadersRejectMalformedValuesAndPreserveText() throws {
@@ -187,7 +187,7 @@ private func contractDefinition(
         envelope: OutputEnvelope(
             source: .assistant,
             input: AgentInput(
-                id: first.envelope.inputID, sessionID: first.envelope.sessionID,
+                id: first.testEnvelope.inputID, sessionID: first.testEnvelope.sessionID,
                 payload: .event("contract")),
             output: .actionCall(ActionCall(actionPath: setPath, channel: "Ordered", parameters: ["emotion": "smile"]))))
     let firstID = try await scheduler.enqueue(invocation: first)
@@ -197,7 +197,7 @@ private func contractDefinition(
     #expect(before.records.filter { $0.executionID == secondID }.map(\.phase) == [.admitted])
     #expect(await state.effects == 0)
     await release.release()
-    try await scheduler.finish(inputID: first.envelope.inputID)
+    try await scheduler.finish(inputID: first.testEnvelope.inputID)
     #expect(await state.effects == 1)
     #expect(await state.animationPending)
     let after = await scheduler.diagnosticSnapshot()
@@ -218,7 +218,7 @@ private func contractDefinition(
     let first = try await scheduler.enqueue(invocation: invocation)
     let second = try await scheduler.enqueue(invocation: invocation)
     #expect(first != second)
-    try await scheduler.finish(inputID: invocation.envelope.inputID)
+    try await scheduler.finish(inputID: invocation.testEnvelope.inputID)
     #expect(await state.effects == 2)
     #expect(await state.lastExecutionID == second)
     let snapshot = await scheduler.diagnosticSnapshot()
@@ -253,7 +253,7 @@ private func contractDefinition(
     let running = try await scheduler.enqueue(invocation: invocation)
     await committed.wait()
     let queued = try await scheduler.enqueue(invocation: invocation)
-    let cancellation = Task { await scheduler.cancel(inputID: invocation.envelope.inputID) }
+    let cancellation = Task { await scheduler.cancel(inputID: invocation.testEnvelope.inputID) }
     await cancelled.wait()
     let during = await scheduler.diagnosticSnapshot()
     #expect(during.records.last?.executionID == queued)
@@ -278,7 +278,7 @@ private enum ContractFailure: Error, Equatable { case failed }
         ]))
     let invocation = contractInvocation()
     try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.envelope.inputID)
+    try await scheduler.finish(inputID: invocation.testEnvelope.inputID)
     let snapshot = await scheduler.diagnosticSnapshot()
     #expect(snapshot.records.map(\.phase) == [.admitted, .started, .failed])
     #expect(snapshot.records.last?.effect == .unknown)

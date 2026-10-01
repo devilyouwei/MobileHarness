@@ -22,7 +22,7 @@ public struct BluetoothDeviceRecord: Codable, Sendable {
 public enum BluetoothWorkflowError: LocalizedError, Sendable, Equatable, ActionExecutionFailureProviding {
     case disconnected, busy, background, posture, unverified, controlNotReady, feedbackTimeout, completionTimeout
     case incomplete([Int])
-    public var actionExecutionFailure: ActionExecutionRecord.Failure {
+    public var actionExecutionFailure: ActionFailure {
         switch self {
         case .disconnected: .disconnected
         case .busy: .busy

@@ -15,3 +15,5 @@ flowchart LR
 ```
 
 ✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
+
+✅ System entries consume ToolRequest from Tools/Contracts.

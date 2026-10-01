@@ -1,8 +1,10 @@
+import Actions
 import AgentCore
 import Foundation
 
-public struct ActionInvocation: Sendable {
-    public let results = ActionReportStore()
+public struct ScheduledAction: Sendable {
+    public var results: ActionReportStore { execution.results }
+    public let execution: ActionInvocation
     public let executionID: UUID
     public let envelope: OutputEnvelope
     public let call: ActionCall
@@ -25,34 +27,21 @@ public struct ActionInvocation: Sendable {
         self.feedback = feedback
         self.lease = lease
         self.executionID = UUID()
+        self.execution = ActionInvocation(
+            call: call.executionRequest, context: envelope.executionContext, executionID: self.executionID)
         self.envelope = envelope
         self.call = call
     }
 
-    /// Convenience for trusted composition/tests; creates the envelope from the same call.
     public init(source: AgentID, input: AgentInput, call: ActionCall, sequence: UInt64 = 0) {
+        let envelope = OutputEnvelope(source: source, input: input, output: .actionCall(call), sequence: sequence)
         self.owner = nil
         self.feedback = .none
         self.lease = nil
         self.executionID = UUID()
-        self.envelope = OutputEnvelope(source: source, input: input, output: .actionCall(call), sequence: sequence)
+        self.envelope = envelope
         self.call = call
+        self.execution = ActionInvocation(
+            call: call.executionRequest, context: envelope.executionContext, executionID: self.executionID)
     }
-}
-
-public typealias ActionHandler = @Sendable (ActionInvocation) async throws -> Void
-
-public typealias ActionCompletionHandler = @Sendable (ActionInvocation) async throws -> ActionCompletion
-
-/// Compatibility name for Action domain argument decoding.
-public typealias ActionArguments = CallArguments
-
-public actor ActionReportStore {
-    private var report: ActionReport?
-    public init() {}
-    public func record(_ report: ActionReport) throws {
-        guard self.report == nil else { throw ActionExecutionError.invalidCompletion }
-        self.report = report
-    }
-    public func snapshot() -> ActionReport? { report }
 }

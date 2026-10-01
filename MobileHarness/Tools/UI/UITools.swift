@@ -1,4 +1,3 @@
-import AgentCore
 import Foundation
 
 public enum UITools {
@@ -8,7 +7,7 @@ public enum UITools {
         using present: @escaping @Sendable (ToolInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        do { try CallArguments(invocation.call.arguments).validateAllowedKeys([]) } catch {
+        do { try ToolArguments(invocation.call.arguments).validateAllowedKeys([]) } catch {
             throw PresentationError.invalidCall
         }
         try await present(invocation)
@@ -24,7 +23,7 @@ public enum UITools {
         try Task.checkCancellation()
         let text: String
         do {
-            let arguments = CallArguments(invocation.call.arguments)
+            let arguments = ToolArguments(invocation.call.arguments)
             try arguments.validateAllowedKeys(["text"])
             text = try arguments.requiredString("text", maximumUTF8Bytes: 4096, allowBlank: true)
         } catch { throw PresentationError.invalidText }
@@ -38,7 +37,7 @@ public enum UITools {
         using present: @escaping @Sendable (ToolInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        do { try CallArguments(invocation.call.arguments).validateAllowedKeys([]) } catch {
+        do { try ToolArguments(invocation.call.arguments).validateAllowedKeys([]) } catch {
             throw PresentationError.invalidCall
         }
         try await present(invocation)
@@ -53,7 +52,7 @@ public enum UITools {
         try Task.checkCancellation()
         let state: VoiceState
         do {
-            let arguments = CallArguments(invocation.call.arguments)
+            let arguments = ToolArguments(invocation.call.arguments)
             try arguments.validateAllowedKeys(["state"])
             state = try arguments.requiredEnum("state", as: VoiceState.self)
         } catch { throw PresentationError.invalidCall }
@@ -69,7 +68,7 @@ public enum UITools {
         try Task.checkCancellation()
         let text: String
         do {
-            let arguments = CallArguments(invocation.call.arguments)
+            let arguments = ToolArguments(invocation.call.arguments)
             try arguments.validateAllowedKeys(["text"])
             text = try arguments.requiredString("text", maximumUTF8Bytes: 2000, allowBlank: false)
         } catch { throw PresentationError.invalidText }
@@ -85,7 +84,7 @@ public enum UITools {
         try Task.checkCancellation()
         let target: Gaze
         do {
-            let arguments = CallArguments(invocation.call.arguments)
+            let arguments = ToolArguments(invocation.call.arguments)
             try arguments.validateAllowedKeys(["x", "y"])
             target = try Gaze(
                 x: arguments.requiredFiniteDouble("x", range: -1...1),
@@ -98,12 +97,12 @@ public enum UITools {
     /// Atomically replaces all displayed skeletons; an empty people list clears them.
     @Tool(path: "UI.showPose", title: "showPose")
     public static func showPose(
-        call: ToolCall, envelope: OutputEnvelope,
-        present: @escaping @Sendable (PoseOverlay, OutputEnvelope) async throws -> Void
+        call: ToolRequest, context: ToolExecutionContext,
+        present: @escaping @Sendable (ToolPoseOverlay, ToolExecutionContext) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         guard let payload = call.arguments["payload"], payload.utf8.count <= 3000,
-            let overlay = try? JSONDecoder().decode(PoseOverlay.self, from: Data(payload.utf8)),
+            let overlay = try? JSONDecoder().decode(ToolPoseOverlay.self, from: Data(payload.utf8)),
             overlay.timestamp.isFinite, overlay.timestamp >= 0, (0...3).contains(overlay.rotation),
             overlay.people.count <= 6,
             overlay.people.allSatisfy({ person in
@@ -114,7 +113,7 @@ public enum UITools {
                     }
             })
         else { throw PoseError.invalidPayload }
-        try await present(overlay, envelope)
+        try await present(overlay, context)
         try Task.checkCancellation()
     }
 }

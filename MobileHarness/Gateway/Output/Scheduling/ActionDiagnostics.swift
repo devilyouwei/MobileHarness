@@ -1,3 +1,4 @@
+import Actions
 import AgentCore
 import Foundation
 
@@ -41,7 +42,7 @@ public struct ActionDiagnostics: Sendable {
     }
 
     public mutating func record(
-        _ invocation: ActionInvocation, kind: ActionDefinition.Kind, phase: Phase, effect: Effect
+        _ invocation: ScheduledAction, kind: ActionDefinition.Kind, phase: Phase, effect: Effect
     ) {
         let record = Record(
             executionID: invocation.executionID, path: invocation.call.actionPath,

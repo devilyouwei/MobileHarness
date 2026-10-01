@@ -784,3 +784,7 @@ Device installation: iPhone17Pro install succeeded and an independent installed-
 Validation: `./scripts/check.sh` passed (295 IntegrationTests and other enabled suites), all four `./scripts/build-ios.sh` schemes passed, and signed device build `2026100202` passed. No physical motions were run for this cleanup.
 
 Device installation succeeded; an independent iPhone installed-app query confirmed `2026100202`. The app was not auto-launched.
+
+✅ Behavior-owned contracts, explicit Gateway translation and UI display projection are implemented (ADR0096). ❌ Cross-process behavior serialization and durable replay remain outside this migration. Validation: `scripts/check.sh` passed with297 IntegrationTests and the remaining enabled suites; `scripts/build-ios.sh` passed all four schemes. Signed iPhone build2026100203 succeeded. Optional physical-motion and model acceptance were not run for this boundary migration.
+
+Device: the first installation lost the phone installation-service connection. Retrying succeeded, and an independent installed-app query confirmed bundle version2026100203. The app was not auto-launched and no physical motion was issued.

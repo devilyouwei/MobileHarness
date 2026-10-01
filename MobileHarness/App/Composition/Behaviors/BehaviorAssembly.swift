@@ -27,8 +27,18 @@ public struct BehaviorAssembly: Sendable {
     ) throws {
         guard capabilities.count <= 128 else { throw HarnessError.queueFull }
         let actions = try ActionRegistry(modules: actionModules)
-        for capability in capabilities { try actions.validate(capabilities: capability) }
-        let tools = try ToolRegistry(modules: toolModules, capabilities: capabilities)
+        for capability in capabilities {
+            for action in capability.actions.map(\.path) + capability.internalActions.map(\.path) {
+                _ = try actions.definition(for: .init(module: action.module, function: action.function))
+            }
+        }
+        let tools = try ToolRegistry(modules: toolModules)
+        let paths = Set(toolModules.flatMap { $0.definitions.map(\.path) })
+        for capability in capabilities {
+            for path in capability.tools.map(\.path) + capability.internalTools.map(\.path) {
+                guard paths.contains(path) else { throw ToolRegistrationError.missingHandler(path) }
+            }
+        }
         self.actions = actions
         self.tools = tools
     }

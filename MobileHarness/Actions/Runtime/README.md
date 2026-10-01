@@ -1,6 +1,6 @@
 # Action Runtime
 
-Purpose: bind, validate and execute Action implementations. Design goals: explicit completion, bounded composition/results, parameter-based resources and cooperative cleanup. Runtime depends on AgentCore and Foundation; it owns no device or presentation policy.
+Purpose: bind, validate and execute Action implementations. Design goals: explicit completion, bounded composition/results, parameter-based resources and cooperative cleanup. Runtime consumes Actions/Contracts and Foundation; it owns no device or presentation policy.
 
 ## Registration and ownership
 
@@ -21,7 +21,7 @@ flowchart LR
 
 ## Execution
 
-`ActionInvocation` derives call identity from its envelope and carries the execution ID, trusted owner, feedback/lease context and one report store. It does not authorize its caller. Gateway admits a fresh execution ID for every enqueue, resolves resources and fences execution through ResourceCoordinator; direct executor use does not acquire locks.
+`ActionInvocation` carries the module-owned request, execution ID, opaque context and report store. Gateway owns ScheduledAction, validates the Agent envelope and lease, assigns a fresh execution ID per admission and fences execution through ResourceCoordinator. Direct executor use does not acquire locks.
 
 `ActionDefinition` stores kind, completion description, handler and resource/budget resolvers. `requiredResources(for:)` resolves the actual call parameters and rejects more than8 resources. A definition's static resource set is only the default. Children inherit their parent's resource fence.
 
@@ -61,7 +61,7 @@ Reports retain flat child paths, statuses, error codes and optional motor/target
 
 ## Arguments and diagnostics
 
-`ActionArguments` aliases AgentCore.CallArguments. It rejects undeclared keys, malformed values, nonfinite doubles and out-of-range integers; readers bound strings and source values. Domain code owns defaults and relationships between parameters. Gateway separately checks allowed parameter names. Dependency errors must not be relabeled as argument errors.
+`ActionArguments` belongs to Actions/Contracts. It rejects undeclared keys, malformed values, nonfinite doubles and out-of-range integers; readers bound strings and source values. Domain code owns defaults and relationships between parameters. Gateway separately checks allowed parameter names. Dependency errors must not be relabeled as argument errors.
 
 ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by default, configurable1–4096. Overflow replaces the oldest record and increments an eviction count; it never drops device actions. Records contain execution identity, phase, effect and monotonic time, not arguments, media or error objects. Snapshots are bounded diagnostic history, not durable auditing. The separate execution ledger supplies self-described UI snapshots.
 
@@ -69,12 +69,12 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 
 | File | Responsibility |
 |---|---|
-| ActionMacro / ActionDefinition | Compile-time metadata factories and runtime contracts |
+| ../Contracts/ActionMacro / ActionDefinition | Compile-time metadata factories and runtime contracts |
 | ActionRegistry / ActionModules | Validated registry and explicit domain catalog |
-| ActionInvocation | Trusted invocation shape and bounded report store |
-| ActionExecutor / ActionExecutionBudget | Completion validation and cooperative deadlines |
+| ../Contracts/ActionInvocation / ActionReportStore | Module-owned request/context and bounded report store |
+| ActionExecutor / ActionDeadline | Completion validation and cooperative deadlines |
 | ActionComposition | Validated trees, resource/budget union and outcome aggregation |
-| ActionDiagnostics | Payload-free bounded diagnostic ring |
+| Gateway/Output/Scheduling/ActionDiagnostics | Payload-free bounded diagnostic ring |
 
 ✅ Registered execution, dynamic resource/budget resolution, composition, complete failure reporting and Channel continuation are implemented and tested.
 

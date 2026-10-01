@@ -216,3 +216,5 @@ flowchart LR
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
 ✅ A Runtime deadline keeps `ActionReport.executionFailure` when the invocation also has stored child results. The terminal result releases the lane only after cooperative cleanup joins; later accepted Actions still run. Queue time is outside the registered execution budget.
+
+✅ Scheduling and ActionDiagnostics operate on ScheduledAction. Only its ActionInvocation execution value crosses into Actions; Channel ordering, cancellation, admission identity and resource fencing remain unchanged.

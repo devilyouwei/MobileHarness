@@ -73,3 +73,5 @@ flowchart LR
 ✅ Boundary checks validate macro-generated binding placement and keep the BehaviorDefinitions compiler plugin limited to SwiftSyntax dependencies.
 
 ✅ The boundary check also prevents retired NexArm polling diagnostics and historical test algorithms from returning to production Actions.
+
+✅ Behavior boundary checks reject Actions/Tools dependencies on AgentCore, Gateway, UI, App or each other, and recognize Contracts as infrastructure rather than a callable domain.

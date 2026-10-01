@@ -15,7 +15,7 @@ struct ActionDispatcher: Sendable {
             throw ActionExecutionError.invalidInvocation
         }
         try await executor.enqueue(
-            invocation: ActionInvocation(envelope: envelope, owner: owner, feedback: feedback, lease: lease))
+            invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: feedback, lease: lease))
     }
 
     func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {

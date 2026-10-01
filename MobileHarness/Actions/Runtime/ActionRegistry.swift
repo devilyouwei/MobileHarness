@@ -1,9 +1,8 @@
-import AgentCore
 import Foundation
 
 /// Immutable implementation catalog. Agent declarations remain the authorization source.
 public struct ActionRegistry: Sendable {
-    private let definitions: [ActionPath: ActionDefinition]
+    private let definitions: [ActionIdentifier: ActionDefinition]
 
     public init() { definitions = [:] }
 
@@ -22,7 +21,7 @@ public struct ActionRegistry: Sendable {
 
     public init(definitions: [ActionDefinition]) throws {
         guard definitions.count <= 256 else { throw ActionExecutionError.definitionCapacityExceeded }
-        var entries: [ActionPath: ActionDefinition] = [:]
+        var entries: [ActionIdentifier: ActionDefinition] = [:]
         for definition in definitions {
             guard Self.validName(definition.path.module), Self.validName(definition.path.function),
                 !definition.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -39,19 +38,13 @@ public struct ActionRegistry: Sendable {
         self.definitions = entries
     }
 
-    public func definition(for path: ActionPath) throws -> ActionDefinition {
+    public func definition(for path: ActionIdentifier) throws -> ActionDefinition {
         guard let definition = definitions[path] else { throw ActionExecutionError.missingHandler(path) }
         return definition
     }
 
-    public func handler(for path: ActionPath) throws -> ActionCompletionHandler {
+    public func handler(for path: ActionIdentifier) throws -> ActionCompletionHandler {
         try definition(for: path).handler
-    }
-
-    /// Validate the actual assembled model and code-owned catalogs before starting their producers.
-    public func validate(capabilities: CapabilityRegistry) throws {
-        for action in capabilities.actions { _ = try definition(for: action.path) }
-        for action in capabilities.internalActions { _ = try definition(for: action.path) }
     }
 
     private static func validName(_ value: String) -> Bool {

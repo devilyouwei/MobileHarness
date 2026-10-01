@@ -90,7 +90,7 @@ private func actionInvocation(
     try await executor.finish(inputID: first.id)
     try await executor.enqueue(invocation: actionInvocation("two", input: second, path: printPath))
     try await executor.finish(inputID: second.id)
-    await #expect(throws: ActionExecutionError.missingHandler(ActionPath(module: "Device", function: "move"))) {
+    await #expect(throws: ActionExecutionError.missingHandler(ActionIdentifier(module: "Device", function: "move"))) {
         try await executor.enqueue(
             invocation: actionInvocation("three", input: second, path: ActionPath(module: "Device", function: "move")))
     }

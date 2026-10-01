@@ -1,5 +1,6 @@
 import Actions
 import AgentCore
+import AppWorkflows
 import Foundation
 import Testing
 import Tools
@@ -7,7 +8,7 @@ import Tools
 /// Reuse scheduler fixtures in argument validation tests while constructing a genuine immediate Tool envelope.
 func uiToolInvocation(_ invocation: ActionInvocation) -> ToolInvocation {
     let call = ToolCall(toolPath: "UI." + invocation.call.actionPath.function, arguments: invocation.call.parameters)
-    let e = invocation.envelope
+    let e = invocation.testEnvelope
     let envelope = OutputEnvelope(
         source: e.source,
         input: AgentInput(id: e.inputID, sessionID: e.sessionID, payload: .event("fixture"), turn: e.turn),
@@ -20,16 +21,16 @@ private actor CaptionEndpoint {
     var reply = ""
     var transcript = ""
     func begin(_ invocation: ToolInvocation) {
-        if policy.accept(invocation.envelope, update: .beginReply) { reply = "" }
+        if policy.accept(invocation.context, update: .beginReply) { reply = "" }
     }
     func append(_ text: String, _ invocation: ToolInvocation) {
-        if policy.accept(invocation.envelope, update: .reply) { reply += text }
+        if policy.accept(invocation.context, update: .reply) { reply += text }
     }
     func replace(_ text: String, _ invocation: ToolInvocation) {
-        if policy.accept(invocation.envelope, update: .transcript) { transcript = text }
+        if policy.accept(invocation.context, update: .transcript) { transcript = text }
     }
     func close(_ invocation: ToolInvocation) {
-        if policy.accept(invocation.envelope, update: .finishTranscript) { transcript = "" }
+        if policy.accept(invocation.context, update: .finishTranscript) { transcript = "" }
     }
 }
 

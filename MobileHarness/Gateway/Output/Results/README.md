@@ -38,3 +38,5 @@ See [resources](../Resources/README.md), [scheduling](../Scheduling/README.md) a
 ✅ ActionResult completion may carry ActionReport entries and partialFailure. failuresOnly delivers partial failures. Existing reservation/delivery bounds apply; no device replay is introduced.
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ The result ledger translates ActionCompletion into AgentActionCompletion before delivery, preserving every child result and execution-level failure.

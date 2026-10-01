@@ -14,7 +14,7 @@ flowchart LR
 
 ✅ Production `Speech.speak` accepts only `audioID`. SpeechActions.speak validates the audio ID; SpeechPlayback validates source/session/input ownership and obtains a single-consumer lease only when scheduled. Initial and intermediate empty PCM reads wait for synthesis progress; producer failure or cancellation wakes the reader immediately. Production reads have no independent first-frame or midstream deadline. The synthesis Agent retains its 60-second deadline from execution start, excluding its queue time; speak therefore has no fixed total PCM-wait timeout. Frames leave Storage as the player reads them; actual playback completion releases the single-use handle. Cancellation propagates to the individual synthesis job; input/session cancellation handles pending jobs too.
 
-✅ Gateway has no speech preparation or prevalidation stage. The App output consumer releases remaining source/input audio after reply completion/error dispatch has joined Actions, and when dispatch fails; session teardown cancels session audio, and runtime teardown closes the store. Pending audio does not expire while waiting for its Action. The reply owner is the originating source/input, not the whole multi-turn voice session. Generation completion alone does not release unplayed audio. The hardware watchdog is separate: each scheduled buffer allows queued audio duration plus three seconds for playback completion. SpeechPlayback owns only the scheduled playback operation; its error/cancellation path releases the current audio ID.
+✅ Gateway has no speech preparation or prevalidation stage. The App output consumer releases remaining source/input audio after reply completion/error dispatch has joined Actions, and when dispatch fails; session teardown cancels session audio, and runtime teardown closes the store. Pending audio does not expire while waiting for its Action. The reply owner is the originating source/input, not the whole multi-turn voice session. Generation completion alone does not release unplayed audio. The hardware watchdog is separate: each scheduled buffer allows queued audio duration plus three seconds for playback completion. AppWorkflows.SpeechPlayback owns only the scheduled playback operation; its error/cancellation path releases the current audio ID.
 
 ✅ SpeechActions.swift contains only the audioID playback Action. Speech failure, playback cancellation and text-boundary tests exercise SpeechSynthesisAgent plus audioID playback.
 
@@ -42,10 +42,12 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 | --- | --- |
 | SpeechActions.swift | Canonical speak entry and audioID validation |
 | Support/SpeechActionModule.swift | Explicit definition and SpeechPlaybackCapability interface |
-| Support/SpeechPlayback.swift | Actor-owned checkout, playback and cancellation cleanup |
+| App/Workflows/SpeechPlayback.swift | Host-owned checkout, playback and cancellation cleanup |
 
 ✅ Entry and support share the existing Actions target. ❌ No synthesis, new queue or device resource lease is introduced.
 
-✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
+✅ Action display names are declared in entry macros and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
 
 ✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
+
+✅ SpeechActions validates the audio identifier with a module-owned SpeechActionError. The injected playback endpoint owns checkout and drain; AppWorkflows.SpeechPlayback adapts StorageAudio ownership.

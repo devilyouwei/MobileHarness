@@ -193,3 +193,5 @@ Cancellation stops future writes and joins cooperative tasks while retaining pri
 ❌ The API and composition gaps noted above remain open. Physical emergency stopping and persistent result delivery are also unimplemented; automated tests do not establish physical motion quality.
 
 Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros.md), [ADR0091](../../../docs/adr/0091-nexarm-motor-scoped-feedback.md), [ADR0092](../../../docs/adr/0092-atomic-actions-and-composed-results.md), [ADR0093](../../../docs/adr/0093-nexarm-platform-action-boundary.md). This document describes current code, not superseded implementations or unimplemented proposal interfaces.
+
+✅ Registration uses ActionRequest, ActionResource and ActionExecutionBudget from Actions/Contracts. Motor profiles, movement and completion algorithms are unchanged by the contract migration.

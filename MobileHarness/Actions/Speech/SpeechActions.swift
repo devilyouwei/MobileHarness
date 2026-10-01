@@ -1,6 +1,4 @@
-import AgentCore
 import Foundation
-import StorageAudio
 
 /// Stateless namespace for scheduled speech actions.
 public enum SpeechActions {
@@ -16,10 +14,12 @@ public enum SpeechActions {
             let arguments = ActionArguments(invocation.call.parameters)
             try arguments.validateAllowedKeys(["audioID"])
             let value = try arguments.requiredString("audioID", maximumUTF8Bytes: 36, allowBlank: false)
-            guard let parsed = UUID(uuidString: value) else { throw SpeechAudioError.missingAudio }
+            guard let parsed = UUID(uuidString: value) else { throw SpeechActionError.missingAudio }
             id = parsed
-        } catch { throw SpeechAudioError.missingAudio }
+        } catch { throw SpeechActionError.missingAudio }
         try await play(id, invocation)
         try Task.checkCancellation()
     }
 }
+
+public enum SpeechActionError: Error { case missingAudio }

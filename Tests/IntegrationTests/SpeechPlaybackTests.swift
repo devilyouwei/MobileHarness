@@ -1,6 +1,7 @@
 import Actions
 import AgentCore
 import Agents
+import AppWorkflows
 import Foundation
 import Gateway
 import ModelKit
@@ -339,11 +340,11 @@ private actor ReplyCompletionGate {
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         sink: { _ in })
     await #expect(throws: ActionExecutionError.missingHandler(job.2.call.actionPath)) {
-        try await gateway.dispatch(job.2.envelope)
+        try await gateway.dispatch(job.2.testEnvelope)
     }
     // Gateway reports admission failure; the owning output consumer releases its input resources.
     try await store.validate(job.0, owner: job.1)
-    await store.cancel(inputID: job.2.envelope.inputID, source: job.2.envelope.source)
+    await store.cancel(inputID: job.2.testEnvelope.inputID, source: job.2.testEnvelope.source)
     await #expect(throws: CancellationError.self) { try await store.validate(job.0, owner: job.1) }
     await synth.stop()
     await gateway.shutdown()

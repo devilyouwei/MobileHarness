@@ -1,7 +1,7 @@
 import Foundation
 
 /// Bounded leaf results. A child path identifies its location in a nested composition.
-public struct ActionReport: Equatable, Sendable {
+public struct AgentActionReport: Equatable, Sendable {
     public struct Entry: Equatable, Sendable {
         public enum Status: String, Sendable { case succeeded, failed, cancelled, notStarted }
         public enum Code: String, Sendable {
@@ -34,22 +34,16 @@ public struct ActionReport: Equatable, Sendable {
         entries = validatedEntries
         self.executionFailure = executionFailure
     }
+    public init(delivering entries: [Entry], executionFailure: Entry.Code?) {
+        precondition(entries.count <= 256 && entries.allSatisfy { !$0.path.isEmpty && $0.path.utf8.count <= 128 })
+        self.entries = entries
+        self.executionFailure = executionFailure
+    }
     public static func executionFailed(_ code: Entry.Code) -> Self {
         Self(validatedEntries: [], executionFailure: code)
     }
     public static func failure(_ code: Entry.Code) -> Self {
         Self(validatedEntries: [.init(path: "root", status: code == .cancelled ? .cancelled : .failed, code: code)])
-    }
-    public static func code(for error: any Error) -> Entry.Code {
-        if error is CancellationError { return .cancelled }
-        switch (error as? any ActionExecutionFailureProviding)?.actionExecutionFailure {
-        case .feedbackTimeout: return .feedbackLost
-        case .disconnected: return .disconnected
-        case .completionTimeout: return .targetNotReached
-        case .invalidArguments, .invalidPose: return .invalidArguments
-        case .busy, .controlNotReady, .resourceUnavailable, .background: return .unavailable
-        default: return .handlerFailed
-        }
     }
     public init(entries: [Entry]) throws {
         guard entries.count <= 256 else { throw ValidationError.capacity }
@@ -69,11 +63,4 @@ public struct ActionReport: Equatable, Sendable {
         if hasFailures { return entries.contains { $0.status == .succeeded } ? .partialFailure : .failed }
         return .succeeded
     }
-}
-
-/// Adapters can preserve a completed report through existing throwing handler boundaries.
-public protocol ActionReportProviding: Error { var actionReport: ActionReport { get } }
-public struct ActionReportedError: Error, Sendable, ActionReportProviding {
-    public let actionReport: ActionReport
-    public init(_ report: ActionReport) { actionReport = report }
 }

@@ -16,7 +16,7 @@ struct ActionExecutionLedger {
         self.terminalCapacity = terminalCapacity
     }
 
-    mutating func admit(_ invocation: ActionInvocation, definition: ActionDefinition) {
+    mutating func admit(_ invocation: ScheduledAction, definition: ActionDefinition) {
         let semantics: ActionExecutionRecord.Semantics
         switch definition.kind {
         case .finite: semantics = .finite
@@ -45,7 +45,7 @@ struct ActionExecutionLedger {
         guard !(record.phase == .cancelling && phase == .running) else { return false }
         record.phase = phase
         if phase == .running { record.startedAt = .now }
-        record.completion = completion
+        record.completion = completion?.agentValue
         record.failureDescription = failureDescription.map { String($0.prefix(512)) }
         record.failure = failure
         if record.isTerminal {

@@ -60,3 +60,5 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ The local package builds BehaviorDefinitions as a host compiler macro plugin for Action/Tool metadata; it is not an iOS runtime device dependency. NexArm profile/budget policy remains in the Actions target.
 
 ✅ Navigation no longer references unused permission/transport placeholders. Historical NexArm diagnostics are listed under root IntegrationTests; production compilation remains SwiftPM-owned.
+
+✅ Navigation includes Actions/Contracts and Tools/Contracts, Gateway translation/scheduling context and App workflow adapters. SwiftPM remains the single source compilation map.

@@ -4,7 +4,7 @@ Purpose: support immediate presentation tools without exposing implementation fi
 
 - ✅ `UIToolModule.swift`: seven completion-only definitions, `UIUpdateCapability` and `PosePresentationCapability`; App injects endpoints.
 - ✅ `UIToolTypes.swift`: `UITools.Gaze`, `VoiceState` and validation errors; existing public names are preserved.
-- ✅ `ConversationPresentation.swift`: current turn, transcript/reply flags and one sequence per six update kinds. New accepted turns reset bounded state; stale/duplicate updates are rejected. It owns no queue; App validates session identity.
+- ✅ App-owned `App/Workflows/ConversationPresentation.swift`: current turn, transcript/reply flags and one sequence per six update kinds. New accepted turns reset bounded state; stale/duplicate updates are rejected. It owns no queue; App validates session identity.
 - ❌ Rendering acknowledgement and new host primitives are not implemented here.
 
 ```mermaid
@@ -12,10 +12,12 @@ flowchart LR
     Module[UIToolModule] --> Entries[UITools functions]
     Entries --> Capability[Injected presentation capability]
     Capability --> Adapter[App endpoint]
-    Adapter --> Policy[ConversationPresentation acceptance]
+    Adapter --> Policy[AppWorkflows.ConversationPresentation acceptance]
     Policy --> State[UI state]
 ```
 
 The callback must complete before the Tool completes. Types and policy do not register themselves or grant Agent permissions.
 
 ✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
+
+✅ Support contains capability interfaces and explicit bindings. ConversationPresentation moved to App/Workflows; Tools does not choose permitted Agent identities.

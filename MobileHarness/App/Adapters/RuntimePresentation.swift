@@ -19,7 +19,7 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
 @MainActor
 protocol CameraOutputHandling: AnyObject, Sendable {
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws
-    func present(_ overlay: PoseOverlay, sessionID: UUID) throws
+    func present(_ overlay: ToolPoseOverlay, sessionID: UUID) throws
 }
 
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
@@ -75,7 +75,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(target, invocation: invocation)
     }
-    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws {
+    func present(_ overlay: ToolPoseOverlay, sessionID: UUID) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(overlay, sessionID: sessionID)
     }

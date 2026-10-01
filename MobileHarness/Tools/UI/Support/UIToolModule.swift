@@ -1,4 +1,3 @@
-import AgentCore
 import Foundation
 
 /// Typed presentation operations; completion means the endpoint accepted the update.
@@ -12,7 +11,7 @@ public protocol UIUpdateCapability: Sendable {
 }
 
 public protocol PosePresentationCapability: Sendable {
-    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws
+    func present(_ overlay: ToolPoseOverlay, sessionID: UUID) async throws
 }
 
 public struct UIToolModule: ToolModule {
@@ -25,44 +24,44 @@ public struct UIToolModule: ToolModule {
     public var definitions: [ToolDefinition] {
         [
             UITools.finishTranscriptDefinition(
-                completing: { [updates] call, envelope in
-                    try await UITools.finishTranscript(invocation: ToolInvocation(call: call, envelope: envelope)) {
+                completing: { [updates] call, context in
+                    try await UITools.finishTranscript(invocation: ToolInvocation(call: call, context: context)) {
                         try await updates.finishTranscript(invocation: $0)
                     }
                 }),
             UITools.setTranscriptDefinition(
-                completing: { [updates] call, envelope in
-                    try await UITools.setTranscript(invocation: ToolInvocation(call: call, envelope: envelope)) {
+                completing: { [updates] call, context in
+                    try await UITools.setTranscript(invocation: ToolInvocation(call: call, context: context)) {
                         try await updates.presentTranscript($0, invocation: $1)
                     }
                 }),
             UITools.beginReplyTurnDefinition(
-                completing: { [updates] call, envelope in
-                    try await UITools.beginReplyTurn(invocation: ToolInvocation(call: call, envelope: envelope)) {
+                completing: { [updates] call, context in
+                    try await UITools.beginReplyTurn(invocation: ToolInvocation(call: call, context: context)) {
                         try await updates.beginReplyTurn(invocation: $0)
                     }
                 }),
             UITools.setVoiceStateDefinition(
-                completing: { [updates] call, envelope in
-                    try await UITools.setVoiceState(invocation: ToolInvocation(call: call, envelope: envelope)) {
+                completing: { [updates] call, context in
+                    try await UITools.setVoiceState(invocation: ToolInvocation(call: call, context: context)) {
                         try await updates.presentVoiceState($0, invocation: $1)
                     }
                 }),
             UITools.printDefinition(
-                completing: { [updates] call, envelope in
-                    try await UITools.print(invocation: ToolInvocation(call: call, envelope: envelope)) {
+                completing: { [updates] call, context in
+                    try await UITools.print(invocation: ToolInvocation(call: call, context: context)) {
                         try await updates.present($0, invocation: $1)
                     }
                 }),
             UITools.moveEyesDefinition(
-                completing: { [updates] call, envelope in
-                    try await UITools.moveEyes(invocation: ToolInvocation(call: call, envelope: envelope)) {
+                completing: { [updates] call, context in
+                    try await UITools.moveEyes(invocation: ToolInvocation(call: call, context: context)) {
                         try await updates.present($0, invocation: $1)
                     }
                 }),
             UITools.showPoseDefinition(
-                completing: { [presentation] call, envelope in
-                    try await UITools.showPose(call: call, envelope: envelope) {
+                completing: { [presentation] call, context in
+                    try await UITools.showPose(call: call, context: context) {
                         try await presentation.present($0, sessionID: $1.sessionID)
                     }
                 }),

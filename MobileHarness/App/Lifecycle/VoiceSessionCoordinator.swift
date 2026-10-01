@@ -2,6 +2,7 @@ import AVFAudio
 import Actions
 import AgentCore
 import Agents
+import AppWorkflows
 import Foundation
 import Gateway
 import ModelKit
@@ -414,10 +415,10 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard let speechPlayback else { throw CommunicationError.scopeClosed }
         try await speechPlayback.play(audioID: audioID, invocation: invocation) { [weak self] stream, invocation in
             guard let self else { throw CancellationError() }
-            try await self.play(stream, envelope: invocation.envelope)
+            try await self.play(stream, envelope: invocation.context)
         }
     }
-    private func play(_ stream: SpeechAudio, envelope: OutputEnvelope) async throws {
+    private func play(_ stream: SpeechAudio, envelope: ActionExecutionContext) async throws {
         let generation = envelope.sessionID
         guard conversationPresentation.isCurrent(envelope), accepts(session: generation) else {
             throw CancellationError()
@@ -461,35 +462,35 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
 
     func presentTranscript(_ text: String, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
-        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        guard conversationPresentation.accept(invocation.envelope, update: .transcript) else { return }
+        guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.context, update: .transcript) else { return }
         state.liveTranscript = text
     }
 
     func finishTranscript(invocation: ToolInvocation) throws {
         try Task.checkCancellation()
-        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        guard conversationPresentation.accept(invocation.envelope, update: .finishTranscript) else { return }
+        guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.context, update: .finishTranscript) else { return }
         state.liveTranscript = ""
     }
 
     func beginReplyTurn(invocation: ToolInvocation) throws {
         try Task.checkCancellation()
-        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        guard conversationPresentation.accept(invocation.envelope, update: .beginReply) else { return }
+        guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.context, update: .beginReply) else { return }
         state.assistantReply = ""
         state.expression = nil
     }
 
     func presentVoiceState(_ voiceState: UITools.VoiceState, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
-        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        if conversationPresentation.isCurrent(invocation.envelope), conversationPresentation.transcriptClosed,
+        guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+        if conversationPresentation.isCurrent(invocation.context), conversationPresentation.transcriptClosed,
             voiceState != .listening
         {
             return
         }
-        guard conversationPresentation.accept(invocation.envelope, update: .voiceState) else { return }
+        guard conversationPresentation.accept(invocation.context, update: .voiceState) else { return }
         switch voiceState {
         case .processing:
             presentationPhase = .processing
@@ -506,15 +507,15 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
 
     func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws {
         try Task.checkCancellation()
-        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        guard conversationPresentation.accept(invocation.envelope, update: .expression) else { return }
+        guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.context, update: .expression) else { return }
         state.expression = emotion == .clear ? nil : EyeExpression(emotion)
     }
 
     func present(_ text: String, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
-        guard accepts(session: invocation.envelope.sessionID) else { throw CancellationError() }
-        guard conversationPresentation.accept(invocation.envelope, update: .reply) else { return }
+        guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+        guard conversationPresentation.accept(invocation.context, update: .reply) else { return }
         state.assistantReply += text
         record(text)
     }

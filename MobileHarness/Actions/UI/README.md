@@ -6,7 +6,7 @@ Purpose: implement the model-callable `UI.express` Action. Design goals: typed v
 - ✅ Required, case-sensitive emotion: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. Missing, extra or invalid arguments throw before presentation.
 - ✅ Cancellation is checked before and after the injected callback. Success means the presentation policy accepted the target, not that animation finished.
 - ✅ Assistant JSON declares the model alias and default Display channel. Explicit channel/wait scopes still apply. Its scheduled status appears in the Action panel, like every other Action.
-- ✅ Fixed caption, recognition, voice phase, gaze and turn lifecycle updates moved to [Tools/UI](../../Tools/UI/README.md). They have no Action definitions or channels. That module also owns ConversationPresentation, shared by App's expression endpoint.
+- ✅ Fixed caption, recognition, voice phase, gaze and turn lifecycle updates moved to [Tools/UI](../../Tools/UI/README.md). They have no Action definitions or channels. AppWorkflows.ConversationPresentation owns the acceptance policy shared by those tools and the expression endpoint.
 - ❌ Native model Tool output and animation-completion acknowledgments remain outside this change. Expression intentionally remains an Action until that model transport is supported.
 
 ```mermaid
@@ -34,3 +34,5 @@ The Action owns no task or queue. App rejects outdated sessions and turns; stale
 ✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
 
 ✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
+
+✅ Expressions consume ActionInvocation from Actions/Contracts. Rendering and session acceptance remain in the injected App endpoint.

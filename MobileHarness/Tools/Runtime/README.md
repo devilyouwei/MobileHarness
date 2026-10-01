@@ -1,18 +1,18 @@
 # Tool Runtime
 
-Purpose: register and execute resolved ToolCalls directly. Design goals: explicit feedback kind, bounded catalogs and host-owned effects without Action scheduling. Runtime uses AgentCore; ToolMacro references the separate compile-time BehaviorDefinitions plugin.
+Purpose: register and execute ToolRequests directly. Design goals: explicit feedback kind, bounded catalogs and host-owned effects without Action scheduling. Runtime consumes Tools/Contracts; ToolMacro references the separate compile-time BehaviorDefinitions plugin.
 
 | File | Responsibility |
 |---|---|
-| ToolMacro | Attached metadata declarations and generated factory interface |
-| ToolDefinition / ToolModules | Domain definitions and explicit built-in catalog |
+| ../Contracts/ToolMacro | Attached metadata declarations and generated factory interface |
+| ../Contracts/ToolDefinition / ToolModules | Domain definitions and explicit built-in catalog |
 | ToolRegistry | Actor-owned bounded handlers and resource mappings |
-| ToolInvocation | ToolCall plus trusted output context |
+| ../Contracts/ToolInvocation | ToolRequest plus trusted output context |
 | ToolExecutor | Lookup, cancellation and result/completion semantics |
 
 ## Registration and bounds
 
-Domain Support catalogs bind `@Tool`-generated factories to explicit capabilities. `ToolRegistry(modules:capabilities:)` validates the entire catalog atomically: at most32 modules,128 handlers,128 capability catalogs and8 resources per definition. Path segments use the1–64-byte identifier grammar. Duplicate/invalid entries and missing implementations throw; no partial startup registration is published. Agent declarations remain the permission source.
+Domain Support catalogs bind `@Tool`-generated factories to explicit capabilities. `ToolRegistry(modules:)` validates the execution catalog atomically: at most32 modules,128 handlers and8 resources per definition. BehaviorAssembly checks up to128 Agent capability catalogs against registered paths before producers start. Path segments use the1–64-byte identifier grammar. Duplicate/invalid entries throw in the registry; missing implementations throw in assembly; no partial startup registration is published. Agent declarations remain the permission source.
 
 The registry retains handler and resource mappings. ToolDefinition also carries a display name; this metadata does not create an Action execution record. Dynamic registration APIs support explicit isolated runtimes; production uses the complete catalog constructor.
 
@@ -31,11 +31,11 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Call[Authorized resolved ToolCall] --> Lookup[Registry lookup]
-    Lookup -->|unknown| Error[Error ToolResult]
+    Call[Authorized resolved ToolRequest] --> Lookup[Registry lookup]
+    Lookup -->|unknown| Error[Error ToolResponse]
     Lookup --> Returning[Returning handler]
     Lookup --> Completion[Completion handler]
-    Returning -->|String or ordinary error| Result[Correlated ToolResult]
+    Returning -->|String or ordinary error| Result[Correlated ToolResponse]
     Completion -->|success| Done[Return nil]
     Completion -->|failure| Throw[Throw to dispatcher]
     Result --> Input[Dispatcher routes through InputGateway]

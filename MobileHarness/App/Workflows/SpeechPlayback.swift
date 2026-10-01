@@ -1,3 +1,4 @@
+import Actions
 import AgentCore
 import Foundation
 import StorageAudio
@@ -13,8 +14,8 @@ public actor SpeechPlayback {
     ) async throws {
         try Task.checkCancellation()
         let owner = SpeechAudioStore.Owner(
-            source: invocation.envelope.source, session: invocation.envelope.sessionID,
-            input: invocation.envelope.inputID)
+            source: AgentID(rawValue: invocation.context.source), session: invocation.context.sessionID,
+            input: invocation.context.inputID)
         let audio = try await store.checkout(id, owner: owner)
         let cancellation = Mutex<Task<Void, Never>?>(nil)
         do {
