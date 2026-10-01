@@ -43,7 +43,7 @@ flowchart TD
 
 finish seals root input and joins all accepted work; unclosed wait scopes fail with invalidSchedule and cancel the task. Empty paired waits are valid barriers. A handler error cancels every queued/running Action belonging to that task, preserving the first error. A failed task remains admission-fenced until its producer finishes or explicitly cancels it; this prevents a still-generating producer from recreating a failed tree. Cancel/shutdown wait for cooperative handler cleanup; completion/cancellation releases the entire tree. Stop the producer before explicit cancellation. Once an explicitly completed/cancelled task has been released, IDs must not be reused by stale producers.
 
-Handler completion means the implementation's actual completion (including drained speech playback), not inference completion, XML closure or admission. Persistent presentation effects may remain after their handler returns. Already executed effects cannot be rolled back. A wait adds no timeout; existing Action/model/cache deadlines still apply. Speech synthesis prefetch remains outside Action scheduling and can expire during long waits. Tools remain outside XML wait groups.
+Handler completion means the implementation's actual completion (including drained speech playback), not inference completion, XML closure or admission. Persistent presentation effects may remain after their handler returns. Already executed effects cannot be rolled back. A wait adds no timeout; individual Action hardware and model execution deadlines still apply. Speech synthesis runs outside Action scheduling: each executing job has a 60-second deadline, but queued/ready audio has no wall-clock expiry and remains owned by its reply until consumed or explicitly cleaned up. Production PCM reads have no independent starvation timer. Tools remain outside XML wait groups.
 
 ❌ Priority, preemption, global cross-task barriers, rollback, arbitrary resource dependency graphs and hardware takeover are not implemented. Device acceptance is separate from deterministic handler tests. See ADR 0059 for the migration from shared lanes.
 
@@ -171,3 +171,40 @@ Before enabling locks, test:
 ## Action runtime stage 2
 
 ✅ Stage 2 reserves bounded feedback slots before enqueue, stores typed completion and performs delivery after releasing lane/module. Resource declarations add execution fences; cancel(resources:) and cancel(agent:incarnation:) cancel/join owning inputs. Session/shutdown closes matching receipts. ❌ Feedback delivery is not part of finish barrier and does not prove exactly-once processing. See sibling Results and Resources READMEs for algorithms and limits.
+
+## Execution observation
+
+✅ ChannelScheduler owns `ActionExecutionLedger`: retain every admitted active execution under existing scheduler capacity limits plus the latest100 terminal executions, evicting only the oldest terminal record and counting evictions. Records are keyed by fresh execution ID; terminal records cannot regress. Running cancellation publishes `cancelling` before signalling the task and remains nonterminal until the handler joins. Queued cancellation is terminal without a start timestamp. Structured adapter failure reasons fall back to generic operation failure. Rejected admission has no execution record.
+
+```mermaid
+flowchart LR
+    Admission[Validated admission] --> Ledger[Active records and100 terminal records]
+    Worker[Started / cancellation requested / joined terminal] --> Ledger
+    Ledger --> Snapshot[Versioned full snapshot]
+    Snapshot --> Stream[Up to8 observers; bufferingNewest1]
+    Stream --> App[Root-owned presentation workflow]
+    App --> UI[Channel summaries and recent execution history]
+```
+
+✅ `observeExecutions()` atomically registers a subscriber and yields an initial full snapshot. Every update is another full snapshot, so coalescing intermediate notifications or skipping revisions requires no delta recovery and never discards device actions. Subscribers beyond8 are rejected; termination removes their registration. Shutdown joins work, yields final state, then closes observers. Publishing performs no observer await and cannot block on UI consumption. `executionSnapshot()` supports read-only diagnostics/tests. All phases are available irrespective of Agent feedback policy; ActionResult delivery is unchanged.
+
+❌ Terminal retention is bounded rather than durable: a consumer stalled beyond100 completions can see eviction counts but cannot recover evicted history. No physical stop or per-device progress is inferred from cancellation or state acceptance.
+
+## Action and Tool presentation boundary
+
+✅ Failed executions capture error.localizedDescription at the throw boundary and publish it in the bounded execution record. ToolCalls never enter this ledger; all admitted Actions do. ❌ No per-module/source visibility rules exist.
+
+## Domain-owned execution names
+
+✅ Admission copies displayName from the validated implementation definition into ActionExecutionRecord; transitions and retained history preserve it. The scheduler does not resolve Agent aliases, localize strings or emit UI commands. Full snapshots retain initial-state delivery, bufferingNewest(1), at most eight observers, bounded active records and the existing terminal-history limit. A slow observer can miss intermediate transitions but receives complete retained state; this is not an audit event log.
+
+```mermaid
+flowchart LR
+    Domain[Domain definition: name / kind / handler] --> Admit[Validated admission]
+    Admit --> Record[Execution record: copied name + runtime facts]
+    Record --> Snapshot[Versioned bounded snapshot]
+    Snapshot --> App[Root subscription]
+    App --> UI[Generic presentation]
+```
+
+✅ The unfamiliar-action integration test observes a new domain through the real scheduler and Workflow into UI without mappings. ❌ Metadata adds no queue, new execution result or automatic recovery policy. See ADR 0086.

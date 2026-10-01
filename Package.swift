@@ -51,7 +51,8 @@ let package = Package(
             path: "MobileHarness/App/Workflows", exclude: ["README.md"]),
         .testTarget(name: "UITests", dependencies: ["UI"], exclude: ["README.md"]),
         .testTarget(
-            name: "AppWorkflowTests", dependencies: ["AppWorkflows", "UI", "Storage", "StorageChat", "ModelKit"],
+            name: "AppWorkflowTests",
+            dependencies: ["AppWorkflows", "UI", "Storage", "StorageChat", "ModelKit"],
             exclude: ["README.md"]),
         .target(
             name: "AgentCore", path: "MobileHarness/Agents/Core",
@@ -71,7 +72,11 @@ let package = Package(
         .target(
             name: "Actions", dependencies: ["AgentCore", "StorageAudio"],
             path: "MobileHarness/Actions",
-            exclude: ["UI/README.md", "README.md", "Speech/README.md", "Robot/README.md", "Runtime/README.md"]),
+            exclude: [
+                "README.md", "Runtime/README.md", "NexArm/README.md", "NexArm/Support/README.md",
+                "Speech/README.md", "Speech/Support/README.md", "UI/README.md", "UI/Support/README.md",
+                "Robot/README.md", "Robot/Support/README.md",
+            ]),
         .target(
             name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageChat", "StorageAudio"],
             path: "MobileHarness/Agents",
@@ -98,7 +103,10 @@ let package = Package(
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
             name: "Tools", dependencies: ["AgentCore"], path: "MobileHarness/Tools",
-            exclude: ["README.md", "System/README.md", "UI/README.md", "Runtime/README.md"]),
+            exclude: [
+                "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
+                "Runtime/README.md",
+            ]),
         .target(
             name: "ModelKit", path: "MobileHarness/ModelKit",
             exclude: [
@@ -174,11 +182,14 @@ let package = Package(
         .testTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
         .target(
             name: "PlatformKit", path: "MobileHarness/PlatformKit",
-            exclude: ["README.md", "Audio/README.md", "Vision/README.md", "Core/README.md", "Connectivity/README.md"]),
+            exclude: [
+                "README.md", "Audio/README.md", "Vision/README.md", "Core/README.md", "Connectivity/README.md",
+                "Connectivity/NexArm/README.md",
+            ]),
         .testTarget(
             name: "IntegrationTests",
             dependencies: [
-                "BehaviorAssembly",
+                "BehaviorAssembly", "AppWorkflows", "UI",
                 "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
                 "Storage", "StorageChat", "StorageAudio",
                 "PlatformKit",

@@ -4,7 +4,7 @@ Purpose: provide local text-only ChatCapability using pinned Qwen3.5 affine 4-bi
 
 ✅ Production uses Qwen3.5-2B 4-bit files from Models/Qwen35. The download profile pins the upstream revision; runtime loads the local directory directly.
 ✅ The injected ModelResource admits one active request and rejects concurrent calls; unload waits for generation cleanup. Each request starts with fresh cache state; history is supplied explicitly by the caller.
-✅ Up to 64 messages / 64 KiB, 4096 prompt-plus-output tokens, no fixed output cap; omitted budgets may use the remaining local context. The output stream holds at most 128 events of 4096 bytes each; overflow fails explicitly.
+✅ Up to 64 messages / 64 KiB, 4096 prompt-plus-output tokens, no fixed output cap; omitted budgets may use the remaining local context. The output stream has no pending-event count cap; the 4096-byte per-event limit remains.
 ✅ No automatic fallback. Physical Apple Silicon only. Load, warmup and unload are composition-root operations.
 ❌ Vision, native Tool Call transport and universal device compatibility are not implemented. Downloaded multimodal weights are consumed by MLX's text loader, which discards vision tensors; visual requests are not exposed.
 
@@ -15,7 +15,7 @@ flowchart LR
     Consumer -->|ChatRequest| Qwen35Chat
     Qwen35Chat -->|Exclusive lease| Resource[Manager-owned ModelResource]
     Resource -->|Local model| MLXLanguageEngine
-    Qwen35Chat -->|Bounded ChatEvent stream| Consumer
+    Qwen35Chat -->|ChatEvent stream without count cap| Consumer
 ```
 
 Run scripts/download-qwen35.py before testing. The root project package declares this adapter; the base SDK does not depend on MLX or concrete models. Real quality and latency are acceptance measurements, separate from compilation and protocol-contract tests.
@@ -24,7 +24,7 @@ Run scripts/download-qwen35.py before testing. The root project package declares
 
 ## Queue and asynchronous processing contract
 
-The Chat provider acquires one manager-owned ModelResource lease before generation; competing requests fail rather than wait. A generation task produces text/finished events; the Agent consumes the returned InferenceSession. Its stream holds 128 events, each at most 4096 estimated bytes. Overflow fails the session and terminates generation instead of dropping text and continuing. Request history belongs to the caller; it is not a queue retained by the model.
+The Chat provider acquires one manager-owned ModelResource lease before generation; competing requests fail rather than wait. A generation task produces text/finished events; the Agent consumes the returned InferenceSession. Its stream has no pending-event count cap; each event is at most 4096 estimated bytes. Generation remains constrained by EOS and the prompt-plus-output token budget. A slow consumer can drain the whole reply after generation finishes without bufferOverflow. Request history belongs to the caller; it is not a queue retained by the model.
 
 The session cancellation hook cancels the generation task. Worker cleanup releases its lease after backend work finishes; unload waits for that lease. Normal completion emits a finish reason and closes the stream; generation failures propagate through it. Blocking admission, automatic retries and persistent generation recovery are unsupported.
 
@@ -32,9 +32,9 @@ The session cancellation hook cancels the generation task. Worker cleanup releas
 flowchart LR
     Caller --> Lease[Acquire exclusive model lease]
     Lease --> Worker[Generation task]
-    Worker --> Buffer[128-event stream]
+    Worker --> Buffer[Stream without event-count cap]
     Buffer --> Consumer[Agent consumer]
-    Cancel[Cancel / overflow] --> Worker
+    Cancel[Cancel / error] --> Worker
     Worker --> Cleanup[Backend cleanup then lease release]
 ```
 

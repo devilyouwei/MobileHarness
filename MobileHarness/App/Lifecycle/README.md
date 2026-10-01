@@ -17,6 +17,8 @@ flowchart LR
     Producers --> Gateways[InputGateway / OutputGateway]
     Gateways --> Execution[Action and Tool execution]
     Execution --> Endpoint[Session-fenced effect methods]
+    Execution --> Done[Reply completion or cancellation barrier]
+    Done --> Retire[Retire remaining source/input audio]
     Endpoint --> State[UI state / platform playback]
     Stop[Stop or replacement] --> Close[Stop and join producers]
     Close --> Cancel[Cancel audio and executors; await cleanup]
@@ -38,3 +40,11 @@ flowchart LR
 ## Action implementation audit
 
 ✅ VoiceSessionCoordinator implements typed play(audioID:invocation:) and delegates checkout/drain/release to SpeechPlayback. Audio argument decoding belongs to SpeechActions.speak.
+
+✅ Structured Action failures are labeled as action failures rather than generic speech-processing failures. NexArm argument errors provide localized descriptions instead of exposing Swift error type names. Cancellation and input cleanup behavior remain unchanged.
+
+## Action and Tool presentation boundary
+
+✅ Caption append, full transcript replacement, voice phase and gaze endpoints consume ToolInvocation. The existing session/turn acceptance policy remains; expression and audio keep scheduled Action contexts. ❌ No audio/recognition errors are inserted into the Action panel.
+
+✅ VoiceSessionCoordinator retires source/input audio after successful dispatch of reply completion/error controls, when Gateway has joined the corresponding Actions. Dispatch failure also retires that input; voice interruption still stops the producer before cancelling all audio in that session. Pending/ready PCM has no wall-clock expiry. Consumed frames already leave Storage on read, and each played handle is released after hardware drain; reply cleanup retires only remaining handles. The production store has no PCM read timeout; the synthesis worker owns its 60-second execution deadline, excluding queue time. The voice session spans multiple replies; current voice admission allows one reply through playback at a time, while cache ownership still isolates other sources and inputs. ❌ Generation completion alone is not playback completion, and this does not add barge-in or multi-reply UI.

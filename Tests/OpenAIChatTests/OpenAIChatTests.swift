@@ -112,6 +112,51 @@ private final class HangingProtocol: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
+private final class LongReplyProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url,
+            let response = HTTPURLResponse(
+                url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/event-stream"])
+        else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        var wire = ""
+        for index in 0..<1024 {
+            wire +=
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\(index)你\"},\"finish_reason\":null}]}\n\n"
+        }
+        wire += "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        client?.urlProtocol(self, didLoad: Data(wire.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@Test(.timeLimit(.minutes(1))) func longCloudReplyCompletesBeforeConsumerStarts() async throws {
+    let manager = ModelManager()
+    let configuration = try config()
+    try await manager.register(
+        ModelRegistration(id: ModelID("long-cloud"), capabilities: [.chat]) { context in
+            ProvidedCapabilities(
+                chat: try OpenAIChat(
+                    context: context, configuration: configuration,
+                    sessionConfiguration: {
+                        let settings = URLSessionConfiguration.ephemeral
+                        settings.protocolClasses = [LongReplyProtocol.self]
+                        return settings
+                    }))
+        }, defaults: [.chat])
+    let chat = try await manager.get(.chat)
+    let session = try await chat.chat(ChatRequest(messages: [.init(role: .user, content: "Long reply")]))
+    // Unload joins producer cleanup without cancelling it. Do not consume until it releases its lease.
+    try await manager.unload(.chat)
+    var events: [ChatEvent] = []
+    for try await event in session.events { events.append(event) }
+    #expect(events == (0..<1024).map { .text("\($0)你") } + [.finished(.stop)])
+    await manager.shutdown()
+}
+
 @Test func overlapCancellationAndShutdown() async throws {
     let manager = ModelManager()
     let configuration = try config()

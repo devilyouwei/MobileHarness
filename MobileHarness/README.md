@@ -1,5 +1,8 @@
 # MobileHarness Technical Design
 
+> Current status (2026-09-30): the user confirmed iPhone LLM conversation control of NexArm. Normal BLE connections now use protocol/gesture validation, discovery includes other BLE devices, and foreground recovery avoids repeated motion. Physical acceptance of the latest discovery/recovery UX is pending.
+
+
 ## Overview
 
 **MobileHarness** is a *multi-modal*, *multi-agent*, *bio-inspired* harness for mobile and embodied AI systems. Its architecture follows a continuous information-processing loop inspired by biological nervous systems: **Signal → Cognition → Action**.
@@ -157,12 +160,13 @@ MobileHarness/
 │   └── Output/             # Validation, routing, dispatch, scheduling, results and resources
 ├── Actions/                # One target: scheduled execution and behaviors
 │   ├── Runtime/            # ActionRegistry, ActionExecutor and invocation
+│   ├── NexArm/             # Agent-used robot actions
 │   ├── Speech/             # Audio-ID playback and awaited completion
-│   └── UI/                 # Captions, voice state, expressions and turns
+│   └── UI/                 # Scheduled expression; non-callable Support below
 ├── Tools/                  # One target: direct execution and functions
 │   ├── Runtime/            # ToolRegistry and ToolExecutor
 │   ├── System/             # Fixed runtime information
-│   └── UI/                 # Completion-only skeleton display
+│   └── UI/                 # Immediate captions, gaze, voice state and skeleton display
 ├── Storage/                # Core cache, persistence and local synchronization
 │   ├── Audio/              # StorageAudio: PCM handles
 │   └── Chat/               # StorageChat: conversation records and journal
@@ -281,17 +285,17 @@ An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input
 | SpeechPerception | Bounded PCM admission; LiveSpeechInput and VoiceActivitySegmenter own VAD/ASR sessions, segmentation/merging and partial/final observations; explicit UI Actions own recognition presentation |
 | VisionPerception | FrameChangeFilter selects frames; shared pose inference feeds independently bounded observation publication and latest skeleton Tool / eye gaze Action output                                                   |
 | SpeechSynthesis | Directed serial synthesis into owner-scoped StorageAudio handles; playback remains a separate Action |
-| Photographer     | Proposed camera-motion policy in [docs](../docs/Photographer-Proposal.md); no active runtime or display responsibility                                                                                                             |
+| Photographer     | Subscribes to `vision.pose` and can emit internal `Robot.aim`; the camera session leaves arm control off. Tracking remains in [docs](../docs/Photographer-Proposal.md). See [ADR 0091](../docs/adr/0091-photographer-aim.md). |
 
-✅ Shared speech/vision perception and conversational Assistant. ❌ Photographer motion policy, ReflexAgent and additional task Agents. Perception freshness does not establish robot safety or sampling guarantees.
+✅ Shared speech/vision perception, conversational Assistant, and a pose subscriber that can aim. ❌ Tracking, ReflexAgent and additional task Agents. Perception freshness does not establish robot safety or sampling guarantees. The live camera does not move the arm.
 
 ### Actions
 
-[Actions](Actions/README.md) implements behavior that uses Channel scheduling. `Speech.speak(audioID)` consumes shared StorageAudio PCM prepared by the independent SpeechSynthesisAgent, while its scheduled handler still awaits actual playback completion. `UI` implements caption, expression, voice-state and turn-boundary operations through App-bound MainActor services.
+[Actions](Actions/README.md) implements behavior that uses Channel scheduling. `Speech.speak(audioID)` consumes shared StorageAudio PCM prepared by the independent SpeechSynthesisAgent, while its scheduled handler still awaits actual playback completion. `UI` implements scheduled expression through App-bound MainActor services; immediate caption, voice-state, gaze and turn updates belong to Tools/UI.
 
 Domain modules own behavior definitions, parameter validation and function bindings; Agent JSON owns available aliases/default Channels. App supplies typed execution capabilities through BehaviorAssembly. Shared physical resources must have coherent ownership across behavior functions.
 
-✅ Speech and UI behaviors, including `UI.express(emotion:)`. ❌ Photo-capture, robot, media and other device Actions; no separate smile Action is introduced.
+✅ Speech and UI behaviors, including `UI.express(emotion:)`, and [NexArm supervised USB Actions](Actions/NexArm/README.md), including Assistant base sweeps and gestures. ✅ iPhone BLE settings/workflow binding is implemented. ✅ Internal `Robot.aim` validates logical radians and forwards them to an injected sender. ❌ Photo-capture and media Actions remain pending. The camera session does not send an aim frame.
 
 #### Actions/Runtime
 
@@ -477,7 +481,7 @@ Syntax, escaping, nesting, bounds and malformed-stream behavior are defined in [
 | Execution         | OutputGateway → ChannelScheduler → Actions/Runtime        | OutputGateway → Tools/Runtime directly                    |
 | Ordering          | Task-local Channel FIFO; nested wait joins; global module exclusion | Caller awaits handler; no Channel queue                  |
 | Completion        | Handler completion and per-input finish barrier           | Value feedback or Void completion, fixed by registration |
-| Current examples  | Speech.speak, UI.print, UI.express                        | runtimeInfo, UI.showPose                          |
+| Current examples  | Speech.speak, UI.express                        | runtimeInfo, UI.print, UI.setTranscript, UI.moveEyes, UI.showPose |
 
 Both are validated executable outputs, and either may have side effects. Their distinction is execution/feedback semantics, not simply “write versus read.” Returning Tools re-enter InputGateway with ToolResult; Void Tools do not. Actions can return correlated terminal feedback under the policy described in [Action feedback and resource ownership](#action-feedback-and-resource-ownership). Typed internal observations use a separate messaging port, not either generation protocol.
 
@@ -498,7 +502,7 @@ flowchart LR
     Advance --> Tree
 ```
 
-Channel queues are task-local; equal names across Agents do not impose cross-task FIFO. Resource exclusion is process-wide. A wait affects one Agent/session/input, never unrelated tasks. finish seals root input and joins accepted work; errors cancel that task's tree and cooperative running work. No queued device action is silently discarded on capacity exhaustion. Speech prefetch remains outside this schedule and retains cache deadlines.
+Channel queues are task-local; equal names across Agents do not impose cross-task FIFO. Resource exclusion is process-wide. A wait affects one Agent/session/input, never unrelated tasks. finish seals root input and joins accepted work; errors cancel that task's tree and cooperative running work. No queued device action is silently discarded on capacity exhaustion. Speech synthesis remains outside this schedule, with a per-job execution deadline and reply-owned unplayed cache lifetime; pending/ready audio has no expiry timer.
 
 ✅ Bounded nested wait groups, streaming execution, local FIFO, global module exclusion and cancellation barriers. ❌ Priority, preemption, rollback and cross-task synchronization. Exact capacities and failure fencing belong in [Scheduling](Gateway/Output/Scheduling/README.md); protocol rules belong in [Generation](Agents/Core/Generation/README.md). ADR 0059 records this change.
 
@@ -542,11 +546,12 @@ sequenceDiagram
     OG->>IG: validate and deliver
     IG->>S: receive request
     S->>C: reserve audioID for source / session / input
+    S->>S: enqueue in bounded FIFO; start if worker idle
     S-->>IG: admitted
     IG-->>OG: delivery receipt
     OG-->>A: admission receipt
     par Synthesis path
-        S->>M: synthesize text and locale
+        S->>M: when FIFO worker starts, synthesize with 60 s execution deadline
         loop ordered audio events
             M-->>S: PCM frame or finished
             S->>C: append frame / complete audioID
@@ -560,7 +565,7 @@ sequenceDiagram
         C-->>P: single-use PCM stream
         loop as frames become available
             P->>C: read next frame
-            C-->>P: PCM or explicit failure
+            C-->>P: PCM when available; otherwise await producer / failure / cancellation
             P->>H: play PCM
         end
         H-->>P: playback drained
@@ -570,11 +575,17 @@ sequenceDiagram
     end
 ```
 
-The Agent waits for **request admission**, not synthesis completion, before emitting `Speech.speak(audioID)`. SpeechSynthesisAgent processes admitted requests in its own serial FIFO and does not inspect Channels; the Gateway's ChannelScheduler independently decides when Actions/Runtime invokes playback. App injects the process-wide ModelKit synthesis capability and one shared audio store into synthesis and playback. The current capability uses the MOSS-TTS-Nano adapter over Core ML; `StorageAudio` adapts PCM and owner identity to the general `Storage` memory primitives. Playback may consume PCM before synthesis finishes, but only as frames arrive: an empty initial or intermediate read waits up to three seconds from that read, then fails. This is not a three-second synthesis deadline. MOSS produces native 80 ms audio blocks after prompt prefill; neither block duration nor streaming guarantees a three-second first-audio deadline.
+The Agent waits for **request admission**, not synthesis completion, before emitting `Speech.speak(audioID)`. SpeechSynthesisAgent processes admitted requests in its own serial FIFO and does not inspect Channels; the Gateway's ChannelScheduler independently decides when Actions/Runtime invokes playback. The worker starts the next request after synthesis completes, without waiting for playback.
 
-[ADR 0055](../docs/adr/0055-synthesis-agent-audio-handles.md) and [ADR 0056](../docs/adr/0056-storage-audio-migration.md) record the synthesis/playback split and shared-cache ownership.
+App injects the process-wide ModelKit synthesis capability and one shared audio store into synthesis and playback. The current capability uses the MOSS-TTS-Nano adapter over Core ML; `StorageAudio` adapts PCM and owner identity to the general `Storage` memory primitives.
 
-Successful Action completion means the player has drained and the single-use cache lease has been released. Synthesis/cache errors, expiration, a missing handle or read starvation fail playback explicitly; cancellation and dispatch failure release the owning audio. No audio file, re-synthesis or Channel-driven synthesis reorder is involved. [Assistant](Agents/Assistant/README.md) owns current semantic segmentation; [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Speech playback](Actions/Speech/README.md), [MOSS](ModelKit/Speech/TTS/MossNano/README.md) and [PlatformKit Audio](PlatformKit/Audio/README.md) own their detailed limits and implementation contracts.
+Playback may consume PCM before synthesis finishes, but only as frames arrive: an empty initial or intermediate read waits for the producer, its failure or cancellation. The synthesis Agent owns the 60-second deadline from worker execution start, excluding FIFO queue time. It is neither a cache lifetime nor a total timeout measured from speak checkout; production initial and intermediate PCM reads have no independent deadline. The platform separately bounds scheduled-buffer hardware completion by queued audio duration plus three seconds. MOSS produces native 80 ms audio blocks after prompt prefill; neither block duration nor streaming guarantees a three-second first-audio deadline.
+
+[ADR 0055](../docs/adr/0055-synthesis-agent-audio-handles.md) and [ADR 0056](../docs/adr/0056-storage-audio-migration.md) record the synthesis/playback split. [ADR 0085](../docs/adr/0085-reply-owned-speech-audio.md) and [ADR 0087](../docs/adr/0087-speech-producer-deadline.md) supersede their cache-expiry and PCM-read-timeout policies.
+
+Successful Action completion means the player has drained and the single-use cache lease has been released. Each consumed frame leaves Storage on read; already consumed audio is not preserved for replay. The reply lifetime is one source/input within a voice session, not the full multi-turn session or durable conversation history. Pending/ready audio has no wall-clock expiry; the reply owner retires unused handles after all Actions complete, or during reply error/interruption cleanup. LLM generation completion alone does not release unplayed audio. Synthesis/cache errors, a missing handle or synthesis execution timeout fail playback explicitly; cancellation and dispatch failure release the owning audio. No audio file, re-synthesis or Channel-driven synthesis reorder is involved. [Assistant](Agents/Assistant/README.md) owns current semantic segmentation; [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Speech playback](Actions/Speech/README.md), [MOSS](ModelKit/Speech/TTS/MossNano/README.md) and [PlatformKit Audio](PlatformKit/Audio/README.md) own their detailed limits and implementation contracts.
+
+The synthesis deadline fails the shared audioID; pending or subsequent PCM reads throw, and playback propagates the failure to the Action. This is shared-cache error propagation, not a direct Agent-to-Action callback. See [synthesis timeout propagation](Agents/SpeechSynthesis/README.md#synthesis-timeout-propagation) for timing, cancellation and terminal-error retention.
 
 ### Session, Turn and UI Boundaries
 
@@ -595,7 +606,7 @@ ConversationTurn carries an ID and session-local ordinal through input, observat
 | Reply completed             | Empty                             | Retain until next utterance                          |
 | Stop / background / failure | Clear and invalidate session      | Clear and invalidate session                         |
 
-Eye gaze reuses pose facial landmarks and emits the code-owned `UI.moveEyes` Action within the camera session. [ADR 0049](../docs/adr/0049-perception-eye-gaze.md) records bounded presentation replacement and per-Action completion; smoothness and crossing-face behavior still require device acceptance.
+Eye gaze reuses pose facial landmarks and emits the code-owned immediate `UI.moveEyes` Tool within the camera session. [ADR 0049](../docs/adr/0049-perception-eye-gaze.md) records the earlier gaze design; ADR0083 migrates it to immediate Tool completion with the same bounded replacement policy; smoothness and crossing-face behavior still require device acceptance.
 
 Vision freshness uses separate bounded inference, publication and display paths, allowing a slow subscriber to coexist with fresh local visualization. The configured maximum refresh interval avoids change-filter starvation when new frames exist; it does not guarantee inference FPS. Details: [App](App/README.md), [ADR 0043](../docs/adr/0043-conversation-turn-presentation.md) and [VisionPerception](Agents/VisionPerception/README.md).
 
@@ -666,3 +677,33 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 ✅ Outer Storage files implement reusable bounded memory/cache, persistence and local synchronization. Audio and Chat own their business contracts in separate subdirectories/targets; core never depends on domains. Chat moved without data migration. See [Storage layout](Storage/README.md) and [ADR 0069](../docs/adr/0069-storage-core-domain-layout.md).
 
 ❌ Image, Video and semantic Memory domains are planned only; no empty directories or placeholder APIs. MemoryLeaseStore is a generic RAM lease primitive, not semantic memory. Cross-device sync and general reclaimable disk cache remain unimplemented.
+
+✅ `PlatformKit/Connectivity/NexArm` owns the shared protocol/controller and macOS-only serial I/O in PlatformKit. Its diagnostic composition lives in root IntegrationTests; Assistant declares the bounded base Action; the iPhone root binds foreground BLE through BluetoothWorkflow, while the Mac diagnostic binds USB. See ADR 0070. ❌ TCP and general robot ownership/watchdog validation remain pending.
+
+## Action source organization
+
+✅ Actions retains Runtime, NexArm, Speech, UI and Robot in one target. Each domain root groups related callable entries; Support holds registrations, capability interfaces, values and actual services. Runtime holds shared contracts and ActionModules. The unused diagnostic Action is removed; direct device diagnostics remain in controller tests. Production public names, Agent JSON and scheduling/completion contracts are unchanged; see [Action standard](Actions/README.md).
+
+❌ No placeholder domains, generic action factories or new runtime behavior.
+
+## Action and Tool presentation boundary
+
+✅ Immediate UI updates use Tools/UI; Actions/UI now contains only scheduled expression. The Action panel follows the ActionCall/ToolCall boundary rather than module filters. CallArguments lives in Agents/Core/Capability and shared generation preserves mixed Action/Tool events. See ADR0083. ❌ Native model Tool output remains pending; expression intentionally remains an Action.
+
+✅ LLM output streams have no pending-fragment count cap. Cloud response byte/time limits and local generation token limits remain; other queues keep their own policies. See [ADR 0084](../docs/adr/0084-llm-output-buffering.md). ❌ Long-reply device acceptance remains pending.
+
+## Execution metadata and UI observation
+
+✅ Domain registrations declare displayName; scheduler admission copies it into shared ActionExecutionRecord values. Root-owned Workflow forwards versioned snapshots and UI derives generic state wording without importing Actions/Gateway or enumerating paths. Raw Channel names are preserved; UI grouping does not imply shared cross-task FIFO. Agent outputs still cross OutputGateway, while runtime observation uses the independent read-only stream. See [ADR 0086](../docs/adr/0086-action-display-metadata.md).
+
+❌ Localization resources and detailed device progress remain future work.
+
+### Cohesive Tool source organization
+
+✅ Tools follows the domain layout used by Actions: `System/SystemTools.swift` and `UI/UITools.swift` contain callable functions; domain `Support/` contains registration, injected protocols, types and policy. `Runtime/ToolModules.swift` owns the built-in catalog alongside definition/invocation/registry/executor contracts. See [Tools](Tools/README.md). ❌ Native model Tool transport remains outstanding.
+
+✅ Cartesian NexArm Channel Actions now share the Settings frame factory and nominal cadence, with no motion-time queries or per-waypoint arrival gates. Whole-Action scheduling waits for fresh stable final home; head gestures retain calibrated per-segment control. See [controller contract](PlatformKit/Connectivity/NexArm/README.md#settings-matched-cartesian-channel-playback-current) and ADR0088. ❌ Phone jitter acceptance remains pending.
+
+### NexArm gripper-independent arm output (ADR0090)
+
+✅ PlatformKit prepares device IK before playback and compiles pose intents into bounded synchronous writes listing motors1–5 only. Settings/Channel/reset/connection indication share this arm-only contract; explicit manual motor6 control remains independent. No raw six-axis CMD8/CMD54 fallback. Settings estimates preserve the gripper, and final completion observes only arm axes. See [ADR0090](../docs/adr/0090-nexarm-arm-only-motion-packets.md). ❌ BLE endurance and loaded-arm trajectory acceptance remain separate.

@@ -1,12 +1,15 @@
-# System · 系统信息工具
+# System Tools
 
-用途：提供运行配置说明。设计目标：与 App 装配和 Tools/Runtime 注册解耦。
+Purpose: small direct system functions, grouped in `SystemTools.swift`. The design keeps callable entries at the domain root and registration in [Support](Support/README.md).
 
-- ✅ RuntimeInfo.swift / SystemTools.runtimeInfo：返回原有固定配置说明，由 App 绑定 runtimeInfo。
-- ❌ 真实健康探测、模型加载状态与设备诊断查询。
+✅ `SystemTools.runtimeInfo(_:)` returns the fixed configuration description. Its registered path remains `runtimeInfo`; it is not a live health probe. `Support/SystemToolModule.swift` declares the returning handler and App composes it through `ToolModules`.
 
-这是固定信息工具，不代表动态健康检查。修改实现、名称或目录时同步此 README。
+❌ Live health reporting and additional system functions are not implemented. This domain owns no queue or scheduling state.
 
-## Domain-owned behavior assembly
-
-✅ SystemToolModule owns runtimeInfo registration and returning semantics. New system tools are added to this module's definitions, not ApplicationRuntime. ❌ The existing informational result is not a hardware health probe.
+```mermaid
+flowchart LR
+    Definition[SystemToolModule] --> Registry[ToolRegistry]
+    Registry --> Function[SystemTools.runtimeInfo]
+    Function --> Executor[ToolExecutor result]
+    Executor --> Gateway[ToolDispatcher to InputGateway]
+```

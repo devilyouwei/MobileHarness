@@ -14,7 +14,7 @@ public struct StorageOwner: Sendable, Hashable {
     }
 }
 
-/// Bounded, single-checkout handles. A lease suspends completed-value expiry until release.
+/// Bounded, single-checkout handles. Nil TTLs leave lifetime to the owning scope.
 public actor MemoryLeaseStore<Value: Sendable> {
     private struct Entry {
         let owner: StorageOwner
@@ -34,17 +34,19 @@ public actor MemoryLeaseStore<Value: Sendable> {
     private var entries: [UUID: Entry] = [:]
     private var terminal: [UUID: Terminal] = [:]
     private let capacity: Int
-    private let queueTTL: Duration
-    private let readyTTL: Duration
+    private let queueTTL: Duration?
+    private let readyTTL: Duration?
     private let errorTTL: Duration
     private let onRemove: @Sendable (Value, any Error) async -> Void
     private var closed = false
 
     public init(
-        capacity: Int, queueTTL: Duration, readyTTL: Duration, errorTTL: Duration,
+        capacity: Int, queueTTL: Duration?, readyTTL: Duration?, errorTTL: Duration,
         onRemove: @escaping @Sendable (Value, any Error) async -> Void
     ) {
-        precondition(capacity > 0 && queueTTL > .zero && readyTTL > .zero && errorTTL > .zero)
+        precondition(capacity > 0 && errorTTL > .zero)
+        precondition(queueTTL.map { $0 > .zero } ?? true)
+        precondition(readyTTL.map { $0 > .zero } ?? true)
         self.capacity = capacity
         self.queueTTL = queueTTL
         self.readyTTL = readyTTL
@@ -61,7 +63,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
         guard entries[id] == nil, terminal[id] == nil else { throw StorageError.duplicate }
         guard entries.count < capacity else { throw StorageError.capacityExceeded }
         entries[id] = Entry(owner: owner, value: value, cancel: cancel)
-        arm(id, after: queueTTL)
+        if let queueTTL { arm(id, after: queueTTL) }
     }
 
     public func begin(_ id: UUID) async throws -> Value {
@@ -85,7 +87,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
 
     public func complete(_ id: UUID) {
         guard let entry = entries[id], !entry.leased else { return }
-        arm(id, after: readyTTL)
+        if let readyTTL { arm(id, after: readyTTL) }
     }
 
     public func validate(_ id: UUID, owner: StorageOwner) async throws {

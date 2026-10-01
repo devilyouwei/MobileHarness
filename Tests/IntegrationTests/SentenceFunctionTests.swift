@@ -42,14 +42,14 @@ private actor StreamingSentenceChat: ChatCapability {
     #expect(
         await speechRequests.restored(earlySay.output)
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "你好👋！"])))
-    #expect(earlyPrint.output == .actionCall(expectedActionCall(name: "print", parameters: ["text": "你好👋！"])))
+    #expect(normalizeToolID(earlyPrint.output) == expectedPrint("你好👋！"))
     try await model.finish()
     var remainder: [AgentOutput] = []
     for _ in 0..<3 { remainder.append(try #require(await outputs.next()).output) }
     #expect(
         await speechRequests.restored(remainder) == [
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "下一句，尾巴"])),
-            .actionCall(expectedActionCall(name: "print", parameters: ["text": "下一句，尾巴"])),
+            expectedPrint("下一句，尾巴"),
             .control("assistant.finished"),
         ])
     await agent.stop()
@@ -111,14 +111,14 @@ private struct ExcessiveSentencesChat: ChatCapability {
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("many")))
     var outputs = agent.outputs.makeAsyncIterator()
-    var tokens: [ActionCall] = []
+    var tokens: [AgentOutput] = []
     for _ in 0..<120 {
         let output = try #require(await outputs.next()).output
-        guard case .actionCall(let token) = output else {
+        guard output.kind == .actionCall || output.kind == .toolCall else {
             Issue.record("Expected admitted sentence function token")
             return
         }
-        tokens.append(token)
+        tokens.append(output)
     }
     #expect(tokens.count == 120)
     let terminal = try #require(await outputs.next()).output
@@ -176,8 +176,8 @@ private struct ExcessiveSentencesChat: ChatCapability {
         try generator.append("<express emotion='thinking'/><channel.Speech>然后回答</channel.Speech>尾巴")
         + generator.finish()
     let calls = events.compactMap(\.actionCall)
-    #expect(calls.map { $0.actionPath.function } == ["speak", "print", "express", "speak", "print", "speak", "print"])
+    #expect(calls.map { $0.actionPath.function } == ["speak", "express", "speak", "speak"])
     #expect(calls[0].parameters["text"] == "你好，先想一下")
-    #expect(calls[3].channel == "Speech" && calls[3].parameters["text"] == "然后回答")
-    #expect(calls[5].parameters["text"] == "尾巴")
+    #expect(calls[2].channel == "Speech" && calls[2].parameters["text"] == "然后回答")
+    #expect(calls[3].parameters["text"] == "尾巴")
 }

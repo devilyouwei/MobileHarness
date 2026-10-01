@@ -2,9 +2,9 @@ import AgentCore
 import Foundation
 import ModelKit
 
-/// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven eye Actions.
+/// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven gaze Tools.
 public actor VisionPerceptionAgent: Agent {
-    private static let gaze = InternalAction(module: "UI", function: "moveEyes", channel: "Gaze", required: ["x", "y"])
+    private static let gaze = InternalTool(path: "UI.moveEyes", required: ["x", "y"])
     private static let overlay = InternalTool(path: "UI.showPose", required: ["payload"])
     private var resultInbox = ActionResultInbox()
     public func actionResults() -> [ActionResult] { resultInbox.results }
@@ -48,7 +48,7 @@ public actor VisionPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "VisionPerception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.actionCall, .toolCall, .control],
+            outputs: [.toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.filter = FrameChangeFilter(configuration: try sampling ?? FrameChangeConfiguration())
         self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
@@ -60,7 +60,7 @@ public actor VisionPerceptionAgent: Agent {
         continuation = stream.continuation
     }
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
-        try model.adding(internalActions: [gaze], internalTools: [overlay])
+        try model.adding(internalTools: [gaze, overlay])
     }
 
     public func bind(_ port: AgentMessaging) throws {
@@ -99,21 +99,21 @@ public actor VisionPerceptionAgent: Agent {
     public func receive(_ input: AgentInput) throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID else { throw ImageInputError.wrongSession }
+        guard !input.metadata.expired else {
+            expiredInputs += 1
+            throw CommunicationError.expired
+        }
+        if case .actionResult(let result) = input.payload {
+            guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
+                result.owner.sessionID == input.sessionID
+            else { throw CommunicationError.unauthorized }
+            resultInbox.accept(result)
+            return
+        }
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
         guard lastSequence.map({ image.sequence > $0 }) ?? true,
             lastTimestamp.map({ image.timestamp >= $0 }) ?? true
         else { throw ImageInputError.outOfOrder }
-        guard !input.metadata.expired else {
-            if case .actionResult(let result) = input.payload {
-                guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
-                    result.owner.sessionID == input.sessionID
-                else { throw CommunicationError.unauthorized }
-                resultInbox.accept(result)
-                return
-            }
-            expiredInputs += 1
-            throw CommunicationError.expired
-        }
         lastSequence = image.sequence
         lastTimestamp = image.timestamp
         guard try filter.accepts(image) else { return }
@@ -167,7 +167,7 @@ public actor VisionPerceptionAgent: Agent {
             try emitOverlay(observation, input: input)
             let target = gaze.update(observation)
             let move = try Self.gaze.call(["x": String(target.x), "y": String(target.y)])
-            try emit(.actionCall(move), input: input)
+            try emit(.toolCall(move), input: input)
             if pendingPublication != nil { publicationReplacements += 1 }
             pendingPublication = Publication(observation: observation, parent: input)
             drainPublication()
@@ -252,7 +252,7 @@ public actor VisionPerceptionAgent: Agent {
             // Only this Agent's replaceable UI state may be coalesced; never arbitrary device commands.
             switch replaced.output {
             case .toolCall(let call) where call.toolPath == "UI.showPose": overlayReplacements += 1
-            case .actionCall(let call) where call.actionPath.module == "UI" && call.actionPath.function == "moveEyes":
+            case .toolCall(let call) where call.toolPath == "UI.moveEyes":
                 gazeReplacements += 1
             default: throw HarnessError.queueFull
             }

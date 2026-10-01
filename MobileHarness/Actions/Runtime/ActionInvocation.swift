@@ -42,3 +42,6 @@ public struct ActionInvocation: Sendable {
 public typealias ActionHandler = @Sendable (ActionInvocation) async throws -> Void
 
 public typealias ActionCompletionHandler = @Sendable (ActionInvocation) async throws -> ActionCompletion
+
+/// Compatibility name for Action domain argument decoding.
+public typealias ActionArguments = CallArguments

@@ -6,13 +6,11 @@ Purpose: bind and execute declared Action implementations. Design goals: one con
 
 | File | Responsibility |
 | --- | --- |
-| ActionModule.swift | Explicit domain-owned definition catalog |
-| ActionDefinition.swift | Path, implementation kind, completion description and awaited handler |
+| ActionDefinition.swift | ActionModule protocol and definitions: path, kind, completion, resources and handler |
 | ActionRegistry.swift | Immutable validated definitions and assembled capability coverage checks |
-| ActionInvocation.swift | Single-envelope call construction and execution identity |
-| ActionExecutor.swift | Handler lookup, cancellation checks and awaited execution |
-| ActionExecutionError.swift | Definition/lookup/invocation errors only |
-| ActionArguments.swift | Typed string/integer/finite-number/enum decoding and allowed-key validation |
+| ActionInvocation.swift | Single-envelope identity, handler aliases and ActionArguments compatibility alias |
+| ActionExecutor.swift | Execution errors, handler lookup, cancellation and typed completion validation |
+| ActionModules.swift | Explicit built-in domain catalog; host callbacks remain required |
 | ActionDiagnostics.swift | Bounded payload-free execution record ring and chronological snapshots |
 
 ## Registration and completion contracts
@@ -58,7 +56,7 @@ Execution creates no additional work queue, timeout task or detached worker. The
 
 `ActionArguments` reads existing `[String: String]` transport values. `validateAllowedKeys` rejects undeclared keys; required readers reject missing keys, malformed values and out-of-range values. Strings preserve content and enforce caller-supplied UTF-8 limits; `allowBlank: true` explicitly permits empty/whitespace values. Integer/double/enum readers cap source values at 4096 UTF-8 bytes. Finite doubles reject NaN and infinities. Enum matching is exact. Optional defaults and relationships between fields remain explicit Action code; there is no coercion, clamping, reflection or implicit fallback.
 
-UI Actions now use these readers and translate decoding errors into their domain errors **before** invoking dependencies. Dependency and cancellation errors are not caught by that translation. `UIActions.PresentationError` owns invalid text and presentation-call errors; existing emotion/gaze errors remain domain-owned. Gateway still independently checks the Agent's permitted parameter-name set.
+UI Actions now use these readers and translate decoding errors into their domain errors **before** invoking dependencies. Dependency and cancellation errors are not caught by that translation. `UIActions.ExpressionError` owns expression validation. Caption, gaze and other immediate presentation errors belong to Tools/UI. Gateway still independently checks the Agent's permitted parameter-name set.
 
 Scheduling errors moved to `Gateway.ActionSchedulingError` (capacity, lifecycle and wait structure). `ActionExecutionError` contains missing handler, duplicate/invalid/excessive definitions and invalid invocation and completion-kind mismatch. Runtime forwards original handler errors without converting them to success. Stage 2 adds terminal ActionResult delivery through Gateway; only delivery retries, never Action effects.
 
@@ -97,7 +95,7 @@ flowchart TD
 - ✅ Stage 1: implementation definitions, duplicate/metadata checks, assembled startup coverage, consistent invocation, typed arguments, error separation and bounded execution diagnostics.
 - ✅ Deterministic [contract tests](../../../Tests/IntegrationTests/ActionContractTests.swift) cover metadata, internal grants, malformed invocations/arguments, finite versus state completion, ID correlation, eviction, cleanup and effect uncertainty; existing scheduling tests remain in place.
 - ✅ Stage 2: typed completion, declared resource sets (maximum 8), trusted owner/feedback/lease invocation context; Gateway implements bounded feedback and resource arbitration.
-- ❌ Full domain namespace/file/signature migration, generic activity registry, per-Action execution deadlines and all-device resource migration remain later work.
+- ❌ Generic activity registry, per-Action execution deadlines and all-device resource migration remain later work.
 - ❌ Physical-device completion, animation and sustained-operation acceptance are not established by unit tests or simulator builds.
 
 See [authoring standard](../README.md), [scheduling](../../Gateway/Output/Scheduling/README.md) and [ADR 0065](../../../docs/adr/0065-action-runtime-contracts.md). Handler cooperation remains necessary for cleanup; this stage does not force interruption or introduce rollback.
@@ -115,3 +113,15 @@ See [authoring standard](../README.md), [scheduling](../../Gateway/Output/Schedu
 ## Action implementation audit
 
 ✅ Runtime remains infrastructure; no namespace-per-Action requirement applies to registry/executor/diagnostic services. Domain audit retains existing definition categories, resources and typed completion validation.
+
+## Action and Tool presentation boundary
+
+✅ ActionArguments now aliases AgentCore.CallArguments, allowing immediate Tools to share argument validation without a dependency on Actions. ❌ No scheduling behavior changes.
+
+✅ Related short contracts are co-located; Registry and Diagnostics retain independent files and algorithms. Runtime remains non-callable infrastructure with no new queue or registration side effects.
+
+## Self-described execution records
+
+✅ ActionDefinition.displayName is required; ActionRegistry rejects blank or >256-byte UTF-8 names as invalidDefinition. ChannelScheduler passes the full registered definition to its execution ledger, which copies the immutable name at admission. Registry/handler lookup and completion semantics are unchanged. No name inference, fallback catalog, queue or mutable presentation service is added.
+
+❌ Localized resource lookup and visual styling are not Runtime responsibilities. Domain registrations currently provide resolved Chinese strings; UI alone owns phase wording and visual policy.

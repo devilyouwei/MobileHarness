@@ -8,15 +8,18 @@ public struct BehaviorAssembly: Sendable {
     public let tools: ToolRegistry
 
     public init(
-        presentation: any UIPresentationCapability,
+        presentation: any UIPresentationCapability & UIUpdateCapability,
         playback: any SpeechPlaybackCapability,
         pose: any PosePresentationCapability,
+        gesture: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void,
+        shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
         aim: @escaping @Sendable (Double, Double, ActionInvocation) async throws -> Void,
         capabilities: [CapabilityRegistry]
     ) throws {
         try self.init(
-            actionModules: ActionModules.builtIn(presentation: presentation, playback: playback, aim: aim),
-            toolModules: ToolModules.builtIn(presentation: pose), capabilities: capabilities)
+            actionModules: ActionModules.builtIn(
+                presentation: presentation, playback: playback, gesture: gesture, shakeBase: shakeBase, aim: aim),
+            toolModules: ToolModules.builtIn(presentation: pose, updates: presentation), capabilities: capabilities)
     }
 
     /// Explicit catalog injection for isolated tests or other hosts; never runtime discovery.

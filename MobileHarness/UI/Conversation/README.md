@@ -1,5 +1,8 @@
 # Conversation UI
 
+> Current status (2026-09-29): the user identified desktop simulator screen sharing as the cause of missing iPhone camera/microphone input. BLE settings and conversation binding are restored; receipt-admission and robot-only disconnect fixes remain. iPhone BLE acceptance without screen sharing is still pending; no causal claim is made about the earlier BLE failure.
+
+
 Purpose: display startup and conversation state through eyes, captions and spectra. Design goals: accessible user controls, observable readiness and no Agent/model/device ownership in views.
 
 | File | Responsibility |
@@ -37,3 +40,31 @@ flowchart LR
 Sources compile once in UI; page navigation does not create or destroy the voice runtime.
 
 ❌ Physical-device startup latency, layout/animation, accessibility/landscape and face-tracking acceptance; hand-driven gaze and additional character pages remain unimplemented.
+
+✅ ConversationView receives shared BluetoothSettingsState presentation values and displays real connected/motion-completion status alongside conversation. It receives no device service or motion closure; Agent outputs still pass through Gateway and Actions. ❌ The display is not an emergency-stop control or evidence of independent position measurement.
+
+✅ Connected but unverified robots display “机械臂已连接，控制待验证”; the conversation does not imply motion readiness from a radio connection alone.
+
+## Unified channel execution display
+
+✅ `ActionActivityState` receives whole shared execution snapshots forwarded by AppWorkflows. The home footer replaces the robot-only motion label with up to3 channel summaries plus an overflow/history link; concurrent channels retain separate rows. Same-channel parallel work and queued work show counts. Nonfailure terminal summaries hide after3s while history remains available; failures persist until dismissed or superseded by a newer execution in that channel. Dismissal never removes runtime records or cancels Actions. Newer revisions replace older state; dismissed IDs are bounded by retained records.
+
+✅ `ActionActivityView` exposes a read-only sheet containing all retained active records and the latest100 terminal records, using definition-provided names, exact Channel strings, generic statuses and timestamps without execution IDs or raw arguments; errors display the bounded thrown description. Cancellation pending says “正在取消”; terminal cancellation says “执行前已取消” or “已取消” based on whether execution started; completed settings/state/activity operations do not claim physical completion. Connection readiness remains a separate fallback label, and Settings send-only tests do not feed this Action display. Views own only presentation selection and a wall-clock auto-hide refresh; long-lived observation remains in App. Dynamic Type, VoiceOver labels and system sheet controls are retained; no motion animation is required.
+
+❌ Device-specific stage progress and physical iPhone layout/accessibility acceptance remain separate. This is process-local recent history, not a durable per-conversation audit or an emergency-stop control.
+
+✅ Debug-only `-actions-preview` renders the actual conversation/status components with explicitly labeled synthetic records for parallel, queued, cancelling and failed states; it bypasses models, camera, audio and Bluetooth startup. Release ignores the flag. ❌ Preview data is not execution acceptance.
+
+✅ The execution footer uses native iOS26+ Liquid Glass (`glassEffect`) with a material fallback on earlier supported systems. Home and detail records include all scheduled Actions without filtering. Fixed internal UI updates are immediate Tools. Tool calls are not execution records.
+
+## Action and Tool presentation boundary
+
+✅ The native glass panel receives every scheduled Action, including expression; fixed presentation Tools generate no records. Failed rows use the description from the thrown error rather than a frontend error catalog. ❌ Tools/audio recognition are not synthetic Action rows.
+
+## Generic Action presentation
+
+✅ ActionActivityItem stores only its immutable execution record; title, channelTitle, status and symbol are computed. Names come from record.displayName, Channel names remain case-sensitive and unchanged, and phase/completion determine generic wording. Failure descriptions pass through with a generic fallback. No path-to-title, channel-to-device or error-type catalog exists in UI or Workflow.
+
+✅ Summaries aggregate exact Channel names for display across tasks; additionalRunning explicitly represents concurrent work. This is not a shared FIFO or resource-ownership boundary. Version checks, bounded dismissals, three-second success hiding and failure retention remain unchanged. Synthetic previews use the same record-driven presenter.
+
+❌ No claim of physical rollback/stop follows cancellation wording; no locale resource system or new per-Action views are introduced. See ADR 0086.

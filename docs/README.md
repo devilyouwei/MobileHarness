@@ -63,3 +63,83 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ [ADR 0069](adr/0069-storage-core-domain-layout.md) records the Storage core/domain split and no-data-migration guarantee.
 
 ❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.
+
+✅ [ADR 0070](adr/0070-nexarm-usb-diagnostic.md) records the opt-in USB wrist Action and its production limitations. ❌ Wireless/iPhone robot acceptance remains pending.
+
+✅ ADR 0070 also records the supervised Assistant base Action and explicit unavailable iPhone binding. ❌ Wireless and unattended robot acceptance remain outstanding.
+
+✅ [ADR 0071](adr/0071-nexarm-iphone-ble.md) documents iPhone BLE settings, bounded transport, shared Action binding and foreground cancellation. ❌ Physical acceptance and emergency-stop guarantees remain distinct from implementation.
+
+✅ ADR 0071 distinguishes NexArm BLE connection from control readiness and documents manual read-only revalidation. ❌ Persistent AT32 version readout and physical iPhone acceptance remain open.
+
+✅ ADR 0071 records the user-requested one-time reset/ID5 connection indication and its separate write-ACK/physical-feedback contract. ❌ Hardware acceptance remains pending.
+
+✅ Revised ADR 0071 records physical USB/BLE evidence and explicit NexArm 1.0.2 compatibility for missing AT32 version, with truthful presentation and ID5 ±8° connection feedback. ❌ iPhone motion acceptance remains pending.
+
+✅ ADR 0071 now records user-confirmed iPhone conversation control, firmware-independent BLE protocol validation, broad BLE discovery and read-only foreground recovery. ❌ Updated physical discovery/lock-screen UX acceptance remains pending.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ [ADR 0072](adr/0072-nexarm-entertainment-skills.md) records finite NexArm entertainment skills, typed host bindings and cancellation/failure limits. ❌ Full physical sequence acceptance remains pending.
+
+## Peripheral detail controls
+
+✅ [ADR 0073](adr/0073-peripheral-detail-controls.md) records Bluetooth peripheral details, shared manual-motion admission and measured telemetry. ❌ Physical six-motor acceptance remains pending.
+
+✅ ADR 0073 now distinguishes unconfirmed motion from transport failure and documents read-only recovery without forced reconnection. ❌ Physical recovery acceptance remains pending.
+
+✅ ADR 0073 now covers complete Bluetooth discovery/forget cleanup and one-shot read-only recovery after native transport loss. ❌ System accessory unpairing is outside the App's CoreBluetooth controls.
+
+✅ [ADR 0074 — NexArm live jog](adr/0074-nexarm-live-jog.md) separates streaming manual intents from completion-based presets and records reset preemption. ❌ Physical acceptance pending.
+
+✅ [Fixed NexArm choreography](adr/0075-nexarm-fixed-choreography.md) records absolute gesture targets, synchronous servo packets and feedback/cancellation semantics. ❌ Physical acceptance remains pending.
+
+✅ [NexArm preset transport compatibility](adr/0076-nexarm-controller-preset-transport.md) records the replacement of raw servo broadcasts and clarified reset/feedback semantics. ❌ Physical confirmation remains pending.
+
+✅ [Calibrated NexArm pose choreography](adr/0077-nexarm-calibrated-pose-choreography.md) distinguishes physical pose from example encoder counts and unifies phone performance transport. ❌ Full physical acceptance remains pending.
+
+✅ [NexArm USB physical acceptance](NexArm_Physical_Acceptance.md) records seven real-arm results, failed diagnoses and reproducible shared-controller testing. [ADR0078](adr/0078-nexarm-shared-physical-validation.md) owns the resulting contract. ❌ USB does not establish BLE timing.
+
+✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](adr/0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
+
+✅ [ADR 0080](adr/0080-nexarm-independent-motion-results.md): explicit preset admission no longer depends on previous completion/recovery feedback. New actions retain their own completion checks. ❌ Physical failure recovery acceptance remains pending.
+
+✅ Tilt return repair keeps ready height240mm while preserving arm-relative yaw±12°/roll±40° and unchanged arrival thresholds. Both complete USB sequences passed; see [physical acceptance](NexArm_Physical_Acceptance.md). ❌ Phone BLE acceptance remains pending.
+
+✅ [ADR0081](adr/0081-settings-immediate-test-control.md) separates immediate preemptible settings tests from unchanged completion-based channel actions. ❌ Settings send status does not assert physical completion.
+
+✅ [ADR0082](adr/0082-nexarm-observation-watchdogs.md) adds continuous pose reception, notification-first channel completion, limited query fallback and independent silence/total deadlines. Settings live tests remain unchanged. ❌ Device-side watchdog and action-ID completion require firmware support.
+
+✅ ADR0082 clarifies whole-action budget composition after isolated USB dance reproduction: sum per-segment allowances without extending the fixed deadline during playback.
+
+✅ NexArm physical acceptance records a full isolated USB channel run after2026093015: all7 presets/50 segments completed observed arrival and home return in68.073s. BLE and repeated-cycle acceptance remain separate.
+
+✅ [ADR0083](adr/0083-action-execution-presentation.md) documents unified channel execution observation and frontend presentation, including bounds, cancellation semantics and lifecycle ownership.
+
+✅ ADR0083 also records internal-action visibility filtering and native Liquid Glass presentation. NexArm argument validation errors are identified separately from device-connectivity failures.
+
+✅ [ADR 0084](adr/0084-llm-output-buffering.md) documents removal of the LLM pending-event count limit. ❌ Phone replay acceptance remains pending.
+
+✅ NexArm head preparation now matches the other presets’ intermediate arrival contract; regression tests retain strict final-home verification. Actual phone measurements for the reported timeout remain unavailable.
+
+✅ [NexArm physical acceptance](NexArm_Physical_Acceptance.md) now includes reproduced head no-motion failure, a controlled handoff experiment, and successful nod/shake closed-loop USB evidence. ❌ USB results do not substitute for phone BLE conversation acceptance.
+
+✅ [Action authoring](../MobileHarness/Actions/README.md) now specifies cohesive entry files and non-callable Support directories. This is source organization only; runtime contracts and historical ADRs remain unchanged.
+
+✅ [ADR 0085](adr/0085-reply-owned-speech-audio.md) records reply-owned speech cache retention and post-Action cleanup. ❌ Physical-device long-sequence acceptance remains pending.
+
+✅ ADR 0070 records removal of the unused diagnostic Action while retaining direct device tests and production Action coverage.
+
+- ✅ [ADR 0086](adr/0086-action-display-metadata.md) removes centralized Action UI maps through domain-owned metadata and generic state rendering.
+
+✅ ADR 0082 now records the all-segment nominal-duration gate and celebration/dance regression coverage. ❌ The reported motor2 oscillation remains pending physical iPhone BLE acceptance.
+
+✅ [ADR 0087](adr/0087-speech-producer-deadline.md) documents producer-owned PCM waits and regression coverage for delayed synthesis. ❌ Physical playback acceptance remains pending.
+
+✅ [ADR0088](adr/0088-nexarm-settings-matched-playback.md) records Settings-matched Cartesian Channel playback and final-home completion. The user reports the phone symptom resolved. [Physical acceptance](NexArm_Physical_Acceptance.md) records five supervised USB dance comparisons: intermediate waits alone reproduced motor2 jitter and timeout; queries or extra frames alone did not. ❌ Underlying servo holding-loop causes, isolated celebration and endurance remain unverified.
+
+✅ TTS documentation audit (2026-09-30): Agent admission/FIFO, Speech.speak scheduling, producer-owned waits, hardware completion and per-reply PCM cleanup are aligned across module READMEs and the technical plan. Historical MOSS measurements are preserved with the old read deadline explicitly labeled historical. ❌ These documentation corrections do not establish the cause of reported repetition or abnormal speech.
+
+✅ [ADR0089](adr/0089-nexarm-arm-completion-scope.md) documents arm-only performance completion after reproducing a claw-offset-induced timeout. ❌ This is not gripper calibration or grasp verification.
+
+✅ [ADR0090 — Arm-only motion packets](adr/0090-nexarm-arm-only-motion-packets.md) documents gripper exclusion from all arm motion and home writes. ❌ BLE endurance remains pending.

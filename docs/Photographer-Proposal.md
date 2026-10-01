@@ -4,7 +4,7 @@ Status: aim subscription and the joint frame are implemented. Composition, track
 
 Goal: enable a robot-mounted phone to frame subjects, track movement and choose camera motion based on user intent and shared perception. Photographer decides aim from shared perception and requests an authorized Action. Device-side limits, stop acknowledgement and disconnect behavior must be designed before physical movement is allowed.
 
-Current status: [VisionPerception](../MobileHarness/Agents/VisionPerception/README.md) owns pose inference and UI.showPose skeleton feedback. [Photographer](../MobileHarness/Agents/Photographer/README.md) subscribes to `vision.pose` and can emit `Robot.aim`. The camera session starts that subscriber with arm control off. No Wi-Fi socket is opened. See [ADR 0070](adr/0070-photographer-aim.md).
+Current status: [VisionPerception](../MobileHarness/Agents/VisionPerception/README.md) owns pose inference and UI.showPose skeleton feedback. [Photographer](../MobileHarness/Agents/Photographer/README.md) subscribes to `vision.pose` and can emit `Robot.aim`. The camera session starts that subscriber with arm control off. No Wi-Fi socket is opened. See [ADR 0091](adr/0091-photographer-aim.md).
 
 Aim already consumes `vision.pose` and does not own YOLO or skeleton rendering. Composition, tracking, motion limits and disconnect recovery still need a defined task and device acknowledgement before physical movement.
 

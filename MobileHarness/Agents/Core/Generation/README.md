@@ -48,7 +48,7 @@ Each generation owns one parser, one bounded unified Channel/wait scope stack an
 1. Incrementally decode UTF-8 and retain only incomplete byte/entity/tag state and pending text.
 2. Parse completed tags; update ChannelParser scopes and emit text, Action, scope-boundary or scheduling events in order.
 3. AgentGenerator accumulates text in SentenceFunctionBuffer. At sentence or protocol boundaries, flush text and invoke the Agent-owned text callback.
-4. Resolve explicit Action aliases and parameters through CapabilityRegistry. Return ordered GenerationEvents (resolved Actions and scheduling directives) to the Agent for its bounded output stream.
+4. Resolve explicit Action aliases and parameters through CapabilityRegistry. Return ordered GenerationEvents (resolved Actions, immediate Tools and scheduling directives) to the Agent for its bounded output stream.
 5. On normal termination, call `finish` to flush valid remaining text and reject incomplete syntax. On cancellation, discard state instead of flushing partial output.
 
 ```mermaid
@@ -75,7 +75,7 @@ flowchart TD
     Tools --> Tool[Resolved ToolCall]
 ```
 
-For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression call to `UI.express`, then text-bearing calls to `Speech.speak` and `UI.print`. Assistant subsequently directs the speech text to SpeechSynthesisAgent and replaces the text-bearing call with `Speech.speak(audioID)` before output. Outside a channel scope those calls use their respective defaults. This illustrates why text is a Function Token even when it contains no XML.
+For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression call to `UI.express`, then text-bearing calls to `Speech.speak` and `UI.print`. Assistant subsequently directs the speech text to SpeechSynthesisAgent and replaces the text-bearing call with `Speech.speak(audioID)` before output. Speech uses its default or explicit channel; the caption Tool has no channel. This illustrates why text is a Function Token even when it contains no XML.
 
 ## Bounds, completion and failure
 
@@ -149,7 +149,7 @@ flowchart LR
 
 ✅ `<wait>` and `</wait>` are exact, attribute-free paired tags; `<wait/>` is invalid and wait is reserved as a capability alias. The unified ChannelParser lexical stack rejects crossing scopes such as `<wait><channel.Speech></wait></channel.Speech>`. A Channel may surround a wait or be nested within it. Wait does not change the effective channel. begin/end flush preceding sentence text before emitting SchedulingDirective, preserving the lexical position of every action.
 
-✅ AgentGenerator append/finish now return `[GenerationEvent]` with `.action(ActionCall)` and `.scheduling(SchedulingDirective)`. Consumers must forward the entire event sequence, not filter out directives. Natural text produces the code-owned mapped Actions in callback order; their default lanes allow concurrent speech/captions. No special text-step type is needed. The parser limits 32 waits and combined depth 8; scheduled execution additionally validates balanced groups and bounds. Each Agent owns its parser; Gateway only receives resolved values and typed boundaries.
+✅ AgentGenerator append/finish now return `[GenerationEvent]` with `.action(ActionCall)`, `.tool(ToolCall)` and `.scheduling(SchedulingDirective)`. Consumers must forward the entire event sequence, not filter out directives. Natural text produces the code-owned mapped Action/Tool calls in callback order; speech is scheduled and caption append executes immediately. No special text-step type is needed. The parser limits 32 waits and combined depth 8; scheduled execution additionally validates balanced groups and bounds. Each Agent owns its parser; Gateway only receives resolved values and typed boundaries.
 
 A wait waits for its parent's preceding work, executes internally by ordinary Channel rules, and releases its parent's continuation only once closed and all children complete. Nested waits apply the same rule locally. An open group may execute already received work. Completed XML is not physical completion; cancellation discards unfinished parsing state and Gateway cancels accepted work. Self-closing Actions never acquire paired start/stop semantics.
 
@@ -161,7 +161,11 @@ flowchart LR
     Stack --> Generator[Flush text; resolve Actions; preserve wait edges]
     Generator --> Events[GenerationEvent sequence]
     Events --> Agent[Agent: speech audioID conversion in place]
-    Agent --> Gateway[Resolved Actions and typed scheduling directives]
+    Agent --> Gateway[Resolved Actions, Tools and scheduling directives]
 ```
 
 ✅ Source location: `MobileHarness/Agents/Core/Generation`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
+
+## Action and Tool presentation boundary
+
+✅ TextMapping now returns ordered GenerationEvents containing ActionCalls or ToolCalls. Each chunk yields at most8 events and a generation at most120 calls. Assistant supplies a speech Action and append-caption Tool. Tool events retain unique call IDs but have no channel/wait membership. XML still resolves only model-declared Action aliases; native Tool parsing remains separate. ❌ The change does not invent XML Tool aliases or model-native transport.

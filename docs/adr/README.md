@@ -111,6 +111,70 @@ These are **dated decision records**, including proposals and stages later repla
 
 ❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.
 
+✅ [0070 — NexArm USB diagnostic](0070-nexarm-usb-diagnostic.md): first bounded real-device Action, separate from production autonomous control. ❌ BLE/TCP and physical watchdog acceptance remain pending.
+
+✅ ADR 0070 extended with bounded Assistant base sweeps and typed host binding; ❌ hardware stop/watchdog remains unverified.
+
+✅ [0071 — iPhone NexArm BLE](0071-nexarm-iphone-ble.md): settings and root-owned BLE-to-Action chain. ❌ Unattended operation and physical stop/watchdog remain deferred.
+
+✅ ADR 0071 now records retained BLE connections with control admission closed when AT32 version is unavailable, and explicit read-only revalidation. ❌ Device-side readout stability remains unverified.
+
+✅ ADR 0071 includes one reset and bounded ID5 movement as explicit connection feedback, with joined cancellation and readiness only after position verification. ❌ Physical acceptance pending.
+
+✅ ADR 0071 revises the earlier strict BLE gate using physical USB/BLE evidence: named compatibility profile, stationary telemetry checks, missing-version disclosure, and one reset/ID5 ±8° indication. ❌ No claim of iPhone physical acceptance.
+
+✅ ADR 0071 includes the current BLE UX contract: no normal firmware query, name-independent discovery, one read-only recovery attempt on activation, persisted opt-out after manual disconnect/forget, and no motion replay.
+
+## NexArm entertainment skills (2026-09-30)
+
+- ✅ [0072 — NexArm entertainment skills](0072-nexarm-entertainment-skills.md): bounded presets, typed bindings, terminal feedback and no replay. ❌ Physical sequence acceptance pending.
+
+- ✅ [0073 — Peripheral detail controls](0073-peripheral-detail-controls.md): root-owned manual actions, sampled telemetry and bounded six-motor adjustments. ❌ Physical acceptance pending.
+
+✅ ADR 0073 amendment: preserve live Bluetooth connection after uncertain motion, with bounded read-only recovery and no replay. ❌ Physical acceptance pending.
+
+✅ ADR 0073 lifecycle amendment separates connection indication from protocol readiness, adds bounded native-link recovery and defines complete App-owned discovery/forget cleanup. ❌ Physical acceptance pending.
+
+- ✅ [0074 — NexArm live jog](0074-nexarm-live-jog.md): spring-return speed controls, bounded native no-response admission and priority reset. ❌ Physical acceptance pending.
+
+- ✅ [0075 — Fixed NexArm choreography](0075-nexarm-fixed-choreography.md): complete absolute presets and synchronized servo transitions; ❌ physical acceptance pending.
+
+- ✅ [0076 — NexArm controller preset transport](0076-nexarm-controller-preset-transport.md): use established CMD51 and preserve failure details; ❌ physical confirmation pending.
+
+- ✅ [0077 — Calibrated NexArm pose choreography](0077-nexarm-calibrated-pose-choreography.md): fixed physical poses, device IK and large/fast phone base sway; ❌ physical acceptance pending.
+
+- ✅ [0078 — Shared NexArm physical validation](0078-nexarm-shared-physical-validation.md): identical controller over USB/BLE, absolute pose commands and physical evidence; ❌ BLE timing/visual acceptance separate.
+
+✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
+
+✅ [0080 — Independent NexArm motion results](0080-nexarm-independent-motion-results.md) removes prior-result locks from new explicit preset requests; ❌ physical failure recovery acceptance remains pending.
+
+✅ [0081 — Settings immediate test control](0081-settings-immediate-test-control.md) records latest-request replacement without feedback waits; ❌ delivery is not completion.
+
+✅ [0082 — NexArm observation watchdogs](0082-nexarm-observation-watchdogs.md) bounds channel await without query-response blocking; ❌ no device-side stop guarantee.
+
+✅ ADR0082 clarifies whole-action budget composition after isolated USB dance reproduction: sum per-segment allowances without extending the fixed deadline during playback.
+
+- [0083 — Unified Action execution presentation](0083-action-execution-presentation.md): bounded scheduler snapshots, root-owned UI projection and honest cancellation/completion states.
+
+- ✅ [0084 — LLM output buffering](0084-llm-output-buffering.md): unbounded pending-event count for finite chat generation; other queue policies remain. ❌ Device acceptance pending.
+
+- ✅ [0085 — Reply-owned speech audio](0085-reply-owned-speech-audio.md): no queued/ready PCM expiry; completion/interruption cleanup follows the reply owner. ❌ Physical-device acceptance remains pending.
+
+✅ ADR 0070 now records retirement of the unused wrist diagnostic Action; direct controller diagnostics remain outside the Agent capability catalog.
+
+- [0086 — Domain-owned Action display metadata](0086-action-display-metadata.md): self-described execution records, subscription-only Workflow and generic UI presentation.
+
+✅ ADR 0082 extends the earlier head handoff protection to all conversation trajectory segments; ❌ physical celebration/dance jitter acceptance remains pending.
+
+- ✅ [0087 — Producer-owned speech deadline](0087-speech-producer-deadline.md): PCM reads follow producer completion/failure/cancellation without a default three-second cutoff; synthesis and hardware deadlines remain. ❌ Audible device acceptance remains pending.
+
+- ✅ [0088 — Settings-matched NexArm Cartesian playback](0088-nexarm-settings-matched-playback.md): shared finite plan/cadence, final-home observation and retained whole-Action exclusion; ❌ physical phone acceptance pending.
+
+- ✅ [0089: NexArm arm completion scope](0089-nexarm-arm-completion-scope.md) excludes unrelated gripper state from performance completion while retaining strict generic tracking.
+
+- ✅ [0090 — NexArm arm-only motion packets](0090-nexarm-arm-only-motion-packets.md): read-only device IK, explicit motors1–5, gripper-independent reset and Settings estimates. ❌ Loaded-arm/BLE endurance acceptance.
+
 ## Photographer aim
 
-✅ [0070-photographer-aim.md](0070-photographer-aim.md) subscribes Photographer to `vision.pose` and sends logical aim as an internal Action plus a six-position frame. ❌ The camera session leaves arm control off, and no Wi-Fi socket is opened.
+✅ [0091 — Photographer aim](0091-photographer-aim.md) subscribes Photographer to `vision.pose` and sends logical aim as an internal Action plus a provisional six-position frame. ❌ The camera session leaves arm control off and does not call the production NexArm controller.

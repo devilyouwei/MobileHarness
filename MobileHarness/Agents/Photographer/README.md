@@ -1,6 +1,6 @@
 # Photographer
 
-Purpose: decide arm aim from shared pose observations. Design goals: subscribe to VisionPerception, emit one internal Action, and leave skeleton display and YOLO where they already are. See [ADR 0070](../../../docs/adr/0070-photographer-aim.md).
+Purpose: decide arm aim from shared pose observations. Design goals: subscribe to VisionPerception, emit one internal Action, and leave skeleton display and YOLO where they already are. See [ADR 0091](../../../docs/adr/0091-photographer-aim.md).
 
 ```mermaid
 flowchart LR

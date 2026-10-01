@@ -1,6 +1,7 @@
 import Actions
 import AgentCore
 import Agents
+import AppWorkflows
 import BehaviorAssembly
 import Foundation
 import Gateway
@@ -8,6 +9,7 @@ import ModelKit
 import PlatformKit
 import Storage
 import StorageChat
+import UI
 
 /// Root-owned communication assembly, available before voice models are ready.
 @MainActor
@@ -18,9 +20,10 @@ final class ApplicationRuntime {
     let output: OutputGateway
     let presentation: RuntimePresentation
     let actions: ChannelScheduler
+    let actionActivity: ActionActivityWorkflow
     let resources: ResourceCoordinator
 
-    init(camera: AppleCamera) throws {
+    init(camera: AppleCamera, bluetooth: BluetoothWorkflow) throws {
         let root = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         var directory = root.appendingPathComponent("MobileHarness/Conversations", isDirectory: true)
@@ -51,6 +54,21 @@ final class ApplicationRuntime {
         self.resources = resources
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation,
+            gesture: { request, _ in
+                let gesture: NexArmGesture
+                switch request.gesture {
+                case .nod: gesture = .nod
+                case .shakeHead: gesture = .shakeHead
+                case .wave: gesture = .wave
+                case .tiltLeft: gesture = .tiltLeft
+                case .tiltRight: gesture = .tiltRight
+                case .lookAround: gesture = .lookAround
+                case .celebrate: gesture = .celebrate
+                case .dance: gesture = .dance
+                }
+                try await bluetooth.performGesture(gesture, repetitions: request.repetitions)
+            },
+            shakeBase: { cycles, _ in try await bluetooth.shakeBase(cycles: cycles) },
             aim: { _, _, _ in throw RobotActions.AimError.notConnected },
             capabilities: [
                 AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
@@ -68,8 +86,11 @@ final class ApplicationRuntime {
         self.input = input
         self.presentation = presentation
         self.actions = actions
+        actionActivity = ActionActivityWorkflow(state: ActionActivityState())
+        actionActivity.start { try await actions.observeExecutions() }
         output = OutputGateway(
             manager: manager, requests: input, tools: behaviors.tools, actions: actions, policy: policy,
+            actionFeedback: .terminal,
             observedContracts: ["speech.partial", "speech.final", "speech.phase"],
             observeEvent: { try await presentation.observe($0) }, sink: { await presentation.output($0) })
     }

@@ -22,6 +22,7 @@ public enum SchedulingDirective: Equatable, Sendable {
 /// Ordered generation output. Never discard scheduling boundaries when forwarding actions.
 public enum GenerationEvent: Equatable, Sendable {
     case action(ActionCall)
+    case tool(ToolCall)
     case scheduling(SchedulingDirective)
 
     public var actionCall: ActionCall? {

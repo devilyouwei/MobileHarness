@@ -62,7 +62,7 @@ public actor Qwen35Chat: ChatCapability {
             try Task.checkCancellation()
             let control = GenerationControl()
             let pair = InferenceSession<ChatEvent>.make(
-                context: request.context, limits: try StreamLimits(capacity: 128, maximumEventBytes: 4096),
+                context: request.context, limits: try StreamLimits(capacity: nil, maximumEventBytes: 4096),
                 estimatedBytes: { $0.estimatedBytes },
                 onTermination: { reason in
                     if case .finished = reason { return }

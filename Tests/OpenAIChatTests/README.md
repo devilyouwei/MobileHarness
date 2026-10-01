@@ -11,3 +11,5 @@ Purpose: independently verify the OpenAI-compatible adapter without network acce
 ✅ Offline tests verify blank endpoint fallback, missing Authorization for empty credentials on chat and discovery, surfaced HTTP failures, and chat-family filtering with third-party deployment preservation. ❌ No live credentials or provider calls are used.
 
 ✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+
+✅ Offline long-reply regression queues 1,024 Unicode text events before starting the consumer and verifies every fragment plus the terminal finish reason. Producer completion is joined through resource unload; no timing sleeps or live credentials are used.

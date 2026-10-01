@@ -10,7 +10,7 @@ flowchart LR
     Inbox --> Worker[One serial synthesis worker]
     Worker --> Model[SpeechSynthesisCapability]
     Model --> Store[StorageAudio PCM store]
-    Store -->|failure / expiry / cancellation| Worker
+    Store -->|failure / reply cleanup / cancellation| Worker
 ```
 
 ## 输入、订阅与输出契约
@@ -22,7 +22,7 @@ flowchart LR
 | 定向 send | `speech.synthesize / 1 / observation` | `.observation(.speechSynthesis(SpeechSynthesisInput(audioID: UUID, text: String, locale: String)))`；audioID 是请求方生成的唯一句柄；text 去空白后须非空、最多 2000 UTF-8 字节；locale 为 `auto / zh-CN / en-US`。完整消息编码最多 16 KiB。 | 校验未过期、类型与内容、队列容量和句柄唯一性；先在 StorageAudio 注册句柄，再返回接纳回执。按实际接纳顺序串行合成。 |
 | 定向 send | `speech.cancel / 1 / observation` | `.observation(.cancelSpeech(audioID: UUID))`；只含待取消句柄，完整消息编码最多 16 KiB。 | 句柄所有者必须匹配绑定发送方、session 和原父输入。取消队列或活动任务；不占合成队列。 |
 
-输入 `AgentInput` 带 sessionID、turn 和 InputMetadata。发送方用 `parent` 建立因果关系；StorageAudio 的所有权键为 `source + sessionID + (parentID ?? input.id)`。队列最多 32 个等待/接纳中的合成请求，满时明确拒绝；每项执行超时 60 秒。`DeliveryReport.delivered` 只表示上述接纳成功，不表示 PCM 已产生。
+输入 `AgentInput` 带 sessionID、turn 和 InputMetadata。发送方用 `parent` 建立因果关系；StorageAudio 的所有权键为 `source + sessionID + (parentID ?? input.id)`。队列最多 32 个等待/接纳中的合成请求，满时明确拒绝；每项从 worker 开始执行起限时 60 秒，不包含 FIFO 排队时间，也不是从 speak 开始等待起计时。生产 PCM 空读没有独立超时。共享缓存另限制最多 32 个存活句柄（含排队、合成中、待播和播放中）；达到任一容量限制即明确拒绝。`DeliveryReport.delivered` 只表示上述接纳成功，不表示 PCM 已产生。
 
 ### 输出、publish 与 send
 
@@ -39,10 +39,49 @@ PCM 格式在一项请求内保持一致，帧 sequence 严格递增，流必须
 
 ✅ `speech.cancel / 1 / observation` carries a UUID; ownership is checked against the directed sender, session and parent input. No subscriptions and no Assistant-specific source assumptions. Reception validates and reserves the handle before returning admission; it never awaits inference or capacity.
 
-✅ Synthesis is serial in actual reception/admission order, regardless of Channel eligibility. Per-request execution deadline is 60 seconds; mono Float32, stable format, increasing sequence, explicit EOS, nonempty audio and 8 MiB total output are validated. Cache overflow fails that request and the worker continues. Pause retains bounded work, stop cancels/joins owned work; cancellation never drops another source's request.
+✅ Synthesis is serial in actual reception/admission order, regardless of Channel eligibility. The 60-second execution deadline starts in produce, excludes queue time and ends when synthesis completes or fails; mono Float32, stable format, increasing sequence, explicit EOS, nonempty audio and 8 MiB total output are validated. The worker advances after synthesis completion/failure without waiting for playback; later text requests can queue while an earlier Action waits or plays. Cache overflow fails that request and the worker continues. Pause retains bounded work, stop cancels/joins owned work; cancellation never drops another source's request.
 
 ✅ App registers the Agent alongside Assistant; shared cache ownership is injected. No Actions, model SDK imports, playback callback or direct Agent-to-Agent calls.
 
 ❌ File output, retry, priority, replay and hardware performance acceptance remain outside this implementation.
 
 ✅ Synthesis and cache failures use the shared SpeechAudioError type; scheduled consumption belongs to SpeechPlayback.
+
+✅ Pending and completed-unclaimed audio uses reply-owned lifetime without queue/ready TTL. App clears remaining source/input handles after reply completion/cancellation, and session handles on interruption. A reply is one originating source/input within a voice session, not the entire multi-turn session. Consumed frames leave the cache immediately and each played handle is released after hardware drain; only unconsumed audio remains until owner cleanup. The synthesis execution deadline is not a cache expiry or a total playback-wait deadline. ❌ Long-sequence physical-device acceptance remains pending.
+
+<a id="synthesis-timeout-propagation"></a>
+
+## 合成执行超时与播放 Action 的错误传递
+
+✅ 超时由 `SpeechSynthesisAgent.produce` 内的独立 Task 实现：请求从 FIFO 出队并开始执行时启动，默认 `executionTimeout = 60 秒`。收到 PCM 不会重置计时；合成正常完成或失败退出时，由 `defer` 取消计时任务。排队时间不计入此期限，已经合成成功的音频也不会因为后续等待播放而触发合成超时。
+
+到期后调用 `store.fail(audioID, error: SpeechAudioError.synthesisTimedOut)`。Agent 不直接调用播放 Action，也不发送一条超时 Agent 消息；合成与播放通过同一 audioID 对应的共享缓存传递失败状态。
+
+```mermaid
+sequenceDiagram
+    participant S as SpeechSynthesisAgent
+    participant C as SpeechAudioStore / MemoryLeaseStore
+    participant B as SpeechAudio / BoundedMemoryStream
+    participant P as App / AppleAudioIO
+    participant A as SpeechPlayback / speak Action
+    S->>C: fail(audioID, synthesisTimedOut)
+    C->>C: retire handle and retain bounded terminal error
+    C->>B: fail(error): clear unread PCM and wake reader
+    C->>S: cancelJob(audioID): cancel active synthesis worker
+    B-->>P: pending or next PCM read throws
+    P->>P: stop playback on error
+    P-->>A: propagate error and clean up
+    A-->>A: throw to scheduler / Gateway
+```
+
+| 播放状态 | 收到超时后的行为 |
+| --- | --- |
+| 正等待首块或下一块 PCM | 缓存立即以 `synthesisTimedOut` 恢复挂起的读取，播放端停止当前播放并抛错。 |
+| 正播放已提交的缓冲 | 失败不会直接回调播放器；下一次读取 PCM 时发现错误，再停止尚未播完的缓冲。已经出声的部分无法撤回。 |
+| Action 尚未执行 | 后续 checkout 在终态错误记录仍保留时抛出同一错误；记录过期或被容量淘汰后报告 missingAudio。终态记录最多 128 条、默认保留 30 秒，不保留 PCM。 |
+
+错误经 AppleAudioIO → SpeechPlayback → Speech.speak 向调度器/Gateway 传播，由既有 Action 失败和 App 回复清理流程处理。清理不会自动重新合成或重播；同一缓存句柄的首次失败会保留，后续取消不会覆盖已记录的超时。
+
+✅ `SpeechPlaybackTests.synthesisExecutionDeadlineIsIndependentOfPlaybackDeadline` 验证 Agent 执行期限能让等待 PCM 的读取收到 `synthesisTimedOut`；延迟 PCM、显式读取期限和取消有各自回归测试。PCM 空读默认没有独立期限，硬件播放完成超时是另一项 PlatformKit 保护。
+
+❌ 取消是协作式的：底层推理若未及时响应，worker 退出和下一项合成仍可能延迟；这不是强制终止底层计算或保证精确到 60 秒的实时机制。测试不等于真机超时听感验收。

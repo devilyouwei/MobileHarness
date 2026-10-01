@@ -1,10 +1,10 @@
 # ModelKit Core — Data, Sessions and Model Admission
 
-Purpose: document the implemented concurrency contracts and their limits. Design goal: explicit ownership, bounded work and observable termination.
+Purpose: document the implemented concurrency contracts and their limits. Design goal: explicit ownership, adapter-selected buffering and observable termination.
 
 ## Queue and asynchronous processing contract
 
-`InferenceSession` connects one adapter producer to one capability consumer using `AsyncThrowingStream.bufferingOldest`. `StreamLimits` specifies a positive event count and maximum estimated bytes/event; the product is checked for integer overflow. These are payload accounting limits, not measured total process memory. The producer must serialize emissions.
+`InferenceSession` connects one adapter producer to one capability consumer. `StreamLimits.capacity` defaults to 64 and uses `AsyncThrowingStream.bufferingOldest`; an explicit nil selects `.unbounded` for finite LLM replies. Bounded capacity must be positive and its product with maximum estimated bytes/event is checked for integer overflow. The per-event byte limit remains positive for both policies. These are payload accounting limits, not measured total process memory. The producer must serialize emissions.
 
 `yield` checks event size, then stream admission. Oversized events fail with `eventTooLarge`; a dropped yield fails the session with `bufferOverflow`. It never waits for a free slot. The single consumer checks terminal failure before and after awaiting each event, so failure/cancellation prevents buffered events being delivered afterwards. Normal finish permits accepted events to drain. A second iterator is rejected. Explicit cancellation, consumer cancellation or session-handle destruction terminates the session; the adapter's termination callback stops its worker. Callers breaking consumption early must cancel explicitly.
 
@@ -18,7 +18,10 @@ Unsupported: blocking producer admission, durable event replay, request priority
 ```mermaid
 flowchart TD
     Producer[Adapter producer] --> Check[Check estimated event size]
-    Check --> Buffer[Bounded event stream]
+    Check --> Policy{Event capacity policy}
+    Policy -->|positive count| Buffer[Bounded event stream]
+    Policy -->|nil - finite LLM output| Chat[Unbounded event stream]
+    Chat --> Consumer
     Buffer --> Consumer[Single consumer]
     Check -->|oversize| Fail[Fail session]
     Buffer -->|overflow| Fail
@@ -55,4 +58,6 @@ Keep shared media values separate from model-specific tensors, preprocessing and
 
 ✅ ImageFrame now accepts either RGB Data or a read-only retained BGRA NativeImageBuffer with clockwise quarter-turn orientation. Native storage validates 4 MP / 4096-per-side bounds and format; producer must not mutate it while retained. CoreVideo is an Apple data-buffer API, not a concrete model engine or business dependency. rgb is optional for native inputs; consumers must select the available storage explicitly.
 
-✅ InferenceEmitter.yieldSuspending is an opt-in serialized-producer operation: it suspends at the configured event capacity until the single consumer removes an event. One producer waiter is allowed; synchronous yield retains explicit overflow failure. Cancellation/termination wakes the waiter; cancellation suppresses buffered events. Size validation and single-consumer rules are unchanged. Capacity accounts for emitted events until consumer receipt; no unbounded task/event queue is introduced. ❌ Concurrent producer emission is unsupported.
+✅ InferenceEmitter.yieldSuspending is an opt-in serialized-producer operation: it suspends at the configured event capacity until the single consumer removes an event. One producer waiter is allowed; synchronous yield retains explicit overflow failure. Cancellation/termination wakes the waiter; cancellation suppresses buffered events. Size validation and single-consumer rules are unchanged. For bounded streams, capacity accounts for emitted events until consumer receipt; no additional task/event queue is introduced. ❌ Concurrent producer emission is unsupported.
+
+✅ Cloud and local LLM adapters explicitly select no event-count cap. Pending fragments drain in order after normal completion; cancellation, errors, per-event size checks and single-consumer ownership still apply. yieldSuspending does not wait for capacity in this mode. Generation/response limits belong to the adapter; this is a user-requested exception to bounded event queues. ❌ This does not remove downstream parser, journal or Action limits or promise bounded total memory for arbitrary unbounded producers.

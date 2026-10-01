@@ -57,5 +57,4 @@ public enum NexArmJointCommand {
 public enum NexArmControlError: Error, Equatable, Sendable {
     case invalidAngle
     case invalidPosition
-    case provisionalHome
 }

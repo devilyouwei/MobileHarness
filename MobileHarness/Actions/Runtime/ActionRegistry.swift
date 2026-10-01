@@ -25,6 +25,8 @@ public struct ActionRegistry: Sendable {
         var entries: [ActionPath: ActionDefinition] = [:]
         for definition in definitions {
             guard Self.validName(definition.path.module), Self.validName(definition.path.function),
+                !definition.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                definition.displayName.utf8.count <= 256,
                 !definition.completion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                 definition.completion.utf8.count <= 512, definition.resources.count <= 8,
                 definition.resources.allSatisfy({ Self.validName($0.rawValue) })

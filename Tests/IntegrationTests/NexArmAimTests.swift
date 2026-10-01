@@ -5,14 +5,6 @@ import Foundation
 import PlatformKit
 import Testing
 
-private actor MemoryTransport: ExternalDeviceTransport {
-    private(set) var sent: [[UInt8]] = []
-    func connect() async throws {}
-    func send(_ bytes: [UInt8]) async throws { sent.append(bytes) }
-    func emergencyStop() async {}
-    func disconnect() async {}
-}
-
 private func pose(
     noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,
     sequence: UInt64, timestamp: TimeInterval, people: Int = 1
@@ -82,18 +74,14 @@ private func positions(in frame: [UInt8]) -> [Int] {
     }
     #expect(call.actionPath == ActionPath(module: "Robot", function: "aim"))
     #expect(call.channel == "arm")
-    let transport = MemoryTransport()
-    let arm = NexArmController(transport: transport)
     try await RobotActions.aim(invocation: ActionInvocation(envelope: aimed)) { base, pitch, _ in
         #expect(base < 0)
         #expect(abs(pitch) < 0.001)
-        try await arm.aim(base: base, pitch: pitch)
+        let frame = try NexArmJointCommand.aimFrame(base: base, pitch: pitch)
+        let joints = positions(in: frame)
+        #expect(joints[0] < 2048)
+        #expect(joints.dropFirst().allSatisfy { $0 == 2048 })
     }
-    let frame = try #require(await transport.sent.first)
-    let joints = positions(in: frame)
-    #expect(joints[0] < 2048)
-    #expect(joints.dropFirst().allSatisfy { $0 == 2048 })
-    await #expect(throws: NexArmControlError.provisionalHome) { try await arm.home() }
     await agent.stop()
 }
 

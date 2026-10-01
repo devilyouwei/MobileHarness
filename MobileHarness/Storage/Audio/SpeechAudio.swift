@@ -10,7 +10,7 @@ public enum SpeechAudioError: Error, Equatable, Sendable, LocalizedError {
         case .capacityExceeded: "语音缓冲已满，请重试"
         case .missingAudio: "语音任务已失效"
         case .synthesisTimedOut: "语音合成执行超时"
-        case .timedOut: "等待语音超过 3 秒，请重试"
+        case .timedOut: "等待语音超时，请重试"
         case .invalidAudio: "语音合成返回了无效音频"
         case .duplicate: "语音任务重复"
         case .expired: "语音缓存已过期"
@@ -40,7 +40,7 @@ public final class SpeechAudio: Sendable {
     public let id: UUID
     private let stream: BoundedMemoryStream<AudioFrame>
 
-    public init(id: UUID = UUID(), maximumBytes: Int = 1_048_576, waitTimeout: Duration = .seconds(3)) {
+    public init(id: UUID = UUID(), maximumBytes: Int = 1_048_576, waitTimeout: Duration? = nil) {
         self.id = id
         stream = BoundedMemoryStream(maximumBytes: maximumBytes, maximumItems: 2048, waitTimeout: waitTimeout) {
             $0.data.count

@@ -3,8 +3,11 @@
 Purpose: group communication with external hardware by capability rather than device category. Design goals: separate transport from Agent decisions and future robot-specific command semantics.
 
 - ✅ ExternalDeviceTransport defines actor-isolated connect, send, emergencyStop and disconnect operations; its API is unchanged.
-- ✅ `NexArmJointCommand` maps logical `base` / `pitch` to six raw positions and builds the position-write frame (command 97, little-endian, checksum). Provisional home is raw 2048. `base` changes `shoulder_pan`; `pitch` changes `wrist_flex`.
-- ✅ `NexArmController` sends that frame on an injected transport. `home()` throws `provisionalHome` and does not move hardware.
-- ❌ Concrete Wi-Fi/BLE/network transports, bounded transport queues, hardware watchdogs and physical stop acknowledgements are not implemented. The intended NexArm endpoint is `192.168.4.1:8080`. The camera session does not connect.
+- ✅ `NexArmJointCommand` maps logical `base` / `pitch` to a provisional six-position frame (command 97, little-endian, checksum). Raw 2048 is the frame center. `base` changes `shoulder_pan`; `pitch` changes `wrist_flex`. The camera session does not send this frame.
+- ❌ That provisional frame is not the production motors1–5 packet, and no Wi-Fi socket opens it.
 
 The protocol alone provides no safety guarantee. Future adapters must document bounded admission, overflow, cancellation and completion; robot hardware must enforce its own safety independently of app execution. No placeholder transport implementation is provided.
+
+✅ [NexArm](NexArm/README.md) now implements a bounded macOS USB diagnostic transport, protocol parser and bounded motion controller. It does not claim the generic emergency-stop contract. ❌ BLE/TCP and device-side watchdog validation remain pending.
+
+✅ NexArm now includes iOS/macOS CoreBluetooth discovery, explicitly selected connection, FFE1 writes, FFE2 notifications and bounded request matching. App owns persisted selection and foreground policy; PlatformKit owns no Agent, Gateway or UI types. ❌ General external-device watchdog/stop semantics remain unverified.

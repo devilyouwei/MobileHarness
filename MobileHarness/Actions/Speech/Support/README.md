@@ -1,0 +1,21 @@
+# Speech Action Support
+
+Purpose: keep non-callable implementation support separate from registered entry points. Design goals: cohesive definitions, explicit typed injection, stable public names and no hidden registration.
+
+SpeechActionModule and SpeechPlaybackCapability define registration and host injection; SpeechPlayback retains audio checkout, drain and cancellation cleanup.
+
+```mermaid
+flowchart LR
+    Capability[Host playback capability] --> Module[SpeechActionModule]
+    Module --> Entry[SpeechActions.speak]
+    Entry --> Host[Session endpoint]
+    Host --> Playback[SpeechPlayback checkout / drain / cleanup]
+```
+
+✅ Sources compile once in Actions. Public visibility exists where App/test composition requires it; it does not grant model access. Definitions remain explicit, and Agent declarations remain the permission source. See the [domain contract](../README.md) for completion, lifetime, cancellation and limits.
+
+✅ This directory adds no queue or scheduler. SpeechPlayback retains its existing single cancellation-cleanup task per active playback, joins cleanup before failure, and uses the bounded StorageAudio store described by the domain contract.
+
+❌ No automatic discovery, generic action factory or new runtime behavior.
+
+✅ Registrations own each operation's required displayName alongside its handler and completion contract. Execution records carry this value; no App or UI switch enumerates domain actions. ❌ This is human-readable metadata, not model permission or a SwiftUI dependency.

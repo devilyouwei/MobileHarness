@@ -58,20 +58,21 @@ public actor AssistantAgent: Agent {
             + (try CapabilityContextBuilder.build(capabilities, speechChannel: "Speech"))
     }
 
-    private static let beginReply = InternalAction(module: "UI", function: "beginReplyTurn", channel: "Display")
+    private static let beginReply = InternalTool(path: "UI.beginReplyTurn")
     private static let playback = InternalAction(
         module: "Speech", function: "speak", channel: "Speech", required: ["audioID"])
-    private static let caption = InternalAction(module: "UI", function: "print", channel: "Display", required: ["text"])
+    private static let caption = InternalTool(path: "UI.print", required: ["text"])
 
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
-        try model.adding(internalActions: [beginReply, playback, caption])
+        try model.adding(internalActions: [playback], internalTools: [beginReply, caption])
     }
 
     /// Agent-owned text expansion. Speech text is replaced with an audioID before Gateway admission.
-    public nonisolated static func mapText(_ text: String, channel: String?) throws -> [ActionCall] {
+    public nonisolated static func mapText(_ text: String, channel: String?) throws -> [GenerationEvent] {
         [
-            ActionCall(actionPath: playback.path, channel: channel ?? playback.channel, parameters: ["text": text]),
-            try caption.call(["text": text], channel: channel),
+            .action(
+                ActionCall(actionPath: playback.path, channel: channel ?? playback.channel, parameters: ["text": text])),
+            .tool(try caption.call(["text": text])),
         ]
     }
 
@@ -174,8 +175,8 @@ public actor AssistantAgent: Agent {
         guard let turn = input.turn else { return }
         if begunSession == input.sessionID, let begunTurn, turn.ordinal <= begunTurn.ordinal { return }
         if begunTurn == turn { return }
-        let call = try Self.beginReply.call()
-        guard emit(.actionCall(call), for: input) else { throw HarnessError.queueFull }
+        let call = try Self.beginReply.call([:])
+        guard emit(.toolCall(call), for: input) else { throw HarnessError.queueFull }
         begunSession = input.sessionID
         begunTurn = turn
     }
@@ -286,6 +287,13 @@ public actor AssistantAgent: Agent {
             if case .scheduling(let directive) = event {
                 try Task.checkCancellation()
                 guard emit(.scheduling(directive), for: input) else { throw HarnessError.queueFull }
+                continue
+            }
+            if case .tool(let call) = event {
+                try Task.checkCancellation()
+                guard count < 120 else { throw GenerationError.limitExceeded }
+                count += 1
+                guard emit(.toolCall(call), for: input) else { throw HarnessError.queueFull }
                 continue
             }
             guard case .action(let original) = event else { continue }

@@ -90,6 +90,45 @@ public actor ChannelScheduler {
     private var isShutdown = false
     private var sequence: UInt64 = 0
     private var busyModules: Set<String> = []
+    private var executionLedger = ActionExecutionLedger()
+    private var executionObservers: [UUID: AsyncStream<ActionExecutionSnapshot>.Continuation] = [:]
+    public enum ObservationError: Error { case capacityExceeded }
+
+    /// Full snapshots coalesce safely: a slow observer never blocks execution or needs delta replay.
+    public func observeExecutions() throws -> AsyncStream<ActionExecutionSnapshot> {
+        guard executionObservers.count < 8 else { throw ObservationError.capacityExceeded }
+        let id = UUID()
+        let pair = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        pair.continuation.yield(executionLedger.snapshot())
+        if isShutdown {
+            pair.continuation.finish()
+        } else {
+            executionObservers[id] = pair.continuation
+            pair.continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeExecutionObserver(id) }
+            }
+        }
+        return pair.stream
+    }
+    public func executionSnapshot() -> ActionExecutionSnapshot { executionLedger.snapshot() }
+    private func removeExecutionObserver(_ id: UUID) { executionObservers.removeValue(forKey: id) }
+    private func publishExecutions() {
+        guard !executionObservers.isEmpty else { return }
+        let snapshot = executionLedger.snapshot()
+        for observer in executionObservers.values { observer.yield(snapshot) }
+    }
+    private func executionTransition(
+        _ id: UUID, to phase: ActionExecutionRecord.Phase,
+        completion: ActionCompletion? = nil, failure: ActionExecutionRecord.Failure? = nil,
+        failureDescription: String? = nil
+    ) {
+        if executionLedger.transition(
+            id, to: phase, completion: completion, failure: failure, failureDescription: failureDescription)
+        {
+            publishExecutions()
+        }
+    }
+
     private var diagnostics: ActionDiagnostics
     private let resources: ResourceCoordinator?
     private var resultLedger: ActionResultLedger
@@ -178,6 +217,8 @@ public actor ChannelScheduler {
             Job(
                 sequence: sequence, phase: state.writePhase, kind: definition.kind, resources: definition.resources,
                 invocation: invocation))
+        executionLedger.admit(invocation, definition: definition)
+        publishExecutions()
         diagnostics.record(invocation, kind: definition.kind, phase: .admitted, effect: .notStarted)
         startEligibleChannels()
         return invocation.executionID
@@ -259,6 +300,8 @@ public actor ChannelScheduler {
         resultLedger.close()
         deliveryWorker?.cancel()
         deliveryAttempt?.cancel()
+        for observer in executionObservers.values { observer.finish() }
+        executionObservers.removeAll()
     }
 
     public func cancel(agent: AgentID, incarnation: UUID) async {
@@ -307,6 +350,7 @@ public actor ChannelScheduler {
                 do {
                     try Task.checkCancellation()
                     started = true
+                    self.executionTransition(job.id, to: .running)
                     self.diagnostics.record(job.invocation, kind: job.kind, phase: .started, effect: .unknown)
                     let completion: ActionCompletion
                     if !job.resources.isEmpty, let resources {
@@ -335,10 +379,18 @@ public actor ChannelScheduler {
         state.pending -= 1
         switch outcome {
         case .success(let completion):
+            executionTransition(job.id, to: .succeeded, completion: completion)
             resultLedger.complete(
                 job.invocation, status: .succeeded, effect: .contractCompleted, completion: completion)
             diagnostics.record(job.invocation, kind: job.kind, phase: .succeeded, effect: .contractCompleted)
         case .failure(let error):
+            executionTransition(
+                job.id, to: error is CancellationError ? .cancelled : .failed,
+                failure: error is CancellationError
+                    ? nil
+                    : ((error as? any ActionExecutionFailureProviding)?.actionExecutionFailure
+                        ?? (error is ResourceError ? .resourceUnavailable : .operationFailed)),
+                failureDescription: error is CancellationError ? nil : error.localizedDescription)
             resultLedger.complete(
                 job.invocation, status: error is CancellationError ? .cancelled : .failed,
                 effect: started ? .unknown : .notStarted,
@@ -375,6 +427,7 @@ public actor ChannelScheduler {
             for name in Array(state.phases[phase].lanes.keys) {
                 let queued = state.phases[phase].lanes[name]?.queued ?? []
                 for job in queued {
+                    executionTransition(job.id, to: .cancelled)
                     resultLedger.complete(job.invocation, status: .cancelled, effect: .notStarted, failure: .cancelled)
                     diagnostics.record(job.invocation, kind: job.kind, phase: .cancelled, effect: .notStarted)
                 }
@@ -382,7 +435,10 @@ public actor ChannelScheduler {
                 state.pending -= count
                 decrementChannel(name, by: count)
                 state.phases[phase].lanes[name]?.queued.removeAll()
-                state.phases[phase].lanes[name]?.running?.task.cancel()
+                if let running = state.phases[phase].lanes[name]?.running {
+                    executionTransition(running.job.id, to: .cancelling)
+                    running.task.cancel()
+                }
             }
         }
         startResultDelivery()

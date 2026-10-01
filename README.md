@@ -1,5 +1,8 @@
 # MobileHarness
 
+> Current status (2026-09-30): the user confirmed iPhone LLM conversation control of NexArm. Normal BLE connections now use protocol/gesture validation, discovery includes other BLE devices, and foreground recovery avoids repeated motion. Physical acceptance of the latest discovery/recovery UX is pending.
+
+
 *The first bio-inspired Agent Harness.*
 
 Apple-Native · Multi-Modal · Multi-Agent · Embodied Intelligence · Robotics · Biomimetics
@@ -77,7 +80,7 @@ The current backend integrations include **Core ML** for Silero VAD and YOLO pos
 
 ✅ These paths are implemented, with module and integration tests. Build success does not establish device accuracy, latency or sustained stability.
 
-❌ Fast/slow model orchestration, robot/device control, Photographer motion policy, dynamic subscriptions, general request/reply, persistent messaging and Channel takeover are not implemented. Configured cloud chat has an implementation, but real-provider acceptance remains pending. The simulator supports UI development; it does not provide the physical-device model pipeline.
+❌ Fast/slow model orchestration, unattended robot control, Photographer tracking, dynamic subscriptions, general request/reply, persistent messaging and Channel takeover are not implemented. Photographer can emit `Robot.aim` from a subscribed pose; the camera session leaves arm control off. Configured cloud chat has an implementation, but real-provider acceptance remains pending. The simulator supports UI development; it does not provide the physical-device model pipeline.
 
 ## Architecture at a Glance
 
@@ -177,7 +180,7 @@ Run the repository checks from its root:
 
 `check.sh` checks module boundaries, provisioning tests, Swift formatting, Swift tests and project metadata. `build-ios.sh` builds four unsigned simulator schemes and requires full Xcode. Optional real-model evaluations require their documented local artifacts and opt-in settings.
 
-Shared sources are mapped into independently tested targets by root `Package.swift`; tests live in root `Tests/`. SwiftUI state is MainActor-isolated and runtime state is actor-owned. Every queue must document its bound and overflow policy.
+Shared sources are mapped into independently tested targets by root `Package.swift`; tests live in root `Tests/`. SwiftUI state is MainActor-isolated and runtime state is actor-owned. Every queue must document its capacity policy. Finite LLM output streams explicitly have no pending-event count cap; other queues retain their documented bounds and overflow policies (see [ADR 0084](docs/adr/0084-llm-output-buffering.md)).
 
 Input routing uses explicit `publish` (configured subscriptions) or `send` (named target); there is no default-Agent router. See [ADR 0047](docs/adr/0047-explicit-input-routing.md).
 
@@ -241,3 +244,11 @@ Local user settings now use Storage-backed cached persistence in the application
 ## Behavior module ownership
 
 ✅ Actions/Tools now own explicit behavior catalogs; App binds typed capabilities through the independently tested BehaviorAssembly target. See [ADR 0067](docs/adr/0067-domain-owned-behavior-assembly.md). ❌ New native capabilities can still require App adaptation.
+
+## NexArm diagnostic
+
+✅ An opt-in macOS USB [NexArm Action](MobileHarness/Actions/NexArm/README.md) now supports supervised hardware validation through the gateways. ✅ Assistant declares `shakeBase(cycles: 1...3)` for supervised Mac USB sweeps; the hardware test supplies the real binding and deterministic model output. ✅ iPhone settings and foreground BLE binding are implemented. ❌ TCP, unattended robot safety and full physical acceptance remain pending.
+
+✅ iPhone Settings → 蓝牙设备 now scans NexArm, verifies/connects, remembers one device, disconnects and forgets. Return to conversation to request “让底座左右晃动一次”; supported posture and finite-motion bounds still apply. [BLE lifecycle and limits](MobileHarness/PlatformKit/Connectivity/NexArm/README.md) distinguish implementation/tests from physical acceptance.
+
+✅ Action implementations now group related entries, with registration, types and services in domain Support directories. See the [Action authoring standard](MobileHarness/Actions/README.md); public behavior and runtime contracts are unchanged.

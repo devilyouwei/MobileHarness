@@ -34,3 +34,7 @@ flowchart LR
 ## Action implementation audit
 
 ✅ SpeechPlaybackCapability now receives a typed audioID UUID plus trusted invocation; RuntimePresentation forwards it without parsing Action arguments. Existing whole-endpoint binding remains unchanged.
+
+## Action and Tool presentation boundary
+
+✅ RuntimePresentation implements immediate UIUpdateCapability using ToolInvocation, while speech and expression retain ActionInvocation. Voice/camera endpoint ownership, session/turn/sequence checks and weak bindings are preserved. ❌ No presentation effect bypasses OutputGateway.

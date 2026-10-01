@@ -6,19 +6,21 @@ import Foundation
 import Testing
 import Tools
 
-private actor BehaviorEndpoint: UIPresentationCapability, SpeechPlaybackCapability, PosePresentationCapability {
+private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
+    PosePresentationCapability
+{
     private(set) var emotion: UIActions.Emotion?
     private(set) var pose: PoseOverlay?
     func play(audioID: UUID, invocation: ActionInvocation) async throws {}
-    func present(_ text: String, invocation: ActionInvocation) async throws {}
-    func presentTranscript(_ text: String, invocation: ActionInvocation) async throws {}
-    func finishTranscript(invocation: ActionInvocation) async throws {}
-    func beginReplyTurn(invocation: ActionInvocation) async throws {}
-    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ActionInvocation) async throws {}
+    func present(_ text: String, invocation: ToolInvocation) async throws {}
+    func presentTranscript(_ text: String, invocation: ToolInvocation) async throws {}
+    func finishTranscript(invocation: ToolInvocation) async throws {}
+    func beginReplyTurn(invocation: ToolInvocation) async throws {}
+    func presentVoiceState(_ state: UITools.VoiceState, invocation: ToolInvocation) async throws {}
     func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
         self.emotion = emotion
     }
-    func present(_ target: UIActions.Gaze, invocation: ActionInvocation) async throws {}
+    func present(_ target: UITools.Gaze, invocation: ToolInvocation) async throws {}
     func present(_ overlay: PoseOverlay, sessionID: UUID) async throws { pose = overlay }
 }
 
@@ -39,6 +41,8 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let endpoint = BehaviorEndpoint()
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint,
+        gesture: { _, _ in throw CancellationError() },
+        shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw RobotActions.AimError.notConnected },
         capabilities: [
             AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
@@ -86,7 +90,8 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(throws: HarnessError.queueFull) { try ToolRegistry(modules: Array(repeating: tool, count: 33)) }
     let action = FixtureActionModule(definitions: [
         ActionDefinition(
-            path: ActionPath(module: "Fixture", function: "apply"), kind: .state, completion: "Committed.",
+            path: ActionPath(module: "Fixture", function: "apply"), displayName: "测试动作", kind: .state,
+            completion: "Committed.",
             handler: { _ in })
     ])
     #expect(throws: ActionExecutionError.duplicateDefinition(ActionPath(module: "Fixture", function: "apply"))) {
@@ -100,7 +105,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let resource = ResourceID(rawValue: "fixture.output")
     let action = FixtureActionModule(definitions: [
         ActionDefinition(
-            path: path, kind: .state, completion: "Expression accepted.", resources: [resource],
+            path: path, displayName: "测试动作", kind: .state, completion: "Expression accepted.", resources: [resource],
             handler: {
                 try await endpoint.presentExpression(.smile, invocation: $0)
             })

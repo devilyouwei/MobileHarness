@@ -4,6 +4,7 @@ import ModelKit
 import ModelKitDefaults
 import Observation
 import PlatformKit
+import Storage
 import UI
 
 /// The scene's composition root. Runtime services are lazy but never discovered by consumers.
@@ -19,6 +20,19 @@ final class AppAssembly {
         endChange: { [weak self] in self?.container?.lifecycle.endSettingsChange() })
     @ObservationIgnored lazy var settings = SettingsState(
         operations: settingsWorkflow, initial: SettingsWorkflow.initial)
+    @ObservationIgnored lazy var bluetooth = BluetoothWorkflow(
+        state: BluetoothSettingsState(), link: NexArmBluetooth(),
+        quiesce: { [weak self] in
+            await self?.container?.lifecycle.beginSettingsChange()
+            self?.container?.lifecycle.endSettingsChange()
+        },
+        makeStore: {
+            let root = try FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask,
+                appropriateFor: nil, create: true)
+            return try LocalDocumentStore<BluetoothDeviceRecord>(
+                url: root.appendingPathComponent("MobileHarness/Bluetooth/device.json"), maximumBytes: 4096)
+        })
     @ObservationIgnored lazy var camera = makeCamera()
     private func makeCamera() -> CameraCoordinator {
         let device = cameraDevice
@@ -58,7 +72,7 @@ final class AppAssembly {
     }
     private func runtime() throws -> ApplicationRuntime {
         if let runtimeValue { return runtimeValue }
-        let runtime = try ApplicationRuntime(camera: cameraDevice)
+        let runtime = try ApplicationRuntime(camera: cameraDevice, bluetooth: bluetooth)
         runtimeValue = runtime
         return runtime
     }

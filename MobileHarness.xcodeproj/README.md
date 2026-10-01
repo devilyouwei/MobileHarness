@@ -29,7 +29,7 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 
 ## Action implementation audit
 
-✅ Canonical UIActions/SpeechActions namespaces, audioID-only Speak.swift and ActionAuthoringTests are navigation-only shared package sources; no duplicate App compilation.
+✅ Canonical UIActions/SpeechActions namespaces, audioID-only SpeechActions.swift and ActionAuthoringTests are navigation-only shared package sources; no duplicate App compilation.
 
 ## Storage domain organization
 
@@ -38,3 +38,19 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Photographer, Robot.aim and the NexArm frame sources are navigator references. SwiftPM compiles them; they are not added to App Sources.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+✅ NexArm Action, PlatformKit connectivity and diagnostic test sources are navigation-only references. SwiftPM owns compilation; the macOS serial implementation is excluded on iOS by conditional compilation. ❌ No iPhone robot binding is enabled.
+
+✅ NexArmActions.swift is navigation-only and compiled by the existing Actions package target; ❌ no duplicate App compilation or iPhone USB binding.
+
+✅ App configurations include NSBluetoothAlwaysUsageDescription; NexArmBluetooth, BluetoothWorkflow, settings UI and tests are SwiftPM-owned navigation references. No Bluetooth background mode is enabled. ❌ Simulator build success does not prove a Bluetooth radio connection.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ Navigator groups mirror consolidated domain entries and their Support subdirectories, including grouped registration and type files. Swift package targets compile the shared sources; no duplicate source copies or signing settings added. ❌ Physical gesture acceptance remains separate from builds.
+
+✅ Actions navigation is rebuilt from its actual entry/Support/Runtime files, removing obsolete per-verb and migrated UI references. All remain SwiftPM-owned, without App Sources membership.
+
+✅ Removed the unused NexArmDiagnostics navigation reference together with its Action entry; production action/support sources retain their existing package ownership.
+
+✅ Tools navigator mirrors the Runtime/domain/Support layout, including all grouped callable entries and support files. Shared Tools sources continue compiling through SwiftPM only. ❌ This navigation update adds no App source build memberships.

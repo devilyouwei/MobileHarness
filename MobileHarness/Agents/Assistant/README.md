@@ -3,12 +3,12 @@
 Purpose: send user input to ChatCapability, maintain bounded history and interpret generated output inside the Agent. Its local registry controls available capabilities; Gateway receives resolved calls.
 
 - ✅ AssistantAgent actor: 32 waiting inputs, 256 output envelopes and one generation worker; overflow fails explicitly.
-- ✅ Assistant.agent.json v5 exposes express under Display and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
+- ✅ Assistant.agent.json v5 exposes express under Display, six NexArm actions under Robot and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
 - ✅ Each turn owns AgentGenerator state. Natural text uses Assistant.mapText; explicit XML resolves only JSON Actions. Channel scopes override defaults without moving wait boundaries.
 - ✅ CapabilityContextBuilder includes JSON Action aliases/docs/parameters/examples only. Speech behavior is an English Agent-owned instruction; internal methods and native Tools never enter system context.
 - ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
 - ✅ /status resolves runtimeInfo. Tool results and event descriptions are escaped before text interpretation.
-- ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 ActionCalls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
+- ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 generated Action/Tool calls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
 - ✅ Cancellation bypasses full/paused inbox admission, joins the worker and discards incomplete parsing state.
 - ❌ Native model tool deltas, durable inbox/runtime checkpoints, restart and long-running background execution. ToolCallParser exists, but ChatCapability produces text/completion events.
 
@@ -20,8 +20,8 @@ flowchart TD
     Queue --> Model
     Model -->|Persist raw fragments before parsing| History
     Model --> Parser[AgentGenerator]
-    Parser --> Events[Ordered Actions and wait boundaries]
-    Events --> Calls[Resolved ActionCall]
+    Parser --> Events[Ordered Actions, Tools and wait boundaries]
+    Events --> Calls[Resolved ActionCall / ToolCall]
     Events -->|beginWait / endWait in order| Stream
     Calls -->|speech text| Synthesis[Directed SpeechSynthesisAgent]
     Synthesis -->|admitted audioID| Playback[Speech.speak audioID]
@@ -33,7 +33,7 @@ flowchart TD
     Cancel --> Parser
 ```
 
-Speech and captions use different default channels and can run concurrently. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
+Speech is a scheduled Action on its default or explicit Channel; captions are immediate Tools without a Channel and may update while speech is queued or playing. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
 
 ## Configuration and initialization
 
@@ -61,7 +61,7 @@ flowchart LR
     Synth -->|audioID admitted| Out
     Out -->|App transport pump| Gateway[OutputGateway validation]
     Gateway --> Runtime[Action / Tool runtime]
-    Runtime --> UI[UI Actions via injected handlers]
+    Runtime --> UI[Expression Action and UI Tools via injected handlers]
     Cancel[Cancel or stop] -->|clear and join| Chat
 ```
 
@@ -75,9 +75,9 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ JSON v5 subscribes to speech.final and user.text; final transcript uses the same conversation path as text. Inputs expire before dequeue, never during a started reply. Partial transcripts cannot enter Assistant.
 
-✅ JSON v5 also subscribes to speech.phase. Speech onset emits UI.beginReplyTurn once per turn on Display, followed by agent.finished to release Action tracking; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
+✅ JSON v5 also subscribes to speech.phase. Speech onset emits UI.beginReplyTurn once per turn as an immediate Tool, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
 
-✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Action exists if onset was missed. Every output has a monotonically increasing source sequence; text/expression survive normal reply completion until the next turn.
+✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Tool exists if onset was missed. Every output has a monotonically increasing source sequence; text/expression survive normal reply completion until the next turn.
 
 
 ## 输入、订阅与输出契约
@@ -103,8 +103,8 @@ flowchart LR
     IG --> A[Assistant]
     A -->|ordinary text or final| Chat[ChatCapability]
     Chat -->|text deltas| Parser[AgentGenerator]
-    Parser --> Events[Ordered Actions and wait boundaries]
-    Events --> Calls[Resolved ActionCall]
+    Parser --> Events[Ordered Actions, Tools and wait boundaries]
+    Events --> Calls[Resolved ActionCall / ToolCall]
     Events -->|beginWait / endWait in order| OG2
     Calls -->|speech text| Synthesis[Directed speech.synthesize]
     Synthesis -->|audioID| Play[Resolved Speech.speak audioID]
@@ -122,21 +122,21 @@ flowchart LR
 
 | 输出类别 | 调用路径 / Channel | 数据、触发与接收者 |
 | --- | --- | --- |
-| Action | `Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.speak(audioID)`。 |
-| Action | `Speech.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用原 say 的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
-| Action | `UI.print / Display` | 同样的 text 参数，追加回复字幕；与 say 来自同一段自然文本。 |
+| Agent 内部分段事件（尚未发送） | `Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.speak(audioID)`。 |
+| Action | `Speech.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用该文本段的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
+| 无返回值 Tool | `UI.print`，无 Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
 | Action | `express → UI.express / Display` | `parameters["emotion"]` 为 `clear / smile / happy / laugh / thinking / surprised / sad / love / angry / scared / playful`，设置或清除表情。 |
-| Action | `UI.beginReplyTurn / Display` | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
+| 无返回值 Tool | `UI.beginReplyTurn`，无 Channel | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
 | 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。目前不是模型原生 Tool streaming。 |
-| control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。 |
-| control | `agent.finished` | speaking 阶段的展示 Action 完成屏障，释放该输入的 Action 跟踪。 |
+| control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
+| control | `agent.finished` | speaking 阶段的输入完成通知（初始化展示通过 Tool 执行），释放该输入的 Action 跟踪。 |
 | control | `assistant.error: …` | 生成、解析、即时输出等失败；输出流溢出会直接进入 failed 并关闭流，不能保证再塞入错误消息。 |
 
 Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再额外声明 `main`；跨轨同步使用 wait。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
 
 ### Publish / send 数据标准
 
-`communication.publications = []`：Assistant 不广播共享观测。`communication.sends` 只允许以下两种定向消息，目标均为 `speechSynthesis`，均通过 `AgentMessaging.send(message, parent: input, to:)` 经 OutputGateway → InputGateway。发送端身份由绑定端口确定为 `assistant`；parent 是触发该段回复的输入，保留 session/turn/因果链。send 的回执只确认接纳，不等待模型合成或播放。
+`communication.publications = []`：Assistant 不广播共享观测。`communication.sends` 只允许以下两种定向消息，目标均为 `speechSynthesis`，均通过 `AgentMessaging.send(message, parent: input, to:)` 经 OutputGateway → InputGateway。发送端身份由绑定端口确定为 `assistant`；parent 是触发该段回复的输入，保留 session/turn/因果链。send 的回执只确认接纳，不等待模型合成或播放。每段独立创建 audioID；合成 FIFO 与 Action Channel 独立推进，前段未播放完时后段仍可合成。没有自动重发或播放重试。
 
 | contract / version / kind | typed payload 与字段标准 | 时机与失败语义 |
 | --- | --- | --- |
@@ -189,3 +189,33 @@ flowchart LR
 ✅ Assistant and title generation import StorageChat for conversation schemas/journal. Generic storage core no longer owns chat records; Agent behavior and persisted data remain unchanged.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+## Supervised NexArm base Action
+
+✅ JSON is the only model registration: `<shakeBase cycles="1"/>` resolves to `NexArm.shakeBase` on Robot. Required integer `cycles` is 1...3; one cycle is origin → +2° → -2° → origin. No angle/speed parameters. All calls and completion receipts cross the Gateways. The domain handler validates arguments; the host binds a connected controller. The Mac USB integration harness exercises the real Assistant/parser with explicitly deterministic model output and test presentation.
+
+✅ iPhone binds the verified BLE profile through AppWorkflows. ❌ Unattended model motion and verified hardware stop/watchdog are unavailable; disconnected devices fail explicitly. Generation completion is not motion completion. Use only explicitly requested supervised motions; never automatically retry failures.
+
+✅ shakeBase documentation now identifies phone Settings → Bluetooth Devices and foreground/posture requirements. iPhone has a real BLE workflow binding. Terminal ActionResults enter the existing bounded inbox, and UI shows workflow completion independently of model prose. ❌ Receipt-driven follow-up model generation and arbitrary robot Actions are not introduced.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ Robot now exposes waveWrist(count), tiltWrist(direction), lookAround(cycles), celebrate(cycles) and dance(cycles), alongside shakeBase. JSON v5 alone lists model permissions. Docs distinguish motion geometry, finite completion, foreground/connection requirements and no automatic retry; examples use structured wait. Choose a gesture when the user requests robot motion/performance, not on every ordinary chat reply. ❌ No new receipt-driven model recovery or implicit motion on reconnect.
+
+✅ Robot gesture descriptions now specify fixed preparation/body/home, larger coordinated angles and all-six-servo poses including grip. JSON v5 aliases and parameter schemas are unchanged. ❌ Physical choreography acceptance remains pending.
+
+✅ Robot docs now describe the phone base Action as ±30° and all performances as fixed Cartesian home/ready/body/home with800ms body interpolation. Joint calibration belongs to the device; no model-callable registry changes. ❌ Physical performance acceptance remains pending.
+
+✅ NexArm left/right means the arm’s own frame, viewed from behind facing forward. The tiltWrist description now matches the shared controller: left positive yaw/roll, right negative yaw/roll. ❌ Observer-relative directions are not a separate action mode.
+
+✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
+
+✅ TiltWrist keeps ready height240mm with yaw±12° / roll±40° and its fixed return sequence; there is no extra260mm lift. ❌ Precise Cartesian positioning is not promised.
+
+## Action and Tool presentation boundary
+
+✅ beginReplyTurn and per-sentence print are code-owned immediate Tools; speech playback and model-selected expression remain scheduled Actions. Text mapping returns ordered GenerationEvents: speech Action followed by caption Tool. Captions append sentence chunks, never full accumulated replies, and do not inherit channel scopes. The same 120-call/256-output bounds cover both kinds. ❌ Native model Tool generation is unchanged.
+
+## Head gestures
+
+✅ JSON v5 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Tool presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.

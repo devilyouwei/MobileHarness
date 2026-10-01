@@ -10,7 +10,7 @@ This is the normative authoring standard for new Actions and deliberate migratio
 | --- | --- | --- |
 | Action | One permission-checked, scheduled behavior identified by `ActionPath(module:function:)`. It validates input, performs an effect and returns at its documented completion point. | `Speech.speak`, `UI.express`; an Action is not an Agent, thread, animation or Swift class. |
 | Action module | A cohesive behavior domain and stable path namespace, normally one directory under Actions. Today its name is also the scheduler's process-wide mutual-exclusion key. | `Speech`, `UI`; do not invent another module name to bypass exclusion. |
-| Swift target/module | A compilation and dependency boundary. | The single `Actions` target contains Runtime, Speech and UI. An Action module does not require a new Swift target. |
+| Swift target/module | A compilation and dependency boundary. | The single `Actions` target contains Runtime, Speech, UI and NexArm supervised Actions. An Action module does not require a new Swift target. |
 | Channel | An ordering lane selected by the Agent declaration or an allowed scope override. | `Display` is a Channel; `UI` is an Action module. Same-named Channels in different tasks do not share FIFO. |
 | Alias | An Agent-local model-visible name resolved inside Agents. | `express` resolves to `UI.express`; Runtime never resolves model aliases. |
 | Runtime service | An injected owner of mutable state, resources or ongoing work; it is not itself a model-callable Action. | `SpeechPlayback` owns playback/cache handling. Service methods are not implicitly registered. |
@@ -47,6 +47,8 @@ Every category has admission, execution and terminal success/failure/cancellatio
 
 ### Finite operations
 
+**Await the whole operation, not an invented completion gate for every internal step.** Actions validate arguments and `try await` the injected capability through its documented completion and cleanup. Device trajectory timing, feedback sampling and control-mode handoffs belong to PlatformKit. Do not implement a second per-waypoint stability loop, arbitrary settling sleeps, command replay, or a device queue inside an Action. Do not start an unjoined `Task` and return early: that releases Channel/module exclusion before the effect has finished. Nominal trajectory durations may schedule internal frames, but do not by themselves establish whole-operation success. NexArm Cartesian playback verifies fresh final home; native head gestures retain their measured handoff and segment gates. See [NexArm authoring pitfalls](NexArm/README.md#authoring-nexarm-actions-avoid-these-patterns) before adding robot Actions.
+
 - Await the actual promised endpoint: speaker drain, gesture completion, saved photo, or device-reported arrival within documented tolerance. Enqueuing work or closing an XML tag is not completion.
 - Keep retries, waits and buffers bounded. A duration estimate or `Task.sleep` is not evidence of physical/animation completion; await the owning capability's acknowledgment.
 - Cancellation stops owned work and joins cleanup before releasing execution resources. Already visible/physical effects are not automatically rolled back.
@@ -54,7 +56,7 @@ Every category has admission, execution and terminal success/failure/cancellatio
 
 ### State setting
 
-- Prefer `setExpression`, `setTarget`, `clearExpression` names for new APIs. Existing `UI.express` and `UI.moveEyes` retain their names until an explicit migration.
+- Prefer `setExpression`, `setTarget`, `clearExpression` names for new APIs. Existing `UI.express` retains its published name; immediate `UI.moveEyes` now belongs to Tools.
 - Return after the documented state/target acknowledgment. Do not wait until a persistent state is removed; do not promise visible interpolation or physical arrival unless actually acknowledged.
 - A committed state belongs to its state owner after return. Define replacement, reset, lifetime and repeated-setting semantics. Repeated same-value Set should be idempotent unless a documented reason requires another behavior; `toggle` is not equivalent to `setEnabled(true)`.
 - Distinguish requested target from observed state. `setTarget(90)` must not claim the arm has reached 90 degrees. Use a finite `moveTo(90)` or an explicit arrival observation/barrier for subsequent operations that require arrival.
@@ -88,7 +90,7 @@ flowchart TD
 
 ## 3. Types, class policy and canonical signatures
 
-Use a **caseless enum `<Module>Actions`** as the stateless namespace. Declare it exactly once in `<Module>Actions.swift`; place each Action in an extension in its own file. Do not use a singleton, base Action class, one class per function, or an actor merely to namespace functions.
+Use a **caseless enum `<Module>Actions`** as the stateless namespace. Declare it exactly once in `<Module>Actions.swift` and implement related short Actions together. Use an extension file only for a cohesive separate concern, such as a separate family of Agent behaviors; a function does not require its own file. Do not use a singleton, base Action class, one class per function, or an actor merely to namespace functions.
 
 | Responsibility | Swift form | Rule |
 | --- | --- | --- |
@@ -132,33 +134,39 @@ Prefer shared `ActionArguments` readers for transport validation; map decoding e
 
 ## 4. Modules, files and formatting
 
-A module groups related effects and a coherent control domain; it is not a category folder such as `Instant` or `Blocking`. Different Action categories may share a module. Module names are UpperCamelCase (established acronyms such as `UI` remain); function names are lowerCamelCase verbs. A path's function matches its Swift entry name, and `<Verb>.swift` uppercases the first letter of that function. Aliases may differ but resolve only inside Agents.
+A module groups related effects and a coherent control domain; it is not a category folder such as `Instant` or `Blocking`. Different Action categories may share a module. Module names are UpperCamelCase (established acronyms such as `UI` remain); function names are lowerCamelCase verbs. A path's function matches its Swift entry name; filenames describe cohesive responsibilities rather than individual verbs. Aliases may differ but resolve only inside Agents.
 
-Target layout for a module **when its real implementation is migrated**:
+Implemented module layout (create only files with real responsibilities):
 
 ```text
 Actions/
 ├── README.md
-├── Runtime/                 # Registry / invocation / executor, not a callable domain
+├── Runtime/                       # Reusable execution contracts and built-in catalog
+│   ├── ActionModules.swift
 │   └── README.md
 └── <Module>/
-    ├── README.md            # Purpose, contract inventory, design, ✅ / ❌
-    ├── <Module>Actions.swift # Namespace declaration only
-    ├── <Verb>.swift         # One callable verb + its action-specific types/helpers
-    ├── Types.swift          # Only if multiple Actions actually share these values
-    └── <Owner>.swift        # Only if a real runtime service is needed
+    ├── README.md                  # Per-Action contracts and file inventory
+    ├── <Module>Actions.swift       # Namespace plus related callable entries
+    └── Support/
+        ├── README.md
+        ├── <Module>ActionModule.swift  # Definitions and consumed capability protocols
+        ├── <Module>Types.swift         # Real domain values and complete error definitions
+        └── <Owner>.swift               # Only for an actual runtime/resource service
 ```
 
-- Put types used by one Action in that Action file, nested in `<Module>Actions` with specific names (`NodError`, not a module-wide ambiguous `Error`). Put genuinely shared domain values in `Types.swift`; do not introduce empty files.
-- Put runtime-service files beside the consuming Actions when they belong to that domain. Device engines and general platform adapters remain in PlatformKit; UI rendering remains in UI. Gateway alone owns Channel/wait scheduling.
-- Keep imports explicit and minimal, declaration/member ordering consistent (types, entry, private helpers), and declarations on separate lines. Run the repository Swift formatter; do not invent per-module formatting rules.
+- Domain roots make callable behavior easy to discover. `Support` owns non-callable registration, capability interfaces, types and resource services. Shared cross-domain infrastructure belongs to `Runtime`; never create a miscellaneous global helpers directory.
+- Group related short entries; split when a distinct responsibility, dependency or lifecycle makes navigation clearer, not after an arbitrary line count. NexArm uses `NexArmActionModules.swift` for its two production registration types. Do not expose a device diagnostic as an Action solely to exercise the harness; direct diagnostic tests belong with the device capability.
+- Use domain-qualified type filenames, such as `NexArmTypes.swift` and `UIActionTypes.swift`, because all domains compile into one Actions target. Preserve public nested type names; directory placement does not determine Swift access control or model permissions.
+- Keep each error's cases, localized description and failure classification together. Do not split an error declaration from its presentation conformance across files. Add helpers only for actual shared logic; do not replace explicit entries with generic factories or reflection.
+- Keep stateful services separate from stateless entry validation, inside the owning domain's Support. Device engines/adapters remain in PlatformKit; rendering remains in UI; Gateway alone owns Channel/wait scheduling.
+- Keep imports explicit and minimal, declarations on separate lines, and types before methods. Run the repository Swift formatter. Use the same entry signature and cancellation/validation order regardless of file grouping.
 - An Action may use internal helpers or capability operations to implement one declared effect. It must not directly invoke another registered Action to bypass that Action's permissions, Channel or module exclusion. Agent-level sequences are separate resolved calls through OutputGateway.
 - Keep tests under root `Tests/` in the existing appropriate target. Root Package.swift maps shared source files; do not duplicate sources or recreate Packages/HarnessKit/Sources.
 - Update every touched directory's README. Tooling/runtime queues require design descriptions and Mermaid diagrams, with producer/consumer, capacity, overflow, ordering, finish and cancellation behavior.
 
 ## 5. Implementation examples
 
-The following three snippets illustrate the proposed standard using the **current** ActionInvocation/ActionHandler boundary. They are not production APIs, device implementations or an instruction to create these domains. Namespace declarations are shown with entries for readability; split them into the files described above when implementing a real module. The injected callbacks must fulfill the stated contracts, not merely enqueue work.
+The following three snippets illustrate the proposed standard using the **current** ActionInvocation/ActionHandler boundary. They are not production APIs, device implementations or an instruction to create these domains. Namespace declarations are shown with entries; keep related short entries together and move support types to the domain Support directory when implementing a real module. The injected callbacks must fulfill the stated contracts, not merely enqueue work.
 
 ### A. Finite operation: `Motion.nod`
 
@@ -265,7 +273,7 @@ extension CameraActions {
 }
 ```
 
-For a real module, place the two entries in StartRecording.swift and StopRecording.swift; their shared error belongs in Types.swift. An Update command uses typed validated arguments like the Set example, while preserving the activity's identity and ownership. A photo/file identifier would need an explicitly designed observation or returning Tool contract; the activity ID in ActionCompletion is not a media-file result.
+For a real module, keep start/stop entries together in CameraActions.swift; their shared error belongs in Support/CameraTypes.swift. An Update command uses typed validated arguments like the Set example, while preserving the activity's identity and ownership. A photo/file identifier would need an explicitly designed observation or returning Tool contract; the activity ID in ActionCompletion is not a media-file result.
 
 ### Explicit App binding
 
@@ -279,7 +287,7 @@ func makeExampleRegistry(
 ) throws -> ActionRegistry {
     try ActionRegistry(definitions: [
         ActionDefinition(
-            path: ActionPath(module: "Face", function: "setExpression"), kind: .state,
+            path: ActionPath(module: "Face", function: "setExpression"), displayName: "setExpression", kind: .state,
             completion: "Expression target committed; visual interpolation is not joined."
         ) { invocation in
             try await FaceActions.setExpression(invocation: invocation, using: applyExpression)
@@ -296,7 +304,7 @@ Each domain README must include purpose/design goals, current files, implemented
 
 | Contract field | Required content |
 | --- | --- |
-| Identity | Stable module/function, Swift entry, file, model/internal exposure; default Channel belongs to the Agent declaration, not the implementation. |
+| Identity | Stable module/function, required displayName (nonblank, at most 256 UTF-8 bytes), Swift entry, file, model/internal exposure; default Channel belongs to the Agent declaration, not the implementation. |
 | Category | Finite operation, state setting, or activity start/update/stop. |
 | Parameters | Required/optional keys, typed meaning, units, ranges, byte/count limits, defaults and unknown-key rejection. |
 | Dependencies | Injected interface, state/resource owner, isolation and platform permission checks. |
@@ -313,25 +321,19 @@ Run `./scripts/check.sh` and, with full Xcode, `./scripts/build-ios.sh`; report 
 
 ## 7. Current implementation audit
 
-✅ UI and Speech now follow the namespace/file/signature standard: UIActions.swift and SpeechActions.swift declare caseless namespaces, each registered function has a same-named file and an `invocation:using:` entry. UIActionModule and SpeechActionModule bind these entries; ActionModules owns the catalog. Runtime is infrastructure, not a callable domain, and does not need a RuntimeActions namespace.
+✅ UI, Speech and Robot now follow the namespace/file/signature standard: UIActions.swift, SpeechActions.swift and RobotActions.swift contain their caseless namespaces and `invocation:using:` entries. Domain Support directories own UIActionModule, SpeechActionModule and RobotActionModule with their typed interfaces; Runtime/ActionModules.swift owns the catalog. Runtime is infrastructure, not a callable domain, and does not need a RuntimeActions namespace.
 
 | Path | Kind / endpoint | Validation / dependency |
 | --- | --- | --- |
 | Speech.speak | finite / playback drained and single-use audio released | audioID only, UUID at most 36 UTF-8 bytes; typed playback capability |
-| UI.print | finite / accepted text append | nonblank text ≤2000 UTF-8 bytes; typed presentation |
 | UI.express | state / accepted expression target | exact Emotion enum; no animation acknowledgment |
-| UI.moveEyes | state / accepted gaze target | finite x/y in [-1,1] |
-| UI.setTranscript | state / transcript replacement | text ≤4096 UTF-8 bytes, empty clears |
-| UI.setVoiceState | state / accepted presentation phase | listening/hearing/processing |
-| UI.beginReplyTurn | state / turn initialized | no parameters |
-| UI.finishTranscript | state / transcript closed | no parameters |
 | Robot.aim | finite / transport accepted the joint frame | finite base/pitch within four turns; injected sender. Settling is not joined |
 
-All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Shared PresentationError belongs in UI/Types.swift; per-action emotion/gaze values remain with their entries. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
+All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Fixed caption/gaze/recognition presentation now belongs to Tools/UI, including PresentationError and gaze values. Expression remains here. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
 
-✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. Legacy names express/moveEyes are retained as published paths. Registry and resource contracts remain in Runtime/Gateway.
+✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. The expression path remains UI.express; immediate UI.moveEyes belongs to Tools. Registry and resource contracts remain in Runtime/Gateway.
 
-❌ One-shot expression/restore, Camera Actions, generic activity supervision, audio/robot resource integration and physical-device timing acceptance remain separate work. `Robot.aim` validates and forwards logical radians; it does not open a socket or integrate a robot resource lease.
+❌ One-shot expression/restore, Camera Actions, generic activity supervision, audio/robot resource integration and physical-device timing acceptance remain separate work. They are not implemented by renaming or wrapping an entry. `Robot.aim` validates and forwards logical radians; it does not open a socket, call the production NexArm controller, or integrate a robot resource lease.
 
 ## 8. Stage 2: results and resource ownership
 
@@ -339,7 +341,7 @@ All entries reject undeclared keys, check cancellation before validation and aft
 
 ```swift
 ActionDefinition(
-    path: ActionPath(module: "Camera", function: "startCapture"),
+    path: ActionPath(module: "Camera", function: "startCapture"), displayName: "startCapture",
     kind: .activityStart, completion: "Capture started; service retains lifetime.",
     resources: [.cameraCapture],
     completing: { invocation in
@@ -374,3 +376,29 @@ flowchart LR
 ```
 
 The earlier explicit single-definition binding example illustrates isolated construction; production bindings now belong to domain module lists. BehaviorAssembly in App/Composition/Behaviors is an independently compiled pure assembly target, not an application service. ❌ No reflection, implicit registration, permission expansion or generic string/Any effect dispatch. See [ADR 0067](../../docs/adr/0067-domain-owned-behavior-assembly.md).
+
+## NexArm integration
+
+✅ [NexArm](NexArm/README.md) provides Agent-used gestures and built-in `NexArm.shakeBase(cycles:)` with required typed host injection and controller feedback. ✅ iPhone foreground BLE binding is implemented. ❌ Autonomous motion and physical-stop proof remain unavailable.
+
+## NexArm entertainment skills (2026-09-30)
+
+✅ NexArm now adds waveWrist, tiltWrist, lookAround, celebrate and dance as typed finite Actions, alongside shakeBase. The domain owns registration and per-verb validation; all share NexArm exclusion. See [contracts](NexArm/README.md). ❌ New gesture sequences await physical acceptance.
+
+## Immediate presentation migration
+
+✅ UIActionModule now registers only model-selected expression. Fixed caption append, transcript replacement/closure, voice phase, gaze and turn initialization moved to Tools/UI with typed ToolInvocation and shared CallArguments. Every remaining Action is displayed without per-path filters. ❌ Native model Tool output remains pending; expression retains scheduling by product choice.
+
+## Cohesive source organization
+
+✅ Fifteen Swift files replace the former thirty-one. Production public symbols, paths, arguments, completion semantics and the built-in catalog remain unchanged; the unused diagnostic Action and its support types were removed. Domain roots contain entries, Support contains non-callable implementation support, and Runtime contains shared infrastructure. The source check recursively discovers definitions and accepts grouped entries; Swift compilation and assembly tests remain responsible for semantic validation.
+
+❌ This reorganization adds no generic action factory, device behavior or runtime contract. Future splits should follow real responsibilities.
+
+## Execution display metadata
+
+✅ Every ActionDefinition requires a nonblank displayName of at most 256 UTF-8 bytes. Declare the human-readable operation name beside its implementation registration in domain Support. It is independent of Agent aliases, permission JSON, Channel selection and completion text; no SwiftUI/localization-framework type crosses the boundary. The scheduler copies the validated name into each execution record at admission, so history needs no registry lookup. Production currently supplies Chinese names; richer localization remains future work.
+
+✅ UI owns generic phase/completion wording, symbols and layout; AppWorkflows only forwards shared snapshots. Adding an Action through an existing capability requires no action-name or error-code mapping in App/UI. Channel names are displayed exactly as supplied, never inferred from module/device names. See ADR 0086.
+
+❌ This metadata does not change permissions, scheduling or Agent result feedback. Do not put a second model-callable catalog in Swift or presentation metadata in Agent JSON v5.

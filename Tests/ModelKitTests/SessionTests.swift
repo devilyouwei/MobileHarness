@@ -9,6 +9,32 @@ private final class EndCounter: Sendable {
     func increment() { value.withLock { $0 += 1 } }
 }
 
+@Test func unboundedEventsRetainWholeGenerationBeforeConsumerStarts() async throws {
+    let pair = InferenceSession<Int>.make(
+        limits: try StreamLimits(capacity: nil), estimatedBytes: { _ in 8 })
+    for value in 0..<20000 { try pair.emitter.yield(value) }
+    try await pair.emitter.yieldSuspending(20000)
+    pair.emitter.finish()
+    var received: [Int] = []
+    for try await event in pair.session.events { received.append(event) }
+    #expect(received == Array(0...20000))
+}
+
+@Test func unboundedEventsStillValidateSizeAndCancellation() async throws {
+    let oversized = InferenceSession<String>.make(
+        limits: try StreamLimits(capacity: nil, maximumEventBytes: 2), estimatedBytes: { $0.utf8.count })
+    #expect(throws: CapabilityError.eventTooLarge) { try oversized.emitter.yield("你") }
+    let pair = InferenceSession<Int>.make(
+        limits: try StreamLimits(capacity: nil), estimatedBytes: { _ in 8 })
+    for value in 0..<1000 { try pair.emitter.yield(value) }
+    pair.emitter.finish()
+    pair.session.cancel()
+    var iterator = pair.session.events.makeAsyncIterator()
+    await #expect(throws: CancellationError.self) { try await iterator.next() }
+    #expect(throws: CapabilityError.sessionClosed) { try pair.emitter.yield(1000) }
+    #expect(throws: CapabilityError.self) { try StreamLimits(capacity: nil, maximumEventBytes: 0) }
+}
+
 @Test func orderedEventsDrainOnNormalFinish() async throws {
     let pair = InferenceSession<String>.make(limits: try StreamLimits(capacity: 2), estimatedBytes: { $0.utf8.count })
     try pair.emitter.yield("一")

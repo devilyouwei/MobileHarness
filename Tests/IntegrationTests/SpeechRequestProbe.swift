@@ -10,7 +10,7 @@ actor SpeechRequestProbe {
     func text(_ id: String) -> String? { requests[id] }
     func restored(_ output: AgentOutput) -> AgentOutput {
         guard case .actionCall(let call) = output, let id = call.parameters["audioID"], let text = requests[id] else {
-            return output
+            return normalizeToolID(output)
         }
         return .actionCall(ActionCall(actionPath: call.actionPath, channel: call.channel, parameters: ["text": text]))
     }
