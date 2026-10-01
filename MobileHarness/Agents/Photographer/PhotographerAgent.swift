@@ -1,38 +1,40 @@
 import AgentCore
 import Foundation
-import ModelKit
 
-/// Photography role. Pose overlay always runs. Arm aim runs only when `controlsArm` is set.
+/// Camera-motion policy. Consumes published pose observations and, when enabled, emits one arm Action.
 public actor PhotographerAgent: Agent {
+    private static let aimPermission = InternalAction(
+        module: "Robot", function: "aim", channel: "arm", required: ["base", "pitch"])
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let pose: any PoseCapability
     private let sessionID: UUID
+    private let controlsArm: Bool
     private var lifecycle: AgentLifecycle = .registered
-    private var pending: AgentInput?
-    private var worker: Task<Void, Never>?
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
-    private var processed = 0
-    private let controlsArm: Bool
     private var lastAim: (base: Double, pitch: Double, time: TimeInterval)?
+    private var processed = 0
 
-    public init(
-        pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil, controlsArm: Bool = false
-    ) throws {
+    public init(sessionID: UUID, configuration: AgentConfiguration? = nil, controlsArm: Bool = false) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
-            id: configuration.agentID, name: "Photographer", inputs: [.image],
-            outputs: [.actionCall, .control], capabilities: configuration.capabilities)
-        self.pose = pose
+            id: configuration.agentID, name: "Photographer",
+            inputs: Set(configuration.communication.inputs.map(\.kind)),
+            outputs: [.actionCall],
+            capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.sessionID = sessionID
         self.controlsArm = controlsArm
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
         outputs = stream.stream
         continuation = stream.continuation
     }
+
+    public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
+        try model.adding(internalActions: [aimPermission])
+    }
+
     public func start() throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         lifecycle = .running
@@ -44,125 +46,67 @@ public actor PhotographerAgent: Agent {
     public func resume() throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
         lifecycle = .running
-        drain()
     }
     public func stop() async {
         lifecycle = .stopped
-        pending = nil
-        worker?.cancel()
-        await worker?.value
         continuation.finish()
     }
     public func status() -> AgentStatus {
-        AgentStatus(lifecycle: lifecycle, queuedInputs: pending == nil ? 0 : 1, processedInputs: processed)
+        AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)
     }
+
     public func receive(_ input: AgentInput) throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-        guard input.sessionID == sessionID else { throw ImageInputError.wrongSession }
-        guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
-        guard lastSequence.map({ image.sequence > $0 }) ?? true,
-            lastTimestamp.map({ image.timestamp >= $0 }) ?? true
-        else { throw ImageInputError.outOfOrder }
-        lastSequence = image.sequence
-        lastTimestamp = image.timestamp
-        pending = input  // Explicit newest-frame replacement, never applied to Action/Tool outputs.
-        drain()
+        guard input.sessionID == sessionID else { throw CommunicationError.unauthorized }
+        guard case .observation(.pose(let pose)) = input.payload else { throw HarnessError.unsupportedInput }
+        guard lastSequence.map({ pose.sequence > $0 }) ?? true,
+            lastTimestamp.map({ pose.timestamp >= $0 }) ?? true
+        else { throw CommunicationError.outOfOrder }
+        guard !input.metadata.expired else { throw CommunicationError.expired }
+        lastSequence = pose.sequence
+        lastTimestamp = pose.timestamp
+        processed += 1
+        guard lifecycle == .running, let aim = nextAim(pose) else { return }
+        let call = try Self.aimPermission.call(["base": String(aim.base), "pitch": String(aim.pitch)])
+        try emit(.actionCall(call), input: input, sequence: pose.sequence)
+        lastAim = (aim.base, aim.pitch, pose.timestamp)
     }
-    private func drain() {
-        guard lifecycle == .running, worker == nil, let input = pending else { return }
-        pending = nil
-        worker = Task { await infer(input) }
-    }
-    private func infer(_ input: AgentInput) async {
-        defer {
-            worker = nil
-            drain()
-        }
-        do {
-            guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
-            let context = InferenceContext(requestID: input.id, conversationID: input.sessionID)
-            let result = try await pose.estimatePose(
-                PoseRequest(
-                    image: ImageFrame(width: image.width, height: image.height, rgb: image.rgb), context: context))
-            try Task.checkCancellation()
-            guard lifecycle == .running || lifecycle == .paused else { return }
-            guard result.context == context else {
-                throw CapabilityError.invalidRequest("Pose result context mismatch")
-            }
-            let people = try result.people.prefix(6).map { person in
-                guard person.keypoints.count == 17 else { throw CapabilityError.invalidRequest("Invalid COCO pose") }
-                return try person.keypoints.enumerated().map { index, point in
-                    guard point.joint.rawValue == index, point.x.isFinite, point.y.isFinite,
-                        point.confidence.isFinite, (0...1).contains(point.confidence)
-                    else { throw CapabilityError.invalidRequest("Invalid pose joint") }
-                    let x = Double(point.x) / Double(image.width)
-                    let y = Double(point.y) / Double(image.height)
-                    // Bounded off-image transport; invisible points stay low confidence.
-                    let visible = (0...1).contains(x) && (0...1).contains(y)
-                    return PoseOverlay.Joint(
-                        x: Int((max(-1, min(2, x)) * 10000).rounded()),
-                        y: Int((max(-1, min(2, y)) * 10000).rounded()),
-                        confidence: visible ? Int((point.confidence * 1000).rounded()) : 0)
-                }
-            }
-            let overlay = PoseOverlay(
-                sequence: image.sequence, timestamp: image.timestamp, rotation: image.rotation, people: people)
-            let data = try JSONEncoder().encode(overlay)
-            guard data.count <= 3000, let json = String(data: data, encoding: .utf8) else {
-                throw CapabilityError.eventTooLarge
-            }
-            // Deterministic CV output uses the same shared Function Token parser and JSON alias registry.
-            var generator = try AgentGenerator(capabilities: descriptor.capabilities, textActions: [])
-            var calls = try generator.append("<showPose payload='" + AgentGenerator.escapeText(json) + "'/>")
-            if let aim = nextAim(people: result.people, image: image) {
-                calls += try generator.append("<aim base=\"\(aim.base)\" pitch=\"\(aim.pitch)\"/>")
-                lastAim = (aim.base, aim.pitch, image.timestamp)
-            }
-            calls += try generator.finish()
-            for call in calls { try emit(.actionCall(call), input: input) }
-            try emit(.control("agent.finished"), input: input)
-            processed += 1
-        } catch is CancellationError {} catch {
-            if !Task.isCancelled && lifecycle != .stopped {
-                do { try emit(.control("agent.error: pose inference failed"), input: input) } catch {}
-                lifecycle = .failed
-                pending = nil
-                continuation.finish()
-            }
-        }
-    }
-    /// Image-center error times 0.8 radians. Nose is the aim point when it is visible.
-    private func nextAim(people: [PersonPose], image: ImageInput) -> (base: Double, pitch: Double)? {
-        guard controlsArm, let person = people.max(by: { $0.confidence < $1.confidence }) else { return nil }
-        let width = Double(image.width)
-        let height = Double(image.height)
-        let point = aimPoint(person, width: width, height: height)
-        let base = (point.x / width - 0.5) * 0.8
-        let pitch = (point.y / height - 0.5) * 0.8
+
+    /// First published person. Nose at confidence ≥ 0.3 inside the image, otherwise the midpoint of such joints.
+    private func nextAim(_ pose: PoseObservation) -> (base: Double, pitch: Double)? {
+        guard controlsArm, let person = pose.people.first else { return nil }
+        guard let point = aimPoint(person, width: pose.width, height: pose.height) else { return nil }
+        let base = (point.x / Double(pose.width) - 0.5) * 0.8
+        let pitch = (point.y / Double(pose.height) - 0.5) * 0.8
         if let lastAim {
-            let waited = image.timestamp - lastAim.time >= 0.2
+            let waited = pose.timestamp - lastAim.time >= 0.2
             let moved = hypot(base - lastAim.base, pitch - lastAim.pitch) >= 0.02
             guard waited, moved else { return nil }
         }
         return (base, pitch)
     }
 
-    private func aimPoint(_ person: PersonPose, width: Double, height: Double) -> (x: Double, y: Double) {
-        if let nose = person.keypoints.first(where: { $0.joint == .nose }),
-            nose.confidence >= 0.3, nose.x.isFinite, nose.y.isFinite,
-            Double(nose.x) >= 0, Double(nose.y) >= 0, Double(nose.x) <= width, Double(nose.y) <= height
-        {
-            return (Double(nose.x), Double(nose.y))
+    private func aimPoint(_ person: [PoseObservation.Joint], width: Int, height: Int) -> (x: Double, y: Double)? {
+        func usable(_ joint: PoseObservation.Joint) -> Bool {
+            joint.confidence >= 0.3 && joint.x.isFinite && joint.y.isFinite && joint.x >= 0 && joint.y >= 0
+                && Double(joint.x) <= Double(width) && Double(joint.y) <= Double(height)
         }
-        return (Double(person.box.x + person.box.width / 2), Double(person.box.y + person.box.height / 2))
+        if usable(person[0]) { return (Double(person[0].x), Double(person[0].y)) }
+        let visible = person.filter(usable)
+        guard !visible.isEmpty else { return nil }
+        let count = Double(visible.count)
+        let x = visible.reduce(0.0) { $0 + Double($1.x) } / count
+        let y = visible.reduce(0.0) { $0 + Double($1.y) } / count
+        return (x, y)
     }
 
-    private func emit(_ output: AgentOutput, input: AgentInput) throws {
-        switch continuation.yield(OutputEnvelope(source: descriptor.id, input: input, output: output)) {
+    private func emit(_ output: AgentOutput, input: AgentInput, sequence: UInt64) throws {
+        switch continuation.yield(
+            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: sequence))
+        {
         case .enqueued: return
         case .dropped, .terminated:
             lifecycle = .failed
-            pending = nil
             continuation.finish()
             throw HarnessError.queueFull
         @unknown default: throw HarnessError.queueFull

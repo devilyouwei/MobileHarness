@@ -1,7 +1,7 @@
 import AgentCore
 import Foundation
 
-/// Bundled Agent policy is read once per instance; no source-path or hard-coded registry fallback.
+/// Bundled model catalog and communication policy; code-owned internal grants are assembled by each Agent.
 public enum AgentConfigurations {
     public static func load(named name: String) throws -> AgentConfiguration {
         guard !name.isEmpty, !name.contains("/"), !name.contains("\\"),

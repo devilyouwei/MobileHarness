@@ -1,27 +1,30 @@
-import ActionRuntime
 import AgentCore
 import Foundation
 
-public enum RobotActions {
+extension RobotActions {
     public enum AimError: Error, Equatable, Sendable {
         case invalidAngle
+        case notConnected
     }
 
     /// Completes once `send` accepts the logical angles. Does not wait for the arm to settle.
     public static func aim(
         invocation: ActionInvocation,
-        send: @escaping @Sendable (_ base: Double, _ pitch: Double, _ invocation: ActionInvocation) async throws -> Void
+        using send: @escaping @Sendable (Double, Double, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        guard let base = angle(invocation.call.parameters["base"]),
-            let pitch = angle(invocation.call.parameters["pitch"])
-        else { throw AimError.invalidAngle }
+        let base: Double
+        let pitch: Double
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["base", "pitch"])
+            let limit = 4 * Double.pi
+            base = try arguments.requiredFiniteDouble("base", range: -limit...limit)
+            pitch = try arguments.requiredFiniteDouble("pitch", range: -limit...limit)
+        } catch {
+            throw AimError.invalidAngle
+        }
         try await send(base, pitch, invocation)
         try Task.checkCancellation()
-    }
-
-    private static func angle(_ raw: String?) -> Double? {
-        guard let raw, let value = Double(raw), value.isFinite, abs(value) <= 4 * .pi else { return nil }
-        return value
     }
 }

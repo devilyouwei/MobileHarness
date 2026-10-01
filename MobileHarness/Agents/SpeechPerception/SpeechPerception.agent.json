@@ -1,0 +1,33 @@
+{
+  "version": 5,
+  "id": "speechPerception",
+  "actions": {},
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "media.audio",
+        "version": 1,
+        "kind": "audio"
+      },
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "media.audio",
+        "source": "phone.microphone",
+        "topic": "media.audio"
+      }
+    ],
+    "publications": [
+      "speech.partial",
+      "speech.final",
+      "speech.phase"
+    ],
+    "sends": []
+  }
+}

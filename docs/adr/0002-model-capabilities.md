@@ -1,5 +1,7 @@
 # ADR 0002 模型能力与后端解耦
 
+> Historical scope: Historical proposal. Later ModelKit management and default assembly decisions are in [ADR 0030](0030-shared-model-manager.md) and [ADR 0034](0034-modelkit-default-assembly.md); current contracts live in the module READMEs.
+
 状态：采纳设计，待实施。日期：2026-09-22。
 
 P1 优先接入必备模型与能力封装。保留原方案 ModelKit 的 Core、Speech、Language、Vision、Embedding、Runtime 分组，增加制品管理、统一 IO 和模型专用适配层。详见 [ModelKit README](../../MobileHarness/ModelKit/README.md)。

@@ -1,115 +1,143 @@
-# App — Application Entry and Composition
+# App — Application Host and Composition
 
-App assembles the system described in architecture sections 37–40. It obtains the internal model defaults and selects platform adapters, injects capability protocols, registers executable handlers, and connects Experience to Gateway. Business decisions belong to Agents.
+Purpose: host the application, assemble dependencies and coordinate application/session lifetimes. Design goals: explicit ownership, acyclic compilation, one shared model manager, bounded work and cleanup before resource replacement. UI is a separate sibling target; App does not own page layout or editable form state.
 
-## Responsibilities and boundaries
+## Directory structure
 
-- Own the SwiftUI entry point and dependency composition in `AppContainer`.
-- Register Agents and concrete Action/Tool handlers through `AgentBootstrap`. Agent permissions remain in each Agent's JSON configuration, independently of implementation registration.
-- Coordinate foreground voice sessions, model preparation, output consumption, playback, and cancellation through `AppLifecycleCoordinator`.
-- Report configuration or capability failures explicitly. A simulator configuration must not masquerade as a working model.
+```text
+App/
+├── MobileHarnessApp.swift   # Window host, navigation and scene events
+├── Composition/             # AppAssembly, model preparation, runtime assembly
+│   ├── Behaviors/           # Independently compiled BehaviorAssembly
+│   ├── AppAssembly.swift
+│   ├── AppContainer.swift
+│   └── ApplicationRuntime.swift
+├── Lifecycle/               # Voice and camera sessions, input/output pumps and cleanup
+│   ├── VoiceSessionCoordinator.swift
+│   ├── CameraCoordinator.swift
+│   └── VisionSession.swift
+├── Workflows/               # Settings, history and explicit diagnostic operations
+│   ├── SettingsWorkflow.swift
+│   ├── CloudSettingsStore.swift
+│   ├── ConversationHistoryWorkflow.swift
+│   ├── SpeechDiagnosticWorkflow.swift
+│   └── ChatDiagnosticWorkflow.swift
+├── Adapters/                # Typed effect endpoints, native preview and value conversion
+│   ├── RuntimePresentation.swift
+│   ├── CurrentChatCapability.swift
+│   ├── CameraImageAttachment.swift
+│   ├── CameraPreviewAdapter.swift
+│   └── EyeExpression.swift
+└── README.md
+```
 
-## Direct relationships
+## Upstream and downstream
 
-This is a composition and coordination diagram. Dashed edges carry injected dependencies; solid edges carry user intent or runtime state.
+The following arrows describe runtime flow. App imports UI; UI has no App dependency. Workflows compile in the separate AppWorkflows target, allowing their behavior to be tested without the executable. Composition/Behaviors compiles in the separate BehaviorAssembly target; the remaining App sources compile once in each Xcode application target.
 
 ```mermaid
 flowchart LR
-    Experience -->|User intent| App
-    App -->|Observable state and presentation| Experience
-    App -->|Input submission and cancellation| Gateway
-    Gateway -->|Output observations and completion| App
-    App -.->|Agent registration and lifecycle| AgentCore
-    App -.->|Capability injection| Agents
-    App -.->|Action handlers| ActionRuntime
-    App -.->|Tool handlers| ToolRuntime
-    ModelKit -->|Capability interfaces and model sessions| App
-    PlatformKit -->|Audio IO and permission services| App
+    Host[Window and scene events] --> Assembly[AppAssembly]
+    Assembly -->|Construct and inject| Services[Storage / ModelManager / AgentManager / Gateways]
+    Assembly --> Sessions[Voice and camera lifecycles]
+    Assembly --> Operations[Settings / history / diagnostics workflows]
+    Views[UI views] -->|Injected operations| Operations
+    Views -->|User controls| Sessions
+    Sessions -->|External input| Input[InputGateway]
+    Input --> Agents
+    Agents --> Output[OutputGateway]
+    Output --> Execute[Actions / Tools]
+    Execute --> Adapters[App effect endpoints]
+    Adapters -->|Session-validated state| State[UI state]
+    Adapters --> Platform[PlatformKit device operation]
+    State --> Views
 ```
 
-## Implementation status
+## Internal composition
 
-- ✅ `MobileHarnessApp.swift`: conversation entry, explicit Kokoro validation entry, and Debug-only `-qwen35-validation` ASR/chat coexistence entry.
-- ✅ `AppContainer.swift`: Nemotron ASR, Silero VAD, Qwen3.5-2B MLX chat, Apple TTS, audio IO, and optional Kokoro validation composition.
-- ✅ `AgentBootstrap.swift`: throwing Assistant initialization, runtime registration, and ChannelScheduler assembly.
-- ✅ `AppLifecycleCoordinator.swift`: foreground voice loop, playback, error presentation, and session cleanup. Listening resumes 350 ms after generation and accepted actions complete.
-- ✅ Stop cancels input and actions and waits for old-session cleanup without unloading weights. Invalid configuration leaves the application unready.
-- ❌ Complete separation of page subscriptions from long-lived Agent execution, background execution, and global resource supervision.
-
-The device configuration requires iOS 27 and matching h18p artifacts. Models load and warm up before recording. The simulator is for UI debugging and reports unavailable chat explicitly. Kokoro remains a separate English-language validation path.
-
-## Maintenance
-
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
-
-✅ The voice interface exposes start/stop controls and captions; diagnostic messages use private OSLog output.
-
-✅ Bootstrap binds UI.express and routes express to a separate session-checked expression callback. The coordinator holds one current expression and a presentation identity for repeated expressions; new speech and session stop clear it. Successful presentation means state acceptance, not animation completion.
-
-✅ Only UI.express is registered for facial expressions; smile is an emotion parameter, not a separate handler.
-
-✅ Qwen35Chat is selected only at the composition root; ASR, TTS, Agent registration and Actions continue using the existing capability contracts. Simulator chat remains explicitly unavailable.
-
-## Queue and asynchronous processing contract
-
-`AppLifecycleCoordinator` owns the capture, Agent-output and dispatch tasks on MainActor; it does not introduce another work FIFO. The capture task sequentially resamples microphone frames, awaits VAD processing and enqueues committed events into LiveSpeechInput. That bridge consumes audio independently. Final text enters InputGateway once.
-
-The output task consumes one Agent envelope at a time and awaits OutputGateway dispatch. Function dispatch waits for admission, while `assistant.finished` waits for accepted Actions (including playback) to complete; only then does the coordinator wait 350 ms and resume listening. Tool dispatch also suspends this output consumer until execution/result delivery finishes. Slow downstream work can therefore fill the bounded Agent output stream.
-
-Session/generation identity checks prevent stale audio or presentation callbacks affecting a newer session. Stop cancels input/generation/dispatch and joins cleanup and Action cancellation before reuse. No global task-priority scheduler or background voice execution is implemented.
+App composes the running system; Agents compose task behavior. Solid arrows below mean construction or assembly, and dashed arrows mean capability injection or binding, not Swift imports. Runtime facilities are shared across sessions; voice/camera owners create and clean up their own running scopes. UI receives state and operations rather than owning those scopes.
 
 ```mermaid
-flowchart LR
-    Capture[Capture task] -->|await segmentation| Input[LiveSpeechInput]
-    Input -->|final text| Gateway[InputGateway]
-    Agent[Agent output stream] --> Consumer[One output consumer]
-    Consumer --> Dispatch[Await OutputGateway]
-    Dispatch -->|finish joins Actions| Resume[350 ms then listen]
-    Stop[Stop / session change] --> Cleanup[Cancel and join owned tasks]
+flowchart TB
+    Root[AppAssembly: composition root] --> Runtime[ApplicationRuntime: shared infrastructure]
+    Root --> Container[AppContainer: voice capability preparation]
+    Root --> Camera[CameraCoordinator]
+    Root --> Workflows[Settings and history workflows]
+    Root --> State[UI state and injected operations]
+
+    Runtime --> Manager[AgentManager]
+    Runtime --> Gateways[InputGateway and OutputGateway]
+    Runtime --> Scheduler[ChannelScheduler]
+    Runtime --> Resources[ResourceCoordinator]
+    Runtime --> History[ConversationHistoryStore]
+    Runtime --> Bindings[RuntimePresentation: typed endpoints]
+    Runtime --> Behavior[BehaviorAssembly]
+    Catalogs[Actions and Tools: domain module catalogs] --> Behavior
+    Bindings -.->|Presentation / playback / pose capabilities| Behavior
+    Behavior --> Registries[ActionRegistry and ToolRegistry]
+    Registries -.->|Action registry| Scheduler
+    Registries -.->|Tool registry| Gateways
+    Scheduler -.-> Gateways
+    Resources -.->|Shared execution authority| Scheduler
+
+    Container --> Voice[VoiceSessionCoordinator]
+    Container --> Diagnostic[SpeechDiagnosticWorkflow]
+    Voice --> Speech[SpeechPerceptionAgent]
+    Voice --> Assistant[AssistantAgent: runtime factory]
+    Voice --> Synthesis[SpeechSynthesisAgent]
+    Voice --> Audio[SpeechAudioStore and SpeechPlayback]
+    Camera --> Session[VisionSession]
+    Session --> Vision[VisionPerceptionAgent]
+    Voice -.->|Bind whole voice endpoint| Bindings
+    Session -.->|Bind camera endpoint| Bindings
+
+    Models[ModelKitDefaults / ModelManager] -.->|Recognition / VAD / chat / synthesis| Container
+    Models -.->|Pose capability via session factory| Session
+    Platform[PlatformKit: AppleAudioIO / AppleCamera] -.->|Device services| Voice
+    Platform -.->|Device service| Camera
 ```
 
-✅ The algorithm above describes the current implementation.
+[ApplicationRuntime](Composition/ApplicationRuntime.swift) builds communication policy, shared storage and runtime services. [BehaviorAssembly](Composition/Behaviors/README.md) combines domain-owned Action/Tool modules with typed App capabilities and validates Agent implementation coverage before producers start. Agent declarations authorize calls; the registries bind their implementations. [AppContainer](Composition/AppContainer.swift) obtains model capabilities from the shared manager, while [Lifecycle](Lifecycle/README.md) owns Agent registration, pumps, cancellation and cleanup. Detailed lifetimes and completion boundaries remain below.
 
-Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+## Responsibilities and injection
 
-✅ The output consumer dispatches AgentOutput.actionCall payloads as resolved ActionCalls; ToolCalls retain their separate execution route.
+| Owner | Creates or receives | Lifetime / consumer |
+| --- | --- | --- |
+| AppAssembly | ApplicationRuntime, settings/history workflows, camera coordinator and prepared AppContainer | One root-owned assembly; consumers never call ApplicationRuntime.shared |
+| ApplicationRuntime | ConversationHistoryStore, AgentManager, immutable communication policy, Gateways, ActionRegistry/ChannelScheduler, ToolRegistry | Shared by voice, camera and history; created lazily even before voice readiness |
+| AppContainer | AppAssembly's resource root; shared capability handles from ModelManager; audio service; conversation state and diagnostic dependencies | Prepares capabilities and forwards memory pressure; registration/default selection stays in ModelKitDefaults |
+| Voice lifecycle | Injected runtime, capabilities, audio service, model-label query and ConversationState | Registers Agents, owns output/input consumers, shared PCM store, playback and cleanup for its running scope |
+| Camera lifecycle | Injected AppleCamera, CameraState and vision-session factory | Owns foreground intent, permission/start/stop work and one vision session |
+| Settings/history workflows | Injected change barriers, shared journal loader and managed chat factory | Coordinate application operations; UI retains only UI state and controls |
+| RuntimePresentation | One weak typed voice endpoint and one weak typed camera endpoint | Whole-role binding rejects overlap; the same owner unbinds only after cleanup |
 
-## Failed reply recovery
+App supplies each consumer only the dependencies it needs. Storage owns consistency, bounds and expiry; Agents own inboxes and generation; Gateway owns Channel/wait scheduling; ModelKit owns model resource admission. The App coordinates these owners rather than duplicating their algorithms. State classes in UI are MainActor-isolated; shared runtime queues and model/storage state remain in their existing actors.
 
-- ✅ `assistant.error` cancels the voice session and pending Actions, shows a retryable error, and retains prepared model providers. Retry waits for cleanup and uses fresh generation/parser state without reloading the weights.
-- ✅ Explicit user stop and voice failures cancel sessions only; model residency belongs to the shared ModelManager.
-- ❌ Physical-device recovery after malformed model output still requires acceptance testing; an ordinary Swift parsing error is not evidence of a process crash.
+## Lifecycle and completion
 
-## Model composition
+Window-root tasks own voice runtime and camera observation, so navigation does not recreate the Agent system. Entering Settings stops voice and suspends the camera; returning restores camera intent. Background transitions, audio interruptions and route changes stop voice. A settings transaction joins old work before updating the model binding. ApplicationRuntime and the journal outlive individual voice sessions; a model switch never erases conversation history.
 
-✅ AppContainer creates its manager through ModelKitDefaults and obtains typed default capabilities using deferred get. The initial UI waits for asynchronous composition and displays configuration errors without fallback. Before presenting the conversation page, AppContainer sequentially warms recognition/chat and loads VAD/system TTS. Subsequent recording turns reuse resident weights and reload only evicted resources. Kokoro diagnostic load/unload also goes through this manager.
+Cancellation order remains: close/stop producers, cancel and join generation, cancel audio handles and scheduled work, wait for handler cleanup, then release bindings. The synthesis Agent and shared PCM store are stopped at voice-runtime teardown. Camera replacement stops native capture and joins the previous vision task before admitting another session. No observer signal can invoke an unregistered UI/device effect.
 
-```mermaid
-flowchart LR
-    App[AppContainer] -->|Register / get / prepare| Models[ModelManager]
-    Models -->|Managed capabilities| Consumers[Agent / Gateway / Actions]
-    Voice[Voice coordinator] -->|Cancel sessions only| Consumers
-```
+Speech completes only after actual playback drains. UI Actions complete when the current session/turn accepts state; animation completion is separate. Each accepted vision Action is joined/retired before consuming the next replaceable presentation state. Late sessions/sequences cannot overwrite current output. RuntimePresentation is an endpoint holder with no queue; a missing/occupied role explicitly fails.
 
-❌ Automatic resource eviction and physical-device stability acceptance remain outstanding.
+## Application workflows
 
-✅ Production resolves one ASR and one chat provider from the shared manager: Nemotron and Qwen3.5-2B. Simulator ASR/chat explicitly report unavailable; local model paths are flat directories without runtime manifests.
+- SettingsWorkflow owns restore/discovery/save, device-only Keychain credentials and Storage-backed settings documents. SettingsState owns form edits and loading/error presentation. Save stays alive across page navigation, joins voice cleanup and preserves rollback on model-binding failure. CurrentChatCapability resolves the current binding on each request.
+- ConversationHistoryWorkflow loads the shared durable journal, archives/reset atomically, requests metadata-only titles, saves errors and produces non-executing parser previews. It has one operation slot, no backlog; cancellation retains that slot until cleanup. Raw user/model data and the latest ten completed context rounds are unchanged.
+- SpeechDiagnosticWorkflow owns the explicit MOSS synthesis/player/session and stop/unload sequence. Diagnostic pages receive state and controls; no player or inference session is constructed in a view. Diagnostics remain separate from the production Agent Action path.
+- ChatDiagnosticWorkflow runs the Debug synthetic ASR/chat check using injected preparation and the configured ChatCapability. Its page task owns cancellation; the workflow closes the inference session, while ModelManager retains model residency policy. The historical diagnostic launch flag remains supported.
 
-✅ ModelKitDefaults configures the MLX cache to 64 MiB before model registration; App forwards memory warnings to ModelManager.handleMemoryPressure. The notification stream has capacity one with newest-warning coalescing; no inference is cancelled. The observer is removed on stream termination and the task is cancelled when AppContainer is released.
+Detailed contracts: [Composition](Composition/README.md), [Lifecycle](Lifecycle/README.md), [Workflows](Workflows/README.md), [Adapters](Adapters/README.md), [UI](../UI/README.md), [Storage](../Storage/README.md), [scheduling](../Gateway/Output/Scheduling/README.md).
 
-✅ AppContainer supplies the resource directory to ModelKitDefaults.manager and injects returned protocols. It contains no concrete provider factories, model directory selection or cache configuration. OS warnings and UI lifecycle remain here.
+✅ Explicit application composition, shared journal/model services, typed role bindings, independent presentation compilation and preserved Gateway/Action authorization.
 
-✅ ModelKitDefaults.manager(resources:) returns the process-wide manager. Concurrent calls share assembly and provider instances; conflicting resource roots fail. Construction/registration are assembly SPI. Each model admits one active operation, rejects overlap with inputBusy, and releases admission only after cleanup. Cross-model scheduling is not implemented.
+❌ Independent multi-window namespaces, background supervision, automatic recovery of non-cooperative handlers and physical-device acceptance of this refactor. Simulator/build success does not establish device interaction quality.
 
-## Startup readiness
+## Action runtime stage 2
 
-AppContainer reports loading stages to MobileHarnessApp. The startup ring has no input action. Required conversation models are prepared sequentially (Nemotron, Qwen, Silero, system TTS) before publishing the container; Agent registration then enables the conversation ring. Microphone permission/capture waits for a user tap. Kokoro is diagnostic-only and loads through its explicit benchmark path.
+✅ Composition and Lifecycle now share concrete camera resource ownership. Runtime feedback and resource cleanup remain independent of page lifetime. ❌ Physical-device takeover acceptance and audio/robot resource migration remain pending.
 
-Failure keeps the container unpublished and offers reload using the same process-wide manager. Cancellation cannot publish a partially prepared container. There is one scene startup task per attempt; retry is available only after failure, so there is no queued startup work. A simulator without supported models shows an explicit failure rather than a ready conversation.
+## Domain-owned behavior assembly
 
-- ✅ Staged loading, disabled startup interaction, retry and sequential model preparation.
-- ❌ Numerical download/loading percentages and physical-device startup acceptance.
-
-✅ CameraCoordinator owns scene-local preview intent independently of model startup. Normal launch requests the front camera; permission denial offers Settings. A single reconciliation worker applies the latest enabled/facing/foreground state, checks revision after permissions, masks stale preview immediately, and joins stop on scene exit. Inactive/background pauses capture; foreground resumes only if enabled. Diagnostic launches do not start camera. Camera frames now enter the PhotographySession composition described below.
-
-✅ PhotographySession composes Photographer, InputGateway, OutputGateway and the explicit UI.showPose handler independently of voice model readiness. Both flows acquire models from the same process-wide defaults manager. CameraCoordinator owns one capture/analysis incarnation, cancels and joins it before replacement, stops capture before joining inference, and rejects old-session/old-sequence presentation callbacks. Camera errors and pose errors are separate UI states; pose failure requires explicit retry.
+✅ The host binds capabilities through BehaviorAssembly instead of registering each Action/Tool. The pure assembly target lives at Composition/Behaviors; domain catalogs live in Actions/Tools. ❌ New device primitives or lifecycle changes still require host work.

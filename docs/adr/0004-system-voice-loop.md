@@ -1,5 +1,7 @@
 # ADR 0004 系统语音网关闭环
 
+> Historical scope: Historical system-voice stage. Local Nemotron, Silero and bilingual Kokoro replaced the production model choices; see the [current voice path](../Voice.md).
+
 状态：已实施，真实麦克风/识别效果待真机验收。日期：2026-09-23。
 
 为先验证语音交互，新增 ModelKitAppleSpeech adapter：系统 ASR/TTS 实现已有能力协议。兼容 iOS 18，ASR 使用 SFSpeechRecognizer，adapter 默认强制端侧。2026-09-23 经用户授权，App 显式选择 allowNetwork 用于调试，允许 Apple 在线处理音频；UI 可切回离线，已有请求策略不随配置变化。TTS 使用 AVSpeechSynthesizer.write 导出音频。

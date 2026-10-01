@@ -1,60 +1,24 @@
 {
-  "schemaVersion": 3,
-  "agentID": "photographer",
-  "channels": [],
-  "textActions": [],
-  "actions": [
-    {
-      "alias": "showPose",
-      "path": {
-        "module": "UI",
-        "function": "showPose"
-      },
-      "defaultChannel": "Vision",
-      "parameters": [
-        {
-          "name": "payload",
-          "valueType": "string",
-          "required": true,
-          "description": "JSON pose overlay for one observed camera frame.",
-          "constraints": "At most 3000 UTF-8 bytes. sequence, timestamp, rotation 0...3, and people (0...6 arrays of 17 COCO joints). Each joint is [x,y,confidence], coordinates in 1/10000 image units, confidence 0...1000."
-        }
-      ],
-      "examples": [
-        "<showPose payload='{\"sequence\":1,\"timestamp\":0,\"rotation\":1,\"people\":[]}'/>"
-      ],
-      "doc": "Replace the camera skeleton overlay atomically. Empty people clears previous skeletons. Coordinates describe the upright unmirrored inference image. Does not control physical equipment.",
-      "hidden": true
-    },
-    {
-      "alias": "aim",
-      "path": {
-        "module": "Robot",
-        "function": "aim"
-      },
-      "defaultChannel": "arm",
-      "parameters": [
-        {
-          "name": "base",
-          "valueType": "string",
-          "required": true,
-          "description": "Logical yaw in radians. Positive turns toward the right side of the upright image.",
-          "constraints": "Finite decimal string within four turns. The adapter maps it to shoulder_pan."
-        },
-        {
-          "name": "pitch",
-          "valueType": "string",
-          "required": true,
-          "description": "Logical camera nod in radians. Positive nods toward the bottom of the upright image.",
-          "constraints": "Finite decimal string within four turns. The adapter maps it to wrist_flex."
-        }
-      ],
-      "examples": [
-        "<aim base=\"0.10\" pitch=\"0.20\"/>"
-      ],
-      "doc": "Send one non-settling aim to the arm channel. Empty detections do not emit this tag. Completion means the transport accepted the joint frame.",
-      "hidden": true
-    }
-  ],
-  "tools": []
+  "version": 5,
+  "id": "photographer",
+  "actions": {},
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "vision.pose",
+        "version": 1,
+        "kind": "observation"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "vision.pose",
+        "source": "visionPerception",
+        "topic": "vision.pose"
+      }
+    ],
+    "publications": [],
+    "sends": []
+  }
 }

@@ -13,14 +13,15 @@ public struct ChatMessage: Equatable, Sendable {
 public struct ChatRequest: Sendable {
     public let context: InferenceContext
     public let messages: [ChatMessage]
-    public let maximumOutputTokens: Int
+    public let maximumOutputTokens: Int?
     public let temperature: Double
 
     public init(
         messages: [ChatMessage], context: InferenceContext = InferenceContext(),
-        maximumOutputTokens: Int = 512, temperature: Double = 0.7
+        maximumOutputTokens: Int? = nil, temperature: Double = 0.7
     ) throws {
-        guard !messages.isEmpty, maximumOutputTokens > 0, temperature.isFinite, (0...2).contains(temperature)
+        guard !messages.isEmpty, maximumOutputTokens.map { $0 > 0 } ?? true, temperature.isFinite,
+            (0...2).contains(temperature)
         else { throw CapabilityError.invalidRequest("Invalid chat messages or generation options") }
         self.context = context
         self.messages = messages

@@ -1,39 +1,75 @@
-# PlatformKit — OS and Device Primitives
+# PlatformKit — Device Input and Output
 
-PlatformKit abstracts operating-system services, audio hardware, permissions, and external-device transport. Architecture section 34 defines its target coverage. It acquires input and performs device operations without Agent business semantics or model reasoning.
+Owns hardware and operating-system I/O through public APIs. The goal is permission-aware device lifecycles and bounded data delivery. PlatformKit has no project-target dependency; ModelKit processes supplied data separately.
 
-## Direct relationships
+## Directory structure
 
-The current App supplies the wiring between PlatformKit and consumers. Arrows show logical data and operations, not direct module imports.
+```text
+PlatformKit/
+├── Audio/
+│   ├── AppleAudioIO.swift                 # Capture, playback and audio-session setup
+│   ├── MicrophoneFrame.swift              # Bounded captured PCM
+│   ├── StreamingMonoPCMResampler.swift     # Continuous format conversion
+│   └── AudioSpectrum.swift                # FFT telemetry for captured/played PCM
+├── Vision/
+│   ├── AppleCamera.swift                  # Camera lifecycle and preview source
+│   ├── CameraFrame.swift                  # Native frame and orientation metadata
+│   └── CameraGraySampler.swift            # Compact luminance samples
+├── Core/DeviceCapability.swift            # Shared availability/authorization contract
+├── Connectivity/
+│   ├── ExternalDeviceTransport.swift          # External-device transport contract
+│   ├── NexArmJointCommand.swift               # Six-position aim frame
+│   └── NexArmController.swift                 # Sends that frame on an injected transport
+└── README.md                              # Device boundary and status
+```
+
+Group implementations by capability domain. Core holds shared contracts; add device subdirectories only when actual implementations need them.
+
+## Upstream and downstream
+
+Arrows show data flow through App adapters, not imports between the two Kits.
 
 ```mermaid
 flowchart LR
-    Hardware[OS and audio hardware] -->|Microphone samples and device state| PlatformKit
-    PlatformKit -->|Audio operations and playback| Hardware
-    PlatformKit -->|Captured PCM through App| Gateway
-    Actions -->|PCM through injected playback callback| PlatformKit
-    PlatformKit -->|Playback completion or failure| Actions
-    App -->|Audio session and permission operations| PlatformKit
-    PlatformKit -->|Availability and errors| App
+    Hardware[Hardware / OS] -->|Capture| PlatformKit
+    PlatformKit -->|PCM, frames and telemetry| App
+    App --> Input[InputGateway]
+    Input --> Agents[SpeechPerception / VisionPerception]
+    Agents -->|Inference| ModelKit
+    Output[OutputGateway] --> Runtime[Action / Tool handlers]
+    Runtime -->|App-injected device operation| PlatformKit
+    PlatformKit -->|Playback| Hardware
+    App -->|Preview and telemetry| Views
 ```
 
-## Implementation status
+## Internal structure and data flow
 
-- ✅ `Audio/AppleAudioIO.swift`: Apple audio capture, playback, and platform operations.
-- ✅ `Audio/StreamingMonoPCMResampler.swift`: continuous mono PCM conversion with stream-local filter state and conversion errors.
-- ✅ `Audio/MicrophoneFrame.swift`: shared captured PCM and level measurements. Segmentation is owned by Gateway using VAD probabilities; the obsolete energy segmenter and batch resampler have been removed.
-- ✅ `Device/DeviceCapability.swift`: capability, authorization, and permission interfaces.
-- ✅ `ExternalDevice/ExternalDeviceTransport.swift`: connect, send, emergency-stop, and disconnect contracts.
-- ❌ Concrete Sensors, Storage, Network, BLE, robot, and IoT adapters.
-- ❌ Real robot integration and hardware safety validation; transport protocols alone do not establish either.
-- ✅ [`ExternalDevice`](ExternalDevice/README.md) `NexArmJointCommand` and `NexArmController` build and send the six-position aim frame. The home table is provisional raw 2048. ❌ The Wi-Fi socket is not opened. See [ADR 0037](../../docs/adr/0037-photographer-aim.md).
+```mermaid
+flowchart TD
+    Intent[App device request] --> Permission[Authorization and availability]
+    Permission --> Audio[Audio capture / playback]
+    Permission --> Vision[Camera session]
+    Audio --> PCM[Bounded PCM / resampling]
+    PCM --> Capture[Capture consumer]
+    Audio --> Spectrum[AudioSpectrum from actual PCM]
+    Vision --> Frame[Native frame and gray samples]
+    Frame --> Latest[Capacity-one latest-frame stream]
+    Vision --> Preview[Native preview source]
+    InputPCM[Supplied synthesis PCM] --> Audio
+```
 
-External input enters through InputGateway; Agent device actions must pass through OutputGateway and runtime execution. Use public APIs and validate capabilities and permissions. Robot emergency-stop and disconnect protection must be enforced by the device, without relying on iOS background execution.
+Audio and camera own their devices and cleanup. Capture delivery is bounded; audio overflow is explicit, while the camera stream replaces its pending frame with the newest one. Playback waits for device completion and supports cancellation. FFT is device telemetry, not model inference or an Agent-selected UI command. See [Audio](Audio/README.md) and [Vision](Vision/README.md) for capacities and lifecycle rules.
 
-## Maintenance
+## Feature status
 
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+- ✅ Microphone capture, speaker playback, PCM conversion and spectrum analysis.
+- ✅ Foreground camera capture, front/back selection, native preview and compact gray samples.
+- ✅ Shared permission contracts and an external-device transport interface.
+- ❌ Concrete BLE/network/robot transports, recording and additional hardware domains.
 
-✅ Camera/AppleCamera provides actor-owned video-only preview capture, front/back switching and authorization. It does not configure the shared audio session or request microphone access. ❌ Recording is not implemented.
+## Issue record
 
-✅ Camera now exposes bounded upright RGB frames (max 640 per side) in addition to preview. Late native frames and an older queued frame may be replaced; no Agent/model dependencies are introduced.
+| Status | Issue / next step |
+| --- | --- |
+| Open | Measure camera/audio coexistence, route-dependent playback latency and sustained thermal/power behavior on device. |
+| Open | Robot control requires device-side limits, stop acknowledgement and disconnect protection; iOS background execution cannot provide safety. |

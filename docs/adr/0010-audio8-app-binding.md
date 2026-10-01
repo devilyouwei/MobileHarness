@@ -1,5 +1,7 @@
 # ADR 0010 默认语音切换为 Audio8 + Silero
 
+> Historical scope: Historical default binding. Audio8 is no longer packaged; the [current voice path](../Voice.md) uses other local capabilities.
+
 状态：已实施。日期：2026-09-23。
 
 用户要求先在模拟器调试语音，当前模拟器 SDK 不包含 CoreAI。AppContainer 改为构造 Audio8ASR；Silero VAD、Apple TTS 和固定回复保持原有职责。录音前 warmup 校验固定制品并预加载 5 秒函数。Gateway、Agent 继续依赖 capability，运行时契约不变。

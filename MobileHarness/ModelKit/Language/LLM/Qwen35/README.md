@@ -4,7 +4,7 @@ Purpose: provide local text-only ChatCapability using pinned Qwen3.5 affine 4-bi
 
 ✅ Production uses Qwen3.5-2B 4-bit files from Models/Qwen35. The download profile pins the upstream revision; runtime loads the local directory directly.
 ✅ The injected ModelResource admits one active request and rejects concurrent calls; unload waits for generation cleanup. Each request starts with fresh cache state; history is supplied explicitly by the caller.
-✅ Up to 64 messages / 64 KiB, 4096 prompt-plus-output tokens, at most 1024 output tokens. The output stream holds at most 128 events of 4096 bytes each; overflow fails explicitly.
+✅ Up to 64 messages / 64 KiB, 4096 prompt-plus-output tokens, no fixed output cap; omitted budgets may use the remaining local context. The output stream holds at most 128 events of 4096 bytes each; overflow fails explicitly.
 ✅ No automatic fallback. Physical Apple Silicon only. Load, warmup and unload are composition-root operations.
 ❌ Vision, native Tool Call transport and universal device compatibility are not implemented. Downloaded multimodal weights are consumed by MLX's text loader, which discards vision tensors; visual requests are not exposed.
 
@@ -49,3 +49,5 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 ✅ The Defaults assembly calls configureCache(limitBytes:) before loading MLX models and chooses 64 MiB explicitly. The manager may evict idle Qwen weights on memory pressure; an existing ChatCapability handle reloads through its resource on the next inference.
 
 ✅ The Defaults assembly registers Qwen as chat and selects its resource directory. Capability consumers and App do not construct Qwen35Chat.
+
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.

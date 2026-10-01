@@ -1,5 +1,7 @@
 # ADR 0017 · 新设计第一阶段：入口到 Gateway
 
+> Source layout: [ADR 0063](0063-module-directory-consolidation.md) supersedes standalone runtime targets and former top-level Core/presentation locations; the behavioral decisions below remain historical records.
+
 日期：2026-09-24。状态：已采用，分阶段迁移。
 
 ## 决策

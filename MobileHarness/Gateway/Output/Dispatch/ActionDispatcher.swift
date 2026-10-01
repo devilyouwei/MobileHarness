@@ -1,4 +1,4 @@
-import ActionRuntime
+import Actions
 import AgentCore
 import Foundation
 
@@ -7,9 +7,19 @@ import Foundation
 struct ActionDispatcher: Sendable {
     let executor: ChannelScheduler
 
-    func dispatch(_ token: ActionCall, envelope: OutputEnvelope) async throws {
+    func dispatch(
+        _ token: ActionCall, envelope: OutputEnvelope, owner: ExecutionOwner,
+        feedback: ActionFeedback, lease: ResourceLease?
+    ) async throws {
+        guard case .actionCall(let call) = envelope.output, call == token else {
+            throw ActionExecutionError.invalidInvocation
+        }
         try await executor.enqueue(
-            path: token.actionPath, invocation: ActionInvocation(envelope: envelope, call: token))
+            invocation: ActionInvocation(envelope: envelope, owner: owner, feedback: feedback, lease: lease))
+    }
+
+    func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {
+        try await executor.schedule(directive, envelope: envelope)
     }
 
     func finish(_ envelope: OutputEnvelope) async throws {

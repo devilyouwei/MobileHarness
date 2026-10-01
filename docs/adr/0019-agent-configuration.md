@@ -1,5 +1,11 @@
 # ADR 0019 · Agent 独立 plist 配置与统一开发规范
 
+> Source layout: [ADR 0063](0063-module-directory-consolidation.md) supersedes standalone runtime targets and former top-level Core/presentation locations; the behavioral decisions below remain historical records.
+
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
+> Historical scope: Historical plist v1 format. [ADR 0022](0022-json-capability-configuration.md) replaced it with JSON, and current production declarations use JSON v4; see the [Agents README](../../MobileHarness/Agents/README.md).
+
 日期：2026-09-24。状态：采用。
 
 ## 决策与格式

@@ -14,3 +14,6 @@ Maintain expected sample sequences and error assertions when changing stream con
 ✅ Local model fixtures use flat Models directories: Silero and Nemotron-macos. Required backend files are loaded directly; download profiles are development-only configuration.
 
 ✅ Isolated adapter fixtures explicitly import ModelManagement SPI to own test lifecycle; production adapters receive their context from the manager.
+
+
+✅ VoiceActivitySegmenter is now owned by Agents/SpeechPerception; these segmentation regression tests import Agents alongside ModelKit. No model source is duplicated.

@@ -1,5 +1,7 @@
 # 0015 · 分句 FunctionToken 与共享 Actions
 
+> Historical scope: Historical implementation layout and queue values. [ADR 0020](0020-layout-alignment.md) moved the source layout; later synthesis uses [ADR 0055](0055-synthesis-agent-audio-handles.md). [ADR 0059](0059-structured-wait-scheduling.md) replaces module FIFO with task-local phase/Channel FIFO and nested wait groups; modules now provide process-wide exclusion, not a shared FIFO. Current contracts live in module READMEs.
+
 状态：已采纳，2026-09-24。
 
 ## 背景

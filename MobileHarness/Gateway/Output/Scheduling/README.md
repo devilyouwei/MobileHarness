@@ -1,50 +1,55 @@
-# Scheduling — Channel Action Queues
+# Scheduling — Structured Wait Groups and Channel Queues
 
-Purpose: schedule resolved ActionCalls. Design goals: FIFO within each channel, concurrency across available resources, bounded admission and explicit completion/cancellation. ToolCalls bypass this module.
+Purpose: execute resolved Actions with task-local order and scoped synchronization. Design goals: streaming progress, bounded admission, explicit failure/cancellation and process-wide device exclusion. Tools stay outside this scheduler.
 
-- ✅ ChannelScheduler actor owns FIFO state in Channel.swift and executes handlers through ActionRuntime/ActionExecutor.
-- ✅ Defaults: 32 jobs per channel including its running job, 16 active channels and 64 tracked Agent/input pairs. Capacity exhaustion rejects admission.
-- ✅ Each channel waits for the full handler, including physical playback, before starting its next job.
-- ✅ Module exclusion prevents conflicting Actions across channels; eligible heads compete in admission order.
-- ✅ Per-input/session cancellation, failure handling and shutdown barriers wait for cooperative running-handler cleanup.
-- ❌ Priority, preemption, dependency graphs, general multi-resource requirements, fairness quotas and durable idempotency.
+✅ ChannelScheduler owns a tree per `(AgentID, inputID)`, with a validated session ID. The root group and each child wait group contain alternating ordinary phases and child groups. A phase owns FIFO lanes by Channel name. Channel.swift supplies one lane's queued and running state. Equal Channel names in different tasks do not share a FIFO; module exclusion remains process-wide.
 
-The Agent determines each effective channel. XML scope closure affects later tokens; it does not flush or cancel scheduled Actions. The scheduler never parses XML or aliases. Channel names share process-local lanes across Agents; completion/failure remains isolated by source AgentID/inputID. Stop producers before cancellation to prevent later submission under the same input ID.
+✅ A wait joins its parent's earlier work before activation and joins all its own work before releasing the parent's continuation. Nested waits never wait on their ancestors or unrelated tasks. Channel scopes only choose a lane; closing one does not wait. No name, including main, has special scheduling semantics.
 
-main has ordinary channel semantics, without global blocking. See [Function Token semantics](../../../AgentCore/Generation/README.md) for text/XML scope behavior. Keep this README synchronized with algorithms and ✅/❌ status.
+## Admission, bounds and execution
 
-## Queue and asynchronous processing contract
+Agent output pumps send ordered ActionCall and typed SchedulingDirective events through OutputGateway/ActionDispatcher. Admission validates and records work synchronously inside the scheduler actor; it never waits for physical execution. Each task keeps a lexical wait stack and a writable phase. beginWait seals that phase and appends a child group; endWait seals the child and creates the parent's next phase. Group IDs are internal array indices, never model parameters.
 
-The actor owns all lanes, running jobs, module reservations and input completion states. `ActionDispatcher` produces jobs; one task per eligible channel consumes them. Defaults are 32 jobs per channel including its running job, 16 active channels and 64 tracked `(AgentID, inputID)` entries. Full admission throws; existing jobs are not evicted.
+| Bound | Capacity / policy |
+| --- | --- |
+| Tracked tasks | 64, including failed tasks awaiting producer finish/cancel; reject excess |
+| Live Channel names | 16 process-wide; reject a new name at capacity |
+| Unfinished Actions per Channel name | 32 across all tasks, including running and dormant stages; reject excess |
+| Actions per task | 120 cumulative, including completed Actions |
+| Wait groups per task | 32 cumulative; root is additional; at most 65 phases |
+| Runtime wait nesting | 8; parser additionally limits combined wait/Channel nesting to 8 |
+| Completion signal | One terminal value per task and one finish waiter; duplicate finish fails |
 
-1. Validate the handler/path and input state, then check all capacities before admission.
-2. Assign a monotonically increasing sequence and append to the channel FIFO. Start its head only when the channel is idle and that Action module is not busy.
-3. Reserve the module, await the complete handler, then release it. Speech handlers include actual playback in their completion.
-4. After completion, sort ready channel heads by admission sequence and try each. Different modules may run concurrently; a busy head prevents later jobs in the same channel overtaking it. Module exclusion applies across channels and Agents.
-5. `finish` seals that Agent/input and waits for all accepted jobs. Each input has a one-element terminal signal stream; only one finish waiter is accepted. Empty idle lanes are removed.
-6. Handler failure records the first error and cancels that input's queued/running jobs across channels. Cancel removes waiting jobs, requests cooperative cancellation and joins running handlers. Shutdown closes admission and joins all tracked inputs. Stop the producer before cancellation so later tokens cannot recreate the input.
+No admitted Action is evicted on overflow. Gateway cancels the owning task on validation/admission errors; direct scheduler callers receive the error and must finish or cancel their producer. There is no producer backpressure or retry queue.
 
-`main` is an ordinary FIFO channel, not a global barrier. Channel names share lanes across Agents; completion/failure keys remain Agent-specific. No priority, preemption, persistent replay or general multi-resource scheduler exists. Array dequeue is linear in lane length; ready-head sorting is bounded by the channel count.
+The scheduler follows only the current entry of each group. A closed empty phase advances; a closed completed child advances its parent. An active unclosed phase may run received Actions, but cannot release its continuation. Only active phase lane heads compete, sorted by admission sequence. A head starts if its lane is idle and its module is free. Reserve the module immediately before invoking ActionExecutor; release it only after handler completion/cleanup, then reconsider all eligible heads. Groups and dormant Actions hold no resource locks. Same-lane jobs never overtake their head; unrelated tasks can bypass a dormant stage, avoiding cross-task head-of-line deadlocks. Queues use bounded arrays; tree traversal depth is at most eight wait groups plus root.
 
 ```mermaid
 flowchart TD
-    Producer[ActionDispatcher] --> Admit[Validate and check bounds]
-    Admit --> FIFO[Append to channel FIFO]
-    FIFO --> Ready{Idle channel and free module?}
-    Ready -->|yes| Run[Reserve module and await handler]
-    Run --> Done[Release module and update input]
-    Done --> Next[Sort ready heads by sequence]
-    Next --> Ready
-    Done --> Join[Resolve sealed or cancelled input at zero pending]
-    Cancel[Failure or cancellation] --> Remove[Remove queued jobs and cancel running jobs]
-    Remove --> Join
+    Events[Ordered Actions / wait boundaries] --> Admit[Validate task and capacity]
+    Admit --> Tree[Task root: phases and child wait groups]
+    Tree --> Active[Walk active entries only]
+    Active --> Heads[Collect idle lane heads across tasks]
+    Heads --> Resources{Module free?}
+    Resources -->|yes| Execute[Reserve module; await Action handler]
+    Execute --> Release[Release module; decrement pending]
+    Release --> Active
+    Release --> Join[Closed and empty: advance parent]
+    Join --> Active
+    Cancel[Failure / cancel] --> Cleanup[Remove dormant work; cancel and join running handlers]
 ```
 
-✅ The algorithm above describes the current implementation.
+## Completion and failure
 
-Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+finish seals root input and joins all accepted work; unclosed wait scopes fail with invalidSchedule and cancel the task. Empty paired waits are valid barriers. A handler error cancels every queued/running Action belonging to that task, preserving the first error. A failed task remains admission-fenced until its producer finishes or explicitly cancels it; this prevents a still-generating producer from recreating a failed tree. Cancel/shutdown wait for cooperative handler cleanup; completion/cancellation releases the entire tree. Stop the producer before explicit cancellation. Once an explicitly completed/cancelled task has been released, IDs must not be reused by stale producers.
+
+Handler completion means the implementation's actual completion (including drained speech playback), not inference completion, XML closure or admission. Persistent presentation effects may remain after their handler returns. Already executed effects cannot be rolled back. A wait adds no timeout; existing Action/model/cache deadlines still apply. Speech synthesis prefetch remains outside Action scheduling and can expire during long waits. Tools remain outside XML wait groups.
+
+❌ Priority, preemption, global cross-task barriers, rollback, arbitrary resource dependency graphs and hardware takeover are not implemented. Device acceptance is separate from deterministic handler tests. See ADR 0059 for the migration from shared lanes.
 
 ## Channel Lock Design
+
+This is a future device-ownership proposal, not wait synchronization. Task-local phase lanes cannot serve as a process-wide ownership registry; enforcement will require a separate bounded resource-domain registry spanning all tasks.
 
 A lock gives one authorized Agent exclusive control of one or more channels. **Acquisition interrupts existing control:** block new calls, cancel queued work, stop running work, then grant ownership.
 
@@ -58,7 +63,7 @@ A lock gives one authorized Agent exclusive control of one or more channels. **A
 - Agent A decides whether to request control.
 - The runtime checks permission and performs the takeover; a signal never transfers ownership.
 
-See the general [signal-to-takeover flow](../../../AgentCore/Bus/README.md#signals-and-control-takeover). Input delivery continues while a channel is locked.
+See the general [signal-to-takeover flow](../../../Agents/Core/Communication/README.md). Input delivery continues while a channel is locked.
 
 ### Acquire: interrupt, then grant
 
@@ -99,12 +104,12 @@ flowchart TD
 
 A channel name is a scheduling scope. Exclusive **device** control additionally requires:
 
-- App-defined ActionPath → resource-domain mapping, covering alternative channels such as `main`.
+- App-defined ActionPath → resource-domain mapping, covering every allowed Channel, regardless of its name or task.
 - The same ownership fence for side-effecting Tools, or exclusion of those Tools from that device.
 - Adapter cancellation and generation checks so revoked commands or late callbacks cannot restore old control.
 - Complete route coverage before enabling a physical-control lock. Module mutual exclusion alone is insufficient.
 
-Current Agent JSON v3 has no lock permissions. Configuration and trusted invocation context need coordinated changes before enabling this API.
+Current Agent JSON v5 has no lock permissions. Configuration and trusted invocation context need coordinated changes before enabling this API.
 
 ### Release and owner loss
 
@@ -140,7 +145,7 @@ func release(_ lease: ChannelLease) async throws
 
 ### Bounds and required checks
 
-- Channel groups and live lock/transition records share `maximumChannels` (currently 16). Empty owned or faulted lanes retain their gate and count toward that bound.
+- The proposed ownership registry must bound live leases, groups and transition records independently of ephemeral task lanes. The current `maximumChannels` value (16 live names with unfinished Actions) is not an implemented ownership limit. Empty owned or faulted resource domains must retain their gate until explicit cleanup.
 - Use bounded deadline bookkeeping; no waiting-lock queue. Release/cancel must remain serviceable when business and Action queues are full.
 - Revalidate identity, deadline and transition generation after every external await.
 
@@ -152,3 +157,17 @@ Before enabling locks, test:
 - ❌ Alternative-channel and Tool-route enforcement.
 - ❌ Timeout, failed cleanup, owner loss, release and no stale replay.
 - ❌ Capacity limits, full-queue control access and unchanged unlocked scheduling.
+
+## Action contract stage 1
+
+✅ `enqueue(invocation:)` derives the path from the validated invocation and returns a newly assigned execution UUID after admission. Each admission is a new execution, including reuse of a submitted invocation. The same ID reaches the handler and diagnostic records. Immutable implementation definitions describe kind/completion; all handlers still use identical scheduling and awaited completion. No category bypasses a lane or a wait.
+
+✅ Capacity, input lifecycle and wait errors now belong to `ActionSchedulingError.swift` in Gateway. Runtime lookup/definition/invocation failures remain ActionExecutionError. Completion errors still cancel the owning input and preserve its original error.
+
+✅ The scheduler actor owns the bounded ActionDiagnostics ring: 256 records by default (configuration 1–4096), oldest-record overwrite with an explicit eviction counter. It records admitted/started and terminal succeeded/failed/cancelled transitions; queued cancellation is notStarted and running failure/cancellation conservatively has unknown effects. No parameters/errors/media are retained. Terminal records follow handler cleanup. `diagnosticSnapshot()` is a bounded chronological copy, not a stream or new queue. Diagnostic eviction never discards Actions. Full algorithm and lifecycle limits are in [Runtime](../../../Actions/Runtime/README.md).
+
+❌ Persistent resources, activity ownership, execution/cleanup deadlines and Agent-facing ActionResult remain unimplemented; ADR 0065 does not change the future Channel ownership proposal above.
+
+## Action runtime stage 2
+
+✅ Stage 2 reserves bounded feedback slots before enqueue, stores typed completion and performs delivery after releasing lane/module. Resource declarations add execution fences; cancel(resources:) and cancel(agent:incarnation:) cancel/join owning inputs. Session/shutdown closes matching receipts. ❌ Feedback delivery is not part of finish barrier and does not prove exactly-once processing. See sibling Results and Resources READMEs for algorithms and limits.

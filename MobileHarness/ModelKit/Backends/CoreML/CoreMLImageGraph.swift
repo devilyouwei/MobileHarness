@@ -1,13 +1,21 @@
 import CoreML
 import CoreVideo
 import Foundation
+import ImageIO
+import Vision
+import os
 
 /// Fixed RGB image input and a single float tensor output. Native objects remain actor isolated.
 public actor CoreMLImageGraph {
     private let model: MLModel
-    public init(contentsOf url: URL) throws {
+    private let outputName: String
+    private let visionModel: VNCoreMLModel
+    public enum Compute: Sendable { case cpuAndNeuralEngine, all }
+    private let preparation = CoreMLImagePreparation()
+    private let signposter = OSSignposter(subsystem: "dev.mobileharness.models", category: "Pose")
+    public init(contentsOf url: URL, compute: Compute = .cpuAndNeuralEngine) throws {
         let configuration = MLModelConfiguration()
-        configuration.computeUnits = .all
+        configuration.computeUnits = compute == .all ? .all : .cpuAndNeuralEngine
         if url.pathExtension == "mlpackage" {
             let compiled = try MLModel.compileModel(at: url)
             defer { try? FileManager.default.removeItem(at: compiled) }
@@ -15,56 +23,68 @@ public actor CoreMLImageGraph {
         } else {
             model = try MLModel(contentsOf: url, configuration: configuration)
         }
+        visionModel = try VNCoreMLModel(for: model)
         let description = model.modelDescription
         guard Set(description.inputDescriptionsByName.keys) == ["image"],
             let input = description.inputDescriptionsByName["image"]?.imageConstraint,
             input.pixelsWide == 640, input.pixelsHigh == 640,
-            let output = description.outputDescriptionsByName["predictions"]?.multiArrayConstraint,
-            output.shape.map(\.intValue) == [1, 56, 8400]
-        else { throw CoreMLGraphError.invalidTensor("YOLO image/output contract") }
+            description.outputDescriptionsByName.count == 1,
+            let name = description.outputDescriptionsByName.keys.first,
+            let output = description.outputDescriptionsByName[name]?.multiArrayConstraint,
+            output.shape.map(\.intValue) == [1, 300, 57]
+        else { throw CoreMLGraphError.invalidTensor("YOLO26 end-to-end image/output contract") }
+        outputName = name
     }
-    public func run(rgb: Data) throws -> CoreMLTensor {
+    public func run(rgb: Data, layout: CoreMLImageLayout) throws -> CoreMLTensor {
         try Task.checkCancellation()
-        guard rgb.count == 640 * 640 * 3 else { throw CoreMLGraphError.invalidTensor("RGB size") }
-        var optional: CVPixelBuffer?
-        let status = CVPixelBufferCreate(kCFAllocatorDefault, 640, 640, kCVPixelFormatType_32BGRA, nil, &optional)
-        guard status == kCVReturnSuccess, let pixels = optional else {
-            throw CoreMLGraphError.invalidTensor("Pixel buffer allocation")
-        }
-        guard CVPixelBufferLockBaseAddress(pixels, []) == kCVReturnSuccess else {
-            throw CoreMLGraphError.invalidTensor("Pixel buffer lock")
-        }
+        let prepareInterval = signposter.beginInterval("PrepareImage")
+        let pixels: CVPixelBuffer
         do {
-            defer { CVPixelBufferUnlockBaseAddress(pixels, []) }
-            guard let base = CVPixelBufferGetBaseAddress(pixels) else {
-                throw CoreMLGraphError.invalidTensor("Pixel buffer storage")
-            }
-            let stride = CVPixelBufferGetBytesPerRow(pixels)
-            rgb.withUnsafeBytes { source in
-                let src = source.bindMemory(to: UInt8.self)
-                let dst = base.assumingMemoryBound(to: UInt8.self)
-                for y in 0..<640 {
-                    for x in 0..<640 {
-                        let i = (y * 640 + x) * 3
-                        let j = y * stride + x * 4
-                        dst[j] = src[i + 2]
-                        dst[j + 1] = src[i + 1]
-                        dst[j + 2] = src[i]
-                        dst[j + 3] = 255
-                    }
-                }
-            }
+            defer { signposter.endInterval("PrepareImage", prepareInterval) }
+            pixels = try preparation.prepare(rgb: rgb, layout: layout)
         }
-        let provider = try MLDictionaryFeatureProvider(dictionary: ["image": MLFeatureValue(pixelBuffer: pixels)])
-        let output = try model.prediction(from: provider)
         try Task.checkCancellation()
-        guard let array = output.featureValue(for: "predictions")?.multiArrayValue,
-            array.shape.map(\.intValue) == [1, 56, 8400]
-        else { throw CoreMLGraphError.invalidOutput("predictions") }
-        // Indexed access respects non-contiguous Core ML tensor strides.
-        let values = (0..<56).flatMap { channel in
-            (0..<8400).map { index in array[[0, NSNumber(value: channel), NSNumber(value: index)]].floatValue }
+        let provider = try MLDictionaryFeatureProvider(dictionary: ["image": MLFeatureValue(pixelBuffer: pixels)])
+        let predictionInterval = signposter.beginInterval("Prediction")
+        let output: any MLFeatureProvider
+        do {
+            defer { signposter.endInterval("Prediction", predictionInterval) }
+            output = try model.prediction(from: provider)
         }
-        return CoreMLTensor(shape: [1, 56, 8400], values: values)
+        try Task.checkCancellation()
+        guard let array = output.featureValue(for: outputName)?.multiArrayValue else {
+            throw CoreMLGraphError.invalidOutput("predictions")
+        }
+        let readInterval = signposter.beginInterval("ReadTensor")
+        defer { signposter.endInterval("ReadTensor", readInterval) }
+        return try PoseTensorReader.read(array)
     }
+    /// The producer retains immutable pixels; the closure is invoked only on this actor.
+    public func runNative(source: @Sendable () -> CVPixelBuffer, rotation: Int) throws -> CoreMLTensor {
+        try Task.checkCancellation()
+        guard (0...3).contains(rotation) else { throw CoreMLGraphError.invalidTensor("Orientation") }
+        let pixels = source()
+        let width = CVPixelBufferGetWidth(pixels)
+        let height = CVPixelBufferGetHeight(pixels)
+        guard (1...4096).contains(width), (1...4096).contains(height), width * height <= 4_194_304,
+            CVPixelBufferGetPixelFormatType(pixels) == kCVPixelFormatType_32BGRA
+        else { throw CoreMLGraphError.invalidTensor("Native image buffer") }
+        let request = VNCoreMLRequest(model: visionModel)
+        request.imageCropAndScaleOption = .scaleFit
+        let orientations: [CGImagePropertyOrientation] = [.up, .right, .down, .left]
+        let interval = signposter.beginInterval("VisionPreprocessAndPrediction")
+        do {
+            defer { signposter.endInterval("VisionPreprocessAndPrediction", interval) }
+            try VNImageRequestHandler(cvPixelBuffer: pixels, orientation: orientations[rotation], options: [:])
+                .perform([request])
+        }
+        try Task.checkCancellation()
+        guard let observations = request.results as? [VNCoreMLFeatureValueObservation],
+            let array = observations.first(where: { $0.featureName == outputName })?.featureValue.multiArrayValue
+        else { throw CoreMLGraphError.invalidOutput("Vision predictions") }
+        let readInterval = signposter.beginInterval("ReadTensor")
+        defer { signposter.endInterval("ReadTensor", readInterval) }
+        return try PoseTensorReader.read(array)
+    }
+
 }

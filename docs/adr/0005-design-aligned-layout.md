@@ -1,5 +1,7 @@
 # ADR 0005 按技术方案整理源码目录
 
+> Source layout: [ADR 0063](0063-module-directory-consolidation.md) supersedes standalone runtime targets and former top-level Core/presentation locations; the behavioral decisions below remain historical records.
+
 状态：已实施。日期：2026-09-23。
 
 用户指出原 App/ 与 Packages/HarnessKit/Sources/ 物理布局偏离 Tech_Design.md 第 16 节。源码统一迁至 MobileHarness/ 下的 App、Experience、Gateway、AgentCore、Agents、ToolRuntime、ModelKit、PlatformKit 和 Resources，测试迁至根 Tests/。

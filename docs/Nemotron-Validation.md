@@ -1,5 +1,7 @@
 # Nemotron 接入验证（2026-09-23）
 
+这是分阶段验证记录：开头的“未注入 App”仅指首次独立能力测试；下方“App 切换后的追加验证”记录了后续接入。当前语音链路见 [Voice.md](Voice.md)。
+
 模型与制品固定版本、接口和资源上限见 [模型 README](../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md)，架构取舍见 [ADR 0006](adr/0006-nemotron-streaming-asr.md)。本次仅实现独立 capability，未注入 App/Gateway pipeline。
 
 ## 已执行

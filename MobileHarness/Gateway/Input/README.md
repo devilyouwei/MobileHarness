@@ -1,78 +1,83 @@
-# Input · 输入网关
+# Input Gateway
 
-用途：让文本、控制事件、语音转换结果和工具结果统一进入 Agent。设计目标：采集适配、归一化、上下文增强和路由，不承担 Agent 决策。
+Purpose: admit external inputs and route validated signals to Agent inboxes. Gateway has no ModelKit dependency and does not capture devices, run ASR/VAD/vision, or select frames by image content.
 
-- ✅ `InputGateway.swift`：统一接纳入口与 DeliveryReport；ASR capability 注入，仅提供现行流式识别入口。
-- ✅ `LiveSpeechInput.swift`：有界连续语音、partial 预览和 final 合并；预览不触发 Agent。
-- ✅ `VoiceActivitySegmenter.swift`：VAD 概率分段，仅输出 streamEvents；保留长句、预滚、句内停顿和尾音处理，不再重复缓存整段音频。
-- ✅ 已移除 VoiceInputSession、recognize/recognizeAndSubmit 旧批量路径；最终文本由调用方经 submit 提交一次。
-- ✅ [Routing](Routing/README.md)：可注入路由、定向投递、多目标去重及逐目标失败隔离。
-- ❌ `Signal.swift`、`SignalType.swift`、`SignalAdapter.swift`：等待统一 Signal 契约；当前沿用 AgentCore.AgentInput。
-- ❌ `ContextBuilder.swift`：独立上下文增强，尚未建立。
-- ✅ 相机灰度变化抽帧与图片路由；❌ 其他传感器适配。
+✅ `AgentInput` carries payload, contract/version, source/incarnation, session, capture metadata, sequence, causal root/parent, hop count and a monotonic admission deadline. Audio/image transport contracts are AgentCore-owned; App converts platform frames without exposing concrete model types to Gateway.
 
-语音文件是已在用的输入适配实现，保留在 Input 下；本轮不将它们替换为无行为的通用 adapter。
+✅ `publish` matches static JSON v5 contract/source/topic subscriptions. `send(to:)` bypasses subscription matching but preserves acceptance, identity, session, deadline and capacity checks. `publish` requires CommunicationPolicy and fails if no subscriptions match. `send` requires an explicit target; there is no default-Agent fallback or compatibility router. Policy-free construction supports explicit directed admission only, using the target descriptor and runtime checks. ToolResult remains directed to its original Agent/session.
 
-维护约定：修改本目录代码、文件或子目录时同步更新此 README；✅ 表示已实现，❌ 表示尚未实现，不用空实现占位。
-
+✅ External and internal admission share bounds of 128 concurrent operations, 256 branches, 8 MiB observation payload (charged per target) and 16 distinct targets per call; excess is rejected immediately. Gateway creates no persistent media mailbox. It reports per-target rejection; one destination does not prevent other destinations from admission. Concrete Agents own business queues. Internal delivery is reachable through the bound OutputGateway port and validates both sender and destination incarnations.
 
 ```mermaid
 flowchart LR
-    PCM[Resampled PCM] --> VAD[VoiceActivitySegmenter]
-    VAD -->|Audio and end events| Live[LiveSpeechInput]
-    Live -->|Open stream| Gateway[InputGateway]
-    Gateway --> ASR[Recognition capability]
-    ASR -->|Partial and final events| Live
-    Live -->|Preview| App
-    Live -->|Final text| App
-    App -->|Submit once| Gateway
+    Platform[PlatformKit via App] --> Validate[Envelope / size / expiry validation]
+    Validate --> Route{Publish or send}
+    Route -->|publish| Policy[Static JSON v5 subscriptions]
+    Route -->|send| Target[Explicit destination]
+    Policy --> Admit[Capability / incarnation / session check]
+    Target --> Admit
+    Output[OutputGateway] --> Admit
+    Admit --> Inbox[Bounded Agent inbox]
 ```
 
-The VAD policy retains only pre-roll, pending VAD samples and uncommitted silence, rather than a second full utterance. LiveSpeechInput bounds pending work to 128 events / 64,000 samples and the turn to 960,000 samples; overflow rejects admission explicitly. Existing cancellation and completion barriers remain in force.
+## External input admission and delivery
 
-## Queue and asynchronous processing contract
-
-`InputGateway.submit` has no mailbox: it awaits delivery to each distinct destination and reports per-Agent rejections. The actual business inbox belongs to the Agent.
-
-`LiveSpeechInput` is an actor-owned producer/consumer bridge. The capture loop produces ordered `.audio` and `.end` events after VAD segmentation. Admission allows at most 128 waiting events and 64,000 queued samples (4 s at 16 kHz), with 960,000 samples per turn (60 s). An audio event contains at most 64 frames; each frame has at most 16,000 samples. Bounds are checked before append; overflow throws rather than waiting or dropping old audio. Running work is removed from queue accounting before its awaited send.
-
-One drain task opens ASR lazily and awaits each frame send. A separate reader consumes ASR output so results cannot deadlock behind input submission. It retains at most 64 segment IDs, ignores stale revisions/final replacements, previews partial text and merges only finals on segment completion; visible text is capped at 65,536 UTF-8 bytes. Preview does not submit Agent input. `finish` seals admission, joins accepted work and closes the last ASR segment, with a 20 s deadline. The caller submits the returned text once. Cancel clears waiting events, cancels reader/worker and ASR, then joins them. Drain failure records the error, clears pending PCM and cancels recognition; it does not retry.
-
-`VoiceActivitySegmenter` keeps a separate framing buffer, not a work queue: one process call at a time; busy calls fail. Inputs are at most 16,000 samples, pending PCM at most 32,000, and returned VAD scores at most 64 per call. It consumes contiguous scored samples, retaining only unscored PCM plus policy pre-roll/held silence. Invalid coverage or processing failure closes the segmenter and cancels VAD. Finish emits the uncommitted tail only when appropriate; cancel discards it. See the policy constants in `SpeechBoundaryPolicy` for speech onset, silence and segment-duration thresholds.
+External producers supply native `AgentInput` values through App adapters. InputGateway selects targets and calls their `receive` methods directly; this path does not enter InternalSignalBus or create per-target transport queues/workers.
 
 ```mermaid
-flowchart LR
-    Capture --> Segmenter[VAD framing and boundary policy]
-    Segmenter -->|ordered events| Queue[128 events and 64000 queued samples]
-    Queue -->|one drain task| ASR[Await audio send / segment finish]
-    ASR -->|result stream| Reader[Revision-aware result reader]
-    Reader -->|partial| Preview[UI preview]
-    Reader -->|final on finish| Caller[App]
-    Caller -->|submit once| Gateway[InputGateway]
-    Gateway --> Agent[Agent inbox]
+flowchart TB
+    External["External Inputs<br/>Microphone / Camera / User / Runtime"]
+    App["App Adapters<br/>Build AgentInput"]
+    External --> App
+
+    subgraph Gateway["InputGateway — bounded direct admission"]
+        Route{"Input operation"}
+        Send["send: select explicit target"]
+        Publish["publish: match static subscriptions"]
+        Targets["Selected target list"]
+        Admit["Validate payload and external source<br/>Check admission and target limits"]
+        Route --> Send
+        Route --> Publish
+        Send --> Targets
+        Publish --> Targets
+        Targets --> Admit
+        Admit --> CheckA["Validate A<br/>Input support / Identity / Session"]
+        Admit --> CheckB["Validate B<br/>Input support / Identity / Session"]
+        Admit --> CheckC["Validate C<br/>Input support / Identity / Session"]
+    end
+
+    App --> Route
+    CheckA --> ReceiveA["A.receive(input)"]
+    CheckB --> ReceiveB["B.receive(input)"]
+    CheckC --> ReceiveC["C.receive(input)"]
+    ReceiveA --> InboxA["Agent A bounded inbox"]
+    ReceiveB --> InboxB["Agent B bounded inbox"]
+    ReceiveC --> InboxC["Agent C bounded inbox"]
+
+    classDef external fill:#F1F5F9,stroke:#64748B,color:#0F172A
+    classDef gateway fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A
+    classDef agent fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    class External,App external
+    class Route,Send,Publish,Targets,Admit,CheckA,CheckB,CheckC gateway
+    class ReceiveA,ReceiveB,ReceiveC,InboxA,InboxB,InboxC agent
 ```
 
-✅ The algorithm above describes the current implementation.
+A/B/C represent selected destinations, not an unconditional broadcast. `send` selects one target; `publish` selects matching subscribers. The validation boxes belong to the same InputGateway instance. Inbox boxes represent Agent-owned business admission; individual Agents may handle explicit control inputs immediately instead of queuing them.
 
-Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+1. Reject a supplied internal incarnation; resolve the explicit target or exact static subscriptions. A publication without subscribers fails with `noRecipients`.
+2. Validate the envelope/payload and expiry, reserve shared operation/branch/observation-byte capacity, and validate the allowed external source and at most 16 distinct targets. Exhaustion rejects; there is no waiting admission queue.
+3. A structured task group creates one task per target. Each checks declared input support, obtains and validates the live target identity/session, and awaits `receive`. These tasks are not persistent workers.
+4. Collect each target's success or rejection into DeliveryReport; one receiver's rejection does not suppress the others. The call awaits all target tasks, so a slow receiver can delay the aggregate report even while other targets admit independently.
+5. Release the operation, branch and byte reservations when the operation returns. `delivered` means reception/admission, not model processing or physical completion. Agent-owned queues enforce their own capacity, expiry and overflow rules.
 
-✅ FrameChangeFilter and CameraInputSession add configurable grayscale change selection. See the camera algorithm below; no pose inference occurs in Gateway.
+Concurrent external submissions have no Gateway per-target FIFO guarantee. Internal delivery uses the same bounded structured calls. Deadlines are checked before receive; there are no timeout tasks or communication session registries. Neither path has transport FIFO or state replacement; Agent inboxes own pending-message policy. InputGateway actor isolation alone does not establish arrival order across suspension points.
 
-## Camera change sampling
+Compare the [internal direct admission lifecycle](../../Agents/Core/Communication/README.md) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
 
-Purpose: convert a camera stream into changed-image inputs without choosing business behavior or running YOLO. FrameChangeConfiguration validates minimumChange (0...1, default 0.03) and minimumInterval (0...1 seconds, default 0). App exposes 1/3/5/10% threshold choices. Configuration replacement creates a fresh capture/filter/Agent session.
+SpeechPerception owns LiveSpeechInput and VoiceActivitySegmenter. VisionPerception owns FrameChangeFilter. Source normalization means protocol validation and metadata here, not inference or perceptual transformations.
 
-```mermaid
-flowchart LR
-    Camera[Latest upright RGB frame] --> Order[Validate increasing sequence and monotonic time]
-    Order --> Interval[Optional minimum interval]
-    Interval --> Gray[64 x 64 center-sampled grayscale grid]
-    Gray --> Difference[Mean absolute difference / 255]
-    Difference -->|First frame / geometry change / threshold reached| Gateway[InputGateway.submit to Photographer]
-    Difference -->|Below threshold| Idle[No Agent input / no inference]
-    Gray --> Baseline[Replace previous examined frame baseline]
-```
+❌ Dynamic subscriptions, model-based routing suggestions, remote inputs and physical sensor adapters remain future work. Future model-assisted routing runs in an Agent and supplies a validated selection; no model will be added to Gateway.
 
-Gray = (77R + 150G + 29B + 128) >> 8. Change = sum(abs(current - previous)) / (4096 × 255). The baseline updates on every examined frame, including below-threshold frames; interval-skipped frames do not update it. This is a normalized brightness-difference metric, not percentage of changed pixels or comparison with the last inferred image. Slow cumulative motion can remain below a per-frame threshold; lower the configured threshold if needed. Identical frames never pass even at threshold zero. First frame and width/height/rotation changes always pass.
+## Action runtime stage 2
 
-CameraInputSession has one active submit, no queue, and rejects overlapping submits. It owns one filter and capture session ID, checks delivery rejection, and propagates errors. Two 4096-byte grayscale grids bound comparison memory. The producer's RGB frame stream keeps only the newest queued frame; Photographer independently replaces its one pending image. No Action, control command or Tool result is discarded by these media policies.
+✅ Dedicated deliverActionResult/deliverActivityEvent paths validate runtime payload, target incarnation/session and declared input contract, returning accepted/retry/closed. Public send/publish reject runtime feedback payloads. Existing bounded admission reports retry on capacity; stale owner returns closed. ❌ No durable feedback transport.

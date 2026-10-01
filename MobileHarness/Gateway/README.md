@@ -1,46 +1,123 @@
-# Gateway — Input and Output Boundaries
+# Gateway — Input and Output Routing
 
-Gateway connects external input, cognitive processing, and execution. Architecture sections 4–5 and 25–27 define two complementary paths: Input Gateway adapts and routes signals; Output Gateway validates and dispatches resolved calls.
+Validates and routes Agent input, communication and resolved calls. The goal is bounded admission, explicit failure and clear completion semantics. The target depends on AgentCore, Actions and Tools, using only their Runtime APIs; model processing belongs to Agents.
 
-## Responsibilities and boundaries
+## Directory structure
 
-- Input receives user input, audio, and tool results, performs supported adaptation, and selects Agent destinations.
-- Output accepts resolved `ActionCall` and `ToolCall` values. XML parsing, local alias resolution, and Channel selection happen inside Agents using AgentCore.
-- Action Calls enter bounded Channel scheduling. Calls within one Channel are serial; independent Channels may run concurrently, subject to shared module resource exclusion.
-- Tool Calls bypass Channel scheduling. Results re-enter through InputGateway with the originating session and Agent association.
+```text
+Gateway/
+├── Input/
+│   └── InputGateway.swift            # Validation, static subscriptions and explicit delivery
+├── Output/
+│   ├── OutputGateway.swift           # Output dispatch and bound event ports
+│   ├── Validation/                   # Capability and call validation
+│   ├── Routing/                      # Select Action, scheduling, Tool or control path
+│   ├── Dispatch/                     # Invoke runtimes and return Tool results
+│   └── Scheduling/                   # Task-local wait groups, Channel FIFO and module exclusion
+└── README.md                         # Module boundary and status
+```
 
-## Direct relationships
+## Upstream and downstream
 
-Arrows show current logical payload flow. Platform input is connected through App; concrete Actions and Tools are reached through their runtimes.
+Arrows show runtime data flow. ModelKit and PlatformKit are not Gateway dependencies.
 
 ```mermaid
 flowchart LR
-    App -->|User input and captured audio| Gateway
-    Gateway -->|AgentInput and tool-result feedback| Agents
-    Agents -->|Resolved calls and runtime notifications| Gateway
-    Gateway -->|ASR and VAD requests| ModelKit
-    ModelKit -->|Transcripts and voice-activity scores| Gateway
-    Gateway -->|Scheduled ActionInvocation| ActionRuntime
-    ActionRuntime -->|Completion or error| Gateway
-    Gateway -->|ToolCall| ToolRuntime
-    ToolRuntime -->|ToolResult| Gateway
-    Gateway -->|Observed output and completion| App
+    App -->|Adapted external input| Input[InputGateway]
+    Input --> Agents
+    Agents -->|Resolved calls and typed events| Output[OutputGateway]
+    Output -->|Internal observation| Input
+    Output --> ActionExecution[Actions/Runtime]
+    Output --> ToolExecution[Tools/Runtime]
+    ToolExecution -->|Returning ToolResult via dispatcher| Input
+    Output -->|Runtime observations| App
 ```
 
-## Implementation status
+## Internal flow
 
-- ✅ [Input](Input/README.md): InputGateway, voice sessions, ASR/VAD adaptation, SignalRouter protocol, and LogicRouter.
-- ✅ [Output](Output/README.md): validation, execution routing, action/tool dispatch, and bounded Channel scheduling.
-- ✅ Per-Channel FIFO, module exclusion, explicit overflow rejection, and input/session cancellation and completion barriers.
-- ✅ Dependencies on ActionRuntime and ToolRuntime; concrete implementation handlers are registered by App.
-- ❌ Unified `Signal`, general context enrichment, JEV/Agentic routing, ActionResult feedback, priorities, preemption, and generic resource declarations.
+Gateway connects the Agent network to adapted external input, registered execution and feedback. The inner subgraph is Gateway-owned coordination; Agents own inboxes, and Actions/Tools own handlers. Arrows describe runtime flow rather than compilation dependencies. Semantic interpretation and fusion remain in Agents.
 
-The current input contract is `AgentInput`. `control` is a temporary runtime completion/error notification, not a third model output protocol. `main` has ordinary Channel semantics; it does not block every other Channel. See [Scheduling](Output/Scheduling/README.md) for limits and cancellation behavior.
+```mermaid
+flowchart TB
+    App[App adapters: external business input]
+    Agents[Agents: inboxes / state / decisions]
+    ActionRuntime[Actions/Runtime: await registered handler]
+    ToolRuntime[Tools/Runtime: await registered handler]
+    Endpoints[App-bound UI / device effect endpoints]
 
-## Maintenance
+    subgraph Gateway[Gateway internals]
+        Select[InputGateway: subscription or explicit target]
+        ValidateIn[Validate identity / session / contract / admission bounds]
+        Out[OutputGateway: validate source and permissions]
+        Route{Resolved output kind}
+        Dispatch[ActionDispatcher: bounded admission]
+        Queue[ChannelScheduler: task tree / Channel FIFO / wait / module exclusion]
+        Tool[ToolDispatcher: direct execution]
+        Event[Bound messaging port: metadata and target selection]
+        Barrier[Finish / cancel: join accepted Actions]
+        Resource[ResourceCoordinator: declared resource leases and fences]
+        Results[ActionResult delivery: bounded correlated feedback]
+        Return[Returning ToolResult: original Agent / session]
 
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+        Select --> ValidateIn
+        Out --> Route
+        Route -->|Action / scheduling| Dispatch
+        Dispatch --> Queue
+        Route -->|Tool| Tool
+        Route -->|Internal event| Event
+        Event -->|Selected internal delivery| ValidateIn
+        Route -->|Finish / cancel| Barrier
+        Barrier --> Queue
+        Queue -.->|Resource validation and execution guard| Resource
+        Tool -.->|Declared resource guard| Resource
+        Queue -->|Terminal status under feedback policy| Results
+        Results -->|InputGateway result admission| ValidateIn
+        Tool -->|Non-nil result| Return
+        Return --> Select
+    end
 
-✅ Voice input uses LiveSpeechInput and stream-only VAD events; final text enters through submit once per turn.
+    App --> Select
+    ValidateIn -->|Prompt admission or rejection| Agents
+    Agents -->|Resolved calls / scheduling / control / messages| Out
+    Queue -->|Eligible Action| ActionRuntime
+    ActionRuntime -->|Completion / failure / cancellation| Queue
+    Tool --> ToolRuntime
+    ToolRuntime -->|Value or completion| Tool
+    ActionRuntime --> Endpoints
+    ToolRuntime --> Endpoints
+```
 
-✅ CameraInputSession owns configurable grayscale frame selection and routes only admitted images through InputGateway to Photographer. Generic agent.finished/error controls use existing output barriers.
+Declared resources are guarded around execution; Tools do not join Action queues. Resource declarations and registered handlers are supplied by App assembly. ActionResult delivery retries feedback without repeating an effect. Completion-only Tools produce no ToolResult. App lifecycle and UI workflows retain their typed host interfaces; this diagram covers Agent business communication and execution, not every application call.
+
+Input admission reports acceptance, not Agent processing completion. Action dispatch waits for queue admission; finish controls join admitted Actions. Tool dispatch awaits execution and any result delivery. App observers supervise runtime state and capture admission; they do not turn events into UI commands.
+
+| Owner | Default bound and overflow |
+| --- | --- |
+| InputGateway | 128 concurrent admissions shared by external/internal calls, 256 branches, 8 MiB observation bytes, up to 16 targets each; reject excess |
+| OutputGateway event port | 16 concurrent emissions per source; reject excess |
+| ChannelScheduler | 32 unfinished Actions per Channel name across tasks, including running/dormant work; 16 live names, 64 tracked tasks, 120 Actions and 32 waits per task; reject excess |
+
+Each active task phase runs FIFO per Channel and shares process-wide Action-module exclusion. Different Channels may run concurrently when modules permit; equal names in separate tasks do not share a FIFO. Wait gates only its parent continuation. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only Agent-owned declared latest-state buffers coalesce pending state. Gateways do not queue signals. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
+
+## Feature status
+
+- ✅ Static JSON v5 subscriptions via publish and explicit directed delivery via send, source/session validation and admission receipts. No legacy router or implicit Assistant fallback remains.
+- ✅ Action scheduling, direct Tools, event transport and completion/cancellation barriers.
+- ✅ Bounded correlated ActionResult feedback and shared ownership checks for declared resources.
+- ❌ General request/reply, dynamic subscriptions, priorities and preemption.
+- ❌ Enforced Channel locks and all-device physical control arbitration; Channel lock metadata grants no ownership. Resource leases are a separate implemented authority, with camera capture as the first production integration.
+
+## Issue record
+
+| Status | Issue / next step |
+| --- | --- |
+| Open | Cleanup depends on cooperative handlers; device stop acknowledgements require future adapters. |
+
+
+✅ ADR 0059 adds task-local nested wait groups. Ordinary Channel FIFO order is scoped to a task/active phase, while name capacities and module exclusion are process-wide. Typed scheduling directives pass through validation/routing/dispatch; no XML enters Gateway. ❌ Cross-task barriers and preemption remain unsupported.
+
+✅ Consolidated Actions/Tools targets provide execution APIs; Gateway still cannot directly call concrete behavior helpers. Boundary checks enforce source imports and reject direct behavior symbols. ❌ Transitive linkage through Actions/StorageAudio does not authorize Gateway model inference.
+
+## Action runtime stage 2
+
+✅ Action terminal feedback returns through InputGateway with owner isolation; Output/Results owns bounded delivery, Output/Resources owns lease/fence arbitration across declared Action/Tool/host paths. ❌ No durable delivery or all-device resource coverage.

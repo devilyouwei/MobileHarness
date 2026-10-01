@@ -1,143 +1,376 @@
-# Actions — Executable Behavior Library
+# Actions — Module and Action Authoring Standard
 
-Actions implements behaviors that affect presentation or the external world, as described in architecture section 28. Implementations consume resolved invocations and use injected capabilities or platform callbacks; they do not make Agent decisions or manage scheduling.
+Purpose: implement Agent-selected behavior with explicit completion, ordering and lifetime contracts. Design goals: consistent Swift entry points, cohesive modules, typed dependency injection, bounded execution and understandable ownership of effects.
 
-This README is the development standard for all current and future Action modules, for both developers and AI coding tools. Follow it alongside the [technical architecture](../README.md) and [Agent configuration standard](../Agents/README.md).
+This is the normative authoring standard for new Actions and deliberate migrations. **Stage 1 runtime support is implemented; Action paths and Channel/wait semantics remain unchanged.** No JSON configuration fields were added. The current implementation and migration exceptions are listed below. Domain READMEs supply exact parameters and operational limits; they must identify any departure from this standard. Examples are design examples, not registered production capabilities.
 
-## Direct relationships
+## 1. Vocabulary and boundaries
 
-The current audio and presentation connections use callbacks supplied by App. These edges describe logical data flow rather than direct imports of PlatformKit or Experience.
+| Term | Definition | Example / boundary |
+| --- | --- | --- |
+| Action | One permission-checked, scheduled behavior identified by `ActionPath(module:function:)`. It validates input, performs an effect and returns at its documented completion point. | `Speech.speak`, `UI.express`; an Action is not an Agent, thread, animation or Swift class. |
+| Action module | A cohesive behavior domain and stable path namespace, normally one directory under Actions. Today its name is also the scheduler's process-wide mutual-exclusion key. | `Speech`, `UI`; do not invent another module name to bypass exclusion. |
+| Swift target/module | A compilation and dependency boundary. | The single `Actions` target contains Runtime, Speech and UI. An Action module does not require a new Swift target. |
+| Channel | An ordering lane selected by the Agent declaration or an allowed scope override. | `Display` is a Channel; `UI` is an Action module. Same-named Channels in different tasks do not share FIFO. |
+| Alias | An Agent-local model-visible name resolved inside Agents. | `express` resolves to `UI.express`; Runtime never resolves model aliases. |
+| Runtime service | An injected owner of mutable state, resources or ongoing work; it is not itself a model-callable Action. | `SpeechPlayback` owns playback/cache handling. Service methods are not implicitly registered. |
+| Effect lifetime | How long the resulting state, resource or activity exists after a command returns. | A facial expression may remain after its Action completes. |
+
+Actions differ from Tools by execution and feedback contracts, not by read/write or fast/slow behavior. A quick state setter can still be an Action when it needs Channel ordering. Tools bypass Action scheduling and must not become an alternate route around device ownership checks.
+
+Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither App, concrete Agents, Gateway, PlatformKit nor the Swift UI target. The current target depends on AgentCore and StorageAudio; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
 
 ```mermaid
 flowchart LR
-    ActionRuntime -->|Resolved ActionInvocation| Actions
-    Actions -->|Actual completion or thrown error| ActionRuntime
-    Actions -->|Speech synthesis request| ModelKit
-    ModelKit -->|Synthesized PCM| Actions
-    Actions -->|PCM through injected playback callback| PlatformKit
-    Actions -->|Caption or expression through injected callback| Experience
+    Agent[Agent: resolve aliases and select Channel] --> Gateway[OutputGateway: validate and schedule]
+    Gateway --> Runtime[Actions/Runtime: lookup and await handler]
+    Runtime --> Entry[ModuleActions.function: validate and execute]
+    App[App composition: explicit bindings] -.-> Runtime
+    App -.-> Entry
+    Entry --> Service[Injected capability / runtime service]
+    Service --> Effect[Device or UI effect]
+    Effect --> Completion[Documented completion or failure]
+    Completion --> Runtime
 ```
 
-## Implementation status
+## 2. Action categories and completion
 
-- ✅ [Speech](Speech/README.md): `Speak.swift` / `SpeechActions.speak` synthesizes speech and awaits actual playback completion.
-- ✅ [UI](UI/README.md): `Print.swift` and `Express.swift` / `UIActions` present captions and expressions.
-- ✅ Each function owns its parameter validation and output handling; speak and print independently validate text without a shared TextAction helper.
-- ✅ ActionRuntime owns path registration and execution; Gateway owns Channel queues and resource exclusion.
-- ✅ [UI.showPose](UI/README.md) replaces the camera skeleton overlay.
-- ✅ [Robot.aim](Robot/README.md) parses finite `base` and `pitch` strings and forwards them. It does not open a socket.
-- ❌ Camera, Media, Device, `UI.show`, and `Speech.stopSpeak` implementations. See [ADR 0037](../../docs/adr/0037-photographer-aim.md).
-- ❌ General action metadata for execution policies and resource requirements; the current resource exclusion unit is the action module.
+Two command semantics are distinguished: **Perform** waits for a finite operation to finish; **Set** waits for a target/state to be accepted or established at a precisely named boundary. Ongoing activities additionally need **Start / Update / Stop** lifecycle commands. These labels are represented by implementation-side `ActionDefinition.Kind` metadata and completion descriptions. They do not select different dispatch algorithms and are not JSON v5 fields.
 
-Agent JSON configuration maps the model alias `say` to `Speech.speak`, and `print`/`express` to `UI.print`/`UI.express`. Default Channels remain `Speech` and `Display`; a Channel name need not equal its action module. Handlers must await real completion, propagate errors, and cooperate with cancellation.
+| Standard category | Intent and completion | Effect after return | Example |
+| --- | --- | --- | --- |
+| Finite operation — Perform | Perform one bounded operation; return after its promised endpoint and operation-local cleanup. Duration need not be known in advance. | May disappear or remain; persistent consequences do not turn an operation into a setter. | Play supplied audio to drain; nod once; take one photo; move until physically settled. |
+| State setting — Set | Validate and commit a state, or have the responsible controller confirm ownership of a target. State exactly which acknowledgment is promised. | Persists until replacement, clear, expiry or documented owner/session teardown. | Set an expression; set a gaze target; set a controller's target angle. |
+| Activity control — Start / Update / Stop | Establish, modify or stop an independently owned ongoing activity. Start returns after confirmed activation; Stop returns after termination and promised finalization. | The activity outlives Start and remains owned until stopped, failed or torn down. | Start recording; update tracking parameters; stop recording and finalize the file. |
 
-## 1. Directory and naming conventions
+Every category has admission, execution and terminal success/failure/cancellation. A setter is not zero-time or inherently resource-free. Every handler occupies its Channel and module until it returns; it does not occupy a thread while suspended with `await`.
+
+### Finite operations
+
+- Await the actual promised endpoint: speaker drain, gesture completion, saved photo, or device-reported arrival within documented tolerance. Enqueuing work or closing an XML tag is not completion.
+- Keep retries, waits and buffers bounded. A duration estimate or `Task.sleep` is not evidence of physical/animation completion; await the owning capability's acknowledgment.
+- Cancellation stops owned work and joins cleanup before releasing execution resources. Already visible/physical effects are not automatically rolled back.
+- A one-shot gesture may temporarily override a base state. Define composition and conflict policy. If restoring the base, restore the **current** base under an ownership/version check, never blindly write a snapshot that can overwrite a newer command.
+
+### State setting
+
+- Prefer `setExpression`, `setTarget`, `clearExpression` names for new APIs. Existing `UI.express` and `UI.moveEyes` retain their names until an explicit migration.
+- Return after the documented state/target acknowledgment. Do not wait until a persistent state is removed; do not promise visible interpolation or physical arrival unless actually acknowledged.
+- A committed state belongs to its state owner after return. Define replacement, reset, lifetime and repeated-setting semantics. Repeated same-value Set should be idempotent unless a documented reason requires another behavior; `toggle` is not equivalent to `setEnabled(true)`.
+- Distinguish requested target from observed state. `setTarget(90)` must not claim the arm has reached 90 degrees. Use a finite `moveTo(90)` or an explicit arrival observation/barrier for subsequent operations that require arrival.
+- Cancel before commit: make no new effect where possible. Cancel/fail after commit: do not assume rollback; report the error and retain or reconcile state according to the documented owner policy.
+
+### Activity control
+
+- The ongoing activity must have an explicit actor/lifecycle owner retained independently of an Action call or UI page. App assembles this owner and its capabilities. A handler may delegate activation to that owner; it must not create an unowned `Task` and return success.
+- Document activity identity (including owner/session), states, resource ownership, capacity, repeat-start/update/stop policy and who may stop it. If only one activity per session is supported, say so and reject conflicting starts. Do not silently coalesce device commands.
+- Start awaits activation and cleans up partial activation on failure/cancellation before ownership handoff. After handoff, cancellation of the completed call is not an implicit Stop. Session teardown must explicitly stop and join its activities.
+- Stop awaits termination and required cleanup/finalization. “Stop requested” must be named and documented as a weaker contract if a future API intentionally provides it. A file is not ready merely because capture stopped.
+- Release the command lane after Start; never wait there for the whole activity, which could prevent a queued Stop on the same lane from running. Persistent resource ownership is separate from this lane.
+- Later failures require bounded, correlated observations through InputGateway, rather than retroactively failing an already completed Start. Agent-originated messages still go through OutputGateway → InputGateway. Stage 2 implements terminal ActionResult and a direct ActivityEvent route; a generic activity registry/event outbox remains outstanding.
+
+```mermaid
+flowchart TD
+    Admit[Gateway admission] --> Validate[Validate arguments / trusted owner / availability]
+    Validate --> Kind{Documented category}
+    Kind --> Perform[Perform: await operation endpoint]
+    Kind --> Set[Set: await state or target acknowledgment]
+    Kind --> Control[Control: await activation / update / stop acknowledgment]
+    Perform --> Finish[Finish operation-local cleanup]
+    Set --> Finish
+    Control --> Finish
+    Finish --> Return[Handler returns; release Channel and module]
+    Set -.-> State[State owner preserves or replaces state]
+    Control -.-> Activity[Activity owner retains resources until termination]
+```
+
+`<wait>` joins handler completion only. It does not upgrade a setter into “wait for animation/arrival,” and it does not wait for a started activity to end. Current module exclusion ends with the handler; persistent resource leases and group takeover are implemented in Gateway/Output/Resources. Each device must still integrate real stop acknowledgment and activity supervision before these examples can control hardware. Actor isolation alone does not guarantee ordering across suspension points.
+
+## 3. Types, class policy and canonical signatures
+
+Use a **caseless enum `<Module>Actions`** as the stateless namespace. Declare it exactly once in `<Module>Actions.swift`; place each Action in an extension in its own file. Do not use a singleton, base Action class, one class per function, or an actor merely to namespace functions.
+
+| Responsibility | Swift form | Rule |
+| --- | --- | --- |
+| Callable Action entry | `public static func` in `<Module>Actions` | One entry per Action; validate and await its declared effect. |
+| Arguments, identifiers, results internal to a capability | Immutable `Sendable` struct / enum | Use typed values beyond the string-transport boundary; add `Equatable` when comparisons are useful. |
+| Dependencies without mutable runtime state | `Sendable` protocol, callback or immutable struct | Inject explicitly; avoid service lookup and global mutable state. |
+| Shared mutable runtime/resource state | Actor with a named responsibility | App creates/retains it; do not add a second scheduling queue without a concrete need and documented bounds. |
+| SwiftUI presentation state | MainActor-owned type in the separate UI target | App adapts Action values to UI values; Actions does not import SwiftUI. |
+| Reference identity required by an adapter | `final class` with justified isolation | Use only for an actual platform/reference constraint; no inheritance framework or unchecked Sendable shortcut. |
+
+The Void adapter boundary for finite/state/update handlers is:
+
+```swift
+public typealias ActionHandler = @Sendable (ActionInvocation) async throws -> Void
+```
+
+The stored registry handler is `ActionCompletionHandler`, returning `ActionCompletion`; activity start/stop use the typed `completing:` initializer.
+
+The standard Action-entry shape is:
+
+```swift
+// Signature template: replace placeholders with module-specific types.
+public static func verb(
+    invocation: ActionInvocation,
+    using perform: @escaping @Sendable (Arguments, ActionInvocation) async throws -> Void
+) async throws
+```
+
+For a parameterless Action, the callback is `@Sendable (ActionInvocation) async throws -> Void`. For a cohesive multi-operation dependency, use `using capability: any <Domain>Capability` instead; define the smallest Sendable protocol needed by real Actions. Do not create both a protocol and an equivalent closure wrapper without a need. Use `using` consistently; give the local name a concrete meaning such as `play`, `apply`, `start` or `stop`.
+
+`ActionInvocation` is the existing trusted call/context carrier. Do not add caller IDs, permissions, Channel names or service references to model parameters. A callback receives typed arguments and this context so the bound implementation can validate session/turn ownership. Finite/state/update helpers may return `Void`, adapted by the registry to `.completed`. Activity start/stop helpers return `ActionCompletion` carrying the activity ID through the typed terminal result; arbitrary capability values do not become an undeclared return channel.
+
+Entry order is consistent:
+
+1. Check cancellation; parse parameters and validate all names, types, ranges, sizes, units and relationships before effects.
+2. Convert transport strings into typed values. Reject unknown parameters for new Actions; declare every permitted optional default. Never silently clamp, reinterpret or fall back after malformed input.
+3. Invoke the injected dependency. The owner must validate current permission/session/availability and commit atomically enough for its resource; an earlier gateway check does not freeze platform state.
+4. Await the documented acknowledgment, including cleanup required by the contract. Then check cancellation again and return. A post-effect cancellation error does not prove that no effect occurred.
+
+Prefer shared `ActionArguments` readers for transport validation; map decoding errors to domain errors before calling dependencies. Use scoped, meaningful error enums (for example `NodError.invalidCount`) conforming to `Error` and `Sendable`; use `Equatable` when tests compare them. Preserve dependency errors and `CancellationError`. No `try!`, success-producing `try?`, retry without a bound, detached execution, or guessed success. Best-effort cleanup must have an explicit policy that retains the primary error and exposes cleanup failure; uncertain physical cleanup must not be treated as a free device.
+
+## 4. Modules, files and formatting
+
+A module groups related effects and a coherent control domain; it is not a category folder such as `Instant` or `Blocking`. Different Action categories may share a module. Module names are UpperCamelCase (established acronyms such as `UI` remain); function names are lowerCamelCase verbs. A path's function matches its Swift entry name, and `<Verb>.swift` uppercases the first letter of that function. Aliases may differ but resolve only inside Agents.
+
+Target layout for a module **when its real implementation is migrated**:
 
 ```text
 Actions/
-├── README.md                 # Shared development standard
-└── <Module>/                 # Speech, UI, Camera, Media, Device, Robot
-    ├── README.md             # Module purpose, action contracts and status
-    ├── <Verb>.swift          # One independently callable action per file
-    └── <AnotherVerb>.swift
+├── README.md
+├── Runtime/                 # Registry / invocation / executor, not a callable domain
+│   └── README.md
+└── <Module>/
+    ├── README.md            # Purpose, contract inventory, design, ✅ / ❌
+    ├── <Module>Actions.swift # Namespace declaration only
+    ├── <Verb>.swift         # One callable verb + its action-specific types/helpers
+    ├── Types.swift          # Only if multiple Actions actually share these values
+    └── <Owner>.swift        # Only if a real runtime service is needed
 ```
 
-- Use PascalCase for module directories and Swift filenames, and lowerCamelCase verbs for functions. Current examples are `Speech/Speak.swift` and `UI/Print.swift`.
-- Group related behaviors under `<Module>Actions`, such as `SpeechActions` or `UIActions`. Declare the namespace once in an action file; use extensions in sibling files. Do not add an empty namespace file solely for symmetry.
-- Use `ActionPath(module: "Speech", function: "speak")` as the implementation key. Model aliases, such as `say`, belong to Agent configuration and need not match Swift names.
-- Add only modules and functions with an actual implementation and use case. Do not create placeholder actions or unrelated helper actions at the Actions root.
-- Current scheduling excludes concurrent execution within the same action module, even across Channels. Consider that resource boundary when choosing a module; do not rename modules merely to bypass hardware serialization.
+- Put types used by one Action in that Action file, nested in `<Module>Actions` with specific names (`NodError`, not a module-wide ambiguous `Error`). Put genuinely shared domain values in `Types.swift`; do not introduce empty files.
+- Put runtime-service files beside the consuming Actions when they belong to that domain. Device engines and general platform adapters remain in PlatformKit; UI rendering remains in UI. Gateway alone owns Channel/wait scheduling.
+- Keep imports explicit and minimal, declaration/member ordering consistent (types, entry, private helpers), and declarations on separate lines. Run the repository Swift formatter; do not invent per-module formatting rules.
+- An Action may use internal helpers or capability operations to implement one declared effect. It must not directly invoke another registered Action to bypass that Action's permissions, Channel or module exclusion. Agent-level sequences are separate resolved calls through OutputGateway.
+- Keep tests under root `Tests/` in the existing appropriate target. Root Package.swift maps shared source files; do not duplicate sources or recreate Packages/HarnessKit/Sources.
+- Update every touched directory's README. Tooling/runtime queues require design descriptions and Mermaid diagrams, with producer/consumer, capacity, overflow, ordering, finish and cancellation behavior.
 
-## 2. Function interface and dependencies
+## 5. Implementation examples
 
-The current runtime handler contract is `@Sendable (ActionInvocation) async throws -> Void`. Concrete functions use `public static func`, accept `invocation: ActionInvocation`, and receive the capabilities or callbacks they need explicitly. App binds those dependencies when registering the handler.
+The following three snippets illustrate the proposed standard using the **current** ActionInvocation/ActionHandler boundary. They are not production APIs, device implementations or an instruction to create these domains. Namespace declarations are shown with entries for readability; split them into the files described above when implementing a real module. The injected callbacks must fulfill the stated contracts, not merely enqueue work.
 
-- Read resolved parameters from `invocation.call.parameters`. Retain the envelope's input/session association for model requests and callbacks.
-- Inject capability protocols and Sendable callbacks. Do not construct concrete models, read global service registries, or locate the App singleton inside an action.
-- Do not import concrete Agents, Gateway, App, Experience or SwiftUI. UI work crosses an injected callback whose implementation provides MainActor isolation; model and device adapters own their respective isolation and permissions.
-- Keep mutable operation state local to the invocation, or in an explicitly injected actor-owned service. Do not add mutable static state shared by unrelated calls.
-- Actions do not parse XML, resolve model aliases, route Agent inputs, register themselves, or create Channel schedulers. Those responsibilities remain with AgentCore, App and Gateway.
-- A function's own dependencies must be sufficient to execute it. Do not require another action to have run first unless an explicit, documented external resource state is part of its contract.
+### A. Finite operation: `Motion.nod`
 
-## 3. Function cohesion and parameter validation
+`count` is required and limited to 1–3. Return only after all nod cycles and playback/controller cleanup complete. The controller defines the endpoint and interruption policy; it must stop and join on cancellation. Repeating this call performs another gesture, so automatic retry is not safe by default.
 
-Each function owns parameter extraction, validation, execution, output checks, cleanup and any explicitly supported fallback. Small duplicated checks across functions are allowed and preferred to coupling unrelated functions through a shared validator such as the removed TextAction helper.
+```swift
+public enum MotionActions {}
 
-- Validate required parameters and action-specific constraints before the first side effect. Agent/Gateway capability and structural checks do not replace function-local validation for direct callers.
-- For each parameter, document its name, meaning, required/optional status, default, units, accepted values and size/range bounds. Distinguish an omitted optional value from an invalid supplied value.
-- Parse numeric values safely, reject non-finite values where applicable, and check domain limits. Avoid forced unwraps, `try!`, and silent replacement of invalid input with a default.
-- State whether length limits count UTF-8 bytes, characters, samples or another unit. Preserve valid input unless normalization is explicitly part of the action's contract.
-- Keep defaults, output handling and fallback rules with the function they govern. Private helpers in the same file are appropriate for a complex implementation; shared model/device algorithms belong in their capability or platform modules.
-- Do not force all actions to accept the same parameters or use the same validation limits merely to reduce repeated code.
+extension MotionActions {
+    public enum NodError: Error, Equatable, Sendable {
+        case invalidCount
+    }
 
-Currently, speak and print independently reject missing, whitespace-only or over-2000-byte UTF-8 text. Both preserve accepted text, including surrounding whitespace. express requires a supported emotion string and owns the corresponding emoji. Agent configuration rejects undeclared parameters before dispatch; this is distinct from each function's semantic checks.
+    public static func nod(
+        invocation: ActionInvocation,
+        using perform: @escaping @Sendable (Int, ActionInvocation) async throws -> Void
+    ) async throws {
+        try Task.checkCancellation()
+        let count: Int
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["count"])
+            count = try arguments.requiredInt("count", range: 1...3)
+        } catch { throw NodError.invalidCount }
+        try await perform(count, invocation)
+        try Task.checkCancellation()
+    }
+}
+```
 
-## 4. Execution, output and fallback
+### B. State setting: `Face.setExpression`
 
-- Successful return means the promised operation actually completed. Await playback, presentation or the relevant device acknowledgment according to the documented contract; do not return merely because work was queued.
-- Validate output that the action depends on: completion markers, payload format, finite values, nonempty required results and explicit payload budgets where applicable. Availability checks are snapshots; execution can still fail.
-- Propagate synthesis, presentation, device and cleanup-related failures appropriately. Never fabricate a successful result or substitute unrelated output to hide failure.
-- Fallback is optional, not a required feature. If implemented, keep it inside the action and document the trigger, permitted substitute, limits, observable outcome and errors that still propagate. It must preserve caller intent and permission boundaries.
-- Never treat cancellation as a fallback trigger. Retries need an explicit bound and must not duplicate non-idempotent side effects; do not automatically retry physical movement, capture, payment-like operations or other externally visible work.
-- Streaming execution may have emitted visible output before a later failure. Document this partial-effect behavior rather than promising rollback.
+Success commits the expression target; it does not await animation. The state owner retains the expression until replacement/clear or session teardown. Applying the same value does not restart a one-shot gesture. The domain uses semantic values, not SwiftUI types, and `clear` restores its defined neutral/default state.
 
-Current speak owns TTS completion checks, the 8 MiB audio budget, playback completion and session cleanup. print and express propagate presentation failures. None of the current actions implements silent output fallback. Standard ActionResult feedback is not implemented; do not claim it exists or directly submit results to Agents as a workaround.
+```swift
+public enum FaceActions {}
 
-## 5. Cancellation, resources and errors
+extension FaceActions {
+    public enum Expression: String, Sendable {
+        case clear, smile, angry
+    }
 
-- Check cancellation before side effects and after awaited work; check during long-running loops or streams.
-- Propagate cancellation to any model session or device operation started by the function. Release resources on success, failure and cancellation using defer and cancellation handlers as appropriate.
-- Do not create detached or untracked work that outlives the invocation. A function must not finish while its owned operation can still produce stale side effects.
-- Bound buffers, generated output and any necessary internal work queue. Define overflow behavior explicitly; never silently discard device actions. Gateway already owns action admission and Channel ordering, so do not duplicate its queues.
-- Reuse an existing error only when its meaning matches. New action-specific failures may use a clearly named error type alongside the action. Keep scheduler errors and business failures distinct; do not convert every error into invalidText.
-- Validate device capabilities and permissions through the responsible adapter. Robot limits, emergency-stop and disconnect protection must not depend on iOS background execution.
-- Diagnostic logging must not expose user text, media or credentials. Do not introduce ad hoc user-facing status messages into a reusable function; return errors through the existing execution boundary.
+    public enum SetExpressionError: Error, Equatable, Sendable {
+        case invalidExpression
+    }
 
-## 6. Registration and Agent exposure
+    public static func setExpression(
+        invocation: ActionInvocation,
+        using apply: @escaping @Sendable (Expression, ActionInvocation) async throws -> Void
+    ) async throws {
+        try Task.checkCancellation()
+        let expression: Expression
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["expression"])
+            expression = try arguments.requiredEnum("expression", as: Expression.self)
+        } catch { throw SetExpressionError.invalidExpression }
+        try await apply(expression, invocation)
+        try Task.checkCancellation()
+    }
+}
+```
 
-Implementation registration and Agent permission declarations are separate steps:
+### C. Activity control: `Camera.startRecording` / `Camera.stopRecording`
 
-1. Implement the function in its Actions module and document its contract.
-2. Bind its explicit ActionPath to a concrete handler in App's composition root, currently AgentBootstrap. Inject required services there.
-3. For each Agent allowed to use it, add an entry to that Agent's versioned `<AgentName>.agent.json`, following the Agents README. Declare alias, implementation path, defaultChannel, doc, hidden, parameters and XML examples. Required/optional parameter sets are derived from the parameter entries.
-4. Add it to textActions only when natural text should invoke it and it accepts the text-mapping contract. Do not implicitly expose every registered action to every Agent.
-5. Keep parameter names and implementation paths consistent across the function, handler registration, configuration, prompt context and tests.
+These parameterless commands use the trusted session identity to address one recording per session. The injected owner must reject a conflicting owner, bound the number of active sessions and retain the running capture independently of the Action. For this example, repeated Start for the same active owner and repeated Stop after confirmed termination are idempotent. Start success means capture is active; Stop success means capture has ended and the media writer has finalized. A failure must remain observable and must not be converted into “already stopped.” Concurrent transitions and lifecycle teardown need an explicit owner state machine; the entry wrappers below do not implement it.
 
-Do not create a second action registry or an Actions-specific configuration format. Current JSON configuration describes parameter names, intended types, usage constraints, function-derived doc, visibility and XML examples; it is not a full executable value-validation schema or resource policy. Function-local constraints remain authoritative for execution. Channels are selected before execution; `main` is an ordinary Channel, not a global barrier.
+```swift
+import Foundation
+import AgentCore
 
-## 7. Module documentation and validation
+public enum CameraActions {}
 
-Each module README must document its purpose, resource boundary, dependencies and ✅/❌ implementation status. For every action, record:
+extension CameraActions {
+    public enum RecordingCommandError: Error, Equatable, Sendable {
+        case unexpectedParameters
+    }
 
-| Contract item | Required content |
+    public static func startRecording(
+        invocation: ActionInvocation,
+        using start: @escaping @Sendable (ActionInvocation) async throws -> UUID
+    ) async throws -> ActionCompletion {
+        try Task.checkCancellation()
+        guard invocation.call.parameters.isEmpty else {
+            throw RecordingCommandError.unexpectedParameters
+        }
+        let id = try await start(invocation)
+        try Task.checkCancellation()
+        return .activityStarted(id)
+    }
+
+    public static func stopRecording(
+        invocation: ActionInvocation,
+        using stop: @escaping @Sendable (ActionInvocation) async throws -> UUID
+    ) async throws -> ActionCompletion {
+        try Task.checkCancellation()
+        guard invocation.call.parameters.isEmpty else {
+            throw RecordingCommandError.unexpectedParameters
+        }
+        let id = try await stop(invocation)
+        try Task.checkCancellation()
+        return .activityStopped(id)
+    }
+}
+```
+
+For a real module, place the two entries in StartRecording.swift and StopRecording.swift; their shared error belongs in Types.swift. An Update command uses typed validated arguments like the Set example, while preserving the activity's identity and ownership. A photo/file identifier would need an explicitly designed observation or returning Tool contract; the activity ID in ActionCompletion is not a media-file result.
+
+### Explicit App binding
+
+The registry is not an authorization catalog. Model-callable declarations stay in versioned Agent JSON v5; fixed internal permissions stay in Agent code, following [Agents](../Agents/README.md). App binds each real implementation explicitly. Do not add `kind`, `completion` or `lifetime` to v5: those fields are not supported. Describe completion in the existing Action `doc` and in the domain README.
+
+```swift
+// Composition example using the hypothetical FaceActions above.
+// The caller supplies the actual owner-backed callback; no global lookup.
+func makeExampleRegistry(
+    applyExpression: @escaping @Sendable (FaceActions.Expression, ActionInvocation) async throws -> Void
+) throws -> ActionRegistry {
+    try ActionRegistry(definitions: [
+        ActionDefinition(
+            path: ActionPath(module: "Face", function: "setExpression"), kind: .state,
+            completion: "Expression target committed; visual interpolation is not joined."
+        ) { invocation in
+            try await FaceActions.setExpression(invocation: invocation, using: applyExpression)
+        }
+    ])
+}
+```
+
+This App-side example requires `import Actions` and `import AgentCore` after the example Actions are implemented in the Actions target. It is only the implementation binding; an authorized Agent still emits a resolved call through OutputGateway. Configuration or missing-handler errors propagate without fallback.
+
+## 6. Required domain contract and verification
+
+Each domain README must include purpose/design goals, current files, implemented ✅ and outstanding ❌ items, and this inventory for **each** Action. Fill concrete values; do not ship a table of unspecified policies.
+
+| Contract field | Required content |
 | --- | --- |
-| Identity | Source file, Swift function and registered ActionPath |
-| Parameters | Names, defaults, units, validation and limits |
-| Dependencies | Required capability protocols and callbacks |
-| Side effects | What changes and when successful return occurs |
-| Output and failure | Output checks, partial effects, errors, fallback or explicitly no fallback |
-| Cancellation | Owned resources, cleanup and cancellation limitations |
-| Validation | Automated coverage and any remaining device acceptance |
+| Identity | Stable module/function, Swift entry, file, model/internal exposure; default Channel belongs to the Agent declaration, not the implementation. |
+| Category | Finite operation, state setting, or activity start/update/stop. |
+| Parameters | Required/optional keys, typed meaning, units, ranges, byte/count limits, defaults and unknown-key rejection. |
+| Dependencies | Injected interface, state/resource owner, isolation and platform permission checks. |
+| Completion | Observable endpoint and what success does **not** imply (for example target accepted versus physical arrival). |
+| Lifetime | Effects remaining after return; state reset or activity teardown owner and trigger. |
+| Conflicts | Channel/module serialization plus any persistent ownership, replacement, temporary override or rejection policy. |
+| Cancellation / failure | Before and after commit; partial effects, cleanup/join, deadlines, uncertain hardware state and error propagation. |
+| Repetition / feedback | Idempotency, retry/deduplication policy and bounded correlated observations where applicable. |
+| Limits / evidence | Queue and resource bounds, overflow policy, test locations and outstanding device acceptance. |
 
-Tests should exercise the function directly, independently of Agent/Gateway validation. Cover relevant invalid-input boundaries before side effects, successful input preservation, dependency failures, invalid or missing output, cancellation and resource cleanup. If fallback exists, test both its trigger and prohibited cases. Use capability/callback doubles under Tests; do not add production flags for fixed replies or pretend hardware success.
+Tests should verify contracts rather than mirror the function body. For finite operations, hold a fake completion acknowledgment and verify that following same-lane work cannot start early. For Set, verify committed state and lane release without waiting for animation. For activity control, verify activation acknowledgment, Stop reachability, resource retention, partial-start cleanup and teardown. Cover invalid input before effects, stale/wrong-owner calls, cancellation and dependency failures where relevant. Use deterministic acknowledgments, not timing sleeps. General activity ownership tests become required when that feature is implemented; the examples do not imply it exists today.
 
-Reuse existing coverage rather than adding tests that mirror implementation details. Add registration or Agent-configuration integration coverage when the exposed contract changes. Distinguish unit tests, build success and actual device acceptance.
+Run `./scripts/check.sh` and, with full Xcode, `./scripts/build-ios.sh`; report unavailable checks explicitly. Builds and fake capabilities do not prove physical completion or device safety. Runtime-contract migrations require ADR and roadmap updates; Stage 1 runtime-contract changes are recorded in [ADR 0065](../../docs/adr/0065-action-runtime-contracts.md).
 
-## 8. Delivery checklist
+## 7. Current implementation audit
 
-- Place the implementation and README in the correct module; update existing documentation when behavior changes.
-- Keep each function cohesive even when that repeats small checks from another action.
-- Update App registration and Agent configuration only where exposure is intended.
-- Synchronize Package.swift and Xcode references when files, resources or dependencies change. Do not duplicate sources or add a third-party dependency without a concrete need.
-- Run `./scripts/check.sh` and, when full Xcode is available, `./scripts/build-ios.sh`; report unavailable checks. Verify the device target when changing device-specific composition.
-- Update architecture decisions and Roadmap for runtime-contract changes. Describe unimplemented behavior honestly; do not advertise a fallback, permission check or device capability that has no implementation.
+✅ UI and Speech now follow the namespace/file/signature standard: UIActions.swift and SpeechActions.swift declare caseless namespaces, each registered function has a same-named file and an `invocation:using:` entry. UIActionModule and SpeechActionModule bind these entries; ActionModules owns the catalog. Runtime is infrastructure, not a callable domain, and does not need a RuntimeActions namespace.
 
-## Maintenance
+| Path | Kind / endpoint | Validation / dependency |
+| --- | --- | --- |
+| Speech.speak | finite / playback drained and single-use audio released | audioID only, UUID at most 36 UTF-8 bytes; typed playback capability |
+| UI.print | finite / accepted text append | nonblank text ≤2000 UTF-8 bytes; typed presentation |
+| UI.express | state / accepted expression target | exact Emotion enum; no animation acknowledgment |
+| UI.moveEyes | state / accepted gaze target | finite x/y in [-1,1] |
+| UI.setTranscript | state / transcript replacement | text ≤4096 UTF-8 bytes, empty clears |
+| UI.setVoiceState | state / accepted presentation phase | listening/hearing/processing |
+| UI.beginReplyTurn | state / turn initialized | no parameters |
+| UI.finishTranscript | state / transcript closed | no parameters |
+| Robot.aim | finite / transport accepted the joint frame | finite base/pitch within four turns; injected sender. Settling is not joined |
 
-Keep this README synchronized with changes to responsibilities, files, interfaces, and implementation status. ✅ means implemented; ❌ means planned or incomplete. Do not create unused placeholder modules. The [technical architecture](../README.md) defines the target; the [layout audit](../../docs/Repository-Structure.md) records implementation exceptions.
+All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Shared PresentationError belongs in UI/Types.swift; per-action emotion/gaze values remain with their entries. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
 
-Action documentation must describe the actual function. Combine usage guidance in doc; do not invent a return-value section for Void functions. Use XML/natural-text example strings. Mark automatic text-mapping actions hidden when they should not be shown as explicit LLM commands.
+✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. Legacy names express/moveEyes are retained as published paths. Registry and resource contracts remain in Runtime/Gateway.
 
-✅ UI.express adds seven validated facial expressions through one injected presentation callback; smile is an emotion value. Expressions update the orb independently of captions.
+❌ One-shot expression/restore, Camera Actions, generic activity supervision, audio/robot resource integration and physical-device timing acceptance remain separate work. `Robot.aim` validates and forwards logical radians; it does not open a socket or integrate a robot resource lease.
 
-✅ UI.showPose validates and presents a bounded skeleton overlay through an App-injected callback. JSON v3 declares this capability only for Photographer.
+## 8. Stage 2: results and resource ownership
+
+✅ The implementation registry now stores typed `ActionCompletion`. Finite/state/update implementations can keep the Void `handler:` adapter. Start and stop definitions must use `completing:` and return the ongoing service's activity ID:
+
+```swift
+ActionDefinition(
+    path: ActionPath(module: "Camera", function: "startCapture"),
+    kind: .activityStart, completion: "Capture started; service retains lifetime.",
+    resources: [.cameraCapture],
+    completing: { invocation in
+        let id = try await captureService.start(invocation: invocation)
+        return .activityStarted(id)
+    }
+)
+```
+
+This is an authoring example with an injected service, not a registered production Camera Action. Resource ownership must be acquired through the bound ResourceControl before a protected start is admitted. A stop/release command must reach that control port without queuing behind the activity it is stopping. Return only after the declared acknowledgment; keep long-lived state/tasks in the injected actor. Register the same resource on every Action/Tool that uses it; direct host paths must call ResourceCoordinator.run. Resource names describe physical conflict domains, not module names.
+
+✅ Gateway reserves a result slot before admission, reports correlated terminal status through InputGateway and retries delivery without re-execution. Default feedback is failuresOnly for opted-in Agents; explicit terminal mode includes success. Current Agents retain bounded receipts without triggering model inference. ActivityEvent is separate from start/stop Action completion.
+
+✅ Persistent resource leases are owner/instance/session-bound, expire unless renewed and support atomic group takeover. Cleanup failure/timeout keeps affected resources gated. Production camera capture uses the coordinator through App lifecycle. See [results](../Gateway/Output/Results/README.md), [resources](../Gateway/Output/Resources/README.md) and [ADR 0066](../../docs/adr/0066-action-results-resource-leases.md).
+
+❌ General activity registry/event subscriptions, audio/robot resource integration, device safety watchdogs, durable delivery remain outstanding. Camera capture is not video recording; current UI expressions remain state acceptance, without waiting for animation.
+
+## 9. Module-owned registration
+
+✅ Each domain implements ActionModule and owns its complete ActionDefinition list. ActionModules.builtIn is the explicit catalog. Add an Action by editing its implementation and domain module, then update Agent permissions only when it should be callable. Add a domain by editing ActionModules; do not add a registration in App. ActionRegistry(modules:) flattens and validates modules with bounds and duplicate rejection.
+
+UIActionModule receives UIPresentationCapability; SpeechActionModule receives SpeechPlaybackCapability. Typed capability protocols live beside the domain that consumes them, without App or concrete device imports. They are required initializer dependencies. UI parsing/validation stays in Actions; App implements semantic effects. A new behavior implemented using existing capability operations requires no App changes. A new native primitive or changed lifetime requires an explicit capability/adapter extension.
+
+```mermaid
+flowchart LR
+    Catalog[ActionModules: built-in modules] --> Modules[Domain definitions + handlers]
+    Capabilities[Host typed capabilities] --> Modules
+    Modules --> Registry[ActionRegistry: bounds / duplicate validation]
+    Permissions[Agent permissions] --> Coverage[Coverage validation in BehaviorAssembly]
+    Registry --> Coverage
+    Coverage --> Gateway[Gateway execution]
+```
+
+The earlier explicit single-definition binding example illustrates isolated construction; production bindings now belong to domain module lists. BehaviorAssembly in App/Composition/Behaviors is an independently compiled pure assembly target, not an application service. ❌ No reflection, implicit registration, permission expansion or generic string/Any effect dispatch. See [ADR 0067](../../docs/adr/0067-domain-owned-behavior-assembly.md).

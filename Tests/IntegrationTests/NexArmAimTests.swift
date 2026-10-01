@@ -1,42 +1,37 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import Foundation
-import ModelKit
 import PlatformKit
 import Testing
 
-private struct ScriptedPose: PoseCapability {
-    var availability: CapabilityAvailability { .available }
-    let people: [PersonPose]
-    func estimatePose(_ request: PoseRequest) async throws -> PoseResult {
-        PoseResult(context: request.context, people: people)
-    }
-}
-
 private actor MemoryTransport: ExternalDeviceTransport {
     private(set) var sent: [[UInt8]] = []
-    private(set) var stopped = false
     func connect() async throws {}
     func send(_ bytes: [UInt8]) async throws { sent.append(bytes) }
-    func emergencyStop() async { stopped = true }
+    func emergencyStop() async {}
     func disconnect() async {}
 }
 
-private func frameImage(sequence: UInt64, timestamp: TimeInterval) throws -> ImageInput {
-    try ImageInput(
-        width: 100, height: 100, rgb: Data(repeating: 0, count: 30_000),
-        sequence: sequence, timestamp: timestamp, rotation: 1)
+private func pose(
+    noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,
+    sequence: UInt64, timestamp: TimeInterval, people: Int = 1
+) throws -> PoseObservation {
+    let joints = (0..<17).map { index in
+        PoseObservation.Joint(
+            x: index == 0 ? noseX : others, y: index == 0 ? noseY : others,
+            confidence: index == 0 ? noseConfidence : 0.9)
+    }
+    return try PoseObservation(
+        width: 100, height: 100, sequence: sequence, timestamp: timestamp, rotation: 1,
+        people: Array(repeating: joints, count: people))
 }
 
-private func person(noseX: Float, noseY: Float) -> PersonPose {
-    let joints = BodyJoint.allCases.map { joint in
-        PoseKeypoint(
-            joint: joint, x: joint == .nose ? noseX : 50, y: joint == .nose ? noseY : 50, confidence: 0.9)
-    }
-    return PersonPose(
-        box: PoseBox(x: 0, y: 0, width: 100, height: 100), confidence: 0.9, keypoints: joints)
+private func observation(_ pose: PoseObservation, session: UUID) -> AgentInput {
+    let payload = InputPayload.observation(.pose(pose))
+    return AgentInput(
+        sessionID: session, payload: payload,
+        metadata: InputMetadata(payload: payload, source: "visionPerception", sequence: pose.sequence))
 }
 
 private func positions(in frame: [UInt8]) -> [Int] {
@@ -61,29 +56,25 @@ private func positions(in frame: [UInt8]) -> [Int] {
     #expect(left[4] == 2048)
     #expect(left[5] == 2048)
     let high = try NexArmJointCommand.positions(base: 0, pitch: -0.32)
-    #expect(high[0] == 2048)
-    #expect(high[1] == 2048)
-    #expect(high[2] == 2048)
     #expect(high[3] < 2048)
-    #expect(high[4] == 2048)
-    #expect(high[5] == 2048)
     #expect(throws: NexArmControlError.invalidAngle) { try NexArmJointCommand.positions(base: .nan, pitch: 0) }
+}
+
+@Test func photographerPolicyAcceptsVisionPose() throws {
+    let policy = try CommunicationPolicy(configurations: [
+        AgentConfigurations.load(named: "VisionPerception"),
+        AgentConfigurations.load(named: "Photographer"),
+    ])
+    let input = observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: UUID())
+    #expect(policy.destinations(for: input) == [.photographer])
 }
 
 @Test func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
     let session = UUID()
-    let agent = try PhotographerAgent(
-        pose: ScriptedPose(people: [person(noseX: 10, noseY: 50)]), sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
-    try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(frameImage(sequence: 1, timestamp: 0))))
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
     var stream = agent.outputs.makeAsyncIterator()
-    let skeleton = try #require(await stream.next())
-    guard case .actionCall(let shown) = skeleton.output else {
-        Issue.record("Missing skeleton")
-        return
-    }
-    #expect(shown.actionPath == ActionPath(module: "UI", function: "showPose"))
     let aimed = try #require(await stream.next())
     guard case .actionCall(let call) = aimed.output else {
         Issue.record("Missing aim")
@@ -93,9 +84,7 @@ private func positions(in frame: [UInt8]) -> [Int] {
     #expect(call.channel == "arm")
     let transport = MemoryTransport()
     let arm = NexArmController(transport: transport)
-    try await RobotActions.aim(
-        invocation: ActionInvocation(envelope: aimed, call: call)
-    ) { base, pitch, _ in
+    try await RobotActions.aim(invocation: ActionInvocation(envelope: aimed)) { base, pitch, _ in
         #expect(base < 0)
         #expect(abs(pitch) < 0.001)
         try await arm.aim(base: base, pitch: pitch)
@@ -103,55 +92,51 @@ private func positions(in frame: [UInt8]) -> [Int] {
     let frame = try #require(await transport.sent.first)
     let joints = positions(in: frame)
     #expect(joints[0] < 2048)
-    #expect(joints[1] == 2048)
-    #expect(joints[2] == 2048)
-    #expect(joints[3] == 2048)
-    #expect(joints[4] == 2048)
-    #expect(joints[5] == 2048)
-    let finished = try #require(await stream.next())
-    guard case .control(let state) = finished.output else {
-        Issue.record("Missing finish")
+    #expect(joints.dropFirst().allSatisfy { $0 == 2048 })
+    await #expect(throws: NexArmControlError.provisionalHome) { try await arm.home() }
+    await agent.stop()
+}
+
+@Test func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    try await agent.start()
+    let body = try pose(noseX: 0, noseY: 0, noseConfidence: 0.1, others: 80, sequence: 1, timestamp: 0)
+    try await agent.receive(observation(body, session: session))
+    var stream = agent.outputs.makeAsyncIterator()
+    let aimed = try #require(await stream.next())
+    guard case .actionCall(let call) = aimed.output else {
+        Issue.record("Missing aim")
         return
     }
-    #expect(state == "agent.finished")
-    await #expect(throws: NexArmControlError.provisionalHome) { try await arm.home() }
+    let base = try #require(Double(call.parameters["base"] ?? ""))
+    let pitch = try #require(Double(call.parameters["pitch"] ?? ""))
+    #expect(abs(base - 0.24) < 0.001)
+    #expect(abs(pitch - 0.24) < 0.001)
     await agent.stop()
 }
 
 @Test func emptyPoseDoesNotAim() async throws {
     let session = UUID()
-    let agent = try PhotographerAgent(pose: ScriptedPose(people: []), sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
-    try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(frameImage(sequence: 1, timestamp: 0))))
+    let empty = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 0, rotation: 1, people: [])
+    try await agent.receive(observation(empty, session: session))
     var stream = agent.outputs.makeAsyncIterator()
-    _ = try #require(await stream.next())
-    let finished = try #require(await stream.next())
-    guard case .control(let state) = finished.output else {
-        Issue.record("Expected finish without aim")
-        return
-    }
-    #expect(state == "agent.finished")
     await agent.stop()
+    #expect(await stream.next() == nil)
 }
 
 @Test func aimWaitsForTimeAndMovement() async throws {
     let session = UUID()
-    let agent = try PhotographerAgent(
-        pose: ScriptedPose(people: [person(noseX: 10, noseY: 50)]), sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
-    try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(frameImage(sequence: 1, timestamp: 0))))
-    try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(frameImage(sequence: 2, timestamp: 0.1))))
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
     var stream = agent.outputs.makeAsyncIterator()
-    var aimCount = 0
-    for _ in 0..<5 {
-        let envelope = try #require(await stream.next())
-        if case .actionCall(let call) = envelope.output, call.actionPath.function == "aim" { aimCount += 1 }
-    }
-    #expect(aimCount == 1)
+    _ = try #require(await stream.next())
     await agent.stop()
+    #expect(await stream.next() == nil)
 }
 
 @Test func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
@@ -161,7 +146,7 @@ private func positions(in frame: [UInt8]) -> [Int] {
         parameters: ["base": "nan", "pitch": "0"])
     let envelope = OutputEnvelope(source: .photographer, input: input, output: .actionCall(call))
     await #expect(throws: RobotActions.AimError.invalidAngle) {
-        try await RobotActions.aim(invocation: ActionInvocation(envelope: envelope, call: call)) { _, _, _ in
+        try await RobotActions.aim(invocation: try ActionInvocation(envelope: envelope)) { _, _, _ in
             Issue.record("Invalid angle was sent")
         }
     }

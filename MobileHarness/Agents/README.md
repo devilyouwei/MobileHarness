@@ -1,181 +1,259 @@
-# Agents — Business Agents and Development Standards
+# Agents — Perception and Business Policy
 
-Agents implements independent, stateful cognitive roles. Each Agent owns its business decisions and interprets model output into resolved calls. The [technical architecture](../README.md), especially sections 6–24 and 32, defines the target. This document is the implementation standard for developers and AI coding tools; the v3 JSON configuration rules are enforced by `AgentCore/Capability/AgentConfiguration.swift`.
+Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit, StorageChat and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
 
-## Direct relationships
-
-Solid arrows show logical requests and results. Dashed arrows show injected dependencies or shared services. Agents do not call concrete Actions or Tools directly.
-
-```mermaid
-flowchart LR
-    Gateway -->|AgentInput including tool results| Agents
-    Agents -->|Resolved ActionCall and ToolCall| Gateway
-    Agents -->|Runtime completion and error notifications| Gateway
-    Agents -->|Capability requests| ModelKit
-    ModelKit -->|Generation events| Agents
-    App -.->|Injected capabilities and lifecycle setup| Agents
-    AgentCore -.->|Contracts, configuration, parsers, lifecycle| Agents
-```
-
-## Directory and ownership rules
+## Directory structure
 
 ```text
 Agents/
-├── README.md                       # This standard
-├── AgentConfigurations.swift       # Shared package-resource loader
-└── <AgentName>/
-    ├── README.md                   # Purpose, state, status, validation scope
-    ├── <AgentName>.agent.json      # Single capability declaration source
-    ├── <AgentName>Agent.swift       # Actor, decisions, lifecycle
-    └── <AgentName>State.swift       # Only when state warrants a separate file
+├── Core/                     # Independent AgentCore compilation boundary
+├── AgentConfigurations.swift  # Load versioned JSON from package resources
+├── Assistant/                 # Chat, reply history and resolved speech/UI Actions
+├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
+├── SpeechSynthesis/           # Directed serial synthesis into shared PCM handles
+├── VisionPerception/          # Frame filtering, pose inference and skeleton ToolCalls
+├── Photographer/              # Subscribed pose observations and optional arm aim
+└── README.md                  # Shared Agent and configuration rules
 ```
 
-- Each Agent has one UTF-8 JSON configuration. Foundation loads it without another configuration dependency.
-- Use a unique `<AgentName>.agent.json` filename within the package. SwiftPM processes the resource and `Bundle.module` loads it; do not guess `Bundle.main` locations or use absolute source paths.
-- Update the root Package.swift resource list and Xcode navigation references when adding resources. Do not duplicate them in the App target.
-- AgentCore owns shared contracts, configuration validation, parsers, and lifecycle infrastructure. Agents owns business policy. Do not copy a parser into a concrete Agent.
+Each implemented Agent has `<AgentName>.agent.json`, an actor implementation and a README. Helper files remain in that Agent's directory. Shared parsers belong in Agents/Core/Generation. Add JSON resources to root Package.swift; the loader uses Bundle.module, not App bundle lookup.
 
-## Capability configuration v3 — JSON
+## Upstream and downstream
 
-Use UTF-8 `<AgentName>.agent.json`, parsed by Foundation JSONDecoder. JSON comments are not supported: use doc. Version 3 uses doc for usage guidance; the loader accepts JSON v3 only. Repackage configuration and code together.
+Arrows show runtime data flow; Agents never call concrete Actions or Tools. Compile-time dependencies are `AgentCore` (contracts, permissions and parsers), `ModelKit` (capability protocols), `StorageChat` (conversation history) and `StorageAudio` (shared PCM handles). App injects the production services; neither storage service delivers Agent messages.
 
-All fields shown below are required except hidden, which defaults to false. Arrays must be present, and constraints may be empty. Unknown fields, incorrect types and missing fields are rejected. Names are case-sensitive. Changes to field semantics require coordinated validation, tests, documentation and version migration.
+```mermaid
+flowchart LR
+    App -.->|Capability injection and lifecycle| Agents
+    Input[InputGateway] -->|AgentInput and ToolResult| Agents
+    Agents -->|Read context and persist turns| Storage[Storage ConversationHistoryStore]
+    Storage -->|Last ten completed rounds| Agents
+    Agents -->|Register and write synthesized PCM| Audio[StorageAudio SpeechAudioStore]
+    Audio -->|Scoped audioID checkout| Playback[Actions/Speech]
+    Agents -->|Inference| ModelKit
+    ModelKit -->|Typed results| Agents
+    Agents -->|Resolved calls and typed events| Output[OutputGateway]
+    Output --> Runtime[Action / Tool runtimes]
+    Output --> Input
+```
 
-| Top-level field | JSON type | Contract |
+## Internal structure and data flow
+
+Agents combine injected processing capabilities with explicit messages and executable calls. Solid arrows show capability use or runtime flow, not imports. Dashed arrows show validated configuration. Model/storage interfaces are used directly; communication and skill calls cross Gateway. The external subgraph is a boundary, not Agent-owned implementation.
+
+```mermaid
+flowchart TB
+    JSON[Five Agent JSON v5 resources] --> Loader[AgentConfigurations / AgentCore validation]
+    Loader --> Policy[Model-callable catalogs and communication policy]
+    Internal[Agent code: fixed internal permissions] --> Grants[Assembled runtime capabilities]
+    Policy --> Grants
+
+    subgraph Cognitive[Agent-owned state and processing]
+        Speech[SpeechPerception: segmentation / recognition]
+        Assistant[Assistant: context / generation / output parsing]
+        Synth[SpeechSynthesis: directed serial synthesis]
+        Vision[VisionPerception: frame filtering / pose interpretation]
+    end
+    Grants -.-> Speech
+    Grants -.-> Assistant
+    Grants -.-> Synth
+    Grants -.-> Vision
+
+    subgraph Capabilities[Injected model and storage interfaces]
+        VAD[VoiceActivityCapability]
+        ASR[SpeechRecognitionCapability]
+        Chat[ChatCapability]
+        TTS[SpeechSynthesisCapability]
+        Pose[PoseCapability]
+        History[ConversationHistoryStore]
+        Cache[SpeechAudioStore]
+    end
+    Speech --> VAD
+    Speech --> ASR
+    Assistant --> Chat
+    Assistant <-->|Records and context| History
+    Synth --> TTS
+    Synth -->|Write owned audio handles| Cache
+    Vision --> Pose
+
+    subgraph External[External communication and execution boundary]
+        Input[InputGateway]
+        Output[OutputGateway]
+        Actions[Scheduled Actions: speech / captions / expressions / gaze]
+        Tools[Direct Tools: pose display]
+        Endpoints[App-bound presentation and device endpoints]
+    end
+    Input -->|Admitted PCM| Speech
+    Input -->|Final speech / phase / ToolResult| Assistant
+    Input -->|Directed synthesis / cancellation| Synth
+    Input -->|Admitted image| Vision
+    Speech -->|Observations and transcript / voice-state Actions| Output
+    Assistant -->|Synthesis messages / resolved Actions / wait| Output
+    Vision -->|Pose observations / gaze Actions / display Tool| Output
+    Output -->|Validated internal messages| Input
+    Output --> Actions
+    Output --> Tools
+    Actions --> Endpoints
+    Tools --> Endpoints
+    Cache -->|Single-use checkout by speech playback| Endpoints
+```
+
+The diagram groups current business paths; runtime control and ActionResult receipts use the same validated boundaries. Assistant requests synthesis by message, not by calling SpeechSynthesisAgent directly. Its audio-ID playback Action is scheduled separately from synthesis. App injects the same PCM store into synthesis and playback; the store is shared data, not a message transport. Model-callable registrations come from JSON; fixed text mapping and internal behavior remain code-owned.
+
+SpeechPerception owns one utterance across ASR segments. Assistant consumes final speech and speech onset, maps generated text through its code-owned text policy and retains bounded durable conversation history. VisionPerception performs one shared pose request per admitted frame and independently publishes pose state and displays skeletons. Photographer subscribes to that pose and can emit `Robot.aim` when arm control is enabled. The camera session starts it with arm control off.
+
+Each actor documents its own capacity, overflow, pause, stop and cleanup rules: [Assistant](Assistant/README.md), [SpeechPerception](SpeechPerception/README.md), [SpeechSynthesis](SpeechSynthesis/README.md) and [VisionPerception](VisionPerception/README.md). Audio and discrete work fail on overflow; vision can replace its latest pending frame, observation and display state. Generation completion does not mean playback completion. Stop must close admission and join owned work before a replacement session starts.
+
+## 输入输出文档约定
+
+每个 Agent README 都要按下面四个方向描述当前实现，且以同目录 JSON v5 声明和 Swift 行为为准。JSON 的 `communication.inputs` 表示可接纳的 `contract / version / kind`；`subscriptions` 另限定广播消息的 `source / topic`。声明输入不自动创建订阅。定向消息由 Gateway 校验发送方、目标方和双方权限，不需要目标方订阅。
+
+| 方向 | 数据标准至少写明 | 边界 |
 | --- | --- | --- |
-| schemaVersion | Integer | Exactly 3 |
-| agentID | String | Stable identity matching the Agent implementation |
-| channels | Array of String | Additional allowed Channels, such as main; action defaults are also allowed |
-| textActions | Array of String | Ordered unique aliases for natural-text mapping, at most 8; each must accept string text without other required parameters |
-| actions | Array of Object | Actions this Agent may invoke |
-| tools | Array of Object | Native tools this Agent may invoke |
+| 输入 | 接收方式、contract/version/kind、source/topic 或目标、payload 类型与字段、单位/上限、会话/序号/期限、拒绝条件 | 所有外部输入和 ToolResult 经 InputGateway；注入依赖与生命周期方法须标为非业务输入。 |
+| 输出 | `OutputEnvelope` 中 ActionCall、ToolCall、scheduling 或 control 的路径/参数/Channel、触发时机、完成语义和失败行为 | 输出流由 App 送 OutputGateway；调用接纳、Action 完成和最终播放是不同事件。 |
+| publish | `communication.publications` 的 contract、typed `AgentMessage` payload、发送时机、消费者、可替换/丢失策略和接纳回执含义 | `AgentMessaging.publish(..., parent:)` 经 OutputGateway → InputGateway 广播；不是 Action/Tool 输出。 |
+| send | `communication.sends` 的 contract/target、typed payload 字段、因果与所有权、接纳/取消/超时语义 | `AgentMessaging.send(..., parent:, to:)` 走同一双 Gateway 链路，但只定向一个 Agent。 |
 
-Each Action entry uses this common registration format:
+公共 `AgentInput` 包含 `id: UUID`、`sessionID: UUID`、`turn: ConversationTurn?` 和 `InputMetadata(contract, version, topic, source, incarnation, capturedAt, sequence, rootID, parentID, hops, deadline)`。publish/send 的端口绑定发送方身份，以 `parent` 继承会话、轮次和因果关系；接收方不能从业务 payload 自行推断授权身份。`DeliveryReport.delivered / rejected` 只表示目标 Agent 的接纳或拒绝，不代表推理、合成、Action 或播放完成。`OutputEnvelope` 含 `source / inputID / sessionID / turn / sequence / output`；它与共享观测消息是两条不同的输出通路。某方向没有声明或实现时，明确写“无”，不要把缓存副作用或本地方法误记为 publish/send。
 
-| Field | JSON type | Meaning |
-| --- | --- | --- |
-| alias | String | Agent-local model-visible name, such as say |
-| path | Object | Exactly module and function strings, such as Speech / speak |
-| defaultChannel | String | Channel used outside an explicit scope |
-| doc | String | Function-derived instructions for the LLM: what it does and how to call it; describe a return value only if one exists |
-| hidden | Boolean | Optional; false by default. True omits the capability from model-facing context without unregistering it |
-| parameters | Array of Object | Ordered parameter documentation and required flags; the sole source of parameter names |
-| examples | Array of String | 1–8 GhostShell/XML examples, optionally mixed with natural text, such as `<express emotion="smile"/> Hello.` |
+### 业务输出与系统功能调用边界
 
-Tools use the same fields except path is a String such as System.runtimeInfo and defaultChannel is forbidden. Their examples are native JSON call strings with exactly name and arguments, for example `{"name":"runtimeInfo","arguments":{}}`. Tools are not XML actions. Their metadata is retained for the separate native Tool Call protocol; it must not be concatenated into the system prompt. A future provider-native tool schema path should honor hidden, but is not implemented by the current text-only ChatCapability. This shared documentation format does not merge the two execution protocols.
+Agent 的业务输出仅限于已在 JSON 声明通信权限的消息信号（publish/send），以及已注册的 ActionCall / ToolCall。消息必须通过绑定的 AgentMessaging 端口进入 OutputGateway → InputGateway；ActionCall / ToolCall 必须经 OutputGateway 分发执行。
 
-Each parameter contains:
+所有完整的业务功能调用，包括 UI 渲染变动、音量调节、媒体播放和设备控制，都必须取得明确权限，再由 Agent 输出解析完成的调用，经 OutputGateway 执行。模型可调用能力在 JSON 中声明；Agent 固定内部行为通过代码定义的 InternalAction / InternalTool 声明权限，不创建模型 alias。不得通过注入服务、闭包回调、直接调用平台 API 或借用消息处理链路绕过这一边界；接收消息的 Agent 若要执行这些功能，也必须输出已注册的 ActionCall / ToolCall。App 的运行时观察器不能代替 Agent 执行业务展示或设备控制。
 
-| Field | JSON type | Meaning |
-| --- | --- | --- |
-| name | String | Exact key the Action reads from the invocation |
-| valueType | String | Intended parsed type: string, integer, number or boolean |
-| required | Boolean | Whether the caller must supply the key |
-| description | String | Meaning of the parameter, including units where relevant |
-| constraints | String | Human-readable limits, accepted formats, normalization and omitted-value behavior; may be empty |
+Storage、ModelKit 等基础能力不属于这里的完整业务功能：Agent 可以通过注入的能力接口进行模型推理、内部状态与共享缓存管理，无须把这些基础操作包装为 Action / Tool。此例外不允许基础能力接口夹带 UI 变更、音量调节等业务副作用。
 
-**Transport values remain strings**, including numeric and boolean examples: use `"speed": "0.5"` or `"enabled": "true"`, not JSON numbers/booleans. valueType and constraints document function semantics; they do not perform conversion, execute validation expressions or inject defaults. The Action itself owns parsing, semantic validation and optional-parameter defaults. Keep these descriptions synchronized with its implementation.
+`control` 是完成、失败等运行时协议通知，不是额外的业务输出或通用系统功能调用入口；它仍随输出流进入 OutputGateway，不能用于编码业务命令或触发未注册的业务功能。
 
-Action examples are strings in the actual model-output syntax. Use self-closing action tags, quote XML attribute values and escape XML entities. Natural text can appear before or after tags. The loader parses every example using FunctionTokenParser and resolves explicit actions against the Agent registry, including parameter names and Channels. An example must demonstrate its containing Action, either explicitly or through natural-text mapping for a textAction. This checks syntax and call structure, not execution-time value constraints.
+## Capability configuration v5 — JSON
 
-Visible examples must not explicitly call hidden Actions. Write natural text instead of exposing hidden say/print tags. Configuration authors must also keep doc prose free of instructions to call hidden capabilities. hidden is a prompt-visibility flag, not an authorization or security boundary; internal resolution and existing explicit-call permissions remain unchanged.
+UTF-8 `<AgentName>.agent.json` is limited to 64 KiB and accepts version 5 only. Resources and code migrate together; no v4 fallback remains. Top-level fields are required and unknown fields fail. Version and identity are written first for readability; JSON key ordering has no semantic effect.
 
-### Action example
+| Field | Contract |
+| --- | --- |
+| version | Integer, exactly 5 |
+| id | Stable Agent identity, matching its implementation |
+| actions | Object mapping Channel names to arrays of model-callable Actions; an empty array declares a Channel without callable Actions |
+| tools | OpenAI Chat Completions function declarations |
+| communication | Existing inputs, subscriptions, publications and sends; semantics unchanged |
 
 ```json
 {
-  "alias": "express",
-  "path": {
-    "module": "UI",
-    "function": "express"
+  "version": 5,
+  "id": "example",
+  "actions": {
+    "Display": [{
+      "alias": "express",
+      "path": {"module": "UI", "function": "express"},
+      "doc": "Change the eye expression.",
+      "parameters": [{
+        "name": "emotion", "valueType": "string", "required": true,
+        "description": "Requested expression.", "constraints": "smile or clear"
+      }],
+      "examples": ["<express emotion=\"smile\"/>"]
+    }],
+    "Speech": []
   },
-  "defaultChannel": "Display",
-  "parameters": [
-    {
-      "name": "emotion",
-      "valueType": "string",
-      "required": true,
-      "description": "The facial expression to display in the voice circle.",
-      "constraints": "Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default."
+  "tools": [{
+    "type": "function",
+    "function": {
+      "name": "runtimeInfo",
+      "description": "Read the fixed runtime configuration.",
+      "parameters": {"type": "object", "properties": {}, "required": [], "additionalProperties": false},
+      "strict": true
     }
-  ],
-  "examples": [
-    "<express emotion=\"smile\"/> Hello.",
-    "<express emotion=\"happy\"/> That is wonderful!",
-    "<express emotion=\"thinking\"/> Let me think."
-  ],
-  "doc": "Show a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.",
-  "hidden": false
+  }],
+  "communication": {"inputs": [], "subscriptions": [], "publications": [], "sends": []}
 }
 ```
 
-See [Assistant.agent.json](Assistant/Assistant.agent.json) for the complete configuration. Its say and print entries have hidden=true because natural text is automatically mapped to them. Their examples can be ordinary text. express is visible and demonstrates mixed markup/text. Other actions default to hidden=false; hiding does not happen implicitly from membership in textActions.
+Each Action has exactly `alias`, `path` (`module` and `function`), `doc`, `parameters` and `examples`. The enclosing key supplies its default Channel. A Channel scope may override that default; module identity remains unchanged and controls process-wide mutual exclusion. Aliases must be unique across all Channel groups and Tools in one Agent. `wait` and `channel.*` aliases are reserved. `main` is an ordinary opt-in Channel.
 
-### Limits and error behavior
+Parameters contain exactly `name`, `valueType`, `required`, `description`, `constraints`. Types are string/integer/number/boolean documentation; XML transport values remain strings and handlers own semantic conversion, limits and defaults. Required/optional name sets are derived, never repeated in JSON. Each Action has 1–8 nonblank XML examples; every example must explicitly demonstrate that Action and resolve only model-callable aliases. Natural text in examples is allowed but does not authorize an internal method.
 
-- Configurations are at most 64 KiB and contain at most 128 Action/Tool entries combined. Each capability has at most 32 uniquely named parameters and 1–8 examples. Each doc, parameter description/constraints string and example is at most 2048 UTF-8 bytes; doc, parameter descriptions and examples must be nonblank.
-- Agent IDs, aliases, path components, tool paths, Channels and parameter names match `[A-Za-z_][A-Za-z0-9_.-]*` and use at most 64 UTF-8 bytes. Paths are registry keys, not reflection or filesystem paths.
-- Actions and Tools share the alias namespace within an Agent. Duplicate aliases or parameter names fail. Aliases cannot start with channel.; different Agents may bind the same alias differently.
-- Channel and textActions arrays must be unique; at most 16 Channels are allowed after defaults are included. Text mapping accepts string text and no additional required parameters. Assistant requires a nonempty textActions list; other policies can leave it empty.
-- Required/optional name sets are derived from parameters[].required. Do not also maintain requiredParameters or optionalParameters in JSON; these obsolete fields are rejected.
-- Missing resources, malformed data, unsupported versions and invalid identity/structure propagate as errors. Do not use try!, swallow errors, fall back to hardcoded lists or broaden permissions. App remains unready on configuration failure.
-- Configuration and descriptions are bundled author-controlled content, not an authorization source for physical devices. Runtime checks and platform permissions remain necessary.
+Tools use `type: function` and nested `function` with `name`, `description`, `parameters`, optional `strict`. The callable name is also the handler registry key; App explicitly binds it. No internal path, alias, hidden flag or example list is added to the OpenAI declaration. The current ToolCall transport supports **string properties only**, optional string descriptions/enums, an object parameter schema with required names and `additionalProperties: false`. Strict mode requires all properties to be required. Unsupported schema features/types fail explicitly; full JSON Schema and provider-native Tool event transport are outstanding. The validated definition is retained for future native transport; it is not appended to the XML system prompt.
 
-### Loading, registration and prompt integration
+Limits: at most 128 combined model/internal capability entries, 16 distinct Channels after internal permissions are assembled, 32 parameters per capability, 64-byte identifier names, and 2048-byte Action prose/examples. Configuration errors propagate without `try!`, silent fallback or inferred broad permissions.
 
-AgentConfigurations loads the package resource through Bundle.module. AgentConfiguration produces an immutable CapabilityRegistry and textActions snapshot. CapabilityDocumentation retains doc, ordered parameter metadata and example strings on ActionRegistration/ToolRegistration. JSON-loaded registrations always carry this metadata; programmatic low-level registrations can omit it for existing tests and infrastructure use.
+## Fixed internal behavior
 
-Configuration defines what an Agent may invoke. App registers actual Swift handlers and injected services, defining what the application implements. Do not duplicate production capability lists in Agent Swift code, remove the App allowlist or dynamically reflect arbitrary paths. Missing runtime handlers still fail during dispatch.
+JSON has no `channels`, `textActions`, `textOutput`, `internal`, `hidden` or per-Action `defaultChannel` fields. Agent code owns fixed business behavior and creates typed `InternalAction` / `InternalTool` permissions without model aliases or documentation:
 
-CapabilityContextBuilder includes doc, parameter guidance and examples only for Action registrations with hidden=false. Tool declarations, parameters, docs and examples never enter this system-prompt text, regardless of hidden. Hidden entries contribute neither their declaration nor their documentation/examples. Generic instructions explain automatic text mapping without exposing hidden aliases. Tool calls remain a separate native protocol; this change does not implement model-native tool streaming or full JSON Schema. Configuration size and per-field limits bound author-supplied prompt content; model-specific context limits still apply.
+- Assistant: reply initialization, automatic speech synthesis/audioID playback and captions.
+- SpeechPerception: transcript updates/closure and voice-state presentation.
+- VisionPerception: gaze targets and skeleton display.
+- Photographer: optional `Robot.aim` from a subscribed pose. The model catalog stays empty.
+- SpeechSynthesis: directed synthesis/cancellation only; no device-output permission.
 
-Changes require repackaging and a new Agent instance; no hot reload is implemented. Tests may inject data only through the same validator. Useful later extensions include machine-readable value constraints, explicit deprecation/version metadata and resource declarations, but they should not be added before their consumer and semantics are implemented.
+These declarations form the descriptor's immutable runtime capability snapshot together with the JSON model catalog. Internal calls are never resolved from model XML or native Tool names. All calls still pass OutputGateway permission validation, Action module exclusion/Channel/wait scheduling or the independent Tool runtime. App retains explicit implementation handlers. Internal permissions are mandatory code policy, not recovery for an invalid JSON resource.
 
-## Agent implementation standards
+Assistant supplies a bounded text-mapping callback to AgentGenerator. It preserves sentence boundaries and event position, sends synthesis requests, and replaces each speech text call with audioID playback before Gateway admission. Only audioID playback is authorized downstream. Captions and speech keep Display/Speech defaults unless a Channel scope overrides them. The system prompt explains automatic audio and wait; it does not disclose internal methods or subtitle mechanics.
 
-1. **Dependencies:** implement Agents as actors, depending only on AgentCore and required ModelKit capability protocols. Do not import Actions, Gateway, PlatformKit, SwiftUI, concrete model SDKs, or other business Agent implementations. App injects providers.
-2. **Identity and descriptor:** configuration identity must match the implementation. Descriptor and output-stream references use immutable nonisolated values. Declare only supported input/output kinds.
-3. **Lifecycle and state:** define start/pause/resume/stop and failure behavior. Currently stop is terminal; pause suspends taking subsequent inputs. Do not claim restart or background persistence. Extract complex business state when needed.
-4. **Concurrency and bounds:** isolate mutable state in the actor. Mailboxes, output streams, history, generated text/tokens, parsing buffers, and queued work need explicit bounds and overflow policies. Do not create unbounded Tasks per input or silently discard actions or tool results.
-5. **Input and context:** route external inputs and tool results through InputGateway. Preserve inputID/sessionID and isolate history per session. Generate capability context from configuration instead of a parallel prompt-side list. Do not claim an operation completed before it did.
-6. **Two output protocols:** use generation-local shared AgentGenerator/FunctionTokenParser state. Map text through configured textActions. Self-closing actions, paired Channels, and scope restoration follow the Generation README. Native Tool Calls use ToolCallParser, not XML or Channel queues.
-7. **Resolution and trust:** resolve aliases to paths and select effective Channels inside the Agent. Emit ActionCall/ToolCall, not raw XML or unresolved aliases. Treat tool results and demo text as text, never as executable markup. Runtime attaches trusted source identity.
-8. **Cancellation and completion:** cancellation must interrupt active work, release model sessions, suppress stale-generation outputs, and discard unfinished parsing fragments. Flush and retain history only after normal completion; report abnormal termination explicitly. Generation completion is not playback completion.
-9. **Real capabilities:** do not directly perform UI, TTS, network, or device side effects inside an Agent. Adapters validate permissions and device availability. Configuration allowlists do not replace system permission, device limits, or emergency-stop enforcement. Clearly label test doubles and demonstrations.
-10. **Errors and recovery:** report configuration errors during initialization. Missing capabilities, parsing failures, timeouts, and overflow must be observable. Do not crash as recovery or silently switch models. App coordinates user-facing error state.
+```mermaid
+flowchart LR
+    JSON[JSON v5 grouped Actions and native Tools] --> Model[Model-callable catalog]
+    Code[Agent fixed behavior and typed permissions] --> Runtime[Descriptor runtime permissions]
+    Model --> Runtime
+    Model --> Parser[Alias resolution and prompt]
+    Text[Sentence chunks] --> Mapping[Agent-owned text mapping]
+    Parser --> Calls[Resolved outputs and wait events]
+    Mapping --> Calls
+    Calls --> Gateway[OutputGateway validates against descriptor]
+    Runtime -.-> Gateway
+    Gateway --> Execution[Action scheduler or Tool runtime]
+```
 
-## Delivery requirements
+## Registration and implementation rules
 
-- Read this standard, the target architecture, and the destination README. Identify existing handlers; new implementations and registration belong in their respective modules and App.
-- Add a minimal `<AgentName>.agent.json`, resource declaration, project reference, identity validation, and composition. Do not add unused empty modules.
-- Test business decisions with capability doubles. Cover loading/errors, configuration-driven output changes, local alias isolation, Channel restoration, tool-result association, overflow, cancellation, failures, and absence of stale-session output.
-- Extend shared protocol tests when changing XML or Tool Call semantics. Do not create an Agent-specific duplicate parser.
-- Maintain a README for every actual directory with purpose, goals, ✅/❌ status, and validation scope. Parser, scheduler, registry, and loader modules also need Mermaid diagrams and design descriptions.
-- Update affected architectural decisions and Roadmap when runtime contracts change. Run `./scripts/check.sh` and, with full Xcode, `./scripts/build-ios.sh`. Verify device-target compilation for device-specific composition. Distinguish compilation, tests with doubles, and actual device acceptance.
-- Never store secrets, local signing settings, weights, or user data in configuration. Semantic changes require explicit version migration rather than implicit fallback.
+- JSON is the sole production list of model-callable Actions/Tools and communication permissions. Internal behavior is declared once in Agent code. No reflection, fallback registry or direct platform/UI side effects.
+- Communication policy, trusted envelopes, input/session/turn identity, bounded inboxes and producer-first cancellation remain unchanged.
+- Every interpreted wait boundary is forwarded in order. Internal text expansion does not reset or move group boundaries. Internal device Actions follow the same runtime limits as model Actions.
+- CapabilityContextBuilder includes only JSON Actions grouped by Channel. Assistant supplies its code-owned speech policy. Tools remain separate; current ChatCapability emits text/completion only.
+- Storage and ModelKit remain foundational capabilities, not wrappers for unregistered UI/device effects. Control notifications cannot carry business commands.
+- New Agents need a real implementation, JSON resource, explicit App handler bindings and focused lifecycle, permission and failure tests. Update module READMEs, ADRs and roadmap; run repository and iOS checks.
 
-## Implementation status
+## Feature status
 
-- ✅ [Assistant](Assistant/README.md) loads actions/tools/channels/textActions from its own JSON resource.
-- ✅ AgentConfigurations loads package resources; AgentConfiguration strictly validates v3. Errors propagate to App.
-- ✅ Shared parsers, parameter/Channel validation, bounded queues, and cancellation/completion regression coverage.
-- ✅ `say` maps to `Speech.speak`; `print`/`express` map to `UI.print`/`UI.express`. Default `Speech`/`Display` Channels remain compatible; Channel and module names need not match.
-- ❌ Configuration hot reload, remote configuration, full JSON Schema, dynamic handler discovery, and configuration-driven lifecycle budgets.
-- ✅ [Photographer](Photographer/README.md) implements pose perception, `UI.showPose`, and optional NexArm `aim` when arm control is enabled. ❌ The live camera session does not enable arm control. Composition, temporal tracking, and other Vision/Media/Control roles remain outstanding. See [ADR 0037](../../docs/adr/0037-photographer-aim.md).
-- ❌ Model-native tool deltas, general StateStore/AgentRuntime, restart, and InternalSignalBus.
+- ✅ Assistant, SpeechPerception, SpeechSynthesis and VisionPerception actors with JSON v5 model/communication configuration and code-owned internal permissions.
+- ✅ Strict resource loading, local aliases, visible Action context and static event permissions.
+- ✅ Documented business-output boundary: messages and registered Action/Tool calls; Storage/ModelKit remain foundational capabilities.
+- ✅ Shared parsing, bounded processing, conversation-turn context and cancellation coverage.
+- ✅ [Photographer](Photographer/README.md) subscribes to `vision.pose` and emits internal `Robot.aim` when arm control is enabled. ❌ The camera session leaves that control off. Tracking and other media/control roles remain outstanding. See [ADR 0070](../../docs/adr/0070-photographer-aim.md).
+- ❌ Configuration hot reload, full executable value schemas, native Tool deltas and general request/reply.
 
-## Maintenance
+See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete configuration. Expression names and guidance are kept there and in Actions/UI, rather than copied into this standard.
 
-Keep this standard synchronized with configuration validation and Agent changes. ✅ means implemented; ❌ means incomplete. Keep implementation limitations distinct from the target architecture and do not create placeholder files to imply completion.
+## Issue record
 
-✅ Assistant now requires an injected ChatCapability. Fixed replies and model doubles live only in Tests; production has no nil-model demo fallback.
+| Status | Issue / next step |
+| --- | --- |
+| Open | Sustained speech/camera operation and real-model output quality require physical-device acceptance. |
+| Open | Configured value types are documentation, not runtime casts; each handler must validate semantic values. |
 
-✅ Assistant also exposes UI.express through JSON, with a required emotion string and documented finite values. Parameter type metadata and casting policy are unchanged.
+## Direct input admission contract
 
-✅ All facial expressions use one express Action with a required emotion parameter, including smile. Do not register separate per-emotion functions or compatibility aliases.
+✅ Gateways directly call receive; Agent inboxes own all pending-message buffering. Ordinary receive must validate/admit or reject promptly, without awaiting inference or inbox space. Concurrent calls have no transport FIFO guarantee: Agents requiring stale-state rejection use session/source/sequence checks. State coalescing belongs to the Agent and must be explicit; discrete events and device actions cannot silently disappear. Lifecycle/control cancellation may join cleanup. Existing Assistant, SpeechPerception and VisionPerception buffering policies remain; see ADR 0048.
 
-## Agent concurrency documentation
 
-Each Agent README must follow the [concurrency documentation standard](../README.md#concurrency-documentation-standard). Document its inbox producer and drain worker, output consumer, capacities, pause/resume behavior, cancellation admission, failure propagation and completion semantics. A registry bound or actor mailbox is not a substitute for an explicit bounded application inbox. Include a Mermaid diagram and distinguish implemented behavior from planned scheduling features. The Assistant README provides the current concrete example.
+✅ SpeechSynthesisAgent is an independent JSON v5 directed service with one FIFO model worker. Agents may additionally depend on StorageChat for durable conversation records and StorageAudio for the shared audio cache; they still cannot depend on Actions, Gateway, PlatformKit or concrete engines. Assistant binds a messaging port and sends text before emitting audioID playback. ❌ Hardware timing acceptance remains pending.
 
-✅ Photographer is the 摄像师 role: injected PoseCapability, one active/one latest pending image, JSON v3 showPose, and optional aim on channel `arm`. The camera session does not enable aim. Composition and tracking remain unimplemented; see Photographer/README.md.
+
+✅ An Agent interpreting wait markup must declare OutputKind.scheduling and forward the entire GenerationEvent sequence through OutputGateway. SchedulingDirective is typed runtime coordination, not an extra business Action or message. Preserve directive order across speech preparation and substitutions; never forward only ActionCalls. Assistant's output buffer is 256 events, including at most 120 generated Actions and 64 wait edges. Wait is local to the originating task; native Tools and directed speech synthesis requests do not become wait members. ❌ Cross-task coordination is not implied.
+
+✅ Assistant receives a shared StorageChat journal from App; ten completed rounds form current context, while failed/cancelled raw records remain inspectable. Voice sessions no longer determine conversation boundaries. New conversation archives the current context explicitly. Title inference is metadata-only and never generates dispatched Actions. ❌ Persistent Action execution/replay is not introduced.
+
+✅ Shared contracts/parsers are managed under Core in this directory. Package.swift compiles Core as AgentCore and the remaining business files as Agents; Core is excluded from the Agents target. This retains acyclic Gateway/StorageAudio dependencies while unifying source ownership. ❌ Core cannot import concrete Agents, model engines or UI.
+
+✅ Action runtime stage 1 reuses Agent-owned runtimeCapabilities assemblers for startup handler coverage, including internal grants. JSON v5 and business output routing remain unchanged. ❌ Action kinds/completion metadata are implementation-side and must not be added as unsupported JSON fields.
+
+## Action runtime stage 2
+
+✅ Assistant, SpeechPerception and VisionPerception declare action.result in communication.inputs. They retain runtime receipts without scheduling a model call. JSON v5 model-callable actions/tools remain unchanged. ❌ Result-driven planning/recovery and activity subscriptions are not enabled.
+
+## Storage domain organization
+
+✅ Agents depends on StorageChat for conversation storage and StorageAudio for speech media. Both domains reuse Storage core; concrete model/device boundaries remain unchanged.
+
+❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.

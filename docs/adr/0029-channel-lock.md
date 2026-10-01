@@ -1,5 +1,7 @@
 # 0029 — Exclusive Channel Ownership
 
+> Scheduling update: [ADR 0059](0059-structured-wait-scheduling.md) supersedes shared cross-task Channel lanes and introduces typed nested wait groups. This document retains its historical decision context; Channel ownership/takeover remains planned.
+
 Status: ownership value definitions implemented; runtime lock behavior is design-only.
 
 ## Decision
@@ -14,7 +16,7 @@ Planned lock control enters through OutputGateway runtime APIs, with outcomes th
 
 - Agent B sends facts, current state and optional advice to Agent A.
 - Agent A decides whether to request a lock; the runtime authorizes and performs takeover.
-- Signals never grant ownership. See the [general interaction](../../MobileHarness/AgentCore/Bus/README.md#signals-and-control-takeover).
+- Signals never grant ownership. See the [general interaction](../../MobileHarness/Agents/Core/Communication/README.md#signals-and-control-takeover).
 
 ## Takeover and physical boundaries
 

@@ -1,6 +1,6 @@
 # ModelKitRuntime — Shared Model Container
 
-Purpose: give App composition one IoC entry point for model registration, capability retrieval and weight lifecycle. Design goals: shared identity, bounded concurrency, explicit errors and safe cleanup. This target depends only on ModelKit; concrete adapters are registered by ModelKitDefaults, never imported here.
+Purpose: provide internal Defaults registration and App-facing capability retrieval/model lifecycle through one shared container. Design goals: shared identity, bounded concurrency, explicit errors and safe cleanup. This target depends only on ModelKit; concrete adapters are registered by ModelKitDefaults, never imported here.
 
 ## Public API and ownership
 
@@ -61,7 +61,7 @@ No cancellation callback runs while holding a mutex. Resource load generations p
 - ✅ Unified registration, typed get, deferred get, load, warmup, unload, status and shutdown.
 - ✅ Shared provider identity and backend loading; retained handles survive unload; cancelled loads/streams have explicit cleanup.
 - ✅ Lifecycle tests cover identity, retry, concurrent construction, unload barriers, shutdown and capacity.
-- ❌ Timed idle eviction, measured cross-model memory budgets, priorities, waiting inference queues and hot replacement.
+- ❌ Timed idle eviction, measured cross-model memory budgets, priorities and waiting inference queues.
 - ❌ Physical-device retry stability requires device acceptance; compilation is not that evidence.
 
 ## Memory policy and status
@@ -97,3 +97,16 @@ get(.chat, load:) resolves the default ID and follows the same construction/reso
 ❌ Automatic fallback and dynamic default replacement.
 
 ✅ Typed `.pose` acquisition and availability use the existing factory, lifecycle and memory policy paths. The capability binding count is now six.
+
+## Assembly replacement
+
+✅ ModelAssembly SPI replace constructs a candidate before retiring the old provider. It rejects overlapping replacement, validates identical capabilities, closes old resource-backed handles, cancels/joins active work and keeps default IDs and other registrations. Construction failure retains the old provider; manager shutdown includes pending candidates. No replacement queue. Consumers retaining handles must resolve the new binding; App supplies a capability forwarding handle. ❌ Arbitrary automatic model switching is not provided.
+
+```mermaid
+flowchart LR
+    Update[Explicit assembly update] --> Gate[Reserve existing entry]
+    Gate --> Candidate[Construct candidate]
+    Candidate -->|failure| Keep[Keep old provider]
+    Candidate -->|success| Close[Cancel and join old resource]
+    Close --> Commit[Replace entry under same ID]
+```

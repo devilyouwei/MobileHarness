@@ -1,28 +1,25 @@
-import ActionRuntime
-
 extension UIActions {
+    /// Semantic identifiers only; presentation owns the procedural eye geometry.
+    public enum Emotion: String, CaseIterable, Sendable {
+        case clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful
+    }
+
     public enum ExpressionError: Error, Equatable, Sendable {
         case invalidEmotion
     }
 
-    /// Presents a finite UI expression; never substitutes an unknown emotion.
     public static func express(
         invocation: ActionInvocation,
-        present: @escaping @Sendable (String, ActionInvocation) async throws -> Void
+        using present: @escaping @Sendable (Emotion, ActionInvocation) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        let emoji: String
-        switch invocation.call.parameters["emotion"] {
-        case "smile": emoji = "🙂"
-        case "happy": emoji = "😊"
-        case "laugh": emoji = "😄"
-        case "thinking": emoji = "🤔"
-        case "surprised": emoji = "😮"
-        case "sad": emoji = "😔"
-        case "love": emoji = "🥰"
-        default: throw ExpressionError.invalidEmotion
-        }
-        try await present(emoji, invocation)
+        let emotion: Emotion
+        do {
+            let arguments = ActionArguments(invocation.call.parameters)
+            try arguments.validateAllowedKeys(["emotion"])
+            emotion = try arguments.requiredEnum("emotion", as: Emotion.self)
+        } catch { throw ExpressionError.invalidEmotion }
+        try await present(emotion, invocation)
         try Task.checkCancellation()
     }
 }

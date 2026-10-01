@@ -1,93 +1,109 @@
 {
-  "schemaVersion": 3,
-  "agentID": "assistant",
-  "channels": [
-    "main"
-  ],
-  "textActions": [
-    "say",
-    "print"
-  ],
-  "actions": [
-    {
-      "alias": "say",
-      "path": {
-        "module": "Speech",
-        "function": "speak"
-      },
-      "defaultChannel": "Speech",
-      "parameters": [
-        {
-          "name": "text",
-          "valueType": "string",
-          "required": true,
-          "description": "Text to speak.",
-          "constraints": "Nonblank; at most 2000 UTF-8 bytes. Original formatting is preserved."
-        }
-      ],
-      "examples": [
-        "Hello."
-      ],
-      "doc": "Speak text aloud using the configured speech capability. Playback can be partially audible before an error. No silent fallback.",
-      "hidden": true
-    },
-    {
-      "alias": "print",
-      "path": {
-        "module": "UI",
-        "function": "print"
-      },
-      "defaultChannel": "Display",
-      "parameters": [
-        {
-          "name": "text",
-          "valueType": "string",
-          "required": true,
-          "description": "Text to display.",
-          "constraints": "Nonblank; at most 2000 UTF-8 bytes. Original formatting is preserved."
-        }
-      ],
-      "examples": [
-        "Hello."
-      ],
-      "doc": "Append text to the conversation caption. Preserves accepted text, including surrounding whitespace.",
-      "hidden": true
-    },
-    {
-      "alias": "express",
-      "path": {
-        "module": "UI",
-        "function": "express"
-      },
-      "defaultChannel": "Display",
-      "parameters": [
-        {
-          "name": "emotion",
-          "valueType": "string",
-          "required": true,
-          "description": "The facial expression to display in the voice circle.",
-          "constraints": "Exactly one of: smile, happy, laugh, thinking, surprised, sad, love. Case-sensitive; no default."
-        }
-      ],
-      "examples": [
-        "<express emotion=\"smile\"/> Hello.",
-        "<express emotion=\"happy\"/> That is wonderful!",
-        "<express emotion=\"thinking\"/> Let me think."
-      ],
-      "doc": "Show a large facial expression in the center of the voice circle. Use sparingly when it suits the reply. Replaces the previous expression, without adding to captions or speech. Visible until replaced, the user speaks again, or the session stops. This controls UI only.",
-      "hidden": false
-    }
-  ],
+  "version": 5,
+  "id": "assistant",
+  "actions": {
+    "Display": [
+      {
+        "alias": "express",
+        "path": {
+          "module": "UI",
+          "function": "express"
+        },
+        "parameters": [
+          {
+            "name": "emotion",
+            "valueType": "string",
+            "required": true,
+            "description": "The emotion expressed by the two animated blue eyes; no emoji or text glyphs.",
+            "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear smoothly returns the eyes to neutral."
+          }
+        ],
+        "examples": [
+          "<express emotion=\"smile\"/> Hello.",
+          "<express emotion=\"happy\"/> That is wonderful!",
+          "<express emotion=\"thinking\"/> Let me think."
+        ],
+        "doc": "Smoothly change the procedural eye expression. clear returns to neutral. Never render an emoji as the expression. Does not modify captions or speech. The Assistant clears its previous expression on new user speech."
+      }
+    ],
+    "Speech": []
+  },
   "tools": [
     {
-      "alias": "runtimeInfo",
-      "path": "System.runtimeInfo",
-      "parameters": [],
-      "examples": [
-        "{\"name\":\"runtimeInfo\",\"arguments\":{}}"
-      ],
-      "doc": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
-      "hidden": false
+      "type": "function",
+      "function": {
+        "name": "runtimeInfo",
+        "description": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "strict": true
+      }
     }
-  ]
+  ],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "user.text",
+        "version": 1,
+        "kind": "text"
+      },
+      {
+        "contract": "runtime.event",
+        "version": 1,
+        "kind": "event"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      },
+      {
+        "contract": "speech.final",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "speech.phase",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "speech.final",
+        "source": "speechPerception",
+        "topic": "speech.final"
+      },
+      {
+        "contract": "user.text",
+        "source": "user",
+        "topic": "user.text"
+      },
+      {
+        "contract": "speech.phase",
+        "source": "speechPerception",
+        "topic": "speech.phase"
+      }
+    ],
+    "publications": [],
+    "sends": [
+      {
+        "contract": "speech.synthesize",
+        "target": "speechSynthesis"
+      },
+      {
+        "contract": "speech.cancel",
+        "target": "speechSynthesis"
+      }
+    ]
+  }
 }

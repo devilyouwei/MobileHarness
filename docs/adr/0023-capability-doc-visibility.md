@@ -1,5 +1,9 @@
 # ADR 0023: Function Documentation and Model Visibility
 
+> Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
+
+> Historical scope: Historical JSON v3 decision. Current declarations use JSON v4; see the [Agents README](../../MobileHarness/Agents/README.md).
+
 Status: accepted. Date: 2026-09-24.
 
 JSON v3 replaces capability description/outputDescription/notes with one nonblank doc derived from the actual function. Void Actions need no invented return-value description. Parameter-specific description/constraints remain local to parameter entries.

@@ -1,9 +1,6 @@
 # ADR 0027 — Qwen3.5 chat through MLX
 
-Status: implemented; device acceptance is recorded separately in output/qwen35-mlx-2026-09-25.
-
-## Context
-
+Status: historical implementation decision. Device experiment artifacts were written to local `output/qwen35-mlx-2026-09-25` and are not part of the versioned public documentation; the observations summarized below remain dated evidence, not current model selection or device acceptance.
 
 ## Decision
 

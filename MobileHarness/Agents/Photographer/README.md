@@ -1,57 +1,30 @@
-# Photographer Agent — 摄像师
+# Photographer
 
-Purpose: camera perception for future robot-arm phone cinematography, composition and tracking. Phase one performs pose inference and emits UI actions only. Design goals: freshest useful input, no duplicate inference, shared capability ownership, bounded output and strict lifecycle fencing.
-
-## Contracts and algorithm
-
-`Photographer.agent.json` v3 is the only Action/Tool/Channel declaration. The actor receives an injected PoseCapability from the process-wide ModelManager; it never creates YOLO or calls UI/device APIs. One capture session owns one Agent incarnation. A new camera session creates a new Agent, but uses the same managed model provider/weights. Registration/configuration errors propagate.
+Purpose: decide arm aim from shared pose observations. Design goals: subscribe to VisionPerception, emit one internal Action, and leave skeleton display and YOLO where they already are. See [ADR 0070](../../../docs/adr/0070-photographer-aim.md).
 
 ```mermaid
 flowchart LR
-    Gateway[CameraInputSession / InputGateway] --> Inbox[One latest pending image]
-    Inbox --> Worker[One inference worker]
-    Worker --> Pose[Shared PoseCapability / exclusive model lease]
-    Pose --> Format[COCO points to bounded overlay JSON]
-    Format --> Parser[Shared AgentGenerator / FunctionTokenParser]
-    Parser --> Registry[JSON alias / Channel resolution]
-    Registry --> Output[8 output envelopes: fail on overflow]
-    Output --> OG[OutputGateway]
-    OG --> Action[UI.showPose on Vision Channel]
-    Parser --> Aim[aim on arm Channel, only when arm control is enabled]
-    Worker -->|Only if a newer image is waiting| Inbox
+    Vision[VisionPerception vision.pose] --> Input[InputGateway]
+    Input --> Latest[Admitted observation]
+    Latest --> Policy[First person / nose or visible midpoint]
+    Policy --> Gate{controlsArm and throttle}
+    Gate --> Call[Robot.aim on channel arm]
+    Call --> Output[OutputGateway]
 ```
 
-- Inbox: one active image plus one pending image; newer accepted images replace only the pending image. No task per frame and no polling/timer. Finishing a frame starts the newest pending frame, or becomes idle.
-- Sequence must strictly increase; timestamps must not decrease; session ID must match this Agent's capture session. Duplicate/stale frames are rejected before inference. A pause preserves only the latest pending frame; active work may finish. Resume drains once. Stop is terminal: clear pending input, cancel/join inference and suppress late native results.
-- Output: at most 8 envelopes, bufferingOldest. Overflow fails the Agent/stream explicitly; Actions are never replaced. Each successful inference emits `UI.showPose` plus runtime `agent.finished`; OutputGateway's finish barrier retires scheduler input state. Inference failures emit `agent.error:` and terminate this incarnation; App exposes retry. Runtime controls are not an alternate UI side-effect path.
-- Overlay: at most six people (YOLO score order), each with COCO-17 points. JSON is at most 3000 bytes; each integer joint is `[x,y,confidence]` in 1/10000 upright-image units and confidence 0...1000. Out-of-image joints receive confidence zero and bounded coordinates. Empty detections explicitly clear the overlay through the same Action. No tracking identity is inferred.
-- All presentation goes through JSON-declared `showPose` → `UI.showPose`, shared Function Token parsing, Gateway validation and Channel scheduling. The first version does not use an LLM or native Tool Calls.
+✅ JSON v5 subscribes to `vision.pose` from `visionPerception` and declares no model-callable Actions or Tools. Code grants internal `Robot.aim` on channel `arm`. The output stream holds 8 envelopes and fails when full; an aim is not replaced or dropped.
 
-✅ Latest-only inference, sequence/session checks, shared provider injection, JSON v3, bounded action output and cleanup.
-✅ Tests cover threshold routing, latest replacement under delayed inference, one active call, duplicate rejection, pause/stop, late-result suppression, empty detections and real action execution/barriers.
-❌ Robot hardware commands, composition decisions, temporal person tracking, autonomous cinematography, device accuracy/latency/thermal acceptance.
+✅ The first person in the published array is the target. That array keeps VisionPerception's copy order. The current pose decoder sorts by detection score before the score is removed, but this Agent does not re-rank. The nose is the aim point when its confidence is at least 0.3 and it lies inside the image. Otherwise the point is the midpoint of joints that pass the same test. No such joint means no aim. `base` and `pitch` are `(point / size - 0.5) * 0.8` radians. The first aim is immediate. Later aims require both 0.2 seconds and 0.02 radians since the previous emitted aim, using the observation timestamp. Empty people emits nothing and does not return to center. Pause admits the observation and does not aim.
 
-Validation (2026-09-26): final root scripts/check.sh passed, including 66 IntegrationTests and shared .pose provider identity. A separate full check with YOLO_POSE_MODEL_ROOT enabled passed real Core ML blank-image inference, unload/reload and shutdown checks. All four simulator schemes and the unsigned physical MobileHarness Debug build passed. Inspected the final device App: Photographer.agent.json matches source, pinned YOLO weight bytes match, and the AGPL license is present. An old generated Agent bundle was invalidated so the new configuration was recopied. The signed Debug build was subsequently installed and launched on iPhone 17 Pro. The user confirmed the feature works on the phone; quantitative alignment/accuracy, latency and thermal acceptance remain outstanding.
+✅ The live camera session registers this Agent so the publication has its declared subscriber, with `controlsArm` false. It does not read the arm output stream. ❌ The App does not open the NexArm socket.
 
+## 输入、订阅与输出契约
 
-## 真机反馈与性能待办（2026-09-26）
+| 方向 | 数据标准与边界 |
+| --- | --- |
+| 输入 | 静态订阅 `vision.pose / 1 / observation`，source `visionPerception`，topic `vision.pose`。payload 为 `PoseObservation`。session 必须匹配；sequence 严格递增，timestamp 不倒退；过期输入拒绝。这不是图像，也不运行 `PoseCapability`。 |
+| 输出 | `controlsArm == true` 且通过节流时发出 `ActionCall`，路径 `Robot.aim`，通道 `arm`，参数 `base` / `pitch` 为十进制弧度字符串。完成语义在 Action：传输接受六轴帧，不等关节到位。 |
+| publish | 无。 |
+| send | 无。 |
 
-✅ 用户在 iPhone 17 Pro 上确认功能效果正常，摄像头到姿态展示的完整流程可用。
-
-❌ 用户反馈 YOLO 处理明显卡顿。目前尚无分阶段耗时数据，瓶颈未定位；不能据此认定 Core ML 推理本身慢，也不能认为性能已经验收通过。本次仅记录问题，未做性能优化。
-
-后续定位需分别测量以下环节，并区分首次模型加载与稳定运行：
-
-- 相机取帧、RGB 转换、缩放和旋转。
-- Gateway 灰度采样、变化比对和输入路由。
-- Agent 最新帧等待时间、模型资源等待和输入预处理。
-- Core ML 推理、输出解码与 NMS。
-- Action 序列化/解析、OutputGateway 调度及主线程骨架绘制。
-
-记录每阶段耗时、端到端帧龄、实际推理频率、待处理帧替换数量，以及 CPU/GPU/内存和温度表现。比较前后摄像头、不同变化阈值和持续运行场景；先凭测量确认瓶颈，再优化，保留单例模型、单帧串行推理、只处理最新帧、不重复推理和 Action 输出协议约束。
-
-## Phase 2 aim
-
-✅ When `controlsArm` is true, the same inference appends hidden `<aim base="..." pitch="..."/>` after `showPose`. The highest-confidence person supplies the aim point: the nose when its confidence is at least 0.3 and it lies inside the image, otherwise the box center. `base` and `pitch` are `(point / size - 0.5) * 0.8` radians. The first aim is sent immediately. Later aims wait until both 0.2 seconds and 0.02 radians have passed. An empty pose does not emit `aim`. The live camera session leaves `controlsArm` false, so it still emits only `showPose`.
-
-❌ The App does not open the NexArm Wi-Fi socket. Wrist-travel recovery stays off. See [ADR 0037](../../../docs/adr/0037-photographer-aim.md).
+❌ 构图、跟踪身份、腕部行程补偿和真机运动验收未实现。

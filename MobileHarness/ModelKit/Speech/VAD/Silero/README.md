@@ -6,7 +6,7 @@ Purpose: implement VoiceActivityCapability in ModelKitSilero, depending only on 
 - ✅ Adaptation follows hugging-mac revision 60b176843703fd730a04e2b537212fba92b399a3; no Python runtime or additional Swift dependency.
 - ✅ 16 kHz mono Float32 input; 512 new samples plus 64 context samples, audio[1,1,576], h/c[1,1,128]. Graph IO is Float16. Each output contains probability and the actual sample range.
 - ✅ Reset clears recurrent state, remainder and positions. Finish pads the last window but counts only real input; cancel discards the remainder and joins active graph work.
-- ✅ One session per manager-owned resource; App registers the factory and injects the returned capability. No microphone, segmentation policy or Agent dependency belongs here.
+- ✅ One session per manager-owned resource; ModelKitDefaults registers the factory; App injects the returned capability. No microphone, segmentation policy or Agent dependency belongs here.
 - ❌ Background-noise quality, sustained iPhone use and false-positive/negative rates require device acceptance.
 
 Gateway owns onset/endpoint policy: 96 ms onset, approximately 256 ms pre-roll, 800 ms silence, approximately 12 s internal chunks and 60 s turns. PlatformKit resamples; the model emits probabilities only. HARNESS_TEST_SILERO=1 enables real artifact tests for packet parity, reset, tails and cancellation.

@@ -4,8 +4,9 @@ Purpose: isolate native graph execution and MLX language generation. Design goal
 
 | Directory | Responsibility |
 | --- | --- |
-| CoreAI | Native graph and tensor execution for Nemotron and Kokoro |
+| CoreAI | Native graph and tensor execution for Nemotron |
 | CoreML | Validated Core ML graph execution for Silero |
+| FluidAudio | Pinned Kokoro Core ML graphs and local Mandarin frontend |
 | MLX | Local Qwen generation, tokenizer bridge and explicit allocator configuration |
 
 ```mermaid
@@ -19,3 +20,6 @@ flowchart LR
 - ✅ Separate backend targets compiled from this single source tree.
 - ✅ Backend concurrency and cancellation contracts are documented in each child README.
 - ❌ A universal backend interchange format or cross-model scheduler.
+
+
+✅ [MossCoreML](MossCoreML/README.md) contains the pinned, narrowly adapted MOSS beta graph loop and tokenizer. No runtime downloader or new third-party package is introduced. ❌ iPhone stability/performance acceptance remains pending.

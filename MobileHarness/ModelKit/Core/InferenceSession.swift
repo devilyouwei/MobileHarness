@@ -41,7 +41,8 @@ public final class InferenceSession<Event: Sendable>: Sendable {
         onTermination: @escaping @Sendable (SessionTermination) -> Void = { _ in }
     ) -> (session: InferenceSession<Event>, emitter: InferenceEmitter<Event>) {
         let pair = AsyncThrowingStream<Event, Error>.makeStream(bufferingPolicy: .bufferingOldest(limits.capacity))
-        let storage = SessionStorage(continuation: pair.continuation, onTermination: onTermination)
+        let storage = SessionStorage(
+            continuation: pair.continuation, capacity: limits.capacity, onTermination: onTermination)
         pair.continuation.onTermination = { termination in
             if case .cancelled = termination { storage.end(.cancelled) }
         }
@@ -77,6 +78,7 @@ public struct InferenceEvents<Event: Sendable>: AsyncSequence, Sendable {
                 try Task.checkCancellation()
                 try storage.checkFailure()
                 let event = try await iterator.next()
+                if event != nil { storage.consumed() }
                 try Task.checkCancellation()
                 try storage.checkFailure()
                 return event
@@ -104,7 +106,7 @@ public struct InferenceEmitter<Event: Sendable>: Sendable {
             storage.end(.failed(CapabilityError.eventTooLarge))
             throw CapabilityError.eventTooLarge
         }
-        let continuation = try storage.activeContinuation()
+        let continuation = try storage.reserveEmission()
         switch continuation.yield(event) {
         case .enqueued: break
         case .dropped:
@@ -117,6 +119,18 @@ public struct InferenceEmitter<Event: Sendable>: Sendable {
         }
     }
 
+    /// Serialized producers may suspend instead of failing on a full event buffer.
+    public func yieldSuspending(_ event: Event) async throws {
+        let bytes = estimatedBytes(event)
+        guard bytes >= 0, bytes <= maximumEventBytes else {
+            storage.end(.failed(CapabilityError.eventTooLarge))
+            throw CapabilityError.eventTooLarge
+        }
+        try await storage.waitForCapacity()
+        try Task.checkCancellation()
+        try yield(event)
+    }
+
     public func finish() { storage.end(.finished) }
     public func fail(_ error: any Error) { storage.end(.failed(error)) }
 }
@@ -126,14 +140,18 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         var continuation: AsyncThrowingStream<Event, Error>.Continuation?
         var termination: SessionTermination?
         var consumerClaimed = false
+        var outstanding = 0
+        var capacityWaiter: CheckedContinuation<Void, Error>?
     }
     private let state: Mutex<State>
+    private let capacity: Int
     private let onTermination: @Sendable (SessionTermination) -> Void
 
     init(
-        continuation: AsyncThrowingStream<Event, Error>.Continuation,
+        continuation: AsyncThrowingStream<Event, Error>.Continuation, capacity: Int,
         onTermination: @escaping @Sendable (SessionTermination) -> Void
     ) {
+        self.capacity = capacity
         state = Mutex(State(continuation: continuation))
         self.onTermination = onTermination
     }
@@ -150,6 +168,46 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         try state.withLock {
             guard let continuation = $0.continuation else { throw CapabilityError.sessionClosed }
             return continuation
+        }
+    }
+
+    func reserveEmission() throws -> AsyncThrowingStream<Event, Error>.Continuation {
+        do {
+            return try state.withLock { state in
+                guard let continuation = state.continuation else { throw CapabilityError.sessionClosed }
+                guard state.outstanding < capacity else { throw CapabilityError.bufferOverflow }
+                state.outstanding += 1
+                return continuation
+            }
+        } catch {
+            end(.failed(error))
+            throw error
+        }
+    }
+    func consumed() {
+        let waiter = state.withLock { state in
+            state.outstanding = max(0, state.outstanding - 1)
+            let waiter = state.capacityWaiter
+            state.capacityWaiter = nil
+            return waiter
+        }
+        waiter?.resume()
+    }
+    func waitForCapacity() async throws {
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { (waiter: CheckedContinuation<Void, Error>) in
+                let result: Result<Void, Error>? = state.withLock { state in
+                    guard state.continuation != nil else { return .failure(CapabilityError.sessionClosed) }
+                    if state.outstanding < capacity { return .success(()) }
+                    guard state.capacityWaiter == nil else { return .failure(CapabilityError.bufferOverflow) }
+                    state.capacityWaiter = waiter
+                    return nil
+                }
+                if let result { waiter.resume(with: result) }
+            }
+        } onCancel: {
+            self.end(.cancelled)
         }
     }
 
@@ -177,6 +235,12 @@ private final class SessionStorage<Event: Sendable>: Sendable {
             state.continuation = nil
             return continuation
         }
+        let waiter = state.withLock { state in
+            let waiter = state.capacityWaiter
+            state.capacityWaiter = nil
+            return waiter
+        }
+        waiter?.resume(throwing: CancellationError())
         guard let continuation else { return }
         // Never call a continuation or adapter callback while holding the mutex.
         switch termination {

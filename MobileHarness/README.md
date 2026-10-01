@@ -1,1787 +1,642 @@
+# MobileHarness Technical Design
 
-# MobileHarness Technical Architecture
+## Overview
 
-## 1. Overview
+**MobileHarness** is a *multi-modal*, *multi-agent*, *bio-inspired* harness for mobile and embodied AI systems. Its architecture follows a continuous information-processing loop inspired by biological nervous systems: **Signal → Cognition → Action**.
 
-**MobileHarness** is a multimodal, multi-agent, bio-inspired harness for mobile and embodied AI systems.
+The system supports concurrent, stateful Agents and streaming multimodal processing. Its design separates system assembly, cognitive policy, communication and execution so capabilities can be combined without coupling their implementations.
 
-Its architecture follows a continuous information-processing loop inspired by biological nervous systems:
+This is the target technical plan. Module READMEs own detailed algorithms, queue limits and API contracts; the [docs index](../docs/README.md) links requirements, decisions and evidence. [Architecture](../docs/Architecture.md) provides the public overview, and [Roadmap](../docs/Roadmap.md) tracks delivery. The original `docs/Technical_Design.docx` remains preserved.
 
-**Signal → Cognition → Action**
+- [Part I — Architectural Framework](#part-i--architectural-framework): design philosophy, module composition, runtime collaboration and source organization.
+  - [Design philosophy](#design-philosophy--a-coordinated-organism): composition and biological analogies.
+  - [Architecture](#architecture): system assembly, Agent capability composition and coordination ownership.
+  - [Basic data flows](#basic-data-flows): communication and feedback.
+  - [Project structure](#project-structure): source layout, target mapping and compilation boundaries.
+- [Part II — Module Design](#part-ii--module-design): each top-level source directory and its subdesigns.
+- [Part III — Key Techniques](#part-iii--key-techniques): protocols, communication, scheduling, lifecycle and presentation.
+  - [TTS synthesis and playback data flow](#tts-synthesis-and-playback-data-flow): parallel synthesis and scheduled playback linked by an audio ID.
+- [Summary](#summary): invariants and implemented versus outstanding scope.
 
-The system is organized around three major functional domains:
+## Part I — Architectural Framework
 
-- **Input Gateway** — receives, adapts, normalizes, enriches, and routes multimodal signals.
-- **Agent Core / Agents** — independent, stateful cognitive units that process signals and generate executable outputs.
-- **Output Gateway** — schedules and dispatches fully resolved Action Calls and Tool Calls.
+### Design Philosophy — A Coordinated Organism
 
-The architecture is designed around four core properties:
+**MobileHarness is designed through composition.** App assembles a complete running system from independent modules. Agents combine model capabilities, context, messages and executable skills into purposeful behavior. Gateway connects their collaboration through explicit communication and execution contracts.
 
-- **Multimodal** — text, audio, image, video, sensor, physical, and system signals.
-- **Multi-Agent** — multiple specialized Agents run independently and concurrently.
-- **Bio-inspired** — signal input, specialized cognition, centralized action coordination, and continuous feedback loops.
-- **Streaming & Stateful** — signals, model generation, Function Tokens, Tool Calls, and execution may operate continuously instead of following request-response semantics.
+The biological analogy explains this division of responsibility: signals become observations, observations inform decisions, and actions change an environment that can be sensed again. The software follows that feedback structure without claiming to reproduce a biological brain.
 
----
+| Role | Module | Biological analogy and responsibility |
+| --- | --- | --- |
+| Host and interaction | **App** | The host that brings the organism into operation: assembly, application/session lifetime and cleanup. |
+| Host and interaction | **UI** | Its face and interaction surface: user controls and presentation state. |
+| Cognition and coordination | **Agents** | Specialized brain regions: stateful perception, interpretation, context and behavior selection. |
+| Cognition and coordination | **Gateway** | Neural pathways and execution coordination: validated signals, routing, permissions and execution rules. |
+| Execution | **Actions / Tools** | Reusable skills: concrete operations with explicit parameters, effects and completion semantics. |
+| Foundations | **ModelKit** | Recognition and generation machinery: model-processing capabilities and model resources. |
+| Foundations | **PlatformKit** | Access to sensory organs and effectors: device/OS input, output and resource handling. |
+| Foundations | **Storage** | A substrate for retained information: shared data and durable records whose meaning is interpreted by Agents. |
 
-# 2. Core Architecture
+An Agent can turn a signal into an observation, an internal state update or a behavior call. Together, Agents form a stateful feedback network rather than a single linear pipeline. They may share model capabilities; an Agent need not have a dedicated model.
+
+### Architecture
+
+The diagrams distinguish system assembly from runtime capability use. Their arrows describe composition and data flow; compilation dependencies are listed under [Project Structure](#project-structure).
+
+#### System composition
+
+App connects the modules through explicit bindings and gives each consumer the interfaces it needs. UI receives state and operations, while long-lived runtime work has owners outside page lifetimes.
+
+```mermaid
+flowchart TB
+    App["App<br/>System Assembly and Lifecycle"]
+    App --> UI["UI<br/>Interaction and Presentation"]
+    App --> Agents["Agents<br/>Perception, Cognition and Policy"]
+    App --> Gateway["Gateway<br/>Communication and Execution Coordination"]
+    App --> Skills["Actions / Tools<br/>Executable Skills"]
+    App --> ModelKit["ModelKit<br/>Model Processing"]
+    App --> PlatformKit["PlatformKit<br/>Device and OS I/O"]
+    App --> Storage["Storage<br/>Shared Data and Records"]
+```
+
+#### Agent capability composition
+
+Agents use injected model and storage interfaces directly. They compose behavior by emitting resolved calls and coordination instructions through Gateway. Executable skills use App-bound services to produce presentation or device effects.
+
+```mermaid
+flowchart TB
+    Agents["Agents<br/>Context, Decisions and Behavior Planning"]
+    Agents <-->|Model processing| ModelKit["ModelKit"]
+    Agents <-->|State and records| Storage["Storage"]
+    Agents -->|Messages, skill calls and ordering| Gateway["Gateway"]
+    Gateway -->|Messages and execution feedback| Agents
+    Gateway -->|Scheduled execution| Actions["Actions"]
+    Gateway -->|Direct execution| Tools["Tools"]
+    Actions --> Bindings["App-Injected Execution Capabilities"]
+    Tools --> Bindings
+    Bindings --> UI["UI<br/>Presentation Effects"]
+    Bindings --> PlatformKit["PlatformKit<br/>Device Effects"]
+```
+
+Actions participate in Channel/wait scheduling; Tools execute directly with registered value-returning or completion-only semantics. Both may have side effects. A skill is atomic at its exposed call boundary: it may contain multiple steps or control an ongoing activity, and its completion means the acknowledgment promised by its contract.
+
+#### Coordination ownership
+
+| Owner | Question | Responsibility |
+| --- | --- | --- |
+| **App — lifecycle coordination** | What runs, and for how long? | Assemble, start, stop and clean up runtime scopes and their resources. |
+| **Agents — task and behavior planning** | What should happen next, and why? | Interpret signals, choose capabilities and express behavior dependencies. |
+| **Gateway — execution coordination** | How can accepted work execute? | Enforce admission, ordering, wait dependencies, exclusion and declared resource rules. |
+
+Semantic fusion belongs to Agents: combining observations to infer meaning is a cognitive policy. Gateway handles the identities, contracts and destinations that let those observations reach the appropriate Agents.
+
+### Basic Data Flows
+
+#### Communication and feedback loop
+
+Execution closes the loop: effects produce new observations, while messages and results inform subsequent Agent processing.
 
 ```mermaid
 flowchart LR
+    External["External World<br/>Users and Environment"]
+    Adapt["App with UI / PlatformKit<br/>Interaction and Input Adaptation"]
+    Input["InputGateway"]
+    Agents["Agents<br/>Stateful Collaboration"]
+    Output["OutputGateway"]
+    Skills["Actions / Tools"]
+    Effects["App with UI / PlatformKit<br/>Presentation and Device Effects"]
 
-    WORLD["External World<br/>User · Environment · Device"]
-
-    WORLD --> SIGNALS["Multimodal Signals<br/>Text · Audio · Image · Video · Sensor · System"]
-
-    SIGNALS --> IG
-
-    subgraph IG["Input Gateway"]
-        ACQ["Signal Acquisition"]
-        ADAPT["Signal Adaptation<br/>ASR · Sampling · Normalize · Feature Processing"]
-        CTX["Context Enrichment"]
-        ROUTE["Signal Routing<br/>Logic · JEV · Lightweight Agent"]
-
-        ACQ --> ADAPT --> CTX --> ROUTE
-    end
-
-    IG --> CORE
-
-    subgraph CORE["Agent Core / Cognitive System"]
-        MANAGER["Agent Manager"]
-        REGISTRY["Agent Registry"]
-        BUS["Internal Signal Bus"]
-
-        A1["Assistant Agent"]
-        A2["Vision Agent"]
-        A3["Photography Agent"]
-        A4["Tracking Agent"]
-        A5["Media Agent"]
-        A6["Control Agent"]
-        AX["Other Agents"]
-
-        MANAGER -.-> A1
-        MANAGER -.-> A2
-        MANAGER -.-> A3
-        MANAGER -.-> A4
-        MANAGER -.-> A5
-        MANAGER -.-> A6
-
-        BUS <--> A1
-        BUS <--> A2
-        BUS <--> A3
-        BUS <--> A4
-        BUS <--> A5
-        BUS <--> A6
-    end
-
-    CORE --> RESOLVED["Resolved Agent Outputs<br/>ActionCall | ToolCall"]
-
-    RESOLVED --> OG
-
-    subgraph OG["Output Gateway"]
-        VALIDATE["Validate"]
-        ROUTER["Execution Router"]
-        GHOST["Channel Scheduler"]
-        DISPATCH["Dispatch"]
-
-        VALIDATE --> ROUTER
-        ROUTER --> GHOST
-        ROUTER --> DISPATCH
-        GHOST --> DISPATCH
-    end
-
-    OG --> ACTIONS["Actions"]
-    OG --> TOOLS["Tools"]
-
-    ACTIONS --> WORLD
-
-    TOOLS --> RESULT["Execution Result Signal"]
-    ACTIONS --> RESULT
-    RESULT --> IG
-
-    MODELS["ModelKit<br/>ASR · TTS · LLM · VLM · JEV · CV · Embedding"]
-    PLATFORM["PlatformKit<br/>Camera · Audio · Storage · Sensors · Device · Robot · Network"]
-
-    MODELS -.-> IG
-    MODELS -.-> CORE
-    MODELS -.-> ACTIONS
-
-    PLATFORM -.-> IG
-    PLATFORM -.-> ACTIONS
-    PLATFORM -.-> TOOLS
-```
-
----
-
-# 3. Core Information Model
-
-## 3.1 Signal
-
-`Signal` is the unified input abstraction of MobileHarness.
-
-Everything entering the cognitive system is represented as a Signal regardless of modality or source.
-
-Typical signal types include:
-
-| Signal Type | Examples |
-|---|---|
-| Text | user text, system text |
-| Audio | recorded audio |
-| Audio Stream | microphone stream |
-| Image | camera image, photo |
-| Video Stream | live camera/video |
-| Physical | force, temperature, IMU, touch |
-| Sensor | proximity, motion, depth |
-| System | timer, notification, app event |
-| Internal | Agent-generated internal signal |
-| Execution Result | Action or Tool execution result |
-
-Conceptual Swift structure:
-
-```swift
-struct Signal {
-    let id: UUID
-    let type: SignalType
-    let source: SignalSource
-    let timestamp: TimeInterval
-    let payload: SignalPayload
-    let metadata: SignalMetadata
-}
-```
-
-```swift
-enum SignalPayload {
-    case text(String)
-    case audio(AudioBuffer)
-    case audioStream(AudioStream)
-    case image(ImageFrame)
-    case videoStream(VideoStream)
-    case sensor(SensorData)
-    case physical(PhysicalSignal)
-    case structured(StructuredData)
-}
-```
-
-Signals may be discrete or continuous streams.
-
----
-
-# 4. Input Gateway
-
-The **Input Gateway** is the sensory and input coordination layer of MobileHarness.
-
-Its responsibilities are:
-
-```text
-Input Gateway
-├── Signal Acquisition
-├── Signal Adaptation
-├── Signal Normalization
-├── Modality Transformation
-├── Context Enrichment
-└── Signal Routing
-```
-
-## 4.1 Signal Acquisition
-
-Typical sources include:
-
-```text
-Microphone
-Camera
-Keyboard
-File
-Sensors
-System Events
-Network
-External Device
-Internal Agent Signal
-Execution Result
-```
-
-## 4.2 Signal Adaptation
-
-Agents are not required to support every modality directly.
-
-The Input Gateway transforms signals when necessary.
-
-```text
-Audio Stream
-    ↓
-Input Gateway
-    ↓
-ASR
-    ↓
-Text Signal
-    ↓
-Assistant Agent
-```
-
-```text
-Video Stream
-    ↓
-Frame Sampling
-    ↓
-Image Signal
-    ↓
-Vision Agent
-```
-
-```text
-Force Sensor
-    ↓
-Filter / Normalize
-    ↓
-Physical Signal
-    ↓
-Control Agent
-```
-
-ASR, CV preprocessing, embedding, and model-backed transformations are provided by `ModelKit`.
-
----
-
-# 5. Signal Routing
-
-The Input Gateway uses a hybrid routing mechanism.
-
-```text
-Signal
-  ↓
-Signal Router
-  ├── Logic / State Routing
-  ├── JEV / Judge Routing
-  └── Lightweight Agent / Small LLM Routing
-  ↓
-Agent(s)
-```
-
-Routing may depend on:
-
-- signal type;
-- signal source;
-- application context;
-- current Agent state;
-- Agent accepted input types;
-- deterministic rules;
-- JEV/Judge classification;
-- semantic intent;
-- system priority.
-
-One signal may fan out to multiple Agents.
-
-```mermaid
-flowchart LR
-
-    VS["Video Signal"] --> IG["Input Gateway"]
-
-    IG --> VA["Vision Agent"]
-    IG --> TA["Tracking Agent"]
-    IG --> PA["Photography Agent"]
-```
-
-The router determines which Agent receives the signal.
-
-Task planning and execution remain inside the Agent layer.
-
----
-
-# 6. Agent Core
-
-The **Agent Core** provides common runtime infrastructure for all Agents.
-
-```text
-Agent Core
-├── Agent Manager
-├── Agent Registry
-├── Agent Runtime
-├── Agent Descriptor
-├── Agent State
-├── Capability Registry
-├── Internal Signal Bus
-└── Agent Protocol
-```
-
-Each Agent is an independently running, long-lived, stateful runtime unit.
-
-```mermaid
-flowchart LR
-
-    INPUT["Signal Stream"] --> QUEUE["Input Queue"]
-
-    QUEUE --> STATE["Domain State Machine"]
-
-    STATE --> PROCESS["Processing Loop<br/>Logic · Model · Tool"]
-
-    PROCESS --> GENERATE["Model / Logic Output"]
-
-    GENERATE --> PARSE["Agent-side Parser"]
-
-    PARSE --> MAP["Capability Mapping"]
-
-    MAP --> OUTPUT["Resolved Output<br/>ActionCall | ToolCall"]
-
-    OUTPUT --> GATEWAY["Output Gateway"]
-
-    RESULT["Execution Result Signal"] --> INPUT
-```
-
-An Agent may:
-
-- continuously receive Signals;
-- maintain internal state;
-- perform model inference;
-- use Actions and Tools;
-- remain idle;
-- proactively produce output;
-- run concurrently with other Agents.
-
----
-
-# 7. Agent Lifecycle
-
-`AgentManager` manages runtime lifecycle.
-
-```text
-registered
-    ↓
-starting
-    ↓
-running
-    ↕
-idle
-    ↕
-paused
-    ↓
-stopping
-    ↓
-stopped
-
-failed
-```
-
-Typical management operations:
-
-```text
-register
-create
-start
-stop
-pause
-resume
-restart
-status
-health
-```
-
-Runtime lifecycle state is separate from business/domain state.
-
----
-
-# 8. Agent Descriptor
-
-Each Agent declares its runtime contract through an `AgentDescriptor`.
-
-```text
-AgentDescriptor
-├── Identity
-│   ├── id
-│   ├── name
-│   └── version
-│
-├── Runtime
-│   ├── persistent
-│   ├── autoStart
-│   ├── priority
-│   └── concurrency
-│
-├── Input
-│   └── accepted Signal types
-│
-├── Output
-│   ├── ActionCall
-│   └── ToolCall
-│
-├── Capabilities
-│   ├── registered Actions
-│   └── registered Tools
-│
-├── Models
-│   └── required model capabilities
-│
-└── State
-    └── observable domain/runtime state
-```
-
-Capability registration and alias resolution are encapsulated inside the Agent.
-
----
-
-# 9. Agent Capability Registry
-
-Every Agent owns its own capability registry.
-
-The registry contains all Actions and Tools available to that Agent.
-
-The names exposed to the model are **Agent-local aliases** and do not need to match implementation paths.
-
-```text
-capture
-    ↓
-Actions.Camera.capturePhoto
-```
-
-```text
-search
-    ↓
-Tools.MediaLibrary.semanticSearch
-```
-
-The Agent owns the complete capability lifecycle:
-
-```text
-Register Capability
-       ↓
-Expose Alias to Model Context
-       ↓
-Model Generates Alias
-       ↓
-Agent Parses Output
-       ↓
-Resolve Alias
-       ↓
-Resolved Action / Tool Path
-       ↓
-Output Gateway
-```
-
----
-
-# 10. Capability Naming Rules
-
-Within one Agent, all registered Action and Tool aliases must be unique.
-
-Example:
-
-```text
-capturePhoto → Actions.Camera.capturePhoto
-captureVideo → Actions.Video.captureVideo
-```
-
-Different Agents may use the same alias.
-
-```text
-AssistantAgent:
-    speak → Actions.Speech.speak
-
-PhotographyAgent:
-    speak → Actions.Speech.speak
-```
-
-The alias namespace is local to the Agent.
-
----
-
-# 11. Agent Capability Mapping
-
-Example capability registry:
-
-```text
-PhotographyAgent
-
-Actions
-├── speak
-│   → Actions.Speech.speak
-├── capture
-│   → Actions.Camera.capturePhoto
-├── focus
-│   → Actions.Camera.focus
-└── express
-    → Actions.UI.express
-
-Tools
-├── detectPerson
-│   → Tools.Vision.detectPerson
-├── detectFace
-│   → Tools.Vision.detectFace
-└── describeScene
-    → Tools.Vision.describeScene
-```
-
-The model sees only the compact aliases and their parameter schemas.
-
----
-
-# 12. Model Context Generation
-
-Each Agent builds its model context from its capability registry.
-
-```text
-Agent Capability Registry
-      ↓
-Context Builder
-      ↓
-Available Actions
-Available Tools
-Parameter Schemas
-Descriptions
-Constraints
-      ↓
-LLM / VLM
-```
-
-This ensures that only permitted capabilities are exposed to the model.
-
----
-
-# 13. Agent Output Contract
-
-Model-derived executable Agent output has two classes:
-
-```text
-AgentOutput
-├── ActionCall
-└── ToolCall
-```
-
-Before emitting an output, the Agent must:
-
-1. parse model output;
-2. identify the generated capability alias;
-3. validate the alias;
-4. resolve it to the real Action or Tool path;
-5. attach scheduling metadata where applicable;
-6. emit a fully resolved object.
-
-Raw model text, XML, or unresolved aliases never leave the Agent boundary. Typed runtime communication uses the Gateway-mediated InternalSignal path specified in section 32; it is not a third model generation protocol.
-
----
-
-# 14. Function Token Protocol
-
-Function Token includes natural text characters and restricted XML: self-closing Action tags and paired Channel tags. A parsed FunctionToken is not a model tokenizer token. Agent-side interpretation resolves these events into ActionCalls. See the [protocol reference](AgentCore/Generation/README.md) for syntax, boundaries and limits.
-
-The Function Token protocol provides streaming text/XML output used by Agents for action-oriented generation.
-
-Example:
-
-```xml
-<channel.main>
-    <express emotion="smile"/>
-    hello
-</channel.main>
-```
-
-Inside the Agent:
-
-```text
-LLM Token Stream
-      ↓
-FunctionTokenParser
-      ↓
-FunctionToken events: text / action / boundary
-      ↓
-Agent Action Interpretation
-      ↓
-Capability Alias Resolution
-      ↓
-Resolved Action Calls
-      ↓
-Output Gateway
-```
-
-The Output Gateway receives resolved action calls rather than raw markup.
-
----
-
-# 15. Channel Model
-
-A **Channel** defines an ordered execution sequence.
-
-Actions inside the same Channel execute serially and may block one another.
-
-Different Channels may execute concurrently.
-
-Core rule:
-
-**Serial within a Channel, concurrent across Channels.**
-
----
-
-# 16. Default Channel
-
-Every registered Action defines its own default Channel.
-
-Example:
-
-```text
-Actions.Speech.speak
-defaultChannel = speech
-```
-
-```text
-Actions.UI.express
-defaultChannel = expression
-```
-
-```text
-Actions.Robot.look
-defaultChannel = head
-```
-
-If the model emits a Function Token without an explicit Channel, the Action uses its registered default Channel.
-
-Example:
-
-```xml
-<express emotion="smile"/>
-```
-
-may resolve to:
-
-```text
-Actions.UI.express
-channel = expression
-```
-
----
-
-# 17. Explicit Channel Assignment
-
-The model may explicitly place actions into a Channel.
-
-A common explicit Channel is `main`.
-
-```xml
-<channel.main>
-    <express emotion="smile"/>
-    hello
-</channel.main>
-```
-
-This explicitly places both actions in `main`.
-
-The Agent may resolve this to:
-
-```text
-ActionCall {
-    actionPath: Actions.UI.express
-    params: { emotion: "smile" }
-    channel: main
-}
-
-ActionCall {
-    actionPath: Actions.Speech.speak
-    channel: main
-    params: {
-        text: "hello"
-    }
-}
-```
-
-Because both belong to `main`, execution is blocking and sequential:
-
-```text
-express(emotion="smile")
-  ↓
-speak("hello")
-```
-
----
-
-# 18. Channel Override
-
-Explicit Channel assignment overrides the Action's registered default Channel.
-
-For example:
-
-```xml
-<channel.main>
-    <express emotion="smile"/>
-</channel.main>
-```
-
-may force:
-
-```text
-Actions.UI.express
-
-default:
-expression
-
-effective:
-main
-```
-
-This allows the Agent/model to enforce temporal ordering across Actions that normally belong to different Channels.
-
----
-
-# 19. Multiple Channels
-
-Example:
-
-```xml
-<channel.main>
-    <express emotion="smile"/>
-    hello
-</channel.main>
-
-<channel.motion>
-    <look target="user"/>
-</channel.motion>
-```
-
-Execution model:
-
-```text
-channel.main:
-express(emotion="smile") → speak("hello")
-
-channel.motion:
-look(user)
-```
-
-Both Channels may run concurrently.
-
----
-
-# 20. Channel Semantics
-
-Channels may support:
-
-- ordered execution;
-- blocking;
-- concurrency;
-- priority;
-- interruption;
-- cancellation;
-- preemption;
-- dependencies;
-- synchronization;
-- resource ownership.
-
-Typical Channels may include:
-
-```text
-main
-speech
-expression
-camera
-head
-body
-motion
-media
-device
-```
-
-Channels are logical scheduling scopes rather than fixed hardware definitions.
-
----
-
-## 20.1 Channel Lock — Exclusive Agent Control
-
-A channel lock gives one authorized Agent exclusive control of an atomic channel group for a finite lease. **Immediate takeover is the initial contract:**
-
-```mermaid
-flowchart LR
-    Request[Request lock] --> Gate[Block new work]
-    Gate --> Cancel[Cancel queued work]
-    Cancel --> Stop[Stop active control and await cleanup]
-    Stop --> Grant[Grant owner lease]
-    Grant --> Next[Owner submits next Action]
-```
-
-- **Decision:** Agent B sends observations and optional advice; Agent A decides whether to request takeover. The runtime grants or rejects it. See the [general interaction](AgentCore/Bus/README.md#signals-and-control-takeover).
-- **Authority:** App policy controls acquisition. Identity binds Agent, runtime instance, session, lease and monotonic deadline; credentials are never model parameters.
-- **Atomicity:** Acquire all requested channels or none. Conflicts fail immediately; no waiting-lock queue or implicit stealing.
-- **Enforcement:** Check calls both at admission and before execution. Non-owner calls fail explicitly. Locking does not stop input delivery or Agent reasoning.
-- **Device boundary:** Stop old control before granting ownership. Lock does not issue `hold`; the owner chooses and executes its next Action. All routes to the same protected hardware, including other channels and Tools, must share ownership enforcement.
-- **Cleanup:** Release, expiry or owner loss cancels work and stops control before reopening. Uncertain cleanup keeps the domain gated. Never replay cancelled Actions or automatically resume motion.
-- **Transport:** Runtime control uses OutputGateway, with outcomes through InputGateway; no new XML or native Tool Call syntax.
-
-✅ `Channel.swift` defines ownership metadata; all channels remain immutable `unlocked`.
-
-❌ Runtime lock operations, enforcement, notifications and device control remain unimplemented. Waiting for the current Action to finish as an alternative handoff mode is outside initial scope.
-
-See [Channel Lock Design](Gateway/Output/Scheduling/README.md#channel-lock-design) for the API sketch, lifecycle, bounds and acceptance checks.
-
----
-
-# 21. Natural Text Handling
-
-For conversational Agents, natural text inside Function Token output may be mapped to a registered Action.
-
-Example:
-
-```xml
-<channel.main>
-    <express emotion="smile"/>
-    hello
-</channel.main>
-```
-
-The Agent may map:
-
-```text
-hello
-```
-
-to:
-
-```text
-speak → Actions.Speech.speak
-```
-
-Result:
-
-```text
-ActionCall {
-    path: Actions.Speech.speak
-    channel: main
-    params: {
-        text: "hello"
-    }
-}
-```
-
-Whether natural text maps to `speak`, `print`, or another Action is defined by the Agent.
-
----
-
-# 22. ActionCall
-
-A ActionCall is a fully resolved Action invocation.
-
-Conceptually:
-
-```swift
-struct ActionCall {
-    let id: UUID
-    let actionPath: ActionPath
-    let channel: ChannelID
-    let params: ActionParameters
-    let priority: Int?
-    let metadata: ActionMetadata
-}
-```
-
-Example:
-
-```text
-ActionCall {
-    actionPath: "Actions.Camera.capturePhoto"
-    channel: "main"
-    params: {}
-}
-```
-
----
-
-# 23. ToolCall
-
-A ToolCall is a fully resolved invocation of a Tool capability.
-
-The Agent resolves the model-visible alias before output.
-
-```text
-detectFace
-   ↓
-Tools.Vision.detectFace
-```
-
-Conceptually:
-
-```swift
-struct ToolCall {
-    let id: UUID
-    let toolPath: ToolPath
-    let params: ToolParameters
-    let metadata: ToolMetadata
-}
-```
-
----
-
-# 24. ActionCall and ToolCall Execution Models
-
-Both Action Calls and Tool Calls are valid Agent outputs and both may return results to the Agent through the Signal loop.
-
-Their runtime behavior is different.
-
-## ActionCall
-
-Action Calls use the Channel execution model.
-
-They support:
-
-- Channel assignment;
-- serial execution within a Channel;
-- parallel execution across Channels;
-- synchronization;
-- priority;
-- interruption;
-- cancellation;
-- preemption;
-- embodied action coordination.
-
-This makes Action Calls especially suitable for:
-
-- multimodal output;
-- embodied control;
-- synchronized speech and motion;
-- camera interaction;
-- device control;
-- robotic behavior.
-
-```text
-Agent
-  ↓
-ActionCall
-  ↓
-Output Gateway
-  ↓
-Channel Scheduler
-  ↓
-Action Runtime
-  ↓
-Result Signal
-```
-
-## ToolCall
-
-Tool Calls follow the model-native Tool Call protocol.
-
-They are executed directly through the Tool Runtime and do not enter the Channel Scheduler.
-
-```text
-Agent
-  ↓
-ToolCall
-  ↓
-Output Gateway
-  ↓
-Tool Runtime
-  ↓
-Result Signal
-```
-
-Tool Calls are primarily suited to discrete capability invocation such as:
-
-```text
-search
-query
-retrieve
-detect
-read
-lookup
-calculate
-```
-
-Both execution paths may return results as Signals to support subsequent reasoning, chain-of-thought-style execution, and long-horizon tasks.
-
----
-
-# 25. Output Gateway
-
-The **Output Gateway** is the centralized execution coordination layer.
-
-It receives only fully resolved Action Calls and Tool Calls.
-
-Its responsibilities are:
-
-```text
-Output Gateway
-├── Receive
-├── Validate
-├── Route by output type
-├── Schedule Action Calls
-├── Dispatch Action Calls
-├── Dispatch Tool Calls
-├── Collect Results
-└── Observe Execution
-```
-
-It does not:
-
-- inspect Agent capability aliases;
-- build Agent prompts;
-- parse raw model output;
-- resolve aliases to real paths.
-
----
-
-# 26. Output Gateway Architecture
-
-```mermaid
-flowchart LR
-
-    A1["Agent A"] --> F1["ActionCall"]
-    A2["Agent B"] --> F2["ActionCall"]
-    A3["Agent C"] --> T1["ToolCall"]
-
-    F1 --> OG
-    F2 --> OG
-    T1 --> OG
-
-    subgraph OG["Output Gateway"]
-        VALIDATE["Validation"]
-        ROUTE["Execution Router"]
-
-        GHOST["Channel Scheduler"]
-        TD["Tool Dispatcher"]
-        AD["Action Dispatcher"]
-
-        VALIDATE --> ROUTE
-
-        ROUTE --> GHOST
-        ROUTE --> TD
-
-        GHOST --> AD
-    end
-
-    AD --> ACTIONS["Action Runtime"]
-    TD --> TOOLS["Tool Runtime"]
-
-    ACTIONS --> RESULT1["Result Signal"]
-    TOOLS --> RESULT2["Result Signal"]
-
-    RESULT1 --> IG["Input Gateway"]
-    RESULT2 --> IG
-```
-
----
-
-# 27. Channel Scheduler
-
-The Channel scheduler is the Action Call scheduling engine inside Output Gateway.
-
-Input:
-
-```text
-ActionCall(express(emotion="smile"), channel=main)
-ActionCall(speak("hello"), channel=main)
-
-ActionCall(look(user), channel=motion)
-```
-
-Scheduling:
-
-```text
-main:
-express(emotion="smile") → speak("hello")
-
-motion:
-look(user)
-```
-
-`main` and `motion` execute concurrently.
-
----
-
-# 28. Actions
-
-`Actions` is the executable behavior library.
-
-Actions are organized by module.
-
-```text
-Actions/
-├── Speech/
-│   ├── Speak
-│   └── StopSpeak
-├── UI/
-│   ├── Print
-│   ├── Express
-│   └── Show
-├── Camera/
-│   ├── Capture
-│   ├── Focus
-│   └── Zoom
-├── Media/
-│   ├── Play
-│   └── Share
-├── Device/
-│   ├── Notify
-│   └── Open
-└── Robot/
-    ├── Move
-    ├── Turn
-    └── Look
-```
-
-Each Action should define metadata including:
-
-```text
-actionPath
-parameterSchema
-defaultChannel
-executionPolicy
-resourceRequirements
-```
-
-Example:
-
-```text
-Actions.Speech.speak
-defaultChannel = speech
-```
-
-```text
-Actions.Robot.look
-defaultChannel = head
-```
-
----
-
-# 29. Action Runtime
-
-The Action Runtime maps resolved Action paths to executable Swift implementations.
-
-```text
-Actions.Speech.speak
-      ↓
-SpeakAction
-      ↓
-TTS
-      ↓
-Speaker
-```
-
-```text
-Actions.Camera.capturePhoto
-      ↓
-CaptureAction
-      ↓
-PlatformKit.Camera
-      ↓
-Camera Hardware
-```
-
-```text
-Actions.Robot.move
-      ↓
-MoveAction
-      ↓
-PlatformKit.ExternalDevice
-      ↓
-Motor Controller
-```
-
-Action execution may produce a result.
-
-The result is converted into a Signal and returned through Input Gateway when required.
-
----
-
-# 30. Tools
-
-Tools provide callable capabilities exposed through model-native Tool Call protocols.
-
-```text
-Tools/
-├── Vision/
-├── Media/
-├── Memory/
-├── Search/
-├── Storage/
-├── Network/
-└── System/
-```
-
-Typical explicit paths:
-
-```text
-Tools.Vision.detectFace
-Tools.Media.search
-Tools.Memory.retrieve
-Tools.Search.web
-```
-
-Agents may expose compact local aliases for these paths.
-
----
-
-# 31. Tool Runtime
-
-Tool Runtime executes resolved Tool Calls directly.
-
-```text
-ToolCall
-   ↓
-Tool Runtime
-   ↓
-Tool Implementation
-   ↓
-Tool Result
-   ↓
-Signal
-   ↓
-Input Gateway
-```
-
-Tool Calls bypass Channel scheduling.
-
----
-
-# 32. Internal Agent Communication
-
-Agents communicate through typed internal signals, without references to other Agent implementations or shared mutable business state. The transport is process-local and asynchronous. It supports direct requests with one terminal reply and event publication to an explicit Agent or configured topic subscribers. Agent processing may use deterministic logic, models or tools; receiving a signal does not require model inference.
-
-## 32.1 Communication boundary
-
-All Agent-originated messages pass through OutputGateway; all deliveries, replies and transport failures enter the receiving runtime through InputGateway. InternalSignalBus owns bounded transport, correlation, deadlines and delivery state. AgentCore declares transport ports; the App injects Gateway implementations to keep module dependencies acyclic.
-
-```mermaid
-flowchart LR
-    A[Agent A business logic] --> Port[AgentContext messaging port]
-    Port --> OG[OutputGateway: identity and permission validation]
-    OG --> Bus[InternalSignalBus: bounded transport and request tracking]
-    Bus --> IG[InputGateway: destination and lifecycle validation]
-    IG --> B[Agent B business inbox]
-    B --> Reply[Single-use reply port]
-    Reply --> OG
-    IG --> Completion[Agent A runtime completion endpoint]
-    Completion --> A
-```
-
-Function Token and native Tool Call remain the two model generation protocols. Internal communication is a typed runtime API, not XML syntax, an ActionCall, a ToolCall or a free-form control string. Models cannot provide trusted source identity or transport permissions. Agent logic may translate validated model intent into an authorized message, but no communication syntax is added to prompts by default.
-
-## 32.2 Message model and configuration
-
-An internal signal carries a runtime-issued message ID, trusted source/target Agent identities and incarnation IDs, session scope, causal root/parent IDs, an absolute monotonic deadline, hop count, a versioned event/operation name and a bounded structured payload. Replies correlate with a request ID and are bound to the original callee/caller. Every response has one terminal outcome: success, typed business failure or transport failure.
-
-Each Agent declares outgoing event/request permissions, accepted event/request schemas and static topic subscriptions. App composition validates both ends and creates immutable communication policy. These declarations belong in a future versioned Agent JSON schema; current JSON v3 remains unchanged until implementation. Wildcard addressing, dynamic subscriptions, arbitrary Swift objects and inline media are outside the initial scope.
-
-## 32.3 Routing and execution
-
-Requests require one explicit destination. Events use either one destination or a topic with a bounded immutable recipient snapshot. Topics do not broadcast to every Agent implicitly. SignalRouter resolves authorized recipients deterministically; InternalSignalBus tracks each selected delivery, and InputGateway validates destination capabilities/lifecycle immediately before inbox admission. Fan-out is best-effort with per-recipient acceptance/rejection, not an atomic broadcast.
-
-Sending acknowledges transport admission, not handling or side-effect completion. A request returns a cancellable handle after admission; awaiting its result is separate from sending. Replies enter a reserved runtime completion endpoint, bypassing the ordinary business inbox while still passing through InputGateway. Thus an Agent may await a result without blocking delivery of that result. Causal ancestry rejects cyclic nested requests; replies do not create another business turn automatically.
-
-## 32.4 Bounds, lifecycle and reliability
-
-All queues and tracking tables have explicit count/byte limits and reject new work when full. Delivery is FIFO per source/destination lane; different destinations may progress concurrently. Replies/cancellation/deadline handling have reserved state independent of full business queues. The design does not guarantee global order, reliable publication, persistence or exactly-once side effects.
-
-Within one process incarnation and the documented deduplication window, each delivery key is admitted to the destination inbox at most once. There is no automatic retransmission. Expired, cancelled or stale-incarnation messages are not replayed. Stop/session closure rejects new work, cancels related requests, invalidates reply ports and joins affected work. Cancellation is cooperative and cannot roll back already executed Actions.
-
-## 32.5 Status and implementation ownership
-
-- ✅ AgentManager registration/lifecycle and InputGateway directed/fan-out delivery provide foundations.
-- ✅ Detailed contracts, algorithms, capacities, diagrams and acceptance criteria are specified in [AgentCore/Bus](AgentCore/Bus/README.md#inter-agent-communication-design).
-- ❌ InternalSignalBus, messaging ports, request tracking, reply completion endpoints and communication configuration are not implemented.
-- ❌ Durable messaging, remote transport, dynamic discovery and streaming request replies are outside the initial implementation scope.
-
-The detailed design is authoritative for transport semantics. Create executable files only when implementing their stages; the Bus directory currently contains documentation only.
-
----
-
-# 33. ModelKit
-
-`ModelKit` provides local model capabilities.
-
-```text
-ModelKit/
-├── Speech/
-│   ├── ASR
-│   └── TTS
-├── Language/
-│   ├── LLM
-│   ├── VLM
-│   └── JEV
-├── Vision/
-│   ├── YOLO
-│   ├── RetinaFace
-│   └── MediaPipe
-├── Embedding/
-├── Core/
-│   ├── AudioFrame / AudioFormat
-│   ├── ModelResource / ModelContext
-│   └── OperationAdmission
-├── Defaults/                    # Internal model selection and default bindings
-├── Management/
-│   ├── ModelManager
-│   └── ModelRegistration
-└── Backends/
-    ├── CoreML
-    ├── CoreAI
-    └── MLX
-```
-
-ModelKit is responsible for:
-
-- model registration;
-- loading/unloading;
-- warmup;
-- caching;
-- memory management;
-- inference;
-- model scheduling.
-
-Models are converted before integration into MobileHarness.
-
-## 33.1 Shared Model Lifecycle
-
-- App owns one ModelManager created by ModelKitDefaults. Defaults registers factories, stable identities, default capabilities and local resource directories internally.
-- `get(id, as: .chat)` returns a shared capability instance and ensures loading; `load: false` supports lightweight composition. Consumers receive only capability protocols.
-- Adapters access backend resources through the manager-owned ModelContext/ModelResource. Concurrent get/load is coalesced; inference remains explicitly bounded.
-- The manager unifies registry lookup, instance caching, load, warmup, unload, status and terminal shutdown. Development download profiles select fixed upstream revisions; backend SDKs load the packaged files directly.
-- Ending a voice turn, XML failure or stopping recording cancels sessions and releases usage, without unloading weights. Explicit unload waits for active usage; shutdown cancels and joins it. Existing handles load again after unload.
-- Limits: 32 registrations, four concurrent factories, four concurrent weight loaders, 32 construction/load waiters per model and one inference lease per model, including system speech. Capacity exhaustion rejects without a waiting inference queue.
-
-```mermaid
-flowchart LR
-    App -->|Register / get / lifecycle| Manager[ModelManager]
-    Manager --> Context[ModelContext / ModelResource]
-    Manager -->|Shared capabilities| Consumers[Agent / Gateway / Actions]
-    Consumers -->|Session operations| Adapter[Model adapter]
-    Adapter -->|Lease / cleanup| Context
-```
-
-✅ Shared lifecycle and registry integration are implemented. ❌ Timed idle eviction, measured cross-model memory budgeting and physical-device stability acceptance remain outstanding. Detailed algorithms: [ModelKitRuntime](ModelKit/Management/README.md).
-
-
----
-
-# 34. PlatformKit
-
-`PlatformKit` abstracts OS, device, sensors, and external hardware.
-
-```text
-PlatformKit/
-├── Camera/
-├── Audio/
-│   ├── Microphone
-│   └── Speaker
-├── Sensors/
-├── Storage/
-├── Network/
-├── Device/
-└── ExternalDevice/
-    ├── BLE
-    ├── Robot
-    └── IoT
-```
-
-PlatformKit exposes device primitives without Agent business semantics.
-
----
-
-# 35. End-to-End Voice Example
-
-User says:
-
-```text
-“Look here and take a photo.”
-```
-
-```mermaid
-sequenceDiagram
-
-    participant U as User
-    participant IG as Input Gateway
-    participant A as Photography Agent
-    participant OG as Output Gateway
-    participant ACT as Action Runtime
-    participant W as World
-
-    U->>IG: Audio Stream Signal
-    IG->>IG: ASR
-    IG->>A: Text Signal
-
-    A->>A: Process / LLM generation
-    A->>A: Parse Function Token output
-    A->>A: Resolve capabilities
-
-    A->>OG: ActionCall(express(emotion="smile"), main)
-    A->>OG: ActionCall(speak("Look here"), main)
-    A->>OG: ActionCall(capturePhoto, main)
-
-    OG->>OG: Channel scheduling
-
-    OG->>ACT: Actions.UI.express
-    ACT->>W: Smile
-
-    OG->>ACT: Actions.Speech.speak
-    ACT->>W: "Look here"
-
-    OG->>ACT: Actions.Camera.capturePhoto
-    ACT->>W: Capture
-```
-
-Because all three Action Calls use `main`, they execute sequentially.
-
----
-
-# 36. Default and Explicit Channel Example
-
-Registered Action metadata:
-
-```text
-express(emotion="smile")
-→ Actions.UI.express
-→ defaultChannel = expression
-
-speak
-→ Actions.Speech.speak
-→ defaultChannel = speech
-
-look
-→ Actions.Robot.look
-→ defaultChannel = head
-```
-
-Model output:
-
-```xml
-<express emotion="smile"/>
-hello
-<look target="user"/>
-```
-
-may produce:
-
-```text
-expression:
-express(emotion="smile")
-
-speech:
-speak("hello")
-
-head:
-look(user)
-```
-
-These Channels may execute concurrently.
-
-Explicit grouping:
-
-```xml
-<channel.main>
-    <express emotion="smile"/>
-    hello
-    <look target="user"/>
-</channel.main>
+    External --> Adapt
+    Adapt --> Input
+    Input -->|Signals and results| Agents
+    Agents -->|Messages and behavior calls| Output
+    Output -->|Agent-to-Agent communication| Input
+    Output --> Skills
+    Skills --> Effects
+    Effects --> External
+    Skills -.->|Execution feedback via Gateway| Input
 ```
 
-produces:
+Feedback follows the registered Tool semantics and Action feedback policy. Admission and completion are different milestones; their transport and buffering rules are defined in [Communication Framework](#communication-framework).
 
-```text
-main:
-express(emotion="smile") → speak("hello") → look(user)
-```
+This loop covers Agent business communication. App assembly, lifecycle coordination and UI workflows also use their typed host interfaces. Detailed internal paths are documented in [App](App/README.md#internal-composition), [Agents](Agents/README.md#internal-structure-and-data-flow) and [Gateway](Gateway/README.md#internal-flow).
 
-The explicit `main` Channel forces serialization across Actions that otherwise have different default Channels.
+<a id="37-project-structure"></a>
 
----
+### Project Structure
 
-# 37. Project Structure
+The layout below maps those roles to source ownership and succeeds the former section 37. Each maintained directory has a README describing its purpose, design and implemented/outstanding scope; downloaded model artifacts are excluded.
 
 ```text
 MobileHarness/
-│
-├── App/
-│   ├── MobileHarnessApp.swift
-│   └── AppContainer.swift
-│
-├── Experience/
+├── App/                    # Application host and explicit composition
+│   ├── Composition/        # AppAssembly and runtime/model assembly
+│   │   └── Behaviors/       # Independent BehaviorAssembly target
+│   ├── Lifecycle/          # Voice/camera sessions and cleanup
+│   ├── Workflows/          # Settings, history and diagnostics (AppWorkflows target)
+│   └── Adapters/           # Effect endpoints, media and native preview bridges
+├── UI/                     # Independent pages, state and interaction target
 │   ├── Conversation/
-│   ├── Character/
+│   ├── Components/
 │   ├── Camera/
-│   └── Components/
-│
-├── Gateway/
+│   ├── Settings/
+│   └── Diagnostics/
+├── Agents/                 # Shared core and business Agent source ownership
+│   ├── Core/               # Independent AgentCore compilation target
+│   │   ├── Runtime/        # Agent registry, manager and lifecycle
+│   │   ├── Capability/     # JSON, model catalog and internal permissions
+│   │   ├── Generation/     # Function Token, Channel/wait and Tool parsers
+│   │   ├── Output/         # Resolved calls and trusted envelopes
+│   │   └── Communication/  # Typed messages and routing policy
+│   ├── Assistant/          # Conversation generation and interpretation
+│   ├── SpeechPerception/   # Shared VAD/ASR and speech observations
+│   ├── SpeechSynthesis/    # Directed FIFO text-to-audio synthesis
+│   └── VisionPerception/   # Pose inference, gaze and skeleton output
+├── Gateway/                # Input/output validation, routing and scheduling
 │   ├── Input/
-│   │   ├── InputGateway.swift
-│   │   ├── Signal.swift
-│   │   ├── SignalType.swift
-│   │   ├── SignalAdapter.swift
-│   │   ├── ContextBuilder.swift
-│   │   └── Routing/
-│   │       ├── SignalRouter.swift
-│   │       ├── LogicRouter.swift
-│   │       ├── JEVRouter.swift
-│   │       └── AgenticRouter.swift
-│   │
-│   └── Output/
-│       ├── OutputGateway.swift
-│       ├── Validation/
-│       │   └── OutputValidator.swift
-│       ├── Routing/
-│       │   └── ExecutionRouter.swift
-│       ├── Scheduling/
-│       │   ├── Channel.swift
-│       │   └── ChannelScheduler.swift
-│       └── Dispatch/
-│           ├── ActionDispatcher.swift
-│           └── ToolDispatcher.swift
-│
-├── AgentCore/
-│   ├── Agent.swift
-│   ├── AgentDescriptor.swift
-│   ├── AgentContext.swift
-│   │
-│   ├── Runtime/
-│   │   ├── AgentRuntime.swift
-│   │   ├── AgentManager.swift
-│   │   ├── AgentRegistry.swift
-│   │   ├── AgentLifecycle.swift
-│   │   └── AgentStatus.swift
-│   │
-│   ├── State/
-│   │   ├── AgentState.swift
-│   │   └── StateStore.swift
-│   │
-│   ├── Capability/
-│   │   ├── CapabilityRegistry.swift
-│   │   ├── ActionRegistration.swift
-│   │   ├── ToolRegistration.swift
-│   │   ├── CapabilityAlias.swift
-│   │   └── CapabilityContextBuilder.swift
-│   │
-│   ├── Generation/
-│   │   ├── AgentGenerator.swift
-│   │   ├── FunctionTokenParser.swift
-│   │   ├── ToolCallParser.swift
-│   │   └── ChannelParser.swift
-│   │
-│   ├── Output/
-│   │   ├── AgentOutput.swift
-│   │   ├── ActionCall.swift
-│   │   └── ToolCall.swift
-│   │
-│   └── Bus/
-│       └── InternalSignalBus.swift
-│
-├── Agents/
-│   ├── Assistant/
-│   ├── Vision/
-│   ├── Photography/
-│   ├── Tracking/
-│   ├── Media/
-│   └── Control/
-│
-├── Actions/
-│   ├── Speech/
-│   ├── UI/
-│   ├── Camera/
-│   ├── Media/
-│   ├── Device/
-│   └── Robot/
-│
-├── ActionRuntime/
-│   ├── ActionRegistry.swift
-│   ├── ActionExecutor.swift
-│   └── ActionResult.swift
-│
-├── Tools/
-│   ├── Vision/
-│   ├── Media/
-│   ├── Memory/
-│   ├── Search/
-│   ├── Storage/
-│   ├── Network/
-│   └── System/
-│
-├── ToolRuntime/
-│   ├── ToolRegistry.swift
-│   ├── ToolExecutor.swift
-│   └── ToolResult.swift
-│
-├── ModelKit/
+│   └── Output/             # Validation, routing, dispatch, scheduling, results and resources
+├── Actions/                # One target: scheduled execution and behaviors
+│   ├── Runtime/            # ActionRegistry, ActionExecutor and invocation
+│   ├── Speech/             # Audio-ID playback and awaited completion
+│   └── UI/                 # Captions, voice state, expressions and turns
+├── Tools/                  # One target: direct execution and functions
+│   ├── Runtime/            # ToolRegistry and ToolExecutor
+│   ├── System/             # Fixed runtime information
+│   └── UI/                 # Completion-only skeleton display
+├── Storage/                # Core cache, persistence and local synchronization
+│   ├── Audio/              # StorageAudio: PCM handles
+│   └── Chat/               # StorageChat: conversation records and journal
+├── ModelKit/               # Independent SDK and separate provider targets
 │   ├── Core/
-│   ├── Defaults/
-│   ├── Management/
 │   ├── Speech/
 │   ├── Language/
 │   ├── Vision/
-│   ├── Embedding/
+│   ├── Defaults/
+│   ├── Management/
 │   └── Backends/
-│       ├── CoreML/
-│       ├── CoreAI/
-│       └── MLX/
-│
-├── PlatformKit/
-│   ├── Camera/
+├── PlatformKit/            # Device/OS I/O and capability validation
 │   ├── Audio/
-│   ├── Sensors/
-│   ├── Storage/
-│   ├── Network/
-│   ├── Device/
-│   └── ExternalDevice/
-│
-├── Resources/
-│   ├── Models/
-│   ├── Prompts/
-│   └── Assets/
-│
-└── Tests/
-    ├── GatewayTests/
-    ├── AgentTests/
-    ├── CapabilityTests/
-    ├── ActionTests/
-    ├── ToolTests/
-    └── ModelTests/
+│   ├── Vision/
+│   ├── Connectivity/
+│   └── Core/
+└── Resources/              # Privacy, model profiles and local artifacts
+
+Tests/                      # Root module tests and integration/model evaluations
+Config/                     # Shared configuration; local signing is ignored
+scripts/                    # Checks, builds and provisioning
+MobileHarness.xcodeproj/    # App/framework schemes and source navigation
 ```
 
----
+#### Compilation map
 
-# 38. Core Interfaces
+Root [Package.swift](../Package.swift) compiles shared sources into independently tested targets. The Xcode application targets compile the host and link those targets. The table combines source mapping and direct project dependencies; tests and system frameworks are omitted from dependency lists.
 
-```swift
-struct Signal {
-    let id: UUID
-    let type: SignalType
-    let source: SignalSource
-    let timestamp: TimeInterval
-    let payload: SignalPayload
-    let metadata: SignalMetadata
-}
+| Source path | Target | Direct dependencies |
+| --- | --- | --- |
+| `App/` excluding the two subtargets below | Xcode App targets | Composition root; see [App](App/README.md) for bindings |
+| `App/Composition/Behaviors/` | BehaviorAssembly | AgentCore, Actions, Tools |
+| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, StorageChat, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit |
+| `UI/` | UI | AgentCore, StorageChat; shared values only |
+| `Agents/Core/` | AgentCore | None |
+| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio |
+| `Gateway/` | Gateway | AgentCore, Actions, Tools; execution uses Runtime APIs only |
+| `Actions/` including `Runtime/` | Actions | AgentCore, StorageAudio |
+| `Tools/` including `Runtime/` | Tools | AgentCore |
+| `Storage/` excluding `Audio/` and `Chat/` | Storage | None |
+| `Storage/Chat/` | StorageChat | Storage |
+| `Storage/Audio/` | StorageAudio | Storage, AgentCore, ModelKit |
+| `PlatformKit/` | PlatformKit | None |
+| `ModelKit/` shared capability sources | ModelKit | None |
+| `ModelKit/Management/` | ModelKitRuntime | ModelKit |
+| `ModelKit/Defaults/` | ModelKitDefaults | ModelKit, ModelKitRuntime and registered model adapters |
+| ModelKit concrete adapters and backends | Separate targets | See the [ModelKit target map](ModelKit/README.md) |
+| `Resources/` | App resource staging | Local weights remain ignored |
+| Root `Tests/` | Module and integration test targets | Tested targets; no duplicated production sources |
+
+#### Layout exceptions and invariants
+
+- **Physical nesting does not imply one target.** AgentCore stays independent inside Agents so shared contracts cannot depend on business policy. AppWorkflows and BehaviorAssembly are separately testable inside App. Model management and concrete adapters remain separate from the ModelKit SDK.
+- **Behavior ownership and host bindings are separate.** Actions/Tools include their Runtime APIs; domain modules own implementations. BehaviorAssembly validates their coverage against Agent permissions, and App supplies concrete capabilities. Injected UI/device callbacks do not introduce reverse imports.
+- **Foundations remain independent.** ModelKit and PlatformKit have no dependency on each other or on business Agents. StorageAudio bridges media and storage contracts; it replaced the former SpeechRuntime cache owner ([ADR 0056](../docs/adr/0056-storage-audio-migration.md)). UI accesses shared values, not runtime/model/device services.
+- **One source has one compilation owner per target.** Do not recreate `Packages/HarnessKit/Sources`, duplicate sources or add empty future-domain implementations. Directory migrations must update Package.swift, Xcode navigation and affected READMEs together. Unimplemented domains stay in the [Roadmap](../docs/Roadmap.md).
+
+Source consolidation and App/UI separation are recorded in [ADR 0063](../docs/adr/0063-module-directory-consolidation.md) and [ADR 0064](../docs/adr/0064-app-ui-boundaries.md). Their dated migration checks are retained in the [Roadmap](../docs/Roadmap.md).
+
+The next part describes module implementations; Part III explains their shared runtime protocols.
+
+## Part II — Module Design
+
+### App
+
+[App](App/README.md) hosts the application and owns the explicit AppAssembly composition root. `AppContainer` prepares capabilities and platform services; `ApplicationRuntime` assembles the shared journal, AgentManager, communication policy and gateways, and constructs Assistant with that journal.
+
+#### Domain-owned behavior assembly
+
+[BehaviorAssembly](App/Composition/Behaviors/README.md) combines domain-owned Action/Tool definitions and catalogs with typed App-injected capabilities. It validates implementation coverage against assembled Agent permissions before producers start; App does not register individual behavior functions. Model-callable permissions remain in Agent JSON and fixed internal permissions in Agent code. New device capabilities or lifetime changes still require host bindings. Target dependencies are listed in the compilation map; [ADR 0067](../docs/adr/0067-domain-owned-behavior-assembly.md) records the assembly decision.
+
+#### Application lifetimes
+
+VoiceSessionCoordinator and CameraCoordinator own separate voice/camera lifetimes, and VisionSession bridges camera frames through the shared Agent runtime. AppAssembly supplies one ModelKit resource root; consumers receive capability interfaces from the process-wide manager. App/Adapters adapts media, resolves the current chat binding and binds one complete typed voice/camera endpoint. AppWorkflows coordinates settings transactions, history archive/title operations and explicit speech/chat diagnostics. Session owners retain startup, cancellation and cleanup; UI owns page state and controls. The complete source/responsibility inventory lives in the [App README](App/README.md) and [UI README](UI/README.md).
+
+✅ Shared assembly, independent camera/voice sessions and explicit handlers. ❌ Persistent background supervision and independent multi-window Agent namespaces.
+
+### UI
+
+[UI](UI/README.md) contains MainActor pages, observable page state and user interaction interfaces, grouped by feature. `Conversation` owns view/state, `Components` owns reusable visuals, `Camera` accepts an injected native preview, `Settings` owns settings/history views and state, and `Diagnostics` exposes state/control interfaces. UI compiles independently, imports shared record/overlay values only, and never references App coordinators or constructs models, devices or stores. The native preview bridge remains in App/Adapters.
+
+`Actions/UI` and `Tools/UI` remain behavior directories within Actions and Tools. They update UI state through App-bound handlers; the `UI.*` Action/Tool namespace does not imply a dependency on the Swift UI target.
+
+Agent-selected UI changes arrive through registered Actions or Tools. Device audio telemetry and user/OS lifecycle resets are App-owned presentation inputs. Expressions use semantic emotion values mapped to procedural eyes; they are not emoji commands.
+
+✅ Conversation, camera controls, captions, eye expressions and audio spectrum presentation. ❌ Physical-device visual/latency acceptance; Debug simulations must remain labeled.
+
+### Gateway
+
+[Gateway](Gateway/README.md) owns protocol admission and coordinated output. It imports neither model capabilities nor device adapters and performs no perception inference.
+
+- **Input:** validate external inputs, select static subscribers or explicit targets, and validate internal deliveries before `Agent.receive`. Production uses CommunicationPolicy; publish requires configured subscriptions and send requires an explicit target. No default-Agent routing fallback exists.
+- **Output/Validation:** recheck resolved executable calls and event permissions.
+- **Output/Routing and Dispatch:** classify outputs, dispatch Actions/Tools, and return data Tool results through InputGateway.
+- **Output/Scheduling:** bound Action queues, serialize by Channel within task phases, coordinate nested wait dependencies and process-wide module exclusion, completion and cancellation.
+- **Output/Results and Resources:** deliver bounded Action feedback and arbitrate declared resources across Action, Tool and host paths; see [execution feedback and resources](#action-feedback-and-resource-ownership).
+- **Internal messaging:** bind sender identity, select recipients and directly hand validated events to InputGateway; registered runtime observers do not create implicit Agent subscriptions.
+
+✅ Static publish/send, output validation and execution coordination. ❌ Dynamic subscriptions and model-assisted routing; any future model routing decision belongs in an Agent.
+
+### Agents/Core (AgentCore target)
+
+[AgentCore](Agents/Core/README.md) defines the reusable contracts and mechanisms without business policy. Root contracts describe Agents, identity, descriptors, input payloads and errors. `Runtime` manages instances and lifecycle; `Capability` validates configuration and local names; `Generation` parses generated output; `Output` defines resolved calls and context; `Communication` defines messaging contracts, receipts and shared communication policy.
+
+An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input: AgentInput) async throws` entry and an output stream. Concrete Agents own their bounded inboxes and domain state. Shared ToolResult, ActionResult, execution-owner and lease values belong here to avoid dependencies on execution implementations; bounded Agent receipt history lives in Core/Runtime.
+
+✅ Actor contracts, lifecycle, configuration, generation and event transport. ❌ Generic AgentContext/AgentRuntime/StateStore, general restart/health supervision and request/reply infrastructure.
+
+### Agents
+
+[Agents](Agents/README.md) implements domain actors. Each versioned `<AgentName>.agent.json` declares model-callable Actions grouped by Channel, native Tools and communication permissions. Fixed internal behavior and text mappings belong to Agent code. Each Agent resolves its own aliases before output and uses only injected model capability protocols. Agents compose skills by emitting resolved calls through OutputGateway, never by directly calling concrete Actions, Tools or other Agents.
+
+| Agent            | Basic design and subdesigns                                                                                                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Assistant        | Bounded input and durable ten-round context; consumes user text, final speech, phase and Tool results; streams chat through shared generation parsers into resolved calls                                           |
+| SpeechPerception | Bounded PCM admission; LiveSpeechInput and VoiceActivitySegmenter own VAD/ASR sessions, segmentation/merging and partial/final observations; explicit UI Actions own recognition presentation |
+| VisionPerception | FrameChangeFilter selects frames; shared pose inference feeds independently bounded observation publication and latest skeleton Tool / eye gaze Action output                                                   |
+| SpeechSynthesis | Directed serial synthesis into owner-scoped StorageAudio handles; playback remains a separate Action |
+| Photographer     | Proposed camera-motion policy in [docs](../docs/Photographer-Proposal.md); no active runtime or display responsibility                                                                                                             |
+
+✅ Shared speech/vision perception and conversational Assistant. ❌ Photographer motion policy, ReflexAgent and additional task Agents. Perception freshness does not establish robot safety or sampling guarantees.
+
+### Actions
+
+[Actions](Actions/README.md) implements behavior that uses Channel scheduling. `Speech.speak(audioID)` consumes shared StorageAudio PCM prepared by the independent SpeechSynthesisAgent, while its scheduled handler still awaits actual playback completion. `UI` implements caption, expression, voice-state and turn-boundary operations through App-bound MainActor services.
+
+Domain modules own behavior definitions, parameter validation and function bindings; Agent JSON owns available aliases/default Channels. App supplies typed execution capabilities through BehaviorAssembly. Shared physical resources must have coherent ownership across behavior functions.
+
+✅ Speech and UI behaviors, including `UI.express(emotion:)`. ❌ Photo-capture, robot, media and other device Actions; no separate smile Action is introduced.
+
+#### Actions/Runtime
+
+[Actions/Runtime](Actions/Runtime/README.md) supplies validated ActionDefinition registration, trusted ActionInvocation values, shared typed argument readers and awaited execution. Each admitted call receives an execution ID; bounded payload-free diagnostics distinguish admission, execution and effect status. ActionExecutor validates typed completion; finite/state handlers can use a Void adapter, while activity start/stop completions identify the service-owned activity. State acceptance does not promise rendered or physical completion.
+
+Gateway owns Channel/wait scheduling, feedback and resource coordination; the executor does not parse markup, resolve aliases or decide policy. [ADR 0065](../docs/adr/0065-action-runtime-contracts.md) and [ADR 0066](../docs/adr/0066-action-results-resource-leases.md) record the contract decisions.
+
+✅ Validated registration, correlated invocation, typed completion and execution diagnostics. ❌ Generic activity supervision, per-Action deadlines and physical completion acceptance remain outstanding; current domain conventions are maintained in [Actions](Actions/README.md).
+
+### Tools
+
+[Tools](Tools/README.md) provides direct callable functions. `runtimeInfo` returns fixed configuration text, not live health. `UI.showPose` validates a bounded skeleton projection and awaits an injected display update; it may have a presentation side effect despite being a Tool.
+
+✅ System information and skeleton display. ❌ Search, storage, network, memory and additional model/device tools.
+
+#### Tools/Runtime
+
+[Tools/Runtime](Tools/Runtime/README.md), compiled within Tools, provides ToolRegistry and ToolExecutor. Domain definitions assembled through BehaviorAssembly select either a data-returning handler or a completion-only Void handler. Tool execution bypasses ChannelScheduler; the registration determines feedback semantics, never model arguments.
+
+Data-returning calls produce correlated ToolResult through Gateway. Void calls complete without feedback; failure propagates to the caller. Awaiting display-state acceptance does not guarantee the screen has rendered a frame.
+
+✅ Both handler modes and correlated data feedback. ❌ General Tool timeout/retry supervision and durable execution.
+
+### Storage
+
+[Storage](Storage/README.md) provides Foundation-only bounded memory streams and single-checkout handles. [StorageAudio](Storage/Audio/README.md) adapts ModelKit PCM frames and Agent identity to those primitives; App injects the shared audio store into synthesis and playback. Storage core remains independent of ModelKit and SwiftUI. LocalDocumentStore synchronizes bounded cached documents with durable files; App settings and the Assistant conversation journal are durable consumers. General reclaimable disk caches and persistent media remain later stages.
+
+✅ Both Storage targets are registered. Production PCM uses the memory cache; user settings use revision-checked local persistence with write-through caching. ❌ Persistent media, disk cache and memory records remain future work.
+
+#### Persistent conversation history
+
+[Assistant](Agents/Assistant/README.md) and App history workflows share one [Storage journal](Storage/README.md#conversation-journal). Logical conversations survive voice sessions and App restarts; the latest ten completed rounds supply model context. Records retain original user input, received model text, actual requests and failures for inspection.
+
+Start New atomically archives the current conversation and creates an empty one. A separate metadata-only request generates the archive title; browsing history never replays Actions. [ADR 0060](../docs/adr/0060-persistent-conversation-history.md) records the boundary. Device performance and live-model title quality remain acceptance work.
+
+### ModelKit
+
+[ModelKit](ModelKit/README.md) is an independent capability SDK for model-driven data processing; general business algorithms remain in their owning modules. `Speech`, `Language` and `Vision` expose typed capabilities; `Core` supplies media/session/resource contracts. Concrete model SDKs live in separate adapter targets, and `Backends` encapsulates engines.
+
+`Defaults` owns internal providers/default bindings. `Management` compiles as ModelKitRuntime and supplies ModelManager lifecycle and acquisition. Production uses one process-wide manager; consumers receive capability protocols only. App provides resources but does not register concrete providers. Construction/registration require ModelAssembly SPI; model management remains independent of Agents and UI.
+
+The default TTS adapter is `Speech/TTS/MossNano` → ModelKitMossNano, backed by `Backends/MossCoreML` → ModelKitMossCoreML. [ADR 0058](../docs/adr/0058-moss-tts-nano.md) records its replacement of the Kokoro default; device evidence and remaining acceptance live in [MOSS validation](../docs/Moss-Validation.md).
+
+✅ ASR/TTS/VAD/chat/pose integration, shared lifecycle, AudioFrame/ImageFrame and separate backend targets. ❌ General video sessions, further model capabilities, cross-model scheduling and independent SDK distribution.
+
+### PlatformKit
+
+[PlatformKit](PlatformKit/README.md) owns device/OS data I/O through public APIs with capability and permission validation. `Audio` owns microphone/speaker lifecycle, conversion and telemetry; `Vision` owns camera sessions, frames and gray sampling; `Connectivity` declares external-device transport; `Core` holds cross-domain contracts.
+
+Small capability domains remain flat until concrete implementations justify subdirectories. App bridges PlatformKit media into AgentCore transport and ModelKit values; the two Kits do not depend on each other.
+
+✅ Foreground audio and camera I/O. ❌ Concrete external-device transports and robot control. Physical safety cannot rely on iOS background execution.
+
+### Resources
+
+[Resources](Resources/README.md) contains privacy declarations, model provisioning profiles and ignored local artifacts. App supplies the resource root; providers load their configured model files. Platform/backend selection is explicit, and unavailable models report errors rather than silently falling back.
+
+✅ Local artifact provisioning and packaged resource selection. ❌ Broader model distribution and physical-device acceptance. Secrets, local signing settings, model weights and user media must not be committed.
+
+## Part III — Key Techniques
+
+This part follows the runtime path: input representation and routing, Agent generation, Action execution, speech playback, session presentation, then model/device boundaries and concurrency rules.
+
+### Signal and Media Representation
+
+Signal is the conceptual input abstraction; `AgentInput` is its implemented type. There is no second parallel Signal type. Payload is separate from source, contract/version, session, turn, sequence, capture time, incarnation, causal root/parent and monotonic admission deadline.
+
+| Payload                | Meaning                                                       |
+| ---------------------- | ------------------------------------------------------------- |
+| Text / runtime event   | User text or explicit runtime input                           |
+| Audio / image          | Bounded PCM or image data / controlled in-process attachment  |
+| Perception observation | Typed transcript, speech phase or pose without original media |
+| ToolResult             | Result correlated with its originating call and session       |
+| ActionResult / ActivityEvent | Runtime execution outcome / ongoing activity observation with trusted ownership |
+
+Media streams are successive typed inputs. JSON v5 configures Agents; it is not the audio/image transport format. App-owned attachments bridge native frames without making AgentCore depend on model/platform frameworks. Remote serialization, compressed video and additional physical sensors remain future work. Bounds and value contracts live in [Input](Gateway/Input/README.md) and [Communication](Agents/Core/Communication/README.md).
+
+<a id="32-internal-agent-communication"></a>
+
+### Communication Framework
+
+Communication covers external input, internal Agent observations and Tool-result return. **Gateways perform intermediate validation, metadata construction and routing. Agent inboxes own pending messages. There is no independent message Bus.**
+
+```mermaid
+flowchart TD
+    Config[Agent JSON declarations] --> Policy[App assembles CommunicationPolicy]
+    External[App: user / microphone / camera / runtime] --> Input[InputGateway: validate / direct admission]
+    Sender[Sending Agent] --> Port[Identity-bound AgentMessaging]
+    Port --> Output[OutputGateway: permission / metadata / target selection]
+    Policy -.-> Output
+    Policy -.-> Input
+    Output --> Input
+    Tool[Returning ToolResult] -->|Original Agent / session| Input
+    Input --> Receive[Target Agent.receive]
+    Receive --> Inbox[Agent-owned bounded inbox]
 ```
 
-```swift
-protocol Agent: Actor {
-    var descriptor: AgentDescriptor { get }
+#### Subscription ownership and target selection
 
-    func receive(_ signal: Signal) async
+Each Agent JSON declares `inputs` (supported contract/version/kind), `subscriptions` (exact contract/source/topic), `publications` (publishable contracts) and `sends` (allowed contract/target pairs). App validates these into an immutable policy. Agents do not register listeners dynamically. Topic currently equals contract; there are no wildcards or implicit fallback recipients.
 
-    func start() async throws
-    func pause() async
-    func resume() async
-    func stop() async
-}
+External publish/send selects targets in InputGateway. Internal publish/send selects targets in OutputGateway after outbound permission checks. Supporting an input is distinct from subscribing to it: directed sends bypass subscription matching but preserve supported-contract validation.
+
+OutputGateway binds source identity/incarnation, sequence, session, turn and causal parent into the envelope. It resolves live target identities and directly invokes the module-internal InputGateway entry. Public external entry points reject forged internal incarnations. Child deadlines cannot outlive their parent.
+
+#### Direct admission, lifetime and ownership
+
+InputGateway uses structured per-target tasks and a common capacity boundary for external and internal admission. It checks source/target identity, session, supported payload, cancellation and message expiry before `receive`. One rejected destination does not suppress successful peers, but the aggregate report awaits all targets.
+
+Ordinary `receive` must promptly validate and enqueue or reject; it must not await inference or inbox space. Cross-actor calls still use await. Explicit cancellation controls may join cleanup. Neither Gateway has a pending-message queue, persistent worker or independent delivery lifecycle. There is no communication FIFO guarantee across concurrent calls and no automatic duplicate suppression or state replacement.
+
+InputGateway and OutputGateway enforce explicit active-call bounds; full admission rejects immediately and structured calls release their reservations on completion. These are active-call bounds, not queues. Current values and release behavior belong in the [Gateway Input](Gateway/Input/README.md) and [Gateway Output](Gateway/Output/README.md) READMEs.
+
+A message deadline is a freshness check, not a timer racing receive. Cancelling the caller propagates through structured admission calls; already accepted work belongs to the Agent. App stops producers and coordinates Agent/runtime cleanup. No Bus session registry, timeout tasks, retained operation registry or shutdown barrier remains. Action Channels remain separate execution queues.
+
+| Concern | External input | Internal Agent event |
+| --- | --- | --- |
+| Target selection | InputGateway subscription lookup or explicit target | OutputGateway permission check and target selection |
+| Admission | Shared InputGateway bounded task group | Same InputGateway bounded task group |
+| Queue / processing | Agent inbox | Agent inbox |
+| Lifecycle | Caller, App and Agent/runtime ownership | Same; source incarnation and causal context are also checked |
+| Receipt | Per-target admission, not processing completion | Same |
+
+Detailed diagrams: [external input](Gateway/Input/README.md#external-input-admission-and-delivery) and [internal direct delivery](Agents/Core/Communication/README.md#target-selection-and-per-agent-delivery).
+
+#### Current routes and future scope
+
+| Source | Input | Receiver |
+| --- | --- | --- |
+| phone.microphone | media.audio | SpeechPerception subscription |
+| phone.camera | media.image | VisionPerception subscription |
+| user | user.text | Assistant subscription; no current text-entry UI |
+| speechPerception | speech.final / speech.phase | Assistant subscription |
+| speechPerception | speech.partial / final / phase | Registered runtime observer for admission/logging, without UI mutation |
+| visionPerception | vision.pose | Declared business subscribers; skeleton output is an independent Tool |
+| runtime | ToolResult / assistant.cancel | Original or explicitly selected Agent/session |
+
+Assistant declares directed `speech.synthesize` and `speech.cancel` sends to SpeechSynthesis; the other current Agents have empty sends lists. Zero recipients fails unless a registered publication observer handles the contract. Ordinary discrete events and physical actions must not be silently coalesced; Agent-local latest-state policies are explicit.
+
+✅ Static subscriptions, direct delivery and correlated Tool return. ❌ Dynamic subscriptions, request/reply, remote transport, persistence and retry. Remote Agents may use a transport adapter; they do not inherently require a Bus or broker. See [ADR 0048](../docs/adr/0048-direct-signal-admission.md).
+
+### Capability Declaration and Resolution
+
+```mermaid
+flowchart LR
+    JSON[Agent JSON v5] --> Registry[Agent-local capability registry]
+    Registry --> Context[Model context / visible aliases]
+    Context --> Model[Model generation]
+    Model --> Parse[Agent-side shared parser]
+    Parse --> Resolve[Alias and parameter validation]
+    Registry --> Resolve
+    Resolve --> Calls[Resolved ActionCall / ToolCall]
+    Calls --> Gateway[OutputGateway]
 ```
 
-```swift
-struct ActionRegistration {
-    let alias: String
-    let actionPath: ActionPath
-    let schema: ParameterSchema
-    let defaultChannel: ChannelID
-}
+Action and Tool aliases are unique within one Agent; different Agents may reuse a name. An alias such as `express` resolves to `UI.express`, not a reflected Swift method. JSON v5 groups model-callable Actions by Channel. Code-owned internal permissions have no model aliases or prompt metadata. Context generation exposes only the callable catalog. App explicitly binds implementations. Invalid configuration propagates without `try!` or fallback registrations.
+
+### Function Token Protocol
+
+Function Token is a streaming mixture of natural text and restricted XML. A parsed FunctionToken is not a model tokenizer token. Shared parsers live in Agents/Core/Generation, while parser instances and alias resolution belong to each Agent.
+
+```xml
+<express emotion="smile"/>
+Hello.
+<wait>
+  <express emotion="thinking"/>
+  Let me think.
+</wait>
 ```
 
-```swift
-struct ToolRegistration {
-    let alias: String
-    let toolPath: ToolPath
-    let schema: ParameterSchema
-}
+The four forms are natural text, self-closing Action tags, paired Channel scopes and paired wait groups. FunctionTokenParser handles fragment boundaries; ChannelParser tracks scope; SentenceFunctionBuffer groups text; AgentGenerator resolves calls. Assistant supplies a code-owned text callback for speech and captions; internal playback/initialization permissions are assembled in code. Explicit Action tags do not implicitly duplicate that mapping.
+
+Completed Actions can be emitted before a Channel closes. Tag/scope boundaries flush preceding text; normal completion flushes remaining valid text, while cancellation discards incomplete state. Raw markup and unresolved aliases never reach Gateway; resolved Actions and typed wait boundaries do. Native Tool calls use the separate ToolCallParser; production incremental native Tool deltas are still outstanding.
+
+Syntax, escaping, nesting, bounds and malformed-stream behavior are defined in [Generation](Agents/Core/Generation/README.md).
+
+### ActionCall versus ToolCall
+
+| Dimension         | ActionCall                                                | ToolCall                                                 |
+| ----------------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| Agent generation  | Function Token interpretation or explicit Agent logic     | Separate native Tool parsing or explicit Agent logic     |
+| Resolved identity | ActionPath, parameters and effective Channel              | ToolPath and arguments                                   |
+| Execution         | OutputGateway → ChannelScheduler → Actions/Runtime        | OutputGateway → Tools/Runtime directly                    |
+| Ordering          | Task-local Channel FIFO; nested wait joins; global module exclusion | Caller awaits handler; no Channel queue                  |
+| Completion        | Handler completion and per-input finish barrier           | Value feedback or Void completion, fixed by registration |
+| Current examples  | Speech.speak, UI.print, UI.express                        | runtimeInfo, UI.showPose                          |
+
+Both are validated executable outputs, and either may have side effects. Their distinction is execution/feedback semantics, not simply “write versus read.” Returning Tools re-enter InputGateway with ToolResult; Void Tools do not. Actions can return correlated terminal feedback under the policy described in [Action feedback and resource ownership](#action-feedback-and-resource-ownership). Typed internal observations use a separate messaging port, not either generation protocol.
+
+### Multi-Channel Action Scheduling
+
+A Channel is an ordered Action execution scope. The Agent capability declaration supplies each Action's default Channel; an explicit `<channel.name>` scope overrides it. Closing an inner scope restores the parent; closing the outermost restores each Action's default. Only permitted Channels may be selected. Channel scopes do not themselves create wait groups.
+
+With Assistant's default mapping, natural text produces speech on `Speech` and captions on `Display`. They may progress concurrently. A `<wait>...</wait>` group joins its parent's preceding work, preserves ordinary Channel scheduling internally, and joins all its children before releasing its parent's continuation. Consecutive wait groups express sequential stages; nested waits synchronize only within their parent. Channel closing changes scope without waiting. No channel name, including main, has special semantics; Assistant does not declare main.
+
+```mermaid
+flowchart LR
+    Events[Resolved Actions / wait boundaries] --> Gateway[Validation and admission]
+    Gateway --> Tree[Task-local nested execution groups]
+    Tree --> Active[Active phase Channel FIFO heads]
+    Active --> Resources[Process-wide module exclusion]
+    Resources --> Execute[Await complete Action handler]
+    Execute --> Advance[Release resources; advance closed completed groups]
+    Advance --> Tree
 ```
 
-```swift
-enum AgentOutput {
-    case actionCall(ActionCall)
-    case toolCall(ToolCall)
-}
+Channel queues are task-local; equal names across Agents do not impose cross-task FIFO. Resource exclusion is process-wide. A wait affects one Agent/session/input, never unrelated tasks. finish seals root input and joins accepted work; errors cancel that task's tree and cooperative running work. No queued device action is silently discarded on capacity exhaustion. Speech prefetch remains outside this schedule and retains cache deadlines.
+
+✅ Bounded nested wait groups, streaming execution, local FIFO, global module exclusion and cancellation barriers. ❌ Priority, preemption, rollback and cross-task synchronization. Exact capacities and failure fencing belong in [Scheduling](Gateway/Output/Scheduling/README.md); protocol rules belong in [Generation](Agents/Core/Generation/README.md). ADR 0059 records this change.
+
+<a id="201-channel-lock--exclusive-agent-control"></a>
+
+#### Channel ownership and takeover — planned
+
+Future control takeover must validate permission, atomically gate the channel group, cancel queued work, stop active control and await cleanup before granting a finite owner lease. Signals may communicate observations or advice but never transfer ownership. All alternate Action and Tool routes to protected hardware must share enforcement; uncertain cleanup leaves the domain gated.
+
+Only ownership metadata exists today and Channels remain unlocked. Channel-specific acquire/renew/release and notifications remain unimplemented. This planned Channel ownership is distinct from the implemented physical-resource leases below. See [Channel Lock Design](Gateway/Output/Scheduling/README.md#channel-lock-design).
+
+### Action Feedback and Resource Ownership
+
+Execution feedback and resource ownership complement Channel scheduling; neither changes task-local FIFO or wait semantics.
+
+**Terminal feedback.** Gateway reserves bounded result capacity before admission and returns correlated ActionResult through InputGateway, bound to the originating Agent incarnation and session. The default is failure-only feedback for opted-in Agents; terminal mode also reports success. Delivery retries reuse the result without repeating the effect. Current Agents retain bounded receipts without automatically triggering inference or replanning. An Action result describes its declared handler completion boundary; ActivityEvent describes later ongoing activity.
+
+**Resource ownership.** One App-assembled ResourceCoordinator guards declared Action, Tool and host paths. Transient execution fences and persistent leases are separate from Channel/module exclusion. Group takeover gates affected resources, stops and joins old work, then grants ownership; uncertain cleanup leaves the group faulted. Camera capture is the first production lease integration, with start/stop still owned by App lifecycle rather than a model-callable recording Action.
+
+The [Results](Gateway/Output/Results/README.md) and [Resources](Gateway/Output/Resources/README.md) documents own limits, algorithms and failure rules. Shared values live in Agents/Core/Output and receipt history in Agents/Core/Runtime; [ADR 0066](../docs/adr/0066-action-results-resource-leases.md) records the decision.
+
+✅ Bounded terminal feedback, owner isolation, delivery retry and shared resource leases/fences. ❌ Generic activity registry/event outbox, audio/robot resource migration, device watchdogs, durable delivery, per-Action deadlines and real-device takeover acceptance remain outstanding.
+
+### TTS synthesis and playback data flow
+
+Speech output has two linked paths. The originating Agent chooses the spoken text boundary and creates an `audioID`; Assistant currently does this while interpreting generated text, and another authorized Agent can use the same synthesis service. The directed synthesis request contains `audioID`, `text` and `locale`. The playback Action contains only `audioID`, with the original Channel retained. Both paths carry the originating source, session and input identity so the cache can reject another caller's handle.
+
+```mermaid
+sequenceDiagram
+    participant A as Originating Agent
+    participant OG as OutputGateway
+    participant IG as InputGateway
+    participant S as SpeechSynthesisAgent
+    participant M as ModelKit MOSS-TTS-Nano
+    participant C as StorageAudio / Storage
+    participant Q as ChannelScheduler
+    participant R as ActionExecution
+    participant P as SpeechPlayback
+    participant H as App / PlatformKit Audio
+    A->>OG: directed speech.synthesize(audioID, text, locale)
+    OG->>IG: validate and deliver
+    IG->>S: receive request
+    S->>C: reserve audioID for source / session / input
+    S-->>IG: admitted
+    IG-->>OG: delivery receipt
+    OG-->>A: admission receipt
+    par Synthesis path
+        S->>M: synthesize text and locale
+        loop ordered audio events
+            M-->>S: PCM frame or finished
+            S->>C: append frame / complete audioID
+        end
+    and Scheduled playback path
+        A->>OG: resolved Speech.speak(audioID)
+        OG->>Q: validate and schedule on original Channel
+        Q->>R: execute when eligible
+        R->>P: invoke registered Speech handler
+        P->>C: checkout audioID with same owner
+        C-->>P: single-use PCM stream
+        loop as frames become available
+            P->>C: read next frame
+            C-->>P: PCM or explicit failure
+            P->>H: play PCM
+        end
+        H-->>P: playback drained
+        P->>C: release audioID
+        P-->>R: playback result
+        R-->>Q: Action completion
+    end
 ```
 
-```swift
-struct ActionCall {
-    let id: UUID
-    let actionPath: ActionPath
-    let channel: ChannelID
-    let params: ActionParameters
-    let priority: Int?
-}
+The Agent waits for **request admission**, not synthesis completion, before emitting `Speech.speak(audioID)`. SpeechSynthesisAgent processes admitted requests in its own serial FIFO and does not inspect Channels; the Gateway's ChannelScheduler independently decides when Actions/Runtime invokes playback. App injects the process-wide ModelKit synthesis capability and one shared audio store into synthesis and playback. The current capability uses the MOSS-TTS-Nano adapter over Core ML; `StorageAudio` adapts PCM and owner identity to the general `Storage` memory primitives. Playback may consume PCM before synthesis finishes, but only as frames arrive: an empty initial or intermediate read waits up to three seconds from that read, then fails. This is not a three-second synthesis deadline. MOSS produces native 80 ms audio blocks after prompt prefill; neither block duration nor streaming guarantees a three-second first-audio deadline.
+
+[ADR 0055](../docs/adr/0055-synthesis-agent-audio-handles.md) and [ADR 0056](../docs/adr/0056-storage-audio-migration.md) record the synthesis/playback split and shared-cache ownership.
+
+Successful Action completion means the player has drained and the single-use cache lease has been released. Synthesis/cache errors, expiration, a missing handle or read starvation fail playback explicitly; cancellation and dispatch failure release the owning audio. No audio file, re-synthesis or Channel-driven synthesis reorder is involved. [Assistant](Agents/Assistant/README.md) owns current semantic segmentation; [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Speech playback](Actions/Speech/README.md), [MOSS](ModelKit/Speech/TTS/MossNano/README.md) and [PlatformKit Audio](PlatformKit/Audio/README.md) own their detailed limits and implementation contracts.
+
+### Session, Turn and UI Boundaries
+
+Runtime lifecycle is separate from business state. AgentManager controls registration and running instances; each Agent owns domain state and bounded input processing. Voice and camera share infrastructure but close their own sessions independently. Stop first prevents producer admission, cancels and joins perception/transport work, then cancels consumers and Actions. Incarnations fence old instances from replacements.
+
+The current voice stop and interruption chain is coordinated by App: stop producers, send assistant.cancel through InputGateway, then cancel session Actions through OutputGateway. Tool cancellation follows the active dispatch task. See [App lifecycle and completion](App/README.md#lifecycle-and-completion) for cleanup order and implemented boundaries.
+
+Agent-selected presentation uses explicitly permitted, resolved Actions/Tools through OutputGateway. SpeechPerception owns recognition captions and phase presentation; Assistant owns reply captions, expressions and atomic beginReplyTurn; VisionPerception owns UI.showPose and UI.moveEyes. Signal observers only coordinate capture admission/logging. App may reset state for user/OS lifecycle and present actual device telemetry.
+
+ConversationTurn carries an ID and session-local ordinal through input, observations, output and Tool return. A long utterance retains its turn across segments. Trusted output sequences and turn checks reject stale UI updates; model parameters cannot override this identity.
+
+| Boundary                    | Recognition caption               | Reply / expression                                   |
+| --------------------------- | --------------------------------- | ---------------------------------------------------- |
+| Confirmed new utterance     | Latest partial replaces preview   | Assistant clears once through beginReplyTurn         |
+| Endpoint, ASR pending       | Preserve preview                  | Await reply                                          |
+| Final or empty recognition  | finishTranscript clears and seals | Reply or return to listening                         |
+| Response and playback       | Remains sealed                    | Append reply; speaking state follows actual playback |
+| Reply completed             | Empty                             | Retain until next utterance                          |
+| Stop / background / failure | Clear and invalidate session      | Clear and invalidate session                         |
+
+Eye gaze reuses pose facial landmarks and emits the code-owned `UI.moveEyes` Action within the camera session. [ADR 0049](../docs/adr/0049-perception-eye-gaze.md) records bounded presentation replacement and per-Action completion; smoothness and crossing-face behavior still require device acceptance.
+
+Vision freshness uses separate bounded inference, publication and display paths, allowing a slow subscriber to coexist with fresh local visualization. The configured maximum refresh interval avoids change-filter starvation when new frames exist; it does not guarantee inference FPS. Details: [App](App/README.md), [ADR 0043](../docs/adr/0043-conversation-turn-presentation.md) and [VisionPerception](Agents/VisionPerception/README.md).
+
+<a id="391-platformkit-versus-modelkit"></a>
+
+### PlatformKit versus ModelKit
+
+| Concern             | PlatformKit: device/OS I/O                                     | ModelKit: model processing                                  |
+| ------------------- | -------------------------------------------------------------- | ----------------------------------------------------------- |
+| Audio input         | Microphone → PCM                                              | PCM → transcript or VAD score                              |
+| Audio output        | Supplied PCM → speaker                                        | Text → synthesized PCM                                     |
+| Vision              | Camera → frame and preview                                    | Supplied image → pose/model results                        |
+| Adaptation          | Capture format, orientation, compact gray sampling             | Model resize/normalization, tensor decoding and coordinates |
+| Resources           | Device sessions, engines, connections and I/O buffers          | Weights, graphs, model instances and operation leases       |
+| Policy outside both | App bridges data; Agents choose when and why to process or act | Gateway validates and routes without inference              |
+
+“Processing” means model capability processing, not all computation. VisionPerception compares gray samples as perception policy, asks ModelKit for poses, then emits observations and a display Tool. Model synthesis produces PCM; playback is a separate platform operation owned by the Speech behavior. Neither Kit owns Agent business decisions.
+
+### Shared Model Lifecycle
+
+ModelKitDefaults supplies the process-wide ModelManager and internal provider bindings; conflicting resource roots fail. `ModelManager.get` is the capability acquisition API. Shared construction/loading is coalesced, while each model admits only one active operation and rejects overlap rather than creating an inference queue.
+
+```mermaid
+flowchart LR
+    App[App: resource root] --> Defaults[ModelKitDefaults internal assembly]
+    Defaults --> Manager[ModelKitRuntime.ModelManager]
+    Manager --> Capabilities[Shared capability interfaces]
+    Capabilities --> Consumers[Agents / Actions]
+    Consumers --> Adapter[Model adapter operation]
+    Adapter --> Resource[Managed resource / lease / cleanup]
 ```
 
-```swift
-struct ToolCall {
-    let id: UUID
-    let toolPath: ToolPath
-    let params: ToolParameters
-}
-```
+Stopping a conversation cancels work without automatically unloading weights. Explicit unload waits for usage to end; shutdown cancels and joins active work. Residency policy is distinct from capability availability; memory warnings are coalesced and forwarded by App. Registration and construction require assembly SPI, and management uses its designated SPI rather than business access to backend resources.
 
----
+✅ Shared lifecycle, bounded load/acquisition and explicit memory policy. ❌ Timed idle eviction, measured cross-model budgets and sustained physical-device pressure/retry acceptance. Details: [Management](ModelKit/Management/README.md), [Core](ModelKit/Core/README.md), [ADR 0032](../docs/adr/0032-modelkit-admission-and-memory-policy.md).
 
-# 39. Responsibility Boundaries
+### Concurrency and Validation
 
-| Component | Responsibilities |
-|---|---|
-| Input Gateway | Signal acquisition, adaptation, normalization, context, routing |
-| Agent | State, reasoning, model execution, capability registration, prompt exposure, parsing, alias resolution |
-| Output Gateway | Output validation, Action/Tool routing, Channel scheduling, dispatch, result collection |
-| Actions | Executable behaviors |
-| Tools | Model-native callable capabilities |
-| ModelKit | Model lifecycle, inference, scheduling |
-| PlatformKit | OS, sensor, device, hardware APIs |
+Swift 6 language mode and Swift 6.4+ tooling are required. SwiftUI presentation is MainActor-isolated; runtime mutable state belongs to actors or explicitly owned synchronization. Every queue has a bound and overflow policy; device actions and discrete events cannot be silently discarded. Admission, handler completion and physical/rendered completion are different milestones.
 
----
-
-# 40. Architectural Invariants
-
-1. All external and internal inputs enter the cognitive system as `Signal`.
-2. Every Agent owns its capability registry.
-3. Capability aliases are unique within one Agent.
-4. Raw model markup never leaves the Agent boundary.
-5. Model-derived executable outputs are fully resolved `ActionCall` or `ToolCall`; runtime internal messages follow section 32 and also cross OutputGateway.
-6. Every registered Action has a default Channel.
-7. Explicit Channel assignment overrides the Action's default Channel.
-8. Action Calls enter the Channel Scheduler.
-9. Tool Calls bypass Channel scheduling and execute directly.
-10. Actions in the same Channel execute serially.
-11. Different Channels may execute concurrently.
-12. Action Calls and Tool Calls may both produce Result Signals.
-13. Execution results re-enter the cognitive loop through Input Gateway when needed.
-14. Agents do not directly depend on other Agent implementations.
-15. Agents are long-lived, stateful, independently manageable runtime units.
-16. ModelKit and PlatformKit contain infrastructure capabilities without Agent business semantics.
-
----
-
-# 41. System Summary
-
-```text
-External World
-      ↓
-Multimodal Signal
-      ↓
-Input Gateway
-      ↓
-Signal Adaptation / Routing
-      ↓
-Stateful Agent
-      ↓
-Model / Logic
-      ↓
-Agent-side Parsing
-      ↓
-Capability Resolution
-      ↓
-ActionCall / ToolCall
-      ↓
-Output Gateway
-      ├── ActionCall → Channel Scheduler → Actions
-      └── ToolCall     → Tool Runtime
-      ↓
-Result Signal
-      ↓
-Input Gateway
-```
-
-The bio-inspired abstraction is:
-
-```text
-Signals
-   ↓
-Sensory Gateway
-   ↓
-Distributed Cognition
-   ↓
-Resolved Intent
-   ↓
-Output Gateway
-   ↓
-Scheduled Actions / Tool Execution
-```
-
-**Signals in. Cognition within. Actions out.**
-
-Implementation rule: facial expressions share `UI.express(emotion:)`; there is no separate smile Action or alias. Supported emotion values are defined by Actions/UI and documented in each Agent configuration.
-
-## Concurrency documentation standard
+#### Concurrency documentation standard
 
 Every directory implementing queues, asynchronous workers or producer/consumer processing must describe its current algorithm in its local README. Keep these descriptions synchronized with code; use English for new documentation. Include:
 
@@ -1794,24 +649,20 @@ Every directory implementing queues, asynchronous workers or producer/consumer p
 
 Distinguish work queues, framing buffers, terminal signals and busy-reject admission. Actor isolation alone does not guarantee FIFO completion across suspension points. Document opaque third-party buffering as a limitation. Documentation changes alone do not alter runtime contracts.
 
-Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [voice input](Gateway/Input/README.md), [Action scheduling](Gateway/Output/Scheduling/README.md), [model streams and leases](ModelKit/Core/README.md), [audio capture/playback](PlatformKit/Audio/README.md), and [App task coordination](App/README.md). Model adapters and streaming parsers carry their own local descriptions.
+Current detailed contracts: [Agent inbox/output](Agents/Assistant/README.md), [speech perception](Agents/SpeechPerception/README.md), [Action scheduling](Gateway/Output/Scheduling/README.md), [model streams and leases](ModelKit/Core/README.md), [audio capture/playback](PlatformKit/Audio/README.md), and [App task coordination](App/README.md). [Storage](Storage/README.md) owns the shared memory boundary and [StorageAudio](Storage/Audio/README.md) owns the live PCM contract. Model adapters and streaming parsers carry their own local descriptions.
 
-## ModelKit resource policy
+Run `./scripts/check.sh` for format, tests and configuration/boundary validation, and `./scripts/build-ios.sh` when full Xcode is available. Report unavailable checks and distinguish successful builds from physical-device acceptance. No third-party dependency is added without a concrete integration need.
 
-✅ ModelManager.get is the sole acquisition API. ModelContext management uses ModelManagement SPI. Residency includes unmanaged and is distinct from capability availability. ModelKitDefaults configures the MLX cache explicitly; App forwards coalesced memory warnings; releaseWhenIdle entries evict only loaded resources without active work. OperationAdmission rejects concurrent backend operations without a queue. See docs/adr/0032-modelkit-admission-and-memory-policy.md for the contract.
-❌ Timed eviction, measured cross-model memory budgets and physical-device pressure/retry acceptance.
+## Summary
 
-## ModelKit project boundary
+MobileHarness composes a stateful **Signal → Cognition → Action** loop: App assembles the system, Agents select behavior, Gateway coordinates communication and execution, and skills execute through bound services. Independent model, storage and platform capabilities support the loop.
 
-✅ Root Package.swift declares all targets. ModelKit stays inside this project with no nested package and no dependency on business targets. Management and Backends separate lifecycle control from engine execution. All tests live under root Tests; application prompt evaluations are isolated in AgentModelEvaluationTests. scripts/check.sh enforces import/target boundaries and directory READMEs. See ADR 0033 for the contract.
-❌ Independent SDK distribution and physical-device acceptance are outside this migration.
+✅ Current scope includes shared perception and synthesis, conversation history, explicit Agent communication, streaming generation, scheduled Actions, direct Tools, typed execution feedback and declared resource ownership.
 
-Core owns shared media data contracts: AudioFormat/AudioFrame are implemented; image/video values will be added when required by a concrete capability. Device I/O, model-specific tensors and business routing stay outside these value types.
+❌ General semantic fusion, fast/slow cognition orchestration, dynamic subscriptions, general request/reply, durable message delivery, native Tool streaming, Channel ownership, broader device/resource integration and sustained physical-device acceptance remain open. Delivery milestones and validation records belong in the [Roadmap](../docs/Roadmap.md); design history belongs in the [ADRs](../docs/adr/README.md).
 
-✅ ModelKitDefaults.manager(resources:) returns the process-wide manager. Concurrent calls share assembly and provider instances; conflicting resource roots fail. Construction/registration are assembly SPI. Each model admits one active operation, rejects overlap with inputBusy, and releases admission only after cleanup. Cross-model scheduling is not implemented.
+## Storage core and domains
 
-✅ ModelKit/Vision now implements PoseCapability and the independent YOLO adapter. Core/ImageFrame carries bounded upright RGB8 data; `.pose` is a default manager binding. ✅ Photographer integrates the camera and pose capability through both gateways.
+✅ Outer Storage files implement reusable bounded memory/cache, persistence and local synchronization. Audio and Chat own their business contracts in separate subdirectories/targets; core never depends on domains. Chat moved without data migration. See [Storage layout](Storage/README.md) and [ADR 0069](../docs/adr/0069-storage-core-domain-layout.md).
 
-✅ PlatformKit/Camera and Experience/Camera provide foreground camera capture and preview: normal launch defaults to front camera, mirrored on the front and natural on the back, with on/off and switch controls above a dimmed full-screen feed. App/CameraCoordinator owns scene intent independently of voice readiness. ✅ Changed camera frames now enter InputGateway and Photographer pose inference.
-
-✅ First camera pipeline: PlatformKit capture → Gateway grayscale filter → Photographer latest-image inbox → shared PoseCapability → Function Token / ActionCall → OutputGateway → UI.showPose → preview skeletons. See ADR 0036 for bounds and phase-one scope.
+❌ Image, Video and semantic Memory domains are planned only; no empty directories or placeholder APIs. MemoryLeaseStore is a generic RAM lease primitive, not semantic memory. Cross-device sync and general reclaimable disk cache remain unimplemented.

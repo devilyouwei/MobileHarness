@@ -1,29 +1,45 @@
 import Foundation
 import ModelKit
 import ModelKitCoreML
+import os
 
 public actor YOLOPose: PoseCapability {
+    private let signposter = OSSignposter(subsystem: "dev.mobileharness.models", category: "Pose")
     private let url: URL
     private let resource: ModelResource<CoreMLImageGraph>
     public init(context: ModelContext, artifacts: URL) throws {
-        let compiled = artifacts.appendingPathComponent("yolov8n-pose.mlmodelc")
+        let compiled = artifacts.appendingPathComponent("yolo26n-pose.mlmodelc")
         let url =
             FileManager.default.fileExists(atPath: compiled.path)
-            ? compiled : artifacts.appendingPathComponent("yolov8n-pose.mlpackage")
+            ? compiled : artifacts.appendingPathComponent("yolo26n-pose.mlpackage")
         self.url = url
         resource = try context.resource { try CoreMLImageGraph(contentsOf: url) }
     }
     public var availability: CapabilityAvailability {
         FileManager.default.fileExists(atPath: url.path)
-            ? .available : .unavailable(reason: "YOLOv8n Pose artifacts are not installed")
+            ? .available : .unavailable(reason: "YOLO26n Pose artifacts are not installed")
     }
     public func estimatePose(_ request: PoseRequest) async throws -> PoseResult {
         let lease = try await resource.acquire()
         let worker = Task {
-            let letterbox = PoseLetterbox(image: request.image)
-            let pixels = try letterbox.render(request.image)
-            let output = try await lease.model.run(rgb: pixels)
-            let people = try PoseDecoder.decode(output, letterbox: letterbox)
+            let letterbox = try CoreMLImageLayout(
+                width: request.image.width, height: request.image.height,
+                visionScaleFit: request.image.native != nil)
+            let output: CoreMLTensor
+            if let native = request.image.native {
+                output = try await lease.model.runNative(
+                    source: { native.withPixelBuffer { $0 } }, rotation: native.rotation)
+            } else if let rgb = request.image.rgb {
+                output = try await lease.model.run(rgb: rgb, layout: letterbox)
+            } else {
+                throw CapabilityError.invalidRequest("Missing image storage")
+            }
+            let interval = signposter.beginInterval("DecodePose")
+            let people: [PersonPose]
+            do {
+                defer { signposter.endInterval("DecodePose", interval) }
+                people = try PoseDecoder.decode(output, letterbox: letterbox)
+            }
             try Task.checkCancellation()
             return PoseResult(context: request.context, people: people)
         }
