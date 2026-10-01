@@ -43,7 +43,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         presentation: endpoint, playback: endpoint, pose: endpoint,
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
-        aim: { _, _, _ in throw RobotActions.AimError.notConnected },
+        aim: { _, _, _ in throw RobotTools.AimError.notConnected },
         capabilities: [
             AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
             SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities),

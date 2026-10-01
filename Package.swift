@@ -75,7 +75,6 @@ let package = Package(
             exclude: [
                 "README.md", "Runtime/README.md", "NexArm/README.md", "NexArm/Support/README.md",
                 "Speech/README.md", "Speech/Support/README.md", "UI/README.md", "UI/Support/README.md",
-                "Robot/README.md", "Robot/Support/README.md",
             ]),
         .target(
             name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageChat", "StorageAudio"],
@@ -105,7 +104,7 @@ let package = Package(
             name: "Tools", dependencies: ["AgentCore"], path: "MobileHarness/Tools",
             exclude: [
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
-                "Runtime/README.md",
+                "Robot/README.md", "Robot/Support/README.md", "Runtime/README.md",
             ]),
         .target(
             name: "ModelKit", path: "MobileHarness/ModelKit",

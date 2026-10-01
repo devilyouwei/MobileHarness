@@ -8,11 +8,11 @@ flowchart LR
     Input --> Latest[Admitted observation]
     Latest --> Policy[First person / nose or visible midpoint]
     Policy --> Gate{controlsArm and throttle}
-    Gate --> Call[Robot.aim on channel arm]
+    Gate --> Call[Robot.aim Tool]
     Call --> Output[OutputGateway]
 ```
 
-✅ JSON v5 subscribes to `vision.pose` from `visionPerception` and declares no model-callable Actions or Tools. Code grants internal `Robot.aim` on channel `arm`. The output stream holds 8 envelopes and fails when full; an aim is not replaced or dropped.
+✅ JSON v5 subscribes to `vision.pose` from `visionPerception` and declares no model-callable Actions or Tools. Code grants internal `Robot.aim`. The output stream holds 8 envelopes and fails when full; an aim is not replaced or dropped.
 
 ✅ The first person in the published array is the target. That array keeps VisionPerception's copy order. The current pose decoder sorts by detection score before the score is removed, but this Agent does not re-rank. The nose is the aim point when its confidence is at least 0.3 and it lies inside the image. Otherwise the point is the midpoint of joints that pass the same test. No such joint means no aim. `base` and `pitch` are `(point / size - 0.5) * 0.8` radians. The first aim is immediate. Later aims require both 0.2 seconds and 0.02 radians since the previous emitted aim, using the observation timestamp. Empty people emits nothing and does not return to center. Pause admits the observation and does not aim.
 
@@ -23,7 +23,7 @@ flowchart LR
 | 方向 | 数据标准与边界 |
 | --- | --- |
 | 输入 | 静态订阅 `vision.pose / 1 / observation`，source `visionPerception`，topic `vision.pose`。payload 为 `PoseObservation`。session 必须匹配；sequence 严格递增，timestamp 不倒退；过期输入拒绝。这不是图像，也不运行 `PoseCapability`。 |
-| 输出 | `controlsArm == true` 且通过节流时发出 `ActionCall`，路径 `Robot.aim`，通道 `arm`，参数 `base` / `pitch` 为十进制弧度字符串。完成语义在 Action：传输接受六轴帧，不等关节到位。 |
+| 输出 | `controlsArm == true` 且通过节流时发出 `ToolCall`，路径 `Robot.aim`，参数 `base` / `pitch` 为十进制弧度字符串。完成语义在 Tool：发送函数返回，不进 Channel，不写夹爪，不等关节到位。 |
 | publish | 无。 |
 | send | 无。 |
 

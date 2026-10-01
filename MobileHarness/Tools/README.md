@@ -13,6 +13,10 @@ Tools/
 ├── UI/
 │   ├── UITools.swift        # Callable presentation entries
 │   └── Support/             # Registration, capabilities, types and turn policy
+├── Robot/
+│   ├── RobotTools.swift     # Tracking aim namespace
+│   ├── Aim.swift            # Immediate five-axis aim
+│   └── Support/             # Completion-only registration
 └── README.md
 ```
 
@@ -51,6 +55,7 @@ Tools owns no queue and bypasses Channel scheduling. VisionPerception retains th
 
 - ✅ [System](System/README.md): fixed runtime information.
 - ✅ [UI](UI/README.md): seven completion-only presentation functions.
+- ✅ [Robot](Robot/README.md): completion-only `Robot.aim`. The sender accepts five-axis angles; the gripper is not addressed.
 - ❌ Search, storage, network, memory and other model/device tools.
 - ❌ Live model/device health reporting.
 
@@ -68,7 +73,7 @@ Tools owns no queue and bypasses Channel scheduling. VisionPerception retains th
 
 ## Domain-owned registration
 
-✅ ToolModules.builtIn lists SystemToolModule and UIToolModule. Domains own ToolDefinition paths, resources and returning/completion handlers. BehaviorAssembly creates a complete ToolRegistry synchronously and validates both model-callable and internal Tool permissions. No App prepareTools task or per-function binding remains. UI.showPose receives the typed PosePresentationCapability and retains its no-feedback completion contract.
+✅ ToolModules.builtIn lists SystemToolModule, UIToolModule and RobotToolModule. Domains own ToolDefinition paths, resources and returning/completion handlers. BehaviorAssembly creates a complete ToolRegistry synchronously and validates both model-callable and internal Tool permissions. No App prepareTools task or per-function binding remains. UI.showPose receives the typed PosePresentationCapability and retains its no-feedback completion contract.
 
 ```mermaid
 flowchart LR

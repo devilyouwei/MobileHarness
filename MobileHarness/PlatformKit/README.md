@@ -18,7 +18,7 @@ PlatformKit/
 ├── Core/DeviceCapability.swift            # Shared availability/authorization contract
 ├── Connectivity/
 │   ├── ExternalDeviceTransport.swift          # External-device transport contract
-│   ├── NexArmJointCommand.swift               # Provisional six-position aim frame
+│   ├── NexArmJointCommand.swift               # Five-axis aim packet; gripper omitted
 │   └── NexArm/                                # Production USB/BLE controller
 └── README.md                              # Device boundary and status
 ```

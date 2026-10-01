@@ -2,7 +2,7 @@
 
 Status: aim subscription and the joint frame are implemented. Composition, tracking and physical motion remain proposed.
 
-Goal: enable a robot-mounted phone to frame subjects, track movement and choose camera motion based on user intent and shared perception. Photographer decides aim from shared perception and requests an authorized Action. Device-side limits, stop acknowledgement and disconnect behavior must be designed before physical movement is allowed.
+Goal: enable a robot-mounted phone to frame subjects, track movement and choose camera motion based on user intent and shared perception. Photographer decides aim from shared perception and requests an authorized Tool. Device-side limits, stop acknowledgement and disconnect behavior must be designed before physical movement is allowed.
 
 Current status: [VisionPerception](../MobileHarness/Agents/VisionPerception/README.md) owns pose inference and UI.showPose skeleton feedback. [Photographer](../MobileHarness/Agents/Photographer/README.md) subscribes to `vision.pose` and can emit `Robot.aim`. The camera session starts that subscriber with arm control off. No Wi-Fi socket is opened. See [ADR 0091](adr/0091-photographer-aim.md).
 
@@ -25,7 +25,7 @@ flowchart LR
 | --- | --- | --- |
 | 感知订阅 | ✅ 订阅 `vision.pose` | 不能直接读取 VisionPerception 的内部状态。 |
 | 用户任务 / 设备反馈等其他输入 | ❌ 无协议或实现 | 实际业务确定后声明 contract 与来源，再定义数据结构和处理策略；当前不能声称接收这些输入。 |
-| 运镜瞄准 | ✅ 内部 `Robot.aim` 和六轴帧；相机会话关闭臂控制 | 构图、跟踪和真机运动仍未做。不得把未连接的套接字说成已经在动臂。 |
+| 运镜瞄准 | ✅ 内部 `Robot.aim` 和五轴包；夹爪不写；相机会话关闭臂控制 | 构图、跟踪和真机运动仍未做。不得把未连接的套接字说成已经在动臂。 |
 | 共享观测 / Agent 定向消息 | ❌ 无 publications / sends | 有具体消费者后再定义，不隐式拥有发送权限。 |
 | 骨架 UI | ✅ 已由 VisionPerception 实现 | `UI.showPose` 不属于 Photographer。 |
 

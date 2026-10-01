@@ -1,10 +1,9 @@
 import AgentCore
 import Foundation
 
-/// Camera-motion policy. Consumes published pose observations and, when enabled, emits one arm Action.
+/// Camera-motion policy. Consumes published pose observations and, when enabled, emits one arm Tool.
 public actor PhotographerAgent: Agent {
-    private static let aimPermission = InternalAction(
-        module: "Robot", function: "aim", channel: "arm", required: ["base", "pitch"])
+    private static let aimPermission = InternalTool(path: "Robot.aim", required: ["base", "pitch"])
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
@@ -22,7 +21,7 @@ public actor PhotographerAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Photographer",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.actionCall],
+            outputs: [.toolCall],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.sessionID = sessionID
         self.controlsArm = controlsArm
@@ -32,7 +31,7 @@ public actor PhotographerAgent: Agent {
     }
 
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
-        try model.adding(internalActions: [aimPermission])
+        try model.adding(internalTools: [aimPermission])
     }
 
     public func start() throws {
@@ -68,7 +67,7 @@ public actor PhotographerAgent: Agent {
         processed += 1
         guard lifecycle == .running, let aim = nextAim(pose) else { return }
         let call = try Self.aimPermission.call(["base": String(aim.base), "pitch": String(aim.pitch)])
-        try emit(.actionCall(call), input: input, sequence: pose.sequence)
+        try emit(.toolCall(call), input: input, sequence: pose.sequence)
         lastAim = (aim.base, aim.pitch, pose.timestamp)
     }
 

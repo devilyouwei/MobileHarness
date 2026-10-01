@@ -32,7 +32,7 @@ The current repository implementation and source-to-target map are documented in
 
 ❌ Durable memory, general cross-Agent request/reply, unattended robot motion control, continuous background execution and sustained iPhone latency/thermal acceptance remain open. Future work is tracked in the [roadmap](Roadmap.md); historical decisions are in the [ADR index](adr/README.md). Physical robot safety would have to be enforced by the external controller, not by an iPhone App remaining active in the background.
 
-✅ Photographer subscribes to the published pose and can emit internal `Robot.aim`. The Action completes when the injected sender accepts one provisional six-position frame. The camera session starts the subscriber with arm control off, so it does not open Wi-Fi or call the production NexArm controller. See [ADR 0091](adr/0091-photographer-aim.md).
+✅ Photographer subscribes to the published pose and can emit internal `Robot.aim` as a Tool. The Tool returns when the injected sender accepts one five-axis packet. The suction-cup gripper is not addressed. The camera session starts the subscriber with arm control off, so it does not open Wi-Fi or call the production NexArm controller. See [ADR 0091](adr/0091-photographer-aim.md).
 
 User settings persist on this device, while credentials remain in protected device storage. The current design does not synchronize settings across devices. [ADR 0057](adr/0057-local-settings-storage.md) records the storage decision; the [Storage README](../MobileHarness/Storage/README.md) owns the implementation contract.
 

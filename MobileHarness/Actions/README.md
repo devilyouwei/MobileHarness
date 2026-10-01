@@ -321,19 +321,18 @@ Run `./scripts/check.sh` and, with full Xcode, `./scripts/build-ios.sh`; report 
 
 ## 7. Current implementation audit
 
-✅ UI, Speech and Robot now follow the namespace/file/signature standard: UIActions.swift, SpeechActions.swift and RobotActions.swift contain their caseless namespaces and `invocation:using:` entries. Domain Support directories own UIActionModule, SpeechActionModule and RobotActionModule with their typed interfaces; Runtime/ActionModules.swift owns the catalog. Runtime is infrastructure, not a callable domain, and does not need a RuntimeActions namespace.
+✅ UI and Speech now follow the namespace/file/signature standard: UIActions.swift and SpeechActions.swift contain their caseless namespaces and `invocation:using:` entries. Domain Support directories own UIActionModule and SpeechActionModule with their typed interfaces; Runtime/ActionModules.swift owns the catalog. Runtime is infrastructure, not a callable domain, and does not need a RuntimeActions namespace.
 
 | Path | Kind / endpoint | Validation / dependency |
 | --- | --- | --- |
 | Speech.speak | finite / playback drained and single-use audio released | audioID only, UUID at most 36 UTF-8 bytes; typed playback capability |
 | UI.express | state / accepted expression target | exact Emotion enum; no animation acknowledgment |
-| Robot.aim | finite / transport accepted the joint frame | finite base/pitch within four turns; injected sender. Settling is not joined |
 
 All entries reject undeclared keys, check cancellation before validation and after their awaited effect, and preserve dependency errors. Fixed caption/gaze/recognition presentation now belongs to Tools/UI, including PresentationError and gaze values. Expression remains here. Speech retains the existing SpeechAudioError.missingAudio for invalid audio handles for compatibility with the audio domain. SpeechPlayback is a typed runtime service, not the Action entry, and joins cancellation cleanup before returning a failure.
 
 ✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. The expression path remains UI.express; immediate UI.moveEyes belongs to Tools. Registry and resource contracts remain in Runtime/Gateway.
 
-❌ One-shot expression/restore, Camera Actions, generic activity supervision, audio/robot resource integration and physical-device timing acceptance remain separate work. They are not implemented by renaming or wrapping an entry. `Robot.aim` validates and forwards logical radians; it does not open a socket, call the production NexArm controller, or integrate a robot resource lease.
+❌ One-shot expression/restore, Camera Actions, generic activity supervision, audio/robot resource integration and physical-device timing acceptance remain separate work. They are not implemented by renaming or wrapping an entry. Tracking aim is `Robot.aim` in Tools, not an Action.
 
 ## 8. Stage 2: results and resource ownership
 

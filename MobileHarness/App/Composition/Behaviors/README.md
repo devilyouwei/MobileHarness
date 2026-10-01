@@ -2,7 +2,7 @@
 
 Purpose: construct complete Action/Tool registries from domain-owned modules and validate Agent capability coverage before runtime startup. Design goals: no per-function App registration, no device construction, no implicit discovery or partial async installation.
 
-✅ Independently compiled BehaviorAssembly target depends only on AgentCore, Actions and Tools. The host supplies typed presentation/playback/pose capabilities, the NexArm gesture and `shakeBase(Int, ActionInvocation)` closures, and the arm aim sender. Actions.ActionModules and Tools.ToolModules own built-in module catalogs; each domain owns its definitions and handlers. An explicit module-list initializer supports isolated tests and alternative hosts. Registry creation rejects duplicate paths, invalid definitions, bounds and missing model/internal implementations before returning.
+✅ Independently compiled BehaviorAssembly target depends only on AgentCore, Actions and Tools. The host supplies typed presentation/playback/pose capabilities, the NexArm gesture and `shakeBase(Int, ActionInvocation)` closures, and the arm aim Tool sender. Actions.ActionModules and Tools.ToolModules own built-in module catalogs; each domain owns its definitions and handlers. An explicit module-list initializer supports isolated tests and alternative hosts. Registry creation rejects duplicate paths, invalid definitions, bounds and missing model/internal implementations before returning.
 
 ```mermaid
 flowchart LR

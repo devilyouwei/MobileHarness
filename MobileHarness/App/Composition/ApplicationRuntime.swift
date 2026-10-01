@@ -1,4 +1,3 @@
-import Actions
 import AgentCore
 import Agents
 import AppWorkflows
@@ -9,6 +8,7 @@ import ModelKit
 import PlatformKit
 import Storage
 import StorageChat
+import Tools
 import UI
 
 /// Root-owned communication assembly, available before voice models are ready.
@@ -69,7 +69,7 @@ final class ApplicationRuntime {
                 try await bluetooth.performGesture(gesture, repetitions: request.repetitions)
             },
             shakeBase: { cycles, _ in try await bluetooth.shakeBase(cycles: cycles) },
-            aim: { _, _, _ in throw RobotActions.AimError.notConnected },
+            aim: { _, _, _ in throw RobotTools.AimError.notConnected },
             capabilities: [
                 AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
                 SpeechPerceptionAgent.runtimeCapabilities(

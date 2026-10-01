@@ -295,7 +295,7 @@ An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input
 
 Domain modules own behavior definitions, parameter validation and function bindings; Agent JSON owns available aliases/default Channels. App supplies typed execution capabilities through BehaviorAssembly. Shared physical resources must have coherent ownership across behavior functions.
 
-✅ Speech and UI behaviors, including `UI.express(emotion:)`, and [NexArm supervised USB Actions](Actions/NexArm/README.md), including Assistant base sweeps and gestures. ✅ iPhone BLE settings/workflow binding is implemented. ✅ Internal `Robot.aim` validates logical radians and forwards them to an injected sender. ❌ Photo-capture and media Actions remain pending. The camera session does not send an aim frame.
+✅ Speech and UI behaviors, including `UI.express(emotion:)`, and [NexArm supervised USB Actions](Actions/NexArm/README.md), including Assistant base sweeps and gestures. ✅ iPhone BLE settings/workflow binding is implemented. ✅ Internal `Robot.aim` is a Tool: it validates logical radians and forwards them to an injected sender. ❌ Photo-capture and media Actions remain pending. The camera session does not send an aim frame.
 
 #### Actions/Runtime
 
@@ -682,7 +682,7 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 
 ## Action source organization
 
-✅ Actions retains Runtime, NexArm, Speech, UI and Robot in one target. Each domain root groups related callable entries; Support holds registrations, capability interfaces, values and actual services. Runtime holds shared contracts and ActionModules. The unused diagnostic Action is removed; direct device diagnostics remain in controller tests. Production public names, Agent JSON and scheduling/completion contracts are unchanged; see [Action standard](Actions/README.md).
+✅ Actions retains Runtime, NexArm, Speech and UI in one target. Tracking aim lives in Tools/Robot. Each domain root groups related callable entries; Support holds registrations, capability interfaces, values and actual services. Runtime holds shared contracts and ActionModules. The unused diagnostic Action is removed; direct device diagnostics remain in controller tests. Production public names, Agent JSON and scheduling/completion contracts are unchanged; see [Action standard](Actions/README.md).
 
 ❌ No placeholder domains, generic action factories or new runtime behavior.
 

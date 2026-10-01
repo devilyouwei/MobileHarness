@@ -1,9 +1,9 @@
-import Actions
 import AgentCore
 import Agents
 import Foundation
 import PlatformKit
 import Testing
+import Tools
 
 private func pose(
     noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,
@@ -26,29 +26,35 @@ private func observation(_ pose: PoseObservation, session: UUID) -> AgentInput {
         metadata: InputMetadata(payload: payload, source: "visionPerception", sequence: pose.sequence))
 }
 
-private func positions(in frame: [UInt8]) -> [Int] {
-    stride(from: 5, to: 17, by: 2).map { Int(frame[$0]) | (Int(frame[$0 + 1]) << 8) }
+private func armTargets(in frame: [UInt8]) throws -> [Int] {
+    var decoder = NexArmDecoder()
+    try decoder.append(frame)
+    let packet = try #require(decoder.next())
+    #expect(packet.isArmControl)
+    #expect(packet.payload.count == 42)
+    let ids = (0..<5).map { packet.payload[2 + $0 * 8] }
+    #expect(ids == [1, 2, 3, 4, 5])
+    return (0..<5).map { Int(packet.payload[4 + $0 * 8]) | Int(packet.payload[5 + $0 * 8]) << 8 }
 }
 
-@Test func provisionalHomeFrameWritesSixMidpoints() throws {
-    let frame = try NexArmJointCommand.frame(positions: Array(repeating: 2048, count: 6))
-    #expect(frame.count == 18)
-    #expect(frame.starts(with: [UInt8(0xFF), 0xFF, 0xFF, 14, 97]))
-    #expect(positions(in: frame) == Array(repeating: 2048, count: 6))
-    let sum = frame.dropFirst(2).dropLast().reduce(0) { $0 + Int($1) }
-    #expect(frame.suffix(1) == [UInt8(truncatingIfNeeded: ~sum)])
+@Test func aimFrameAddressesFiveArmMotorsAtHome() throws {
+    let frame = try NexArmJointCommand.frame(positions: NexArmJointCommand.armHome)
+    #expect(try armTargets(in: frame) == [2048, 2087, 1198, 1238, 2048])
+    #expect(throws: NexArmControlError.invalidPosition) {
+        try NexArmJointCommand.frame(positions: NexArmJointCommand.armHome + [1122])
+    }
 }
 
 @Test func leftAndHighTargetsMoveOnlyPanAndWrist() throws {
+    let home = NexArmJointCommand.armHome
     let left = try NexArmJointCommand.positions(base: -0.32, pitch: 0)
-    #expect(left[0] < 2048)
-    #expect(left[1] == 2048)
-    #expect(left[2] == 2048)
-    #expect(left[3] == 2048)
-    #expect(left[4] == 2048)
-    #expect(left[5] == 2048)
+    #expect(left[0] < home[0])
+    #expect(left[1] == home[1])
+    #expect(left[2] == home[2])
+    #expect(left[3] == home[3])
+    #expect(left[4] == home[4])
     let high = try NexArmJointCommand.positions(base: 0, pitch: -0.32)
-    #expect(high[3] < 2048)
+    #expect(high[3] < home[3])
     #expect(throws: NexArmControlError.invalidAngle) { try NexArmJointCommand.positions(base: .nan, pitch: 0) }
 }
 
@@ -68,19 +74,22 @@ private func positions(in frame: [UInt8]) -> [Int] {
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
     var stream = agent.outputs.makeAsyncIterator()
     let aimed = try #require(await stream.next())
-    guard case .actionCall(let call) = aimed.output else {
+    guard case .toolCall(let call) = aimed.output else {
         Issue.record("Missing aim")
         return
     }
-    #expect(call.actionPath == ActionPath(module: "Robot", function: "aim"))
-    #expect(call.channel == "arm")
-    try await RobotActions.aim(invocation: ActionInvocation(envelope: aimed)) { base, pitch, _ in
+    #expect(call.toolPath == "Robot.aim")
+    try await RobotTools.aim(invocation: ToolInvocation(call: call, envelope: aimed)) { base, pitch, _ in
         #expect(base < 0)
         #expect(abs(pitch) < 0.001)
         let frame = try NexArmJointCommand.aimFrame(base: base, pitch: pitch)
-        let joints = positions(in: frame)
-        #expect(joints[0] < 2048)
-        #expect(joints.dropFirst().allSatisfy { $0 == 2048 })
+        let joints = try armTargets(in: frame)
+        let home = NexArmJointCommand.armHome
+        #expect(joints[0] < home[0])
+        #expect(joints[1] == home[1])
+        #expect(joints[2] == home[2])
+        #expect(joints[3] == home[3])
+        #expect(joints[4] == home[4])
     }
     await agent.stop()
 }
@@ -93,12 +102,12 @@ private func positions(in frame: [UInt8]) -> [Int] {
     try await agent.receive(observation(body, session: session))
     var stream = agent.outputs.makeAsyncIterator()
     let aimed = try #require(await stream.next())
-    guard case .actionCall(let call) = aimed.output else {
+    guard case .toolCall(let call) = aimed.output else {
         Issue.record("Missing aim")
         return
     }
-    let base = try #require(Double(call.parameters["base"] ?? ""))
-    let pitch = try #require(Double(call.parameters["pitch"] ?? ""))
+    let base = try #require(Double(call.arguments["base"] ?? ""))
+    let pitch = try #require(Double(call.arguments["pitch"] ?? ""))
     #expect(abs(base - 0.24) < 0.001)
     #expect(abs(pitch - 0.24) < 0.001)
     await agent.stop()
@@ -129,12 +138,10 @@ private func positions(in frame: [UInt8]) -> [Int] {
 
 @Test func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
-    let call = ActionCall(
-        actionPath: ActionPath(module: "Robot", function: "aim"), channel: "arm",
-        parameters: ["base": "nan", "pitch": "0"])
-    let envelope = OutputEnvelope(source: .photographer, input: input, output: .actionCall(call))
-    await #expect(throws: RobotActions.AimError.invalidAngle) {
-        try await RobotActions.aim(invocation: try ActionInvocation(envelope: envelope)) { _, _, _ in
+    let call = ToolCall(toolPath: "Robot.aim", arguments: ["base": "nan", "pitch": "0"])
+    let envelope = OutputEnvelope(source: .photographer, input: input, output: .toolCall(call))
+    await #expect(throws: RobotTools.AimError.invalidAngle) {
+        try await RobotTools.aim(invocation: ToolInvocation(call: call, envelope: envelope)) { _, _, _ in
             Issue.record("Invalid angle was sent")
         }
     }

@@ -10,7 +10,7 @@
 - ❌ 在 iPhone 上完成连续中英语音、当前默认 MOSS-TTS-Nano 试听、音频路由切换、摄像头姿态与眼睛跟随的体验、延迟、内存和热状态验收；自动化测试及模拟器构建不能代替这些结果。
 - ❌ 用真实第三方服务验证已接入的云聊天配置、切换和失败恢复。
 - ❌ 在现有本地设置存储之外，按实际需求扩展持久化媒体与记忆、跨 Agent 请求/回复、更多感知能力及机器人动作；物理运动的限幅、失联停机和确认必须由设备侧承担。
-- ✅ Photographer 已订阅 `vision.pose`，并在打开臂控制时发出 `Robot.aim` 和六轴帧。❌ 相机会话仍关闭臂控制，没有 Wi-Fi 套接字，也没有真机运动验收。见 [ADR 0091](adr/0091-photographer-aim.md)。
+- ✅ Photographer 已订阅 `vision.pose`，并在打开臂控制时发出 `Robot.aim` 和五轴包。夹爪装吸盘，不写入。❌ 相机会话仍关闭臂控制，没有 Wi-Fi 套接字，也没有真机运动验收。见 [ADR 0091](adr/0091-photographer-aim.md)。
 
 - ✅ 嵌套 wait、任务内阶段/Channel FIFO 与模块互斥已实现；当前契约见[调度 README](../MobileHarness/Gateway/Output/Scheduling/README.md)，历史模块 FIFO 和共享 Channel 描述已由 [ADR 0059](adr/0059-structured-wait-scheduling.md) 取代。
 - ❌ 新版 wait 的真实模型输出质量、嵌套等待/取消和语音字幕真机交互验收仍待完成。

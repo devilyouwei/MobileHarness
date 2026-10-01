@@ -3,8 +3,7 @@
 Purpose: group communication with external hardware by capability rather than device category. Design goals: separate transport from Agent decisions and future robot-specific command semantics.
 
 - ✅ ExternalDeviceTransport defines actor-isolated connect, send, emergencyStop and disconnect operations; its API is unchanged.
-- ✅ `NexArmJointCommand` maps logical `base` / `pitch` to a provisional six-position frame (command 97, little-endian, checksum). Raw 2048 is the frame center. `base` changes `shoulder_pan`; `pitch` changes `wrist_flex`. The camera session does not send this frame.
-- ❌ That provisional frame is not the production motors1–5 packet, and no Wi-Fi socket opens it.
+- ✅ `NexArmJointCommand` maps logical `base` / `pitch` onto the five arm axes and builds the same motors-1–5 packet used by production motion. The rest pose is `[2048, 2087, 1198, 1238, 2048]`. `base` changes `shoulder_pan`; `pitch` changes `wrist_flex`. The suction-cup gripper is not in the packet. The camera session does not send it.
 
 The protocol alone provides no safety guarantee. Future adapters must document bounded admission, overflow, cancellation and completion; robot hardware must enforce its own safety independently of app execution. No placeholder transport implementation is provided.
 
