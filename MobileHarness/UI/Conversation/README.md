@@ -68,3 +68,11 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 ✅ Summaries aggregate exact Channel names for display across tasks; additionalRunning explicitly represents concurrent work. This is not a shared FIFO or resource-ownership boundary. Version checks, bounded dismissals, three-second success hiding and failure retention remain unchanged. Synthetic previews use the same record-driven presenter.
 
 ❌ No claim of physical rollback/stop follows cancellation wording; no locale resource system or new per-Action views are introduced. See ADR 0086.
+
+## Composed Action outcomes
+
+✅ ActionActivityItem consumes AgentCore ActionReport only. History shows partial failure counts and an expandable list of every retained leaf problem, with motor/target/feedback where provided. No device or Gateway imports are added.
+
+❌ Execution retention remains bounded to the runtime history; this is not persistent audit storage.
+
+✅ Action details show whole-execution timeout separately from preserved child issues. UI consumes only AgentCore report values and does not import Action/device policy.

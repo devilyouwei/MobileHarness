@@ -58,6 +58,7 @@ for name in ('Actions', 'Tools'):
         errors.append(f'Missing consolidated {name}/Runtime')
 # Gateway is transport-only; AgentCore remains independent of models/platform/business.
 for module, forbidden in {
+    'PlatformKit': {'Actions', 'Tools', 'Agents', 'AgentCore', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly'},
     'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'PlatformKit'},
     'AgentCore': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Gateway', 'Agents', 'PlatformKit', 'SwiftUI', 'UIKit', 'CoreVideo'},
 }.items():
@@ -73,6 +74,21 @@ for module, forbidden in {
         name = next(iter(dependency.values()))[0]
         if name in forbidden or name.startswith('ModelKit'):
             errors.append(f'Forbidden {module} dependency: {name}')
+if targets['PlatformKit'].get('dependencies'):
+    errors.append('PlatformKit must remain independent of project targets')
+# Device SDK must not regain choreography or Action completion policy.
+for source in (ROOT / 'MobileHarness/PlatformKit/Connectivity/NexArm').glob('*.swift'):
+    if re.search(r'\b(?:NexArmGesture|NexArmArmPlan|NexArmActionController|NexArmMotionPlan|NexArmSegmentTracker|NexArmMotorCompletion|NexArmMotorResult|NexArmActionError|NexArmJogPlanner|NexArmMotorReset)\b', source.read_text()):
+        errors.append(f'Action policy in device SDK: {source.relative_to(ROOT)}')
+# Foundation SDKs expose data/capabilities; app presentation and action policy stay above them.
+for source in (ROOT / 'MobileHarness/PlatformKit').rglob('*.swift'):
+    content = source.read_text()
+    if re.search(r'"[^"\n]*[\u4e00-\u9fff][^"\n]*"', content):
+        errors.append(f'Localized presentation string in PlatformKit: {source.relative_to(ROOT)}')
+    if re.search(r'\b(?:func|var)\s+(?:discoveryOrder|displayName|performGesture|resetMotor|resetPosition)\b', content):
+        errors.append(f'Business/presentation API in PlatformKit: {source.relative_to(ROOT)}')
+    if 'videoGravity =' in content:
+        errors.append(f'Preview layout policy in PlatformKit: {source.relative_to(ROOT)}')
 # The unified behavior libraries expose runtime APIs to Gateway, not direct behavior calls.
 for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools)\b', source.read_text()):
@@ -151,6 +167,8 @@ for root, allowed in [
 ]:
     for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+            if imported == 'PlatformKit' and source.is_relative_to(ROOT / 'MobileHarness/Actions/NexArm/Support'):
+                continue  # NexArm execution consumes the foundational device protocol SDK (ADR0093).
             if imported not in allowed:
                 errors.append(f'Forbidden behavior-layer import {imported}: {source.relative_to(ROOT)}')
 # Behavior registration belongs to domain catalogs, not individual App call sites.
@@ -167,6 +185,13 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'App invokes a domain behavior helper: {source.relative_to(ROOT)}')
     if re.search(r'\bActionPath\s*\(|\.register\s*\(\s*"', content):
         errors.append(f'App contains a concrete behavior path: {source.relative_to(ROOT)}')
+# Historical polling controllers must not re-enter production Action sources.
+controller = (ROOT / 'MobileHarness/Actions/NexArm/Support/NexArmActionController.swift').read_text()
+if re.search(r'public func (?:nudgeWrist|shakeBase)\(', controller):
+    errors.append('Retired NexArm polling diagnostics belong in root Tests')
+for source in (ROOT / 'MobileHarness/Actions').rglob('*.swift'):
+    if 'NexArmLegacy' in source.read_text():
+        errors.append(f'Production Action imports a historical test algorithm: {source.relative_to(ROOT)}')
 # Action authoring: cohesive entry files, recursively discovered support registrations.
 # This is a source convention check; Swift and assembly tests validate semantic binding.
 actions_root = ROOT / 'MobileHarness/Actions'
@@ -196,6 +221,14 @@ for domain in actions_root.iterdir():
                 errors.append(f'Action registration must live in domain Support: {source.relative_to(ROOT)}')
             if module_name != domain.name or len(entries.get(function, [])) != 1:
                 errors.append(f'Missing or ambiguous canonical Action entry: {module_name}.{function}')
+    # Metadata is attached to canonical entries; binding factories still belong in Support.
+    for source, content in sources.items():
+        for module_name in re.findall(r'@Action\(\s*module: "([^"]+)"', content):
+            if source.parent != domain or module_name != domain.name:
+                errors.append(f'Invalid Action macro owner: {source.relative_to(ROOT)}')
+        for function in re.findall(namespace_name + r'\.(\w+)Definition\(', content):
+            if source.parent != domain / 'Support' or len(entries.get(function, [])) != 1:
+                errors.append(f'Invalid Action macro binding: {source.relative_to(ROOT)}: {function}')
 # Tool authoring uses the same domain/Support boundary without imposing Action signatures.
 tools_root = ROOT / 'MobileHarness/Tools'
 for folder, directories, files in os.walk(tools_root):
@@ -230,6 +263,17 @@ for domain in tools_root.iterdir():
                 module, function = '', path
             if module != domain.name or len(entries.get(function, [])) != 1:
                 errors.append(f'Missing or ambiguous canonical Tool entry: {path}')
+
+    for source, content in sources.items():
+        for function in re.findall(namespace_name + r'\.(\w+)Definition\(', content):
+            if source.parent != domain / 'Support' or len(entries.get(function, [])) != 1:
+                errors.append(f'Invalid Tool macro binding: {source.relative_to(ROOT)}: {function}')
+# Compile-time generation must never acquire business/runtime dependencies.
+macro = targets.get('BehaviorDefinitions')
+if macro is None or macro['type'] != 'macro' or macro.get('path') != 'Macros/BehaviorDefinitions':
+    errors.append('BehaviorDefinitions must remain a compile-time macro target')
+elif any(next(iter(d.values()))[0] not in {'SwiftCompilerPlugin', 'SwiftSyntax', 'SwiftSyntaxBuilder', 'SwiftSyntaxMacros'} for d in macro.get('dependencies', [])):
+    errors.append('BehaviorDefinitions may depend only on SwiftSyntax compiler libraries')
 
 if errors:
     raise SystemExit('\n'.join(errors))

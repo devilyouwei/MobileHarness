@@ -65,3 +65,17 @@ flowchart TD
 ## Head gestures
 
 ✅ The explicit gesture binding maps nod and shakeHead to the shared controller. No transport-specific choreography is duplicated. ❌ Hardware acceptance is separate from registration.
+
+## NexArm feedback execution — 2026-10-01
+
+✅ ApplicationRuntime binds `NexArm.reset` to BluetoothWorkflow.resetArm and other NexArm actions to the shared performer. No motion timing or arrival logic belongs in composition.
+
+❌ Sustained real-device acceptance remains pending.
+
+## Atomic composition — ADR0092
+
+✅ ApplicationRuntime registers six motor resources, injects Settings/manual resource execution, and transfers full device reports through ActionComposition into invocation results. Cleanup joins software work without claiming physical stop.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ ADR0093: NexArm bindings now resolve the gesture catalog from Actions. PlatformKit supplies connection/protocol capabilities; no platform gesture enum or business display-name catalog remains.

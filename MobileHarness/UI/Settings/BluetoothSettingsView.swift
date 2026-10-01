@@ -168,7 +168,7 @@
                 }
                 .disabled(!connected)
                 Section {
-                    Button("重置姿态", systemImage: "arrow.counterclockwise") { controls.tryAction(.reset) }
+                    Button("整臂归位", systemImage: "arrow.counterclockwise") { controls.tryAction(.reset) }
                         .disabled(!connected)
                         .accessibilityIdentifier("settings.bluetooth.reset")
                 }

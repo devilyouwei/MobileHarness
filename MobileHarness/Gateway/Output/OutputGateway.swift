@@ -189,7 +189,7 @@ public actor OutputGateway {
             do {
                 try Task.checkCancellation()
                 let owner = try await executionOwner(envelope)
-                let required = try actions.executor.requiredResources(for: token.actionPath)
+                let required = try actions.executor.requiredResources(for: token)
                 let lease = await resources?.lease(for: owner, resources: required)
                 try await actions.dispatch(
                     token, envelope: envelope, owner: owner,

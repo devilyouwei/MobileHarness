@@ -27,7 +27,6 @@
         @MainActor
         public func connect(_ layer: AVCaptureVideoPreviewLayer) {
             layer.session = session
-            layer.videoGravity = .resizeAspectFill
         }
 
         @MainActor

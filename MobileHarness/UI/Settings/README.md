@@ -131,3 +131,9 @@ flowchart LR
 ## Head gestures
 
 ✅ BluetoothArmAction exposes 点头 and 摇头 as typed settings intents; the existing list discovers them through CaseIterable. UI owns no motor implementation. ❌ Physical arrival is not inferred from a Settings send.
+
+## NexArm feedback execution — 2026-10-01
+
+✅ Settings labels the explicit motors1–5 reset as 整臂归位. UI consumes workflow status and connection-instability messages; it owns no executor, device lock or feedback policy.
+
+❌ Sustained real-device acceptance remains pending.

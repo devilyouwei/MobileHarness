@@ -1,3 +1,4 @@
+import Actions
 import AgentCore
 import Agents
 import AppWorkflows
@@ -42,31 +43,89 @@ final class ApplicationRuntime {
         let manager = AgentManager()
         let input = InputGateway(manager: manager, policy: policy)
         let presentation = RuntimePresentation()
-        let resources = try ResourceCoordinator(definitions: [
-            ResourceDefinition(
-                id: .cameraCapture, allowedOwners: [CameraCoordinator.resourceOwnerID], requiresLease: true
-            ) {
-                await camera.stop()
-            }
-        ])
+        let resources = try ResourceCoordinator(
+            definitions: [
+                ResourceDefinition(
+                    id: .cameraCapture, allowedOwners: [CameraCoordinator.resourceOwnerID], requiresLease: true
+                ) {
+                    await camera.stop()
+                }
+            ]
+                + (1...6).map { motor in
+                    ResourceDefinition(id: ResourceID(rawValue: "nexarm.motor.\(motor)"), allowedOwners: [.assistant]) {
+                        // Cancel and join software ownership; this is not a hardware stop acknowledgment.
+                        await bluetooth.stopActions()
+                    }
+                })
         self.resources = resources
+        bluetooth.withMotorResources = { motors, operation in
+            try await resources.run(
+                resources: Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") }),
+                owner: nil, lease: nil, operation: operation)
+        }
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation,
-            gesture: { request, _ in
-                let gesture: NexArmGesture
-                switch request.gesture {
-                case .nod: gesture = .nod
-                case .shakeHead: gesture = .shakeHead
-                case .wave: gesture = .wave
-                case .tiltLeft: gesture = .tiltLeft
-                case .tiltRight: gesture = .tiltRight
-                case .lookAround: gesture = .lookAround
-                case .celebrate: gesture = .celebrate
-                case .dance: gesture = .dance
-                }
-                try await bluetooth.performGesture(gesture, repetitions: request.repetitions)
+            gesture: { request, invocation in
+                let composition = try ActionComposition(
+                    .action("gesture", [], maximumResults: 100) {
+                        do {
+                            switch request.gesture {
+                            case .reset:
+                                try await bluetooth.resetArm(speed: request.speed, acceleration: request.acceleration)
+                            case .moveMotor, .resetMotor:
+                                guard let motor = request.motor else { throw NexArmError.invalidMotion }
+                                try await bluetooth.moveMotor(
+                                    id: motor, target: request.target, speed: request.speed,
+                                    acceleration: request.acceleration)
+                            default:
+                                let gesture: NexArmGesture
+                                switch request.gesture {
+                                case .nod: gesture = .nod
+                                case .shakeHead: gesture = .shakeHead
+                                case .wave: gesture = .wave
+                                case .tiltLeft: gesture = .tiltLeft
+                                case .tiltRight: gesture = .tiltRight
+                                case .lookAround: gesture = .lookAround
+                                case .celebrate: gesture = .celebrate
+                                case .dance: gesture = .dance
+                                default: throw NexArmError.invalidMotion
+                                }
+                                try await bluetooth.performGesture(
+                                    gesture, repetitions: request.repetitions,
+                                    speed: request.speed, acceleration: request.acceleration)
+                            }
+                        } catch {
+                            if let report = await bluetooth.lastActionReport {
+                                return .report(report)
+                            }
+                            throw error
+                        }
+                        if let report = await bluetooth.lastActionReport { return .report(report) }
+                        return .completed
+                    })
+                try await invocation.results.record(composition.run())
             },
-            shakeBase: { cycles, _ in try await bluetooth.shakeBase(cycles: cycles) },
+            shakeBase: { cycles, invocation in
+                do {
+                    let args = ActionArguments(invocation.call.parameters)
+                    let speed =
+                        try invocation.call.parameters["speed"] == nil
+                        ? 1400 : args.requiredInt("speed", range: 1...1400)
+                    let acceleration =
+                        try invocation.call.parameters["acceleration"] == nil
+                        ? 30 : args.requiredInt("acceleration", range: 1...254)
+                    try await bluetooth.performGesture(
+                        .baseSway, repetitions: cycles, speed: speed, acceleration: acceleration)
+                } catch {
+                    if let report = await bluetooth.lastActionReport {
+                        try await invocation.results.record(report)
+                        if error is CancellationError { throw error }
+                        return
+                    }
+                    throw error
+                }
+                if let report = await bluetooth.lastActionReport { try await invocation.results.record(report) }
+            },
             capabilities: [
                 AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
                 SpeechPerceptionAgent.runtimeCapabilities(

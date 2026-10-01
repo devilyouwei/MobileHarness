@@ -32,3 +32,5 @@ The Action owns no task or queue. App rejects outdated sessions and turns; stale
 ✅ Only the entry lives in the domain root; support declarations are not separate callable Actions. ❌ No rendering or animation lifecycle is added.
 
 ✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
+
+✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.

@@ -7,3 +7,5 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ Configuration saves remain admitted across page disappearance/discovery cancellation; overlapping saves reject, failure releases the slot and retry succeeds. Repeated restoration preserves unsaved edits.
 
 ❌ Native rendering, navigation gestures and physical-device layout/animation acceptance.
+
+✅ Composed Action history tests preserve all child issue descriptions beyond the compact summary. ❌ Real-device accessibility and long-history visual acceptance remain outstanding.

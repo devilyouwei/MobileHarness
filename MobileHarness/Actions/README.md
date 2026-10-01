@@ -2,7 +2,7 @@
 
 Purpose: implement Agent-selected behavior with explicit completion, ordering and lifetime contracts. Design goals: consistent Swift entry points, cohesive modules, typed dependency injection, bounded execution and understandable ownership of effects.
 
-This is the normative authoring standard for new Actions and deliberate migrations. **Stage 1 runtime support is implemented; Action paths and Channel/wait semantics remain unchanged.** No JSON configuration fields were added. The current implementation and migration exceptions are listed below. Domain READMEs supply exact parameters and operational limits; they must identify any departure from this standard. Examples are design examples, not registered production capabilities.
+This is the normative authoring standard for new Actions and deliberate migrations. **Macro registration, dynamic resource/deadline policies and composed results are implemented.** No JSON configuration fields were added. The current implementation and migration exceptions are listed below. Domain READMEs supply exact parameters and operational limits; they must identify any departure from this standard. Examples are design examples, not registered production capabilities.
 
 ## 1. Vocabulary and boundaries
 
@@ -18,7 +18,7 @@ This is the normative authoring standard for new Actions and deliberate migratio
 
 Actions differ from Tools by execution and feedback contracts, not by read/write or fast/slow behavior. A quick state setter can still be an Action when it needs Channel ordering. Tools bypass Action scheduling and must not become an alternate route around device ownership checks.
 
-Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither App, concrete Agents, Gateway, PlatformKit nor the Swift UI target. The current target depends on AgentCore and StorageAudio; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
+Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither App, concrete Agents, Gateway nor the Swift UI target. NexArm/Support additionally consumes the foundational PlatformKit protocol SDK, with no reverse dependency (ADR0093). The runtime target depends on AgentCore, StorageAudio and PlatformKit, with a separate compile-time macro plugin; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
 
 ```mermaid
 flowchart LR
@@ -47,7 +47,7 @@ Every category has admission, execution and terminal success/failure/cancellatio
 
 ### Finite operations
 
-**Await the whole operation, not an invented completion gate for every internal step.** Actions validate arguments and `try await` the injected capability through its documented completion and cleanup. Device trajectory timing, feedback sampling and control-mode handoffs belong to PlatformKit. Do not implement a second per-waypoint stability loop, arbitrary settling sleeps, command replay, or a device queue inside an Action. Do not start an unjoined `Task` and return early: that releases Channel/module exclusion before the effect has finished. Nominal trajectory durations may schedule internal frames, but do not by themselves establish whole-operation success. NexArm Cartesian playback verifies fresh final home; native head gestures retain their measured handoff and segment gates. See [NexArm authoring pitfalls](NexArm/README.md#authoring-nexarm-actions-avoid-these-patterns) before adding robot Actions.
+**Await the whole operation, not an invented completion gate for every internal step.** Actions validate arguments and `try await` the injected capability through its documented completion and cleanup. PlatformKit owns transport sampling, packet encoding and control-mode fences. NexArm/Support owns gesture sequences and one shared per-motor completion policy. Do not duplicate stability loops, add arbitrary settling sleeps or replay failed commands in entry handlers. Do not start an unjoined Task and return before its effect finishes. Explicit rhythm pauses belong in Action composition; nominal durations do not prove completion. See [NexArm authoring pitfalls](NexArm/README.md#authoring-nexarm-actions-avoid-these-patterns) before adding robot Actions.
 
 - Await the actual promised endpoint: speaker drain, gesture completion, saved photo, or device-reported arrival within documented tolerance. Enqueuing work or closing an XML tag is not completion.
 - Keep retries, waits and buffers bounded. A duration estimate or `Task.sleep` is not evidence of physical/animation completion; await the owning capability's acknowledgment.
@@ -213,6 +213,8 @@ extension FaceActions {
         case invalidExpression
     }
 
+    @Action(module: "Face", title: "setExpression", kind: .state,
+            completion: "Expression target committed; visual interpolation is not joined.")
     public static func setExpression(
         invocation: ActionInvocation,
         using apply: @escaping @Sendable (Expression, ActionInvocation) async throws -> Void
@@ -275,7 +277,7 @@ extension CameraActions {
 
 For a real module, keep start/stop entries together in CameraActions.swift; their shared error belongs in Support/CameraTypes.swift. An Update command uses typed validated arguments like the Set example, while preserving the activity's identity and ownership. A photo/file identifier would need an explicitly designed observation or returning Tool contract; the activity ID in ActionCompletion is not a media-file result.
 
-### Explicit App binding
+### Explicit capability binding
 
 The registry is not an authorization catalog. Model-callable declarations stay in versioned Agent JSON v5; fixed internal permissions stay in Agent code, following [Agents](../Agents/README.md). App binds each real implementation explicitly. Do not add `kind`, `completion` or `lifetime` to v5: those fields are not supported. Describe completion in the existing Action `doc` and in the domain README.
 
@@ -286,17 +288,14 @@ func makeExampleRegistry(
     applyExpression: @escaping @Sendable (FaceActions.Expression, ActionInvocation) async throws -> Void
 ) throws -> ActionRegistry {
     try ActionRegistry(definitions: [
-        ActionDefinition(
-            path: ActionPath(module: "Face", function: "setExpression"), displayName: "setExpression", kind: .state,
-            completion: "Expression target committed; visual interpolation is not joined."
-        ) { invocation in
+        FaceActions.setExpressionDefinition { invocation in
             try await FaceActions.setExpression(invocation: invocation, using: applyExpression)
         }
     ])
 }
 ```
 
-This App-side example requires `import Actions` and `import AgentCore` after the example Actions are implemented in the Actions target. It is only the implementation binding; an authorized Agent still emits a resolved call through OutputGateway. Configuration or missing-handler errors propagate without fallback.
+This example belongs in the domain Support catalog; App supplies the callback through an explicit module initializer. It is only the implementation binding; an authorized Agent still emits a resolved call through OutputGateway. Configuration or missing-handler errors propagate without fallback.
 
 ## 6. Required domain contract and verification
 
@@ -332,7 +331,7 @@ All entries reject undeclared keys, check cancellation before validation and aft
 
 ✅ Existing paths, permissions, completion kinds, parameter meaning and Channel/wait semantics remain unchanged. The expression path remains UI.express; immediate UI.moveEyes belongs to Tools. Registry and resource contracts remain in Runtime/Gateway.
 
-❌ One-shot expression/restore, Camera Actions, generic activity supervision, audio/robot resource integration and physical-device timing acceptance remain separate work. They are not implemented by renaming or wrapping an entry.
+❌ One-shot expression/restore, Camera Actions, generic activity supervision, audio resource integration and physical-device timing acceptance remain separate work. They are not implemented by renaming or wrapping an entry.
 
 ## 8. Stage 2: results and resource ownership
 
@@ -356,7 +355,7 @@ This is an authoring example with an injected service, not a registered producti
 
 ✅ Persistent resource leases are owner/instance/session-bound, expire unless renewed and support atomic group takeover. Cleanup failure/timeout keeps affected resources gated. Production camera capture uses the coordinator through App lifecycle. See [results](../Gateway/Output/Results/README.md), [resources](../Gateway/Output/Resources/README.md) and [ADR 0066](../../docs/adr/0066-action-results-resource-leases.md).
 
-❌ General activity registry/event subscriptions, audio/robot resource integration, device safety watchdogs, durable delivery remain outstanding. Camera capture is not video recording; current UI expressions remain state acceptance, without waiting for animation.
+❌ General activity registry/event subscriptions, audio resource integration, device safety watchdogs, durable delivery remain outstanding. Camera capture is not video recording; current UI expressions remain state acceptance, without waiting for animation.
 
 ## 9. Module-owned registration
 
@@ -382,7 +381,7 @@ The earlier explicit single-definition binding example illustrates isolated cons
 
 ## NexArm entertainment skills (2026-09-30)
 
-✅ NexArm now adds waveWrist, tiltWrist, lookAround, celebrate and dance as typed finite Actions, alongside shakeBase. The domain owns registration and per-verb validation; all share NexArm exclusion. See [contracts](NexArm/README.md). ❌ New gesture sequences await physical acceptance.
+✅ NexArm now adds waveWrist, tiltWrist, lookAround, celebrate and dance as typed finite Actions, alongside shakeBase. The domain owns registration and per-verb validation; all share NexArm exclusion. See [contracts](NexArm/README.md). Physical acceptance is tracked per gesture/version in the NexArm README; it does not establish a general hardware safety guarantee.
 
 ## Immediate presentation migration
 
@@ -390,14 +389,18 @@ The earlier explicit single-definition binding example illustrates isolated cons
 
 ## Cohesive source organization
 
-✅ Fifteen Swift files replace the former thirty-one. Production public symbols, paths, arguments, completion semantics and the built-in catalog remain unchanged; the unused diagnostic Action and its support types were removed. Domain roots contain entries, Support contains non-callable implementation support, and Runtime contains shared infrastructure. The source check recursively discovers definitions and accepts grouped entries; Swift compilation and assembly tests remain responsible for semantic validation.
+✅ Domain roots contain attributed entries, Support contains non-callable implementation support and explicit capability bindings, and Runtime contains shared infrastructure. Historical motion algorithms remain in root Tests. The source check recursively discovers definitions and accepts grouped entries; Swift compilation and assembly tests remain responsible for semantic validation.
 
-❌ This reorganization adds no generic action factory, device behavior or runtime contract. Future splits should follow real responsibilities.
+❌ Automatic discovery and unused future-domain scaffolding are not supported. Future splits should follow real responsibilities.
 
 ## Execution display metadata
 
-✅ Every ActionDefinition requires a nonblank displayName of at most 256 UTF-8 bytes. Declare the human-readable operation name beside its implementation registration in domain Support. It is independent of Agent aliases, permission JSON, Channel selection and completion text; no SwiftUI/localization-framework type crosses the boundary. The scheduler copies the validated name into each execution record at admission, so history needs no registry lookup. Production currently supplies Chinese names; richer localization remains future work.
+✅ Every ActionDefinition requires a nonblank displayName of at most 256 UTF-8 bytes. Declare the human-readable operation name in `@Action` beside its canonical entry; domain Support binds the generated factory. It is independent of Agent aliases, permission JSON, Channel selection and completion text; no SwiftUI/localization-framework type crosses the boundary. The scheduler copies the validated name into each execution record at admission, so history needs no registry lookup. Production currently supplies Chinese names; richer localization remains future work.
 
 ✅ UI owns generic phase/completion wording, symbols and layout; AppWorkflows only forwards shared snapshots. Adding an Action through an existing capability requires no action-name or error-code mapping in App/UI. Channel names are displayed exactly as supplied, never inferred from module/device names. See ADR 0086.
 
 ❌ This metadata does not change permissions, scheduling or Agent result feedback. Do not put a second model-callable catalog in Swift or presentation metadata in Agent JSON v5.
+
+✅ NexArm responsibility audit: all motion behavior and wrappers, including manual jog shaping and reset target selection, belong to Actions/NexArm/Support. PlatformKit retains native register encoders and device facts only. The current [NexArm README](NexArm/README.md) replaces the historical implementation narrative with one English technical contract and diagrams.
+
+✅ Canonical entries now use `@Action` for path namespace, title, kind, completion and optional resource/budget resolver functions. Domain Support catalogs explicitly bind the generated `nameDefinition` factories. Dynamic deadlines are cooperative, start after admission, and preserve child reports. See [macro implementation](../../Macros/BehaviorDefinitions/README.md) and [ADR0094](../../docs/adr/0094-arrival-profiles-and-behavior-macros.md).

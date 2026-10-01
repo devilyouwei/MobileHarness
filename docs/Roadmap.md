@@ -713,3 +713,74 @@ Deployment: installed the signed Debug build on the connected iPhone17Pro and ve
 ### NexArm arm-only output, 2026-10-01
 
 ✅ Read-only device IK plus shared five-motor synchronous compilation removes gripper writes from gestures, home/reset and connection indication; manual gripper remains independent. ✅ USB home/celebration/dance passed with claw unchanged. ❌ Long-duration BLE and loaded-arm trajectory acceptance remain pending; joint-space endpoint timing replaces firmware Cartesian interpolation (ADR0090).
+
+## NexArm feedback execution — 2026-10-01
+
+✅ Implemented shared motor-scoped progression, separate single/composite definitions, explicit reset1–5, idle/active feedback watchdog and aggregate missed-segment errors. Device validation of the new progression and deployment are tracked separately below; Gateway-wide resource arbitration remains outstanding.
+
+❌ Sustained real-device acceptance remains pending.
+
+### Validation and remaining measured error
+
+✅ `scripts/check.sh` passed with full Xcode Swift6.4, including277 IntegrationTests; `scripts/build-ios.sh` passed all four simulator schemes. Signed device build2026100104 passed.
+
+✅ Supervised USB dance exercised all8 segments and returned home. Segments2/4/6/7 reported `targetsNotReached`: motor3 remained stable21…26 counts short of target while feedback stayed healthy, exceeding the16-count tolerance. This validates skip-and-report and final return; it is **not** an all-targets acceptance pass. No tolerance, torque or calibration was changed to hide that result. The operator reported no motor2 vibration during the head/dance trials.
+
+❌ Motor3 loaded-position accuracy and long-duration iPhone BLE acceptance remain outstanding. The corrected2000ms head deadline has simulated coverage and measured timing rationale; no automatic physical replay of the failed shake-head sequence was performed.
+
+✅ Installed signed build2026100104 on the connected iPhone17Pro; `devicectl device info apps` independently read back bundle version2026100104. Phone BLE endurance/visual acceptance remains pending; no app launch or action replay was performed during installation.
+
+## Atomic composition — ADR0092
+
+✅ Implemented atomic motor options/reset, simple/complex composition, structured partial failures and Channel continuation. Tests and device deployment for this contract are recorded separately below.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+## ADR0092 validation — 2026-10-01
+
+✅ Full `scripts/check.sh` passed, including286 IntegrationTests, UI report presentation tests, architecture checks and formatting. `scripts/build-ios.sh` passed all four simulator schemes. Signed iPhone build2026100105 passed.
+
+✅ Opt-in supervised USB atomic-group test passed in1.58seconds: motors4/5 moved together with speed800 and acceleration50, then each reset to its calibrated home. All four atomic results succeeded. Targets/observations: motor4 1318/1318 then1238/1248; motor5 2128/2126 then2048/2051. Motors1–3 stayed2047/2088/1196. Gripper6 received no command. No motion-time queries, firmware/calibration writes or failure replay were used.
+
+❌ This does not establish loaded-position accuracy, long-duration BLE behavior or a physical emergency-stop guarantee. Previously measured motor3 off-target positions remain reportable failures, not silently widened tolerances.
+
+✅ Installed build2026100105 on iPhone17Pro and independently read back the same bundle version. The first readback hit a transient CoreDevice/RSD error; refreshing device discovery and retrying the read-only query succeeded. No app launch or motion replay was performed during installation.
+
+## NexArm source boundary correction (2026-10-01)
+
+✅ Moved gesture catalog, names, simple/complex choreography and completion execution from PlatformKit to Actions/NexArm/Support. Renamed native encoder NexArmMotorCommands, added boundary guards, and migrated callers/tests. Motion semantics remain unchanged; validation is recorded after checks. ❌ Physical motion acceptance remains distinct from architectural and simulated tests. See [ADR0093](adr/0093-nexarm-platform-action-boundary.md).
+
+Validation: `scripts/check.sh` passed with Swift 6.4, including all 286 IntegrationTests; `scripts/build-ios.sh` passed all four simulator schemes. Signed iPhone build2026100106 passed. Hardware motion was not replayed for this source-boundary migration. The congestion fixture was made deterministic after its timed unblock raced a later child; production control behavior was unchanged.
+
+Device: signed build2026100106 installed on the connected iPhone; CoreDevice app inventory confirmed Bundle Version2026100106. Initial installation disconnected; retry succeeded. No automatic app launch or physical motion replay.
+
+## PlatformKit responsibility audit and NexArm documentation (2026-10-01)
+
+✅ Audited Audio, Vision, Core and Connectivity. Moved NexArm jog/reset behavior to Actions; made BLE failure snapshots structured and moved sorting/localization to App; moved preview fill choice to the App adapter. Replaced the NexArm Action README with an English current-state design and Mermaid diagrams, distinguishing generic composition support from the current bounded gesture-plan implementation. ❌ Physical acceptance is separate from this source-boundary audit.
+
+Validation of the follow-up audit: `scripts/check.sh` passed, including all286 IntegrationTests, and `scripts/build-ios.sh` passed all four simulator schemes. Signed device build2026100107 passed. No new physical motion acceptance was performed.
+
+Device update: CoreDevice reported successful installation of signed build2026100107. Installed-version readback was not confirmed: the first inventory returned no matching row, then the refreshed connection disconnected during the retry. No app launch or physical motion was triggered.
+
+
+## 2026-10-01 — Arrival profiles and behavior macros
+
+✅ Implemented fresh arrival priority, per-motor tolerances, separate stationary/feedback/movement failures, parameter-dependent budgets and cooperative execution deadlines. Existing Action/Tool metadata now uses attached macros; catalogs and permissions stay explicit.
+
+❌ Full-range/load calibration remains open; motor6 tracking was inconsistent in small-move measurements and its tolerance remains provisional.
+
+Physical acceptance: serial nod/shake-head completed with the new arrival rule; final celebration (5.94s,30 motor outcomes) and dance (6.98s,40 outcomes) both completed with no failed motor results after motor3 tolerance was adjusted using measured raised-pose error. The user confirmed no visible jitter or stalls. Earlier celebration under the narrower trial profile retained its off-target results; it was not reported as success.
+
+Validation: `./scripts/check.sh` passed (294 IntegrationTests plus the other enabled suites); `./scripts/build-ios.sh` passed all four schemes. The signed device build `2026100201` passed.
+
+Device installation: iPhone17Pro install succeeded and an independent installed-app query returned bundle version `2026100201` (previously `2026100107`). The app was not auto-launched.
+
+## 2026-10-02 — Platform/Action/Tool maintenance
+
+✅ Retired production polling diagnostics, unused permission/transport/audio APIs and unreachable error cases were removed or isolated in historical tests. Live/observed native commands share per-motor limits. Current macro/resource/deadline documentation is consolidated.
+
+❌ Generic permission/transport abstraction and physical emergency stopping remain unimplemented; no new physical motion acceptance is claimed by this cleanup.
+
+Validation: `./scripts/check.sh` passed (295 IntegrationTests and other enabled suites), all four `./scripts/build-ios.sh` schemes passed, and signed device build `2026100202` passed. No physical motions were run for this cleanup.
+
+Device installation succeeded; an independent iPhone installed-app query confirmed `2026100202`. The app was not auto-launched.

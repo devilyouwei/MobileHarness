@@ -114,6 +114,13 @@
                     Text(item.title).font(.body.weight(.medium))
                     Text("\(item.channelTitle) · \(item.status)")
                         .font(.subheadline).foregroundStyle(.secondary)
+                    if !item.issueDescriptions.isEmpty {
+                        DisclosureGroup("查看全部问题") {
+                            ForEach(Array(item.issueDescriptions.enumerated()), id: \.offset) { _, description in
+                                Text(description).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
                 }
                 Spacer(minLength: 8)
                 Text(item.execution.endedAt ?? item.execution.startedAt ?? item.execution.admittedAt, style: .time)

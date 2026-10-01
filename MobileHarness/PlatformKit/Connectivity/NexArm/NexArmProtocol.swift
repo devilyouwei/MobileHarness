@@ -2,8 +2,9 @@ import Foundation
 
 public enum NexArmError: Error, Equatable, Sendable {
     case invalidPacket, overflow, timeout, busy, disconnected
+    case feedbackLost
     case io(Int32)
-    case unsupportedFirmware, firmwareUnavailable, invalidMotion, alreadyUsed, moving, uncertainMotion
+    case unsupportedFirmware, firmwareUnavailable, invalidMotion
 }
 
 public struct NexArmPacket: Equatable, Sendable {
@@ -17,40 +18,49 @@ public struct NexArmPacket: Equatable, Sendable {
         self.command = command
         self.payload = payload
     }
-    /// Motion allowlists reject whole-device Cartesian/reset commands that can write the gripper.
+    /// Observation sessions admit supported addressed position writes and read-only telemetry requests.
     public var isObservedControl: Bool {
-        (id == 255 && command == 11 && payload.isEmpty) || isArmControl || isHeadControl
+        (id == 255 && command == 11 && payload.isEmpty) || isSynchronousPositionWrite || isSinglePositionWrite
     }
-    public var isArmControl: Bool {
-        guard id == 254, command == 131, payload.count == 42, payload[0] == 41, payload[1] == 7 else { return false }
-        for index in 0..<5 {
-            let start = 2 + index * 8
-            guard payload[start] == UInt8(index + 1), payload[start + 1] == 30,
+    public var isSynchronousPositionWrite: Bool {
+        guard id == 254, command == 131, (10...50).contains(payload.count), (payload.count - 2) % 8 == 0,
+            payload[0] == 41, payload[1] == 7
+        else { return false }
+        var motors: Set<UInt8> = []
+        for start in stride(from: 2, to: payload.count, by: 8) {
+            guard (1...6).contains(payload[start]), motors.insert(payload[start]).inserted,
+                (1...254).contains(payload[start + 1]),
                 payload[start + 4] == 0, payload[start + 5] == 0
             else { return false }
             let target = Int(payload[start + 2]) | Int(payload[start + 3]) << 8
             let speed = Int(payload[start + 6]) | Int(payload[start + 7]) << 8
-            guard NexArmJogPlanner.limits[index].contains(target), (1...1400).contains(speed) else { return false }
+            guard NexArmMotorCommands.positionLimits[Int(payload[start]) - 1].contains(target),
+                (1...1400).contains(speed)
+            else {
+                return false
+            }
         }
         return true
     }
-    private var isHeadControl: Bool {
-        guard id == 4 || id == 5, command == 3, payload.count == 8,
-            payload[0] == 41, payload[1] == 30, payload[4] == 0, payload[5] == 0
-        else { return false }
-        let position = Int(payload[2]) | Int(payload[3]) << 8
-        let speed = Int(payload[6]) | Int(payload[7]) << 8
-        return NexArmJogPlanner.limits[Int(id) - 1].contains(position) && speed == 1400
-    }
-    public var isLiveControl: Bool {
-        if isHeadControl || isArmControl { return true }
+    private var isSinglePositionWrite: Bool {
         guard (1...6).contains(id), command == 3, payload.count == 8,
-            payload[0] == 41, payload[1] == 30, payload[4] == 0, payload[5] == 0
+            payload[0] == 41, (1...254).contains(payload[1]), payload[4] == 0, payload[5] == 0
         else { return false }
         let position = Int(payload[2]) | Int(payload[3]) << 8
         let speed = Int(payload[6]) | Int(payload[7]) << 8
-        return (0...4095).contains(position) && (1...600).contains(speed)
+        return NexArmMotorCommands.positionLimits[Int(id) - 1].contains(position) && (1...1400).contains(speed)
     }
+    public var motorTargets: [Int: Int]? {
+        if isSynchronousPositionWrite {
+            return Dictionary(
+                uniqueKeysWithValues: stride(from: 2, to: payload.count, by: 8).map { offset in
+                    return (Int(payload[offset]), Int(payload[offset + 2]) | Int(payload[offset + 3]) << 8)
+                })
+        }
+        if isSinglePositionWrite { return [Int(id): Int(payload[2]) | Int(payload[3]) << 8] }
+        return nil
+    }
+    public var isLiveControl: Bool { isSinglePositionWrite || isSynchronousPositionWrite }
     public var bytes: [UInt8] {
         let body = [id, UInt8(payload.count + 2), command] + payload
         return [0xFF, 0xFF] + body + [~body.reduce(0, &+)]
@@ -129,73 +139,12 @@ public protocol NexArmObservableLink: NexArmWritableLink {
     func endObservation(_ session: UUID) async
 }
 
-/// Host observation watchdog. Receipt timestamps are not device sampling timestamps.
-public struct NexArmArrivalTracker: Sendable {
-    public enum Outcome: Sendable, Equatable { case waiting, arrived, feedbackTimeout, completionTimeout }
-    /// Each awaited segment needs its own bounded settling/observation allowance.
-    public static func completionBudget(durationMilliseconds: Int) -> Duration {
-        .milliseconds(durationMilliseconds + 3000)
+/// Connection-level health counts fresh receipts even when all positions are unchanged.
+public struct NexArmFeedbackWatchdog: Sendable {
+    private var lastReceipt: ContinuousClock.Instant
+    public init(started: ContinuousClock.Instant) { lastReceipt = started }
+    public mutating func observe(at receipt: ContinuousClock.Instant) {
+        if receipt > lastReceipt { lastReceipt = receipt }
     }
-    private let target: [Int]
-    private let jointTarget: [Int]?
-    private let includeClaw: Bool
-    private let final: Bool
-    private let started: ContinuousClock.Instant
-    private let deadline: ContinuousClock.Instant
-    private let earliestObservation: ContinuousClock.Instant
-    private var lastFeedback: ContinuousClock.Instant
-    private var stableSince: ContinuousClock.Instant?
-    private var anchor: [Int]?
-    public init(
-        target: [Int], final: Bool, started: ContinuousClock.Instant, durationMilliseconds: Int,
-        actionDeadline: ContinuousClock.Instant? = nil, jointTarget: [Int]? = nil,
-        minimumObservationMilliseconds: Int = 0, includeClaw: Bool = true
-    ) {
-        self.target = target
-        self.jointTarget = jointTarget
-        self.includeClaw = includeClaw
-        self.final = final
-        self.started = started
-        // Stable early feedback can describe a stationary start or an intermediate plateau
-        // while firmware still owns the trajectory. Never hand off before its nominal end.
-        earliestObservation = started.advanced(
-            by: .milliseconds(max(durationMilliseconds, minimumObservationMilliseconds)))
-        let segmentDeadline = started.advanced(by: Self.completionBudget(durationMilliseconds: durationMilliseconds))
-        deadline = min(segmentDeadline, actionDeadline ?? segmentDeadline)
-        lastFeedback = started
-    }
-    public mutating func observe(pose: [Int], joints: [Int], at time: ContinuousClock.Instant) {
-        guard pose.count == 6, target.count == 6, joints.count == 6, time >= started, time >= lastFeedback else {
-            return
-        }
-        lastFeedback = time
-        let poseArrived =
-            zip(pose.prefix(3), target.prefix(3)).allSatisfy { abs($0 - $1) <= (final ? 5 : 15) }
-            && abs(pose[3] - target[3]) <= (final ? 20 : 40)
-            && abs(pose[4] - target[4]) <= 2 && (!includeClaw || abs(pose[5] - target[5]) <= 2)
-        let observedJoints = Array(joints.prefix(includeClaw ? 6 : 5))
-        let arrived =
-            jointTarget.map { target in
-                target.count == 6 && zip(observedJoints, target).allSatisfy { abs($0 - $1) <= 16 }
-            } ?? poseArrived
-        guard arrived else {
-            stableSince = nil
-            anchor = nil
-            return
-        }
-        if let anchor, zip(observedJoints, anchor).allSatisfy({ abs($0 - $1) <= 2 }) { return }
-        anchor = observedJoints
-        stableSince = time
-    }
-    public func outcome(at time: ContinuousClock.Instant) -> Outcome {
-        if time >= deadline { return .completionTimeout }
-        if time - lastFeedback >= .seconds(2) { return .feedbackTimeout }
-        // Only received samples can advance the stable window, never wall-clock waiting alone.
-        if lastFeedback >= earliestObservation, let stableSince,
-            lastFeedback - stableSince >= .milliseconds(final ? 300 : 200)
-        {
-            return .arrived
-        }
-        return .waiting
-    }
+    public func isLost(at now: ContinuousClock.Instant) -> Bool { now - lastReceipt >= .seconds(2) }
 }

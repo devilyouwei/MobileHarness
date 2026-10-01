@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 
 public struct ActionInvocation: Sendable {
+    public let results = ActionReportStore()
     public let executionID: UUID
     public let envelope: OutputEnvelope
     public let call: ActionCall
@@ -45,3 +46,13 @@ public typealias ActionCompletionHandler = @Sendable (ActionInvocation) async th
 
 /// Compatibility name for Action domain argument decoding.
 public typealias ActionArguments = CallArguments
+
+public actor ActionReportStore {
+    private var report: ActionReport?
+    public init() {}
+    public func record(_ report: ActionReport) throws {
+        guard self.report == nil else { throw ActionExecutionError.invalidCompletion }
+        self.report = report
+    }
+    public func snapshot() -> ActionReport? { report }
+}

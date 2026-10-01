@@ -1,96 +1,47 @@
-# Tools — Callable Functions
+# Tools — Direct Callable Functions
 
-Implements functions reached through ToolCalls. The goal is reusable behavior with explicit results or completion. Tools depends only on AgentCore; App injects any presentation or device service.
+Purpose: implement functions reached through resolved ToolCalls. Design goals: explicit result/completion contracts, bounded registration and typed host injection. Runtime depends on AgentCore; the separate BehaviorDefinitions compiler plugin generates metadata factories.
 
-## Directory structure
+## Layout and ownership
 
-```text
-Tools/
-├── Runtime/                 # Definitions, catalog, registry, invocation and executor
-├── System/
-│   ├── SystemTools.swift    # Callable system entries
-│   └── Support/             # Domain registration
-├── UI/
-│   ├── UITools.swift        # Callable presentation entries
-│   └── Support/             # Registration, capabilities, types and turn policy
-└── README.md
-```
+| Directory | Responsibility |
+|---|---|
+| Runtime | Definitions, macros, explicit domain catalog, registry, invocation and execution |
+| System | Fixed runtime-information function |
+| UI | Immediate presentation entries; Support owns injected interfaces, values and turn acceptance policy |
 
-## Upstream and downstream
-
-Arrows show runtime flow through App-supplied handlers.
+Related entries live in `<Domain>Tools.swift`; domain roots contain callable entries and their README. Support contains catalogs, capability protocols, values/errors and supporting policy. Tools cannot import App, UI, concrete Agents or device services. App supplies typed endpoints.
 
 ```mermaid
 flowchart LR
-    Agents -->|Resolved ToolCall| Gateway[OutputGateway]
-    Gateway --> Runtime[Tools/Runtime]
-    App -.->|Handler and service bindings| Runtime
-    Runtime --> Tools
-    Tools -->|Injected presentation callback| Views
-    Tools -->|Value or completion| Runtime
-    Runtime -->|Returning tools only| Input[InputGateway]
-    Input --> Agents
+    Agent[Agent resolves ToolCall] --> Gateway[OutputGateway authorization and resource check]
+    Gateway --> Runtime[ToolExecutor / ToolRegistry]
+    Runtime --> Entry[Domain Tool function]
+    Host[App capability binding] -.-> Entry
+    Entry --> Effect[Injected endpoint]
+    Entry -->|Returning result| Input[InputGateway]
+    Entry -->|Completion-only| Done[Caller resumes without feedback]
+    Input --> Agent
 ```
 
-## Internal flow
+## Registration
 
-```mermaid
-flowchart TD
-    Call[Resolved ToolCall] --> Kind{Registered path}
-    Kind -->|runtimeInfo| Info[Return fixed configuration text]
-    Kind -->|UI.showPose| Validate[Validate PoseOverlay]
-    Validate --> Present[Await App presentation callback]
-    Present --> Complete[Void completion without feedback]
-```
+`@Tool(path:title:resources:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule and UIToolModule; BehaviorAssembly atomically constructs the registry and checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
 
-`runtimeInfo` is a configuration description, not a live health probe. `UI.showPose` accepts at most 3000 UTF-8 bytes and six COCO-17 skeletons; an empty people list clears the display. App validates session and frame order. Completion means display state was accepted, not that a screen frame was rendered.
+Public entry signatures remain explicit: UI updates receive ToolInvocation and an injected callback; showPose receives call/envelope/presentation arguments; runtimeInfo returns a String. Add an entry in its domain catalog; only adding a domain changes ToolModules. Runtime constructors remain available for isolated tests.
 
-Tools owns no queue and bypasses Channel scheduling. VisionPerception retains the latest pending skeleton before dispatch. Tool failures remain observable; no Tool sends results directly to an Agent.
+## Execution contracts
 
-## Feature status
+Tools bypass Channel FIFO and Action wait barriers. Returning functions produce correlated ToolResult values through InputGateway, including ordinary error results. Completion-only functions return no feedback on success and throw failures to their dispatcher. Cancellation propagates for both kinds. There is no generic Tool timeout or replacement policy.
 
-- ✅ [System](System/README.md): fixed runtime information.
-- ✅ [UI](UI/README.md): seven completion-only presentation functions.
-- ❌ Search, storage, network, memory and other model/device tools.
-- ❌ Live model/device health reporting.
+Protected Tools declare resources and use Gateway's shared ResourceCoordinator. They cannot bypass ownership by avoiding Action scheduling. Current UI/System tools claim no hardware locks. App's output consumer awaits each call; there is no detached Tool worker or Tool-owned queue.
 
-## Issue record
+`runtimeInfo` reports fixed configuration text, not live health. UI provides seven completion-only functions: beginReplyTurn, setTranscript, finishTranscript, setVoiceState, print, moveEyes and showPose. Pose input is bounded to3000 UTF-8 bytes and six COCO-17 skeletons; an empty people list clears it. App checks session/frame order. Completion means accepted state, not a rendered frame. Model-selected expression remains the UI.express Action.
 
-| Status | Issue / next step |
-| --- | --- |
-| Open | Measure skeleton presentation latency on a physical device. |
+VisionPerception coalesces its bounded replaceable gaze/skeleton output before dispatch. That is not generic Tool coalescing, and reply chunks are not dropped.
 
-✅ ToolRegistry and ToolExecutor compile in this same Tools module under Runtime. Consumers import Tools; the separate runtime target is removed. ❌ The merge adds no Channel scheduling, timeout or implicit handler registration.
+## Status
 
-## Action runtime stage 2
+✅ Explicit macro metadata, atomic registration/coverage validation, direct execution, resource checks and typed UI/System bindings are implemented. See [Runtime](Runtime/README.md), [UI](UI/README.md) and [System](System/README.md).
 
-✅ Tool resource metadata now supports the same Gateway ownership checks as Actions without joining Action queues. ❌ No automatic resource inference; device-facing Tools must declare actual resources.
-
-## Domain-owned registration
-
-✅ ToolModules.builtIn lists SystemToolModule and UIToolModule. Domains own ToolDefinition paths, resources and returning/completion handlers. BehaviorAssembly creates a complete ToolRegistry synchronously and validates both model-callable and internal Tool permissions. No App prepareTools task or per-function binding remains. UI.showPose receives the typed PosePresentationCapability and retains its no-feedback completion contract.
-
-```mermaid
-flowchart LR
-    Modules[Domain ToolModule definitions] --> Registry[Atomic bounded ToolRegistry construction]
-    Capability[Typed host capability] --> Modules
-    Agent[Agent tool permissions] --> Check[Reject missing implementations]
-    Registry --> Check
-    Check --> Dispatcher[Gateway ToolDispatcher]
-```
-
-Add functions in their domain modules; add domains in ToolModules. Existing capability operations allow implementation changes without App edits. ❌ New native primitives require explicit capability/adapter work. Dynamic registry mutation remains available for explicit isolated runtimes, not production startup.
-
-## Action and Tool presentation boundary
-
-✅ UI completion tools now cover reply append, transcript replacement/closure, turn reset, voice state, gaze and pose. ToolModules injects both UIUpdateCapability and PosePresentationCapability. ❌ Model-selected expression remains an Action pending native model Tool transport.
-
-## Source organization standard
-
-✅ Group related public entry functions in `<Domain>Tools.swift`; do not create a file for every verb. Keep domain roots for callable entries and documentation. Place registration, injected capability protocols, data/error types and supporting policies under `Support/`. Small capability contracts live with their module; independently meaningful state policies retain their own file. Public Swift symbols remain accessible across the Tools target regardless of folder.
-
-Runtime owns shared execution contracts and `ToolModules` (the built-in domain catalog). Register new functions in their domain module; only adding a domain changes the catalog. No function-name mapping belongs in App or UI.
-
-✅ Preserve existing API shapes: UI updates accept `ToolInvocation` and an injected callback; `showPose(call:envelope:present:)` retains its existing pose callback, and `SystemTools.runtimeInfo(_:)` retains its returning signature and unqualified registered path `runtimeInfo`. Folder organization does not change permissions, error handling or feedback.
-
-❌ Native model Tool transport, additional domains and live health reporting remain future work. Do not create empty domain scaffolding.
+❌ Native model Tool transport, live health reporting, additional network/storage/device domains and rendering acknowledgement remain outstanding. Non-cooperative callbacks can delay callers; Tool metadata does not imply forced interruption. Do not add unused domain scaffolding.

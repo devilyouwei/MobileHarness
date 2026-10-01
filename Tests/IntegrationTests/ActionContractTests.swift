@@ -278,7 +278,7 @@ private enum ContractFailure: Error, Equatable { case failed }
         ]))
     let invocation = contractInvocation()
     try await scheduler.enqueue(invocation: invocation)
-    await #expect(throws: ContractFailure.failed) { try await scheduler.finish(inputID: invocation.envelope.inputID) }
+    try await scheduler.finish(inputID: invocation.envelope.inputID)
     let snapshot = await scheduler.diagnosticSnapshot()
     #expect(snapshot.records.map(\.phase) == [.admitted, .started, .failed])
     #expect(snapshot.records.last?.effect == .unknown)

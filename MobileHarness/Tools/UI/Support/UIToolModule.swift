@@ -24,50 +24,43 @@ public struct UIToolModule: ToolModule {
     }
     public var definitions: [ToolDefinition] {
         [
-            ToolDefinition(
-                path: "UI.finishTranscript",
+            UITools.finishTranscriptDefinition(
                 completing: { [updates] call, envelope in
                     try await UITools.finishTranscript(invocation: ToolInvocation(call: call, envelope: envelope)) {
                         try await updates.finishTranscript(invocation: $0)
                     }
                 }),
-            ToolDefinition(
-                path: "UI.setTranscript",
+            UITools.setTranscriptDefinition(
                 completing: { [updates] call, envelope in
                     try await UITools.setTranscript(invocation: ToolInvocation(call: call, envelope: envelope)) {
                         try await updates.presentTranscript($0, invocation: $1)
                     }
                 }),
-            ToolDefinition(
-                path: "UI.beginReplyTurn",
+            UITools.beginReplyTurnDefinition(
                 completing: { [updates] call, envelope in
                     try await UITools.beginReplyTurn(invocation: ToolInvocation(call: call, envelope: envelope)) {
                         try await updates.beginReplyTurn(invocation: $0)
                     }
                 }),
-            ToolDefinition(
-                path: "UI.setVoiceState",
+            UITools.setVoiceStateDefinition(
                 completing: { [updates] call, envelope in
                     try await UITools.setVoiceState(invocation: ToolInvocation(call: call, envelope: envelope)) {
                         try await updates.presentVoiceState($0, invocation: $1)
                     }
                 }),
-            ToolDefinition(
-                path: "UI.print",
+            UITools.printDefinition(
                 completing: { [updates] call, envelope in
                     try await UITools.print(invocation: ToolInvocation(call: call, envelope: envelope)) {
                         try await updates.present($0, invocation: $1)
                     }
                 }),
-            ToolDefinition(
-                path: "UI.moveEyes",
+            UITools.moveEyesDefinition(
                 completing: { [updates] call, envelope in
                     try await UITools.moveEyes(invocation: ToolInvocation(call: call, envelope: envelope)) {
                         try await updates.present($0, invocation: $1)
                     }
                 }),
-            ToolDefinition(
-                path: "UI.showPose",
+            UITools.showPoseDefinition(
                 completing: { [presentation] call, envelope in
                     try await UITools.showPose(call: call, envelope: envelope) {
                         try await presentation.present($0, sessionID: $1.sessionID)

@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 
 public enum UITools {
+    @Tool(path: "UI.beginReplyTurn", title: "beginReplyTurn")
     public static func beginReplyTurn(
         invocation: ToolInvocation,
         using present: @escaping @Sendable (ToolInvocation) async throws -> Void
@@ -15,6 +16,7 @@ public enum UITools {
     }
 
     /// Replace the recognition caption; unlike UI.print, empty text is an explicit clear.
+    @Tool(path: "UI.setTranscript", title: "setTranscript")
     public static func setTranscript(
         invocation: ToolInvocation,
         using present: @escaping @Sendable (String, ToolInvocation) async throws -> Void
@@ -30,6 +32,7 @@ public enum UITools {
         try Task.checkCancellation()
     }
 
+    @Tool(path: "UI.finishTranscript", title: "finishTranscript")
     public static func finishTranscript(
         invocation: ToolInvocation,
         using present: @escaping @Sendable (ToolInvocation) async throws -> Void
@@ -42,6 +45,7 @@ public enum UITools {
         try Task.checkCancellation()
     }
 
+    @Tool(path: "UI.setVoiceState", title: "setVoiceState")
     public static func setVoiceState(
         invocation: ToolInvocation,
         using present: @escaping @Sendable (VoiceState, ToolInvocation) async throws -> Void
@@ -57,6 +61,7 @@ public enum UITools {
         try Task.checkCancellation()
     }
 
+    @Tool(path: "UI.print", title: "print")
     public static func print(
         invocation: ToolInvocation,
         using present: @escaping @Sendable (String, ToolInvocation) async throws -> Void
@@ -72,6 +77,7 @@ public enum UITools {
         try Task.checkCancellation()
     }
 
+    @Tool(path: "UI.moveEyes", title: "moveEyes")
     public static func moveEyes(
         invocation: ToolInvocation,
         using present: @escaping @Sendable (Gaze, ToolInvocation) async throws -> Void
@@ -90,6 +96,7 @@ public enum UITools {
     }
 
     /// Atomically replaces all displayed skeletons; an empty people list clears them.
+    @Tool(path: "UI.showPose", title: "showPose")
     public static func showPose(
         call: ToolCall, envelope: OutputEnvelope,
         present: @escaping @Sendable (PoseOverlay, OutputEnvelope) async throws -> Void

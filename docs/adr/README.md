@@ -174,3 +174,21 @@ These are **dated decision records**, including proposals and stages later repla
 - ✅ [0089: NexArm arm completion scope](0089-nexarm-arm-completion-scope.md) excludes unrelated gripper state from performance completion while retaining strict generic tracking.
 
 - ✅ [0090 — NexArm arm-only motion packets](0090-nexarm-arm-only-motion-packets.md): read-only device IK, explicit motors1–5, gripper-independent reset and Settings estimates. ❌ Loaded-arm/BLE endurance acceptance.
+
+## NexArm feedback execution — 2026-10-01
+
+✅ [0091](0091-nexarm-motor-scoped-feedback.md) records motor-scoped feedback execution, deadline skipping and connection-error priority. Physical acceptance is tracked separately from simulated verification.
+
+❌ Sustained real-device acceptance remains pending.
+
+## Atomic composition — ADR0092
+
+✅ [0092](0092-atomic-actions-and-composed-results.md) defines bounded child results, ordinary feedback-loss errors, resource-union execution and Channel failure isolation.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+- [0093 — NexArm PlatformKit and Action boundary](0093-nexarm-platform-action-boundary.md): business gestures and execution policies reside in Actions; PlatformKit remains an independent device SDK.
+
+- [0094 — Arrival profiles and behavior macros](0094-arrival-profiles-and-behavior-macros.md): immediate fresh arrival, per-motor tolerances, cooperative budgets and compile-time metadata.
+
+- [0095 — Remove retired device and behavior code](0095-remove-retired-device-and-behavior-code.md): production cleanup, historical test isolation and consistent native admission.

@@ -12,6 +12,7 @@ struct CameraPreviewAdapter: UIViewRepresentable {
     func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
         source.connect(view.previewLayer)
+        view.previewLayer.videoGravity = .resizeAspectFill
         return view
     }
     func updateUIView(_ view: PreviewView, context: Context) {

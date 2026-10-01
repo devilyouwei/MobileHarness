@@ -10,15 +10,11 @@ public struct UIActionModule: ActionModule {
     public init(presentation: any UIPresentationCapability) { self.presentation = presentation }
     public var definitions: [ActionDefinition] {
         [
-            ActionDefinition(
-                path: ActionPath(module: "UI", function: "express"), displayName: "调整表情", kind: .state,
-                completion:
-                    "Presentation policy accepted expression target or rejected a stale update; animation is not joined.",
-                handler: { [presentation] invocation in
-                    try await UIActions.express(invocation: invocation) {
-                        try await presentation.presentExpression($0, invocation: $1)
-                    }
-                })
+            UIActions.expressDefinition(handler: { [presentation] invocation in
+                try await UIActions.express(invocation: invocation) {
+                    try await presentation.presentExpression($0, invocation: $1)
+                }
+            })
         ]
     }
 }

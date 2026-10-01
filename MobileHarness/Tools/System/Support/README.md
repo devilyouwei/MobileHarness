@@ -12,3 +12,5 @@ flowchart LR
     Module --> Definition[ToolDefinition returning handler]
     Definition --> Function[SystemTools.runtimeInfo]
 ```
+
+✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.

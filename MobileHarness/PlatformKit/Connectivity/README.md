@@ -1,12 +1,18 @@
 # Connectivity — External Device Communication
 
-Purpose: group communication with external hardware by capability rather than device category. Design goals: separate transport from Agent decisions and future robot-specific command semantics.
+Purpose: implement bounded transport and protocol capabilities for external hardware. Design goals: explicit admission, observable connection state, structured diagnostics and no action/presentation policy.
 
-- ✅ ExternalDeviceTransport defines actor-isolated connect, send, emergencyStop and disconnect operations; its API is unchanged.
-- ❌ Concrete BLE/network transports, command validation, bounded transport queues, hardware watchdogs and physical stop acknowledgements are not implemented.
+✅ [NexArm](NexArm/README.md) implements USB/BLE links, framing, native motor register encoding, hardware position limits, timestamped feedback and connection-health tracking. Device SDKs may know vendor commands and limits; they must not know application gestures, home/reset behavior, motion recipes, localized UI text or preferred discovery ordering.
 
-The protocol alone provides no safety guarantee. Future adapters must document bounded admission, overflow, cancellation and completion; robot hardware must enforce its own safety independently of app execution. No placeholder transport implementation is provided.
+✅ Connections use the concrete NexArm link capabilities. The unused generic transport/emergency-stop placeholder has been removed; no implemented emergency-stop capability is claimed. App supplies persisted selection, foreground/reconnection lifetime and UI mappings. Actions owns all action behavior and wrappers.
 
-✅ [NexArm](NexArm/README.md) now implements a bounded macOS USB diagnostic transport, protocol parser and bounded motion controller. It does not claim the generic emergency-stop contract. ❌ BLE/TCP and device-side watchdog validation remain pending.
+```mermaid
+flowchart LR
+    Actions[Action behavior] --> Protocol[Device protocol and native commands]
+    Protocol --> Link[Bounded USB / BLE link]
+    Link --> Device[Hardware]
+    Device --> Feedback[Structured telemetry and connection facts]
+    Feedback --> Consumer[Actions / App adapters]
+```
 
-✅ NexArm now includes iOS/macOS CoreBluetooth discovery, explicitly selected connection, FFE1 writes, FFE2 notifications and bounded request matching. App owns persisted selection and foreground policy; PlatformKit owns no Agent, Gateway or UI types. ❌ General external-device watchdog/stop semantics remain unverified.
+❌ General network transports, device-side watchdog validation and independently confirmed physical emergency stop remain unimplemented. iOS process lifetime is not a hardware safety mechanism.

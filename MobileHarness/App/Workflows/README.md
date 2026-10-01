@@ -56,7 +56,7 @@ flowchart LR
     Speech[InputGateway → Assistant → OutputGateway] --> Action[Actions NexArm.shakeBase]
     Action --> Binding[Composition callback]
     Binding --> Workflow
-    Workflow --> Controller[PlatformKit bounded NexArmController]
+    Workflow --> Controller[PlatformKit bounded NexArmActionController]
     Controller --> BLE
     Controller --> Result[Action completion → InputGateway]
 ```
@@ -69,7 +69,7 @@ Leaving settings only stops scans. Disconnect/background closes admission immedi
 
 ✅ Bluetooth disconnect/background cleanup no longer invokes the global voice/settings barrier. It closes robot admission and joins only robot work; explicit reconnection still joins prior voice/session work before arming a new controller. This prevents a disconnected Bluetooth owner from stopping unrelated microphone use during permission/lifecycle transitions. ❌ iPhone camera/audio recovery remains a separate acceptance check.
 
-✅ BLE readiness uses the same NexArmController that later executes Actions. It verifies actual firmware once per live connection with bounded read-only handling of missing AT32 information; missing version and unsupported version have distinct errors. Disconnection discards that controller. ❌ Full iPhone physical acceptance remains pending.
+✅ BLE readiness uses the same NexArmActionController that later executes Actions. It verifies actual firmware once per live connection with bounded read-only handling of missing AT32 information; missing version and unsupported version have distinct errors. Disconnection discards that controller. ❌ Full iPhone physical acceptance remains pending.
 
 ✅ Missing AT32 version retains the live BLE connection with control admission closed. An explicit capacity-one verification retry reuses that controller; version, pose, persistence, the requested first connection indication and generation/native-state checks must pass before readiness. Version queries remain read-only. Rejected Actions never replay. Disconnect/background cancels verification and clears readiness. ❌ Persistent device-side version read failure and full iPhone motion acceptance remain unresolved.
 
@@ -217,3 +217,23 @@ flowchart LR
 ✅ Connection verification prepares the bounded PlatformKit IK table before enabling control. Settings tests and reset compile geometry with the same `NexArmArmPlan` used by Channel Actions; only motors1–5 are written. Command estimates update addressed arm joints after admission and preserve motor6, including interrupted tests and return home. Disconnect/reconnect discards the table. Explicit manual motor6 control remains independent.
 
 ❌ BLE endurance remains separate from supervised USB acceptance. See [ADR0090](../../../docs/adr/0090-nexarm-arm-only-motion-packets.md); never restore CMD54 or send geometry intents as raw CMD8.
+
+## NexArm feedback execution — 2026-10-01
+
+✅ BluetoothWorkflow routes Settings and conversation through the same feedback executor. Settings pending capacity is one with explicit replacement; cancellation joins the previous owner before replacement. Idle/active feedback loss disables control and surfaces connection instability; restored feedback never replays motion. `resetArm` resets1–5 only.
+
+❌ Sustained real-device acceptance remains pending.
+
+## Atomic composition — ADR0092
+
+✅ BluetoothWorkflow exposes the last structured motor report and configurable single-motor execution. Settings and manual streaming use injected resource fences; already-owned Channel calls inherit the fence. UI error messages remain separate from collected child outcomes.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ ADR0093: BluetoothWorkflow imports Actions and owns one Actions.NexArmActionController per connection. Settings and conversation invoke the same domain gesture/execution implementation; PlatformKit owns transport only. No duplicated gesture geometry or completion algorithm in Workflow.
+
+✅ BluetoothPresentation owns NexArm display-name fallback/filtering, preferred device ordering and localized failure text. PlatformKit now returns typed NexArmBluetoothFailure values with step/native diagnostic data. BluetoothWorkflow maps those values to UI while preserving connection recovery and Settings behavior. Manual jog planning comes from Actions/NexArm/Support.
+
+✅ NexArm motor movement timeout maps to `timedOut`, separately from stable `targetNotReached`; reports preserve both. Default arrival tolerances and deadline calculations remain in Actions/NexArm, shared by Settings and Channel.
+
+✅ NexArm presentation handles only currently produced motion-failure cases; obsolete pose/query failure branches were removed with the retired diagnostic APIs.

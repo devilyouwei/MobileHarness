@@ -1,3 +1,4 @@
+import Actions
 import AgentCore
 import Foundation
 import PlatformKit
@@ -20,6 +21,7 @@ public struct BluetoothDeviceRecord: Codable, Sendable {
 }
 public enum BluetoothWorkflowError: LocalizedError, Sendable, Equatable, ActionExecutionFailureProviding {
     case disconnected, busy, background, posture, unverified, controlNotReady, feedbackTimeout, completionTimeout
+    case incomplete([Int])
     public var actionExecutionFailure: ActionExecutionRecord.Failure {
         switch self {
         case .disconnected: .disconnected
@@ -29,7 +31,7 @@ public enum BluetoothWorkflowError: LocalizedError, Sendable, Equatable, ActionE
         case .unverified: .unconfirmed
         case .controlNotReady: .controlNotReady
         case .feedbackTimeout: .feedbackTimeout
-        case .completionTimeout: .completionTimeout
+        case .completionTimeout, .incomplete: .completionTimeout
         }
     }
     public var errorDescription: String? {
@@ -39,8 +41,9 @@ public enum BluetoothWorkflowError: LocalizedError, Sendable, Equatable, ActionE
         case .background: "请保持应用在前台后再控制机械臂"
         case .posture: "当前姿态不适合这个动作，请先调整机械臂姿态后重试"
         case .unverified: "动作未确认完成，可刷新状态或继续操作"
-        case .feedbackTimeout: "动作反馈超时，结果未知"
+        case .feedbackTimeout: "机械臂连接不稳定：位置反馈丢失，动作已中断"
         case .completionTimeout: "动作未在期限内到位"
+        case .incomplete(let segments): "第\(segments.map(String.init).joined(separator: "、"))段长期未达到目标位，已继续执行其余段"
         case .controlNotReady: "蓝牙已连接，但控制尚未就绪，请到设置 → 蓝牙外设重新验证"
         }
     }
@@ -56,20 +59,19 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private var store: LocalDocumentStore<BluetoothDeviceRecord>?
     private var revision: UUID?
     private var restoration: Task<Void, any Error>?
-    private var controller: NexArmController?
+    private var controller: NexArmActionController?
     private var operation: Task<Void, Never>?
     private var cleanup: Task<Void, Never>?
     private var motion: Task<Void, any Error>?
     private var liveTask: Task<Void, Never>?
     private var motorInputs = Array(repeating: 0.0, count: 6)
-    private var armPlan: NexArmArmPlan?
     private var jogPlanner: NexArmJogPlanner?
-    private var resetRequested = false
     private var controlRevision = UUID()
-    private var testFrames: [NexArmGesture.TestFrame] = []
-    private var testID = UUID()
-    private var testDue = ContinuousClock.now
-    private var testLabel = ""
+    private var pendingArmAction: BluetoothArmAction?
+    private var settingsWorker: Task<Void, Never>?
+    public var withMotorResources:
+        (@Sendable (Set<Int>, @escaping @Sendable () async throws -> Void) async throws -> Void)?
+    public private(set) var lastActionReport: ActionReport?
     private var motionID: UUID?
     private var generation = UUID()
     private var foreground = true
@@ -153,8 +155,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.scanning = false
         if discoveryVisible && (state.phase == .idle || state.phase == .failed) {
             state.scanning = value.scanning
-            state.nearby = value.devices.compactMap {
-                guard let name = NexArmBluetoothDevice.discoveryName(advertised: $0.name, cached: nil) else {
+            state.nearby = value.devices.sorted(by: BluetoothPresentation.discoveryOrder).compactMap {
+                guard let name = BluetoothPresentation.deviceName($0.name) else {
                     return nil
                 }
                 return .init(id: $0.id, name: name)
@@ -163,7 +165,20 @@ public final class BluetoothWorkflow: BluetoothControlling {
             state.nearby = []
         }
         if let selected = value.selected, state.selected?.id == selected.id {
-            state.selected = .init(id: selected.id, name: selected.name)
+            state.selected = .init(id: selected.id, name: BluetoothPresentation.deviceName(selected.name) ?? "未命名设备")
+        }
+        if value.phase == .connected, controller != nil, state.phase == .connected {
+            if !value.feedbackHealthy {
+                state.controlValidated = false
+                state.error = BluetoothWorkflowError.feedbackTimeout.localizedDescription
+                pendingArmAction = nil
+                motorInputs = Array(repeating: 0, count: 6)
+                liveTask?.cancel()
+                // The active executor reports feedbackLost, not cancellation or target timeout.
+            } else if !state.controlValidated {
+                state.controlValidated = true
+                if state.error == BluetoothWorkflowError.feedbackTimeout.localizedDescription { state.error = nil }
+            }
         }
         if value.phase == .disconnected && controller != nil {
             recoverOnDisconnect = foreground && reconnectEnabled && !manualDisconnectPending && !forgetRequested
@@ -171,21 +186,21 @@ public final class BluetoothWorkflow: BluetoothControlling {
             motion?.cancel()
             state.phase = .idle
             state.controlValidated = false
-            state.error = value.failure ?? "机械臂连接已断开，请重新连接"
+            state.error = value.failure.map(BluetoothPresentation.failure) ?? "机械臂连接已断开，请重新连接"
         }
         if value.phase == .disconnecting && controller != nil {
             recoverOnDisconnect = foreground && reconnectEnabled && !manualDisconnectPending && !forgetRequested
             controller = nil
             motion?.cancel()
             state.phase = .disconnecting
-            state.error = value.failure
+            state.error = value.failure.map(BluetoothPresentation.failure)
         }
         if value.phase == .disconnected && state.phase == .disconnecting && cleanup == nil && operation == nil {
             state.phase = .idle
         }
         if discoveryVisible && value.discoveryLimitReached { state.notice = "附近设备较多，请靠近机械臂后重新搜索" }
         if let failure = value.failure, operation == nil, cleanup == nil, state.selected != nil {
-            state.error = failure
+            state.error = BluetoothPresentation.failure(failure)
         }
         if value.phase == .disconnected, recoverOnDisconnect {
             recoverOnDisconnect = false
@@ -258,7 +273,6 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.scanning = false
         state.joints = []
         jogPlanner = nil
-        armPlan = nil
         state.pose = []
         state.sampledAt = nil
         state.controlValidated = false
@@ -280,7 +294,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 try Task.checkCancellation()
                 guard foreground, token == generation else { throw CancellationError() }
                 try await verifyConnection(
-                    device: device, candidate: NexArmController(link: link, compatibilityPolicy: .nexArmBLEProtocol),
+                    device: device,
+                    candidate: NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol),
                     token: token, indicate: !automatically)
             } catch {
                 let failed = await link.status()
@@ -288,7 +303,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
                     controller = nil
                     state.phase = .failed
                     state.controlValidated = false
-                    state.error = failed.failure ?? Self.message(error)
+                    state.error = failed.failure.map(BluetoothPresentation.failure) ?? Self.message(error)
                 }
                 await link.disconnect()
                 if !automatically, reconnectEnabled, foreground, token == generation,
@@ -301,17 +316,16 @@ public final class BluetoothWorkflow: BluetoothControlling {
         }
     }
     private func verifyConnection(
-        device: BluetoothDeviceRow, candidate: NexArmController, token: UUID, indicate: Bool = true
+        device: BluetoothDeviceRow, candidate: NexArmActionController, token: UUID, indicate: Bool = true
     ) async throws {
         state.phase = .verifying
         state.controlValidated = false
         state.error = nil
         state.notice = nil
         _ = try await candidate.verifyCompatibility()
-        let preparedPlan = try await candidate.prepareArmControl()
+        _ = try await candidate.prepareArmControl()
         try Task.checkCancellation()
         guard foreground, token == generation else { throw CancellationError() }
-        armPlan = preparedPlan
         reconnectEnabled = true
         try await remember(device)
         let ready = await link.status()
@@ -339,10 +353,11 @@ public final class BluetoothWorkflow: BluetoothControlling {
             } catch {
                 try Task.checkCancellation()
                 guard token == generation, foreground else { throw CancellationError() }
-                switch error as? NexArmError {
-                case .uncertainMotion, .moving, .invalidMotion: break
-                default: throw error
-                }
+                guard
+                    error as? NexArmActionError == .uncertainMotion
+                        || error as? NexArmActionError == .moving
+                        || error as? NexArmError == .invalidMotion
+                else { throw error }
                 // A feedback gesture is not the Bluetooth handshake. Leave the connected
                 // controller available for read-only recovery before the next explicit command.
                 indicationUnconfirmed = true
@@ -355,7 +370,6 @@ public final class BluetoothWorkflow: BluetoothControlling {
             }
             if !indicationUnconfirmed { state.motionStatus = "连接提示已完成" }
         }
-        armPlan = preparedPlan
         reconnectEnabled = true
         try await remember(device)
         try Task.checkCancellation()
@@ -382,7 +396,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private func disconnect(preserveReconnect: Bool) {
         recovery?.cancel()
         stopMotorControl()
-        resetRequested = false
+        pendingArmAction = nil
+        settingsWorker?.cancel()
         liveTask?.cancel()
         recoverOnDisconnect = false
         if !preserveReconnect {
@@ -396,7 +411,6 @@ public final class BluetoothWorkflow: BluetoothControlling {
         controller = nil
         state.joints = []
         jogPlanner = nil
-        armPlan = nil
         state.pose = []
         state.sampledAt = nil
         state.controlValidated = false
@@ -421,7 +435,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             state.scanning = false
             let closed = await link.status()
             state.phase = closed.phase == .disconnected ? .idle : .disconnecting
-            if let failure = closed.failure { state.error = failure }
+            if let failure = closed.failure { state.error = BluetoothPresentation.failure(failure) }
             state.controlValidated = false
             state.executing = false
             if manualDisconnectPending {
@@ -514,6 +528,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         await cleanup?.value
         await recovery?.value
         await liveTask?.value
+        await settingsWorker?.value
     }
     public func openSystemSettings() {
         #if os(iOS)
@@ -552,40 +567,56 @@ public final class BluetoothWorkflow: BluetoothControlling {
     }
     public func tryAction(_ action: BluetoothArmAction) {
         guard foreground, state.controlReady else {
-            state.error = Self.message(BluetoothWorkflowError.disconnected)
+            state.error = Self.message(
+                state.phase == .connected ? BluetoothWorkflowError.feedbackTimeout : .disconnected)
             return
         }
-        stopMotorControl()
-        resetRequested = action == .reset
-        state.resetting = resetRequested
-        state.error = nil
-        if action != .reset {
-            let gesture: NexArmGesture
-            switch action {
-            case .shakeBase: gesture = .baseSway
-            case .nod: gesture = .nod
-            case .shakeHead: gesture = .shakeHead
-            case .wave: gesture = .wave
-            case .tiltLeft: gesture = .tiltLeft
-            case .tiltRight: gesture = .tiltRight
-            case .lookAround: gesture = .lookAround
-            case .celebrate: gesture = .celebrate
-            case .dance: gesture = .dance
-            case .reset: return
+        motorInputs = Array(repeating: 0, count: 6)
+        liveTask?.cancel()
+        motion?.cancel()
+        pendingArmAction = action  // Capacity one; Settings explicitly replaces its previous request.
+        guard settingsWorker == nil else { return }
+        settingsWorker = Task {
+            defer {
+                settingsWorker = nil
+                state.testing = false
+                state.resetting = false
             }
-            do {
-                guard let armPlan, let jogPlanner else { throw NexArmError.invalidMotion }
-                testFrames = try armPlan.compile(gesture.settingsTestFrames(), from: jogPlanner.targets.map { Int($0) })
-            } catch {
-                state.error = Self.message(error)
-                return
+            while let action = pendingArmAction {
+                pendingArmAction = nil
+                await liveTask?.value
+                if let movement = motion { _ = await movement.result }
+                // Join the owning workflow continuation too, before reusing its state.
+                while motion != nil, !Task.isCancelled { await Task.yield() }
+                // A newer click replaces the request while the previous owner joins.
+                if pendingArmAction != nil { continue }
+                guard !Task.isCancelled, foreground, state.controlReady else { return }
+                state.testing = action != .reset
+                state.resetting = action == .reset
+                do {
+                    if action == .reset {
+                        try await resetArm()
+                    } else {
+                        let gesture: NexArmGesture
+                        switch action {
+                        case .shakeBase: gesture = .baseSway
+                        case .nod: gesture = .nod
+                        case .shakeHead: gesture = .shakeHead
+                        case .wave: gesture = .wave
+                        case .tiltLeft: gesture = .tiltLeft
+                        case .tiltRight: gesture = .tiltRight
+                        case .lookAround: gesture = .lookAround
+                        case .celebrate: gesture = .celebrate
+                        case .dance: gesture = .dance
+                        case .reset: continue
+                        }
+                        try await performGesture(gesture, repetitions: 1)
+                    }
+                } catch {
+                    if pendingArmAction == nil, !(error is CancellationError) { state.error = Self.message(error) }
+                }
             }
-            testDue = .now
-            testLabel = action.title
-            state.testing = true
-            state.motionStatus = "正在发送\(testLabel)"
         }
-        startLiveControl()
     }
     public func setMotorVelocity(id: Int, value: Double) {
         guard (1...6).contains(id), value.isFinite else { return }
@@ -598,16 +629,16 @@ public final class BluetoothWorkflow: BluetoothControlling {
             return
         }
         cancelTestSequence()
-        resetRequested = false
+        pendingArmAction = nil
         state.resetting = false
         motorInputs[id - 1] = min(1, max(-1, value))
         startLiveControl()
     }
     private func cancelTestSequence() {
-        if state.testing { state.motionStatus = "测试指令已中断" }
-        testID = UUID()
-        testFrames = []
+        pendingArmAction = nil
+        if state.testing || state.resetting { motion?.cancel() }
         state.testing = false
+        state.resetting = false
     }
     public func stopMotorControl() {
         motorInputs = Array(repeating: 0, count: 6)
@@ -622,132 +653,105 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.error = nil
         state.jogging = true
         liveTask = Task {
-            var session: UUID?
-            var failed = false
-            var nextMotorIndex = 0
-            do {
-                let token = try await link.beginLiveControl()
-                session = token
-                if jogPlanner == nil {
-                    jogPlanner = try NexArmJogPlanner(positions: await controller.cachedJoints)
-                }
-                var stalledSince: ContinuousClock.Instant?
-                var admittedTestID = testID
-                var lastTick = ContinuousClock.now.advanced(by: .milliseconds(-30))
-                while true {
-                    let tickStart = ContinuousClock.now
-                    let duration = tickStart - lastTick
-                    let elapsed = Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
-                    lastTick = tickStart
-                    if admittedTestID != testID {
-                        admittedTestID = testID
-                        stalledSince = nil
-                    }
+            let operation: @Sendable () async throws -> Void = { @MainActor [self] in
+                var session: UUID?
+                var failed = false
+                var nextMotorIndex = 0
+                do {
+                    if let movement = motion { _ = await movement.result }
                     try Task.checkCancellation()
-                    guard foreground, generation == connectedGeneration, state.controlReady else {
-                        throw CancellationError()
+                    let token = try await link.beginLiveControl()
+                    session = token
+                    if jogPlanner == nil {
+                        jogPlanner = try NexArmJogPlanner(positions: await controller.cachedJoints)
                     }
-                    if resetRequested {
-                        guard let armPlan, let planner = jogPlanner else { throw NexArmError.invalidMotion }
-                        let packet = try armPlan.home(from: planner.targets.map { Int($0) }).packet
-                        let submittedID = testID
-                        if try await link.sendLive(packet, session: token) {
-                            guard submittedID == testID else { continue }
-                            resetRequested = false
-                            state.resetting = false
-                            jogPlanner = try NexArmJogPlanner(
-                                positions: NexArmArmPlan.applying(packet, to: planner.targets.map { Int($0) }))
-                            state.motionStatus = "已发送重置指令"
-                            stalledSince = nil
-                        } else {
-                            stalledSince = stalledSince ?? .now
+                    var stalledSince: ContinuousClock.Instant?
+                    var lastTick = ContinuousClock.now.advanced(by: .milliseconds(-30))
+                    while true {
+                        let tickStart = ContinuousClock.now
+                        let duration = tickStart - lastTick
+                        let elapsed =
+                            Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+                        lastTick = tickStart
+                        try Task.checkCancellation()
+                        guard foreground, generation == connectedGeneration, state.controlReady else {
+                            throw CancellationError()
                         }
-                    } else if let frame = testFrames.first {
-                        if tickStart >= testDue {
-                            let submittedID = testID
-                            if try await link.sendLive(frame.packet, session: token) {
-                                if submittedID == testID {
-                                    guard let planner = jogPlanner else { throw NexArmError.invalidMotion }
-                                    jogPlanner = try NexArmJogPlanner(
-                                        positions: NexArmArmPlan.applying(
-                                            frame.packet, to: planner.targets.map { Int($0) }))
-                                    testFrames.removeFirst()
-                                    testDue = .now.advanced(by: .milliseconds(frame.milliseconds))
-                                    if testFrames.isEmpty {
-                                        state.testing = false
-                                        state.motionStatus = "已发送\(testLabel)全部指令"
-
-                                    }
+                        do {
+                            let startIndex = nextMotorIndex
+                            for offset in 0..<6 {
+                                let index = (startIndex + offset) % 6
+                                try Task.checkCancellation()
+                                if abs(motorInputs[index]) <= 0.04 {
+                                    jogPlanner?.stop(id: index + 1)
+                                    continue
                                 }
-                                stalledSince = nil
-                            } else {
-                                stalledSince = stalledSince ?? .now
+                                guard
+                                    let proposed = try jogPlanner?.proposal(
+                                        id: index + 1,
+                                        deflection: motorInputs[index], elapsed: elapsed)
+                                else { continue }
+                                guard let packet = proposed.packet else {
+                                    jogPlanner?.accept(proposed)
+                                    continue
+                                }
+                                if try await link.sendLive(packet, session: token) {
+                                    jogPlanner?.accept(proposed)
+                                    nextMotorIndex = (index + 1) % 6
+                                    if state.motionStatus != "手动控制中" { state.motionStatus = "手动控制中" }
+                                    stalledSince = nil
+                                } else {
+                                    stalledSince = stalledSince ?? .now
+                                    nextMotorIndex = index
+                                    break
+                                }
                             }
                         }
-                    } else {
-                        let startIndex = nextMotorIndex
-                        for offset in 0..<6 {
-                            let index = (startIndex + offset) % 6
-                            try Task.checkCancellation()
-                            if resetRequested || !testFrames.isEmpty { break }
-                            if abs(motorInputs[index]) <= 0.04 {
-                                jogPlanner?.stop(id: index + 1)
-                                continue
-                            }
-                            guard
-                                let proposed = try jogPlanner?.proposal(
-                                    id: index + 1,
-                                    deflection: motorInputs[index], elapsed: elapsed)
-                            else { continue }
-                            guard let packet = proposed.packet else {
-                                jogPlanner?.accept(proposed)
-                                continue
-                            }
-                            if try await link.sendLive(packet, session: token) {
-                                jogPlanner?.accept(proposed)
-                                nextMotorIndex = (index + 1) % 6
-                                if state.motionStatus != "手动控制中" { state.motionStatus = "手动控制中" }
-                                stalledSince = nil
-                            } else {
-                                stalledSince = stalledSince ?? .now
-                                nextMotorIndex = index
-                                break
-                            }
+                        for index in 0..<6 where abs(motorInputs[index]) <= 0.04 {
+                            jogPlanner?.stop(id: index + 1)
                         }
+                        if let stalledSince, ContinuousClock.now - stalledSince > .seconds(2) {
+                            throw NexArmError.timeout
+                        }
+                        if motorInputs.allSatisfy({ abs($0) <= 0.04 })
+                            && motion == nil
+                        {
+                            break
+                        }
+                        try await Task.sleep(until: tickStart.advanced(by: .milliseconds(30)), clock: .continuous)
                     }
-                    for index in 0..<6 where abs(motorInputs[index]) <= 0.04 {
-                        jogPlanner?.stop(id: index + 1)
+                } catch {
+                    failed = true
+                    if !(error is CancellationError), generation == connectedGeneration {
+                        state.error = Self.message(error)
                     }
-                    if let stalledSince, ContinuousClock.now - stalledSince > .seconds(2) { throw NexArmError.timeout }
-                    if !resetRequested && testFrames.isEmpty && motorInputs.allSatisfy({ abs($0) <= 0.04 })
-                        && motion == nil
-                    {
-                        break
+                }
+                if let session { await link.endLiveControl(session) }
+                let restart =
+                    !failed && foreground && generation == connectedGeneration && state.controlReady
+                    && motorInputs.contains { abs($0) > 0.04 }
+                if controlRevision == revision {
+                    if failed {
+                        motorInputs = Array(repeating: 0, count: 6)
+                        if pendingArmAction == nil { cancelTestSequence() }
                     }
-                    try await Task.sleep(until: tickStart.advanced(by: .milliseconds(30)), clock: .continuous)
+                    state.jogging = false
+                    if state.motionStatus == "手动控制中" { state.motionStatus = "手动控制已结束" }
+                }
+                liveTask = nil
+                if restart { startLiveControl() }
+            }
+            do {
+                if let withMotorResources {
+                    try await withMotorResources(Set(1...6), operation)
+                } else {
+                    try await operation()
                 }
             } catch {
-                failed = true
-                if !(error is CancellationError), generation == connectedGeneration {
-                    state.error = Self.message(error)
-                }
-            }
-            if let session { await link.endLiveControl(session) }
-            let restart =
-                !failed && foreground && generation == connectedGeneration && state.controlReady
-                && (resetRequested || !testFrames.isEmpty || motorInputs.contains { abs($0) > 0.04 })
-            if controlRevision == revision {
-                if failed {
-                    motorInputs = Array(repeating: 0, count: 6)
-                    resetRequested = false
-                    cancelTestSequence()
-                }
-                state.resetting = resetRequested
                 state.jogging = false
-                if state.motionStatus == "手动控制中" { state.motionStatus = "手动控制已结束" }
+                state.error = Self.message(error)
+                liveTask = nil
             }
-            liveTask = nil
-            if restart { startLiveControl() }
         }
     }
     /// Conversation/channel admission retains completion-based execution.
@@ -755,14 +759,38 @@ public final class BluetoothWorkflow: BluetoothControlling {
         guard (1...3).contains(cycles) else { throw NexArmError.invalidMotion }
         try await runMotion(label: "左右晃动 \(cycles) 次") { try await $0.performGesture(.baseSway, repetitions: cycles) }
     }
-    public func performGesture(_ gesture: NexArmGesture, repetitions: Int) async throws {
-        try await runMotion(label: gesture.displayName) {
-            try await $0.performGesture(gesture, repetitions: repetitions)
+    public func stopActions() async {
+        pendingArmAction = nil
+        settingsWorker?.cancel()
+        motion?.cancel()
+        liveTask?.cancel()
+        if let movement = motion { _ = await movement.result }
+        await liveTask?.value
+    }
+    public func resetArm(speed: Int = 1400, acceleration: Int = 30) async throws {
+        try await runMotion(label: "整臂归位", returnsHome: false) {
+            try await $0.resetPosition(speed: speed, acceleration: acceleration)
+        }
+    }
+    public func performGesture(_ gesture: NexArmGesture, repetitions: Int, speed: Int = 1400, acceleration: Int = 30)
+        async throws
+    {
+        try await runMotion(label: gesture.displayName, motors: gesture.lockedMotors) {
+            try await $0.performGesture(gesture, repetitions: repetitions, speed: speed, acceleration: acceleration)
         }
     }
     private func runMotion(
-        label: String, returnsHome: Bool = true, perform: @escaping @Sendable (NexArmController) async throws -> Void
+        label: String, returnsHome: Bool = true, motors: Set<Int> = Set(1...5),
+        perform: @escaping @Sendable (NexArmActionController) async throws -> Void
     ) async throws {
+        let required = Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") })
+        if let withMotorResources, !required.isSubset(of: ResourceExecutionContext.held) {
+            try await withMotorResources(motors) {
+                try await self.runMotion(label: label, returnsHome: returnsHome, motors: motors, perform: perform)
+            }
+            return
+        }
+        lastActionReport = nil
         try Task.checkCancellation()
         guard foreground else { throw BluetoothWorkflowError.background }
         guard operation == nil, cleanup == nil, motion == nil, liveTask == nil else {
@@ -773,6 +801,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         let token = UUID()
         let connectedGeneration = generation
         let revision = controlRevision
+        lastActionReport = nil
         motionID = token
         state.executing = true
         state.error = nil
@@ -782,7 +811,9 @@ public final class BluetoothWorkflow: BluetoothControlling {
             do {
                 try Task.checkCancellation()
                 try await perform(controller)
+                lastActionReport = try Self.report(await controller.motorResults)
             } catch {
+                lastActionReport = try Self.report(await controller.motorResults)
                 failureDetail = await controller.motionFailure
                 throw error
             }
@@ -812,26 +843,29 @@ public final class BluetoothWorkflow: BluetoothControlling {
             guard controlRevision == revision else { throw CancellationError() }
             state.motionStatus = error is CancellationError ? "动作已取消，未继续后续步骤" : "动作未完成"
             state.error = Self.message(error)
-            if error as? NexArmError == .uncertainMotion {
+            if error as? NexArmError == .feedbackLost {
+                state.controlValidated = false
+                state.error = BluetoothWorkflowError.feedbackTimeout.localizedDescription
+                throw BluetoothWorkflowError.feedbackTimeout
+            }
+            if case .targetsNotReached(let segments) = error as? NexArmActionError {
+                let failure = BluetoothWorkflowError.incomplete(segments)
+                state.error = failure.localizedDescription
+                throw failure
+            }
+            if error as? NexArmActionError == .uncertainMotion {
                 // Completion uncertainty is not a disconnected transport. Keep the owner so
                 // refresh/the next explicit request can revalidate stationary feedback.
                 state.motionStatus = "动作未确认完成"
                 switch failureDetail {
                 case .sending: state.error = "动作指令未能发送，可直接再试其他动作或重置"
-                case .pose: state.error = "机械臂尚未到达动作姿态，可直接再试其他动作或重置"
                 case .feedbackTimeout: state.error = "动作反馈超时，结果未知，可重新发起动作或重置"
                 case .completionTimeout: state.error = "动作未在期限内到位，可重新发起动作或重置"
-                case .feedback: state.error = "暂未读到机械臂位置，可直接再试其他动作或重置"
-                case .target(let joints):
-                    state.error =
-                        joints.isEmpty
-                        ? "机械臂尚未稳定，可直接再试其他动作或重置"
-                        : "舵机 \(joints.map(String.init).joined(separator: "、")) 尚未到达动作位置，可直接再试其他动作或重置"
                 case nil: break
                 }
             }
             if error as? NexArmError == .invalidMotion { throw BluetoothWorkflowError.posture }
-            if error as? NexArmError == .uncertainMotion {
+            if error as? NexArmActionError == .uncertainMotion {
                 if failureDetail == .feedbackTimeout { throw BluetoothWorkflowError.feedbackTimeout }
                 if failureDetail == .completionTimeout { throw BluetoothWorkflowError.completionTimeout }
                 throw BluetoothWorkflowError.unverified
@@ -839,15 +873,54 @@ public final class BluetoothWorkflow: BluetoothControlling {
             throw error
         }
     }
+    private static func report(_ results: [NexArmMotorResult]) throws -> ActionReport? {
+        guard !results.isEmpty else { return nil }
+        return try ActionReport(
+            entries: results.map { result in
+                let code: ActionReport.Entry.Code?
+                switch result.failure {
+                case .targetNotReached: code = .targetNotReached
+                case .timedOut: code = .timedOut
+                case .feedbackLost: code = .feedbackLost
+                case .disconnected: code = .disconnected
+                case .sendingFailed: code = .sendingFailed
+                case .cancelled: code = .cancelled
+                case nil: code = nil
+                }
+                return .init(
+                    path: "step.\(result.step).motor.\(result.motor)",
+                    status: result.failure == .cancelled
+                        ? (result.started ? .cancelled : .notStarted) : (result.failure == nil ? .succeeded : .failed),
+                    code: code, motor: result.motor, target: result.target, observed: result.observed)
+            })
+    }
+    public func moveMotor(id: Int, target: Int?, speed: Int, acceleration: Int) async throws {
+        lastActionReport = nil
+        let options = try NexArmMotorOptions(speed: speed, acceleration: acceleration)
+        let completion = try NexArmMotorCompletion()
+        try await runMotion(label: "舵机\(id)", returnsHome: false, motors: [id]) { controller in
+            if let target {
+                try await controller.moveMotor(id: id, target: target, options: options, completion: completion)
+            } else {
+                try await controller.resetMotor(id: id, options: options, completion: completion)
+            }
+        }
+    }
     private static func message(_ error: any Error) -> String {
         if let error = error as? BluetoothWorkflowError { return error.localizedDescription }
         if error is CancellationError { return "操作已取消" }
+        switch error as? NexArmActionError {
+        case .targetsNotReached(let segments): return BluetoothWorkflowError.incomplete(segments).localizedDescription
+        case .motionTimedOut: return "持续运动超过预计执行上限，已记录超时"
+        case .moving: return "机械臂尚未静止，请稍后重试"
+        case .uncertainMotion: return BluetoothWorkflowError.unverified.localizedDescription
+        default: break
+        }
         switch error as? NexArmError {
+        case .feedbackLost: return BluetoothWorkflowError.feedbackTimeout.localizedDescription
         case .firmwareUnavailable: return "设备验证未完成，请重新连接"
         case .unsupportedFirmware: return "当前固件尚未验证，暂不能控制这台机械臂"
-        case .moving: return "机械臂尚未静止，请稍后重试"
         case .invalidMotion: return BluetoothWorkflowError.posture.localizedDescription
-        case .uncertainMotion: return BluetoothWorkflowError.unverified.localizedDescription
         case .busy: return BluetoothWorkflowError.busy.localizedDescription
         case .disconnected: return BluetoothWorkflowError.disconnected.localizedDescription
         case .timeout: return "设备响应超时，请检查距离、供电及 Wonderbot 是否已断开"

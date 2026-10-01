@@ -102,16 +102,6 @@
             return pair.stream
         }
 
-        /// Compatibility for diagnostics. Production uses the continuous, three-buffer stream.
-        public func play(samples: [Float], sampleRate: Int) async throws {
-            var supplied = false
-            try await playStream {
-                guard !supplied else { return nil }
-                supplied = true
-                return PlaybackPCM(samples: samples, sampleRate: sampleRate)
-            }
-        }
-
         /// At most three PCM buffers scheduled; wait for hardware capacity, not each individual packet.
         public func playStream(next: @escaping @MainActor () async throws -> PlaybackPCM?) async throws {
             try Task.checkCancellation()

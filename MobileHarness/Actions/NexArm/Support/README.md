@@ -1,26 +1,21 @@
-# NexArm Action Support
+# NexArm Action support
 
-Purpose: keep non-callable implementation support separate from registered entry points. Design goals: cohesive definitions, explicit typed injection, stable public names and no hidden registration.
+Purpose: implement the NexArm action domain below its stateless callable entry points. Design goals: one shared Settings/Channel executor, explicit motor scope, bounded work and complete child outcomes.
 
-NexArmActionModules supplies explicit gesture/base catalogs; NexArmTypes owns typed requests and complete domain errors.
+✅ This directory owns gesture metadata, simple/complex recipes, IK plan preparation, the Action controller, completion policy/results, reset wrappers and manual jog shaping. It imports the foundational PlatformKit SDK through injected links; concrete connection lifetime belongs to App. Public helpers do not grant model permission.
+
+✅ Registration and parameter-dependent resources remain explicit. The actor owns a finite device-operation lifetime, not another Channel queue. The [domain README](../README.md) is the authoritative current technical design, source map, algorithms, diagrams and authoring rules.
 
 ```mermaid
 flowchart LR
-    Host[Host callbacks] --> Modules[Explicit module definitions]
-    Modules --> Entries[NexArmActions]
-    Types[Typed requests and errors] --> Entries
+    Entry[Typed request] --> Plan[Gesture / motor plan]
+    Plan --> Execute[Action controller / completion policy]
+    Execute --> SDK[Injected protocol link and native encoder]
+    SDK --> Feedback[Timestamped feedback]
+    Feedback --> Execute
+    Execute --> Report[Collected child outcomes]
 ```
 
-✅ Sources compile once in Actions. Public visibility exists where App/test composition requires it; it does not grant model access. Definitions remain explicit, and Agent declarations remain the permission source. See the [domain contract](../README.md) for completion, lifetime, cancellation and limits.
+❌ No automatic registration, hidden model permissions, physical emergency-stop guarantee or independent concurrent controller per motor. Historical causal and polling diagnostics live in root Tests, not this production implementation. The controller exposes no retired nudge/base diagnostic API or duplicate motor packet encoder.
 
-✅ This directory adds no queue or scheduler. Definitions and typed values introduce no background work, buffering or mutable runtime owner.
-
-❌ No automatic discovery, generic action factory or new runtime behavior.
-
-✅ Registrations own each operation's required displayName alongside its handler and completion contract. Execution records carry this value; no App or UI switch enumerates domain actions. ❌ This is human-readable metadata, not model permission or a SwiftUI dependency.
-
-✅ Cartesian Action completion metadata now describes Settings-matched timed playback and fresh final-home observation. Head entries retain calibrated per-segment completion. ❌ Final home does not prove intermediate waypoint arrival.
-
-✅ Performance completion metadata now explicitly describes arm-only arrival, excluding claw angle/motor6. Cartesian and native head completion still await the owning controller. ❌ No gripper-completion or grasp-success guarantee is added.
-
-✅ Performance completion metadata now states arm-only output: gripper commands and gripper convergence are excluded from every gesture. ❌ Dedicated grasp completion remains a separate future capability.
+✅ `NexArmMotorProfiles` centrally maintains measured arrival tolerances and a parameter-dependent empirical timing envelope. `NexArmRegistration` supplies macro-bound resource and conservative admission-budget resolvers. Arrival does not wait for stability; off-target stability only advances with fresh samples.

@@ -36,3 +36,5 @@ flowchart LR
 ✅ `UITools.swift` groups the seven callable presentation entries. `Support/UIToolModule.swift` owns registrations and typed host capability contracts; `Support/UIToolTypes.swift` owns nested value/error types. `Support/ConversationPresentation.swift` retains the bounded turn/sequence acceptance policy as a separate cohesive implementation. See [Support](Support/README.md).
 
 ❌ This organization adds no rendering acknowledgement, queue or native model Tool transport.
+
+✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.

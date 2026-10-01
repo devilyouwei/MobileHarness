@@ -16,7 +16,7 @@ flowchart LR
 
 ✅ Gateway has no speech preparation or prevalidation stage. The App output consumer releases remaining source/input audio after reply completion/error dispatch has joined Actions, and when dispatch fails; session teardown cancels session audio, and runtime teardown closes the store. Pending audio does not expire while waiting for its Action. The reply owner is the originating source/input, not the whole multi-turn voice session. Generation completion alone does not release unplayed audio. The hardware watchdog is separate: each scheduled buffer allows queued audio duration plus three seconds for playback completion. SpeechPlayback owns only the scheduled playback operation; its error/cancellation path releases the current audio ID.
 
-✅ Removed the obsolete text-to-synthesis helper. SpeechActions.swift now contains only the audioID playback Action. Speech failure, playback cancellation and text-boundary tests now exercise SpeechSynthesisAgent plus audioID playback; there is no legacy synthesis implementation in Actions.
+✅ SpeechActions.swift contains only the audioID playback Action. Speech failure, playback cancellation and text-boundary tests exercise SpeechSynthesisAgent plus audioID playback.
 
 ❌ Persistent/repeatable audio and real iPhone latency, Bluetooth and sustained playback acceptance remain outstanding.
 
@@ -47,3 +47,5 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 ✅ Entry and support share the existing Actions target. ❌ No synthesis, new queue or device resource lease is introduced.
 
 ✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
+
+✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.

@@ -199,13 +199,13 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 | --- | --- | --- |
 | `App/` excluding the two subtargets below | Xcode App targets | Composition root; see [App](App/README.md) for bindings |
 | `App/Composition/Behaviors/` | BehaviorAssembly | AgentCore, Actions, Tools |
-| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, StorageChat, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit |
+| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, StorageChat, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit, Actions |
 | `UI/` | UI | AgentCore, StorageChat; shared values only |
 | `Agents/Core/` | AgentCore | None |
 | `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio |
 | `Gateway/` | Gateway | AgentCore, Actions, Tools; execution uses Runtime APIs only |
-| `Actions/` including `Runtime/` | Actions | AgentCore, StorageAudio |
-| `Tools/` including `Runtime/` | Tools | AgentCore |
+| `Actions/` including `Runtime/` | Actions | AgentCore, StorageAudio, PlatformKit; BehaviorDefinitions at compile time |
+| `Tools/` including `Runtime/` | Tools | AgentCore; BehaviorDefinitions at compile time |
 | `Storage/` excluding `Audio/` and `Chat/` | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
 | `Storage/Audio/` | StorageAudio | Storage, AgentCore, ModelKit |
@@ -221,7 +221,9 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 
 - **Physical nesting does not imply one target.** AgentCore stays independent inside Agents so shared contracts cannot depend on business policy. AppWorkflows and BehaviorAssembly are separately testable inside App. Model management and concrete adapters remain separate from the ModelKit SDK.
 - **Behavior ownership and host bindings are separate.** Actions/Tools include their Runtime APIs; domain modules own implementations. BehaviorAssembly validates their coverage against Agent permissions, and App supplies concrete capabilities. Injected UI/device callbacks do not introduce reverse imports.
+- **Platform Core is documentation only.** Current adapters check authorization directly. Unused permission/transport placeholders were removed; shared contracts require real consumers before implementation.
 - **Foundations remain independent.** ModelKit and PlatformKit have no dependency on each other or on business Agents. StorageAudio bridges media and storage contracts; it replaced the former SpeechRuntime cache owner ([ADR 0056](../docs/adr/0056-storage-audio-migration.md)). UI accesses shared values, not runtime/model/device services.
+- **Compile-time behavior metadata:** root `Macros/BehaviorDefinitions` is a SwiftSyntax-only host plugin. Actions/Runtime and Tools/Runtime declare `@Action`/`@Tool`; domain entries carry metadata and Support catalogs bind factories explicitly. This is build tooling, not a new runtime business layer (ADR0094).
 - **One source has one compilation owner per target.** Do not recreate `Packages/HarnessKit/Sources`, duplicate sources or add empty future-domain implementations. Directory migrations must update Package.swift, Xcode navigation and affected READMEs together. Unimplemented domains stay in the [Roadmap](../docs/Roadmap.md).
 
 Source consolidation and App/UI separation are recorded in [ADR 0063](../docs/adr/0063-module-directory-consolidation.md) and [ADR 0064](../docs/adr/0064-app-ui-boundaries.md). Their dated migration checks are retained in the [Roadmap](../docs/Roadmap.md).
@@ -707,3 +709,19 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 ### NexArm gripper-independent arm output (ADR0090)
 
 ✅ PlatformKit prepares device IK before playback and compiles pose intents into bounded synchronous writes listing motors1–5 only. Settings/Channel/reset/connection indication share this arm-only contract; explicit manual motor6 control remains independent. No raw six-axis CMD8/CMD54 fallback. Settings estimates preserve the gripper, and final completion observes only arm axes. See [ADR0090](../docs/adr/0090-nexarm-arm-only-motion-packets.md). ❌ BLE endurance and loaded-arm trajectory acceptance remain separate.
+
+## NexArm feedback execution — 2026-10-01
+
+✅ Actions/NexArm/Support owns NexArmSimpleActions.swift, NexArmCompositeActions.swift and NexArmMotionPlan.swift (migrated out of PlatformKit by ADR0093). Single-motor/composite definitions share the controller feedback executor; explicit reset owns1–5. See ADR0091 for the current contract replacing nominal-duration/final-only progression.
+
+❌ Sustained real-device acceptance remains pending.
+
+## Atomic composition — ADR0092
+
+✅ Added Actions/Runtime/ActionComposition.swift, Agents/Core/Output/ActionReport.swift, domain/adapter NexArmMotorActions.swift; renamed the head definition file NexArmSimpleActions.swift. See ADR0092 for the current source contract.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ ADR0093: Actions/NexArm/Support owns the gesture catalog, localized names, simple/complex sequences, IK plan preparation and NexArmActionController execution policy. Its explicit PlatformKit dependency consumes link protocols and native command encoding; Actions/Runtime remains platform-independent. AppWorkflows depends on Actions to share the same implementation for Settings and Channel. PlatformKit has no project-target dependencies.
+
+✅ PlatformKit responsibility audit: NexArm jog/reset policy belongs to Actions/NexArm/Support; structured BLE failures remain in the SDK, while BluetoothPresentation in AppWorkflows owns localization and ordering. App/Adapters chooses camera preview fill. The English Actions/NexArm README is the current consolidated technical design; obsolete implementation prose was removed.

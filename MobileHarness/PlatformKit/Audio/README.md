@@ -5,7 +5,7 @@ Purpose: capture and play audio through public Apple APIs and convert capture PC
 - ✅ AppleAudioIO: bounded capture bridge, playback, interruption and route handling.
 - ✅ MicrophoneFrame: capture samples, format, sequence, duration and RMS level.
 - ✅ StreamingMonoPCMResampler: converter state across packets, format validation, packet sequence, reset and explicit conversion errors.
-- ✅ Obsolete energy VAD and whole-utterance resampler removed; Gateway owns VAD policy.
+- ✅ SpeechPerception owns VAD/segmentation policy and consumes ModelKit capabilities; PlatformKit supplies PCM only.
 - ❌ Additional audio routes and hardware acceptance beyond the documented voice validation scope.
 
 ```mermaid
@@ -42,7 +42,7 @@ Audio is the platform capability domain for microphone and speaker I/O. AppleAud
 
 ✅ AudioSpectrum measures the latest 2048 mono samples, removes DC, applies a Hann window and radix-2 FFT, and sums power into 32 logarithmic bands (80 Hz to min(8 kHz, Nyquist)). Fixed −66…−6 dB mapping preserves level differences; there is no per-frame auto normalization. Invalid samples become zero. Attack/release smoothing is deterministic and settles to silence. This is device-level metering, not model inference.
 
-✅ AppleAudioIO.playStream schedules up to three bounded mono PCM buffers continuously. Each is at most 262,144 samples; producer awaits capacity, final completion awaits dataPlayedBack for all buffers. The node is not stopped between packets or same-format Actions. Format changes reconnect only after drain; cancellation/timeout stops the node and resolves capacity/drain waiters. Each buffer has a watchdog allowing queued duration plus 3 seconds. play(samples:) remains a compatibility wrapper.
+✅ AppleAudioIO.playStream schedules up to three bounded mono PCM buffers continuously. Each is at most 262,144 samples; producer awaits capacity, final completion awaits dataPlayedBack for all buffers. The node is not stopped between packets or same-format Actions. Format changes reconnect only after drain; cancellation/timeout stops the node and resolves capacity/drain waiters. Each buffer has a watchdog allowing queued duration plus 3 seconds. Diagnostics also use playStream; there is no separate single-buffer compatibility API.
 
 ```mermaid
 flowchart LR
@@ -58,3 +58,5 @@ flowchart LR
 ✅ The mixer tap retains at most 2048 mono samples; App samples playbackSpectrum every 33 ms for the lifetime of a speech Action. This represents rendered audio, not synthesis progress, and does not toggle UI state for each PCM packet. Physical output latency remains device-dependent (❌).
 
 ✅ All AVAudioEngine taps explicitly use `@Sendable` closures. The mixer tap captures only mutex-protected telemetry, never MainActor state. This prevents Swift 6 executor assertions on the audio callback queue; playback completion hops explicitly to MainActor. Device regression uses MOSS diagnostics with `-moss-autorun -moss-playback` through the production AppleAudioIO.
+
+✅ Responsibility audit: audio capture, device playback/drain, PCM conversion and measured spectrum remain device capabilities. No speech Action, Agent inference or conversation choreography lives here. Presentation and speech sequencing belong to their owning modules.

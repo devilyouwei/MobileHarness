@@ -66,3 +66,9 @@ The configured observer consumes only current speech state and has no unbounded 
 ## Action runtime stage 2
 
 ✅ Stage 2 adds Results/ActionResultLedger and Resources/ResourceCoordinator. OutputGateway binds owner context and ResourceControl to current Agent identity/session, derives the shared coordinator from its scheduler, and wires lifecycle cleanup. Cancellation starts device stop and scheduler join together. ❌ Priority scheduling and generic activity subscriptions remain outstanding.
+
+## Atomic composition — ADR0092
+
+✅ Action failure isolation now releases waits and continues subsequent Actions. ActionResult carries composed leaf outcomes; explicit user/session cancellation is unchanged.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.

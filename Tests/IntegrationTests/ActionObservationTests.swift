@@ -147,7 +147,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     await #expect(throws: ChannelScheduler.ObservationError.self) { try await scheduler.observeExecutions() }
     let input = AgentInput(sessionID: UUID(), payload: .event("failure"))
     try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
-    await #expect(throws: BluetoothWorkflowError.self) { try await scheduler.finish(inputID: input.id) }
+    try await scheduler.finish(inputID: input.id)
     let result = try #require(await scheduler.executionSnapshot().records.first)
     #expect(result.phase == .failed)
     #expect(result.failure == .feedbackTimeout)

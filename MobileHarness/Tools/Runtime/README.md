@@ -1,71 +1,50 @@
-# Tools/Runtime — Direct Tool Execution
+# Tool Runtime
 
-Registers and executes resolved ToolCalls. The goal is explicit completion and feedback without Channel scheduling. These runtime files compile within Tools, whose only package dependency is AgentCore.
+Purpose: register and execute resolved ToolCalls directly. Design goals: explicit feedback kind, bounded catalogs and host-owned effects without Action scheduling. Runtime uses AgentCore; ToolMacro references the separate compile-time BehaviorDefinitions plugin.
 
-## Directory structure
+| File | Responsibility |
+|---|---|
+| ToolMacro | Attached metadata declarations and generated factory interface |
+| ToolDefinition / ToolModules | Domain definitions and explicit built-in catalog |
+| ToolRegistry | Actor-owned bounded handlers and resource mappings |
+| ToolInvocation | ToolCall plus trusted output context |
+| ToolExecutor | Lookup, cancellation and result/completion semantics |
 
-```text
-Runtime/
-├── ToolDefinition.swift # Domain definition and module contract
-├── ToolModules.swift    # Explicit built-in domain catalog
-├── ToolInvocation.swift # Call plus trusted output context
-├── ToolRegistry.swift  # Actor-owned handlers; rejects duplicate paths
-├── ToolExecutor.swift  # Execute and select result or completion semantics
-└── README.md           # Module contract and status
-```
+## Registration and bounds
 
-## Upstream and downstream
+Domain Support catalogs bind `@Tool`-generated factories to explicit capabilities. `ToolRegistry(modules:capabilities:)` validates the entire catalog atomically: at most32 modules,128 handlers,128 capability catalogs and8 resources per definition. Path segments use the1–64-byte identifier grammar. Duplicate/invalid entries and missing implementations throw; no partial startup registration is published. Agent declarations remain the permission source.
 
-Arrows show runtime calls through domain handlers assembled by BehaviorAssembly; Runtime and behavior handlers now share the Tools module without self-imports.
+The registry retains handler and resource mappings. ToolDefinition also carries a display name; this metadata does not create an Action execution record. Dynamic registration APIs support explicit isolated runtimes; production uses the complete catalog constructor.
 
 ```mermaid
 flowchart LR
-    Assembly[BehaviorAssembly + domain modules] -->|Construct registry| ToolExecution
-    Output[OutputGateway] -->|Resolved call and envelope| ToolExecution
-    ToolExecution -->|Invoke| Tools
-    Tools -->|Value, completion or error| ToolExecution
-    ToolExecution -->|Optional result via ToolDispatcher| Input[InputGateway]
-    Input -->|Correlated feedback| Agent[Originating Agent]
+    Attribute[Tool entry metadata] --> Factory[Generated typed definition factory]
+    Host[Injected host capabilities] --> Catalog[Domain Support catalog]
+    Factory --> Catalog
+    Catalog --> Registry[Validate bounded atomic registry]
+    Permissions[Model and internal permissions] --> Check[Verify implementation coverage]
+    Registry --> Check
+    Check --> Executor[ToolExecutor]
 ```
 
-## Internal flow
+## Execution and feedback
 
 ```mermaid
 flowchart TD
-    Call[ToolCall and OutputEnvelope] --> Lookup[ToolRegistry lookup]
-    Lookup --> Kind{Registered kind}
-    Kind --> Returning[Await String handler]
-    Returning --> Result[ToolResult with call ID]
-    Kind --> Completion[Await Void handler]
-    Completion --> Done[Return nil on success]
-    Completion -->|Failure| Throw[Throw to dispatch caller]
-    Lookup -->|Unknown path| Result
+    Call[Authorized resolved ToolCall] --> Lookup[Registry lookup]
+    Lookup -->|unknown| Error[Error ToolResult]
+    Lookup --> Returning[Returning handler]
+    Lookup --> Completion[Completion handler]
+    Returning -->|String or ordinary error| Result[Correlated ToolResult]
+    Completion -->|success| Done[Return nil]
+    Completion -->|failure| Throw[Throw to dispatcher]
+    Result --> Input[Dispatcher routes through InputGateway]
 ```
 
-The domain definition selects the handler kind; call arguments cannot select feedback behavior. A returned empty String still creates a result. Returning-handler errors become error results; completion-handler errors throw. Cancellation throws for both kinds. ToolDispatcher sends only non-nil results through InputGateway.
+Registration selects feedback kind; call arguments cannot change it. An empty returned String still produces a result. Cancellation propagates rather than becoming an ordinary error result. Completion waits for the injected endpoint's stated acknowledgement, not necessarily rendered or physical completion.
 
-There is no execution queue, replay or automatic serialization of independent callers. The App output consumer awaits calls in order. Actor isolation protects registry access, not handler execution. The registry admits at most 128 entries; production uses atomically constructed domain module catalogs.
+Gateway checks resource ownership through the same ResourceCoordinator used by Actions, but Tools remain outside Channel FIFO/wait. Runtime owns no work queue, deadline task or detached worker. An uncooperative handler can delay its caller; no generic timeout is implemented.
 
-## Feature status
+✅ Macro factories, bounded registration, implementation coverage, resource declarations and both feedback kinds are implemented and tested.
 
-- ✅ Shared path namespace, duplicate rejection, returning and completion-only handlers.
-- ✅ Correlated feedback, awaited completion and cancellation propagation.
-- ❌ Runtime execution timeouts, generic pending-call replacement and durable result delivery.
-
-## Issue record
-
-| Status | Issue / next step |
-| --- | --- |
-| Open | A non-cooperative handler can delay its caller; no timeout is enforced. |
-
-## Action runtime stage 2
-
-✅ ToolRegistry accepts explicit resources per handler (at most 8; at most 128 handlers). Gateway uses the scheduler-owned ResourceCoordinator for protected direct calls. Tools remain outside Channel FIFO/wait. ❌ Existing unannotated UI tools claim no hardware locks.
-
-## Domain-owned behavior assembly
-
-✅ ToolDefinition separates returning and completion handlers and retains resource declarations. ToolModule provides explicit definitions. ToolRegistry(modules:capabilities:) builds atomically: maximum 32 modules, 128 definitions, 128 capability catalogs, 8 resources/definition, 1–64-byte identifier grammar. Duplicate/invalid entries or missing model/internal Tool paths throw before the registry is exposed. Existing dynamic register methods remain for isolated/explicit runtimes and validate the same identifiers; production uses complete construction. ❌ No asynchronous module discovery or automatic permission grants.
-
-## Action and Tool presentation boundary
-
-✅ ToolInvocation carries the validated ToolCall and trusted OutputEnvelope to immediate typed endpoints; it has no channel/execution state. ❌ Tools do not participate in Channel wait groups.
+❌ Runtime discovery, forced interruption, implicit permission grants and automatic hardware resource inference are unsupported. Device-facing Tools must explicitly declare their resources.

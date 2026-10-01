@@ -36,3 +36,8 @@ public struct ResourceControl: Sendable {
         self.release = release
     }
 }
+
+/// Trusted execution context inherited by child tasks; never read from model parameters.
+public enum ResourceExecutionContext {
+    @TaskLocal public static var held: Set<ResourceID> = []
+}

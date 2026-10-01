@@ -52,3 +52,11 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Removed the unused NexArmDiagnostics navigation reference together with its Action entry; production action/support sources retain their existing package ownership.
 
 ✅ Tools navigator mirrors the Runtime/domain/Support layout, including all grouped callable entries and support files. Shared Tools sources continue compiling through SwiftPM only. ❌ This navigation update adds no App source build memberships.
+
+✅ ADR0093 updates the NexArm controller navigator reference to Actions/NexArm/Support. SwiftPM remains the source/target authority for the migrated shared implementation.
+
+✅ The NexArm jog-planner navigator entry now belongs to Actions/NexArm/Support; shared implementation files continue to compile through their SwiftPM targets.
+
+✅ The local package builds BehaviorDefinitions as a host compiler macro plugin for Action/Tool metadata; it is not an iOS runtime device dependency. NexArm profile/budget policy remains in the Actions target.
+
+✅ Navigation no longer references unused permission/transport placeholders. Historical NexArm diagnostics are listed under root IntegrationTests; production compilation remains SwiftPM-owned.

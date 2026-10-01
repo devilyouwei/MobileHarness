@@ -17,12 +17,13 @@ public enum ActionFeedback: Sendable { case none, failuresOnly, terminal }
 
 public enum ActionCompletion: Equatable, Sendable {
     case completed
+    case report(ActionReport)
     case activityStarted(UUID)
     case activityStopped(UUID)
 }
 
 public struct ActionResult: Sendable, Equatable {
-    public enum Status: String, Sendable { case succeeded, failed, cancelled }
+    public enum Status: String, Sendable { case succeeded, partialFailure, failed, cancelled }
     public enum Effect: String, Sendable { case notStarted, contractCompleted, unknown }
     public enum Failure: String, Sendable { case handlerFailed, cancelled, resourceUnavailable }
 
@@ -35,6 +36,10 @@ public struct ActionResult: Sendable, Equatable {
     public let effect: Effect
     public let completion: ActionCompletion?
     public let failure: Failure?
+    public var report: ActionReport? {
+        if case .report(let report) = completion { return report }
+        return nil
+    }
 
     public init(
         executionID: UUID, owner: ExecutionOwner, inputID: UUID, turn: ConversationTurn?, path: ActionPath,

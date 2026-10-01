@@ -61,6 +61,9 @@ private actor ObservableArmFixture: NexArmObservableLink {
     var cache = NexArmTelemetryCache()
     var session: UUID?
     var pose = [200, 0, 200, 0, 0, 0]
+    var joints = NexArmGesture.referenceHomeJoints
+    var skippedWrite: Int?
+    func skip(_ index: Int) { skippedWrite = index }
     var lastPush = ContinuousClock.now.advanced(by: .seconds(-1))
     private(set) var writes = 0
     private(set) var queries = 0
@@ -70,8 +73,8 @@ private actor ObservableArmFixture: NexArmObservableLink {
     private(set) var sentAt: [ContinuousClock.Instant] = []
     private(set) var earlyQueries = 0
     private(set) var queriedAfterWrites: [Int] = []
-    private var blockedUntil: ContinuousClock.Instant?
-    func blockAdmission(for duration: Duration) { blockedUntil = .now.advanced(by: duration) }
+    private var admissionBlocked = false
+    func blockAdmission() { admissionBlocked = true }
     init(_ mode: Mode) { self.mode = mode }
     func configure(_ value: Mode) { mode = value }
     func revoke() { session = nil }
@@ -83,9 +86,9 @@ private actor ObservableArmFixture: NexArmObservableLink {
     func endObservation(_ token: UUID) { if session == token { session = nil } }
     func sendObserved(_ packet: NexArmPacket, session token: UUID) throws -> Bool {
         guard session == token else { throw CancellationError() }
-        if packet.isArmControl {
+        if packet.isSynchronousPositionWrite {
             let intent = try ik.intent(packet)
-            if let blockedUntil, ContinuousClock.now < blockedUntil { return false }
+            if admissionBlocked { return false }
             guard packets.count < 40 else { throw NexArmError.overflow }
             packets.append(packet)
             sentAt.append(.now)
@@ -94,6 +97,9 @@ private actor ObservableArmFixture: NexArmObservableLink {
             let duration = values[3] == 200 ? 600 : (values[1] == 200 && values[2] == 0 && values[4] == 0 ? 400 : 800)
             trajectoryEnds = .now.advanced(by: .milliseconds(duration))
             writes += 1
+            if writes != skippedWrite {
+                for (id, target) in packet.motorTargets ?? [:] { joints[id - 1] = target }
+            }
             let v = stride(from: 0, to: 12, by: 2).map {
                 Int(Int16(bitPattern: UInt16(intent.payload[$0]) | UInt16(intent.payload[$0 + 1]) << 8))
             }
@@ -113,6 +119,10 @@ private actor ObservableArmFixture: NexArmObservableLink {
         var reported = pose
         if independentClaw { reported[5] = -6 }
         var payload = try telemetryPacket(reported).payload
+        for (index, joint) in joints.enumerated() {
+            payload[12 + index * 2] = UInt8(joint & 255)
+            payload[13 + index * 2] = UInt8(joint >> 8)
+        }
         if independentClaw {
             // An unrelated gripper can move while the five arm joints are stable.
             let encoder = (cache.latest?.sequence ?? 0).isMultiple(of: 2) ? 1977 : 2000
@@ -141,7 +151,7 @@ private actor ObservableArmFixture: NexArmObservableLink {
 @Test func nexArmPerformanceCompletionDoesNotRequireClawConvergence() async throws {
     let link = ObservableArmFixture(.push)
     await link.offsetClaw()
-    let controller = NexArmController(link: link)
+    let controller = NexArmActionController(link: link)
     try await controller.performGesture(.tiltLeft, repetitions: 1)
     #expect(await link.writes == 3)
     #expect(await controller.latestState.pose[5] == -6)
@@ -192,55 +202,53 @@ func nexArmArmOnlyArrivalRetainsPoseJointAndDeadlineGates(nativeTarget: Bool) {
 }
 
 @Test(arguments: [NexArmGesture.tiltLeft, .celebrate, .dance])
-func nexArmChannelReusesSettingsPacketsAndCadenceBeforeFinalObservation(_ gesture: NexArmGesture) async throws {
+func nexArmChannelUsesFreshMotorFeedbackWithoutNominalWait(_ gesture: NexArmGesture) async throws {
     let link = ObservableArmFixture(.push)
-    let controller = NexArmController(link: link)
+    let controller = NexArmActionController(link: link)
     let began = ContinuousClock.now
     try await controller.performGesture(gesture, repetitions: 1)
     let plan = try await controller.prepareArmControl()
-    let frames = try plan.compile(gesture.settingsTestFrames(), from: NexArmJogPlanner.home)
-    #expect(ContinuousClock.now - began >= .milliseconds(frames.reduce(0) { $0 + $1.milliseconds }))
+    let frames = try plan.motion(gesture, repetitions: 1, from: NexArmGesture.referenceHomeJoints).steps
     #expect(await link.packets == frames.map(\.packet))
+    #expect(ContinuousClock.now - began < .seconds(3))
     let times = await link.sentAt
     for index in 1..<times.count {
-        let interval = times[index] - times[index - 1]
-        #expect(interval >= .milliseconds(frames[index - 1].milliseconds))
-        // No feedback-stability window may be inserted between body frames.
-        #expect(interval < .milliseconds(frames[index - 1].milliseconds + 300))
+        #expect(times[index] - times[index - 1] < .milliseconds(400))
     }
-    #expect(await link.earlyHandoffs == 0)
     #expect(await link.queries == 0)
     #expect(await link.session == nil)
 }
 
-@Test func nexArmChannelUsesBoundedQueryFallbackWhenNoPush() async throws {
+@Test func nexArmFeedbackLossAbortsWithoutQueryFallback() async throws {
     let link = ObservableArmFixture(.queryOnly)
-    try await NexArmController(link: link).performGesture(.tiltRight, repetitions: 1)
-    #expect(await link.writes == 3)
-    #expect(await link.earlyQueries == 0)
-    let queries = await link.queries
-    #expect(queries >= 2 && queries <= 6)
-    #expect(await link.queriedAfterWrites.allSatisfy { $0 == 3 })
-    #expect(await link.earlyHandoffs == 0)
+    let controller = NexArmActionController(link: link)
+    await #expect(throws: NexArmError.feedbackLost) { try await controller.performGesture(.tiltRight, repetitions: 1) }
+    #expect(await link.queries == 0)
+    #expect(await controller.motionFailure == .feedbackTimeout)
+    #expect(await link.writes < 3)
+    #expect(await controller.motorResults.count == 15)
+    #expect(await controller.motorResults.allSatisfy { $0.failure == .feedbackLost })
+    #expect(await controller.motorResults.contains { !$0.started && $0.step == 3 })
 }
 
 @Test func nexArmMissingFeedbackEndsAwaitWithoutReplayAndNextRequestCanRun() async throws {
     let link = ObservableArmFixture(.silent)
-    let controller = NexArmController(link: link)
+    let controller = NexArmActionController(link: link)
     let began = ContinuousClock.now
-    await #expect(throws: NexArmError.uncertainMotion) { try await controller.performGesture(.wave, repetitions: 1) }
+    await #expect(throws: NexArmError.feedbackLost) { try await controller.performGesture(.wave, repetitions: 1) }
     #expect(ContinuousClock.now - began < .seconds(8))
     #expect(await controller.motionFailure == .feedbackTimeout)
-    #expect(await link.writes == 6)
+    let sentBeforeLoss = await link.writes
+    #expect(sentBeforeLoss < 6)
     #expect(await link.session == nil)
     await link.configure(.push)
     try await controller.performGesture(.tiltLeft, repetitions: 1)
-    #expect(await link.writes == 9)
+    #expect(await link.writes == sentBeforeLoss + 3)
 }
 
 @Test func nexArmObservationTakeoverCancelsAwaitAndStopsFurtherFrames() async throws {
     let link = ObservableArmFixture(.silent)
-    let controller = NexArmController(link: link)
+    let controller = NexArmActionController(link: link)
     let task = Task { try await controller.performGesture(.wave, repetitions: 1) }
     for _ in 0..<100 {
         if await link.writes > 0 { break }
@@ -264,7 +272,7 @@ func nexArmChannelReusesSettingsPacketsAndCadenceBeforeFinalObservation(_ gestur
 func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
     let start = ContinuousClock.now
     let pose = [200, 0, 240, 0, 0, 0]
-    let joints = NexArmJogPlanner.home
+    let joints = NexArmGesture.referenceHomeJoints
     var tracker = NexArmArrivalTracker(
         target: pose, final: final, started: start, durationMilliseconds: 800,
         minimumObservationMilliseconds: 100)
@@ -280,7 +288,7 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
 @Test func nexArmEarlyPlateauCannotHideLaterMovementOrFeedbackLoss() {
     let start = ContinuousClock.now
     let pose = [200, 0, 240, 0, 0, 0]
-    let joints = NexArmJogPlanner.home
+    let joints = NexArmGesture.referenceHomeJoints
     var tracker = NexArmArrivalTracker(target: pose, final: false, started: start, durationMilliseconds: 3000)
     tracker.observe(pose: pose, joints: joints, at: start)
     tracker.observe(pose: pose, joints: joints, at: start.advanced(by: .milliseconds(300)))
@@ -319,9 +327,11 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
 
 @Test func nexArmPlaybackCongestionRejectsWithoutReplayingMotion() async throws {
     let link = ObservableArmFixture(.queryOnly)
-    await link.blockAdmission(for: .seconds(2))
-    let controller = NexArmController(link: link)
-    await #expect(throws: NexArmError.uncertainMotion) {
+    // Keep the fixture congested for the whole operation. A timed unblock races the
+    // next child admission after preparation and cannot prove zero committed writes.
+    await link.blockAdmission()
+    let controller = NexArmActionController(link: link)
+    await #expect(throws: NexArmActionError.uncertainMotion) {
         try await controller.performGesture(.dance, repetitions: 1)
     }
     #expect(await link.writes == 0)
@@ -331,15 +341,16 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
 }
 
 @Test func nexArmChannelKeepsNextActionQueuedUntilFreshFinalHome() async throws {
-    let link = ObservableArmFixture(.silent)
-    let controller = NexArmController(link: link)
+    let link = ObservableArmFixture(.push)
+    let controller = NexArmActionController(link: link)
     let registry = try ActionRegistry(modules: [
         NexArmGestureActionModule { request, _ in
-            let gesture: NexArmGesture = request.gesture == .celebrate ? .celebrate : .dance
-            try await controller.performGesture(gesture, repetitions: request.repetitions)
+            try await controller.performGesture(
+                request.gesture == .celebrate ? .celebrate : .dance,
+                repetitions: request.repetitions)
         }
     ])
-    let scheduler = ChannelScheduler(registry: registry)
+    let scheduler = ChannelScheduler(registry: registry, resources: try nexArmTestResources())
     let input = AgentInput(sessionID: UUID(), payload: .text("two gestures"))
     for (function, channel) in [("celebrate", "Robot"), ("dance", "Other")] {
         try await scheduler.enqueue(
@@ -349,31 +360,70 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
                     actionPath: ActionPath(module: "NexArm", function: function),
                     channel: channel, parameters: ["cycles": "1"])))
     }
-    // Silence during body playback must not stall the sequence. Queries only start after home duration.
-    for _ in 0..<700 {
-        if await link.queries > 0 { break }
-        try await Task.sleep(for: .milliseconds(10))
-    }
-    #expect(await link.queries > 0)
-    #expect(await link.writes == 6)
-    #expect(await link.earlyQueries == 0)
-    try await Task.sleep(for: .milliseconds(100))
-    #expect(await link.writes == 6)  // The next Action cannot start on send completion.
-    await link.configure(.queryOnly)
     try await scheduler.finish(inputID: input.id)
     #expect(await link.writes == 14)
-    #expect(await link.earlyQueries == 0)
-    #expect(await link.earlyHandoffs == 0)
+    #expect(await link.queries == 0)
+    #expect(await controller.lockedMotors.isEmpty)
 }
 
 @Test func nexArmCachedHomeDuringPlaybackCannotConfirmFinalCompletion() async throws {
-    let link = ObservableArmFixture(.cachedOnly)
-    let controller = NexArmController(link: link)
-    await #expect(throws: NexArmError.uncertainMotion) {
+    let link = ObservableArmFixture(.silent)
+    let controller = NexArmActionController(link: link)
+    await #expect(throws: NexArmError.feedbackLost) {
         try await controller.performGesture(.tiltLeft, repetitions: 1)
     }
-    #expect(await link.writes == 3)
-    #expect(await link.queriedAfterWrites.allSatisfy { $0 == 3 })
+    #expect(await link.writes < 3)
+    #expect(await link.queries == 0)
     #expect(await controller.motionFailure == .feedbackTimeout)
-    #expect(await link.session == nil)
+}
+
+@Test func nexArmIntermediateTimeoutAdvancesAndReportsMissingSegmentAfterEnding() async throws {
+    let link = ObservableArmFixture(.push)
+    await link.skip(2)
+    let controller = NexArmActionController(link: link)
+    await #expect(throws: NexArmActionError.targetsNotReached([2])) {
+        try await controller.performGesture(.dance, repetitions: 1)
+    }
+    #expect(await link.writes == 8)
+    #expect(await link.queries == 0)
+    #expect(await controller.unreachedSegments == [2])
+    #expect(await controller.lockedMotors.isEmpty)
+    #expect(await controller.cachedJoints.prefix(5) == [2048, 2087, 1225, 1238, 2048])
+}
+
+@Test func nexArmMotorScopeFreshnessAndFeedbackWatchdogAreIndependent() {
+    let start = ContinuousClock.now
+    var tracker = NexArmSegmentTracker(
+        targets: [4: 1500], started: start,
+        deadline: start.advanced(by: .seconds(1)))
+    var joints = NexArmGesture.referenceHomeJoints
+    joints[3] = 1500
+    tracker.observe(joints: joints, at: start.advanced(by: .milliseconds(-1)))
+    #expect(tracker.outcome(at: start) == .waiting)
+    tracker.observe(joints: joints, at: start)
+    #expect(tracker.outcome(at: start.advanced(by: .milliseconds(500))) == .arrived)
+    joints[0] += 100
+    joints[1] += 200
+    joints[5] -= 300
+    tracker.observe(joints: joints, at: start.advanced(by: .milliseconds(200)))
+    #expect(tracker.outcome(at: start.advanced(by: .milliseconds(200))) == .arrived)
+    var stuck = NexArmSegmentTracker(
+        targets: [4: 1600], started: start,
+        deadline: start.advanced(by: .seconds(1)))
+    var health = NexArmFeedbackWatchdog(started: start)
+    for n in 0...5 {
+        let time = start.advanced(by: .milliseconds(n * 200))
+        stuck.observe(joints: joints, at: time)
+        health.observe(at: time)
+    }
+    #expect(stuck.outcome(at: start.advanced(by: .seconds(1))) == .timedOut)
+    #expect(!health.isLost(at: start.advanced(by: .seconds(1))))
+    #expect(health.isLost(at: start.advanced(by: .seconds(3))))
+}
+
+@Test func nexArmPlanRejectsWritesOutsideDeclaredMotorLocks() throws {
+    let frames = try NexArmGesture.nod.settingsTestFrames()
+    #expect(throws: NexArmError.invalidMotion) { try NexArmMotionPlan(lockedMotors: [5], frames: frames) }
+    let plan = try NexArmMotionPlan(lockedMotors: [4], frames: frames)
+    #expect(plan.steps.allSatisfy { Set($0.targets.keys) == [4] })
 }

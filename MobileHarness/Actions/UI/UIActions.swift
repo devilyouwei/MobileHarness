@@ -1,5 +1,11 @@
+import AgentCore
+
 /// Stateless namespace for scheduled presentation actions.
 public enum UIActions {
+    @Action(
+        module: "UI", title: "调整表情", kind: .state,
+        completion:
+            "Presentation policy accepted expression target or rejected a stale update; animation is not joined.")
     public static func express(
         invocation: ActionInvocation,
         using present: @escaping @Sendable (Emotion, ActionInvocation) async throws -> Void

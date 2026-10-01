@@ -3,12 +3,23 @@ import Foundation
 
 extension NexArmActions {
     public enum Gesture: Sendable, Equatable {
-        case nod, shakeHead, wave, tiltLeft, tiltRight, lookAround, celebrate, dance
+        case nod, shakeHead, wave, tiltLeft, tiltRight, lookAround, celebrate, dance, reset, moveMotor, resetMotor
     }
     public struct GestureRequest: Sendable, Equatable {
         public let gesture: Gesture
         public let repetitions: Int
-        public init(gesture: Gesture, repetitions: Int) {
+        public let motor: Int?
+        public let target: Int?
+        public let speed: Int
+        public let acceleration: Int
+        public init(
+            gesture: Gesture, repetitions: Int, motor: Int? = nil, target: Int? = nil, speed: Int = 1400,
+            acceleration: Int = 30
+        ) {
+            self.motor = motor
+            self.target = target
+            self.speed = speed
+            self.acceleration = acceleration
             self.gesture = gesture
             self.repetitions = repetitions
         }

@@ -17,3 +17,5 @@ flowchart LR
 ```
 
 The callback must complete before the Tool completes. Types and policy do not register themselves or grant Agent permissions.
+
+✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.

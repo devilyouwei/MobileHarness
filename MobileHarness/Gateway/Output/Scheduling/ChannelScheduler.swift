@@ -145,8 +145,8 @@ public actor ChannelScheduler {
 
     public nonisolated var resourceCoordinator: ResourceCoordinator? { resources }
 
-    public nonisolated func requiredResources(for path: ActionPath) throws -> Set<ResourceID> {
-        try registry.definition(for: path).resources
+    public nonisolated func requiredResources(for call: ActionCall) throws -> Set<ResourceID> {
+        try registry.definition(for: call.actionPath).requiredResources(for: call)
     }
 
     public func diagnosticSnapshot() -> ActionDiagnostics.Snapshot { diagnostics.snapshot() }
@@ -190,10 +190,11 @@ public actor ChannelScheduler {
         try Task.checkCancellation()
         guard !isShutdown else { throw ActionSchedulingError.shutdown }
         let definition = try registry.definition(for: invocation.call.actionPath)
-        if !definition.resources.isEmpty {
+        let required = try definition.requiredResources(for: invocation.call)
+        if !required.isEmpty {
             guard let resources else { throw ResourceError.unknownResource }
             try await resources.validate(
-                resources: definition.resources, owner: invocation.owner, lease: invocation.lease)
+                resources: required, owner: invocation.owner, lease: invocation.lease)
         }
         // Recheck state after the resource actor hop, before reserving capacity.
         try Task.checkCancellation()
@@ -215,7 +216,7 @@ public actor ChannelScheduler {
         sequence += 1
         state.phases[state.writePhase].lanes[channel, default: Channel()].queued.append(
             Job(
-                sequence: sequence, phase: state.writePhase, kind: definition.kind, resources: definition.resources,
+                sequence: sequence, phase: state.writePhase, kind: definition.kind, resources: required,
                 invocation: invocation))
         executionLedger.admit(invocation, definition: definition)
         publishExecutions()
@@ -345,7 +346,7 @@ public actor ChannelScheduler {
             state.phases[job.phase].lanes[channel]?.queued.removeFirst()
             busyModules.insert(job.path.module)
             let task = Task {
-                let outcome: Outcome
+                var outcome: Outcome
                 var started = false
                 do {
                     try Task.checkCancellation()
@@ -363,7 +364,20 @@ public actor ChannelScheduler {
                     }
                     try Task.checkCancellation()
                     outcome = .success(completion)
-                } catch { outcome = .failure(error) }
+                } catch {
+                    if let reported = error as? any ActionReportProviding {
+                        outcome = .success(.report(reported.actionReport))
+                    } else {
+                        outcome = .failure(error)
+                    }
+                }
+                if let report = await job.invocation.results.snapshot() {
+                    if case .success(.report(let terminal)) = outcome, let failure = terminal.executionFailure {
+                        outcome = .success(.report(report.withExecutionFailure(failure)))
+                    } else {
+                        outcome = .success(.report(report))
+                    }
+                }
                 self.completed(job, outcome: outcome, started: started)
             }
             state.phases[job.phase].lanes[channel]?.running = Running(job: job, task: task)
@@ -379,13 +393,33 @@ public actor ChannelScheduler {
         state.pending -= 1
         switch outcome {
         case .success(let completion):
-            executionTransition(job.id, to: .succeeded, completion: completion)
-            resultLedger.complete(
-                job.invocation, status: .succeeded, effect: .contractCompleted, completion: completion)
-            diagnostics.record(job.invocation, kind: job.kind, phase: .succeeded, effect: .contractCompleted)
-        case .failure(let error):
+            let report: ActionReport?
+            if case .report(let value) = completion { report = value } else { report = nil }
+            let status = report?.status ?? .succeeded
+            let phase: ActionExecutionRecord.Phase =
+                status == .cancelled ? .cancelled : (status == .succeeded ? .succeeded : .failed)
+            var issues =
+                report?.entries.filter { $0.status == .failed }.map {
+                    "\($0.path): \($0.code?.rawValue ?? "handlerFailed")"
+                } ?? []
+            if let failure = report?.executionFailure { issues.append("execution: \(failure.rawValue)") }
+            let description = issues.joined(separator: "; ")
             executionTransition(
-                job.id, to: error is CancellationError ? .cancelled : .failed,
+                job.id, to: phase, completion: completion,
+                failure: status == .succeeded ? nil : .operationFailed,
+                failureDescription: description)
+            resultLedger.complete(
+                job.invocation, status: status,
+                effect: status == .succeeded ? .contractCompleted : .unknown, completion: completion,
+                failure: status == .succeeded ? nil : (status == .cancelled ? .cancelled : .handlerFailed))
+            diagnostics.record(
+                job.invocation, kind: job.kind,
+                phase: status == .cancelled ? .cancelled : (status == .succeeded ? .succeeded : .failed),
+                effect: status == .succeeded ? .contractCompleted : .unknown)
+        case .failure(let error):
+            let report = ActionReport.failure(ActionReport.code(for: error))
+            executionTransition(
+                job.id, to: error is CancellationError ? .cancelled : .failed, completion: .report(report),
                 failure: error is CancellationError
                     ? nil
                     : ((error as? any ActionExecutionFailureProviding)?.actionExecutionFailure
@@ -393,16 +427,12 @@ public actor ChannelScheduler {
                 failureDescription: error is CancellationError ? nil : error.localizedDescription)
             resultLedger.complete(
                 job.invocation, status: error is CancellationError ? .cancelled : .failed,
-                effect: started ? .unknown : .notStarted,
+                effect: started ? .unknown : .notStarted, completion: .report(report),
                 failure: error is CancellationError
                     ? .cancelled : (error is ResourceError ? .resourceUnavailable : .handlerFailed))
             diagnostics.record(
                 job.invocation, kind: job.kind, phase: error is CancellationError ? .cancelled : .failed,
                 effect: started ? .unknown : .notStarted)
-        }
-        if case .failure(let error) = outcome {
-            state.failure = state.failure ?? error
-            cancelJobs(key: job.inputKey)
         }
         finalizeIfReady(job.inputKey)
         startEligibleChannels()

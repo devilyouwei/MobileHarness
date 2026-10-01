@@ -113,7 +113,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(
         config.capabilities.actions.map(\.alias) == [
             "express", "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance", "nodHead",
-            "shakeHead",
+            "shakeHead", "resetArm", "moveMotor", "resetMotor",
         ])
     #expect(config.capabilities.channels == ["Display", "Robot", "Speech"])
     #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "runtimeInfo")

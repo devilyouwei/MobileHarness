@@ -252,3 +252,9 @@ Local user settings now use Storage-backed cached persistence in the application
 ✅ iPhone Settings → 蓝牙设备 now scans NexArm, verifies/connects, remembers one device, disconnects and forgets. Return to conversation to request “让底座左右晃动一次”; supported posture and finite-motion bounds still apply. [BLE lifecycle and limits](MobileHarness/PlatformKit/Connectivity/NexArm/README.md) distinguish implementation/tests from physical acceptance.
 
 ✅ Action implementations now group related entries, with registration, types and services in domain Support directories. See the [Action authoring standard](MobileHarness/Actions/README.md); public behavior and runtime contracts are unchanged.
+
+✅ NexArm gesture definitions and completion execution now belong to Actions; PlatformKit remains the independent connection/protocol SDK. See [ADR0093](docs/adr/0093-nexarm-platform-action-boundary.md) for the enforced source and target boundary.
+
+✅ The PlatformKit responsibility audit also moved manual motion/reset policy to Actions and presentation policy to App. The [NexArm Actions README](MobileHarness/Actions/NexArm/README.md) now provides the consolidated English current-state design and diagrams; repository instructions explicitly enforce directory ownership.
+
+✅ Action/Tool entries use attached metadata macros; NexArm completion now prioritizes fresh arrival and uses centralized motor profiles and dynamic deadlines. See [ADR0094](docs/adr/0094-arrival-profiles-and-behavior-macros.md).

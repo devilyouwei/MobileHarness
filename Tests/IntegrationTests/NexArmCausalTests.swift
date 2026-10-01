@@ -1,3 +1,4 @@
+import Actions
 import Foundation
 import PlatformKit
 import Testing
@@ -81,7 +82,7 @@ import Testing
         }
         func write(_ packet: NexArmPacket) async throws {
             try await serial.write(packet)
-            if packet.isArmControl || (packet.command == 3 && packet.id <= 5) {
+            if packet.isSynchronousPositionWrite || (packet.command == 3 && packet.id <= 5) {
                 leg += 1
                 try record("motion", values: packetValues(packet))
             }
@@ -110,7 +111,7 @@ import Testing
             if let sampleFailure { throw sampleFailure }
             let admitted = try await serial.sendObserved(packet, session: session)
             if admitted {
-                if packet.isArmControl || (packet.command == 3 && packet.id <= 5) {
+                if packet.isSynchronousPositionWrite || (packet.command == 3 && packet.id <= 5) {
                     leg += 1
                     try record("motion", values: packetValues(packet))
                 } else if packet.command == 11 {
@@ -222,7 +223,7 @@ import Testing
         default: throw NexArmError.invalidMotion
         }
         let link = try CausalSerialTrace(path: #require(env["NEXARM_PORT"]))
-        let controller = NexArmController(link: link)
+        let controller = NexArmActionController(link: link)
         print("CAUSAL BEGIN trial=\(trial.rawValue) gesture=\(gesture)")
         do {
             _ = try await controller.verifyCompatibility()

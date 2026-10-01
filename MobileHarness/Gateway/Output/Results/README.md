@@ -32,3 +32,9 @@ flowchart LR
 ❌ No durable delivery, crash recovery, unlimited replay, global exactly-once guarantee, persistent deduplication or automatic Agent/model recovery policy. History eviction ends the deduplication window. ActivityEvent has a validated direct route but no generic activity event outbox or subscription service. Physical effect uncertainty cannot be inferred away from a failed delivery.
 
 See [resources](../Resources/README.md), [scheduling](../Scheduling/README.md) and [lifecycle tests](../../../../Tests/IntegrationTests/ActionLifecycleTests.swift).
+
+## Atomic composition — ADR0092
+
+✅ ActionResult completion may carry ActionReport entries and partialFailure. failuresOnly delivers partial failures. Existing reservation/delivery bounds apply; no device replay is introduced.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.

@@ -43,7 +43,7 @@ public enum BluetoothArmAction: String, CaseIterable, Identifiable, Sendable {
         case .lookAround: "左右张望"
         case .celebrate: "庆祝"
         case .dance: "小舞蹈"
-        case .reset: "重置姿态"
+        case .reset: "整臂归位"
         }
     }
 }

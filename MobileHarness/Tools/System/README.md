@@ -13,3 +13,5 @@ flowchart LR
     Function --> Executor[ToolExecutor result]
     Executor --> Gateway[ToolDispatcher to InputGateway]
 ```
+
+✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.

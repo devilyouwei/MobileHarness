@@ -1,76 +1,28 @@
 # PlatformKit — Device Input and Output
 
-Owns hardware and operating-system I/O through public APIs. The goal is permission-aware device lifecycles and bounded data delivery. PlatformKit has no project-target dependency; ModelKit processes supplied data separately.
+Purpose: provide reusable hardware and operating-system I/O through public APIs. Design goals: permission-aware device lifetimes, bounded data/command admission, explicit cleanup and an independent foundational SDK. PlatformKit has no project-target dependencies.
 
-## Directory structure
-
-```text
-PlatformKit/
-├── Audio/
-│   ├── AppleAudioIO.swift                 # Capture, playback and audio-session setup
-│   ├── MicrophoneFrame.swift              # Bounded captured PCM
-│   ├── StreamingMonoPCMResampler.swift     # Continuous format conversion
-│   └── AudioSpectrum.swift                # FFT telemetry for captured/played PCM
-├── Vision/
-│   ├── AppleCamera.swift                  # Camera lifecycle and preview source
-│   ├── CameraFrame.swift                  # Native frame and orientation metadata
-│   └── CameraGraySampler.swift            # Compact luminance samples
-├── Core/DeviceCapability.swift            # Shared availability/authorization contract
-├── Connectivity/ExternalDeviceTransport.swift # External-device transport contract
-└── README.md                              # Device boundary and status
-```
-
-Group implementations by capability domain. Core holds shared contracts; add device subdirectories only when actual implementations need them.
-
-## Upstream and downstream
-
-Arrows show data flow through App adapters, not imports between the two Kits.
+| Directory | Owns | Must not own |
+|---|---|---|
+| [Core](Core/README.md) | Documentation for future shared contracts; no compiled implementation | Business decisions or device workflow orchestration |
+| [Audio](Audio/README.md) | Capture, PCM conversion, native playback, measured spectrum | Speech Actions, model inference, conversation policy or UI animation choices |
+| [Vision](Vision/README.md) | Camera lifecycle, native preview binding, bounded frames and orientation-aware samples | Gesture/pose decisions, model inference, overlay content or preview cropping policy |
+| [Connectivity](Connectivity/README.md) | Links, device protocols, native command encoding, telemetry and connection diagnostics | Action wrappers, reset/home choices, motion recipes, preferred device ordering or localized UI messages |
 
 ```mermaid
 flowchart LR
-    Hardware[Hardware / OS] -->|Capture| PlatformKit
-    PlatformKit -->|PCM, frames and telemetry| App
-    App --> Input[InputGateway]
-    Input --> Agents[SpeechPerception / VisionPerception]
-    Agents -->|Inference| ModelKit
-    Output[OutputGateway] --> Runtime[Action / Tool handlers]
-    Runtime -->|App-injected device operation| PlatformKit
-    PlatformKit -->|Playback| Hardware
-    App -->|Preview and telemetry| Views
+    Actions[Actions: behavior and completion policy] --> SDK[PlatformKit: device capabilities]
+    App[App: lifecycle and typed adapters] --> SDK
+    SDK <--> Hardware[OS / external hardware]
+    SDK --> Facts[Frames / PCM / telemetry / structured failures]
+    Facts --> App
+    App --> Consumers[Agents and presentation through owned interfaces]
 ```
 
-## Internal structure and data flow
+✅ Audio capture/playback, stream resampling and FFT metering; foreground camera capture/preview and bounded native-frame delivery; adapter-owned authorization; NexArm USB/BLE and protocol support are implemented. Playback drain and transport admission describe device operations, not a business Action result. Fixed buffer capacities and hardware register ranges are capability constraints, not application choreography.
 
-```mermaid
-flowchart TD
-    Intent[App device request] --> Permission[Authorization and availability]
-    Permission --> Audio[Audio capture / playback]
-    Permission --> Vision[Camera session]
-    Audio --> PCM[Bounded PCM / resampling]
-    PCM --> Capture[Capture consumer]
-    Audio --> Spectrum[AudioSpectrum from actual PCM]
-    Vision --> Frame[Native frame and gray samples]
-    Frame --> Latest[Capacity-one latest-frame stream]
-    Vision --> Preview[Native preview source]
-    InputPCM[Supplied synthesis PCM] --> Audio
-```
+✅ The 2026-10-01 audit moved NexArm manual jog/reset behavior to Actions, Bluetooth ordering/localization to AppWorkflows, and preview fill selection to App/Adapters. Gestures, completion policies and Action errors were already moved to Actions. Source/target checks reject reverse dependencies, known Action-policy types, localized presentation strings and business presentation APIs in this SDK.
 
-Audio and camera own their devices and cleanup. Capture delivery is bounded; audio overflow is explicit, while the camera stream replaces its pending frame with the newest one. Playback waits for device completion and supports cancellation. FFT is device telemetry, not model inference or an Agent-selected UI command. See [Audio](Audio/README.md) and [Vision](Vision/README.md) for capacities and lifecycle rules.
+❌ Additional device domains, general network transport, recording, sustained physical audio/camera acceptance and independently confirmed robot emergency stopping remain open. App background execution cannot establish physical safety.
 
-## Feature status
-
-- ✅ Microphone capture, speaker playback, PCM conversion and spectrum analysis.
-- ✅ Foreground camera capture, front/back selection, native preview and compact gray samples.
-- ✅ Shared permission contracts and an external-device transport interface.
-- ❌ BLE/network transports, production robot control, recording and additional hardware domains.
-
-## Issue record
-
-| Status | Issue / next step |
-| --- | --- |
-| Open | Measure camera/audio coexistence, route-dependent playback latency and sustained thermal/power behavior on device. |
-| Open | Robot control requires device-side limits, stop acknowledgement and disconnect protection; iOS background execution cannot provide safety. |
-
-✅ [Connectivity/NexArm](Connectivity/NexArm/README.md) adds macOS USB diagnostics and bounded wrist motion and base sweeps. ❌ iPhone connectivity, production robot ownership and independent physical stop protection remain pending.
-
-✅ NexArmBluetooth provides a real CoreBluetooth transport for iOS/macOS with main-actor delegate ownership behind an actor API. ❌ BLE connectivity does not establish physical stop/watchdog behavior; no new third-party dependency.
+Developer rule: determine the owning directory before adding code. Device-specific protocol knowledge is valid here; a reusable-looking wrapper that chooses an application action is not. Put action functions and composition in Actions, application connection/lifecycle policy in App, and display choices in App/UI. Keep each directory README aligned with its actual responsibility.

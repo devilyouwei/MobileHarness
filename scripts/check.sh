@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 swift --version
 python3 scripts/check-modelkit-boundaries.py
 python3 -m unittest discover -s Tests -p test_model_download.py
-swift format lint --strict --recursive MobileHarness Tests Package.swift
+swift format lint --strict --recursive MobileHarness Macros Tests Package.swift
 test_args=(--package-path .)
 developer_dir="$(xcode-select -p)"
 testing_plugins="$developer_dir/usr/lib/swift/host/plugins/testing"

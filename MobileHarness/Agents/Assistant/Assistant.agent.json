@@ -41,13 +41,27 @@
             "required": true,
             "description": "Number of complete left/right/return cycles.",
             "constraints": "Integer 1 through 3 only."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<shakeBase cycles=\"1\"/>",
           "<shakeBase cycles=\"3\"/>"
         ],
-        "doc": "Perform a complete base sway with fixed preparation, base yaw -30/+30/center degrees, and fixed ending. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       },
       {
         "alias": "waveWrist",
@@ -62,12 +76,26 @@
             "required": true,
             "description": "Number of complete gesture repetitions.",
             "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<wait><waveWrist count=\"1\"/></wait>"
         ],
-        "doc": "Wave hello/goodbye with yaw +/-12 degrees and roll +/-40 degrees, twice per cycle. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       },
       {
         "alias": "tiltWrist",
@@ -82,12 +110,26 @@
             "required": true,
             "description": "Tilt direction relative to the arm.",
             "constraints": "Exactly left or right."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<wait><tiltWrist direction=\"left\"/></wait>"
         ],
-        "doc": "Tilt with yaw12 and roll40 degrees to the selected side, keeping the ready height240mm without an extra lift. Left/right always use the arm's own frame, as if standing behind it facing forward: left uses positive yaw and roll; right uses negative yaw and roll. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       },
       {
         "alias": "lookAround",
@@ -102,12 +144,26 @@
             "required": true,
             "description": "Number of complete gesture repetitions.",
             "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<wait><lookAround cycles=\"1\"/></wait>"
         ],
-        "doc": "Look around with yaw -35/+35/center degrees and roll +/-15 degrees. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       },
       {
         "alias": "celebrate",
@@ -122,12 +178,26 @@
             "required": true,
             "description": "Number of complete gesture repetitions.",
             "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<wait><celebrate cycles=\"1\"/></wait>"
         ],
-        "doc": "Celebrate with yaw +/-20 degrees, roll up to +/-45 degrees and height220...270mm. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       },
       {
         "alias": "dance",
@@ -142,12 +212,26 @@
             "required": true,
             "description": "Number of complete gesture repetitions.",
             "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<wait><dance cycles=\"1\"/></wait>"
         ],
-        "doc": "Dance with yaw +/-30 degrees, roll +/-40 degrees and height220...260mm. On iPhone these use fixed Cartesian poses: home [200,0,200]mm, ready [200,0,240]mm, body and home ending, with pitch0 and claw0 degrees. The controller handles joint calibration and interpolates each body transition over800ms. They are independent of the starting posture. Only perform on user request with a connected arm and clear motion area; keep app foreground. A new explicit request is independent of prior unconfirmed motion; it starts with a fixed3000ms approach without requiring old feedback. No automatic retry. Intermediate poses require observed arrival; final home requires three stable telemetry samples. Reset can interrupt. Do not claim completion from markup or transmission. Use wait for actions that must follow completion."
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       },
       {
         "alias": "nodHead",
@@ -162,12 +246,26 @@
             "required": true,
             "description": "Number of complete gestures, each containing two back-and-forth sweeps.",
             "constraints": "Integer 1 through 3 only; no default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<wait><nodHead cycles=\"1\"/></wait>"
         ],
-        "doc": "Nod yes with motor 4 only during the body. Establish fixed Cartesian home first, sweep the calibrated home joint by +/-33 degrees twice at speed1400 encoder counts/s with firmware acceleration, center and return to observed home. Use for an explicit request to nod or shake the head, not base rotation. Requires a connected arm, clear space and foreground. Await fresh encoder arrival for each body frame and stable physical home at the end; feedback silence and completion watchdogs can fail the Action. Settings tests send without waiting for feedback. No automatic retry; reset can interrupt."
+        "doc": "Compose home, sweeps and return using only motor4. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       },
       {
         "alias": "shakeHead",
@@ -182,12 +280,128 @@
             "required": true,
             "description": "Number of complete gestures, each containing two back-and-forth sweeps.",
             "constraints": "Integer 1 through 3 only; no default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
           }
         ],
         "examples": [
           "<wait><shakeHead cycles=\"1\"/></wait>"
         ],
-        "doc": "Shake no with motor 5 only during the body. Establish fixed Cartesian home first, sweep the calibrated home joint by +/-44 degrees twice at speed1400 encoder counts/s with firmware acceleration, center and return to observed home. Use for an explicit request to nod or shake the head, not base rotation. Requires a connected arm, clear space and foreground. Await fresh encoder arrival for each body frame and stable physical home at the end; feedback silence and completion watchdogs can fail the Action. Settings tests send without waiting for feedback. No automatic retry; reset can interrupt."
+        "doc": "Compose home, sweeps and return using only motor5. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "resetArm",
+        "path": {
+          "module": "NexArm",
+          "function": "reset"
+        },
+        "parameters": [
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><resetArm/></wait>"
+        ],
+        "doc": "Reset motors1–5 only; do not command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "moveMotor",
+        "path": {
+          "module": "NexArm",
+          "function": "moveMotor"
+        },
+        "parameters": [
+          {
+            "name": "motor",
+            "required": true,
+            "description": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.",
+            "valueType": "integer",
+            "constraints": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5."
+          },
+          {
+            "name": "target",
+            "required": true,
+            "description": "Native encoder target, restricted to configured motor limits.",
+            "valueType": "integer",
+            "constraints": "Native encoder target, restricted to configured motor limits."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native speed1–1400, default1400.",
+            "valueType": "integer",
+            "constraints": "Native speed1–1400, default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration1–254, default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration1–254, default30."
+          }
+        ],
+        "examples": [
+          "<wait><moveMotor motor=\"4\" target=\"1238\"/></wait>"
+        ],
+        "doc": "Move only the explicitly selected motor to its native encoder target. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "resetMotor",
+        "path": {
+          "module": "NexArm",
+          "function": "resetMotor"
+        },
+        "parameters": [
+          {
+            "name": "motor",
+            "required": true,
+            "description": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.",
+            "valueType": "integer",
+            "constraints": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native speed1–1400, default1400.",
+            "valueType": "integer",
+            "constraints": "Native speed1–1400, default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration1–254, default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration1–254, default30."
+          }
+        ],
+        "examples": [
+          "<wait><resetMotor motor=\"4\"/></wait>"
+        ],
+        "doc": "Reset only the selected motor to its configured home; motor6 requires an explicitly configured home. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       }
     ]
   },

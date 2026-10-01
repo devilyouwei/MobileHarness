@@ -1,5 +1,8 @@
+import Actions
+import AgentCore
 import AppWorkflows
 import Foundation
+import Gateway
 import Storage
 import Testing
 import UI
@@ -9,6 +12,40 @@ import UI
 /// Explicit simulation. Default tests never create a CoreBluetooth manager or move physical hardware.
 private actor BluetoothArmFixture: NexArmBluetoothLink {
     var ik = NexArmTestIK()
+    private(set) var observedCommands: [NexArmPacket] = []
+    var observation: UUID?
+    var telemetry = NexArmTelemetryCache()
+    var lastPush = ContinuousClock.now.advanced(by: .seconds(-1))
+    func beginObservation() throws -> UUID {
+        guard snapshot.feedbackHealthy else { throw NexArmError.feedbackLost }
+        liveSession = nil
+        let token = UUID()
+        observation = token
+        return token
+    }
+    func endObservation(_ session: UUID) { if observation == session { observation = nil } }
+    func sendObserved(_ packet: NexArmPacket, session: UUID) throws -> Bool {
+        guard observation == session else { throw CancellationError() }
+        guard !liveBlocked else { return false }
+        observedCommands.append(packet)
+        try write(packet)
+        return true
+    }
+    func latestObservation(after sequence: UInt64, session: UUID) async throws -> NexArmTelemetry? {
+        guard observation == session else { throw CancellationError() }
+        guard snapshot.feedbackHealthy else { throw NexArmError.feedbackLost }
+        if !telemetryUnavailable, !holdPose, ContinuousClock.now - lastPush >= .milliseconds(100) {
+            let packet = try await exchange(NexArmPacket(command: 11), replyID: 255, replyCommand: 11, replyCount: 24)
+            try telemetry.receive(packet.bytes)
+            lastPush = .now
+        }
+        guard let value = telemetry.latest, value.sequence > sequence else { return nil }
+        return value
+    }
+    func health(_ healthy: Bool) {
+        snapshot.feedbackHealthy = healthy
+        emit.yield(snapshot)
+    }
     nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
     private let emit: AsyncStream<NexArmBluetoothSnapshot>.Continuation
     nonisolated let id = UUID()
@@ -42,6 +79,10 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     var holdPose = false
     var pendingPose: CheckedContinuation<Void, any Error>?
     func holdTelemetry() { holdPose = true }
+    func resumeTelemetry() {
+        holdPose = false
+        telemetryUnavailable = false
+    }
     var waitingForPose: Bool { pendingPose != nil }
     private(set) var liveCommands: [NexArmPacket] = []
     private(set) var poseReads = 0
@@ -49,6 +90,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     func disableTelemetry() { telemetryUnavailable = true }
     func beginLiveControl() throws -> UUID {
         guard snapshot.phase == .connected else { throw NexArmError.disconnected }
+        observation = nil
         let id = UUID()
         liveSession = id
         pendingPose?.resume(throwing: CancellationError())
@@ -99,7 +141,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     func loseConnectionOnNextMotion() { loseLinkOnMotion = true }
     func loseConnection() {
         snapshot.phase = .disconnected
-        snapshot.failure = "等待设备回复超时"
+        snapshot.failure = .timeout(.response)
         emit.yield(snapshot)
     }
     func invalidatePose() { z = 0 }
@@ -154,7 +196,22 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     func write(_ packet: NexArmPacket) throws {
         guard liveSession == nil else { throw CancellationError() }
         guard snapshot.phase == .connected else { throw NexArmError.disconnected }
-        if packet.isArmControl {
+        if packet.command == 3, let targets = packet.motorTargets {
+            let indicating = feedbackCommands.count < 4 && packet.id == 5
+            if indicating { feedbackCommands.append(packet) } else { writes += 1 }
+            if (indicating && loseLinkOnFeedback) || (!indicating && loseLinkOnMotion) {
+                loseLinkOnFeedback = false
+                loseLinkOnMotion = false
+                loseConnection()
+                throw NexArmError.timeout
+            }
+            if failMotion || failFeedback { throw NexArmError.timeout }
+            for (id, target) in targets {
+                if id == 5 { wrist = target } else { motorOverrides[id - 1] = target }
+            }
+            return
+        }
+        if packet.isSynchronousPositionWrite {
             let intent = try ik.intent(packet)
             let isReset = intent.payload[6] == 200 && (feedbackCommands.isEmpty || resetHeight != 197)
             if isReset {
@@ -182,7 +239,9 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
             pitch = target[0]
             roll = target[4]
             // Arm motion preserves independently measured claw state.
-            wrist = 2048 + roll * 11
+            for (id, target) in packet.motorTargets ?? [:] {
+                if id == 5 { wrist = target } else { motorOverrides[id - 1] = target }
+            }
             return
         }
         feedbackCommands.append(packet)
@@ -303,9 +362,9 @@ func bluetoothSettingsConnectionPersistsAcrossNavigationAndAssistantExecutes() a
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .connected)
     #expect(workflow.state.remembered?.id == link.id)
-    #expect(await link.feedbackCommands.map(\.command) == [131, 51, 51, 51])
+    #expect(await link.feedbackCommands.map(\.command) == [3, 3, 3, 3])
     #expect(
-        await link.feedbackCommands.dropFirst().map { Int($0.payload[1]) | Int($0.payload[2]) << 8 } == [
+        await link.feedbackCommands.dropFirst().map { Int($0.payload[2]) | Int($0.payload[3]) << 8 } == [
             1957, 2139, 2048,
         ])
     workflow.openPage()
@@ -405,14 +464,14 @@ func bluetoothUnknownMotionKeepsConnectionAndRecoversWithoutReplay() async throw
     await link.configure(fail: true)
     await #expect(throws: BluetoothWorkflowError.self) { try await workflow.shakeBase(cycles: 1) }
     #expect(workflow.state.phase == .connected && workflow.state.canControl)
-    #expect(await link.writes == 1)
+    #expect(await link.writes == 5)
     #expect(workflow.state.motionStatus == "动作未确认完成")
     await link.configure()
     await workflow.refreshDevice()
     #expect(workflow.state.error == nil)
-    #expect(await link.writes == 1)
+    #expect(await link.writes == 5)
     try await workflow.shakeBase(cycles: 1)
-    #expect(await link.writes == 6)
+    #expect(await link.writes == 10)
     #expect(await link.connects == 1)
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -479,9 +538,14 @@ func bluetoothConnectionWaitsForPreviousConversationCleanup() async throws {
 }
 
 @Test func bluetoothFailureIdentifiesNativeStep() {
-    #expect(NexArmBluetoothStep.connecting.failure(NexArmError.timeout) == "建立蓝牙连接超时")
-    #expect(NexArmBluetoothStep.notifications.failure(NexArmError.timeout) == "开启设备通知超时")
-    #expect(NexArmBluetoothStep.response.failure(NexArmError.timeout) == "等待设备回复超时")
+    #expect(BluetoothPresentation.failure(.timeout(.connecting)) == "建立蓝牙连接超时")
+    #expect(BluetoothPresentation.failure(.timeout(.notifications)) == "开启设备通知超时")
+    #expect(BluetoothPresentation.failure(.timeout(.response)) == "等待设备回复超时")
+    let native = NexArmBluetoothFailure(step: .writing, error: NSError(domain: "fixture.transport", code: 42))
+    #expect(native == .native(step: .writing, domain: "fixture.transport", code: 42))
+    #expect(BluetoothPresentation.failure(native) == "发送设备指令失败（fixture.transport 42）")
+    #expect(BluetoothPresentation.failure(.incompatibleService(.services)) == "发现设备服务失败：蓝牙服务不兼容")
+    #expect(BluetoothPresentation.failure(.disconnectUnconfirmed) == "蓝牙断开尚未确认，请关闭系统蓝牙后重试")
 }
 
 @Test(.timeLimit(.minutes(1))) @MainActor
@@ -499,7 +563,7 @@ func bluetoothPoseProtocolConnectsWithoutFirmwareQueriesAndAssistantExecutes() a
     #expect(workflow.state.controlReady)
     #expect(workflow.state.notice == "已连接，可以返回对话控制机械臂")
     #expect(await link.versionReads == 0)
-    #expect(await link.feedbackCommands.map(\.command) == [131, 51, 51, 51])
+    #expect(await link.feedbackCommands.map(\.command) == [3, 3, 3, 3])
     #expect(await link.writes == 0)
     workflow.openPage()
     workflow.closePage()
@@ -549,7 +613,7 @@ func bluetoothBackgroundJoinsConnectionResetWithoutStartingWristOrDeclaringReady
     #expect(workflow.state.phase == .indicating && !workflow.state.controlReady)
     workflow.setForeground(false)
     await workflow.waitUntilIdle()
-    #expect(await link.feedbackCommands.map(\.command) == [131])
+    #expect(await link.feedbackCommands.map(\.command) == [3])
     #expect(workflow.state.phase == .idle && !workflow.state.controlReady)
     #expect(await link.status().phase == .disconnected)
     observer.cancel()
@@ -581,11 +645,11 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     #expect(workflow.state.motionStatus == "连接提示动作未确认完成")
     workflow.openPage()
     await workflow.waitUntilIdle()
-    #expect(await link.feedbackCommands.map(\.command) == [131])
+    #expect(await link.feedbackCommands.map(\.command) == [3, 3, 3, 3])
     await link.configure()
     await workflow.refreshDevice()
     #expect(workflow.state.joints.count == 6)
-    #expect(await link.feedbackCommands.map(\.command) == [131])
+    #expect(await link.feedbackCommands.map(\.command) == [3, 3, 3, 3])
     #expect(await link.writes == 0)
     #expect(await link.connects == 1)
     observer.cancel()
@@ -597,7 +661,7 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
         let link = BluetoothArmFixture()
         await link.setVersion(version)
         try await link.connect(link.id)
-        let controller = NexArmController(link: link)
+        let controller = NexArmActionController(link: link)
         await #expect(throws: NexArmError.unsupportedFirmware) { try await controller.verifyCompatibility() }
         #expect(await link.versionReads == 1)
         #expect(await link.feedbackCommands.isEmpty)
@@ -607,21 +671,21 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     await moving.configure(missing: true)
     await moving.setDriftingPose()
     try await moving.connect(moving.id)
-    let controller = NexArmController(link: moving, compatibilityPolicy: .nexArmBLEProtocol)
-    await #expect(throws: NexArmError.moving) { try await controller.verifyCompatibility() }
+    let controller = NexArmActionController(link: moving, compatibilityPolicy: .nexArmBLEProtocol)
+    await #expect(throws: NexArmActionError.moving) { try await controller.verifyCompatibility() }
     #expect(await moving.feedbackCommands.isEmpty)
     await moving.close()
 }
 
-@Test(.timeLimit(.minutes(1))) func bluetoothResetOutsideHomeToleranceStopsBeforeID5() async throws {
+@Test(.timeLimit(.minutes(1))) func bluetoothConnectionIndicationOwnsOnlyMotor5() async throws {
     let link = BluetoothArmFixture()
-    await link.setResetHeight(190)
     try await link.connect(link.id)
-    let controller = NexArmController(link: link)
-    await #expect(throws: NexArmError.uncertainMotion) { try await controller.indicateConnection() }
-    await #expect(throws: NexArmError.uncertainMotion) { try await controller.indicateConnection() }
-    #expect(await link.feedbackCommands.map(\.command) == [131])
-    await link.close()
+    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+    try await controller.indicateConnection()
+    #expect(await link.feedbackCommands.count == 4)
+    #expect(await link.feedbackCommands.allSatisfy { $0.id == 5 })
+    #expect(await controller.latestState.pose[2] == 350)  // Connection indication never resets XYZ.
+    await #expect(throws: NexArmActionError.alreadyUsed) { try await controller.indicateConnection() }
 }
 
 @Test func bluetoothDiscoveryPrioritizesNamesButKeepsRenamedAndOtherDevices() {
@@ -629,7 +693,7 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     let other = NexArmBluetoothDevice(id: UUID(), name: "温度计", rssi: -30)
     let arm = NexArmBluetoothDevice(id: UUID(), name: "Nex_Arm", rssi: -80)
     let unnamed = NexArmBluetoothDevice(id: UUID(), name: "未命名设备", rssi: -60)
-    let rows = [renamed, other, arm, unnamed].sorted(by: NexArmBluetoothDevice.discoveryOrder)
+    let rows = [renamed, other, arm, unnamed].sorted(by: BluetoothPresentation.discoveryOrder)
     #expect(rows.map(\.id) == [arm.id, renamed.id, other.id, unnamed.id])
 }
 
@@ -753,7 +817,7 @@ func bluetoothGestureBackgroundCancelsRemainingLegsAndNeverReplays() async throw
 
 @Test func bluetoothJogPlannerUsesSpeedCurveAndVendorJointLimits() throws {
     for id in 1...6 {
-        var planner = try NexArmJogPlanner(positions: NexArmJogPlanner.home)
+        var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
         #expect(try planner.proposal(id: id, deflection: 0) == nil)
         for _ in 0..<200 {
             if let proposal = try planner.proposal(id: id, deflection: 1) {
@@ -761,7 +825,7 @@ func bluetoothGestureBackgroundCancelsRemainingLegsAndNeverReplays() async throw
             }
         }
         #expect(Int(planner.targets[id - 1]) == NexArmJogPlanner.limits[id - 1].upperBound)
-        #expect(planner.targets[id - 1] - Double(NexArmJogPlanner.home[id - 1]) > 91)
+        #expect(planner.targets[id - 1] - Double(NexArmGesture.referenceHomeJoints[id - 1]) > 91)
     }
 }
 
@@ -828,12 +892,12 @@ func bluetoothLiveBackpressureDoesNotAccumulateCommandsAndResetPreemptsPreset() 
     try await until { await link.writes >= 1 }
     let before = ContinuousClock.now
     workflow.tryAction(.reset)
-    try await until { await link.liveCommands.contains { $0.isArmControl } }
+    try await until { await link.observedCommands.contains { $0.isSynchronousPositionWrite } }
     #expect(ContinuousClock.now - before < .seconds(1))
     await workflow.waitUntilIdle()
     await #expect(throws: CancellationError.self) { try await action.value }
     #expect(await link.feedbackCommands.count == 4)
-    #expect(workflow.state.motionStatus == "已发送重置指令")
+    #expect(workflow.state.motionStatus == "已完成整臂归位")
     #expect(workflow.state.error == nil)
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -846,10 +910,12 @@ func bluetoothManualMotorUncertainWriteLatchesFailure() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
     await link.configure(feedbackFailure: true)
-    let controller = NexArmController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
-    await #expect(throws: NexArmError.uncertainMotion) { try await controller.performGesture(.wave, repetitions: 1) }
-    await #expect(throws: NexArmError.uncertainMotion) { try await controller.resetPosition() }
-    #expect(await link.writes == 1)
+    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+    await #expect(throws: NexArmActionError.uncertainMotion) {
+        try await controller.performGesture(.wave, repetitions: 1)
+    }
+    await #expect(throws: NexArmActionError.uncertainMotion) { try await controller.resetPosition() }
+    #expect(await link.observedCommands.count == 7)
     await link.close()
 }
 
@@ -887,14 +953,19 @@ func bluetoothJoysticksRemainAvailableAfterUnconfirmedPreset() async throws {
 func bluetoothRecoveryRequiresStationaryFeedbackAndSendsNoCommands() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
-    let controller = NexArmController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
     await link.configure(feedbackFailure: true)
-    await #expect(throws: NexArmError.uncertainMotion) { try await controller.performGesture(.wave, repetitions: 1) }
+    await #expect(throws: NexArmActionError.uncertainMotion) {
+        try await controller.performGesture(.wave, repetitions: 1)
+    }
+    let beforeRecovery = await link.writes
     await link.configure()
     await link.setDriftingPose()
-    await #expect(throws: NexArmError.moving) { try await controller.recoverState() }
-    #expect(await link.writes == 1)
-    await #expect(throws: NexArmError.uncertainMotion) { try await controller.performGesture(.wave, repetitions: 1) }
+    await #expect(throws: NexArmActionError.moving) { try await controller.recoverState() }
+    #expect(await link.writes == beforeRecovery)
+    // A fresh target hit succeeds even if later feedback would continue drifting.
+    try await controller.performGesture(.wave, repetitions: 1)
+    #expect(await controller.motorResults.allSatisfy { $0.failure == nil })
     let attempted = await link.writes
     #expect(attempted > 1)
     await link.close()
@@ -902,9 +973,10 @@ func bluetoothRecoveryRequiresStationaryFeedbackAndSendsNoCommands() async throw
     #expect(await link.writes == attempted)
 }
 
-@Test func bluetoothDiscoveryDropsMissingNamesBeforeAdmission() {
+@Test func bluetoothDiscoverySeparatesDeviceNamesFromPresentationPolicy() {
+    #expect(BluetoothPresentation.deviceName("未命名设备") == nil)
     #expect(NexArmBluetoothDevice.discoveryName(advertised: nil, cached: nil) == nil)
-    #expect(NexArmBluetoothDevice.discoveryName(advertised: "  \n", cached: "未命名设备") == nil)
+    #expect(NexArmBluetoothDevice.discoveryName(advertised: "  \n", cached: "未命名设备") == "未命名设备")
     #expect(NexArmBluetoothDevice.discoveryName(advertised: "", cached: " NexArm ") == "NexArm")
     #expect(NexArmBluetoothDevice.discoveryName(advertised: "桌上的机械臂", cached: "旧名字") == "桌上的机械臂")
 }
@@ -1006,7 +1078,7 @@ func bluetoothConnectionGestureTransportTimeoutRecoversWithoutRepeatingReset() a
     #expect(workflow.state.controlReady)
     #expect(workflow.state.error == nil)
     #expect(await link.connects == 2)
-    #expect(await link.feedbackCommands.map(\.command) == [131])
+    #expect(await link.feedbackCommands.map(\.command) == [3])
     workflow.disconnect()
     await workflow.waitUntilIdle()
     observer.cancel()
@@ -1026,9 +1098,10 @@ func bluetoothResetRetiresPendingObservationWithoutClosingLiveControls() async t
     await workflow.waitUntilIdle()
     await link.holdTelemetry()
     let action = Task { try await workflow.performGesture(.wave, repetitions: 1) }
-    try await until(attempts: 700) { await link.waitingForPose }
+    try await until { await link.writes == 1 }
+    await link.resumeTelemetry()
     workflow.tryAction(.reset)
-    try await until { await link.liveCommands.contains { $0.isArmControl } }
+    try await until { await link.observedCommands.contains { $0.isSynchronousPositionWrite } }
     await workflow.waitUntilIdle()
     await #expect(throws: CancellationError.self) { try await action.value }
     workflow.setMotorVelocity(id: 4, value: 1)
@@ -1062,7 +1135,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     await link.configure()
     workflow.tryAction(.reset)  // The fixture emits no reset completion response.
     await workflow.waitUntilIdle()
-    #expect(await link.liveCommands.contains { $0.isArmControl })
+    #expect(await link.observedCommands.contains { $0.isSynchronousPositionWrite })
     #expect(workflow.state.controlReady)
     try await workflow.performGesture(.wave, repetitions: 1)
     #expect(workflow.state.error == nil)
@@ -1075,7 +1148,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
 }
 
 @Test func bluetoothJogShapesVelocityAndRejectsConfigurationWrites() throws {
-    var planner = try NexArmJogPlanner(positions: NexArmJogPlanner.home)
+    var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     var previousAcceleration = 0.0
     var duplicates = 0
     for input in Array(repeating: 0.3, count: 35) + Array(repeating: -0.3, count: 35) {
@@ -1096,7 +1169,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
 }
 
 @Test func bluetoothJogStickExtentControlsCruiseSpeedAndStallsDoNotCatchUp() throws {
-    var slow = try NexArmJogPlanner(positions: NexArmJogPlanner.home)
+    var slow = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     var fast = slow
     for _ in 0..<40 {
         slow.accept(try #require(try slow.proposal(id: 1, deflection: 0.5)))
@@ -1127,11 +1200,11 @@ func bluetoothNewPresetIgnoresPreviousFailureAndMissingOldFeedback() async throw
     let before = await link.writes
     await link.configure()
     await link.disableTelemetry()
-    await #expect(throws: BluetoothWorkflowError.unverified) {
+    await #expect(throws: BluetoothWorkflowError.feedbackTimeout) {
         try await workflow.performGesture(.tiltLeft, repetitions: 1)
     }
-    #expect(await link.writes == before + 3)
-    #expect(workflow.state.controlReady && !workflow.state.executing)
+    #expect(await link.writes < before + 3)
+    #expect(!workflow.state.controlReady && !workflow.state.executing)
     #expect(await link.connects == 1)
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -1140,7 +1213,7 @@ func bluetoothNewPresetIgnoresPreviousFailureAndMissingOldFeedback() async throw
 }
 
 @Test(.timeLimit(.minutes(1))) @MainActor
-func bluetoothSettingsTestsSendImmediatelyWithoutTelemetryAndNewClickPreempts() async throws {
+func bluetoothSettingsSharesObservedExecutorAndPreemptsOldSequence() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
@@ -1150,25 +1223,14 @@ func bluetoothSettingsTestsSendImmediatelyWithoutTelemetryAndNewClickPreempts() 
     try await until { !workflow.state.nearby.isEmpty }
     workflow.connect(link.id)
     await workflow.waitUntilIdle()
-    let reads = await link.poseReads
-    await link.disableTelemetry()
-    let began = ContinuousClock.now
     workflow.tryAction(.wave)
-    try await until { await link.liveCommands.count == 1 }
-    #expect(ContinuousClock.now - began < .milliseconds(300))
-    #expect(workflow.state.testing)
+    try await until { await link.writes == 1 }
     workflow.tryAction(.tiltRight)
-    try await until { await link.liveCommands.count >= 2 }
     await workflow.waitUntilIdle()
-    let packets = await link.liveCommands
-    #expect(packets.count == 4)  // Retired wave start, then new start/body/end; no stale wave body.
-    #expect(packets.allSatisfy { $0.isArmControl && $0.isLiveControl })
-    let wristTarget = Int(packets[2].payload[36]) | Int(packets[2].payload[37]) << 8
-    #expect(wristTarget == 2048 - 40 * 11)
-    #expect(await link.poseReads == reads)
-    #expect(await link.writes == 0)  // No ACK-based preset path.
+    #expect(await link.writes == 4)
+    #expect(await link.liveCommands.isEmpty)
     #expect(workflow.state.error == nil && !workflow.state.testing)
-    #expect(workflow.state.motionStatus == "已发送向右歪头全部指令")
+    #expect(workflow.state.motionStatus == "已完成歪头并回位")
     workflow.disconnect()
     await workflow.waitUntilIdle()
     observer.cancel()
@@ -1191,14 +1253,79 @@ func bluetoothSettingsCongestionRetainsOnlyLatestTestAndResetCancelsEnding() asy
     try await Task.sleep(for: .milliseconds(100))
     workflow.tryAction(.tiltLeft)
     await link.blockLive(false)
-    try await until { await link.liveCommands.count == 1 }
+    try await until { await link.writes == 1 }
     workflow.tryAction(.reset)
     await workflow.waitUntilIdle()
-    let commands = await link.liveCommands
-    #expect(commands.map(\.command) == [131, 131])
+    let commands = await link.observedCommands.filter { $0.isSynchronousPositionWrite }
+    #expect(commands.count == 2)
     try await Task.sleep(for: .milliseconds(900))
-    #expect(await link.liveCommands == commands)
+    #expect(await link.observedCommands.filter { $0.isSynchronousPositionWrite } == commands)
     #expect(!workflow.state.testing && workflow.state.error == nil)
+    workflow.disconnect()
+    await workflow.waitUntilIdle()
+    observer.cancel()
+    await observer.value
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func bluetoothFeedbackHealthDisablesIdleControlAndAbortsActionWithoutReplay() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(link.id)
+    await workflow.waitUntilIdle()
+    let before = await link.observedCommands.count
+    await link.health(false)
+    try await until { !workflow.state.controlReady }
+    #expect(workflow.state.error?.contains("机械臂连接不稳定") == true)
+    await link.health(true)
+    try await until { workflow.state.controlReady }
+    #expect(await link.observedCommands.count == before)
+    let movement = Task { try await workflow.performGesture(.dance, repetitions: 1) }
+    try await until { await link.observedCommands.count > before }
+    await link.health(false)
+    await #expect(throws: BluetoothWorkflowError.feedbackTimeout) { try await movement.value }
+    let stopped = await link.observedCommands.count
+    await link.health(true)
+    try await until { workflow.state.controlReady }
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(await link.observedCommands.count == stopped)
+    workflow.disconnect()
+    await workflow.waitUntilIdle()
+    observer.cancel()
+    await observer.value
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func bluetoothSettingsAndOwnedActionsShareResourceFenceWithoutReacquisition() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let resources = try nexArmTestResources()
+    workflow.withMotorResources = { motors, operation in
+        try await resources.run(
+            resources: Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") }),
+            owner: nil, lease: nil, operation: operation)
+    }
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(link.id)
+    await workflow.waitUntilIdle()
+    workflow.tryAction(.nod)
+    await workflow.waitUntilIdle()
+    #expect(workflow.state.error == nil)
+    try await resources.run(resources: [ResourceID(rawValue: "nexarm.motor.4")], owner: nil, lease: nil) {
+        try await workflow.performGesture(.nod, repetitions: 1)
+    }
+    #expect(workflow.state.error == nil)
+    #expect(workflow.lastActionReport?.entries.count == 6)
+    #expect(workflow.lastActionReport?.entries.allSatisfy { $0.motor == 4 } == true)
     workflow.disconnect()
     await workflow.waitUntilIdle()
     observer.cancel()

@@ -1,8 +1,7 @@
 # Core — Shared Platform Contracts
 
-Purpose: hold small contracts shared across hardware capability domains. Design goals: keep permission vocabulary independent of concrete devices, models and Agent policy; avoid duplicating authorization types in Audio and Vision.
+Purpose: document the boundary for future contracts shared by multiple hardware domains. Design goals: add abstractions only with concrete consumers and keep business policy outside PlatformKit.
 
-- ✅ DeviceCapability, AuthorizationStatus and PermissionProvider retain their existing public API.
-- ❌ A unified concrete PermissionProvider is not implemented; existing device adapters perform their own permission checks.
+✅ Current adapters perform authorization through their public platform APIs. The unused DeviceCapability/AuthorizationStatus/PermissionProvider declarations have been removed; there is no compiled Core implementation today.
 
-This is the shared-contract exception to capability-domain directories. It owns no device instance, queue or lifecycle. Domain-specific implementation belongs in its owning domain, not Core.
+❌ A shared permission service remains unimplemented. Add a contract here only when multiple adapters and real callers need it, with explicit authorization behavior and tests. This directory is documentation only and owns no queue or lifecycle.

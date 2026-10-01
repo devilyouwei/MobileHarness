@@ -208,3 +208,11 @@ flowchart LR
 ```
 
 ✅ The unfamiliar-action integration test observes a new domain through the real scheduler and Workflow into UI without mappings. ❌ Metadata adds no queue, new execution result or automatic recovery policy. See ADR 0086.
+
+## Atomic composition — ADR0092
+
+✅ Parameter-resolved resources are validated at admission/start. A failed handler no longer cancels its input or fences subsequent admission. Partial reports publish failed execution state with full completion details, then advance the lane.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ A Runtime deadline keeps `ActionReport.executionFailure` when the invocation also has stored child results. The terminal result releases the lane only after cooperative cleanup joins; later accepted Actions still run. Queue time is outside the registered execution budget.

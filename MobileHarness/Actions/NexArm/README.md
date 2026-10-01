@@ -1,210 +1,195 @@
-# NexArm — Robot Arm Actions and Lifecycle
+# NexArm Actions
 
-> Current outbound contract (ADR0090): all arm actions and home write only explicitly listed motors1–5. Older CMD8/CMD54 descriptions below are historical; geometry intents must be compiled before transport. The gripper is excluded from both commands and completion.
+## Contract and ownership
 
-Purpose: declare finite robot arm Actions, validate arguments, and execute device behavior through typed callbacks injected by App. Design goals: keep Actions independent of Bluetooth and serial implementations, await actual completion, bound queues and execution deadlines, and report failures and interruptions accurately.
+Each motor operation records its own outcome. Compositions collect outcomes and continue after child failures. Channel continues after an Action succeeds, partially fails or fails. Feedback loss and an unreachable target are ordinary leaf errors; neither implicitly cancels the composition. Explicit user/session cancellation stops remaining work.
 
-The “Complete lifecycle” section defines the current production flow. The earlier USB diagnostic sections retain their separate constraints and do not describe current phone performance behavior.
-
-## Complete lifecycle (current channel Actions)
-
-✅ Eight model-callable entries cover nine gestures; `tiltWrist` distinguishes left and right through its direction argument. The Agent resolves aliases to `NexArm.*`; OutputGateway receives resolved calls and validates permissions and parameter names. Domain Actions then validate argument types, values, and unknown fields before any device effects.
-
-```mermaid
-flowchart TD
-    Input["User input → InputGateway → Assistant"] --> Resolve["Agent resolves JSON-declared aliases and arguments"]
-    Resolve --> Gateway["OutputGateway: permission, invocation and scheduling admission checks"]
-    Gateway -->|Rejected| Reject["Return synchronous error; send no device command"]
-    Gateway -->|Accepted| Queue["Assign execution ID; enter bounded scheduling structure"]
-    Queue --> Eligible{"Active stage eligible, task-local Robot lane idle, NexArm module free?"}
-    Eligible -->|No| Queue
-    Eligible -->|Yes| Execute["Reserve lane / module → ActionExecutor"]
-    Execute --> Args["Domain Action: cancellation check and argument validation"]
-    Args -->|Invalid arguments| Fail
-    Args -->|Valid| Binding["App-injected callback → BluetoothWorkflow.runMotion"]
-    Binding --> Gate{"Foreground, connected, control validated, no competing control?"}
-    Gate -->|No| Fail["Throw execution error"]
-    Gate -->|Yes| Plan["NexArmController: validate compatibility and build fixed poses"]
-    Plan -->|Compatibility or target validation fails| Fail
-    Plan -->|Cartesian preset| Frames["ready400ms → body800ms × repetitions → home600ms"]
-    Plan -->|Nod or shake| Head["home → ready → native motor sweeps / center → home"]
-    Head --> Handoff["Before native writes: fresh converged feedback after ready trajectory duration"]
-    Handoff --> Loop
-    Frames --> Timed["Send on nominal deadlines without motion-time queries"]
-    Timed --> Final["After home duration, await fresh stable home"]
-    Final --> Success
-    Final -->|Unconfirmed home| Fail
-    Loop["Observe each head segment"]
-    Loop -->|All segments pass| Success["Update observed pose; UI reports completion and home return"]
-    Loop -->|Send failure, feedback timeout, arrival timeout or invalid feedback| Fail
-    Success --> Return["Callback and Action return; check cancellation again"]
-    Return --> Terminal["Record succeeded / contractCompleted"]
-    Fail --> Failure["Record failed / unknown; cancel other Actions for the owning input"]
-    Queue -->|Cancelled while queued| QueuedCancel["Remove unexecuted work; cancelled / notStarted"]
-    Execute -. "Cancelled while running; see interruption diagram" .-> Cancel["Join execution cleanup; record cancelled / unknown"]
-    Terminal --> Release["Release lane / NexArm module; advance other eligible work"]
-    Failure --> Release
-    Cancel --> Release
-    QueuedCancel --> Result["Handle ActionResult according to feedback policy"]
-    Release --> Result
-    Result -->|Feedback enabled and required| Deliver["Bounded result delivery → InputGateway → Agent result history"]
-    Result -->|none, or success with failuresOnly| Done["Finish without a success result message"]
-    Deliver --> Done
-```
-
-`await` covers actual handler completion and cleanup, not model generation completion or a successful Bluetooth write. Each task-local lane preserves order; NexArm module exclusion also applies across tasks. Robot channels from all Agents are not collapsed into one global FIFO. Default scheduling limits are 64 tracked tasks and 32 unfinished Actions per channel name. Overflow rejects admission without dropping admitted Actions; see the [scheduling contract](../../Gateway/Output/Scheduling/README.md). Workflow and Controller create no additional Action queue and reject competing control as busy.
-
-Device feedback and Action feedback serve different purposes: device packets establish observed arrival, while `ActionResult` describes the execution outcome. Gateway defaults to `failuresOnly` and enables feedback only for Agents accepting `actionResult`. Terminal results pass through InputGateway; current Agents retain them in history without automatically starting a model turn. Result messages have bounded delivery retries; **device Actions are never replayed by those retries**. Rejected admission has no execution terminal message. A running failure cancels the owning input’s remaining scheduled work; a previous unconfirmed pose does not lock out a new explicit invocation. See [result delivery](../../Gateway/Output/Results/README.md).
-
-### Cartesian playback and final arrival
-
-Cartesian presets and Settings share one frame factory: ready400ms → body800ms × repetitions → home600ms. Single-cycle packets are byte-identical. Only Settings replaces unsent plans on a new click; Channel preserves admitted Actions and holds NexArm exclusion until playback, final observation and cleanup finish.
-
-```mermaid
-flowchart TD
-    Plan[Shared finite Cartesian frames] --> Send[Admit one CMD8; bounded 1s backpressure]
-    Send --> Time[Wait frame duration from actual admission]
-    Time --> More{More frames?}
-    More -->|Yes; caller still active| Send
-    More -->|No| Observe[Fresh final-home feedback; query only now]
-    Observe --> Stable[Home tolerance plus 300ms encoder stability]
-    Stable --> Done[Return Action; release NexArm exclusion]
-    Observe -->|2s silence or 3s deadline| Fail[Unknown result; no replay]
-    Time -->|Caller cancelled| Cancel[Stop unsent frames after joined current frame]
-```
-
-Capacity is one active controller operation and one immutable plan of at most20 frames (three dance cycles); competing calls reject busy. Each admitted packet is sent once. Transport backpressure retries only an unadmitted packet, every25ms for at most1s. Next-frame timing starts at actual admission; late wakeups never emit catch-up bursts. No per-frame position queries, error compensation or intermediate-arrival waits occur. The final nominal duration is joined before starting observation; older telemetry cannot establish final completion. Push feedback gets200ms before query fallback (at most5Hz). Final XYZ tolerance is5mm and pitch/roll2°, with arm encoders1–5 stable within2counts for300ms; claw completion is excluded. Silence2s and final observation3s are independent limits; a fixed total deadline sums nominal durations,1s admission per frame and3s final observation. Legacy links retain their own bounded write/exchange delay.
-
-✅ Completion means the finite plan was submitted and final home was observed, **not** proof that every intermediate waypoint was reached. Cancellation joins the current finite frame (and final observation if already entered), then prevents later frames without sending a rollback. Takeover/disconnect invalidates the observation token. UI receives the final measured pose, without an extra query.
-
-Head gestures retain calibrated home/ready preparation, native motor4/5 trajectories and per-segment observation. Their Cartesian-to-servo handoff still requires fresh arrival after nominal duration; the independent watchdogs and final-home tolerance remain. See the [controller contract](../../PlatformKit/Connectivity/NexArm/README.md#settings-matched-cartesian-channel-playback-current).
-
-✅ The user reports the installed phone repair eliminated the symptom. Supervised USB dance comparisons reproduced jitter and timeout with intermediate stability waits alone, but not with queries or extra frames alone; see [physical evidence](../../../docs/NexArm_Physical_Acceptance.md#motor2-jitter-supervised-single-factor-usb-comparison). ❌ Underlying servo holding-loop causes, isolated celebration, endurance, intermediate trajectory tracking and device-side stop/watchdog remain unverified.
-
-### Authoring NexArm Actions: avoid these patterns
-
-The jitter repair belongs primarily to **PlatformKit**, in `NexArmController.performCartesianPlayback` and the shared Cartesian frame factory. `NexArmActions` owns typed argument validation and awaits the injected whole-gesture callback. `Support/NexArmActionModules` declares the completion contract; App binds the callback to its long-lived Workflow. Gateway retains whole-Action Channel ordering and NexArm exclusion. Do not move device timing or transport access into the Action handler.
-
-| Avoid | Required approach / reason |
-| --- | --- |
-| Loop over Cartesian waypoints in an Action and await stable pose after each one | Submit one typed gesture to the device owner. Continuous presets advance on nominal durations; only final home is verified. Holding a hunting intermediate pose can prolong jitter until the stability gate times out. |
-| Treat `try await perform(...)` as the source of the jitter and remove it | Keep this whole-operation await through final observation and cleanup. Returning early would release exclusion while the device is still active. |
-| Use unjoined `Task`/`Task.detached`, an Action-local command queue, or split the gesture into independently scheduled waypoint Actions | Keep one finite operation and one device owner. Gateway owns Action scheduling; the controller owns the bounded frame plan. |
-| Add arbitrary settling sleeps, replay a sent packet on missing feedback, or burst overdue frames to catch up | Reuse the controller's bounded admission and deadlines. Only a packet not yet admitted may retry; uncertainty must propagate without automatic motion replay. |
-| Copy Settings' latest-request replacement into Channel execution, or return success immediately after a write | Channel preserves admitted Actions and awaits fresh stable final home. Settings has a separate manual takeover/submission-only contract. |
-| Remove all observation gates, including native head preparation/handoff | Nod/shake require measured calibration and Cartesian-to-servo handoff. The continuous Cartesian fix is not a blanket rule for all robot operations. |
-| Assume posture queries caused the jitter, or independently poll the transport from an Action | Queries alone did not reproduce this USB symptom. Passive feedback and bounded query fallback belong to PlatformKit; current Cartesian playback queries only during final observation. This is not proof that arbitrary query rates are harmless. |
-
-✅ Preserve cancellation checks around the awaited callback, propagate errors, and keep completion metadata honest: submitted Cartesian frames plus observed final home do not prove every intermediate waypoint was reached. Regression tests must cover shared Settings packets/cadence, fresh final feedback, exclusion across Channels and no automatic motion replay. ❌ Simulated tests cannot establish physical smoothness; new trajectories or completion-policy changes require separate supervised hardware acceptance.
-
-### Cancellation, manual takeover and failure cleanup
-
-```mermaid
-flowchart TD
-    Interrupt["Interruption / cancellation request"] --> Kind{"Which stage or entry point?"}
-    Kind -->|Queued or before committing the current segment| Before["Cancel unexecuted work; send no new motion segment"]
-    Kind -->|Conversation cancelled after segment commitment| Join["Cancel outer task; join current finite frame"]
-    Join --> Bound["Return after frame duration; join final observation if entered"]
-    Bound --> Stop["Cancellation check prevents all later segments, including home ending"]
-    Kind -->|Settings new test / slider / reset| Takeover["Update control revision; cancel old task; beginLiveControl invalidates old observation session"]
-    Takeover --> New["New control takes over; old task cannot send later segments or overwrite new UI"]
-    Kind -->|Disconnect / connection cleanup| Disconnect["Invalidate observation session; cancel old task and clear connection state"]
-    Disconnect --> Cleanup["Release execution ownership after join / cleanup"]
-    Before --> Cleanup
-    Stop --> Cleanup
-    New --> Cleanup
-    Cleanup --> Result["Return cancellation or failure; no rollback or automatic replay"]
-```
-
-**Ordinary conversation cancellation is not an immediate physical stop.** Cancelling a Swift task does not withdraw an already committed segment; its segment and overall deadlines still apply. Cancellation does not automatically send home; reset requires a new explicit operation. Settings reset sends an arm-only synchronous home target without awaiting a completion reply or claiming confirmed home arrival. Reconnection does not replay the original Action. Physical effects after execution failure or cancellation are conservatively reported as unknown.
-
-### Settings tests and acceptance boundaries
-
-✅ Settings Play invokes the Workflow test-send path directly, bypassing channel Action scheduling and completion waits: ready 400ms → body 800ms per segment → home 600ms, at most 8 frames. Only the latest test plan is retained; new operations replace unsent frames. Playback advances on cancellable frame deadlines without awaiting arrival, and UI reports submission only. Individual motor sliders and reset use the same manual takeover path. See the [device control README](../../PlatformKit/Connectivity/NexArm/README.md) for implementation details.
-
-✅ Physical USB testing verified all seven performance presets, 50 segment arrival checks, and final home returns; see [physical acceptance](../../../docs/NexArm_Physical_Acceptance.md). This validates the controller shared with iPhone. ❌ Bluetooth transport performance, repeated-cycle endurance, and physical emergency stopping require separate acceptance.
-
-Implementation entry points: [domain Actions](NexArmActions.swift), [composition bindings](../../App/Composition/ApplicationRuntime.swift), [Workflow](../../App/Workflows/BluetoothWorkflow.swift), [controller](../../PlatformKit/Connectivity/NexArm/NexArmController.swift), and [arrival tracker](../../PlatformKit/Connectivity/NexArm/NexArmProtocol.swift).
-
-## USB diagnostic ownership
-
-✅ No production Agent uses the former nudgeWrist Action. Its Action entry, registration, error type and test-only Agent were removed. Supervised wrist diagnostics call PlatformKit's controller directly from root tests; production Actions contain only the eight Agent-used entries. See [controller diagnostics](../../PlatformKit/Connectivity/NexArm/README.md).
-
-## Earlier USB diagnostic: Assistant base sweep
-
-✅ `NexArm.shakeBase(cycles:)` / `NexArmBaseActionModule` is in the built-in catalog; `ActionModules.builtIn` requires an explicit typed callback. Assistant JSON declares alias `shakeBase`, Channel Robot and required integer cycles 1...3. Unknown keys fail. Each cycle follows +2° / -2° / origin with 1500 ms interpolation per leg. Successful return requires controller telemetry convergence for every leg and base return within six counts. See the platform README for IK and tolerance limits. No Action-local queue.
+Actions owns gesture definitions, reset/home selection, motion shaping, completion policy and result collection. [PlatformKit](../../PlatformKit/Connectivity/NexArm/README.md) owns connections, protocol/native command encoding, hardware limits and telemetry. App owns connection lifetime, resource bindings and presentation. Settings and conversation use the same Action controller.
 
 ```mermaid
 flowchart LR
-    Input[InputGateway user text] --> Assistant[Assistant + JSON alias]
-    Assistant --> Output[OutputGateway]
-    Output --> Scheduler[Robot Channel / NexArm mutual exclusion]
-    Scheduler --> Action[Domain-owned shakeBase definition]
-    Action --> Binding[Required host callback]
-    Binding --> USB[Mac USB controller]
-    Binding --> Phone[iPhone: root-owned BLE workflow]
-    USB --> Result[Verified completion or failure via InputGateway]
+    Channel[OutputGateway / Channel] --> Entry[NexArmActions]
+    Entry --> App[App binding / resource fence]
+    Settings[Settings] --> App
+    App --> Domain[Actions: plans and controller]
+    Domain --> SDK[PlatformKit: packets and link]
+    SDK <--> Device[Arm]
+    SDK --> Feedback[Fresh telemetry]
+    Feedback --> Domain
+    Domain --> Results[Collected motor outcomes / ActionReport]
+    Results --> Channel
 ```
 
-The supervised Mac test binds real USB; its model output and UI are deterministic test fixtures, not evidence of real-model selection. Cancellation joins only the committed leg and starts no further leg, including return-to-origin. Failed/uncertain legs latch the controller fault. ✅ iPhone BLE binding is implemented in the root-owned BluetoothWorkflow. ❌ Production resource leases and device stop/watchdog remain pending.
+Only NexArm/Support may import PlatformKit within Actions; PlatformKit has no project-target dependencies. Actions/Runtime remains device-independent. Callable registration belongs to the domain modules; Agent JSON grants model access. Public helpers and diagnostic methods are not automatically model-callable.
 
-✅ iPhone composition now invokes the same typed finite Action through BluetoothWorkflow; no BLE types enter Actions. Completion/error/cancellation behavior and ±2°/1...3-cycle limits are unchanged. ❌ Near-vertical or out-of-range poses are rejected; this action never resets/repositions the arm automatically.
+## Source map
 
-## Current phone performance actions
+| Source | Responsibility |
+|---|---|
+| [NexArmActions.swift](NexArmActions.swift) | Gesture/reset entry points and arguments |
+| [NexArmMotorActions.swift](NexArmMotorActions.swift) | Callable single-motor move/reset entries |
+| [Support/NexArmTypes.swift](Support/NexArmTypes.swift) | Typed requests and entry errors |
+| [Support/NexArmActionModules.swift](Support/NexArmActionModules.swift) | Explicit capability bindings to macro-generated definitions |
+| [Support/NexArmSimpleActions.swift](Support/NexArmSimpleActions.swift) | Nod and shake-head sequences |
+| [Support/NexArmCompositeActions.swift](Support/NexArmCompositeActions.swift) | Gesture geometry, home selection and IK plans |
+| [Support/NexArmActionController.swift](Support/NexArmActionController.swift) | Shared execution and feedback observation |
+| [Support/NexArmMotorExecution.swift](Support/NexArmMotorExecution.swift) | Completion policy, motor results, reset wrapper and errors |
+| [Support/NexArmMotionPlan.swift](Support/NexArmMotionPlan.swift) | Bounded groups, motor scope and stability tracking |
+| [Support/NexArmMotorProfiles.swift](Support/NexArmMotorProfiles.swift) | Central per-motor tolerances and empirical timing envelope |
+| [Support/NexArmRegistration.swift](Support/NexArmRegistration.swift) | Parameter-dependent resources and pre-admission budget |
+| [Support/NexArmJogPlanner.swift](Support/NexArmJogPlanner.swift) | Manual jog input, trajectory shaping and release policy |
 
-✅ App maps base sway and the five typed entertainment entries to the shared Settings Cartesian frame plan: ready → body → home. Home XYZ=[200,0,200]mm; ready height240mm; pitch/claw0°. Native absolute CMD8 interpolation replaces nominal encoder targets and per-servo writes. Body segments last800ms. Parameters and Robot channel registrations remain unchanged, and all effects share NexArm module exclusion.
+## Motor operations and parameters
 
-| Entry | Required parameter | Body around fixed pose |
-| --- | --- | --- |
-| shakeBase | cycles1...3 | Base yaw−30°/+30°/center |
-| waveWrist | count1...3 | Yaw±12°, roll±40°, two waves |
-| tiltWrist | direction left/right | Yaw12°, roll40°, keep ready height240mm |
-| lookAround | cycles1...3 | Yaw−35°/+35°/center, roll±15° |
-| celebrate | cycles1...3 | Yaw±20°, roll up to45°, height220...270mm |
-| dance | cycles1...3 | Yaw±30°, roll±40°, height220...260mm |
+`NexArmActions.moveMotor` and `resetMotor` validate an `ActionInvocation` and call the injected handler. The shared controller accepts motor ID, target, `NexArmMotorOptions` and `NexArmMotorCompletion`. Reset resolves that motor's software home and uses the same position encoder and completion executor as move. It never controls another motor.
 
-✅ Device IK owns joint calibration. Cartesian presets use the shared400/800/600ms plan and final-home observation described above; no initial3000ms home command, extra ending-ready pose or per-waypoint arrival gate remains. Head gestures keep their separate calibrated transition. See [ADR 0088](../../../docs/adr/0088-nexarm-settings-matched-playback.md).
+All entries are finite. Unknown parameters fail validation. Optional `speed` defaults to 1400 (range 1–1400); `acceleration` defaults to 30 (range 1–254). These are native register units. The two intervening position-packet bytes remain zero; they are not exposed as time or deceleration. Torque, mode and calibration are not ordinary movement parameters.
 
-Earlier ±2° base text above describes the retained USB diagnostic only and is superseded for phone UI/conversation bindings. `Support/NexArmTypes.swift` uses a domain-qualified name to avoid duplicate Swift basenames. ❌ Complete physical motion quality/clearance acceptance remains pending; prior base primitive success and simulated tests do not establish it.
+| Action | Required arguments | Motor scope |
+|---|---|---|
+| `moveMotor` | `motor`: 1–6; `target`: 0–4095, also checked against hardware limits | Selected motor |
+| `resetMotor` | `motor`: 1–6 | Selected motor |
+| `reset` | None | 1–5 |
+| `nodHead` | `cycles`: 1–3 | 4 |
+| `shakeHead` | `cycles`: 1–3 | 5 |
+| `shakeBase` | `cycles`: 1–3 | 1–5 |
+| `waveWrist` | `count`: 1–3 | 1–5 |
+| `tiltWrist` | `direction`: left/right | 1–5 |
+| `lookAround`, `celebrate`, `dance` | `cycles`: 1–3 | 1–5 |
 
-✅ All seven phone performance presets passed through the same controller on USB hardware; see [physical acceptance](../../../docs/NexArm_Physical_Acceptance.md). Intermediate arrival allows15mm /4° pitch, final home5mm /2° with stable feedback. ❌ iPhone transport timing and visual quality are separate acceptance.
+Nod and shake-head prepare, sweep and return only their own motor. Complex presets prepare and return motors 1–5. Performances and whole-arm reset neither command nor check the gripper. Explicit motor 6 operations are supported; its reset requires a configured home and currently reports `invalidMotion` when missing. No home is guessed or written into firmware calibration. `amplitude` and `pause` are not current callable parameters.
 
-✅ A previous unconfirmed preset does not block the next explicit invocation; only the current invocation waits for completion. ❌ No automatic motion retry or physical stop guarantee.
+Connection preparation uses read-only device IK to resolve the domain's home pose, XYZ=[200,0,200]mm with zero pitch/roll, and caches at most 64 geometries. Reference encoder values are not measured feedback. Finite moves send native CMD3 targets; simultaneous groups use CMD131 addressed writes. Firmware performs the movement. Complex geometry is compiled into motor targets rather than whole-device Cartesian commands that also control the gripper.
 
-✅ Argument validation failures expose localized explanations and the shared `invalidArguments` observation code. A DanceError is raised before the device callback, so an existing Bluetooth connection can remain healthy and Settings can still operate. Malformed or out-of-range repetition values remain rejected before motion; no silent clamping or retry is introduced.
+Manual jog is separate: 30ms planning steps, 4% dead zone, squared input response, speed/acceleration/jerk ceilings of 600/1800/12000 encoder units and 60ms finite look-ahead. Only accepted proposals advance state; identical targets are not resent. Release retains the last finite target and discards future velocity, without automatic reset.
 
-## Head gestures
+## One completion algorithm
 
-✅ nodHead(cycles) and shakeHead(cycles) are finite, model-callable gestures with required integer1...3, localized argument errors and cancellation propagation. Their bodies address motor4 and motor5 respectively; the controller establishes fixed home and ready poses, performs two large sweeps per cycle, centers, and observes stable home. ✅ USB acceptance passed both head sequences; ❌ iPhone BLE conversation acceptance remains pending.
+Each motor observes only its own target. The first fresh post-send sample inside its arrival tolerance succeeds immediately, including passage through the target while moving. This contract does not promise a stationary hold. Old cached samples cannot complete a new move.
 
-## Head preparation gate correction
+Outside the arrival region, fresh samples must remain within a 2-count anchor range for the off-target window before `targetNotReached`. Movement resets that interval. Missing samples never extend stability. Feedback silence for 2000ms produces `feedbackLost`; continuing motion past its calculated deadline produces `timedOut`. These are peer leaf failures and do not cancel subsequent children.
 
-✅ Head preparation now uses the same intermediate arrival contract as all other presets (XYZ15mm, pitch4deg, roll/claw2deg, fresh stable feedback for200ms). Previously it incorrectly selected final-home tolerances before sending any motor4/5 body command. A stationary approach within the normal intermediate envelope could therefore time out without visible movement. Encoder-based body completion and strict final home (XYZ5mm, pitch/roll/claw2deg,300ms fresh stability) remain unchanged. Regression fixtures reproduce a Z-10mm/pitch-3deg preparation and require both gestures to execute; the same error at the ending must still fail. ❌ This fixture establishes the code-path defect, not the exact physical measurements of the reported phone run.
+```mermaid
+flowchart TD
+    A[Validate and send target once] --> B[Observe fresh motor feedback]
+    B --> C{Inside arrival tolerance?}
+    C -->|yes| OK[Success immediately]
+    C -->|no| D{Fresh stable span exceeded?}
+    D -->|yes| E[targetNotReached]
+    D -->|no| F{Feedback gap or motion deadline exceeded?}
+    F -->|no| B
+    F -->|gap| G[feedbackLost]
+    F -->|deadline| H[timedOut]
+    OK --> N[Record result and continue]
+    E --> N
+    G --> N
+    H --> N
+```
 
-## Head channel handoff correction
+### Motor profiles and measurement limits
 
-✅ `nodHead` and `shakeHead` keep their existing Action/Channel completion contract. Their shared controller now establishes home then a distinct ready pose before native servo sweeps, and observes fresh arrival after the ready trajectory's800ms duration before switching command modes. The final home differs from the Cartesian planner's last target. USB acceptance completed both full eight-segment sequences with unchanged strict completion thresholds. ❌ The phone conversation must still be accepted on the installed build.
+`NexArmMotorProfiles` is the single source of default tolerances. `NexArmMotorCompletion` can explicitly override tolerance/timeout for supervised callers; nil selects the motor profile and dynamic budget.
 
-## Source organization
+| Motor | Arrival tolerance (encoder counts) | Observed stationary error in these trials |
+|---|---:|---:|
+| 1 | 16 | up to 4 |
+| 2 | 20 | up to 9 |
+| 3 | 56 | 26 in small moves; 47 in raised celebration poses |
+| 4 | 32 | up to 22 |
+| 5 | 16 | up to 4 |
+| 6 | 24, provisional | 9–49; response inconsistent, not calibrated |
 
-| File | Responsibility |
-| --- | --- |
-| NexArmActions.swift | Eight production entry points, grouped in one stateless namespace |
-| Support/NexArmTypes.swift | Requests, gestures, directions and complete nested error contracts |
-| Support/NexArmActionModules.swift | Gesture and base registration types |
+2026-10-01 serial trials used ±80-count moves for motors1–5, speeds400/800/1400 and accelerations30/50, observing each target for1.6s. The recorded stable tail is the final0.5s. Motor6 used ±20 after a larger trial hit the measurement guard; it did not reliably follow small targets. Its failures remain visible instead of widening tolerance to hide them. Motor6 is excluded from gestures/reset. [Measurement data](../../../docs/measurements/nexarm-2026-10-01.csv) records retained samples, including negative first-hit times caused by pre-send cache receipts, which are not valid arrival evidence.
 
-✅ Production NexArmActions names and both production module types remain unchanged. The unused NexArmActionModule diagnostic registration and NudgeError were removed; no Agent declarations or built-in registrations needed changing.
+Final serial validation also completed nod, shake-head, celebration and dance. Celebration (5.94s,30 motor outcomes) and dance (6.98s,40 outcomes) had no failed motor results; the user reported no jitter/stalls. These remain local tests, not full-range accuracy specifications. Larger moves, load changes and other hardware need additional measurements. No torque, calibration or firmware registers were changed.
 
-❌ No new trajectory, validation default, queue or physical completion guarantee is added by source consolidation.
+### Dynamic execution budgets
 
-✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
+Let `d` be encoder distance, `v` the native speed and `a` native acceleration:
 
-## Arm completion scope (2026-10-01)
+```text
+rampEstimate = 0.4 * sqrt(30 / a) seconds
+expected = d / v + rampEstimate + 0.2 seconds
+motionTimeout = 3 * expected + 1.2 seconds
+stableOffTarget = max(0.6, 8 / v + rampEstimate) seconds
+```
 
-✅ Performance gestures verify XYZ, pitch, roll and stability of motors1–5. Claw angle and motor6 stability are excluded from both Cartesian final-home and head preparation/native/final gates: these Actions do not promise gripper completion. Existing packets (including their claw field), timing, arm tolerances, fresh-feedback requirements, cancellation and deadlines are unchanged. A dedicated gripper Action must declare its own completion scope; do not copy this exclusion into gripper operations. This supersedes references above to all-six-encoder performance completion. ❌ This does not repair or calibrate a gripper, verify grasping, or establish physical emergency stopping. See [ADR0089](../../../docs/adr/0089-nexarm-arm-completion-scope.md).
+This is a conservative empirical envelope, not a claimed physical acceleration conversion. It covers the measured roughly0.25–0.50s small-move arrival times; low-speed/full-range behavior is extrapolated. It avoids the previous fixed2s/3s deadlines. Unknown current position reserves the greatest legal distance to the target. Each accepted group recalculates motor deadlines from fresh available feedback and encoded options. The observation loop runs every20ms; device reports in these trials arrived roughly every200ms.
 
-## Gripper exclusion for every arm action and home
+`@Action` attaches resource and timeout resolver functions to each entry. Registration before device admission conservatively reserves maximum legal travel per group, plus1s admission per group and5s setup/cleanup. Queue waiting is excluded. The actual plan can estimate from known positions: sequential budgets sum, parallel budgets take the maximum; generic compositions multiply repeats and add explicit delays. Estimates never introduce sleeps. Generic Action/composition deadlines cancel and **join** their handler before releasing resources. Whole-Action timeout is reported separately from the preserved child results. An uncooperative handler cannot be forcibly terminated safely.
 
-✅ All performance Actions and return-home operations control only motors1–5. PlatformKit now compiles pose geometry using read-only device IK into explicitly addressed arm-only packets; merely excluding the claw from arrival checks is insufficient. Action authors must use the injected whole-operation callback, must not send six-axis CMD8/CMD50/CMD54, and must not copy the current claw angle into an arm action. Explicit manual gripper control remains separate. Settings and Channel share the compiler, with no intermediate Cartesian stability waits. See [ADR0090](../../../docs/adr/0090-nexarm-arm-only-motion-packets.md).
+Transport refusal before acceptance can be retried within a one-second admission budget; accepted motion is never replayed. A target failure allows the next target to overwrite it. Feedback loss/disconnection ends the affected pending leaves and latches connection failure for the remaining plan: later steps are recorded without blind writes, repeated feedback deadlines, reconnects or query fallback. Preparation and explicit read-only diagnostics may still query.
 
-❌ A dedicated grasp Action with its own completion contract is not implemented.
+## Composition and resource ownership
+
+[ActionComposition](../Runtime/ActionComposition.swift) supports `sequence`, `parallel`, `repeated` and `delay`. Sequential children continue after ordinary failure. Parallel children retain separate outcomes and must use disjoint resources. Intentional rhythm belongs in `delay`, not in atomic completion.
+
+Current presets use a bounded `NexArmMotionPlan`, not a generic composition node for every waypoint. A plan contains at most 20 groups, each with up to 6 distinct addressed motors. Simultaneous groups send one synchronized packet and check each motor independently; they must not become five sequential motor moves.
+
+`ActionDefinition.resolvingResources` computes motor resources from call parameters; entry handlers validate the full argument set. Plan validation requires the lock set to equal the union of addressed motors. The parent holds that union throughout execution, including delays; children inherit the fence instead of reacquiring it. Settings uses the same coordinator. Manual streaming reserves all six motors because its input can change during the session.
+
+| Operation or illustrative composition | Resource union |
+|---|---|
+| Move motor 4 / nod | `{motor4}` |
+| Nod + shake-head | `{motor4, motor5}` |
+| Whole-arm reset | `{motor1…motor5}` |
+
+Resources use IDs `nexarm.motor.1` through `.6`. Sequential reuse is valid; duplicate ownership within a parallel group is rejected. The controller still serializes the physical connection, so generic parallel composition does not imply independent concurrent controllers for disjoint motors.
+
+Composition validation bounds depth to 8, reserved results to 256, repeats to 32, each delay to 30 seconds and the resource union to 8. Report-producing leaves reserve their result budget plus one execution-failure entry before execution. Overflow is an explicit error, never silent truncation.
+
+```mermaid
+flowchart TD
+    Validate[Validate composition, capacity and resource union] --> Lock[Acquire parent fence]
+    Lock --> Child[Run child or simultaneous group]
+    Child --> Collect[Collect success or failure with motor and path]
+    Collect --> More{More work?}
+    More -->|yes| Child
+    More -->|no| Report[One aggregate ActionReport]
+    Child -->|user or session cancellation| Cancel[Retain outcomes; mark remaining work]
+    Cancel --> Report
+    Report --> Release[Publish ActionResult and release execution slot]
+    Release --> Next[Channel continues later Actions]
+```
+
+## Results and Channel behavior
+
+`NexArmMotorResult` stores step, motor, target, last observation, failure and whether it started. App converts these to a flat `ActionReport`; composition prefixes child paths. The current result shape is:
+
+```text
+ActionResult
+  status: succeeded | partialFailure | failed | cancelled
+  completion: report(ActionReport)
+    executionFailure?  // whole-Action deadline; does not consume child capacity
+    entries[]
+      path
+      status: succeeded | failed | cancelled | notStarted
+      code?, motor?, target?, observed?
+```
+
+There are no separate stored `children` and `issues` trees. Failed entries provide the issue list without duplicating nested errors. A successful final home does not erase an earlier missed target. Cancellation marks unstarted work explicitly; connection-unavailable entries remain failed, while `started` is retained only in the controller's motor results.
+
+A standalone motor Action publishes its own terminal result. Nested execution contributes entries to the parent's result rather than publishing each leaf separately. The per-invocation report store preserves collected details through cancellation.
+
+The proposed nonthrowing `ActionOutcome` API is not implemented. The controller collects motor outcomes, then may throw a terminal summary; the App adapter captures the report on that path. Composition catches child failures and continues. Validation errors before execution still throw. Swift `throw` alone does not mean “record and continue.”
+
+For Channel, success, partial failure and failure all terminate the current execution and release its slot. `wait` waits for termination, not success; later Actions do not inherit a previous failure. Runtime converts an uncaught handler error into that Action's failed result. User cancellation and session closure use the explicit cancellation path.
+
+Cancellation stops future writes and joins cooperative tasks while retaining prior results. It cannot retract a committed physical target or forcibly terminate an uncooperative Swift task. No rollback or torque-off is sent automatically.
+
+## Authoring NexArm Actions: avoid these patterns
+
+- Keep action behavior and wrappers in this directory. App adapts lifetimes/presentation; PlatformKit provides device primitives.
+- Reuse the shared executor. Do not add polling loops, arbitrary settling sleeps, accepted-command replay or hidden full-arm preparation.
+- Declare the complete child resource union and keep gripper control explicit.
+- Collect every failed leaf; never treat successful final home as complete success after earlier failures.
+- Await effects and cleanup. Do not detach work and release ownership before it ends.
+- Add callable registrations and Agent permissions explicitly; internal helpers do not imply model access.
+
+## Status
+
+✅ Motor-scoped move/reset, shared completion, bounded gesture plans, result aggregation, generic composition, parameter-based resources and Channel failure continuation are implemented and covered by automated tests. Settings and conversation share the controller. Connection indication remains an Action-side helper. Retired query-driven wrist/base diagnostics live only in `Tests/IntegrationTests/NexArmLegacyDiagnosticController.swift`; production has one feedback-driven motion executor.
+
+❌ The API and composition gaps noted above remain open. Physical emergency stopping and persistent result delivery are also unimplemented; automated tests do not establish physical motion quality.
+
+Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros.md), [ADR0091](../../../docs/adr/0091-nexarm-motor-scoped-feedback.md), [ADR0092](../../../docs/adr/0092-atomic-actions-and-composed-results.md), [ADR0093](../../../docs/adr/0093-nexarm-platform-action-boundary.md). This document describes current code, not superseded implementations or unimplemented proposal interfaces.

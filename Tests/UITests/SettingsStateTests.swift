@@ -1,3 +1,4 @@
+import AgentCore
 import Foundation
 import Testing
 import UI
@@ -55,4 +56,22 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     try await state.restore()
     #expect(state.selectedModel == "unsaved-selection")
     #expect(state.url == "https://new.example.test")
+}
+
+@Test @MainActor func composedActionIssuesRemainVisibleBeyondSummary() throws {
+    let report = try ActionReport(entries: [
+        .init(path: "one", status: .failed, code: .targetNotReached, motor: 3, target: 1443, observed: 1418),
+        .init(path: "two", status: .failed, code: .feedbackLost, motor: 4),
+        .init(path: "three", status: .succeeded),
+    ])
+    let item = ActionActivityItem(
+        execution: ActionExecutionRecord(
+            id: UUID(),
+            path: ActionPath(module: "NexArm", function: "dance"), displayName: "跳舞", source: .assistant,
+            sessionID: UUID(), inputID: UUID(), channel: "Robot", semantics: .finite, phase: .failed,
+            completion: .report(report)))
+    #expect(item.status == "部分完成 · 2项问题")
+    #expect(item.issueDescriptions.count == 2)
+    #expect(item.issueDescriptions[0].contains("1418"))
+    #expect(item.issueDescriptions[1].contains("未收到位置反馈"))
 }

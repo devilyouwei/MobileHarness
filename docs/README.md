@@ -143,3 +143,21 @@ When a runtime contract changes, update the owning module README first, then the
 ✅ [ADR0089](adr/0089-nexarm-arm-completion-scope.md) documents arm-only performance completion after reproducing a claw-offset-induced timeout. ❌ This is not gripper calibration or grasp verification.
 
 ✅ [ADR0090 — Arm-only motion packets](adr/0090-nexarm-arm-only-motion-packets.md) documents gripper exclusion from all arm motion and home writes. ❌ BLE endurance remains pending.
+
+## NexArm feedback execution — 2026-10-01
+
+✅ ADR0091 records motor-scoped feedback execution, superseding the motion progression portions of ADR0088/0090 while preserving gripper exclusion.
+
+❌ Sustained real-device acceptance remains pending.
+
+## Atomic composition — ADR0092
+
+✅ ADR0092 documents atomic motor outcomes and Action composition, superseding failure-propagation portions of ADR0091.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ [ADR0093](adr/0093-nexarm-platform-action-boundary.md) defines the NexArm foundational protocol SDK versus Action behavior boundary.
+
+✅ [ADR0094](adr/0094-arrival-profiles-and-behavior-macros.md) records fresh-arrival completion, measured profiles, dynamic budgets and Action/Tool macros. Bounded hardware evidence lives in [measurements](measurements/README.md).
+
+✅ [ADR0095](adr/0095-remove-retired-device-and-behavior-code.md) records removal of unused device placeholders and isolation of retired Action diagnostics.

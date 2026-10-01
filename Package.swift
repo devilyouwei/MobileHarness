@@ -1,4 +1,6 @@
 // swift-tools-version: 6.4
+
+import CompilerPluginSupport
 import PackageDescription
 
 let package = Package(
@@ -25,6 +27,7 @@ let package = Package(
         .library(name: "ModelKitAppleSpeech", targets: ["ModelKitAppleSpeech"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "603.0.2"),
         .package(
             url: "https://github.com/FluidInference/FluidAudio", revision: "20d4f0bd46d11d7f50a6eb4f7835cfdbd2b4ba14",
             traits: []),
@@ -33,6 +36,14 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.1.0"),
     ],
     targets: [
+        .macro(
+            name: "BehaviorDefinitions",
+            dependencies: [
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+            ], path: "Macros/BehaviorDefinitions", exclude: ["README.md"]),
         .target(
             name: "BehaviorAssembly", dependencies: ["AgentCore", "Actions", "Tools"],
             path: "MobileHarness/App/Composition/Behaviors", exclude: ["README.md"]),
@@ -46,7 +57,7 @@ let package = Package(
             name: "AppWorkflows",
             dependencies: [
                 "UI", "AgentCore", "Agents", "Storage", "StorageChat", "ModelKit", "ModelKitDefaults", "ModelKitOpenAI",
-                "PlatformKit",
+                "PlatformKit", "Actions",
             ],
             path: "MobileHarness/App/Workflows", exclude: ["README.md"]),
         .testTarget(name: "UITests", dependencies: ["UI"], exclude: ["README.md"]),
@@ -70,7 +81,7 @@ let package = Package(
                 "Output/Resources/README.md", "Output/Results/README.md", "README.md",
             ]),
         .target(
-            name: "Actions", dependencies: ["AgentCore", "StorageAudio"],
+            name: "Actions", dependencies: ["AgentCore", "StorageAudio", "PlatformKit", "BehaviorDefinitions"],
             path: "MobileHarness/Actions",
             exclude: [
                 "README.md", "Runtime/README.md", "NexArm/README.md", "NexArm/Support/README.md",
@@ -100,7 +111,7 @@ let package = Package(
             name: "StorageAudio", dependencies: ["Storage", "AgentCore", "ModelKit"],
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
-            name: "Tools", dependencies: ["AgentCore"], path: "MobileHarness/Tools",
+            name: "Tools", dependencies: ["AgentCore", "BehaviorDefinitions"], path: "MobileHarness/Tools",
             exclude: [
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
                 "Runtime/README.md",

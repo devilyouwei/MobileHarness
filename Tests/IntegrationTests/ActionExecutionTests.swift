@@ -122,7 +122,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     }
 }
 
-@Test func actionFailureKeepsOriginalErrorAndRemovesQueuedActionsForThatInput() async throws {
+@Test func actionFailureRecordsErrorAndRunsFollowingActions() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
     let log = ActionTestLog()
@@ -145,9 +145,9 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("must not run", input: failedInput))
     try await executor.enqueue(invocation: actionInvocation("other input", input: otherInput))
     await release.open()
-    await #expect(throws: ActionTestFailure.playback) { try await executor.finish(inputID: failedInput.id) }
+    try await executor.finish(inputID: failedInput.id)
     try await executor.finish(inputID: otherInput.id)
-    #expect(await log.values == ["fail", "other input"])
+    #expect(await log.values == ["fail", "must not run", "other input"])
 }
 
 @Test func cancellingFinishWaitsForHandlerCleanupAndSuppressesQueuedActions() async throws {
@@ -268,7 +268,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     #expect(await log.values == ["first agent", "second:one", "second:two"])
 }
 
-@Test func sharedInputFailureOnlyCancelsTheFailingAgentsActions() async throws {
+@Test func sharedInputFailureDoesNotCancelEitherAgent() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
     let log = ActionTestLog()
@@ -291,9 +291,9 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("must not run", input: shared))
     try await executor.enqueue(invocation: actionInvocation("other agent", input: shared, source: secondAgent))
     await release.open()
-    await #expect(throws: ActionTestFailure.playback) { try await executor.finish(inputID: shared.id) }
+    try await executor.finish(inputID: shared.id)
     try await executor.finish(inputID: shared.id, source: secondAgent)
-    #expect(await log.values == ["fail", "other agent"])
+    #expect(await log.values == ["fail", "must not run", "other agent"])
 }
 
 @Test func explicitChannelSerializesDifferentModulesAndRestoresIndependentDefaults() async throws {
@@ -487,7 +487,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     await scheduler.cancel(inputID: input.id)
 }
 
-@Test func waitFailureCancelsDormantGroupsAndFencesLateAdmission() async throws {
+@Test func waitFailureReleasesDormantGroupsAndAllowsLateAdmission() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
     let log = ActionTestLog()
@@ -514,11 +514,9 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     let probe = AgentInput(sessionID: UUID(), payload: .text("probe"))
     try await scheduler.enqueue(invocation: actionInvocation("probe", input: probe))
     try await scheduler.finish(inputID: probe.id)
-    await #expect(throws: ActionTestFailure.playback) {
-        try await scheduler.enqueue(invocation: actionInvocation("late", input: input, path: printPath))
-    }
-    await #expect(throws: ActionTestFailure.playback) { try await scheduler.finish(inputID: input.id) }
-    #expect(await log.values.isEmpty)
+    try await scheduler.enqueue(invocation: actionInvocation("late", input: input, path: printPath))
+    try await scheduler.finish(inputID: input.id)
+    #expect(await log.values == ["unexpected", "unexpected"])
 }
 
 @Test func nestedWaitCancellationJoinsRunningCleanupAndDropsFuturePhases() async throws {

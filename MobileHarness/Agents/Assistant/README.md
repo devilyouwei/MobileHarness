@@ -219,3 +219,15 @@ flowchart LR
 ## Head gestures
 
 ✅ JSON v5 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Tool presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.
+
+## NexArm feedback execution — 2026-10-01
+
+✅ The versioned Robot channel catalog includes `resetArm` → `NexArm.reset`, with no arguments. Nod and shakeHead descriptions specify motor4 and5 scope; all action failures still return through Gateway.
+
+❌ Sustained real-device acceptance remains pending.
+
+## Atomic composition — ADR0092
+
+✅ Robot JSONv5 exposes moveMotor/resetMotor and optional speed/acceleration on existing composites. Errors are terminal outcomes, not implicit cancellation of later Channel actions.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.

@@ -35,3 +35,9 @@ Timeout does not prove hardware stopped. The group remains faulted, denies all u
 ❌ Audio output, robot joints and other hardware have not been migrated to resource declarations. Unregistered entry paths are not automatically protected. Generic activity registry, priority/fairness, device-side safety watchdogs, durable leases and real-device takeover acceptance remain outstanding. Allowed lease ownership is composition policy, not model-callable Action permission.
 
 See [result delivery](../Results/README.md) and [lifecycle tests](../../../../Tests/IntegrationTests/ActionLifecycleTests.swift).
+
+## Atomic composition — ADR0092
+
+✅ Production now registers nexarm.motor.1…6. ResourceExecutionContext passes the held set to composed children; workflow gates avoid reentrant acquisition. Motor cleanup is software cancellation/join only, not an independently verified hardware stop.
+
+❌ Sustained real-device acceptance and durable result delivery remain outstanding.
