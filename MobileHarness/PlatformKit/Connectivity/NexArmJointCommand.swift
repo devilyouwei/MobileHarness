@@ -24,7 +24,7 @@ public enum NexArmJointCommand {
     }
 
     /// Broadcast servo write listing IDs 1...5. No gripper byte is present.
-    public static func frame(positions: [Int]) throws -> [UInt8] {
+    public static func packet(positions: [Int]) throws -> NexArmPacket {
         guard positions.count == 5,
             zip(positions, NexArmJogPlanner.limits.prefix(5)).allSatisfy({ $1.contains($0) })
         else { throw NexArmControlError.invalidPosition }
@@ -39,11 +39,19 @@ public enum NexArmJointCommand {
         }
         let packet = try NexArmPacket(id: 254, command: 131, payload: payload)
         guard packet.isArmControl else { throw NexArmControlError.invalidPosition }
-        return packet.bytes
+        return packet
+    }
+
+    public static func frame(positions: [Int]) throws -> [UInt8] {
+        try packet(positions: positions).bytes
+    }
+
+    public static func aimPacket(base: Double, pitch: Double) throws -> NexArmPacket {
+        try packet(positions: try positions(base: base, pitch: pitch))
     }
 
     public static func aimFrame(base: Double, pitch: Double) throws -> [UInt8] {
-        try frame(positions: try positions(base: base, pitch: pitch))
+        try aimPacket(base: base, pitch: pitch).bytes
     }
 
     private static func raw(_ center: Int, offset: Double, joint: Int) -> Int {

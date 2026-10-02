@@ -415,6 +415,30 @@ public actor NexArmController {
         lastBaseSweep = BaseSweep(cycles: cycles, start: origin.joints[0], observed: samples)
     }
 
+    /// One motors-1–5 target. Returns when the link accepts the write, not when the joints arrive.
+    public func aim(base: Double, pitch: Double) async throws {
+        try Task.checkCancellation()
+        guard !busy else { throw NexArmError.busy }
+        guard compatibility != nil else { throw NexArmError.firmwareUnavailable }
+        guard let writer = link as? any NexArmWritableLink else { throw NexArmError.invalidMotion }
+        let packet = try NexArmJointCommand.aimPacket(base: base, pitch: pitch)
+        busy = true
+        defer { busy = false }
+        faulted = false
+        lastFailure = nil
+        motionFailure = .sending
+        do {
+            try await writer.write(packet)
+            motionFailure = nil
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            faulted = true
+            lastFailure = String(describing: error)
+            throw NexArmError.uncertainMotion
+        }
+    }
+
     /// Absolute choreography: prepare, perform, then finish at the vendor home pose.
     public func performGesture(_ gesture: NexArmGesture, repetitions: Int) async throws {
         try Task.checkCancellation()

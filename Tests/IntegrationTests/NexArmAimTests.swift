@@ -146,3 +146,43 @@ private func armTargets(in frame: [UInt8]) throws -> [Int] {
         }
     }
 }
+
+private actor AimLink: NexArmWritableLink {
+    private(set) var exchanges = 0
+    private(set) var writes: [NexArmPacket] = []
+    func exchange(_ packet: NexArmPacket, replyID: UInt8, replyCommand: UInt8, replyCount: Int) async throws
+        -> NexArmPacket
+    {
+        exchanges += 1
+        guard packet.command == 11, replyCommand == 11, replyCount == 24 else { throw NexArmError.invalidPacket }
+        var payload = [UInt8](repeating: 0, count: 24)
+        for (index, value) in [200, -1, 197, -10, 0, -81].enumerated() {
+            let bits = UInt16(bitPattern: Int16(value))
+            payload[index * 2] = UInt8(truncatingIfNeeded: bits)
+            payload[index * 2 + 1] = UInt8(truncatingIfNeeded: bits >> 8)
+        }
+        for (index, value) in [2050, 2088, 1196, 1248, 2051, 1122].enumerated() {
+            payload[12 + index * 2] = UInt8(value & 255)
+            payload[13 + index * 2] = UInt8(value >> 8)
+        }
+        return try NexArmPacket(id: 255, command: 11, payload: payload)
+    }
+    func write(_ packet: NexArmPacket) { writes.append(packet) }
+    func close() {}
+}
+
+@Test func controllerAimWritesFiveAxesAfterVerification() async throws {
+    let link = AimLink()
+    let controller = NexArmController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+    await #expect(throws: NexArmError.firmwareUnavailable) {
+        try await controller.aim(base: 0, pitch: 0)
+    }
+    #expect(await link.writes.isEmpty)
+    #expect(try await controller.verifyCompatibility() == .poseProtocol)
+    let reads = await link.exchanges
+    try await controller.aim(base: -0.32, pitch: 0)
+    let writes = await link.writes
+    let packet = try #require(writes.first)
+    #expect(try armTargets(in: packet.bytes) == NexArmJointCommand.positions(base: -0.32, pitch: 0))
+    #expect(await link.exchanges == reads)
+}

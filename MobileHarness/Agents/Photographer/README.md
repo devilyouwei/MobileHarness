@@ -1,6 +1,6 @@
 # Photographer
 
-Purpose: decide arm aim from shared pose observations. Design goals: subscribe to VisionPerception, emit one internal Action, and leave skeleton display and YOLO where they already are. See [ADR 0091](../../../docs/adr/0091-photographer-aim.md).
+Purpose: decide arm aim from shared pose observations. Design goals: subscribe to VisionPerception, emit one internal Tool, and leave skeleton display and YOLO where they already are. See [ADR 0091](../../../docs/adr/0091-photographer-aim.md).
 
 ```mermaid
 flowchart LR
@@ -16,7 +16,7 @@ flowchart LR
 
 ✅ The first person in the published array is the target. That array keeps VisionPerception's copy order. The current pose decoder sorts by detection score before the score is removed, but this Agent does not re-rank. The nose is the aim point when its confidence is at least 0.3 and it lies inside the image. Otherwise the point is the midpoint of joints that pass the same test. No such joint means no aim. `base` and `pitch` are `(point / size - 0.5) * 0.8` radians. The first aim is immediate. Later aims require both 0.2 seconds and 0.02 radians since the previous emitted aim, using the observation timestamp. Empty people emits nothing and does not return to center. Pause admits the observation and does not aim.
 
-✅ The live camera session registers this Agent so the publication has its declared subscriber, with `controlsArm` false. It does not read the arm output stream. ❌ The App does not open the NexArm socket.
+✅ The live camera session registers this Agent with `controlsArm` true and dispatches each `Robot.aim` through OutputGateway. The App writes that aim on the verified BLE controller. ❌ Wi-Fi stays closed, and physical tracking acceptance remains pending.
 
 ## 输入、订阅与输出契约
 
@@ -27,4 +27,4 @@ flowchart LR
 | publish | 无。 |
 | send | 无。 |
 
-❌ 构图、跟踪身份、腕部行程补偿和真机运动验收未实现。
+❌ 构图、跟踪身份、腕部行程补偿和真机运动验收未实现。发出的包只表示蓝牙链路收下了指令。

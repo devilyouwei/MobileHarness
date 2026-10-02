@@ -144,7 +144,9 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
                 self.state.skeleton = nil
                 self.state.gaze = .zero
                 self.gazeSequence = nil
-                self.state.visionMessage = "姿态识别暂不可用，请重试"
+                self.state.visionMessage =
+                    error as? RobotTools.AimError == .notConnected
+                    ? "机械臂未连接或控制未就绪，瞄准没有发出" : "姿态识别暂不可用，请重试"
                 self.log.error("Pose pipeline failed: \(String(describing: error), privacy: .private)")
             }
         }

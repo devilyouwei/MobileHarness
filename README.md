@@ -80,7 +80,7 @@ The current backend integrations include **Core ML** for Silero VAD and YOLO pos
 
 ✅ These paths are implemented, with module and integration tests. Build success does not establish device accuracy, latency or sustained stability.
 
-❌ Fast/slow model orchestration, unattended robot control, Photographer tracking, dynamic subscriptions, general request/reply, persistent messaging and Channel takeover are not implemented. Photographer can emit `Robot.aim` from a subscribed pose; the camera session leaves arm control off. Configured cloud chat has an implementation, but real-provider acceptance remains pending. The simulator supports UI development; it does not provide the physical-device model pipeline.
+❌ Fast/slow model orchestration, unattended robot control, physical Photographer tracking acceptance, dynamic subscriptions, general request/reply, persistent messaging and Channel takeover are not implemented. The camera session dispatches `Robot.aim` and writes one five-axis BLE packet when control is ready; that write is not measured arrival. Configured cloud chat has an implementation, but real-provider acceptance remains pending. The simulator supports UI development; it does not provide the physical-device model pipeline.
 
 ## Architecture at a Glance
 

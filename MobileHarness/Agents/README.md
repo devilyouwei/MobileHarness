@@ -100,7 +100,7 @@ flowchart TB
 
 The diagram groups current business paths; runtime control and ActionResult receipts use the same validated boundaries. Assistant requests synthesis by message, not by calling SpeechSynthesisAgent directly. Its audio-ID playback Action is scheduled separately from synthesis. App injects the same PCM store into synthesis and playback; the store is shared data, not a message transport. Model-callable registrations come from JSON; fixed text mapping and internal behavior remain code-owned.
 
-SpeechPerception owns one utterance across ASR segments. Assistant consumes final speech and speech onset, maps generated text through its code-owned text policy and retains bounded durable conversation history. VisionPerception performs one shared pose request per admitted frame and independently publishes pose state and displays skeletons. Photographer subscribes to that pose and can emit `Robot.aim` when arm control is enabled. The camera session starts it with arm control off.
+SpeechPerception owns one utterance across ASR segments. Assistant consumes final speech and speech onset, maps generated text through its code-owned text policy and retains bounded durable conversation history. VisionPerception performs one shared pose request per admitted frame and independently publishes pose state and displays skeletons. Photographer subscribes to that pose and emits `Robot.aim`. The camera session starts it with arm control on and dispatches the Tool.
 
 Each actor documents its own capacity, overflow, pause, stop and cleanup rules: [Assistant](Assistant/README.md), [SpeechPerception](SpeechPerception/README.md), [SpeechSynthesis](SpeechSynthesis/README.md) and [VisionPerception](VisionPerception/README.md). Audio and discrete work fail on overflow; vision can replace its latest pending frame, observation and display state. Generation completion does not mean playback completion. Stop must close admission and join owned work before a replacement session starts.
 
@@ -220,7 +220,7 @@ flowchart LR
 - ✅ Strict resource loading, local aliases, visible Action context and static event permissions.
 - ✅ Documented business-output boundary: messages and registered Action/Tool calls; Storage/ModelKit remain foundational capabilities.
 - ✅ Shared parsing, bounded processing, conversation-turn context and cancellation coverage.
-- ✅ [Photographer](Photographer/README.md) subscribes to `vision.pose` and emits internal `Robot.aim` when arm control is enabled. ❌ The camera session leaves that control off. Tracking and other media/control roles remain outstanding. See [ADR 0091](../../docs/adr/0091-photographer-aim.md).
+- ✅ [Photographer](Photographer/README.md) subscribes to `vision.pose` and the camera session dispatches internal `Robot.aim` to the verified BLE controller. ❌ Physical tracking acceptance and other media/control roles remain outstanding. See [ADR 0091](../../docs/adr/0091-photographer-aim.md).
 - ❌ Configuration hot reload, full executable value schemas, native Tool deltas and general request/reply.
 
 See [Assistant.agent.json](Assistant/Assistant.agent.json) for a complete configuration. Expression names and guidance are kept there and in Actions/UI, rather than copied into this standard.

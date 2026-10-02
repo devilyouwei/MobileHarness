@@ -6,7 +6,7 @@ Purpose: coordinate voice and camera runtime scopes. Design goals: preserve admi
 | --- | --- |
 | VoiceSessionCoordinator.swift | Voice Agents, capture/output tasks, session/turn checks, actual playback, the voice-scope PCM cache and cleanup; receives runtime, capabilities, audio service and ConversationState |
 | CameraCoordinator.swift | Permission/foreground/user intent, native camera start/stop and one vision task; receives AppleCamera, CameraState and a vision-session factory |
-| VisionSession.swift | One VisionPerception incarnation plus a Photographer subscriber with arm control off; frame admission and vision output consumption through Gateways |
+| VisionSession.swift | One VisionPerception incarnation plus a Photographer subscriber with arm control on; frame admission and vision/aim output consumption through Gateways |
 
 CameraCoordinator has one worker and one latest desired state; newer user intent replaces pending intent. Native frames retain their existing bounded latest-frame stream. VisionSession uses App/Adapters for image conversion, awaits Tool completion and joins each admitted Action before consuming another replaceable output. These files own running scopes, not page layout or dependency registration.
 

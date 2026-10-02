@@ -7,6 +7,8 @@
 
 Purpose: communicate with the connected NexArm from macOS and verify supervised wrist/base motion. Design goals: public POSIX serial APIs, actor-owned lifetime, bounded parsing, no dependencies and motion through production Actions, user-requested controls or explicitly enabled controller diagnostic tests.
 
+✅ `NexArmController.aim` writes one motors-1–5 packet and returns when the link accepts it. The gripper is not in the packet. ❌ This write does not measure arrival, and physical tracking acceptance remains pending.
+
 ✅ `NexArmPacket` / `NexArmDecoder`: FF FF ID LEN CMD PAYLOAD CHECK framing; wrapping inverse-sum checksum; little-endian payloads. Decoder tolerates fragmented/coalesced packets and interleaved ESP32 text logs. RX buffer limit 4096 bytes, exchange input budget 16384 bytes; overflow throws. Maximum payload 253 bytes. Invalid frames/log noise are skipped; incomplete frames are retained. No device action is discarded or replayed.
 
 ```mermaid

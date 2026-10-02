@@ -285,9 +285,9 @@ An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input
 | SpeechPerception | Bounded PCM admission; LiveSpeechInput and VoiceActivitySegmenter own VAD/ASR sessions, segmentation/merging and partial/final observations; explicit UI Actions own recognition presentation |
 | VisionPerception | FrameChangeFilter selects frames; shared pose inference feeds independently bounded observation publication and latest skeleton Tool / eye gaze Action output                                                   |
 | SpeechSynthesis | Directed serial synthesis into owner-scoped StorageAudio handles; playback remains a separate Action |
-| Photographer     | Subscribes to `vision.pose` and can emit internal `Robot.aim`; the camera session leaves arm control off. Tracking remains in [docs](../docs/Photographer-Proposal.md). See [ADR 0091](../docs/adr/0091-photographer-aim.md). |
+| Photographer     | Subscribes to `vision.pose` and emits internal `Robot.aim`. The camera session dispatches it to verified BLE. Physical acceptance remains in [docs](../docs/Photographer-Proposal.md). See [ADR 0091](../docs/adr/0091-photographer-aim.md). |
 
-✅ Shared speech/vision perception, conversational Assistant, and a pose subscriber that can aim. ❌ Tracking, ReflexAgent and additional task Agents. Perception freshness does not establish robot safety or sampling guarantees. The live camera does not move the arm.
+✅ Shared speech/vision perception, conversational Assistant, and a pose subscriber whose aim the live camera dispatches over verified BLE. ❌ Physical tracking acceptance, ReflexAgent and additional task Agents. Perception freshness does not establish robot safety or sampling guarantees. A sent aim packet is not measured arrival.
 
 ### Actions
 
@@ -295,7 +295,7 @@ An Agent is an actor with a descriptor, lifecycle operations, a `receive(_ input
 
 Domain modules own behavior definitions, parameter validation and function bindings; Agent JSON owns available aliases/default Channels. App supplies typed execution capabilities through BehaviorAssembly. Shared physical resources must have coherent ownership across behavior functions.
 
-✅ Speech and UI behaviors, including `UI.express(emotion:)`, and [NexArm supervised USB Actions](Actions/NexArm/README.md), including Assistant base sweeps and gestures. ✅ iPhone BLE settings/workflow binding is implemented. ✅ Internal `Robot.aim` is a Tool: it validates logical radians and forwards them to an injected sender. ❌ Photo-capture and media Actions remain pending. The camera session does not send an aim frame.
+✅ Speech and UI behaviors, including `UI.express(emotion:)`, and [NexArm supervised USB Actions](Actions/NexArm/README.md), including Assistant base sweeps and gestures. ✅ iPhone BLE settings/workflow binding is implemented. ✅ Internal `Robot.aim` is a Tool: it validates logical radians and the camera session forwards them to the verified BLE controller. ❌ Photo-capture and media Actions remain pending. The aim write returns when the link accepts the packet.
 
 #### Actions/Runtime
 

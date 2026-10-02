@@ -177,4 +177,4 @@ These are **dated decision records**, including proposals and stages later repla
 
 ## Photographer aim
 
-✅ [0091 — Photographer aim](0091-photographer-aim.md) subscribes Photographer to `vision.pose` and sends logical aim as an internal Tool plus a motors-1–5 packet. The suction-cup gripper is not addressed. ❌ The camera session leaves arm control off and does not call the production NexArm controller.
+✅ [0091 — Photographer aim](0091-photographer-aim.md) subscribes Photographer to `vision.pose`, enables arm control in the camera session, and writes one motors-1–5 packet through the verified BLE controller. The suction-cup gripper is not addressed. The write returns on link acceptance. ❌ Physical tracking acceptance remains pending.

@@ -69,7 +69,13 @@ final class ApplicationRuntime {
                 try await bluetooth.performGesture(gesture, repetitions: request.repetitions)
             },
             shakeBase: { cycles, _ in try await bluetooth.shakeBase(cycles: cycles) },
-            aim: { _, _, _ in throw RobotTools.AimError.notConnected },
+            aim: { base, pitch, _ in
+                do { try await bluetooth.aim(base: base, pitch: pitch) } catch BluetoothWorkflowError.disconnected,
+                    BluetoothWorkflowError.controlNotReady, BluetoothWorkflowError.background
+                {
+                    throw RobotTools.AimError.notConnected
+                }
+            },
             capabilities: [
                 AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
                 SpeechPerceptionAgent.runtimeCapabilities(

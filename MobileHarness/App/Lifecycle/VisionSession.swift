@@ -27,7 +27,7 @@ final class VisionSession {
         let vision = try VisionPerceptionAgent(
             pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze,
             resolveImage: CameraImageAttachment.resolve)
-        let photographer = try PhotographerAgent(sessionID: sessionID, controlsArm: false)
+        let photographer = try PhotographerAgent(sessionID: sessionID, controlsArm: true)
         try await manager.register(vision, sessionID: sessionID)
         try await manager.register(photographer, sessionID: sessionID)
         let actions = runtime.actions
@@ -66,6 +66,16 @@ final class VisionSession {
                         }
                     }
                     if await vision.status().lifecycle == .failed { throw HarnessError.queueFull }
+                }
+                group.addTask {
+                    for await envelope in photographer.outputs {
+                        try Task.checkCancellation()
+                        try await responses.dispatch(envelope)
+                        if case .control(let state) = envelope.output, state.hasPrefix("agent.error:") {
+                            throw HarnessError.notRunning
+                        }
+                    }
+                    if await photographer.status().lifecycle == .failed { throw HarnessError.queueFull }
                 }
                 defer { group.cancelAll() }
                 try await group.next()
