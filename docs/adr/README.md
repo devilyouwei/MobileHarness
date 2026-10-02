@@ -108,3 +108,5 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 | 0099 | [ADR0099 — Shared Types grouped by category](0099-shared-types-layout.md) |
 
 | 0100 | [ADR0100 — Camera control Tools reuse the App owner](0100-camera-control-tools.md) |
+
+| 0101 | [ADR0101 — Cloud native Tool calls](0101-cloud-native-tool-calls.md) |

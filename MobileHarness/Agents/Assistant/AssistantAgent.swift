@@ -201,10 +201,17 @@ public actor AssistantAgent: Agent {
                     role: message.role == .system ? .system : (message.role == .user ? .user : .assistant),
                     content: message.content)
             }
+            let tools: [ChatToolDefinition]
+            if await chat.supportsToolCalls {
+                tools = try descriptor.capabilities.tools.compactMap { registration in
+                    guard let definition = registration.definition else { return nil }
+                    return try ChatToolDefinition(declaration: JSONEncoder().encode(definition))
+                }
+            } else { tools = [] }
             let request = try ChatRequest(
                 messages: messages,
                 context: InferenceContext(requestID: input.id, conversationID: input.sessionID),
-                maximumOutputTokens: record.maximumOutputTokens, temperature: record.temperature)
+                maximumOutputTokens: record.maximumOutputTokens, temperature: record.temperature, tools: tools)
             _ = try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask { try await self.collect(request, input: input, using: chat) }
                 group.addTask {
@@ -250,12 +257,21 @@ public actor AssistantAgent: Agent {
                 case .text(let delta):
                     text += delta
                     try await emitFunctions(generator.append(delta), for: input, count: &emittedCalls)
+                case .toolCall(let native):
+                    let call = try ToolCallParser.parse(
+                        id: UUID(), alias: native.name, argumentsJSON: Data(native.argumentsJSON.utf8),
+                        capabilities: descriptor.capabilities)
+                    try await emitFunctions([.tool(call)], for: input, count: &emittedCalls)
                 case .finished(let reason):
-                    generationFinishReason = reason == .stop ? "stop" : "lengthLimit"
+                    switch reason {
+                    case .stop: generationFinishReason = "stop"
+                    case .lengthLimit: generationFinishReason = "lengthLimit"
+                    case .toolCalls: generationFinishReason = "toolCalls"
+                    }
                     finished = true
                 }
             }
-            guard finished, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            guard finished, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || emittedCalls > 0 else {
                 throw CapabilityError.unavailable("LLM returned no completed answer")
             }
             try await emitFunctions(generator.finish(), for: input, count: &emittedCalls)

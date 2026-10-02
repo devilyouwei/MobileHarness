@@ -127,7 +127,7 @@ flowchart LR
 | 无返回值 Tool | `UI.print`，无 Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
 | Action | `express → UI.express / Display` | `parameters["emotion"]` 为 `clear / smile / happy / laugh / thinking / surprised / sad / love / angry / scared / playful`，设置或清除表情。 |
 | 无返回值 Tool | `UI.beginReplyTurn`，无 Channel | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
-| 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。目前不是模型原生 Tool streaming。 |
+| 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。同时支持云端模型原生 Tool 调用。 |
 | control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
 | control | `agent.finished` | speaking 阶段的输入完成通知（初始化展示通过 Tool 执行），释放该输入的 Action 跟踪。 |
 | control | `assistant.error: …` | 生成、解析、即时输出等失败；输出流溢出会直接进入 failed 并关闭流，不能保证再塞入错误消息。 |
@@ -143,7 +143,7 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再
 | `speech.synthesize / 1 / observation` | `.speechSynthesis(SpeechSynthesisInput(audioID: UUID, text: String, locale: String))`；audioID 为每段新建的唯一句柄；text 为 Agent 分好的非空语义段，最多 2000 UTF-8 字节；locale 当前默认 `auto`，协议允许 `auto / zh-CN / en-US`。完整编码受 16 KiB 消息上限约束。 | 自然文本完成分段后立即提交；必须在回执中确认目标已接纳且无拒绝，才输出同一 audioID 的内部 Speech.speak(audioID) Action。合成与后续 Action 调度并行。 |
 | `speech.cancel / 1 / observation` | `.cancelSpeech(audioID: UUID)`；只带待取消的音频句柄，不携带文本或 PCM。 | 提交已接纳但 播放 Action 无法成功入队等清理场景发送；SpeechSynthesis 按发送方、session、父输入所有权校验，不能取消别的请求。当前清理发送失败被忽略，原始入队错误继续上抛。 |
 
-❌ 图像理解、partial 驱动回答及模型原生 Tool 增量仍未实现。
+❌ 图像理解与 partial 驱动回答仍未实现。云端 Tool 增量由适配器聚合为完整调用。
 
 ✅ express emits semantic eye emotions; Assistant.agent.json remains the production capability declaration. No emoji conversion is performed. clear smoothly returns to neutral. Three added values are angry/scared/playful; JSON schema is v5, with an additive parameter-domain extension.
 
@@ -214,7 +214,7 @@ flowchart LR
 
 ## Action and Tool presentation boundary
 
-✅ beginReplyTurn and per-sentence print are code-owned immediate Tools; speech playback and model-selected expression remain scheduled Actions. Text mapping returns ordered GenerationEvents: speech Action followed by caption Tool. Captions append sentence chunks, never full accumulated replies, and do not inherit channel scopes. The same 120-call/256-output bounds cover both kinds. ❌ Native model Tool generation is unchanged.
+✅ beginReplyTurn and per-sentence print are code-owned immediate Tools; speech playback and model-selected expression remain scheduled Actions. Text mapping returns ordered GenerationEvents: speech Action followed by caption Tool. Captions append sentence chunks, never full accumulated replies, and do not inherit channel scopes. The same 120-call/256-output bounds cover both kinds. ✅ Cloud native Tools use the same declared registry and Gateway boundary.
 
 ## Head gestures
 
@@ -232,4 +232,24 @@ flowchart LR
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
-✅ JSON v5 declares Camera.open, Camera.close and Camera.flip as no-argument native Tools, separately from Action Channels. They cross OutputGateway and reuse App camera lifecycle. ❌ Current ChatCapability still emits text/completion only; these declarations do not add provider-native Tool event transport.
+✅ JSON v5 declares Camera.open, Camera.close and Camera.flip as no-argument native Tools, separately from Action Channels. They cross OutputGateway and reuse App camera lifecycle. ✅ Cloud ChatCapability emits complete native Tool calls.
+
+## Native cloud Tool calls
+
+✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Qwen remains text-only.
+
+```mermaid
+flowchart LR
+    JSON[Agent JSON v5 Tools] --> Request[ChatRequest tools]
+    Request --> Cloud[Cloud request and SSE deltas]
+    Cloud --> Join[Bounded per-index argument assembly]
+    Join --> Call[Complete ChatEvent.toolCall]
+    Call --> Resolve[AgentCore ToolCallParser and permission resolution]
+    Resolve --> Gateway[OutputGateway / ToolRuntime]
+    Gateway --> Result[Existing InputGateway result feedback]
+```
+
+Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
+
+✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
+❌ Local native tools, result-driven model continuation, persisted native tool-call transcripts and Responses API transport.

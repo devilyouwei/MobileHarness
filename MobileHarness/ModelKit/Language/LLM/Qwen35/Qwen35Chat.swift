@@ -97,6 +97,7 @@ public actor Qwen35Chat: ChatCapability {
     }
 
     static func validate(_ request: ChatRequest) throws {
+        guard request.tools.isEmpty else { throw CapabilityError.invalidRequest("Local native tool calls are unavailable") }
         guard request.messages.count <= 64,
             request.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536,
             request.messages.last?.role == .user,

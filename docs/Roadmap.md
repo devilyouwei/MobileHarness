@@ -26,7 +26,7 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 | --- | --- |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
-| Native Tool events and request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |
+| Local native Tool events and result-driven request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |
 | Fast/slow cognition and compute routing | Explicit Agent roles and capability availability/resource policy. |
 | Activity supervision and multi-window ownership | Named lifetime/resource owners and isolated state routing. |
 | Photographer motion | User task, native device capabilities, bounded motion, feedback and device-side protection; see [proposal](Photographer-Proposal.md). |

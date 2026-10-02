@@ -266,7 +266,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 
 ✅ The current source graph implements the independent runtime, workflow, UI, AgentCore, ModelKit, PlatformKit, Storage and Types boundaries shown above.
 
-❌ Additional shared Types categories, semantic media storage, native model Tool events, multi-window state routing and unattended device operation remain outside the implemented architecture; their delivery state belongs in the [Roadmap](../docs/Roadmap.md).
+❌ Additional shared Types categories, semantic media storage, local native model Tool events, multi-window state routing and unattended device operation remain outside the implemented architecture; their delivery state belongs in the [Roadmap](../docs/Roadmap.md).
 
 ## Part II — Module Responsibilities
 
@@ -650,3 +650,7 @@ SwiftUI state is MainActor-isolated. Runtime services, Agents, stores, managers 
 Every queue or active-call pool has an explicit capacity and overflow rule in its owning module README. Cancellation is cooperative and propagates through structured tasks. Detached work, guessed success, silent device-action loss and unbounded retries are outside the architecture.
 
 ✅ Tools/Camera follows the domain root + Support layout and binds Camera.open/close/flip through a required CameraControlCapability. App validates the active Assistant session and retains single-owner permission/foreground/capture-lease policy; completion confirms capture reconciliation or close cleanup, not pose readiness. Native model Tool event transport remains pending.
+
+### Cloud native Tool generation
+
+Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; ToolResult retains existing feedback behavior. Local Qwen and automatic result-driven continuation remain unsupported.

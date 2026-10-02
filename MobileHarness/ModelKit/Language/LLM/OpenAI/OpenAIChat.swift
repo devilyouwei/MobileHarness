@@ -24,6 +24,8 @@ public actor OpenAIChat: ChatCapability {
     }
 
     /// Configured, not a claim that the remote service or credentials have been probed.
+    public var supportsToolCalls: Bool { true }
+
     public var availability: CapabilityAvailability { .available }
 
     public func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
@@ -55,7 +57,7 @@ public actor OpenAIChat: ChatCapability {
                 guard response.mimeType?.lowercased() == "text/event-stream" else {
                     throw OpenAIChatError.invalidResponse
                 }
-                var decoder = ChatEventDecoder()
+                var decoder = ChatEventDecoder(toolNames: OpenAIChatConfiguration.toolNames(request.tools))
                 var finish: ChatEvent?
                 for try await byte in bytes {
                     try Task.checkCancellation()

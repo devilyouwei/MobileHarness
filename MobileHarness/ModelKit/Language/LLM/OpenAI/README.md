@@ -33,11 +33,11 @@ flowchart LR
 
 ✅ Requests: at most 64 messages, 64 KiB text and at most 32768 explicitly requested output tokens (omitted by default). No inference waiting queue; overlap fails `inputBusy`. SSE line/event: 64 KiB, cumulative response: 8 MiB. Output: no pending-event count limit; each event retains the 65568 estimated-byte limit. Slow consumers do not cause bufferOverflow; normal finish drains all accepted fragments in order. Exceeding limits fails explicitly, never drops text silently. CR/LF/CRLF, fragmented UTF-8, comments and multiline data fields are supported.
 
-✅ `stop` and `length` map to the shared finish reasons. A finish reason is required; premature EOF or `[DONE]` fails. The HTTP request ends on the terminal choice; trailing usage is not exposed. Unsupported native tools, refusal and finish reasons fail explicitly. Errors do not expose provider bodies, URLs or credentials. No automatic retry/fallback; partial text may already have reached the consumer.
+✅ `stop` and `length` map to the shared finish reasons. A finish reason is required; premature EOF or `[DONE]` fails. The HTTP request ends on the terminal choice; trailing usage is not exposed. Refusal and unsupported finish reasons fail explicitly. Errors do not expose provider bodies, URLs or credentials. No automatic retry/fallback; partial text may already have reached the consumer.
 
 ✅ One ephemeral session per active request, no cookie/cache persistence, no redirects (including same-host redirects). Timeouts are 1–600 seconds (default 60), including total resource duration. Cancellation, stream failure and manager shutdown cancel the worker; the request is invalidated before releasing admission. Local unload/reload and terminal manager shutdown use the same ModelResource contract.
 
-❌ Cloud ASR/TTS/vision/judge, native tools, Responses API, retry and live-provider acceptance. Text-only compatibility is intentional; unsupported modalities are not advertised.
+❌ Cloud ASR/TTS/vision/judge, Responses API, retry and live-provider acceptance. Text-only compatibility is intentional; unsupported modalities are not advertised.
 
 Protocol reference: [official OpenAI Chat API](https://developers.openai.com/api/reference/resources/chat).
 
@@ -46,3 +46,23 @@ Protocol reference: [official OpenAI Chat API](https://developers.openai.com/api
 ✅ Empty credentials omit Authorization for both discovery and chat. Blank endpoint text resolves to https://api.openai.com/v1; HTTPS validation remains enforced. Discovery excludes known embedding, reranking, moderation, media, legacy completion and specialized non-chat families. Standard /models objects do not expose capabilities, so name-based filtering is heuristic: unknown third-party deployment names remain available. ❌ Discovery does not prove provider compatibility. See [official model objects](https://developers.openai.com/api/reference/resources/models).
 
 ✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+
+## Native cloud Tool calls
+
+✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Qwen remains text-only.
+
+```mermaid
+flowchart LR
+    JSON[Agent JSON v5 Tools] --> Request[ChatRequest tools]
+    Request --> Cloud[Cloud request and SSE deltas]
+    Cloud --> Join[Bounded per-index argument assembly]
+    Join --> Call[Complete ChatEvent.toolCall]
+    Call --> Resolve[AgentCore ToolCallParser and permission resolution]
+    Resolve --> Gateway[OutputGateway / ToolRuntime]
+    Gateway --> Result[Existing InputGateway result feedback]
+```
+
+Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
+
+✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
+❌ Local native tools, result-driven model continuation, persisted native tool-call transcripts and Responses API transport.

@@ -9,6 +9,11 @@ struct CurrentChatCapability: ChatCapability {
             do { return try await models.availability(.chat) } catch { return .unavailable(reason: "对话模型暂不可用") }
         }
     }
+    var supportsToolCalls: Bool {
+        get async {
+            do { return await (try await models.get(.chat)).supportsToolCalls } catch { return false }
+        }
+    }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         let provider = try await models.get(.chat)
         return try await provider.chat(request)

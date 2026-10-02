@@ -110,14 +110,14 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 | --- | --- |
 | Speech recognition | ✅ Nemotron streaming ASR in the physical App; Apple adapter available separately |
 | Voice activity | ✅ Silero with per-session state |
-| Chat | ✅ Qwen3.5-2B 4-bit MLX or explicitly configured OpenAI-compatible cloud, text-only |
+| Chat | ✅ Qwen3.5-2B 4-bit MLX or explicitly configured OpenAI-compatible cloud, text and native Tool calls |
 | Speech synthesis | ✅ MOSS-TTS-Nano Core ML Mandarin/English TTS (beta) in conversation and diagnostics; Apple and Kokoro are separate optional adapters |
 | Pose | ✅ YOLO26n-Pose INT8 with end-to-end output through PoseCapability |
 | Judgment | ✅ Protocol; ❌ production provider |
 | Other capabilities | ❌ VLM input, embeddings and general video sessions |
 
 - ✅ Shared provider identity, coalesced loading, explicit unload/shutdown, memory-warning handling and release-when-idle policy.
-- ❌ Timed eviction, measured cross-model memory/thermal budgets and native model Tool-call events.
+- ❌ Timed eviction, measured cross-model memory/thermal budgets and local native Tool-call events.
 
 The physical App requires iOS 27 and matching local artifacts. Simulator local ASR/chat report unavailable; explicitly configured cloud chat is supported. No automatic model or network fallback is provided.
 
@@ -126,3 +126,5 @@ The physical App requires iOS 27 and matching local artifacts. Simulator local A
 ModelKitOpenAI exposes explicitly configured endpoint/key/model chat over bounded SSE. Absent cloud configuration selects the local binding; cloud speech/vision is not provided. ModelKitMossNano owns the synthesis adapter and ModelKitMossCoreML owns its backend. Defaults selects MOSS; Kokoro is an optional target outside the aggregate App product.
 
 Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns no Agent permissions, device I/O or business state. Streams define byte estimates, admission and cleanup; unsupported capabilities fail explicitly. Non-cooperative backend calls can delay cancellation/shutdown; no generic forced interruption is provided.
+
+✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Qwen reports no native Tool support and rejects requests carrying tools. See [technical flow](Language/LLM/OpenAI/README.md).

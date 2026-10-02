@@ -47,6 +47,37 @@
                         .accessibilityLabel(camera.isEnabled ? "关闭摄像头" : "开启摄像头")
                         .accessibilityValue(camera.isVisible ? "已开启" : (camera.isEnabled ? "等待相机" : "已关闭"))
                         .accessibilityIdentifier("camera.toggle")
+                        if camera.isEnabled {
+                            HStack(spacing: 12) {
+                                Button(action: controls.switchCamera) {
+                                    Image(systemName: "arrow.triangle.2.circlepath.camera")
+                                        .frame(width: 48, height: 48)
+                                }
+                                .disabled(!camera.isEnabled || camera.isBusy)
+                                .accessibilityLabel(camera.facing == .front ? "切换到后置摄像头" : "切换到前置摄像头")
+                                .accessibilityIdentifier("camera.switch")
+                                Menu {
+                                    Picker(
+                                        "灰度变化阈值",
+                                        selection: Binding(
+                                            get: { camera.changeThreshold }, set: controls.setChangeThreshold)
+                                    ) {
+                                        Text("1%").tag(0.01)
+                                        Text("3%（默认）").tag(0.03)
+                                        Text("5%").tag(0.05)
+                                        Text("10%").tag(0.10)
+                                    }
+                                } label: {
+                                    Text("\(Int(camera.changeThreshold * 100))%")
+                                        .font(.system(size: 15, weight: .medium).monospacedDigit())
+                                        .frame(width: 48, height: 48)
+                                }
+                                .accessibilityLabel("识别抽帧阈值")
+                                .accessibilityValue("\(Int(camera.changeThreshold * 100))%")
+                            }
+                            .font(.system(size: 18, weight: .medium))
+                            .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
+                        }
                         Button(action: openSettings) {
                             Image(systemName: "gearshape").frame(width: 48, height: 48)
                         }
@@ -57,38 +88,6 @@
                     .buttonStyle(.plain)
                     .background(.black.opacity(0.4), in: Capsule())
                     .overlay(Capsule().strokeBorder(.white.opacity(0.18)))
-                    if camera.isEnabled {
-                        HStack(spacing: 12) {
-                            Button(action: controls.switchCamera) {
-                                Image(systemName: "arrow.triangle.2.circlepath.camera")
-                                    .frame(width: 48, height: 48)
-                            }
-                            .disabled(!camera.isEnabled || camera.isBusy)
-                            .accessibilityLabel(camera.facing == .front ? "切换到后置摄像头" : "切换到前置摄像头")
-                            .accessibilityIdentifier("camera.switch")
-                            Menu {
-                                Picker(
-                                    "灰度变化阈值",
-                                    selection: Binding(
-                                        get: { camera.changeThreshold }, set: controls.setChangeThreshold)
-                                ) {
-                                    Text("1%").tag(0.01)
-                                    Text("3%（默认）").tag(0.03)
-                                    Text("5%").tag(0.05)
-                                    Text("10%").tag(0.10)
-                                }
-                            } label: {
-                                Image(systemName: "slider.horizontal.3").frame(width: 44, height: 48)
-                            }
-                            .accessibilityLabel("识别抽帧阈值")
-                            .accessibilityValue("\(Int(camera.changeThreshold * 100))%")
-                        }
-                        .font(.system(size: 18, weight: .medium))
-                        .buttonStyle(.plain)
-                        .background(.black.opacity(0.4), in: Capsule())
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.18)))
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
                     if let message = camera.message ?? camera.visionMessage, camera.isEnabled {
                         VStack(alignment: .trailing, spacing: 8) {
                             Text(message).font(.footnote)

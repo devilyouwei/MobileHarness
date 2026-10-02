@@ -102,6 +102,15 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         }
     }
 
+    static func toolNames(_ tools: [ChatToolDefinition]) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: tools.enumerated().map { index, tool in
+            let stem = tool.name.map { character in
+                character.isASCII && (character.isLetter || character.isNumber || character == "_") ? character : "_"
+            }
+            return (String(stem.prefix(48)) + "_" + String(index), tool.name)
+        })
+    }
+
     func request(_ chat: ChatRequest) throws -> URLRequest {
         guard chat.messages.count <= 64,
             chat.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536,
@@ -119,6 +128,18 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
             "temperature": chat.temperature, "stream": true,
         ]
         if let maximum = chat.maximumOutputTokens { body["max_tokens"] = maximum }
+        if !chat.tools.isEmpty {
+            let names = Self.toolNames(chat.tools)
+            body["tools"] = try chat.tools.map { tool in
+                guard var object = try JSONSerialization.jsonObject(with: tool.declaration) as? [String: Any],
+                    var function = object["function"] as? [String: Any]
+                else { throw CapabilityError.invalidRequest("Invalid tool declaration") }
+                function["name"] = names.first(where: { $0.value == tool.name })?.key
+                object["function"] = function
+                return object
+            }
+            body["tool_choice"] = "auto"
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request
     }
