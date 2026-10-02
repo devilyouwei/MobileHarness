@@ -58,6 +58,36 @@ App assembles concrete implementations but is not a service locator. Long-lived 
 
 Semantic fusion belongs to Agents. Gateway carries identities, contracts and destinations without interpreting observations or choosing business behavior.
 
+### Composition and mediation boundaries
+
+App composes the running system; Agents compose task behavior; Gateway mediates Agent communication and execution. These are separate responsibilities:
+
+```mermaid
+flowchart TB
+    App[App: composition root and lifetime owner]
+    App -.->|Construct and inject| Agents[Agents: cognition and task behavior]
+    App -.->|Construct and wire| Gateway[InputGateway / OutputGateway]
+    App -.->|Register handlers| Behavior[Actions / Tools]
+    App -.->|Supply model capabilities| ModelKit
+    App -.->|Supply stores| Storage
+    App -.->|Supply device capabilities| Platform
+
+    External[User / microphone / camera / runtime] --> Input[InputGateway]
+    Input --> Agents
+    Agents -->|Model processing| ModelKit
+    Agents -->|Records and owned media| Storage
+    Agents -->|Messages / ActionCall / ToolCall| Output[OutputGateway]
+    Output -->|Agent-to-Agent message| Input
+    Output --> Behavior
+    Behavior -->|Device and presentation capabilities| Platform[PlatformKit / App endpoints]
+    Output -->|ToolResult / ActionResult / ActivityEvent| Input
+```
+
+- **App assembles and owns lifetime.** It constructs Agents, Gateways, behavior registries, workflows and shared services, then injects role-specific interfaces. It does not become a global container that modules query at runtime.
+- **Agents compose behavior.** They use injected ModelKit capabilities and Storage directly for cognition and internal state, then express Agent messages, Actions, Tools and scheduling through OutputGateway. Agents do not directly invoke concrete Actions, Tools or PlatformKit device effects.
+- **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, executable Agent output, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit/Storage capability calls or App/UI feature-workflow operations.
+- **Actions and Tools execute effects.** They receive App-bound presentation/device capabilities; device-facing behavior reaches PlatformKit through those explicit bindings. App lifecycle code may also use PlatformKit directly for host-owned capture, preview and connection workflows.
+
 ### Compilation dependencies
 
 The graph below shows the principal project targets. System frameworks, concrete model backends and the `BehaviorDefinitions` compiler plugin are condensed for readability.
