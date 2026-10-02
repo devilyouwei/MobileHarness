@@ -54,7 +54,7 @@ public actor SpeechSynthesisAgent: Agent {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         let owner = SpeechAudioStore.Owner(
-            source: AgentID(rawValue: input.metadata.source),
+            source: input.metadata.source,
             session: input.sessionID, input: input.metadata.parentID ?? input.id)
         if case .observation(.cancelSpeech(let id)) = input.payload {
             try await store.cancel(id, owner: owner)

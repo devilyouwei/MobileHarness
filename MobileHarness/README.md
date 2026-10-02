@@ -208,7 +208,7 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 | `Tools/` including `Contracts/` and `Runtime/` | Tools | BehaviorDefinitions at compile time |
 | `Storage/` excluding `Audio/` and `Chat/` | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
-| `Storage/Audio/` | StorageAudio | Storage, AgentCore, ModelKit |
+| `Storage/Audio/` | StorageAudio | Storage, ModelKit |
 | `PlatformKit/` | PlatformKit | None |
 | `ModelKit/` shared capability sources | ModelKit | None |
 | `ModelKit/Management/` | ModelKitRuntime | ModelKit |
@@ -323,7 +323,7 @@ Data-returning calls produce correlated ToolResult through Gateway. Void calls c
 
 ### Storage
 
-[Storage](Storage/README.md) provides Foundation-only bounded memory streams and single-checkout handles. [StorageAudio](Storage/Audio/README.md) adapts ModelKit PCM frames and Agent identity to those primitives; App injects the shared audio store into synthesis and playback. Storage core remains independent of ModelKit and SwiftUI. LocalDocumentStore synchronizes bounded cached documents with durable files; App settings and the Assistant conversation journal are durable consumers. General reclaimable disk caches and persistent media remain later stages.
+[Storage](Storage/README.md) provides Foundation-only bounded memory streams and single-checkout handles. [StorageAudio](Storage/Audio/README.md) adapts ModelKit PCM frames and opaque caller identity to those primitives; App injects the shared audio store into synthesis and playback. Storage core remains independent of ModelKit and SwiftUI. LocalDocumentStore synchronizes bounded cached documents with durable files; App settings and the Assistant conversation journal are durable consumers. General reclaimable disk caches and persistent media remain later stages.
 
 ✅ Both Storage targets are registered. Production PCM uses the memory cache; user settings use revision-checked local persistence with write-through caching. ❌ Persistent media, disk cache and memory records remain future work.
 

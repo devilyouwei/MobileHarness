@@ -221,3 +221,9 @@ Actions own per-motor arrival profiles and dynamic execution budgets. Arrival su
 The cleanup in [ADR0095](adr/0095-remove-retired-device-and-behavior-code.md) removes unused generic device placeholders and isolates historical polling diagnostics in Tests. PlatformKit/Core currently contains documentation only; actual authorization remains in the concrete adapters.
 
 Actions and Tools now own Contracts directories and have no AgentCore dependency. Gateway translates Agent intents and delivery results; App projects UI display data and adapts stored audio. See [ADR0096](adr/0096-behavior-owned-contracts.md).
+
+## Audio storage identity boundary — ADR0097
+
+✅ StorageAudio depends only on Storage and ModelKit; consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](adr/0097-storage-audio-opaque-owner.md).
+
+❌ ModelKit PCM type extraction and new physical-device acceptance are not included.

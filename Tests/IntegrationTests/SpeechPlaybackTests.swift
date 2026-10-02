@@ -42,7 +42,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
         actionPath: ActionPath(module: "Speech", function: "speak"), channel: "Speech",
         parameters: ["audioID": request.audioID.uuidString])
     return (
-        request.audioID, .init(source: AgentID(rawValue: source), session: session, input: parent.id),
+        request.audioID, .init(source: source, session: session, input: parent.id),
         ActionInvocation(source: AgentID(rawValue: source), input: parent, call: call, sequence: 1)
     )
 }
@@ -83,7 +83,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
 }
 @Test func cacheOwnershipCapacityAndExplicitRelease() async throws {
     let store = SpeechAudioStore(capacity: 1)
-    let owner = SpeechAudioStore.Owner(source: .assistant, session: UUID(), input: UUID())
+    let owner = SpeechAudioStore.Owner(source: "assistant", session: UUID(), input: UUID())
     let id = UUID()
     try await store.register(id, owner: owner, cancel: {})
     await #expect(throws: SpeechAudioError.capacityExceeded) {
@@ -94,7 +94,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
     await store.complete(id)
     await #expect(throws: SpeechAudioError.forbidden) {
         _ = try await store.checkout(
-            id, owner: .init(source: AgentID(rawValue: "other"), session: owner.session, input: owner.input))
+            id, owner: .init(source: "other", session: owner.session, input: owner.input))
     }
     _ = try await store.checkout(id, owner: owner)
     #expect(try await audio.next()?.sequence == 0)
@@ -111,7 +111,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
 
 @Test(.timeLimit(.minutes(2))) func queuedAndCompletedSpeechSurviveOldSixtySecondExpiry() async throws {
     let store = SpeechAudioStore()
-    let owner = SpeechAudioStore.Owner(source: .assistant, session: UUID(), input: UUID())
+    let owner = SpeechAudioStore.Owner(source: "assistant", session: UUID(), input: UUID())
     let queued = UUID()
     let ready = UUID()
     try await store.register(queued, owner: owner, cancel: {})
@@ -136,9 +136,9 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
     let store = SpeechAudioStore()
     let session = UUID()
     let owners = [
-        SpeechAudioStore.Owner(source: .assistant, session: session, input: UUID()),
-        SpeechAudioStore.Owner(source: .assistant, session: session, input: UUID()),
-        SpeechAudioStore.Owner(source: .assistant, session: UUID(), input: UUID()),
+        SpeechAudioStore.Owner(source: "assistant", session: session, input: UUID()),
+        SpeechAudioStore.Owner(source: "assistant", session: session, input: UUID()),
+        SpeechAudioStore.Owner(source: "assistant", session: UUID(), input: UUID()),
     ]
     let ids = [UUID(), UUID(), UUID()]
     for (id, owner) in zip(ids, owners) {
@@ -185,13 +185,13 @@ private struct NeverCompletingSpeech: SpeechSynthesisCapability {
     let store = SpeechAudioStore()
     let session = UUID()
     let input = UUID()
-    let one = SpeechAudioStore.Owner(source: .assistant, session: session, input: input)
-    let two = SpeechAudioStore.Owner(source: AgentID(rawValue: "other"), session: session, input: input)
+    let one = SpeechAudioStore.Owner(source: "assistant", session: session, input: input)
+    let two = SpeechAudioStore.Owner(source: "other", session: session, input: input)
     let a = UUID()
     let b = UUID()
     try await store.register(a, owner: one, cancel: {})
     try await store.register(b, owner: two, cancel: {})
-    await store.cancel(inputID: input, source: .assistant)
+    await store.cancel(inputID: input, source: "assistant")
     await #expect(throws: CancellationError.self) { try await store.validate(a, owner: one) }
     try await store.validate(b, owner: two)
     await store.shutdown()
@@ -254,7 +254,8 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
         } else {
             let report = try await port.send(.speechSynthesis(request), parent: parent, to: synthesizer.descriptor.id)
             #expect(report.delivered == [synthesizer.descriptor.id])
-            let owner = SpeechAudioStore.Owner(source: config.agentID, session: parent.sessionID, input: parent.id)
+            let owner = SpeechAudioStore.Owner(
+                source: config.agentID.rawValue, session: parent.sessionID, input: parent.id)
             let audio = try await store.checkout(request.audioID, owner: owner)
             var count = 0
             while try await audio.next() != nil { count += 1 }
@@ -288,7 +289,7 @@ private actor ReplyCompletionGate {
 @Test(.timeLimit(.minutes(1))) func replyFinishJoinsActionsBeforeCleaningRemainingAudio() async throws {
     let store = SpeechAudioStore()
     let input = AgentInput(sessionID: UUID(), payload: .text("perform then speak"))
-    let owner = SpeechAudioStore.Owner(source: .assistant, session: input.sessionID, input: input.id)
+    let owner = SpeechAudioStore.Owner(source: "assistant", session: input.sessionID, input: input.id)
     let id = UUID()
     try await store.register(id, owner: owner, cancel: {})
     let audio = try await store.begin(id)
@@ -319,7 +320,7 @@ private actor ReplyCompletionGate {
     let finishing = Task {
         try await gateway.dispatch(
             OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished")))
-        await store.cancel(inputID: input.id, source: .assistant)
+        await store.cancel(inputID: input.id, source: "assistant")
     }
     try await store.validate(id, owner: owner)
     await release.open()
@@ -344,7 +345,7 @@ private actor ReplyCompletionGate {
     }
     // Gateway reports admission failure; the owning output consumer releases its input resources.
     try await store.validate(job.0, owner: job.1)
-    await store.cancel(inputID: job.2.testEnvelope.inputID, source: job.2.testEnvelope.source)
+    await store.cancel(inputID: job.2.testEnvelope.inputID, source: job.2.testEnvelope.source.rawValue)
     await #expect(throws: CancellationError.self) { try await store.validate(job.0, owner: job.1) }
     await synth.stop()
     await gateway.shutdown()

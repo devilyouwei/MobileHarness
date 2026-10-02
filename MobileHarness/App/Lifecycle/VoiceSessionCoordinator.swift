@@ -110,10 +110,10 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                                 state == "assistant.finished" || state == "agent.finished"
                                     || state.hasPrefix("assistant.error:") || state.hasPrefix("agent.error:")
                             {
-                                await audioStore.cancel(inputID: output.inputID, source: output.source)
+                                await audioStore.cancel(inputID: output.inputID, source: output.source.rawValue)
                             }
                         } catch {
-                            await audioStore.cancel(inputID: output.inputID, source: output.source)
+                            await audioStore.cancel(inputID: output.inputID, source: output.source.rawValue)
                             throw error
                         }
                     }

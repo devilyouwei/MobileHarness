@@ -129,8 +129,12 @@ for path, directories, files in os.walk(ROOT / 'MobileHarness/Storage'):
         errors.append(f'Missing Storage directory README: {Path(path).relative_to(ROOT)}')
 audio_target = next(t for t in package['targets'] if t['name'] == 'StorageAudio')
 audio_dependencies = [next(iter(d.values()))[0] for d in audio_target.get('dependencies', [])]
-if audio_dependencies != ['Storage', 'AgentCore', 'ModelKit']:
-    errors.append('StorageAudio must depend only on Storage, AgentCore and ModelKit')
+if audio_dependencies != ['Storage', 'ModelKit']:
+    errors.append('StorageAudio must depend only on Storage and ModelKit')
+for source in (ROOT / 'MobileHarness/Storage/Audio').rglob('*.swift'):
+    for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+        if imported not in {'Foundation', 'Storage', 'ModelKit'}:
+            errors.append(f'Forbidden StorageAudio import {imported}: {source.relative_to(ROOT)}')
 # Speech signal observation is runtime admission/logging, never a UI-command side channel.
 coordinator = (ROOT / 'MobileHarness/App/Lifecycle/VoiceSessionCoordinator.swift').read_text()
 observer = coordinator.split('func observeSpeech(', 1)[1].split('private func resumeListening(', 1)[0]

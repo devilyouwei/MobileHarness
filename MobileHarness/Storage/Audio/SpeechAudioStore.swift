@@ -1,20 +1,20 @@
-import AgentCore
 import Foundation
 import Storage
 
 /// PCM-specific ownership adapter over the shared process-local handle store.
 public final class SpeechAudioStore: Sendable {
     public struct Owner: Sendable, Equatable {
-        public let source: AgentID
+        /// Opaque caller identity; Agent callers supply their raw ID at the boundary.
+        public let source: String
         public let session: UUID
         public let input: UUID
-        public init(source: AgentID, session: UUID, input: UUID) {
+        public init(source: String, session: UUID, input: UUID) {
             self.source = source
             self.session = session
             self.input = input
         }
         fileprivate var storage: StorageOwner {
-            StorageOwner(namespace: "speech.pcm", source: source.rawValue, session: session, input: input)
+            StorageOwner(namespace: "speech.pcm", source: source, session: session, input: input)
         }
     }
 
@@ -71,8 +71,8 @@ public final class SpeechAudioStore: Sendable {
     }
 
     public func fail(_ id: UUID, error: any Error) async { await handles.fail(id, error: error) }
-    public func cancel(inputID: UUID, source: AgentID) async {
-        await handles.cancel(inputID: inputID, source: source.rawValue, namespace: "speech.pcm")
+    public func cancel(inputID: UUID, source: String) async {
+        await handles.cancel(inputID: inputID, source: source, namespace: "speech.pcm")
     }
     public func cancel(sessionID: UUID) async { await handles.cancel(sessionID: sessionID, namespace: "speech.pcm") }
     public func shutdown() async { await handles.shutdown() }

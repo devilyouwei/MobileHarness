@@ -194,3 +194,5 @@ These are **dated decision records**, including proposals and stages later repla
 - [0095 — Remove retired device and behavior code](0095-remove-retired-device-and-behavior-code.md): production cleanup, historical test isolation and consistent native admission.
 
 - [0096 — Behavior-owned execution contracts](0096-behavior-owned-contracts.md)
+
+- [0097 — Opaque source identity for audio storage](0097-storage-audio-opaque-owner.md): remove AgentCore dependency while preserving ownership isolation.

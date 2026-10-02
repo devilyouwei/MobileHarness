@@ -75,3 +75,5 @@ flowchart LR
 ✅ The boundary check also prevents retired NexArm polling diagnostics and historical test algorithms from returning to production Actions.
 
 ✅ Behavior boundary checks reject Actions/Tools dependencies on AgentCore, Gateway, UI, App or each other, and recognize Contracts as infrastructure rather than a callable domain.
+
+✅ Boundary validation requires StorageAudio dependencies to be Storage and ModelKit only, and rejects other source imports including AgentCore.

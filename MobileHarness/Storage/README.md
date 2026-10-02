@@ -12,7 +12,7 @@ Purpose: provide one project-wide home for transient and durable data used by mu
 
 ## Upstream and downstream
 
-The base `Storage` target depends only on Foundation. Its direct production consumers are App/AppWorkflows (document assembly/settings), StorageChat (conversation persistence) and StorageAudio (bounded PCM primitives). Agents import StorageChat and StorageAudio. Actions depends on StorageAudio. UI imports StorageChat conversation record values only; its pages receive state/operation interfaces rather than a store. These arrows show runtime use, not reverse imports into Storage.
+The base `Storage` target depends only on Foundation. Its direct production consumers are App/AppWorkflows (document assembly/settings), StorageChat (conversation persistence) and StorageAudio (bounded PCM primitives). Agents import StorageChat and StorageAudio. Scheduled Speech Actions consume audio through AppWorkflows.SpeechPlayback; Actions does not depend on StorageAudio. UI imports StorageChat conversation record values only; its pages receive state/operation interfaces rather than a store. These arrows show runtime use, not reverse imports into Storage.
 
 ```mermaid
 flowchart LR
@@ -98,3 +98,5 @@ See [Chat](Chat/README.md) for the moved journal contract and [Audio](Audio/READ
 ✅ MemoryLeaseStore accepts nil queueTTL/readyTTL for owner-managed values: no expiration task is armed for that state. Explicit durations retain generic queued/completed expiry for other domains. StorageAudio always selects nil for both; error tombstones remain bounded and expire separately. ❌ This adds no persistence or automatic eviction of live reply audio.
 
 ✅ BoundedMemoryStream accepts an optional read timeout. A nil timeout creates no reader timer; producer finish/failure and cancellation still resolve the reader. StorageAudio uses this producer-owned policy so synthesis pauses do not discard PCM. Explicit durations still fail stalled reads. ❌ This does not guarantee real-time production.
+
+✅ StorageAudio accepts an opaque source string and has no AgentCore dependency; callers adapt Agent identity while source/session/input isolation remains unchanged.

@@ -788,3 +788,11 @@ Device installation succeeded; an independent iPhone installed-app query confirm
 ✅ Behavior-owned contracts, explicit Gateway translation and UI display projection are implemented (ADR0096). ❌ Cross-process behavior serialization and durable replay remain outside this migration. Validation: `scripts/check.sh` passed with297 IntegrationTests and the remaining enabled suites; `scripts/build-ios.sh` passed all four schemes. Signed iPhone build2026100203 succeeded. Optional physical-motion and model acceptance were not run for this boundary migration.
 
 Device: the first installation lost the phone installation-service connection. Retrying succeeded, and an independent installed-app query confirmed bundle version2026100203. The app was not auto-launched and no physical motion was issued.
+
+## Audio storage identity boundary — ADR0097
+
+✅ StorageAudio depends only on Storage and ModelKit; consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](adr/0097-storage-audio-opaque-owner.md).
+
+❌ ModelKit PCM type extraction and new physical-device acceptance are not included.
+
+Validation: `scripts/check.sh` passed, including ownership/scoped-cancellation and long audio-retention regressions; `scripts/build-ios.sh` passed all four unsigned simulator schemes. No phone installation or new physical-device acceptance was performed.

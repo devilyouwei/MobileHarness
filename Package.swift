@@ -109,7 +109,7 @@ let package = Package(
             name: "StorageChat", dependencies: ["Storage"],
             path: "MobileHarness/Storage/Chat", exclude: ["README.md"]),
         .target(
-            name: "StorageAudio", dependencies: ["Storage", "AgentCore", "ModelKit"],
+            name: "StorageAudio", dependencies: ["Storage", "ModelKit"],
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
             name: "Tools", dependencies: ["BehaviorDefinitions"], path: "MobileHarness/Tools",
