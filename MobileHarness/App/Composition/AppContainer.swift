@@ -69,7 +69,7 @@ final class AppContainer {
         try Task.checkCancellation()
         let state = ConversationState()
         let lifecycle = VoiceSessionCoordinator(
-            runtime: runtime, state: state, modelName: modelName,
+            runtime: runtime.voiceDependencies, state: state, modelName: modelName,
             audio: AppleAudioIO(), recognition: recognition, synthesis: synthesis,
             prepareRecognition: {
                 // Reload only resources evicted after startup; get/load reuse resident weights.

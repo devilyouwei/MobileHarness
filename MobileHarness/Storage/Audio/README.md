@@ -1,10 +1,10 @@
 # StorageAudio — Process-local PCM adapter
 
-Purpose: share bounded single-use PCM handles between synthesis Agents and scheduled playback without either depending on the other. This target adapts ModelKit `AudioFrame` and opaque caller identity to the Foundation-only Storage primitives; it performs no inference, routing or device I/O.
+Purpose: share bounded single-use PCM handles between synthesis Agents and scheduled playback without either depending on the other. This target adapts AudioTypes `AudioFrame` and opaque caller identity to the Foundation-only Storage primitives; it performs no inference, routing or device I/O.
 
 ## Upstream and downstream
 
-Compile-time dependencies are `Storage` (bounded streams and leases), `ModelKit` (AudioFrame values only). There is no model inference dependency. Direct consumers are Agents and App/AppWorkflows. App creates one shared SpeechAudioStore, injects it into SpeechSynthesisAgent and SpeechPlayback, and owns input/session cancellation and shutdown. SpeechSynthesisAgent writes frames; scheduled SpeechPlayback checks out a handle, forwards its PCM to the App-injected player, and releases the handle after playback drains. Store completion is distinct from physical playback completion.
+Compile-time dependencies are `Storage` (bounded streams and leases), `AudioTypes` (AudioFrame values only). There is no model inference dependency. Direct consumers are Agents and App/AppWorkflows. App creates one shared SpeechAudioStore, injects it into SpeechSynthesisAgent and SpeechPlayback, and owns input/session cancellation and shutdown. SpeechSynthesisAgent writes frames; scheduled SpeechPlayback checks out a handle, forwards its PCM to the App-injected player, and releases the handle after playback drains. Store completion is distinct from physical playback completion.
 
 ## Design goals
 
@@ -41,6 +41,6 @@ flowchart LR
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
 
-✅ StorageAudio depends only on Storage and ModelKit. Callers convert Agent identity to its raw source string; the same source/session/input tuple still fences checkout, release and cancellation.
+✅ StorageAudio depends only on Storage and AudioTypes. Callers convert Agent identity to its raw source string; the same source/session/input tuple still fences checkout, release and cancellation.
 
-❌ PCM values still use ModelKit.AudioFrame; independent shared audio contracts remain future work.
+✅ PCM values are owned by AudioTypes, independently of ModelKit. ❌ Persistent audio and multi-reader replay remain unsupported.

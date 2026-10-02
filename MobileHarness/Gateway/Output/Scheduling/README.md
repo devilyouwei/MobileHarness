@@ -218,3 +218,5 @@ flowchart LR
 ✅ A Runtime deadline keeps `ActionReport.executionFailure` when the invocation also has stored child results. The terminal result releases the lane only after cooperative cleanup joins; later accepted Actions still run. Queue time is outside the registered execution budget.
 
 ✅ Scheduling and ActionDiagnostics operate on ScheduledAction. Only its ActionInvocation execution value crosses into Actions; Channel ordering, cancellation, admission identity and resource fencing remain unchanged.
+
+✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.

@@ -1,3 +1,5 @@
+import ActionRuntime
+
 /// Explicit built-in catalog: add modules here, never in the application host.
 public enum ActionModules {
     public static func builtIn(

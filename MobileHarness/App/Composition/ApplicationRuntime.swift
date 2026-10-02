@@ -1,3 +1,4 @@
+import ActionRuntime
 import Actions
 import AgentCore
 import Agents
@@ -63,69 +64,13 @@ final class ApplicationRuntime {
                 resources: Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") }),
                 owner: nil, lease: nil, operation: operation)
         }
+        let robot = NexArmBehaviorAdapter(bluetooth: bluetooth)
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation,
-            gesture: { request, invocation in
-                let composition = try ActionComposition(
-                    .action("gesture", [], maximumResults: 100) {
-                        do {
-                            switch request.gesture {
-                            case .reset:
-                                try await bluetooth.resetArm(speed: request.speed, acceleration: request.acceleration)
-                            case .moveMotor, .resetMotor:
-                                guard let motor = request.motor else { throw NexArmError.invalidMotion }
-                                try await bluetooth.moveMotor(
-                                    id: motor, target: request.target, speed: request.speed,
-                                    acceleration: request.acceleration)
-                            default:
-                                let gesture: NexArmGesture
-                                switch request.gesture {
-                                case .nod: gesture = .nod
-                                case .shakeHead: gesture = .shakeHead
-                                case .wave: gesture = .wave
-                                case .tiltLeft: gesture = .tiltLeft
-                                case .tiltRight: gesture = .tiltRight
-                                case .lookAround: gesture = .lookAround
-                                case .celebrate: gesture = .celebrate
-                                case .dance: gesture = .dance
-                                default: throw NexArmError.invalidMotion
-                                }
-                                try await bluetooth.performGesture(
-                                    gesture, repetitions: request.repetitions,
-                                    speed: request.speed, acceleration: request.acceleration)
-                            }
-                        } catch {
-                            if let report = await bluetooth.lastActionReport {
-                                return .report(report)
-                            }
-                            throw error
-                        }
-                        if let report = await bluetooth.lastActionReport { return .report(report) }
-                        return .completed
-                    })
-                try await invocation.results.record(composition.run())
-            },
-            shakeBase: { cycles, invocation in
-                do {
-                    let args = ActionArguments(invocation.call.parameters)
-                    let speed =
-                        try invocation.call.parameters["speed"] == nil
-                        ? 1400 : args.requiredInt("speed", range: 1...1400)
-                    let acceleration =
-                        try invocation.call.parameters["acceleration"] == nil
-                        ? 30 : args.requiredInt("acceleration", range: 1...254)
-                    try await bluetooth.performGesture(
-                        .baseSway, repetitions: cycles, speed: speed, acceleration: acceleration)
-                } catch {
-                    if let report = await bluetooth.lastActionReport {
-                        try await invocation.results.record(report)
-                        if error is CancellationError { throw error }
-                        return
-                    }
-                    throw error
-                }
-                if let report = await bluetooth.lastActionReport { try await invocation.results.record(report) }
-            },
+            gesture: { request, invocation in try await robot.gesture(request, invocation) },
+            shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) })
+        try BehaviorCoverage.validate(
+            actions: behaviors.actions, toolPaths: behaviors.toolPaths,
             capabilities: [
                 AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
                 SpeechPerceptionAgent.runtimeCapabilities(
@@ -149,9 +94,17 @@ final class ApplicationRuntime {
             observedContracts: ["speech.partial", "speech.final", "speech.phase"],
             observeEvent: { try await presentation.observe($0) }, sink: { await presentation.output($0) })
     }
-    func makeAssistant(
-        chat: any ChatCapability, modelName: @escaping @Sendable () async throws -> String
-    ) throws -> AssistantAgent {
-        try AssistantAgent(chat: chat, conversations: conversations, modelName: modelName)
+    var voiceDependencies: VoiceRuntimeDependencies {
+        VoiceRuntimeDependencies(
+            manager: manager, input: input, output: output, presentation: presentation, conversations: conversations,
+            makeAssistant: { [conversations] chat, modelName in
+                try AssistantAgent(chat: chat, conversations: conversations, modelName: modelName)
+            },
+            makeSynthesis: { try SpeechSynthesisAgent(synthesis: $0, store: $1) },
+            makePerception: { try SpeechPerceptionAgent(recognition: $0, vad: $1, sessionID: $2) })
     }
+    var visionDependencies: VisionRuntimeDependencies {
+        .init(manager: manager, input: input, output: output, actions: actions, presentation: presentation)
+    }
+    var cameraDependencies: CameraRuntimeDependencies { .init(resources: resources, actions: actions) }
 }

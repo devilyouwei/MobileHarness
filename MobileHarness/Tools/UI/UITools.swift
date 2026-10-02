@@ -1,4 +1,5 @@
 import Foundation
+import ToolRuntime
 
 public enum UITools {
     @Tool(path: "UI.beginReplyTurn", title: "beginReplyTurn")

@@ -1,4 +1,5 @@
 import AVFAudio
+import ActionRuntime
 import Actions
 import AgentCore
 import Agents
@@ -9,13 +10,14 @@ import ModelKit
 import OSLog
 import PlatformKit
 import StorageAudio
+import ToolRuntime
 import Tools
 import UI
 
 @MainActor
 final class VoiceSessionCoordinator: VoiceOutputHandling {
     let state: ConversationState
-    private let runtime: ApplicationRuntime
+    private let runtime: VoiceRuntimeDependencies
     private let modelName: @Sendable () async throws -> String
     private var speechPlayback: SpeechPlayback?
     private var presentationPhase: VoicePhase = .loading { didSet { updatePhase() } }
@@ -46,7 +48,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     private let log = Logger(subsystem: "dev.mobileharness", category: "AppLifecycle")
 
     init(
-        runtime: ApplicationRuntime, state: ConversationState, modelName: @escaping @Sendable () async throws -> String,
+        runtime: VoiceRuntimeDependencies, state: ConversationState,
+        modelName: @escaping @Sendable () async throws -> String,
         audio: AppleAudioIO, recognition: any SpeechRecognitionCapability,
         synthesis: any SpeechSynthesisCapability, prepareRecognition: @escaping @Sendable () async throws -> Void,
         voiceActivity: any VoiceActivityCapability, chat: any ChatCapability
@@ -67,7 +70,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         let manager = runtime.manager
         self.manager = manager
         let agent: Agents.AssistantAgent
-        do { agent = try runtime.makeAssistant(chat: chat, modelName: modelName) } catch {
+        do { agent = try runtime.makeAssistant(chat, modelName) } catch {
             self.manager = nil
 
             presentationPhase = .failed
@@ -88,7 +91,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         speechPlayback = SpeechPlayback(store: audioStore)
         self.responses = responses
         do {
-            let synthesizer = try SpeechSynthesisAgent(synthesis: synthesis, store: audioStore)
+            let synthesizer = try runtime.makeSynthesis(synthesis, audioStore)
             try await manager.register(synthesizer)
             try await manager.start(synthesizer.descriptor.id)
             try await manager.register(agent)
@@ -199,7 +202,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             guard voiceGeneration == generation else { return }
             try Task.checkCancellation()
             guard let manager, let requests, let responses else { throw CapabilityError.sessionClosed }
-            let speech = try SpeechPerceptionAgent(recognition: recognition, vad: voiceActivity, sessionID: generation)
+            let speech = try runtime.makePerception(recognition, voiceActivity, generation)
             try await manager.register(speech, sessionID: generation)
             guard voiceGeneration == generation, !Task.isCancelled else {
                 try? await manager.remove(.speechPerception)

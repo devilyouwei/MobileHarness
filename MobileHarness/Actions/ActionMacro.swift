@@ -1,3 +1,5 @@
+import ActionRuntime
+
 /// Compile-time definition factories; the domain catalog still binds every capability explicitly.
 @attached(peer, names: suffixed(Definition))
 public macro Action(

@@ -1,4 +1,5 @@
 import Foundation
+import ToolRuntime
 
 /// Bounded UI action data, not a model/backend type. Integer coordinates use 1/10000 image units.
 public struct ToolPoseOverlay: Codable, Sendable, Equatable {

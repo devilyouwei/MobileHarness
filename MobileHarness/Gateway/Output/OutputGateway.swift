@@ -1,7 +1,7 @@
-import Actions
+import ActionRuntime
 import AgentCore
 import Foundation
-import Tools
+import ToolRuntime
 
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {

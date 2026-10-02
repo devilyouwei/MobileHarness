@@ -1,3 +1,4 @@
+import ActionRuntime
 import Actions
 import AgentCore
 import Agents
@@ -6,6 +7,7 @@ import Foundation
 import Gateway
 import OSLog
 import PlatformKit
+import ToolRuntime
 import Tools
 import UI
 
@@ -14,8 +16,8 @@ import UI
 final class CameraCoordinator: CameraControlling, CameraOutputHandling {
     static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
     private let captureOwner: ExecutionOwner
-    private let makeRuntime: () throws -> ApplicationRuntime
-    private var resourceRuntime: ApplicationRuntime?
+    private let makeRuntime: () throws -> CameraRuntimeDependencies
+    private var resourceRuntime: CameraRuntimeDependencies?
     private var captureLease: ResourceLease?
     private var leaseRenewal: Task<Void, Never>?
     private var eventSequence: UInt64 = 0
@@ -35,7 +37,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
     private var worker: Task<Void, Never>?
 
     init(
-        camera: AppleCamera, state: CameraState, makeRuntime: @escaping () throws -> ApplicationRuntime,
+        camera: AppleCamera, state: CameraState, makeRuntime: @escaping () throws -> CameraRuntimeDependencies,
         makeSession: @escaping () async throws -> VisionSession
     ) {
         self.captureOwner = ExecutionOwner(agent: Self.resourceOwnerID, incarnation: UUID(), sessionID: UUID())

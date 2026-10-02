@@ -1,6 +1,6 @@
 # Tools — Direct Callable Functions
 
-Purpose: implement functions reached through resolved ToolCalls. Design goals: explicit result/completion contracts, bounded registration and typed host injection. Execution contracts belong to Tools/Contracts; the separate BehaviorDefinitions compiler plugin generates metadata factories.
+Purpose: implement functions reached through resolved ToolCalls. Design goals: explicit result/completion contracts, bounded registration and typed host injection. Execution contracts belong to Tools/Runtime/Contracts; the separate BehaviorDefinitions compiler plugin generates metadata factories.
 
 ## Layout and ownership
 
@@ -47,4 +47,6 @@ VisionPerception coalesces its bounded replaceable gaze/skeleton output before d
 
 ❌ Native model Tool transport, live health reporting, additional network/storage/device domains and rendering acknowledgement remain outstanding. Non-cooperative callbacks can delay callers; Tool metadata does not imply forced interruption. Do not add unused domain scaffolding.
 
-✅ Tools/Contracts owns ToolRequest, ToolResponse, ToolExecutionContext, ToolResource, definitions and macros. Tools has no dependency on AgentCore, Actions or Gateway. App/Gateway translate requests and presentation payloads; AppWorkflows owns conversation acceptance policy.
+✅ Tools/Runtime/Contracts owns ToolRequest, ToolResponse, ToolExecutionContext, ToolResource, definitions and macros. Tools has no dependency on AgentCore, Actions or Gateway. App/Gateway translate requests and presentation payloads; AppWorkflows owns conversation acceptance policy.
+
+✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.

@@ -10,7 +10,8 @@ let package = Package(
         .library(
             name: "HarnessKit",
             targets: [
-                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
+                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ActionRuntime", "ToolRuntime", "AudioTypes",
+                "ModelKit",
                 "Storage", "StorageChat", "StorageAudio", "UI", "AppWorkflows", "BehaviorAssembly",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
@@ -45,7 +46,7 @@ let package = Package(
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
             ], path: "Macros/BehaviorDefinitions", exclude: ["README.md"]),
         .target(
-            name: "BehaviorAssembly", dependencies: ["AgentCore", "Actions", "Tools"],
+            name: "BehaviorAssembly", dependencies: ["Actions", "Tools", "ActionRuntime", "ToolRuntime"],
             path: "MobileHarness/App/Composition/Behaviors", exclude: ["README.md"]),
         .target(
             name: "UI", dependencies: ["AgentCore", "StorageChat"], path: "MobileHarness/UI",
@@ -54,16 +55,37 @@ let package = Package(
                 "Settings/README.md", "Diagnostics/README.md",
             ]),
         .target(
+            name: "AppSettingsWorkflow", dependencies: ["UI", "Storage"], path: "MobileHarness/App/Workflows/Settings",
+            exclude: ["README.md"]),
+        .target(
+            name: "AppHistoryWorkflow", dependencies: ["UI", "StorageChat"],
+            path: "MobileHarness/App/Workflows/History", exclude: ["README.md"]),
+        .target(
+            name: "AppBluetoothWorkflow",
+            dependencies: ["UI", "AgentCore", "Storage", "Actions", "ActionRuntime", "PlatformKit"],
+            path: "MobileHarness/App/Workflows/Bluetooth", exclude: ["README.md"]),
+        .target(
+            name: "AppSpeechPlayback", dependencies: ["ActionRuntime", "StorageAudio"],
+            path: "MobileHarness/App/Workflows/Speech", exclude: ["README.md"]),
+        .target(
+            name: "AppPresentationWorkflow", dependencies: ["UI", "AgentCore", "ActionRuntime", "ToolRuntime"],
+            path: "MobileHarness/App/Workflows/Presentation", exclude: ["README.md"]),
+        .target(
+            name: "AppDiagnosticWorkflow", dependencies: ["UI", "ModelKit", "PlatformKit"],
+            path: "MobileHarness/App/Workflows/Diagnostics", exclude: ["README.md"]),
+        .target(
             name: "AppWorkflows",
             dependencies: [
-                "UI", "AgentCore", "Agents", "Storage", "StorageChat", "ModelKit", "ModelKitDefaults", "ModelKitOpenAI",
-                "PlatformKit", "Actions", "Tools", "StorageAudio",
-            ],
-            path: "MobileHarness/App/Workflows", exclude: ["README.md"]),
+                "AppSettingsWorkflow", "AppHistoryWorkflow", "AppBluetoothWorkflow", "AppSpeechPlayback",
+                "AppPresentationWorkflow", "AppDiagnosticWorkflow",
+            ], path: "MobileHarness/App/Workflows",
+            exclude: ["README.md", "Settings", "History", "Bluetooth", "Speech", "Presentation", "Diagnostics"]),
         .testTarget(name: "UITests", dependencies: ["UI"], exclude: ["README.md"]),
         .testTarget(
             name: "AppWorkflowTests",
-            dependencies: ["AppWorkflows", "UI", "Storage", "StorageChat", "ModelKit"],
+            dependencies: [
+                "AppWorkflows", "UI", "Storage", "StorageChat", "ModelKit", "Agents", "AppSettingsWorkflow",
+            ],
             exclude: ["README.md"]),
         .target(
             name: "AgentCore", path: "MobileHarness/Agents/Core",
@@ -73,7 +95,11 @@ let package = Package(
                 "Runtime/README.md",
             ]),
         .target(
-            name: "Gateway", dependencies: ["AgentCore", "Actions", "Tools"],
+            name: "ActionRuntime", path: "MobileHarness/Actions/Runtime", exclude: ["README.md", "Contracts/README.md"]),
+        .target(
+            name: "ToolRuntime", path: "MobileHarness/Tools/Runtime", exclude: ["README.md", "Contracts/README.md"]),
+        .target(
+            name: "Gateway", dependencies: ["AgentCore", "ActionRuntime", "ToolRuntime"],
             path: "MobileHarness/Gateway",
             exclude: [
                 "Input/README.md", "Output/Dispatch/README.md", "Output/README.md",
@@ -81,11 +107,11 @@ let package = Package(
                 "Output/Resources/README.md", "Output/Results/README.md", "README.md",
             ]),
         .target(
-            name: "Actions", dependencies: ["PlatformKit", "BehaviorDefinitions"],
+            name: "Actions", dependencies: ["ActionRuntime", "PlatformKit", "BehaviorDefinitions"],
             path: "MobileHarness/Actions",
             exclude: [
-                "Contracts/README.md",
-                "README.md", "Runtime/README.md", "NexArm/README.md", "NexArm/Support/README.md",
+                "Runtime",
+                "README.md", "NexArm/README.md", "NexArm/Support/README.md",
                 "Speech/README.md", "Speech/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),
         .target(
@@ -109,17 +135,17 @@ let package = Package(
             name: "StorageChat", dependencies: ["Storage"],
             path: "MobileHarness/Storage/Chat", exclude: ["README.md"]),
         .target(
-            name: "StorageAudio", dependencies: ["Storage", "ModelKit"],
+            name: "StorageAudio", dependencies: ["Storage", "AudioTypes"],
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
-            name: "Tools", dependencies: ["BehaviorDefinitions"], path: "MobileHarness/Tools",
+            name: "Tools", dependencies: ["ToolRuntime", "BehaviorDefinitions"], path: "MobileHarness/Tools",
             exclude: [
-                "Contracts/README.md",
+                "Runtime",
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
-                "Runtime/README.md",
             ]),
+        .target(name: "AudioTypes", path: "MobileHarness/AudioTypes", exclude: ["README.md"]),
         .target(
-            name: "ModelKit", path: "MobileHarness/ModelKit",
+            name: "ModelKit", dependencies: ["AudioTypes"], path: "MobileHarness/ModelKit",
             exclude: [
                 "README.md", "Language/README.md", "Language/JEV/README.md",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
@@ -192,7 +218,7 @@ let package = Package(
             path: "MobileHarness/ModelKit/Speech/TTS/Kokoro", exclude: ["README.md"]),
         .testTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
         .target(
-            name: "PlatformKit", path: "MobileHarness/PlatformKit",
+            name: "PlatformKit", dependencies: ["AudioTypes"], path: "MobileHarness/PlatformKit",
             exclude: [
                 "README.md", "Audio/README.md", "Vision/README.md", "Core/README.md", "Connectivity/README.md",
                 "Connectivity/NexArm/README.md",
@@ -201,7 +227,8 @@ let package = Package(
             name: "IntegrationTests",
             dependencies: [
                 "BehaviorAssembly", "AppWorkflows", "UI",
-                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ModelKit",
+                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ActionRuntime", "ToolRuntime", "AudioTypes",
+                "ModelKit",
                 "Storage", "StorageChat", "StorageAudio",
                 "PlatformKit",
             ],

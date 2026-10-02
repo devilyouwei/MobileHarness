@@ -1,5 +1,4 @@
 import Foundation
-import ModelKitOpenAI
 import Security
 import Storage
 
@@ -28,12 +27,6 @@ struct CloudSettings: Decodable, Equatable, Sendable {
         model = try values.decode(String.self, forKey: .model)
     }
 
-    func configuration() throws -> OpenAIChatConfiguration? {
-        guard enabled else { return nil }
-        let endpoint = try OpenAIChatConfiguration.endpoint(url)
-        return try OpenAIChatConfiguration(
-            baseURL: endpoint, apiKey: key, model: model.isEmpty ? OpenAIChatConfiguration.defaultModel : model)
-    }
 }
 
 enum CloudSettingsError: Error {
@@ -81,9 +74,15 @@ private nonisolated struct UserSettingsDocument: Codable, Sendable {
     }
 }
 
+@MainActor
+protocol SettingsPersistence: AnyObject {
+    func load() async throws -> CloudSettings?
+    func save(_ value: CloudSettings?) async throws
+}
+
 /// App owns schema, credential references and legacy migration; Storage owns file/cache consistency.
 @MainActor
-final class CloudSettingsStore {
+final class CloudSettingsStore: SettingsPersistence {
     private var document: LocalDocumentStore<UserSettingsDocument>?
     private var snapshot: DocumentSnapshot<UserSettingsDocument>?
     private var loaded = false

@@ -1,3 +1,5 @@
+import ActionRuntime
+
 /// One control domain: all gestures share NexArm module exclusion.
 public struct NexArmGestureActionModule: ActionModule {
     private let perform: @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void

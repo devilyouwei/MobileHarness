@@ -1,18 +1,18 @@
 # Tool Runtime
 
-Purpose: register and execute ToolRequests directly. Design goals: explicit feedback kind, bounded catalogs and host-owned effects without Action scheduling. Runtime consumes Tools/Contracts; ToolMacro references the separate compile-time BehaviorDefinitions plugin.
+Purpose: register and execute ToolRequests directly. Design goals: explicit feedback kind, bounded catalogs and host-owned effects without Action scheduling. ToolRuntime consumes its own Contracts. The Tools target owns ToolMacro and the compile-time BehaviorDefinitions dependency.
 
 | File | Responsibility |
 |---|---|
-| ../Contracts/ToolMacro | Attached metadata declarations and generated factory interface |
-| ../Contracts/ToolDefinition / ToolModules | Domain definitions and explicit built-in catalog |
+| ../ToolMacro | Attached metadata declarations and generated factory interface |
+| Contracts/ToolDefinition | Domain definitions and explicit built-in catalog |
 | ToolRegistry | Actor-owned bounded handlers and resource mappings |
-| ../Contracts/ToolInvocation | ToolRequest plus trusted output context |
+| Contracts/ToolInvocation | ToolRequest plus trusted output context |
 | ToolExecutor | Lookup, cancellation and result/completion semantics |
 
 ## Registration and bounds
 
-Domain Support catalogs bind `@Tool`-generated factories to explicit capabilities. `ToolRegistry(modules:)` validates the execution catalog atomically: at most32 modules,128 handlers and8 resources per definition. BehaviorAssembly checks up to128 Agent capability catalogs against registered paths before producers start. Path segments use the1–64-byte identifier grammar. Duplicate/invalid entries throw in the registry; missing implementations throw in assembly; no partial startup registration is published. Agent declarations remain the permission source.
+Domain Support catalogs bind `@Tool`-generated factories to explicit capabilities. `ToolRegistry(modules:)` validates the execution catalog atomically: at most32 modules,128 handlers and8 resources per definition. Gateway.BehaviorCoverage checks up to128 Agent capability catalogs against registered paths before producers start. Path segments use the1–64-byte identifier grammar. Duplicate/invalid entries throw in the registry; missing implementations throw in assembly; no partial startup registration is published. Agent declarations remain the permission source.
 
 The registry retains handler and resource mappings. ToolDefinition also carries a display name; this metadata does not create an Action execution record. Dynamic registration APIs support explicit isolated runtimes; production uses the complete catalog constructor.
 
@@ -48,3 +48,9 @@ Gateway checks resource ownership through the same ResourceCoordinator used by A
 ✅ Macro factories, bounded registration, implementation coverage, resource declarations and both feedback kinds are implemented and tested.
 
 ❌ Runtime discovery, forced interruption, implicit permission grants and automatic hardware resource inference are unsupported. Device-facing Tools must explicitly declare their resources.
+
+✅ ToolRuntime compiles this Runtime tree, including Contracts, without project dependencies. Domain catalogs and macro declarations compile in Tools; Gateway imports only runtime contracts.
+
+❌ No change to scheduling, completion, resource arbitration or cleanup algorithms.
+
+✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.

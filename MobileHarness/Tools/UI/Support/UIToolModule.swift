@@ -1,4 +1,5 @@
 import Foundation
+import ToolRuntime
 
 /// Typed presentation operations; completion means the endpoint accepted the update.
 public protocol UIUpdateCapability: Sendable {

@@ -35,4 +35,6 @@ The Action owns no task or queue. App rejects outdated sessions and turns; stale
 
 ✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
 
-✅ Expressions consume ActionInvocation from Actions/Contracts. Rendering and session acceptance remain in the injected App endpoint.
+✅ Expressions consume ActionInvocation from Actions/Runtime/Contracts. Rendering and session acceptance remain in the injected App endpoint.
+
+✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.

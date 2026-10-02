@@ -18,25 +18,30 @@ App/
 ├── Lifecycle/               # Voice and camera sessions, input/output pumps and cleanup
 │   ├── VoiceSessionCoordinator.swift
 │   ├── CameraCoordinator.swift
-│   └── VisionSession.swift
-├── Workflows/               # Settings, history and explicit diagnostic operations
-│   ├── SettingsWorkflow.swift
-│   ├── CloudSettingsStore.swift
-│   ├── ConversationHistoryWorkflow.swift
-│   ├── SpeechDiagnosticWorkflow.swift
-│   └── ChatDiagnosticWorkflow.swift
+│   ├── VisionSession.swift
+│   └── RuntimeDependencies.swift
+├── Workflows/               # AppWorkflows export facade + independent feature targets
+│   ├── Settings/           # Persistence and injected provider transactions
+│   ├── History/            # Journal operations and injected title/preview
+│   ├── Bluetooth/          # Connection/manual/action lifecycle and presentation
+│   ├── Speech/             # Stored-audio playback adaptation
+│   ├── Presentation/       # Conversation acceptance and execution observation
+│   └── Diagnostics/        # Explicit speech/chat diagnostics
 ├── Adapters/                # Typed effect endpoints, native preview and value conversion
 │   ├── RuntimePresentation.swift
 │   ├── CurrentChatCapability.swift
 │   ├── CameraImageAttachment.swift
 │   ├── CameraPreviewAdapter.swift
-│   └── EyeExpression.swift
+│   ├── EyeExpression.swift
+│   ├── NexArmBehaviorAdapter.swift
+│   ├── HistoryAgentAdapter.swift
+│   └── SettingsProviderAdapter.swift
 └── README.md
 ```
 
 ## Upstream and downstream
 
-The following arrows describe runtime flow. App imports UI; UI has no App dependency. Workflows compile in the separate AppWorkflows target, allowing their behavior to be tested without the executable. Composition/Behaviors compiles in the separate BehaviorAssembly target; the remaining App sources compile once in each Xcode application target.
+The following arrows describe runtime flow. App imports UI; UI has no App dependency. Workflows compile in separate feature targets exposed by the state-free AppWorkflows facade, allowing their behavior to be tested without the executable. Composition/Behaviors compiles in the separate BehaviorAssembly target; the remaining App sources compile once in each Xcode application target.
 
 ```mermaid
 flowchart LR
@@ -58,7 +63,7 @@ flowchart LR
 
 ## Internal composition
 
-App composes the running system; Agents compose task behavior. Solid arrows below mean construction or assembly, and dashed arrows mean capability injection or binding, not Swift imports. Runtime facilities are shared across sessions; voice/camera owners create and clean up their own running scopes. UI receives state and operations rather than owning those scopes.
+App composes the running system; Agents compose task behavior. Solid arrows below mean construction or assembly, and dashed arrows mean capability injection or binding, not Swift imports. Runtime facilities are shared across sessions; voice/camera owners receive role-specific service slices and create and clean up their own running scopes. UI receives state and operations rather than owning those scopes.
 
 ```mermaid
 flowchart TB
@@ -100,7 +105,7 @@ flowchart TB
     Platform -.->|Device service| Camera
 ```
 
-[ApplicationRuntime](Composition/ApplicationRuntime.swift) builds communication policy, shared storage and runtime services. [BehaviorAssembly](Composition/Behaviors/README.md) combines domain-owned Action/Tool modules with typed App capabilities and validates Agent implementation coverage before producers start. Agent declarations authorize calls; the registries bind their implementations. [AppContainer](Composition/AppContainer.swift) obtains model capabilities from the shared manager, while [Lifecycle](Lifecycle/README.md) owns Agent registration, pumps, cancellation and cleanup. Detailed lifetimes and completion boundaries remain below.
+[ApplicationRuntime](Composition/ApplicationRuntime.swift) builds communication policy, shared storage and runtime services. [BehaviorAssembly](Composition/Behaviors/README.md) combines domain-owned Action/Tool modules with typed App capabilities; Gateway.BehaviorCoverage validates Agent implementation coverage before producers start. Agent declarations authorize calls; the registries bind their implementations. [AppContainer](Composition/AppContainer.swift) obtains model capabilities from the shared manager, while [Lifecycle](Lifecycle/README.md) owns Agent registration, pumps, cancellation and cleanup. Detailed lifetimes and completion boundaries remain below.
 
 ## Responsibilities and injection
 

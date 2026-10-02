@@ -224,6 +224,12 @@ Actions and Tools now own Contracts directories and have no AgentCore dependency
 
 ## Audio storage identity boundary — ADR0097
 
-✅ StorageAudio depends only on Storage and ModelKit; consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](adr/0097-storage-audio-opaque-owner.md).
+✅ ADR0097 removed AgentCore from audio storage. ADR0098 subsequently moved PCM values to AudioTypes; StorageAudio now depends only on Storage and AudioTypes, and consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](adr/0097-storage-audio-opaque-owner.md).
 
 ❌ ModelKit PCM type extraction and new physical-device acceptance are not included.
+
+## Independent dependency boundaries — ADR0098 (2026-10-02)
+
+✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. AudioTypes is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](adr/0098-independent-runtime-workflow-audio-boundaries.md).
+
+❌ Real-provider/device acceptance and multi-window coordination remain separate; no phone installation is part of this refactor.

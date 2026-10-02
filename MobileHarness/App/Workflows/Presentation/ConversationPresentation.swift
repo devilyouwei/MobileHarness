@@ -1,7 +1,7 @@
-import Actions
+import ActionRuntime
 import AgentCore
 import Foundation
-import Tools
+import ToolRuntime
 
 /// Bounded acceptance policy for UI handlers. No device, view, queue or callback ownership.
 public struct ConversationPresentation: Sendable {

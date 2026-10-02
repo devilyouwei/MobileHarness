@@ -20,7 +20,7 @@ flowchart LR
     Results --> Channel
 ```
 
-Only NexArm/Support may import PlatformKit within Actions; PlatformKit has no project-target dependencies. Actions/Runtime remains device-independent. Callable registration belongs to the domain modules; Agent JSON grants model access. Public helpers and diagnostic methods are not automatically model-callable.
+Only NexArm/Support may import PlatformKit within Actions; PlatformKit depends only on shared AudioTypes values. Actions/Runtime remains device-independent. Callable registration belongs to the domain modules; Agent JSON grants model access. Public helpers and diagnostic methods are not automatically model-callable.
 
 ## Source map
 
@@ -194,4 +194,6 @@ Cancellation stops future writes and joins cooperative tasks while retaining pri
 
 Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros.md), [ADR0091](../../../docs/adr/0091-nexarm-motor-scoped-feedback.md), [ADR0092](../../../docs/adr/0092-atomic-actions-and-composed-results.md), [ADR0093](../../../docs/adr/0093-nexarm-platform-action-boundary.md). This document describes current code, not superseded implementations or unimplemented proposal interfaces.
 
-✅ Registration uses ActionRequest, ActionResource and ActionExecutionBudget from Actions/Contracts. Motor profiles, movement and completion algorithms are unchanged by the contract migration.
+✅ Registration uses ActionRequest, ActionResource and ActionExecutionBudget from Actions/Runtime/Contracts. Motor profiles, movement and completion algorithms are unchanged by the contract migration.
+
+✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.

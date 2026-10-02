@@ -8,11 +8,14 @@ import PlatformKit
 /// Owns one vision Agent session: frames enter InputGateway, effects leave through OutputGateway.
 @MainActor
 final class VisionSession {
-    private let runtime: ApplicationRuntime
-    private let pose: any PoseCapability
-    init(runtime: ApplicationRuntime, pose: any PoseCapability) {
+    private let runtime: VisionRuntimeDependencies
+    private let makeAgent: (UUID, FrameChangeConfiguration, Bool) throws -> VisionPerceptionAgent
+    init(
+        runtime: VisionRuntimeDependencies,
+        makeAgent: @escaping (UUID, FrameChangeConfiguration, Bool) throws -> VisionPerceptionAgent
+    ) {
         self.runtime = runtime
-        self.pose = pose
+        self.makeAgent = makeAgent
     }
     func run(
         frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: UUID,
@@ -24,9 +27,7 @@ final class VisionSession {
         let responses = runtime.output
         try runtime.presentation.bindCamera(endpoint)
         defer { runtime.presentation.unbindCamera(endpoint) }
-        let vision = try VisionPerceptionAgent(
-            pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze,
-            resolveImage: CameraImageAttachment.resolve)
+        let vision = try makeAgent(sessionID, configuration, mirroredGaze)
         try await manager.register(vision, sessionID: sessionID)
         let actions = runtime.actions
         do {

@@ -72,3 +72,5 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Action failure isolation now releases waits and continues subsequent Actions. ActionResult carries composed leaf outcomes; explicit user/session cancellation is unchanged.
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.

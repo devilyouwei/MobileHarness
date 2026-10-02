@@ -1,6 +1,6 @@
 # PlatformKit — Device Input and Output
 
-Purpose: provide reusable hardware and operating-system I/O through public APIs. Design goals: permission-aware device lifetimes, bounded data/command admission, explicit cleanup and an independent foundational SDK. PlatformKit has no project-target dependencies.
+Purpose: provide reusable hardware and operating-system I/O through public APIs. Design goals: permission-aware device lifetimes, bounded data/command admission, explicit cleanup and an independent foundational SDK. PlatformKit depends only on shared AudioTypes values; it has no business or model dependency.
 
 | Directory | Owns | Must not own |
 |---|---|---|

@@ -11,3 +11,5 @@ Update this README when changing the validation contract or implementation statu
 
 
 ✅ Typed scheduling directives require OutputKind.scheduling in the Agent descriptor. Scheduler admission validates balanced boundaries, task/session identity and group bounds. OutputGateway cancels the owning task when output validation fails; raw wait XML is never accepted here. ❌ Tools are not members of Action wait groups.
+
+✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.

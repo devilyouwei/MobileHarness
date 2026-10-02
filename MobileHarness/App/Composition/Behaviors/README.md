@@ -1,20 +1,20 @@
 # BehaviorAssembly
 
-Purpose: construct complete Action/Tool registries from domain-owned modules and validate Agent capability coverage before runtime startup. Design goals: no per-function App registration, no device construction, no implicit discovery or partial async installation.
+Purpose: construct complete Action/Tool registries from domain-owned modules without Agent policy dependencies. Design goals: no per-function App registration, no device construction, no implicit discovery or partial async installation.
 
-✅ Independently compiled BehaviorAssembly target depends only on AgentCore, Actions and Tools. The host supplies typed presentation/playback/pose capabilities and a required `shakeBase(Int, ActionInvocation)` closure. Actions.ActionModules and Tools.ToolModules own built-in module catalogs; each domain owns its definitions and handlers. An explicit module-list initializer supports isolated tests and alternative hosts. Registry creation rejects duplicate paths, invalid definitions, bounds and missing model/internal implementations before returning.
+✅ Independently compiled BehaviorAssembly target depends only on Actions, Tools, ActionRuntime and ToolRuntime. The host supplies typed presentation/playback/pose capabilities and a required `shakeBase(Int, ActionInvocation)` closure. Actions.ActionModules and Tools.ToolModules own built-in module catalogs; each domain owns its definitions and handlers. An explicit module-list initializer supports isolated tests and alternative hosts. Registry creation rejects duplicate paths, invalid definitions and bounds before returning. Gateway.BehaviorCoverage separately rejects missing model/internal implementations synchronously before producers start.
 
 ```mermaid
 flowchart LR
     Host[App: real typed capability bindings] --> Assembly[BehaviorAssembly]
     Actions[Actions built-in module catalog] --> Assembly
     Tools[Tools built-in module catalog] --> Assembly
-    Permissions[Agent capability declarations] --> Validate[Validate implementation coverage]
+    Permissions[Agent capability declarations] --> Validate[Gateway.BehaviorCoverage: startup validation]
     Assembly --> Validate
     Validate --> Registries[Complete registries passed to Gateway]
 ```
 
-No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; existing total definition bounds remain 256/128. At most 128 capability catalogs per assembly. Missing dependencies are required typed initializer arguments, not optional fallbacks. Resource declarations remain part of definitions; ownership stays with the runtime coordinator.
+No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; existing total definition bounds remain 256/128. Gateway startup coverage accepts at most 128 capability catalogs. Missing dependencies are required typed initializer arguments, not optional fallbacks. Resource declarations remain part of definitions; ownership stays with the runtime coordinator.
 
 ✅ BehaviorAssemblyTests verifies production Agent coverage, typed argument rejection before effects, returning/completion Tool semantics, malformed/duplicate/bounded catalogs and additional modules without an App host. App adapters implement semantic capabilities without invoking individual UI Action/Tool helpers.
 
@@ -30,4 +30,6 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 
 ✅ BehaviorAssembly binds immediate UI tools separately from UI.express and Speech Actions; startup validation checks the updated internal grants. ❌ There is no module/source-specific Action visibility filter.
 
-✅ Assembly validates Agent permissions against module-owned definitions, translating Action paths and checking Tool availability before producers start. Registries themselves do not depend on Agent capability catalogs.
+✅ Gateway.BehaviorCoverage validates Agent permissions against module-owned definitions and the assembled immutable Tool path catalog before producers start. BehaviorAssembly and registries do not depend on Agent capability catalogs.
+
+✅ toolPaths records the validated immutable startup catalog (at most128 paths). Assembly adds no task, queue or device owner. ❌ Runtime discovery and permission inference remain unsupported.

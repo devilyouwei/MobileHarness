@@ -60,3 +60,5 @@ flowchart LR
 ✅ All AVAudioEngine taps explicitly use `@Sendable` closures. The mixer tap captures only mutex-protected telemetry, never MainActor state. This prevents Swift 6 executor assertions on the audio callback queue; playback completion hops explicitly to MainActor. Device regression uses MOSS diagnostics with `-moss-autorun -moss-playback` through the production AppleAudioIO.
 
 ✅ Responsibility audit: audio capture, device playback/drain, PCM conversion and measured spectrum remain device capabilities. No speech Action, Agent inference or conversation choreography lives here. Presentation and speech sequencing belong to their owning modules.
+
+✅ ADR0098: MicrophoneFrame is exported from shared AudioTypes with unchanged samples/rate/sequence, duration and RMS behavior; capture/player algorithms are unchanged.

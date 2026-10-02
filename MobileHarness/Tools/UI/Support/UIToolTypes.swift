@@ -1,3 +1,5 @@
+import ToolRuntime
+
 extension UITools {
     public enum VoiceState: String, Sendable { case listening, hearing, processing }
 

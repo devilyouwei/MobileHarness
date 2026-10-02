@@ -51,3 +51,5 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 ✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
 
 ✅ SpeechActions validates the audio identifier with a module-owned SpeechActionError. The injected playback endpoint owns checkout and drain; AppWorkflows.SpeechPlayback adapts StorageAudio ownership.
+
+✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.

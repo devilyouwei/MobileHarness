@@ -1,6 +1,6 @@
 # Gateway — Input and Output Routing
 
-Validates and routes Agent input, communication and resolved calls. The goal is bounded admission, explicit failure and clear completion semantics. The target depends on AgentCore, Actions and Tools, using only their Runtime APIs; model processing belongs to Agents.
+Validates and routes Agent input, communication and resolved calls. The goal is bounded admission, explicit failure and clear completion semantics. The target depends on AgentCore, ActionRuntime and ToolRuntime; model processing belongs to Agents.
 
 ## Directory structure
 

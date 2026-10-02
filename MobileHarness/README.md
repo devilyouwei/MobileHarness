@@ -136,7 +136,13 @@ MobileHarness/
 │   ├── Composition/        # AppAssembly and runtime/model assembly
 │   │   └── Behaviors/       # Independent BehaviorAssembly target
 │   ├── Lifecycle/          # Voice/camera sessions and cleanup
-│   ├── Workflows/          # Settings, history and diagnostics (AppWorkflows target)
+│   ├── Workflows/          # AppWorkflows facade and independent feature targets
+│   │   ├── Settings/
+│   │   ├── History/
+│   │   ├── Bluetooth/
+│   │   ├── Speech/
+│   │   ├── Presentation/
+│   │   └── Diagnostics/
 │   └── Adapters/           # Effect endpoints, media and native preview bridges
 ├── UI/                     # Independent pages, state and interaction target
 │   ├── Conversation/
@@ -158,15 +164,16 @@ MobileHarness/
 ├── Gateway/                # Input/output validation, routing and scheduling
 │   ├── Input/
 │   └── Output/             # Validation, routing, dispatch, scheduling, results and resources
-├── Actions/                # One target: scheduled execution and behaviors
-│   ├── Runtime/            # ActionRegistry, ActionExecutor and invocation
+├── Actions/                # Concrete scheduled behaviors and independent runtime
+│   ├── Runtime/            # ActionRuntime target; execution and Contracts/
 │   ├── NexArm/             # Agent-used robot actions
 │   ├── Speech/             # Audio-ID playback and awaited completion
 │   └── UI/                 # Scheduled expression; non-callable Support below
-├── Tools/                  # One target: direct execution and functions
-│   ├── Runtime/            # ToolRegistry and ToolExecutor
+├── Tools/                  # Concrete immediate functions and independent runtime
+│   ├── Runtime/            # ToolRuntime target; execution and Contracts/
 │   ├── System/             # Fixed runtime information
 │   └── UI/                 # Immediate captions, gaze, voice state and skeleton display
+├── AudioTypes/             # Shared PCM and microphone values; no dependencies
 ├── Storage/                # Core cache, persistence and local synchronization
 │   ├── Audio/              # StorageAudio: PCM handles
 │   └── Chat/               # StorageChat: conversation records and journal
@@ -197,25 +204,34 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 
 | Source path | Target | Direct dependencies |
 | --- | --- | --- |
-| `App/` excluding the two subtargets below | Xcode App targets | Composition root; see [App](App/README.md) for bindings |
-| `App/Composition/Behaviors/` | BehaviorAssembly | AgentCore, Actions, Tools |
-| `App/Workflows/` | AppWorkflows | UI, AgentCore, Agents, Storage, StorageChat, ModelKit, ModelKitDefaults, ModelKitOpenAI, PlatformKit, Actions, Tools, StorageAudio |
-| `UI/` | UI | AgentCore, StorageChat; shared values only |
+| `App/` excluding package-owned subtrees | Xcode App targets | Composition/adapters/lifecycle; see App README |
+| `App/Composition/Behaviors/` | BehaviorAssembly | Actions, Tools, ActionRuntime, ToolRuntime |
+| `App/Workflows/` facade | AppWorkflows | The six feature workflow targets below |
+| `App/Workflows/Settings/` | AppSettingsWorkflow | UI, Storage |
+| `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat |
+| `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, ActionRuntime, PlatformKit |
+| `App/Workflows/Speech/` | AppSpeechPlayback | ActionRuntime, StorageAudio |
+| `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime, ToolRuntime |
+| `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
+| `UI/` | UI | AgentCore, StorageChat |
 | `Agents/Core/` | AgentCore | None |
 | `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio |
-| `Gateway/` | Gateway | AgentCore, Actions, Tools; execution uses Runtime APIs only |
-| `Actions/` including `Contracts/` and `Runtime/` | Actions | PlatformKit; BehaviorDefinitions at compile time |
-| `Tools/` including `Contracts/` and `Runtime/` | Tools | BehaviorDefinitions at compile time |
+| `Gateway/` | Gateway | AgentCore, ActionRuntime, ToolRuntime |
+| `Actions/Runtime/` including `Contracts/` | ActionRuntime | None |
+| `Tools/Runtime/` including `Contracts/` | ToolRuntime | None |
+| `Actions/` excluding `Runtime/` | Actions | ActionRuntime, PlatformKit, BehaviorDefinitions |
+| `Tools/` excluding `Runtime/` | Tools | ToolRuntime, BehaviorDefinitions |
+| `AudioTypes/` | AudioTypes | None |
 | `Storage/` excluding `Audio/` and `Chat/` | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
-| `Storage/Audio/` | StorageAudio | Storage, ModelKit |
-| `PlatformKit/` | PlatformKit | None |
-| `ModelKit/` shared capability sources | ModelKit | None |
+| `Storage/Audio/` | StorageAudio | Storage, AudioTypes |
+| `PlatformKit/` | PlatformKit | AudioTypes |
+| `ModelKit/` shared capability sources | ModelKit | AudioTypes |
 | `ModelKit/Management/` | ModelKitRuntime | ModelKit |
-| `ModelKit/Defaults/` | ModelKitDefaults | ModelKit, ModelKitRuntime and registered model adapters |
-| ModelKit concrete adapters and backends | Separate targets | See the [ModelKit target map](ModelKit/README.md) |
+| `ModelKit/Defaults/` | ModelKitDefaults | ModelKit, ModelKitRuntime and registered adapters |
+| ModelKit concrete adapters and backends | Separate targets | See ModelKit README |
 | `Resources/` | App resource staging | Local weights remain ignored |
-| Root `Tests/` | Module and integration test targets | Tested targets; no duplicated production sources |
+| Root `Tests/` | Module and integration tests | Tested targets; no duplicated sources |
 
 #### Layout exceptions and invariants
 
@@ -223,7 +239,7 @@ Root [Package.swift](../Package.swift) compiles shared sources into independentl
 - **Behavior ownership and host bindings are separate.** Actions/Tools include their Runtime APIs; domain modules own implementations. BehaviorAssembly validates their coverage against Agent permissions, and App supplies concrete capabilities. Injected UI/device callbacks do not introduce reverse imports.
 - **Platform Core is documentation only.** Current adapters check authorization directly. Unused permission/transport placeholders were removed; shared contracts require real consumers before implementation.
 - **Foundations remain independent.** ModelKit and PlatformKit have no dependency on each other or on business Agents. StorageAudio bridges media and storage contracts; it replaced the former SpeechRuntime cache owner ([ADR 0056](../docs/adr/0056-storage-audio-migration.md)). UI accesses shared values, not runtime/model/device services.
-- **Compile-time behavior metadata:** root `Macros/BehaviorDefinitions` is a SwiftSyntax-only host plugin. Actions/Contracts and Tools/Contracts declare `@Action`/`@Tool`; domain entries carry metadata and Support catalogs bind factories explicitly. This is build tooling, not a new runtime business layer (ADR0094).
+- **Compile-time behavior metadata:** root `Macros/BehaviorDefinitions` is a SwiftSyntax-only host plugin. Actions/ActionMacro.swift and Tools/ToolMacro.swift declare `@Action`/`@Tool`; domain entries carry metadata and Support catalogs bind factories explicitly. This is build tooling, not a new runtime business layer (ADR0094).
 - **One source has one compilation owner per target.** Do not recreate `Packages/HarnessKit/Sources`, duplicate sources or add empty future-domain implementations. Directory migrations must update Package.swift, Xcode navigation and affected READMEs together. Unimplemented domains stay in the [Roadmap](../docs/Roadmap.md).
 
 Source consolidation and App/UI separation are recorded in [ADR 0063](../docs/adr/0063-module-directory-consolidation.md) and [ADR 0064](../docs/adr/0064-app-ui-boundaries.md). Their dated migration checks are retained in the [Roadmap](../docs/Roadmap.md).
@@ -238,7 +254,7 @@ The next part describes module implementations; Part III explains their shared r
 
 #### Domain-owned behavior assembly
 
-[BehaviorAssembly](App/Composition/Behaviors/README.md) combines domain-owned Action/Tool definitions and catalogs with typed App-injected capabilities. It validates implementation coverage against assembled Agent permissions before producers start; App does not register individual behavior functions. Model-callable permissions remain in Agent JSON and fixed internal permissions in Agent code. New device capabilities or lifetime changes still require host bindings. Target dependencies are listed in the compilation map; [ADR 0067](../docs/adr/0067-domain-owned-behavior-assembly.md) records the assembly decision.
+[BehaviorAssembly](App/Composition/Behaviors/README.md) combines domain-owned Action/Tool definitions and catalogs with typed App-injected capabilities. Gateway.BehaviorCoverage validates implementation coverage against assembled Agent permissions before producers start; App does not register individual behavior functions. Model-callable permissions remain in Agent JSON and fixed internal permissions in Agent code. New device capabilities or lifetime changes still require host bindings. Target dependencies are listed in the compilation map; [ADR 0067](../docs/adr/0067-domain-owned-behavior-assembly.md) records the assembly decision.
 
 #### Application lifetimes
 
@@ -323,7 +339,7 @@ Data-returning calls produce correlated ToolResult through Gateway. Void calls c
 
 ### Storage
 
-[Storage](Storage/README.md) provides Foundation-only bounded memory streams and single-checkout handles. [StorageAudio](Storage/Audio/README.md) adapts ModelKit PCM frames and opaque caller identity to those primitives; App injects the shared audio store into synthesis and playback. Storage core remains independent of ModelKit and SwiftUI. LocalDocumentStore synchronizes bounded cached documents with durable files; App settings and the Assistant conversation journal are durable consumers. General reclaimable disk caches and persistent media remain later stages.
+[Storage](Storage/README.md) provides Foundation-only bounded memory streams and single-checkout handles. [StorageAudio](Storage/Audio/README.md) adapts AudioTypes PCM frames and opaque caller identity to those primitives; App injects the shared audio store into synthesis and playback. Storage core remains independent of ModelKit and SwiftUI. LocalDocumentStore synchronizes bounded cached documents with durable files; App settings and the Assistant conversation journal are durable consumers. General reclaimable disk caches and persistent media remain later stages.
 
 ✅ Both Storage targets are registered. Production PCM uses the memory cache; user settings use revision-checked local persistence with write-through caching. ❌ Persistent media, disk cache and memory records remain future work.
 
@@ -684,7 +700,7 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 
 ## Action source organization
 
-✅ Actions retains Runtime, NexArm, Speech and UI in one target. Each domain root groups related callable entries; Support holds registrations, capability interfaces, values and actual services. Runtime holds shared contracts and ActionModules. The unused diagnostic Action is removed; direct device diagnostics remain in controller tests. Production public names, Agent JSON and scheduling/completion contracts are unchanged; see [Action standard](Actions/README.md).
+✅ Actions retains the physical Runtime, NexArm, Speech and UI layout; Runtime compiles independently as ActionRuntime. Each domain root groups related callable entries; Support holds registrations, capability interfaces, values and actual services. Runtime holds shared execution contracts; the Actions root owns ActionModules. The unused diagnostic Action is removed; direct device diagnostics remain in controller tests. Production public names, Agent JSON and scheduling/completion contracts are unchanged; see [Action standard](Actions/README.md).
 
 ❌ No placeholder domains, generic action factories or new runtime behavior.
 
@@ -702,7 +718,7 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 
 ### Cohesive Tool source organization
 
-✅ Tools follows the domain layout used by Actions: `System/SystemTools.swift` and `UI/UITools.swift` contain callable functions; domain `Support/` contains registration, injected protocols, types and policy. `Runtime/ToolModules.swift` owns the built-in catalog alongside definition/invocation/registry/executor contracts. See [Tools](Tools/README.md). ❌ Native model Tool transport remains outstanding.
+✅ Tools follows the domain layout used by Actions: `System/SystemTools.swift` and `UI/UITools.swift` contain callable functions; domain `Support/` contains registration, injected protocols, types and policy. `ToolModules.swift` owns the built-in catalog alongside definition/invocation/registry/executor contracts. See [Tools](Tools/README.md). ❌ Native model Tool transport remains outstanding.
 
 ✅ Cartesian NexArm Channel Actions now share the Settings frame factory and nominal cadence, with no motion-time queries or per-waypoint arrival gates. Whole-Action scheduling waits for fresh stable final home; head gestures retain calibrated per-segment control. See [controller contract](PlatformKit/Connectivity/NexArm/README.md#settings-matched-cartesian-channel-playback-current) and ADR0088. ❌ Phone jitter acceptance remains pending.
 
@@ -722,6 +738,6 @@ MobileHarness composes a stateful **Signal → Cognition → Action** loop: App 
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
-✅ ADR0093: Actions/NexArm/Support owns the gesture catalog, localized names, simple/complex sequences, IK plan preparation and NexArmActionController execution policy. Its explicit PlatformKit dependency consumes link protocols and native command encoding; Actions/Runtime remains platform-independent. AppWorkflows depends on Actions to share the same implementation for Settings and Channel. PlatformKit has no project-target dependencies.
+✅ ADR0093: Actions/NexArm/Support owns the gesture catalog, localized names, simple/complex sequences, IK plan preparation and NexArmActionController execution policy. Its explicit PlatformKit dependency consumes link protocols and native command encoding; Actions/Runtime remains platform-independent. AppWorkflows depends on Actions to share the same implementation for Settings and Channel. PlatformKit depends only on shared AudioTypes values.
 
 ✅ PlatformKit responsibility audit: NexArm jog/reset policy belongs to Actions/NexArm/Support; structured BLE failures remain in the SDK, while BluetoothPresentation in AppWorkflows owns localization and ordering. App/Adapters chooses camera preview fill. The English Actions/NexArm README is the current consolidated technical design; obsolete implementation prose was removed.

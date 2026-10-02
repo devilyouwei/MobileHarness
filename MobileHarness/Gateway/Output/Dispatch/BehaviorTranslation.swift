@@ -1,7 +1,7 @@
-import Actions
+import ActionRuntime
 import AgentCore
 import Foundation
-import Tools
+import ToolRuntime
 
 extension ActionCall {
     public var executionRequest: ActionRequest {

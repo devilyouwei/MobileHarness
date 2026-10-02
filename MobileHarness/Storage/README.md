@@ -29,7 +29,7 @@ flowchart LR
     Audio --> Memory[MemoryLeaseStore and BoundedMemoryStream]
 ```
 
-Generic persistent media files and reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage.
+Generic persistent media files and reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage; both consume independent AudioTypes values.
 
 
 ## Local cache and persistence synchronization

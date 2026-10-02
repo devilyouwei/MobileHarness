@@ -1,3 +1,4 @@
+import Agents
 import AppWorkflows
 import Foundation
 import ModelKit
@@ -15,11 +16,11 @@ final class AppAssembly {
     @ObservationIgnored private let cameraDevice = AppleCamera()
     @ObservationIgnored private let resources = Bundle.main.bundleURL.appendingPathComponent("Models")
     @ObservationIgnored private lazy var settingsWorkflow = SettingsWorkflow(
-        resources: resources,
+        provider: SettingsProviderAdapter.operations(resources: resources),
         beginChange: { [weak self] in await self?.container?.lifecycle.beginSettingsChange() },
         endChange: { [weak self] in self?.container?.lifecycle.endSettingsChange() })
     @ObservationIgnored lazy var settings = SettingsState(
-        operations: settingsWorkflow, initial: SettingsWorkflow.initial)
+        operations: settingsWorkflow, initial: SettingsProviderAdapter.initial)
     @ObservationIgnored lazy var bluetooth = BluetoothWorkflow(
         state: BluetoothSettingsState(), link: NexArmBluetooth(),
         quiesce: { [weak self] in
@@ -40,13 +41,18 @@ final class AppAssembly {
             camera: device, state: CameraState(),
             makeRuntime: { [weak self] in
                 guard let self else { throw CancellationError() }
-                return try self.runtime()
+                return try self.runtime().cameraDependencies
             },
             makeSession: { [weak self] in
                 guard let self else { throw CancellationError() }
                 let models = try await ModelKitDefaults.manager(resources: self.resources)
                 let pose = try await models.get(.pose, load: false)
-                return try VisionSession(runtime: self.runtime(), pose: pose)
+                return try VisionSession(runtime: self.runtime().visionDependencies) {
+                    sessionID, configuration, mirroredGaze in
+                    try VisionPerceptionAgent(
+                        pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze,
+                        resolveImage: CameraImageAttachment.resolve)
+                }
             })
     }
     @ObservationIgnored lazy var history = makeHistory()
@@ -60,15 +66,20 @@ final class AppAssembly {
                 try Task.checkCancellation()
                 return try self.runtime().conversations
             },
-            makeChat: { [weak self] in
+            summarizeTitle: { [weak self] conversation in
                 guard let self else { throw CancellationError() }
-                try await self.settings.restore()
-                await self.container?.lifecycle.beginSettingsChange()
-                defer { self.container?.lifecycle.endSettingsChange() }
+                let chat = try await self.makeHistoryChat()
                 try Task.checkCancellation()
-                let models = try await ModelKitDefaults.manager(resources: self.resources)
-                return CurrentChatCapability(models: models)
-            })
+                return try await ConversationTitleGenerator.summarize(conversation, using: chat)
+            }, previewOutput: HistoryAgentAdapter.preview)
+    }
+    private func makeHistoryChat() async throws -> any ChatCapability {
+        try await settings.restore()
+        await container?.lifecycle.beginSettingsChange()
+        defer { container?.lifecycle.endSettingsChange() }
+        try Task.checkCancellation()
+        let models = try await ModelKitDefaults.manager(resources: resources)
+        return CurrentChatCapability(models: models)
     }
     private func runtime() throws -> ApplicationRuntime {
         if let runtimeValue { return runtimeValue }

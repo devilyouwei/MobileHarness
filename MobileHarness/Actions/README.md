@@ -10,7 +10,7 @@ This is the normative authoring standard for new Actions and deliberate migratio
 | --- | --- | --- |
 | Action | One permission-checked, scheduled behavior identified by `ActionIdentifier(module:function:)`. It validates input, performs an effect and returns at its documented completion point. | `Speech.speak`, `UI.express`; an Action is not an Agent, thread, animation or Swift class. |
 | Action module | A cohesive behavior domain and stable path namespace, normally one directory under Actions. Today its name is also the scheduler's process-wide mutual-exclusion key. | `Speech`, `UI`; do not invent another module name to bypass exclusion. |
-| Swift target/module | A compilation and dependency boundary. | The single `Actions` target contains Runtime, Speech, UI and NexArm supervised Actions. An Action module does not require a new Swift target. |
+| Swift target/module | A compilation and dependency boundary. | `Actions` contains Speech, UI and NexArm behavior; `ActionRuntime` compiles Runtime and its Contracts separately. An Action module does not require a new Swift target. |
 | Channel | An ordering lane selected by the Agent declaration or an allowed scope override. | `Display` is a Channel; `UI` is an Action module. Same-named Channels in different tasks do not share FIFO. |
 | Alias | An Agent-local model-visible name resolved inside Agents. | `express` resolves to `UI.express`; Runtime never resolves model aliases. |
 | Runtime service | An injected owner of mutable state, resources or ongoing work; it is not itself a model-callable Action. | `AppWorkflows.SpeechPlayback` owns playback/cache handling. Service methods are not implicitly registered. |
@@ -18,7 +18,7 @@ This is the normative authoring standard for new Actions and deliberate migratio
 
 Actions differ from Tools by execution and feedback contracts, not by read/write or fast/slow behavior. A quick state setter can still be an Action when it needs Channel ordering. Tools bypass Action scheduling and must not become an alternate route around device ownership checks.
 
-Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither AgentCore, App, concrete Agents, Gateway nor the Swift UI target. NexArm/Support additionally consumes the foundational PlatformKit protocol SDK, with no reverse dependency (ADR0093). The runtime target depends on PlatformKit, with a separate compile-time macro plugin; direct Storage access is not currently required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
+Agents emit resolved calls through OutputGateway. Domain modules own explicit handlers; App binds typed capabilities. Actions receives capability protocols or Sendable callbacks; it imports neither AgentCore, App, concrete Agents, Gateway nor the Swift UI target. NexArm/Support additionally consumes the foundational PlatformKit protocol SDK, with no reverse dependency (ADR0093). ActionRuntime depends only on system libraries. Actions depends on ActionRuntime, PlatformKit and the build-time macro plugin; direct Storage access is not required. Model inference belongs to the appropriate Agent/capability flow, not to hidden synthesis inside a playback Action.
 
 ```mermaid
 flowchart LR
@@ -141,9 +141,10 @@ Implemented module layout (create only files with real responsibilities):
 ```text
 Actions/
 ├── README.md
-├── Contracts/                     # Module-owned calls, context, metadata and results
-├── Runtime/                       # Execution, composition and built-in catalog
-│   ├── ActionModules.swift
+├── ActionMacro.swift              # Build-time metadata declarations
+├── ActionModules.swift            # Explicit concrete domain catalog
+├── Runtime/                       # Independent ActionRuntime target
+│   ├── Contracts/                 # Calls, context, metadata and results
 │   └── README.md
 └── <Module>/
     ├── README.md                  # Per-Action contracts and file inventory
@@ -404,3 +405,5 @@ The earlier explicit single-definition binding example illustrates isolated cons
 ✅ NexArm responsibility audit: all motion behavior and wrappers, including manual jog shaping and reset target selection, belong to Actions/NexArm/Support. PlatformKit retains native register encoders and device facts only. The current [NexArm README](NexArm/README.md) replaces the historical implementation narrative with one English technical contract and diagrams.
 
 ✅ Canonical entries now use `@Action` for path namespace, title, kind, completion and optional resource/budget resolver functions. Domain Support catalogs explicitly bind the generated `nameDefinition` factories. Dynamic deadlines are cooperative, start after admission, and preserve child reports. See [macro implementation](../../Macros/BehaviorDefinitions/README.md) and [ADR0094](../../docs/adr/0094-arrival-profiles-and-behavior-macros.md).
+
+✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.

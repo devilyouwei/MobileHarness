@@ -1,5 +1,5 @@
+import AudioTypes
 import Foundation
-import ModelKit
 import Storage
 
 public enum SpeechAudioError: Error, Equatable, Sendable, LocalizedError {
@@ -35,7 +35,7 @@ extension SpeechAudioError {
     }
 }
 
-/// ModelKit PCM adapter over a bounded, single-reader Storage stream.
+/// Shared PCM adapter over a bounded, single-reader Storage stream.
 public final class SpeechAudio: Sendable {
     public let id: UUID
     private let stream: BoundedMemoryStream<AudioFrame>

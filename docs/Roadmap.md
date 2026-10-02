@@ -796,3 +796,11 @@ Device: the first installation lost the phone installation-service connection. R
 ❌ ModelKit PCM type extraction and new physical-device acceptance are not included.
 
 Validation: `scripts/check.sh` passed, including ownership/scoped-cancellation and long audio-retention regressions; `scripts/build-ios.sh` passed all four unsigned simulator schemes. No phone installation or new physical-device acceptance was performed.
+
+## Independent dependency boundaries — ADR0098 (2026-10-02)
+
+✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. AudioTypes is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](adr/0098-independent-runtime-workflow-audio-boundaries.md).
+
+❌ Real-provider/device acceptance and multi-window coordination remain separate; no phone installation is part of this refactor.
+
+Validation: `scripts/check.sh` passed, including 297 IntegrationTests and 13 AppWorkflowTests (with provider validation and rollback ordering regressions), plus the remaining enabled suites. `scripts/build-ios.sh` passed all four simulator schemes; the unsigned generic iOS device build also passed. Optional real-model/physical-device tests were skipped; no phone installation or physical motion was performed.

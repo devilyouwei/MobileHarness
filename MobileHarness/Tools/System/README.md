@@ -16,4 +16,6 @@ flowchart LR
 
 ✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
 
-✅ System entries consume ToolRequest from Tools/Contracts.
+✅ System entries consume ToolRequest from Tools/Runtime/Contracts.
+
+✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.

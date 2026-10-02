@@ -1,3 +1,5 @@
+import ToolRuntime
+
 public struct SystemToolModule: ToolModule {
     public init() {}
     public var definitions: [ToolDefinition] {

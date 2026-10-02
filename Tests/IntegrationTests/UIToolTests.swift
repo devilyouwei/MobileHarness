@@ -1,8 +1,10 @@
+import ActionRuntime
 import Actions
 import AgentCore
 import AppWorkflows
 import Foundation
 import Testing
+import ToolRuntime
 import Tools
 
 /// Reuse scheduler fixtures in argument validation tests while constructing a genuine immediate Tool envelope.

@@ -46,7 +46,7 @@ flowchart LR
 
 ✅ Agent boundary validation now allows Foundation-only Storage for the shared conversation journal. ModelKit remains independent of Storage and business modules.
 
-✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, remove standalone runtime targets and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
+✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, compile standalone ActionRuntime/ToolRuntime targets without business dependencies and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
 
 ✅ Boundary checks enforce the independent UI target at MobileHarness/UI, shared value-only dependencies, no service construction/App coordinator references, explicit ApplicationRuntime injection, and README coverage in both App and UI directories.
 
@@ -76,4 +76,6 @@ flowchart LR
 
 ✅ Behavior boundary checks reject Actions/Tools dependencies on AgentCore, Gateway, UI, App or each other, and recognize Contracts as infrastructure rather than a callable domain.
 
-✅ Boundary validation requires StorageAudio dependencies to be Storage and ModelKit only, and rejects other source imports including AgentCore.
+✅ Boundary validation requires StorageAudio dependencies to be Storage and AudioTypes only, and rejects other source imports including AgentCore.
+
+✅ ADR0098 boundary checks require independent execution runtimes, shared AudioTypes, narrow feature workflow imports and role-specific Lifecycle dependencies; the complete project target graph is checked for cycles. ❌ Static checks complement compilation/regression tests and do not establish physical-device acceptance.

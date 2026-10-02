@@ -5,7 +5,7 @@
 > Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
 
 
-Purpose: implement cross-module application operations, independently of SwiftUI rendering. Design goals: explicit side effects, bounded operation admission, durable failure handling and injected dependencies. Root Package.swift compiles this directory once as AppWorkflows; the App executable imports it through HarnessKit.
+Purpose: implement cross-module application operations, independently of SwiftUI rendering. Design goals: explicit side effects, bounded operation admission, durable failure handling and injected dependencies. Root Package.swift compiles Settings, History, Bluetooth, Speech, Presentation and Diagnostics as independent feature targets. AppWorkflows is a state-free re-export facade; production code is compiled once in its owning feature target.
 
 ## Upstream and downstream
 
@@ -241,3 +241,7 @@ flowchart LR
 ✅ SpeechPlayback adapts stored-audio ownership; ConversationPresentation owns Agent-specific turn acceptance. ActionActivityPresentation maps execution observations into UI-owned ActionActivityItem values, including all bounded failure details.
 
 ✅ SpeechPlayback passes ActionExecutionContext.source directly into StorageAudio; no AgentID conversion or AgentCore import is required in that playback adapter.
+
+✅ Settings depends only on UI/Storage and History only on UI/StorageChat. Concrete provider and Agent parsing/title bindings live in App/Adapters. SpeechPlayback imports ActionRuntime and StorageAudio; presentation imports only execution/shared/UI values. Existing bounded operation policies and cancellation are unchanged.
+
+❌ The facade is not a service locator and owns no runtime state; independent multi-window arbitration remains future work.

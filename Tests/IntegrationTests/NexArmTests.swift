@@ -1,3 +1,4 @@
+import ActionRuntime
 import Actions
 import AgentCore
 import Agents
@@ -6,6 +7,7 @@ import Foundation
 import Gateway
 import PlatformKit
 import Testing
+import ToolRuntime
 import Tools
 
 /// Deliberately simple IK fixture; does not model physical kinematics.
@@ -325,7 +327,7 @@ private func runNexArmAssistantMarkup(
             NexArmGestureActionModule(perform: gesture),
             NexArmAssistantUIModule(),
         ],
-        toolModules: [], capabilities: [])
+        toolModules: [])
     try assembly.actions.validate(capabilities: assistant.descriptor.capabilities)
     let scheduler = ChannelScheduler(
         registry: assembly.actions, capacityPerChannel: 1, maximumTrackedInputs: 1, resources: try nexArmTestResources()

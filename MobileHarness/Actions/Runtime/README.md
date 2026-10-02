@@ -1,10 +1,10 @@
 # Action Runtime
 
-Purpose: bind, validate and execute Action implementations. Design goals: explicit completion, bounded composition/results, parameter-based resources and cooperative cleanup. Runtime consumes Actions/Contracts and Foundation; it owns no device or presentation policy.
+Purpose: bind, validate and execute Action implementations. Design goals: explicit completion, bounded composition/results, parameter-based resources and cooperative cleanup. Runtime consumes Actions/Runtime/Contracts and Foundation; it owns no device or presentation policy.
 
 ## Registration and ownership
 
-`@Action` generates typed `nameDefinition(handler:)` and `nameDefinition(completing:)` factories beside each canonical entry. Domain Support catalogs bind explicit host capabilities; `ActionModules` lists built-in domains. BehaviorAssembly constructs and validates the registry before producers start. Agent JSON and code-owned internal permissions remain the authorization source; metadata grants no permission.
+`@Action` generates typed `nameDefinition(handler:)` and `nameDefinition(completing:)` factories beside each canonical entry. Domain Support catalogs bind explicit host capabilities; The Actions target owns ActionModules and the macro declaration; BehaviorAssembly constructs the registry and Gateway validates permission coverage before producers start. Agent JSON and code-owned internal permissions remain the authorization source; metadata grants no permission.
 
 `ActionRegistry` accepts at most32 modules and256 definitions. Paths follow the1–64-byte capability identifier grammar, display names must be nonblank and at most256 UTF-8 bytes, and completion descriptions at most512. Invalid/duplicate entries and missing capability implementations throw; nothing is silently replaced. Direct definition/empty-registry constructors support isolated runtimes and tests.
 
@@ -61,7 +61,7 @@ Reports retain flat child paths, statuses, error codes and optional motor/target
 
 ## Arguments and diagnostics
 
-`ActionArguments` belongs to Actions/Contracts. It rejects undeclared keys, malformed values, nonfinite doubles and out-of-range integers; readers bound strings and source values. Domain code owns defaults and relationships between parameters. Gateway separately checks allowed parameter names. Dependency errors must not be relabeled as argument errors.
+`ActionArguments` belongs to Actions/Runtime/Contracts. It rejects undeclared keys, malformed values, nonfinite doubles and out-of-range integers; readers bound strings and source values. Domain code owns defaults and relationships between parameters. Gateway separately checks allowed parameter names. Dependency errors must not be relabeled as argument errors.
 
 ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by default, configurable1–4096. Overflow replaces the oldest record and increments an eviction count; it never drops device actions. Records contain execution identity, phase, effect and monotonic time, not arguments, media or error objects. Snapshots are bounded diagnostic history, not durable auditing. The separate execution ledger supplies self-described UI snapshots.
 
@@ -69,9 +69,9 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 
 | File | Responsibility |
 |---|---|
-| ../Contracts/ActionMacro / ActionDefinition | Compile-time metadata factories and runtime contracts |
-| ActionRegistry / ActionModules | Validated registry and explicit domain catalog |
-| ../Contracts/ActionInvocation / ActionReportStore | Module-owned request/context and bounded report store |
+| ../ActionMacro / ActionDefinition | Compile-time metadata factories and runtime contracts |
+| ActionRegistry | Validated registry and explicit domain catalog |
+| Contracts/ActionInvocation / ActionReportStore | Module-owned request/context and bounded report store |
 | ActionExecutor / ActionDeadline | Completion validation and cooperative deadlines |
 | ActionComposition | Validated trees, resource/budget union and outcome aggregation |
 | Gateway/Output/Scheduling/ActionDiagnostics | Payload-free bounded diagnostic ring |
@@ -79,3 +79,9 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 ✅ Registered execution, dynamic resource/budget resolution, composition, complete failure reporting and Channel continuation are implemented and tested.
 
 ❌ Automatic runtime discovery, generic activity supervision, durable result delivery and forced termination of uncooperative handlers are not implemented. Physical emergency stopping is a device capability, not a Swift cancellation promise.
+
+✅ ActionRuntime compiles this Runtime tree, including Contracts, without project dependencies. Domain catalogs and macro declarations compile in Actions; Gateway imports only runtime contracts.
+
+❌ No change to scheduling, completion, resource arbitration or cleanup algorithms.
+
+✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.

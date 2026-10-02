@@ -1,9 +1,12 @@
+import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import BehaviorAssembly
 import Foundation
+import Gateway
 import Testing
+import ToolRuntime
 import Tools
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
@@ -42,7 +45,9 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint,
         gesture: { _, _ in throw CancellationError() },
-        shakeBase: { _, _ in throw CancellationError() },
+        shakeBase: { _, _ in throw CancellationError() })
+    try BehaviorCoverage.validate(
+        actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [
             AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
             SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities),
@@ -73,7 +78,9 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 @Test func behaviorAssemblyRejectsMissingInternalToolBeforeRuntimeStarts() throws {
     let permissions = try CapabilityRegistry(internalTools: [InternalTool(path: "Missing.tool")])
     #expect(throws: ToolRegistrationError.missingHandler("Missing.tool")) {
-        try BehaviorAssembly(actionModules: [], toolModules: [], capabilities: [permissions])
+        let assembly = try BehaviorAssembly(actionModules: [], toolModules: [])
+        try BehaviorCoverage.validate(
+            actions: assembly.actions, toolPaths: assembly.toolPaths, capabilities: [permissions])
     }
 }
 
@@ -115,7 +122,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
                 await endpoint.emotion?.rawValue ?? "clear"
             })
     ])
-    let assembly = try BehaviorAssembly(actionModules: [action], toolModules: [tool], capabilities: [])
+    let assembly = try BehaviorAssembly(actionModules: [action], toolModules: [tool])
     #expect(try assembly.actions.definition(for: path).resources == [ActionResource(rawValue: resource.rawValue)])
     #expect(await assembly.tools.resources(for: "Fixture.read") == [ToolResource(rawValue: resource.rawValue)])
     let invocation = ActionInvocation(

@@ -1,9 +1,11 @@
+import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import Foundation
 import Gateway
 import Testing
+import ToolRuntime
 import Tools
 
 @Test func lifecycleAndBoundedQueue() async throws {

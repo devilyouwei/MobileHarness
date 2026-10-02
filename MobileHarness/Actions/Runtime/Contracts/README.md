@@ -4,7 +4,7 @@ Purpose: define the public inputs, metadata, capabilities and results owned by A
 
 ✅ `ActionRequest`, `ActionExecutionContext` and `ActionResource` belong to this module. Context contains opaque source/session/input/correlation identifiers and sequence; it carries no Agent input, output envelope, permissions or resource lease. The host validates identity and acquires resources before execution.
 
-✅ Definitions and attached macros describe explicitly registered handlers. Arguments are decoded locally. ActionCompletion and ActionReport preserve bounded child failures; budgets compose by sum for sequences and maximum for parallel groups.
+✅ Definitions describe explicitly registered handlers; attached macro declarations belong to the concrete Actions target. Arguments are decoded locally. ActionCompletion and ActionReport preserve bounded child failures; budgets compose by sum for sequences and maximum for parallel groups.
 
 ```mermaid
 flowchart LR
@@ -15,6 +15,8 @@ flowchart LR
     Result --> Host
 ```
 
-✅ No dependency on AgentCore, Gateway, App, UI or the other behavior module. These contracts compile inside `Actions`; no shared-contract package is introduced. Platform/model capabilities may be consumed by implementations when needed.
+✅ No dependency on AgentCore, Gateway, App, UI or the other behavior module. These contracts compile inside `ActionRuntime` and contain no concrete behavior. Platform/model capabilities may be consumed by implementations when needed.
 
 ❌ Cross-process serialization and durable execution replay are not provided.
+
+✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.

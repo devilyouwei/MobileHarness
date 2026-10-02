@@ -1,3 +1,4 @@
+import Agents
 import AppWorkflows
 import Foundation
 import ModelKit
@@ -37,7 +38,9 @@ func archiveCommitsBeforeTitleAndRejectsOverlappingPageOperations() async throws
     let store = try await completedConversation()
     let state = ConversationHistoryState()
     let chat = ControlledTitle()
-    let workflow = ConversationHistoryWorkflow(state: state, loadStore: { store }, makeChat: { chat })
+    let workflow = ConversationHistoryWorkflow(
+        state: state, loadStore: { store },
+        summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }, previewOutput: { _ in "" })
     await workflow.load()
     let old = try #require(state.archive?.current.id)
     var started = chat.started.stream.makeAsyncIterator()
@@ -62,7 +65,9 @@ func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry(
     let store = try await completedConversation()
     let chat = ControlledTitle()
     let state = ConversationHistoryState()
-    let workflow = ConversationHistoryWorkflow(state: state, loadStore: { store }, makeChat: { chat })
+    let workflow = ConversationHistoryWorkflow(
+        state: state, loadStore: { store },
+        summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }, previewOutput: { _ in "" })
     await workflow.load()
     var started = chat.started.stream.makeAsyncIterator()
     workflow.startNew()
@@ -85,7 +90,8 @@ func failedHistoryLoadDoesNotCreateAnEphemeralStore() async {
     let state = ConversationHistoryState()
     let workflow = ConversationHistoryWorkflow(
         state: state, loadStore: { throw CancellationError() },
-        makeChat: { ControlledTitle() })
+        summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: ControlledTitle()) },
+        previewOutput: { _ in "" })
     await workflow.load()
     workflow.startNew()
     #expect(state.archive == nil && state.status != nil && !state.isBusy)

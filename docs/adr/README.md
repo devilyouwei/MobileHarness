@@ -196,3 +196,5 @@ These are **dated decision records**, including proposals and stages later repla
 - [0096 — Behavior-owned execution contracts](0096-behavior-owned-contracts.md)
 
 - [0097 — Opaque source identity for audio storage](0097-storage-audio-opaque-owner.md): remove AgentCore dependency while preserving ownership isolation.
+
+- [0098 — Independent runtime, workflow and audio boundaries](0098-independent-runtime-workflow-audio-boundaries.md): separate compilation without changing business behavior.

@@ -2,7 +2,7 @@
 
 Processes supplied data through typed model capabilities. The goal is to keep recognition, generation and pose inference independent of Agent policy, UI and device I/O. Consumers receive capability protocols; internal assembly selects concrete models.
 
-The physical directory contains several Swift targets. Base ModelKit has no project-target dependencies. ModelKitRuntime depends only on ModelKit; adapters and backends compile separately. Root Package.swift owns all targets and root Tests owns their tests.
+The physical directory contains several Swift targets. Base ModelKit depends only on the independent AudioTypes value module. ModelKitRuntime depends only on ModelKit; adapters and backends compile separately. Root Package.swift owns all targets and root Tests owns their tests.
 
 ## Directory structure
 
@@ -26,7 +26,7 @@ ModelKit/
 
 ## Upstream and downstream
 
-Arrows show inference requests and results. Neither Gateway nor PlatformKit calls into the model layer directly. StorageAudio also imports base ModelKit for AudioFrame values; it never invokes inference. This type dependency does not make ModelKit depend on StorageAudio.
+Arrows show inference requests and results. Neither Gateway nor PlatformKit calls into the model layer directly. StorageAudio and ModelKit independently consume AudioTypes PCM values; StorageAudio has no model dependency.
 
 ```mermaid
 flowchart LR

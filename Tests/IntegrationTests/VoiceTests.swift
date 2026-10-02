@@ -1,3 +1,4 @@
+import ActionRuntime
 import Actions
 import AgentCore
 import Agents
@@ -9,6 +10,7 @@ import PlatformKit
 import StorageAudio
 import Synchronization
 import Testing
+import ToolRuntime
 import Tools
 
 private struct RecognitionFixture: SpeechRecognitionCapability {

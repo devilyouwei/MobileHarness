@@ -40,3 +40,5 @@ See [resources](../Resources/README.md), [scheduling](../Scheduling/README.md) a
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
 ✅ The result ledger translates ActionCompletion into AgentActionCompletion before delivery, preserving every child result and execution-level failure.
+
+✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
