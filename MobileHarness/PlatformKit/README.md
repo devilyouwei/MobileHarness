@@ -21,8 +21,8 @@ flowchart LR
 
 ✅ Audio capture/playback, stream resampling and FFT metering; foreground camera capture/preview and bounded native-frame delivery; adapter-owned authorization; NexArm USB/BLE and protocol support are implemented. Playback drain and transport admission describe device operations, not a business Action result. Fixed buffer capacities and hardware register ranges are capability constraints, not application choreography.
 
-✅ The 2026-10-01 audit moved NexArm manual jog/reset behavior to Actions, Bluetooth ordering/localization to AppWorkflows, and preview fill selection to App/Adapters. Gestures, completion policies and Action errors were already moved to Actions. Source/target checks reject reverse dependencies, known Action-policy types, localized presentation strings and business presentation APIs in this SDK.
+## Ownership boundary
 
-❌ Additional device domains, general network transport, recording, sustained physical audio/camera acceptance and independently confirmed robot emergency stopping remain open. App background execution cannot establish physical safety.
+Manual jog/reset behavior, gestures and motion completion policy belong to Actions/NexArm/Support. App workflows own Bluetooth ordering/localization; App adapters choose preview layout. PlatformKit exposes native capabilities and device facts without selecting application behavior.
 
-Developer rule: determine the owning directory before adding code. Device-specific protocol knowledge is valid here; a reusable-looking wrapper that chooses an application action is not. Put action functions and composition in Actions, application connection/lifecycle policy in App, and display choices in App/UI. Keep each directory README aligned with its actual responsibility.
+❌ Additional device domains, general network transport, recording and a confirmed independent robot emergency-stop mechanism are not implemented. Physical safety cannot depend on App background execution.

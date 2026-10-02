@@ -13,8 +13,10 @@ Gateway/
 │   ├── Validation/                   # Capability and call validation
 │   ├── Routing/                      # Select Action, scheduling, Tool or control path
 │   ├── Dispatch/                     # Invoke runtimes and return Tool results
+│   ├── Resources/                    # Shared leases and execution fences
+│   ├── Results/                      # Correlated Action result delivery
 │   └── Scheduling/                   # Task-local wait groups, Channel FIFO and module exclusion
-└── README.md                         # Module boundary and status
+└── README.md                         # Module boundary
 ```
 
 ## Upstream and downstream
@@ -27,8 +29,8 @@ flowchart LR
     Input --> Agents
     Agents -->|Resolved calls and typed events| Output[OutputGateway]
     Output -->|Internal observation| Input
-    Output --> ActionExecution[Actions/Runtime]
-    Output --> ToolExecution[Tools/Runtime]
+    Output --> ActionExecution[ActionRuntime]
+    Output --> ToolExecution[ToolRuntime]
     ToolExecution -->|Returning ToolResult via dispatcher| Input
     Output -->|Runtime observations| App
 ```
@@ -41,8 +43,8 @@ Gateway connects the Agent network to adapted external input, registered executi
 flowchart TB
     App[App adapters: external business input]
     Agents[Agents: inboxes / state / decisions]
-    ActionRuntime[Actions/Runtime: await registered handler]
-    ToolRuntime[Tools/Runtime: await registered handler]
+    ActionRuntime[ActionRuntime: await registered handler]
+    ToolRuntime[ToolRuntime: await registered handler]
     Endpoints[App-bound UI / device effect endpoints]
 
     subgraph Gateway[Gateway internals]
@@ -99,25 +101,8 @@ Input admission reports acceptance, not Agent processing completion. Action disp
 
 Each active task phase runs FIFO per Channel and shares process-wide Action-module exclusion. Different Channels may run concurrently when modules permit; equal names in separate tasks do not share a FIFO. Wait gates only its parent continuation. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only Agent-owned declared latest-state buffers coalesce pending state. Gateways do not queue signals. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
 
-## Feature status
+## Scope and limitations
 
-- ✅ Static JSON v5 subscriptions via publish and explicit directed delivery via send, source/session validation and admission receipts. No legacy router or implicit Assistant fallback remains.
-- ✅ Action scheduling, direct Tools, event transport and completion/cancellation barriers.
-- ✅ Bounded correlated ActionResult feedback and shared ownership checks for declared resources.
-- ❌ General request/reply, dynamic subscriptions, priorities and preemption.
-- ❌ Enforced Channel locks and all-device physical control arbitration; Channel lock metadata grants no ownership. Resource leases are a separate implemented authority, with camera capture as the first production integration.
+✅ Static subscriptions/directed delivery, trusted admission, task-local Action scheduling, direct Tools, bounded result feedback and resource coordination are implemented.
 
-## Issue record
-
-| Status | Issue / next step |
-| --- | --- |
-| Open | Cleanup depends on cooperative handlers; device stop acknowledgements require future adapters. |
-
-
-✅ ADR 0059 adds task-local nested wait groups. Ordinary Channel FIFO order is scoped to a task/active phase, while name capacities and module exclusion are process-wide. Typed scheduling directives pass through validation/routing/dispatch; no XML enters Gateway. ❌ Cross-task barriers and preemption remain unsupported.
-
-✅ Consolidated Actions/Tools targets provide execution APIs; Gateway still cannot directly call concrete behavior helpers. Boundary checks enforce source imports and reject direct behavior symbols. ❌ Transitive linkage through Actions/StorageAudio does not authorize Gateway model inference.
-
-## Action runtime stage 2
-
-✅ Action terminal feedback returns through InputGateway with owner isolation; Output/Results owns bounded delivery, Output/Resources owns lease/fence arbitration across declared Action/Tool/host paths. ❌ No durable delivery or all-device resource coverage.
+❌ General request/reply, dynamic subscriptions, Channel locks, priority/preemption and durable feedback are not implemented. Channel metadata does not grant physical ownership; declared resource leases/fences are the separate authority. Cleanup depends on cooperative handlers and each device capability's stop acknowledgment.

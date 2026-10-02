@@ -1,8 +1,5 @@
 # UI — Pages, State and User Controls
 
-> Current status (2026-09-29): the user identified desktop simulator screen sharing as the cause of missing iPhone camera/microphone input. BLE settings and conversation binding are restored; receipt-admission and robot-only disconnect fixes remain. iPhone BLE acceptance without screen sharing is still pending; no causal claim is made about the earlier BLE failure.
-
-
 Purpose: render application state and collect user intent. Design goals: MainActor UI isolation, independent compilation and previews, narrow operation interfaces and no model/device/service construction.
 
 UI covers SwiftUI views, observable page state, user interaction and the operation interfaces consumed by those pages. Files are grouped by feature; reusable visuals live in Components. Cross-module workflows and runtime ownership remain in [App](../App/README.md).
@@ -32,20 +29,14 @@ flowchart LR
     Preview[App native camera preview adapter] -->|View content| View
 ```
 
-The diagram shows runtime use; compile-time dependency goes from App/AppWorkflows to UI. Operation protocols live beside their consuming pages. Conversation receives ConversationState and a toggle closure; Camera receives CameraState, CameraControlling and injected preview content. SettingsState invokes SettingsOperating while owning edits/loading/error UI. History and MOSS receive state plus control interfaces. The Debug chat page awaits an injected diagnostic operation. Effects and model/session handling live in AppWorkflows.
+The diagram shows runtime use; compile-time dependency goes from App/AppWorkflows to UI. Operation protocols live beside their consuming pages. Conversation receives ConversationState and a toggle closure; Camera receives CameraState, CameraControlling and injected preview content. SettingsState invokes SettingsOperating while owning edits/loading/error UI. History and MOSS receive state plus control interfaces. The Debug chat page awaits an injected diagnostic operation. Effects and model/session handling live in App workflows, adapters and lifecycle owners.
 
 Pages can own short-lived rendering/load tasks and cancel their scoped operations on disappearance. They never own voice runtime, camera capture, model construction or long-running application supervision. Background/session cleanup belongs to the App host. Storage record types used for display do not grant access to the journal service.
 
-✅ Same captions, eyes, spectra, settings/history navigation and explicit diagnostics. No page has an App coordinator field or constructs a player, model or store. Actual device FFT telemetry remains injected; the standalone visual preview uses labeled synthetic numeric bands only.
+## Presentation scope
 
-✅ Source-level boundary checks and an independent target prevent reverse App dependencies. UI state and workflow contracts are tested on macOS; iOS views compile only on iOS.
+Conversation renders captions, eyes, spectra, generic Action execution state and injected robot connection state. Settings includes Bluetooth discovery/connection controls and manual-operation presentation. Actual device spectrum data is injected; standalone previews use labeled synthetic bands. UI never owns a BLE connection, controller, registry or model service.
 
-❌ Cross-platform visual implementation, independent multi-window state routing, and physical-device layout/animation acceptance of this refactor.
+✅ Conversation, camera, settings/history and diagnostic pages expose typed operations and shared domain values.
 
-## Storage domain organization
-
-✅ UI depends on AgentCore and StorageChat shared values. Chat records moved from the generic Storage target to its domain subtarget; no storage service enters UI.
-
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
-
-✅ Settings includes independent Bluetooth device state/controls and native discovery/connection UI. Conversation optionally shows actual robot connection/action status from the same injected state. ❌ UI never owns a BLE connection, controller, Action registry or model service.
+❌ Cross-platform views and independent multi-window state routing are not implemented.

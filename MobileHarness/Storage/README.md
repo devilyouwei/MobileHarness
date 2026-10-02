@@ -1,6 +1,6 @@
 # Storage — Shared Local Storage
 
-Purpose: provide one project-wide home for transient and durable data used by multiple domains. Storage concerns ownership, lifetime, capacity and retrieval. Agents decide what is worth remembering; ModelKit produces media/model values; PlatformKit operates devices. Storage does not perform inference, choose Actions or control hardware.
+Purpose: provide one project-wide home for transient and durable data used by multiple domains. Storage concerns ownership, lifetime, capacity and retrieval. Agents decide what is worth remembering; ModelKit produces model results using shared media values; PlatformKit operates devices. Storage does not perform inference, choose Actions or control hardware.
 
 ## Design goals
 
@@ -12,35 +12,34 @@ Purpose: provide one project-wide home for transient and durable data used by mu
 
 ## Upstream and downstream
 
-The base `Storage` target depends only on Foundation. Its direct production consumers are App/AppWorkflows (document assembly/settings), StorageChat (conversation persistence) and StorageAudio (bounded PCM primitives). Agents import StorageChat and StorageAudio. Scheduled Speech Actions consume audio through AppWorkflows.SpeechPlayback; Actions does not depend on StorageAudio. UI imports StorageChat conversation record values only; its pages receive state/operation interfaces rather than a store. These arrows show runtime use, not reverse imports into Storage.
+The base `Storage` target depends only on Foundation. Its direct production consumers are App/AppWorkflows (document assembly/settings), StorageChat (conversation persistence) and StorageAudio (bounded PCM primitives). Agents import StorageChat and StorageAudio. Scheduled Speech Actions consume audio through AppSpeechPlayback.SpeechPlayback; Actions does not depend on StorageAudio. UI imports StorageChat conversation record values only; its pages receive state/operation interfaces rather than a store. These arrows show runtime use, not reverse imports into Storage.
 
 ```mermaid
 flowchart LR
     App[App settings and composition] --> Documents[LocalDocumentStore]
     App -.->|Inject same history service| Assistant[Assistant]
     App -.->|Inject history workflow| Views[UI/Settings]
-    Views -->|User operations| Workflow[AppWorkflows]
+    Views -->|User operations| Workflow[App settings / history workflows]
     Assistant -->|Context and raw turn persistence| History[ConversationHistoryStore]
     Workflow -->|Inspect, archive, title and delete| History
     History --> Documents
     Documents --> Disk[Bounded protected JSON and cached snapshot]
     Synth[SpeechSynthesisAgent] --> Audio[StorageAudio PCM adapter]
-    Playback[Actions/Speech] -->|Checkout and release| Audio
+    Playback[AppSpeechPlayback: Action-bound endpoint] -->|Checkout and release| Audio
     Audio --> Memory[MemoryLeaseStore and BoundedMemoryStream]
 ```
 
 Generic persistent media files and reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage; both consume independent Types values.
 
-
 ## Local cache and persistence synchronization
 
-✅ `LocalDocumentStore<Value>` is a Foundation-only actor providing one bounded JSON document and its read-through, write-through memory cache. The default encoded envelope limit is 64 KiB; oversized reads/writes fail explicitly. One cached snapshot is retained per instance, with no background write queue. App injects a trusted sandbox file URL; the consuming domain owns the payload schema.
+`LocalDocumentStore<Value>` is a Foundation-only actor providing one bounded JSON document and its read-through, write-through memory cache. The default encoded envelope limit is 64 KiB; oversized reads/writes fail explicitly. One cached snapshot is retained per instance, with no background write queue. App injects a trusted sandbox file URL; the consuming domain owns the payload schema.
 
 - `load()` reuses the cache; `refresh()` reads disk and replaces the cache only on success; `invalidate()` releases the cached value.
 - `save(_:expecting:)` rereads the durable revision, rejects stale writers, atomically replaces the file and then updates the cache. A nil expected revision requires an absent file. Failed writes leave the cache unchanged.
 - A process-wide lock protects revision comparison and replacement across instances, including different payload types. This is local synchronization, not cross-process locking or cross-device replication. App assembles one owner per settings file. External edits are noticed by refresh or the next save; no filesystem watcher is installed.
 - Envelope version 1 is independent of the consumer payload version. Invalid JSON, unsupported envelopes and nonregular files fail explicitly; corrupt data is never silently reset. iOS writes use complete file protection. App controls backup and credential policies.
-- App settings are the first durable consumer. PCM remains transient with explicit reply/session-owned retention and bounded capacity; it does not expire merely while waiting for playback.
+- App settings and StorageChat are durable consumers. PCM remains transient with explicit reply/session-owned retention and bounded capacity; it does not expire merely while waiting for playback.
 
 ```mermaid
 sequenceDiagram
@@ -56,13 +55,13 @@ sequenceDiagram
     Cache-->>App: update cache only after success
 ```
 
-## Staged boundary
+## Primitive ownership and lifetime
 
-✅ The Foundation-only `Storage` target implements `BoundedMemoryStream` and `MemoryLeaseStore`. Both are actor-isolated, bounded process-local primitives with explicit overflow failure, single-reader/checkout behavior, scoped owners, cancellation and expiry. `StorageAudio` under [Audio](Audio/README.md) adapts the production PCM cache; App injects one instance into synthesis and playback. No third-party package is required.
+✅ BoundedMemoryStream and MemoryLeaseStore are actor-isolated process-local primitives with explicit overflow failure, scoped owners, single-reader/checkout behavior, cancellation and optional expiry. StorageAudio adapts these primitives to reply/session-owned PCM. App supplies the shared instance to synthesis and playback.
 
-❌ Reclaimable disk caches, persistent media and semantic memory records require concrete consumers, retention rules and separate verification. The general primitives do not yet coordinate global byte budgets across namespaces; each instance supplies an explicit item and byte bound.
+MemoryLeaseStore accepts nil queueTTL/readyTTL for owner-managed values without arming expiry tasks. BoundedMemoryStream accepts a nil read timeout, leaving completion to producer finish/failure or cancellation. StorageAudio uses both owner-managed policies; bounded error tombstones expire separately.
 
-✅ App settings define their layout, payload schema, legacy migration and device-local credential policy in [App](../App/README.md). ❌ Cross-device sync, cross-process writers, general persistent media/indexes and automatic disk-cache eviction are not implemented. Model weights remain in the resource system.
+❌ Global cross-namespace byte budgets, reclaimable disk caches, persistent media, semantic memory and cross-device/cross-process synchronization are not implemented. Each instance supplies its own item/byte bound. Model weights belong to Resources.
 
 ## Directory and target ownership
 
@@ -81,7 +80,7 @@ Storage/                         # Storage target: reusable storage mechanisms o
     └── README.md
 ```
 
-✅ The outer layer owns reusable cache, persistence and local synchronization mechanisms. Domain directories own schemas, domain limits, retention and domain-specific APIs. Chat and Audio depend on core; core never imports a domain. StorageChat depends only on Storage. Existing file formats, paths on disk and data limits are unchanged by the source move.
+The outer layer owns reusable cache, persistence and local synchronization mechanisms. Domain directories own schemas, domain limits, retention and domain-specific APIs. Chat and Audio depend on core; core never imports a domain. StorageChat depends only on Storage.
 
 | Domain | Status and responsibility |
 | --- | --- |
@@ -91,12 +90,6 @@ Storage/                         # Storage target: reusable storage mechanisms o
 | Video/ | ❌ Planned only: video files, finalization and retention |
 | Memory/ | ❌ Planned only: semantic memory records, provenance, retrieval and forgetting; not the core MemoryLeaseStore |
 
-Do not create a domain directory or target until a concrete implementation exists. New domains follow the same dependency direction and must document bounds, deletion, ownership and verification. Core synchronization currently means process-local revision locking/cache coherence; cross-device synchronization and reclaimable disk cache remain unimplemented. App-owned settings schemas remain in App, using the generic document store.
+Domain targets depend on core mechanisms, never the reverse. App owns settings payload/credential policy and uses the generic document store. StorageAudio consumes Types values and opaque source identity; StorageChat consumes Storage alone.
 
-See [Chat](Chat/README.md) for the moved journal contract and [Audio](Audio/README.md) for PCM contracts.
-
-✅ MemoryLeaseStore accepts nil queueTTL/readyTTL for owner-managed values: no expiration task is armed for that state. Explicit durations retain generic queued/completed expiry for other domains. StorageAudio always selects nil for both; error tombstones remain bounded and expire separately. ❌ This adds no persistence or automatic eviction of live reply audio.
-
-✅ BoundedMemoryStream accepts an optional read timeout. A nil timeout creates no reader timer; producer finish/failure and cancellation still resolve the reader. StorageAudio uses this producer-owned policy so synthesis pauses do not discard PCM. Explicit durations still fail stalled reads. ❌ This does not guarantee real-time production.
-
-✅ StorageAudio accepts an opaque source string and has no AgentCore dependency; callers adapt Agent identity while source/session/input isolation remains unchanged.
+See [Chat](Chat/README.md) for the journal contract and [Audio](Audio/README.md) for PCM contracts.

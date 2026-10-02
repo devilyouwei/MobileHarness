@@ -14,6 +14,10 @@ flowchart LR
     Types --> Audio[Audio values]
 ```
 
-✅ Types has no project dependencies; Audio values retain their original limits, validation, sample layout and ownership. ModelKit preserves its original constructor labels and error mapping; PlatformKit preserves its microphone value export.
+## Contracts and scope
 
-❌ Image and other shared categories are added when concrete shared consumers require them. ModelKit/Core currently owns ImageFrame and NativeImageBuffer; this migration does not move them or create unused placeholders. Types owns no capture, inference, persistence, queues or lifecycle services.
+✅ Types has no project dependencies. Audio values own PCM validation and immutable samples/format/sequence data. ModelKit re-exports audio values with its public constructor labels and CapabilityError mapping; PlatformKit re-exports MicrophoneFrame.
+
+ImageFrame and NativeImageBuffer currently belong to ModelKit/Core. Types owns no capture, inference, persistence, queues or lifecycle services.
+
+❌ Other shared value categories are not implemented. A category is added only with concrete values and consumers.
