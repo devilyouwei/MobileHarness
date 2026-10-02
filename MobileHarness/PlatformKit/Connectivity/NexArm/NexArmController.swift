@@ -29,6 +29,7 @@ public actor NexArmController {
     private var compatibility: NexArmCompatibility?
     private var armPlan: NexArmArmPlan?
     private var connectionIndicationUsed = false
+    private var lastAimPositions = NexArmJointCommand.armHome
     public private(set) var cachedJoints: [Int] = []
     private var cachedPose: [Int] = []
     public var latestState: (joints: [Int], pose: [Int]) { (cachedJoints, cachedPose) }
@@ -421,7 +422,8 @@ public actor NexArmController {
         guard !busy else { throw NexArmError.busy }
         guard compatibility != nil else { throw NexArmError.firmwareUnavailable }
         guard let writer = link as? any NexArmWritableLink else { throw NexArmError.invalidMotion }
-        let packet = try NexArmJointCommand.aimPacket(base: base, pitch: pitch)
+        let positions = try NexArmJointCommand.positions(base: base, pitch: pitch)
+        let packet = try NexArmJointCommand.packet(positions: positions, previous: lastAimPositions)
         busy = true
         defer { busy = false }
         faulted = false
@@ -429,6 +431,7 @@ public actor NexArmController {
         motionFailure = .sending
         do {
             try await writer.write(packet)
+            lastAimPositions = positions
             motionFailure = nil
         } catch is CancellationError {
             throw CancellationError()

@@ -5,7 +5,7 @@ import Foundation
 public enum NexArmJointCommand {
     public static let countsPerRadian = 4096.0 / (2 * Double.pi)
     /// Nominal duration used only to choose a legal motor speed. It is not a measured travel time.
-    public static let aimMilliseconds = 800
+    public static let aimMilliseconds = 200
     /// Phone joins this hotspot and keeps one TCP connection. The camera session does not open it.
     public static let wifiHost = "192.168.4.1"
     public static let wifiPort: UInt16 = 8080
@@ -24,14 +24,15 @@ public enum NexArmJointCommand {
     }
 
     /// Broadcast servo write listing IDs 1...5. No gripper byte is present.
-    public static func packet(positions: [Int]) throws -> NexArmPacket {
-        guard positions.count == 5,
+    /// Speed follows the change from `previous`, so a small follow-up step stays slow even far from rest.
+    public static func packet(positions: [Int], previous: [Int]) throws -> NexArmPacket {
+        guard positions.count == 5, previous.count == 5,
             zip(positions, NexArmJogPlanner.limits.prefix(5)).allSatisfy({ $1.contains($0) })
         else { throw NexArmControlError.invalidPosition }
         var payload: [UInt8] = [41, 7]
         for index in 0..<5 {
-            let distance = abs(positions[index] - armHome[index])
-            let speed = max(1, min(1400, Int(ceil(Double(distance) * 1250 / Double(aimMilliseconds)))))
+            let distance = abs(positions[index] - previous[index])
+            let speed = max(1, min(700, Int(ceil(Double(distance) * 1250 / Double(aimMilliseconds)))))
             payload += [
                 UInt8(index + 1), 30, UInt8(positions[index] & 255), UInt8(positions[index] >> 8), 0, 0,
                 UInt8(speed & 255), UInt8(speed >> 8),
@@ -40,6 +41,10 @@ public enum NexArmJointCommand {
         let packet = try NexArmPacket(id: 254, command: 131, payload: payload)
         guard packet.isArmControl else { throw NexArmControlError.invalidPosition }
         return packet
+    }
+
+    public static func packet(positions: [Int]) throws -> NexArmPacket {
+        try packet(positions: positions, previous: armHome)
     }
 
     public static func frame(positions: [Int]) throws -> [UInt8] {
