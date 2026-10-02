@@ -198,7 +198,7 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
 
-✅ Support/NexArmJointCommand maps tracking radians to five motor targets. NexArmActionController.aim requires a verified connection and returns on transport acceptance; it does not wait for arrival. ❌ Physical tracking acceptance remains pending.
+✅ Support/NexArmJointCommand maps tracking radians to five motor targets. `NexArmJogPlanner.approach` moves one of those counts with the same jerk limit as manual jog. Production tracking streams that step on the live Bluetooth loop and does not wait for arrival. ❌ Physical tracking acceptance remains pending.
 
 ✅ Tracking aim is an immediate target write, with capacity-one controller admission and motors1–5 ownership. A failed possible write requires explicit read-only recovery. Its target mapping is Support/NexArmJointCommand.swift; native encoding remains PlatformKit. ❌ Tracking arrival remains unmeasured.
 

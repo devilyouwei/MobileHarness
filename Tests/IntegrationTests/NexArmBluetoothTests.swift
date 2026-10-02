@@ -1154,6 +1154,31 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     await observer.value
 }
 
+@Test func aimFollowApproachesTheLatestCountWithoutJumpingThere() throws {
+    var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
+    let start = Int(planner.targets[0])
+    let goal = start - 80
+    var last = start
+    var moved = false
+    for _ in 0..<100 {
+        guard let proposal = try planner.approach(id: 1, target: goal) else { break }
+        if let packet = proposal.packet {
+            #expect(packet.isLiveControl)
+            #expect(packet.id == 1)
+            let position = Int(packet.payload[2]) | Int(packet.payload[3]) << 8
+            #expect(abs(position - last) <= 40)
+            last = position
+            moved = true
+        }
+        planner.accept(proposal)
+        #expect(abs(planner.accelerations[0]) <= NexArmJogPlanner.maximumAcceleration)
+    }
+    #expect(moved)
+    #expect(abs(Int(planner.targets[0]) - goal) <= 2)
+    #expect(try planner.approach(id: 1, target: goal) == nil)
+    #expect(throws: NexArmError.invalidMotion) { try planner.approach(id: 6, target: goal) }
+}
+
 @Test func bluetoothJogShapesVelocityAndRejectsConfigurationWrites() throws {
     var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     var previousAcceleration = 0.0

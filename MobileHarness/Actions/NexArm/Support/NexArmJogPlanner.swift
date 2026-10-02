@@ -78,6 +78,58 @@ public struct NexArmJogPlanner: Sendable {
             id: id, packet: packet, target: Double(target), position: position,
             velocity: velocity, acceleration: acceleration)
     }
+
+    /// One jerk-limited step toward an absolute count. Uses the same limits as manual jog.
+    /// Returns nil once the joint is already on that count and no longer moving.
+    public mutating func approach(id: Int, target: Int, elapsed: Double = period) throws -> Proposal? {
+        guard (1...5).contains(id), Self.limits[id - 1].contains(target), elapsed.isFinite, elapsed > 0 else {
+            throw NexArmError.invalidMotion
+        }
+        let dt = min(elapsed, 0.06)
+        let index = id - 1
+        let old = states[index]
+        let error = Double(target) - old.position
+        if abs(error) <= 2, abs(old.velocity) < 8, old.lastTarget == target {
+            return nil
+        }
+        func clamp(_ value: Double, _ lower: Double, _ upper: Double) -> Double { min(upper, max(lower, value)) }
+        let desiredVelocity = clamp(error / 0.2, -Self.maximumSpeed, Self.maximumSpeed)
+        let desiredAcceleration = clamp(
+            (desiredVelocity - old.velocity) * 8, -Self.maximumAcceleration, Self.maximumAcceleration)
+        var acceleration =
+            old.acceleration
+            + clamp(desiredAcceleration - old.acceleration, -Self.maximumJerk * dt, Self.maximumJerk * dt)
+        var velocity = clamp(
+            old.velocity + (old.acceleration + acceleration) * 0.5 * dt, -Self.maximumSpeed, Self.maximumSpeed)
+        let lower = Double(Self.limits[index].lowerBound)
+        let upper = Double(Self.limits[index].upperBound)
+        let position = clamp(old.position + (old.velocity + velocity) * 0.5 * dt, lower, upper)
+        if abs(Double(target) - position) <= 2, abs(velocity) < 8 {
+            velocity = 0
+            acceleration = 0
+        }
+        var goal = position + velocity * 0.06
+        if target >= Int(old.position.rounded()) {
+            goal = min(max(goal, position), Double(target))
+        } else {
+            goal = max(min(goal, position), Double(target))
+        }
+        goal = clamp(goal, lower, upper)
+        let next = Int(goal.rounded())
+        let packet: NexArmPacket?
+        if next == old.lastTarget {
+            packet = nil
+        } else {
+            let speed = min(600, max(1, Int(abs(velocity).rounded())))
+            packet = try NexArmPacket(
+                id: UInt8(id), command: 3,
+                payload: [41, 30, UInt8(next & 255), UInt8(next >> 8), 0, 0, UInt8(speed & 255), UInt8(speed >> 8)])
+        }
+        return Proposal(
+            id: id, packet: packet, target: Double(next), position: position,
+            velocity: velocity, acceleration: acceleration)
+    }
+
     public mutating func accept(_ proposal: Proposal) {
         let index = proposal.id - 1
         states[index].position = proposal.position
