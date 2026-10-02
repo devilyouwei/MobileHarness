@@ -1,1 +1,1 @@
-@_exported import AudioTypes
+@_exported import Types

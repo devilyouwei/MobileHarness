@@ -61,4 +61,4 @@ flowchart LR
 
 ✅ Responsibility audit: audio capture, device playback/drain, PCM conversion and measured spectrum remain device capabilities. No speech Action, Agent inference or conversation choreography lives here. Presentation and speech sequencing belong to their owning modules.
 
-✅ ADR0098: MicrophoneFrame is exported from shared AudioTypes with unchanged samples/rate/sequence, duration and RMS behavior; capture/player algorithms are unchanged.
+✅ ADR0098: MicrophoneFrame is exported from shared Types with unchanged samples/rate/sequence, duration and RMS behavior; capture/player algorithms are unchanged.

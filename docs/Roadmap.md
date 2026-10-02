@@ -799,8 +799,16 @@ Validation: `scripts/check.sh` passed, including ownership/scoped-cancellation a
 
 ## Independent dependency boundaries — ADR0098 (2026-10-02)
 
-✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. AudioTypes is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](adr/0098-independent-runtime-workflow-audio-boundaries.md).
+✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. Types is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](adr/0098-independent-runtime-workflow-audio-boundaries.md).
 
 ❌ Real-provider/device acceptance and multi-window coordination remain separate; no phone installation is part of this refactor.
 
 Validation: `scripts/check.sh` passed, including 297 IntegrationTests and 13 AppWorkflowTests (with provider validation and rollback ordering regressions), plus the remaining enabled suites. `scripts/build-ios.sh` passed all four simulator schemes; the unsigned generic iOS device build also passed. Optional real-model/physical-device tests were skipped; no phone installation or physical motion was performed.
+
+## Shared Types layout — ADR0099 (2026-10-02)
+
+✅ Replaced the audio-only top-level directory/target with Types/Audio and the Types target. Updated compilation mapping, Xcode navigation, boundary checks and the current architecture dependency diagram. Current Tools/System and Tools/UI use injected host endpoints and have no direct PlatformKit dependency.
+
+❌ Shared Image extraction and additional device Tool domains require concrete integration needs; no placeholder implementations or phone installation are included.
+
+Validation: `scripts/check.sh` passed, including 297 IntegrationTests and 13 AppWorkflowTests plus the remaining enabled suites. `scripts/build-ios.sh` passed all four simulator schemes with full Xcode selected through DEVELOPER_DIR. Boundary checks validate the Types compilation owner and recursive category imports. No phone installation or physical-device acceptance was performed.

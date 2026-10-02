@@ -1,6 +1,6 @@
-import AudioTypes
 import Foundation
 import Storage
+import Types
 
 public enum SpeechAudioError: Error, Equatable, Sendable, LocalizedError {
     case capacityExceeded, missingAudio, timedOut, invalidAudio, duplicate, closed, expired, forbidden,

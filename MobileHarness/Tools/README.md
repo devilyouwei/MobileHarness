@@ -6,12 +6,13 @@ Purpose: implement functions reached through resolved ToolCalls. Design goals: e
 
 | Directory | Responsibility |
 |---|---|
-| Contracts | Requests, context, resources, definitions, macros and responses |
-| Runtime | Explicit domain catalog, registry and execution |
+| Runtime/Contracts | Requests, context, resources, definitions and responses |
+| Runtime | Independent ToolRuntime registry and execution |
+| Root | ToolModules domain catalog and ToolMacro declarations |
 | System | Fixed runtime-information function |
 | UI | Immediate presentation entries; Support owns injected interfaces and values; App owns turn acceptance policy |
 
-Related entries live in `<Domain>Tools.swift`; domain roots contain callable entries and their README. Support contains catalogs, capability protocols, values/errors and supporting policy. Tools cannot import App, UI, concrete Agents or device services. App supplies typed endpoints.
+Related entries live in `<Domain>Tools.swift`; domain roots contain callable entries and their README. Support contains catalogs, capability protocols, values/errors and supporting policy. Tools cannot import App, UI, concrete Agents or device services. App supplies typed endpoints. Current System/UI tools have no direct PlatformKit dependency. Future device tool domains may depend on PlatformKit for native capabilities when implemented; ToolRuntime remains independent.
 
 ```mermaid
 flowchart LR
@@ -27,7 +28,7 @@ flowchart LR
 
 ## Registration
 
-`@Tool(path:title:resources:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule and UIToolModule; BehaviorAssembly atomically constructs the registry and checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
+`@Tool(path:title:resources:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule and UIToolModule; BehaviorAssembly atomically constructs the registry; Gateway BehaviorCoverage checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
 
 Public entry signatures remain explicit: UI updates receive ToolInvocation and an injected callback; showPose receives a request, execution context and presentation callback; runtimeInfo returns a String. Add an entry in its domain catalog; only adding a domain changes ToolModules. Runtime constructors remain available for isolated tests.
 
@@ -47,6 +48,6 @@ VisionPerception coalesces its bounded replaceable gaze/skeleton output before d
 
 ❌ Native model Tool transport, live health reporting, additional network/storage/device domains and rendering acknowledgement remain outstanding. Non-cooperative callbacks can delay callers; Tool metadata does not imply forced interruption. Do not add unused domain scaffolding.
 
-✅ Tools/Runtime/Contracts owns ToolRequest, ToolResponse, ToolExecutionContext, ToolResource, definitions and macros. Tools has no dependency on AgentCore, Actions or Gateway. App/Gateway translate requests and presentation payloads; AppWorkflows owns conversation acceptance policy.
+✅ Tools/Runtime/Contracts owns ToolRequest, ToolResponse, ToolExecutionContext, ToolResource, definitions; macro declarations belong at the Tools root. Tools has no dependency on AgentCore, Actions or Gateway. App/Gateway translate requests and presentation payloads; AppWorkflows owns conversation acceptance policy.
 
 ✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.

@@ -1,5 +1,5 @@
-@_exported import AudioTypes
 import Foundation
+@_exported import Types
 
 // Preserve the ModelKit constructor API and error contract while sharing the actual PCM values.
 extension AudioFormat {

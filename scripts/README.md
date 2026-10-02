@@ -76,6 +76,6 @@ flowchart LR
 
 ✅ Behavior boundary checks reject Actions/Tools dependencies on AgentCore, Gateway, UI, App or each other, and recognize Contracts as infrastructure rather than a callable domain.
 
-✅ Boundary validation requires StorageAudio dependencies to be Storage and AudioTypes only, and rejects other source imports including AgentCore.
+✅ Boundary validation requires StorageAudio dependencies to be Storage and Types only, and rejects other source imports including AgentCore.
 
-✅ ADR0098 boundary checks require independent execution runtimes, shared AudioTypes, narrow feature workflow imports and role-specific Lifecycle dependencies; the complete project target graph is checked for cycles. ❌ Static checks complement compilation/regression tests and do not establish physical-device acceptance.
+✅ ADR0098 boundary checks require independent execution runtimes, shared Types, narrow feature workflow imports and role-specific Lifecycle dependencies; the complete project target graph is checked for cycles. ❌ Static checks complement compilation/regression tests and do not establish physical-device acceptance.

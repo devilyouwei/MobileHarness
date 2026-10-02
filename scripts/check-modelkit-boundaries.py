@@ -29,12 +29,12 @@ for target in package['targets']:
     if not target['name'].startswith('ModelKit') or target['type'] != 'regular':
         continue
     dependencies = target.get('dependencies', [])
-    if target['name'] == 'ModelKit' and [next(iter(d.values()))[0] for d in dependencies] != ['AudioTypes']:
-        errors.append('The base ModelKit target may depend only on AudioTypes')
+    if target['name'] == 'ModelKit' and [next(iter(d.values()))[0] for d in dependencies] != ['Types']:
+        errors.append('The base ModelKit target may depend only on Types')
     for dependency in dependencies:
         kind, values = next(iter(dependency.items()))
         name = values[0]
-        if kind in ('byName', 'target') and not name.startswith('ModelKit') and name != 'AudioTypes':
+        if kind in ('byName', 'target') and not name.startswith('ModelKit') and name != 'Types':
             errors.append(f"{target['name']} depends on external project target {name}")
         if kind == 'product' and target['name'] not in {'ModelKitMLXLanguage', 'ModelKitFluidAudio'}:
             errors.append(f"Third-party dependency outside a backend: {target['name']} -> {name}")
@@ -80,8 +80,8 @@ for module, forbidden in {
         name = next(iter(dependency.values()))[0]
         if name in forbidden or name.startswith('ModelKit'):
             errors.append(f'Forbidden {module} dependency: {name}')
-if [next(iter(d.values()))[0] for d in targets['PlatformKit'].get('dependencies', [])] != ['AudioTypes']:
-    errors.append('PlatformKit may depend only on shared AudioTypes')
+if [next(iter(d.values()))[0] for d in targets['PlatformKit'].get('dependencies', [])] != ['Types']:
+    errors.append('PlatformKit may depend only on shared Types')
 # Device SDK must not regain choreography or Action completion policy.
 for source in (ROOT / 'MobileHarness/PlatformKit/Connectivity/NexArm').glob('*.swift'):
     if re.search(r'\b(?:NexArmGesture|NexArmArmPlan|NexArmActionController|NexArmMotionPlan|NexArmSegmentTracker|NexArmMotorCompletion|NexArmMotorResult|NexArmActionError|NexArmJogPlanner|NexArmMotorReset)\b', source.read_text()):
@@ -135,11 +135,11 @@ for path, directories, files in os.walk(ROOT / 'MobileHarness/Storage'):
         errors.append(f'Missing Storage directory README: {Path(path).relative_to(ROOT)}')
 audio_target = next(t for t in package['targets'] if t['name'] == 'StorageAudio')
 audio_dependencies = [next(iter(d.values()))[0] for d in audio_target.get('dependencies', [])]
-if audio_dependencies != ['Storage', 'AudioTypes']:
-    errors.append('StorageAudio must depend only on Storage and AudioTypes')
+if audio_dependencies != ['Storage', 'Types']:
+    errors.append('StorageAudio must depend only on Storage and Types')
 for source in (ROOT / 'MobileHarness/Storage/Audio').rglob('*.swift'):
     for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
-        if imported not in {'Foundation', 'Storage', 'AudioTypes'}:
+        if imported not in {'Foundation', 'Storage', 'Types'}:
             errors.append(f'Forbidden StorageAudio import {imported}: {source.relative_to(ROOT)}')
 # Speech signal observation is runtime admission/logging, never a UI-command side channel.
 coordinator = (ROOT / 'MobileHarness/App/Lifecycle/VoiceSessionCoordinator.swift').read_text()
@@ -289,12 +289,14 @@ for module in ('Actions', 'Tools'):
     if dependency_names & forbidden:
         errors.append(f'{module} has reverse execution dependencies: {dependency_names & forbidden}')
 
-# Shared audio values cannot regain model, Agent or device ownership.
-if targets['AudioTypes'].get('dependencies'):
-    errors.append('AudioTypes must have no dependencies')
-for source in (ROOT / 'MobileHarness/AudioTypes').glob('*.swift'):
+# Shared Types values cannot regain model, Agent or device ownership.
+if targets['Types']['path'] != 'MobileHarness/Types' or 'AudioTypes' in targets:
+    errors.append('Shared values must compile once under the category-based Types target')
+if targets['Types'].get('dependencies'):
+    errors.append('Types must have no dependencies')
+for source in (ROOT / 'MobileHarness/Types').rglob('*.swift'):
     if any(module != 'Foundation' for module in re.findall(r'\bimport\s+(\w+)', source.read_text())):
-        errors.append(f'Forbidden AudioTypes import: {source.relative_to(ROOT)}')
+        errors.append(f'Forbidden Types import: {source.relative_to(ROOT)}')
 workflow_boundaries = {
     'Settings': ('AppSettingsWorkflow', {'UI', 'Storage'}),
     'History': ('AppHistoryWorkflow', {'UI', 'StorageChat'}),

@@ -1,4 +1,6 @@
-# AudioTypes — Shared audio values
+# Audio — Shared audio values
+
+Compiled in the parent Types target.
 
 Purpose: provide immutable Sendable PCM format/frame and microphone sample values independently of model, device and storage SDKs. Design goal: one source of media data contracts without runtime ownership.
 
@@ -6,7 +8,7 @@ Purpose: provide immutable Sendable PCM format/frame and microphone sample value
 
 ```mermaid
 flowchart LR
-    ModelKit --> Values[AudioTypes values]
+    ModelKit --> Values[Types values]
     PlatformKit --> Values
     StorageAudio --> Values
 ```

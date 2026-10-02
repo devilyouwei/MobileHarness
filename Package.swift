@@ -10,7 +10,7 @@ let package = Package(
         .library(
             name: "HarnessKit",
             targets: [
-                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ActionRuntime", "ToolRuntime", "AudioTypes",
+                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ActionRuntime", "ToolRuntime", "Types",
                 "ModelKit",
                 "Storage", "StorageChat", "StorageAudio", "UI", "AppWorkflows", "BehaviorAssembly",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
@@ -135,7 +135,7 @@ let package = Package(
             name: "StorageChat", dependencies: ["Storage"],
             path: "MobileHarness/Storage/Chat", exclude: ["README.md"]),
         .target(
-            name: "StorageAudio", dependencies: ["Storage", "AudioTypes"],
+            name: "StorageAudio", dependencies: ["Storage", "Types"],
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
             name: "Tools", dependencies: ["ToolRuntime", "BehaviorDefinitions"], path: "MobileHarness/Tools",
@@ -143,9 +143,9 @@ let package = Package(
                 "Runtime",
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),
-        .target(name: "AudioTypes", path: "MobileHarness/AudioTypes", exclude: ["README.md"]),
+        .target(name: "Types", path: "MobileHarness/Types", exclude: ["README.md", "Audio/README.md"]),
         .target(
-            name: "ModelKit", dependencies: ["AudioTypes"], path: "MobileHarness/ModelKit",
+            name: "ModelKit", dependencies: ["Types"], path: "MobileHarness/ModelKit",
             exclude: [
                 "README.md", "Language/README.md", "Language/JEV/README.md",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
@@ -218,7 +218,7 @@ let package = Package(
             path: "MobileHarness/ModelKit/Speech/TTS/Kokoro", exclude: ["README.md"]),
         .testTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
         .target(
-            name: "PlatformKit", dependencies: ["AudioTypes"], path: "MobileHarness/PlatformKit",
+            name: "PlatformKit", dependencies: ["Types"], path: "MobileHarness/PlatformKit",
             exclude: [
                 "README.md", "Audio/README.md", "Vision/README.md", "Core/README.md", "Connectivity/README.md",
                 "Connectivity/NexArm/README.md",
@@ -227,7 +227,7 @@ let package = Package(
             name: "IntegrationTests",
             dependencies: [
                 "BehaviorAssembly", "AppWorkflows", "UI",
-                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ActionRuntime", "ToolRuntime", "AudioTypes",
+                "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ActionRuntime", "ToolRuntime", "Types",
                 "ModelKit",
                 "Storage", "StorageChat", "StorageAudio",
                 "PlatformKit",

@@ -62,4 +62,4 @@ Keep shared media values separate from model-specific tensors, preprocessing and
 
 ✅ Cloud and local LLM adapters explicitly select no event-count cap. Pending fragments drain in order after normal completion; cancellation, errors, per-event size checks and single-consumer ownership still apply. yieldSuspending does not wait for capacity in this mode. Generation/response limits belong to the adapter; this is a user-requested exception to bounded event queues. ❌ This does not remove downstream parser, journal or Action limits or promise bounded total memory for arbitrary unbounded producers.
 
-✅ ADR0098: Audio values are defined once in AudioTypes and exported here. ModelKit preserves the original audio constructor labels and CapabilityError validation behavior through forwarding initializers.
+✅ ADR0098: Audio values are defined once in Types and exported here. ModelKit preserves the original audio constructor labels and CapabilityError validation behavior through forwarding initializers.

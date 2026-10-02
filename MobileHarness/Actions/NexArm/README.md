@@ -20,7 +20,7 @@ flowchart LR
     Results --> Channel
 ```
 
-Only NexArm/Support may import PlatformKit within Actions; PlatformKit depends only on shared AudioTypes values. Actions/Runtime remains device-independent. Callable registration belongs to the domain modules; Agent JSON grants model access. Public helpers and diagnostic methods are not automatically model-callable.
+Only NexArm/Support may import PlatformKit within Actions; PlatformKit depends only on shared Types values. Actions/Runtime remains device-independent. Callable registration belongs to the domain modules; Agent JSON grants model access. Public helpers and diagnostic methods are not automatically model-callable.
 
 ## Source map
 

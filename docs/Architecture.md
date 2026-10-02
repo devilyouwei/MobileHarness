@@ -224,12 +224,16 @@ Actions and Tools now own Contracts directories and have no AgentCore dependency
 
 ## Audio storage identity boundary — ADR0097
 
-✅ ADR0097 removed AgentCore from audio storage. ADR0098 subsequently moved PCM values to AudioTypes; StorageAudio now depends only on Storage and AudioTypes, and consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](adr/0097-storage-audio-opaque-owner.md).
+✅ ADR0097 removed AgentCore from audio storage. ADR0098 subsequently moved PCM values to Types; StorageAudio now depends only on Storage and Types, and consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](adr/0097-storage-audio-opaque-owner.md).
 
-❌ ModelKit PCM type extraction and new physical-device acceptance are not included.
+✅ Shared PCM values are now extracted; new physical-device acceptance remains outside this migration.
 
 ## Independent dependency boundaries — ADR0098 (2026-10-02)
 
-✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. AudioTypes is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](adr/0098-independent-runtime-workflow-audio-boundaries.md).
+✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. Types is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](adr/0098-independent-runtime-workflow-audio-boundaries.md).
 
 ❌ Real-provider/device acceptance and multi-window coordination remain separate; no phone installation is part of this refactor.
+
+## Shared Types layout — ADR0099 (2026-10-02)
+
+Types is the independent shared-value target, organized by category under Types/Audio. ModelKit, PlatformKit and StorageAudio consume Types; audio algorithms, validation and compatibility exports are unchanged. Image values currently remain in ModelKit/Core; future shared categories require concrete consumers. Current Tools has no PlatformKit dependency; a future device Tool domain may consume PlatformKit without adding a dependency to ToolRuntime. The technical plan now includes the current compilation dependency diagram. See [ADR0099](adr/0099-shared-types-layout.md).
