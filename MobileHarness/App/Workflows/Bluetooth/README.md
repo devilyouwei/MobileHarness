@@ -11,3 +11,5 @@ flowchart LR
 ```
 
 ❌ Physical safety still requires device-side support and sustained real-device acceptance.
+
+✅ Tracking aim uses the verified foreground NexArmActionController and the existing motors 1–5 resource fence. Return means transport acceptance, not arrival.

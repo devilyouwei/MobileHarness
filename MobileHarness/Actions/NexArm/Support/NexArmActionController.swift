@@ -88,6 +88,34 @@ public actor NexArmActionController {
         throw NexArmError.firmwareUnavailable
     }
 
+    /// Completion-only tracking write; accepted transport does not establish arrival.
+    public func aim(base: Double, pitch: Double) async throws {
+        try Task.checkCancellation()
+        guard !busy else { throw NexArmError.busy }
+        guard compatibility != nil else { throw NexArmError.firmwareUnavailable }
+        guard let writer = link as? any NexArmWritableLink else { throw NexArmError.invalidMotion }
+        let packet = try NexArmJointCommand.aimPacket(base: base, pitch: pitch)
+        busy = true
+        lockedMotors = Set(1...5)
+        motorResults = []
+        defer {
+            busy = false
+            lockedMotors = []
+        }
+        lastFailure = nil
+        motionFailure = .sending
+        do {
+            try await writer.write(packet)
+            motionFailure = nil
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            faulted = true
+            lastFailure = String(describing: error)
+            throw NexArmActionError.uncertainMotion
+        }
+    }
+
     /// Prepare a bounded, connection-local IK table before any motion/live session.
     public func prepareArmControl() async throws -> NexArmArmPlan {
         guard !busy else { throw NexArmError.busy }

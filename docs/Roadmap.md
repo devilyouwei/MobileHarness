@@ -4,7 +4,7 @@
 
 | Area | Delivered scope |
 | --- | --- |
-| Agent runtime | Four business Agents, JSON v5 permissions, static communication and independent AgentCore. |
+| Agent runtime | Five business Agents, JSON v5 permissions, static communication and independent AgentCore. |
 | Processing | Local speech/chat/pose capabilities, explicit cloud chat configuration and shared model management. |
 | Behavior | Scheduled Actions, direct Tools, nested wait, result feedback and declared-resource coordination. |
 | Host | Independent UI, role-specific lifecycle dependencies, six feature workflows and typed App adapters. |
@@ -34,3 +34,5 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 No delivery dates or physical safety certification are implied. Requirements belong to [Requirements](Requirements.md), experimental results to evidence documents, and architecture decisions to [ADRs](adr/README.md).
 
 - Camera.open/close/flip Tools are registered and declared in Assistant JSON; physical camera/lens/permission acceptance and native model Tool event transport remain pending.
+
+✅ Shared-pose Photographer and five-axis Robot.aim BLE dispatch are implemented. ❌ Physical tracking, wrist recovery and Wi-Fi control acceptance remain pending.

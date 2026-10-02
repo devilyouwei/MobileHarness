@@ -120,13 +120,14 @@ let package = Package(
             exclude: [
                 "Core", "SpeechSynthesis/README.md", "Assistant/README.md",
                 "SpeechPerception/README.md",
-                "VisionPerception/README.md", "README.md",
+                "VisionPerception/README.md", "Photographer/README.md", "README.md",
             ],
             resources: [
                 .process("Assistant/Assistant.agent.json"),
                 .process("SpeechSynthesis/SpeechSynthesis.agent.json"),
                 .process("SpeechPerception/SpeechPerception.agent.json"),
                 .process("VisionPerception/VisionPerception.agent.json"),
+                .process("Photographer/Photographer.agent.json"),
             ]),
         .target(
             name: "Storage", path: "MobileHarness/Storage",
@@ -142,6 +143,7 @@ let package = Package(
             exclude: [
                 "Runtime",
                 "Camera/README.md", "Camera/Support/README.md",
+                "Robot/README.md", "Robot/Support/README.md",
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),
         .target(name: "Types", path: "MobileHarness/Types", exclude: ["README.md", "Audio/README.md"]),

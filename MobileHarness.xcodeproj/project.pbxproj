@@ -598,9 +598,13 @@
 			"path" = "MobileHarness/Agents/README.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
+		"A71000000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Photographer/PhotographerAgent.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"A71000000000000000000002" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Agents/Photographer/Photographer.agent.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"A71000000000000000000003" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Agents/Photographer/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+		"A71000000000000000000004" = { "isa" = "PBXGroup"; "children" = ("A71000000000000000000001", "A71000000000000000000002", "A71000000000000000000003"); "name" = "Photographer"; "sourceTree" = "<group>"; };
 		"15CE49CA95885FBF33A497E3" = {
 			"isa" = "PBXGroup";
-			"children" = ("BC31CE4B1D6884FDC2EE4C7B", "87070E19E272C0DE8E410863", "98CACACB10D222364E97D6DD", "ED1EBAC56A3F728DC0208202", "1204193BE1425F0E151B9135", "D45DA3BABDC9211F7DB9A3BF", "4843351ABA0EA9CD33D7B856");
+			"children" = ("BC31CE4B1D6884FDC2EE4C7B", "87070E19E272C0DE8E410863", "98CACACB10D222364E97D6DD", "ED1EBAC56A3F728DC0208202", "1204193BE1425F0E151B9135", "D45DA3BABDC9211F7DB9A3BF", "4843351ABA0EA9CD33D7B856", "A71000000000000000000004");
 			"name" = "Agents";
 			"sourceTree" = "<group>";
 		};

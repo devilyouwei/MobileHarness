@@ -110,3 +110,5 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 | 0100 | [ADR0100 — Camera control Tools reuse the App owner](0100-camera-control-tools.md) |
 
 | 0101 | [ADR0101 — Cloud native Tool calls](0101-cloud-native-tool-calls.md) |
+
+✅ [0102 — Photographer aim on shared pose](0102-photographer-aim.md) keeps aim business policy in Actions and independent ToolRuntime dispatch. ❌ Physical tracking acceptance remains pending.

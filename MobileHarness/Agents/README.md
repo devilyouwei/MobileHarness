@@ -12,6 +12,7 @@ Agents/
 ├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
 ├── SpeechSynthesis/           # Directed serial synthesis into shared PCM handles
 ├── VisionPerception/          # Frame filtering, pose inference and skeleton ToolCalls
+├── Photographer/              # Subscribed pose observations and optional arm aim
 └── README.md                  # Shared Agent and configuration rules
 ```
 
@@ -42,7 +43,7 @@ Agents combine injected processing capabilities with explicit messages and execu
 
 ```mermaid
 flowchart TB
-    JSON[Four Agent JSON v5 resources] --> Loader[AgentConfigurations / AgentCore validation]
+    JSON[Five Agent JSON v5 resources] --> Loader[AgentConfigurations / AgentCore validation]
     Loader --> Policy[Model-callable catalogs and communication policy]
     Internal[Agent code: fixed internal permissions] --> Grants[Assembled runtime capabilities]
     Policy --> Grants
@@ -183,6 +184,7 @@ JSON has no `channels`, `textActions`, `textOutput`, `internal`, `hidden` or per
 - Assistant: reply initialization, automatic speech synthesis/audioID playback and captions.
 - SpeechPerception: transcript updates/closure and voice-state presentation.
 - VisionPerception: gaze targets and skeleton display.
+- Photographer: optional `Robot.aim` from a subscribed pose. The model catalog stays empty.
 - SpeechSynthesis: directed synthesis/cancellation only; no device-output permission.
 
 These declarations form the descriptor's immutable runtime capability snapshot together with the JSON model catalog. Internal calls are never resolved from model XML or native Tool names. All calls still pass OutputGateway permission validation, Action module exclusion/Channel/wait scheduling or the independent Tool runtime. App retains explicit implementation handlers. Internal permissions are mandatory code policy, not recovery for an invalid JSON resource.
@@ -222,10 +224,12 @@ Assistant, SpeechPerception and VisionPerception accept action.result receipts w
 
 ## Implemented scope and limitations
 
-✅ Assistant, SpeechPerception, SpeechSynthesis and VisionPerception implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, StorageChat and StorageAudio.
+✅ Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, StorageChat and StorageAudio.
 
 Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.express remains a scheduled model-callable Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
 
-❌ Photographer, configuration hot reload, full executable value schemas, local native Tool deltas, general request/reply, result-driven replanning and activity subscriptions are not implemented.
+❌ Configuration hot reload, full executable value schemas, local native Tool deltas, general request/reply, result-driven replanning and activity subscriptions are not implemented.
 
 See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production configuration. Per-Agent limits and processing algorithms belong to their own READMEs.
+
+✅ Photographer subscribes to vision.pose and emits internal Robot.aim with a bounded output stream. Camera lifecycle enables this Agent; physical tracking acceptance remains outstanding.

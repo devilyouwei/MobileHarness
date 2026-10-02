@@ -35,6 +35,8 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 
 ✅ Storage/Chat now owns the ConversationHistory.swift reference and README. SwiftPM compiles StorageChat separately; no duplicate App Sources membership is introduced.
 
+✅ Photographer, Robot.aim and the NexArm frame sources are navigator references. SwiftPM compiles them; they are not added to App Sources.
+
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
 
 ✅ NexArm Action, PlatformKit connectivity and diagnostic test sources are navigation-only references. SwiftPM owns compilation; the macOS serial implementation is excluded on iOS by conditional compilation. ❌ No iPhone robot binding is enabled.
@@ -61,4 +63,6 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 
 ✅ Navigation no longer references unused permission/transport placeholders. Historical NexArm diagnostics are listed under root IntegrationTests; production compilation remains SwiftPM-owned.
 
-✅ Navigation includes Actions/Contracts and Tools/Contracts, Gateway translation/scheduling context and App workflow adapters. SwiftPM remains the single source compilation map.
+✅ Navigation includes Actions/Runtime/Contracts and Tools/Runtime/Contracts, Gateway translation/scheduling context and App workflow adapters. SwiftPM remains the single source compilation map.
+
+✅ Photographer navigation and JSON are retained; SwiftPM owns compilation of Robot Tools and Action-side aim support.

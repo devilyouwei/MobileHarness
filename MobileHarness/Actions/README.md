@@ -220,3 +220,5 @@ Finite/state handlers can use the Void adapter to ActionCompletion.completed; ac
 ❌ Camera recording Actions, generic activity supervision and audio resource-lease integration are not implemented. Current expressions acknowledge state acceptance; activity metadata alone does not create a supervised activity. Already executed effects are not rolled back.
 
 See [Runtime](Runtime/README.md) for registry/executor limits, [Results](../Gateway/Output/Results/README.md) for feedback and [Resources](../Gateway/Output/Resources/README.md) for lease/fence policy.
+
+✅ NexArm owns tracking aim rest mapping, speed policy and controller admission; the completion-only Robot.aim Tool reaches this behavior through the App sender.

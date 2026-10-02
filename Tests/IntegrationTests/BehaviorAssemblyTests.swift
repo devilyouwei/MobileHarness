@@ -50,13 +50,15 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint, camera: endpoint,
         gesture: { _, _ in throw CancellationError() },
-        shakeBase: { _, _ in throw CancellationError() })
+        shakeBase: { _, _ in throw CancellationError() },
+        aim: { _, _, _ in throw RobotTools.AimError.notConnected })
     try BehaviorCoverage.validate(
         actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [
             AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
             SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities),
             VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
+            PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
             AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
         ])
     let executor = ActionExecutor(registry: assembly.actions)

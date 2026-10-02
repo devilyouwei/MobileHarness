@@ -15,12 +15,13 @@ public struct BehaviorAssembly: Sendable {
         pose: any PosePresentationCapability,
         camera: any CameraControlCapability,
         gesture: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void,
-        shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void
+        shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
+        aim: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void
     ) throws {
         try self.init(
             actionModules: ActionModules.builtIn(
                 presentation: presentation, playback: playback, gesture: gesture, shakeBase: shakeBase),
-            toolModules: ToolModules.builtIn(presentation: pose, updates: presentation, camera: camera))
+            toolModules: ToolModules.builtIn(presentation: pose, updates: presentation, camera: camera, aim: aim))
     }
 
     /// Explicit catalog injection for isolated tests or other hosts; never runtime discovery.

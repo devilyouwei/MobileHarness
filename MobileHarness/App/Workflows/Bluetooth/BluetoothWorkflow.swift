@@ -780,6 +780,11 @@ public final class BluetoothWorkflow: BluetoothControlling {
             try await $0.performGesture(gesture, repetitions: repetitions, speed: speed, acceleration: acceleration)
         }
     }
+    /// Foreground BLE write of one five-axis aim. Returns when the link accepts it, not when the arm arrives.
+    public func aim(base: Double, pitch: Double) async throws {
+        try await runMotion(label: "瞄准", returnsHome: false) { try await $0.aim(base: base, pitch: pitch) }
+        state.motionStatus = "瞄准指令已发送"
+    }
     private func runMotion(
         label: String, returnsHome: Bool = true, motors: Set<Int> = Set(1...5),
         perform: @escaping @Sendable (NexArmActionController) async throws -> Void

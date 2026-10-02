@@ -31,7 +31,7 @@ flowchart LR
 
 App owns composition and application/session lifetime. ModelKit supplies processing, PlatformKit supplies device I/O, and UI receives state and typed operations. The [public architecture](docs/Architecture.md) and [concepts](docs/Concepts.md) explain these roles; the [technical design](MobileHarness/README.md) provides dependency maps and full technical flows.
 
-Photographer motion, general fast/slow orchestration, automatic compute escalation and unattended/background robot control are not implemented. Evidence for quality/performance is recorded separately in [validation documents](docs/README.md#experiments-tests-and-acceptance).
+General fast/slow orchestration, automatic compute escalation and unattended/background robot control are not implemented. Evidence for quality/performance is recorded separately in [validation documents](docs/README.md#experiments-tests-and-acceptance).
 
 ## Quick Start
 
@@ -143,3 +143,5 @@ Do not commit or post credentials, signing settings, model weights, user recordi
 MobileHarness builds on the work behind Apple frameworks, MLX, Qwen, Nemotron, Silero, MOSS-TTS-Nano, Kokoro and Ultralytics YOLO. Dependencies and model artifacts retain their own licenses and redistribution conditions. The configured YOLO26 pose artifact declares AGPL-3.0; model notices are documented with the [resource profiles](MobileHarness/Resources/Models/README.md).
 
 Camera control Tools are registered as Camera.open, Camera.close and Camera.flip through the existing App-owned foreground camera lifecycle. Provider-native model Tool event transport remains unimplemented.
+
+✅ Photographer subscribes to shared pose observations and sends completion-only five-axis BLE aim through Robot.aim. Physical tracking acceptance remains pending.

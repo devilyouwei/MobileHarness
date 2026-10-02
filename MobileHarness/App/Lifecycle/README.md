@@ -56,3 +56,5 @@ flowchart LR
 ✅ ADR0098: RuntimeDependencies supplies immutable voice/vision/camera service slices instead of ApplicationRuntime. Composition injects Agent factories; registration, input/output pumps, barriers and cleanup remain owned here.
 
 ✅ CameraCoordinator implements explicit setEnabled/flip Tool controls. Foreground and idle-worker admission are required; overlap fails busy, flip while disabled fails. Completion waits for reconciliation and checks revision, permission and capture state. Scene/UI supersession fails cancellation; close joins capture release and vision cleanup. VoiceSessionCoordinator validates Assistant source and active voice session. ❌ Open capture does not prove pose inference readiness; admitted intent is not rolled back on caller cancellation.
+
+✅ VisionSession registers Photographer alongside the injected vision Agent, dispatches both output streams, and removes both during joined session cleanup.

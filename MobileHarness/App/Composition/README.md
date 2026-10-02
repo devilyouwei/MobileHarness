@@ -83,3 +83,5 @@ flowchart TD
 ✅ ADR0098: Composition owns Agent factories and supplies role-specific service slices. Robot/provider/history adapters and feature workflow targets are explicit bindings. Permission coverage runs separately through Gateway before scheduler/producers start.
 
 ✅ AppAssembly supplies the root CameraCoordinator to ApplicationRuntime; RuntimePresentation binds the CameraControlCapability required by BehaviorAssembly. It does not create a second camera owner.
+
+✅ Photographer policy and internal Tool coverage are assembled alongside existing Agents. Robot.aim binds the foreground Bluetooth workflow without adding AgentCore to BehaviorAssembly.

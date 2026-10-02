@@ -654,3 +654,5 @@ Every queue or active-call pool has an explicit capacity and overflow rule in it
 ### Cloud native Tool generation
 
 Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; ToolResult retains existing feedback behavior. Local Qwen and automatic result-driven continuation remain unsupported.
+
+✅ Photographer consumes shared pose through InputGateway and emits internal Robot.aim through OutputGateway. Tools validates radians; App binds the verified foreground Bluetooth workflow; Actions/NexArm owns rest mapping and speed policy. PlatformKit only encodes native motor writes. ❌ Physical tracking acceptance remains pending.

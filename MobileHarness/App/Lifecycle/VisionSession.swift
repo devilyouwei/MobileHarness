@@ -28,10 +28,13 @@ final class VisionSession {
         try runtime.presentation.bindCamera(endpoint)
         defer { runtime.presentation.unbindCamera(endpoint) }
         let vision = try makeAgent(sessionID, configuration, mirroredGaze)
+        let photographer = try PhotographerAgent(sessionID: sessionID, controlsArm: true)
         try await manager.register(vision, sessionID: sessionID)
+        try await manager.register(photographer, sessionID: sessionID)
         let actions = runtime.actions
         do {
             try await vision.bind(responses.messaging(for: .visionPerception))
+            try await manager.start(.photographer)
             try await manager.start(.visionPerception)
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -65,13 +68,25 @@ final class VisionSession {
                     }
                     if await vision.status().lifecycle == .failed { throw HarnessError.queueFull }
                 }
+                group.addTask {
+                    for await envelope in photographer.outputs {
+                        try Task.checkCancellation()
+                        try await responses.dispatch(envelope)
+                        if case .control(let state) = envelope.output, state.hasPrefix("agent.error:") {
+                            throw HarnessError.notRunning
+                        }
+                    }
+                    if await photographer.status().lifecycle == .failed { throw HarnessError.queueFull }
+                }
                 defer { group.cancelAll() }
                 try await group.next()
             }
+            try? await manager.remove(.photographer)
             try? await manager.remove(.visionPerception)
             await responses.cancel(sessionID: sessionID)
             try Task.checkCancellation()
         } catch {
+            try? await manager.remove(.photographer)
             try? await manager.remove(.visionPerception)
             await responses.cancel(sessionID: sessionID)
             throw error

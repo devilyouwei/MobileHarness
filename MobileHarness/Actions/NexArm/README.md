@@ -197,3 +197,5 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 ✅ Registration uses ActionRequest, ActionResource and ActionExecutionBudget from Actions/Runtime/Contracts. Motor profiles, movement and completion algorithms are unchanged by the contract migration.
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+
+✅ Support/NexArmJointCommand maps tracking radians to five motor targets. NexArmActionController.aim requires a verified connection and returns on transport acceptance; it does not wait for arrival. ❌ Physical tracking acceptance remains pending.

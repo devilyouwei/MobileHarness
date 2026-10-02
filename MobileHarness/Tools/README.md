@@ -29,7 +29,7 @@ flowchart LR
 
 ## Registration
 
-`@Tool(path:title:resources:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule, UIToolModule and CameraToolModule; BehaviorAssembly atomically constructs the registry; Gateway BehaviorCoverage checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
+`@Tool(path:title:resources:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule, UIToolModule CameraToolModule and RobotToolModule; BehaviorAssembly atomically constructs the registry; Gateway BehaviorCoverage checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
 
 Public entry signatures remain explicit: UI updates receive ToolInvocation and an injected callback; showPose receives a request, execution context and presentation callback; runtimeInfo returns a String. Add an entry in its domain catalog; only adding a domain changes ToolModules.
 
@@ -45,7 +45,7 @@ VisionPerception coalesces its bounded replaceable gaze/skeleton output before d
 
 ## Scope and limitations
 
-✅ SystemToolModule, UIToolModule and CameraToolModule provide explicit functions under the independent ToolRuntime contracts. See [Runtime](Runtime/README.md), [UI](UI/README.md) and [System](System/README.md).
+✅ SystemToolModule, UIToolModule CameraToolModule and RobotToolModule provide explicit functions under the independent ToolRuntime contracts. See [Runtime](Runtime/README.md), [UI](UI/README.md) and [System](System/README.md).
 
 ❌ Native model Tool transport, live health reporting, additional network/storage/device domains and rendering acknowledgment are not implemented. Non-cooperative callbacks can delay callers; metadata does not imply forced interruption.
 

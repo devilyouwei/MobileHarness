@@ -39,9 +39,10 @@ final class ApplicationRuntime {
             maximumBytes: ConversationHistoryStore.maximumBytes)
         conversations = ConversationHistoryStore(document: document)
         let policy = try CommunicationPolicy(
-            configurations: ["Assistant", "SpeechPerception", "VisionPerception", "SpeechSynthesis"].map {
-                try AgentConfigurations.load(named: $0)
-            })
+            configurations: ["Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis"]
+                .map {
+                    try AgentConfigurations.load(named: $0)
+                })
         let manager = AgentManager()
         let input = InputGateway(manager: manager, policy: policy)
         let presentation = RuntimePresentation(cameraControl: cameraControl)
@@ -69,7 +70,15 @@ final class ApplicationRuntime {
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation, camera: presentation,
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
-            shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) })
+            shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) },
+            aim: { base, pitch, _ in
+                do { try await bluetooth.aim(base: base, pitch: pitch) } catch BluetoothWorkflowError.disconnected,
+                    BluetoothWorkflowError.controlNotReady,
+                    BluetoothWorkflowError.background
+                {
+                    throw RobotTools.AimError.notConnected
+                }
+            })
         try BehaviorCoverage.validate(
             actions: behaviors.actions, toolPaths: behaviors.toolPaths,
             capabilities: [
@@ -78,6 +87,7 @@ final class ApplicationRuntime {
                     AgentConfigurations.load(named: "SpeechPerception").capabilities),
                 VisionPerceptionAgent.runtimeCapabilities(
                     AgentConfigurations.load(named: "VisionPerception").capabilities),
+                PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
                 AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
             ])
         let actions = ChannelScheduler(registry: behaviors.actions, resources: resources) {
