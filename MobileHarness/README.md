@@ -84,8 +84,8 @@ flowchart TB
 ```
 
 - **App assembles and owns lifetime.** It constructs Agents, Gateways, behavior registries, workflows and shared services, then injects role-specific interfaces. It does not become a global container that modules query at runtime.
-- **Agents compose behavior.** They use injected ModelKit capabilities and Storage directly for cognition and internal state, then express Agent messages, Actions, Tools and scheduling through OutputGateway. Agents do not directly invoke concrete Actions, Tools or PlatformKit device effects.
-- **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, executable Agent output, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit/Storage capability calls or App/UI feature-workflow operations.
+- **Agents compose behavior.** They use injected foundational capabilities for cognition and internal state, then express Agent messages, Actions, Tools and scheduling through OutputGateway. The current Agents target uses ModelKit and StorageAudio/StorageChat and has no PlatformKit dependency. A future Agent may receive a narrowly scoped PlatformKit capability for a concrete sensing or device-query need; business device commands and other observable effects must still use permitted Actions or Tools rather than bypassing Gateway.
+- **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, executable Agent output, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit/Storage calls, narrowly scoped PlatformKit capability calls or App/UI feature-workflow operations.
 - **Actions and Tools execute effects.** They receive App-bound presentation/device capabilities; device-facing behavior reaches PlatformKit through those explicit bindings. App lifecycle code may also use PlatformKit directly for host-owned capture, preview and connection workflows.
 
 ### Compilation dependencies
