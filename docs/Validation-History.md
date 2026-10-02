@@ -34,3 +34,13 @@ Validation (2026-09-28): root scripts/check.sh passed, followed by all nine Open
 ✅ All four `scripts/build-ios.sh` schemes passed: MobileHarnessSimulator, ModelKitRuntime, ModelKitNemotron and ModelKitSilero. The MobileHarness Debug build for generic iOS completed with configured development signing; `codesign --verify --strict` passed for the resulting device app.
 
 ❌ This change was not installed on a device. Live-model wait syntax quality, actual speech/caption coordination, long waits with prefetched audio expiration and sustained physical-device behavior remain unaccepted. `Technical_Design.docx` is unchanged; no model weights, signing configuration or media are included in the commits.
+
+## 2026-09-28 — Archived voice-guide snapshot
+
+✅ As of 2026-09-28, repository checks and four iOS simulator build targets passed after the StorageAudio migration; the integration suite included 110 tests. ❌ No post-migration physical-device installation, acoustic review, Bluetooth route test or long-session memory/thermal acceptance has been recorded.
+
+## 2026-10-02 — Dependency refactor and installation
+
+On branch refactor/module-dependency-boundaries, repository checks passed with 297 IntegrationTests, 13 AppWorkflowTests and the other enabled suites after the shared Types migration. All four simulator build schemes passed with full Xcode selected. Optional real-model and physical-motion tests were not enabled.
+
+The signed Debug application containing commits through ed778b7 built successfully and installed on the connected iPhone 17 Pro as version 0.1.0, bundle version 2026100204. An independent installed-app query confirmed the version. The application was not automatically launched; installation is not voice/model/device-behavior acceptance. Subsequent README/documentation commits do not change that installed code.

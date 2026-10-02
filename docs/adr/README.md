@@ -1,202 +1,108 @@
 # Architecture decisions
 
-Purpose: preserve the reason, scope and consequences of implementation decisions. Design goal: make supersession visible without rewriting the original decision into a second current technical specification.
-
-These are **dated decision records**, including proposals and stages later replaced. A status such as “accepted” or “implemented” describes that decision at its date, not today's behavior. Keep the original rationale and measurements for traceability; follow supersession notes and the [current module map](../../MobileHarness/README.md#project-structure) before treating any API, model, queue or file path as current.
-
-✅ Numbered ADRs record staged architecture evolution; 0027 selects the Qwen3.5 MLX chat adapter without changing capability or Agent/Gateway contracts.
-❌ Historical decisions may be superseded. Use the [public architecture](../Architecture.md) and [roadmap](../Roadmap.md) for current scope, and follow the [module design index](../../MobileHarness/README.md#part-ii--module-design) to the relevant README for exact implementation contracts.
-
-✅ Output contracts distinguish ActionCall from native ToolCall; Function Token names the mixed text/XML protocol interpreted inside Agents.
-
-✅ [0028](0028-inter-agent-communication.md) records the original Bus-based Agent communication design; [0048](0048-direct-signal-admission.md) removes that transport runtime.
-
-✅ [0029](0029-channel-lock.md) defines channel lock ownership, immediate takeover and the separation between Agent decisions and runtime authorization. ❌ Runtime enforcement remains pending.
-
-✅ [Shared ModelManager](0030-shared-model-manager.md) defines unified registration and lifecycle ownership. ❌ Device stability and timed idle eviction remain pending.
-
-✅ Model capability decisions cover the Qwen3.5 MLX chat path and shared management/resource contracts. Later ADRs replace diagnostic Kokoro with the default bilingual Core ML path; the individual decisions retain their dated context.
-
-✅ [ModelKit project boundary](0033-modelkit-project-boundary.md) defines the root-package build, Management/Backends ownership, root test separation and automated boundary checks.
-
-✅ [Internal default model assembly](0034-modelkit-default-assembly.md) defines ModelKit-owned registrations and capability defaults. App supplies resources and handles OS events.
-
-✅ [0035](0035-yolov8-pose.md) records the former YOLOv8 model choice and bounded RGB inference; [0038](0038-yolo26-pose.md) replaces the model. ❌ Device acceptance remains deferred.
-
-✅ [ADR 0036](0036-photographer-pipeline.md) records the former camera-to-Photographer perception loop, later superseded for skeleton display by [ADR 0041](0041-vision-perception-skeleton-action.md); physical robot behavior remains a [proposal](../Photographer-Proposal.md).
-
-✅ ADR 0035 amended for vImage preprocessing, reusable native buffers, stride-aware bulk pose tensor reads and unchanged runtime boundaries.
-
-✅ [ADR 0037](0037-native-vision-pose.md): native camera/Vision pose path, CPU+ANE baseline and framework-independent Gateway transport.
-
-✅ [ADR 0038](0038-yolo26-pose.md): pinned YOLO26n-Pose INT8 artifact replaces YOLOv8 with end-to-end decoding and no runtime fallback.
-
-✅ [ADR 0039](0039-platform-capability-domains.md): PlatformKit capability domains, device I/O versus ModelKit data processing, and unchanged runtime ownership.
-
-- [0040 — Shared perception and event routing](0040-shared-perception-and-event-routing.md): introduced the Gateway/perception boundary and JSON v4; [0048](0048-direct-signal-admission.md) later removed its Bus/transport queues. Device acceptance is pending.
-
-✅ ADR 0040 caption-action amendment routes recognition preview/clear through configured UI Actions; shared speech events remain unchanged.
-
-✅ [ADR 0041](0041-vision-perception-skeleton-action.md): moved skeleton display from Photographer to VisionPerception; [0042](0042-show-pose-completion-tool.md) later changed display from Action to Tool.
-
-✅ ADR 0040 strict UI amendment separates observable speech facts from protocol-validated UI Actions.
-
-✅ [ADR 0042](0042-show-pose-completion-tool.md): direct Void showPose Tool without Channel scheduling or result feedback.
-
-- [0043 — Conversation turn presentation](0043-conversation-turn-presentation.md): runtime turn context, terminal recognition captions and atomic Assistant reset.
-
-✅ [ADR 0044](0044-visual-freshness.md): bounded independent vision publication, latest skeleton state and maximum refresh admission.
-
-✅ [ADR 0045](0045-audio-spectrum-telemetry.md): measured frequency bands and player render cursor replace synthetic audio animation.
-
-✅ [ADR 0046](0046-semantic-eye-expressions.md): typed expressions, stable procedural eyes and uninterrupted native interpolation.
-
-✅ [ADR 0047](0047-explicit-input-routing.md): explicit publish/send input routing, removal of legacy router and submit fallback, and static-policy regression tests.
-
-✅ [ADR 0048](0048-direct-signal-admission.md): queue-free signal delivery, Agent-owned inbox policy and bounded structured Gateway admission without a Bus lifecycle.
-
-✅ [ADR 0049](0049-perception-eye-gaze.md): YOLO facial landmarks to UI.moveEyes, bounded state replacement and mandatory Action completion barrier.
-
-✅ [0050 — Default Kokoro synthesis](0050-default-kokoro-synthesis.md): historical English-only default; [0052](0052-kokoro-coreml-bilingual.md) replaces it with bilingual Core ML speech.
-
-- ✅ [0051: OpenAI-compatible cloud chat](0051-openai-compatible-chat.md) establishes the adapter; [0053](0053-settings-live-chat.md) adds credential UI and live selection. ❌ Real-provider acceptance remains pending.
-
-✅ [0052 — Kokoro Core ML bilingual synthesis](0052-kokoro-coreml-bilingual.md): local Mandarin/English resources, script-aware speech and process-owned model lifetime.
-
-- ✅ [0053: Settings and live cloud selection](0053-settings-live-chat.md); ❌ real provider acceptance pending.
-
-
-
-- ✅ [0055 — Synthesis Agent and audio handles](0055-synthesis-agent-audio-handles.md): independent FIFO synthesis, shared bounded PCM and state-based expiration. ❌ Device acceptance pending.
-
-- ✅ [0056 — Shared Storage core and PCM adapter](0056-storage-audio-migration.md): Foundation-only bounded memory and leases with a separate PCM adapter; disk persistence remains future work.
-
-✅ [ADR 0057](0057-local-settings-storage.md) records local document cache/persistence synchronization and user-settings migration. ❌ Cross-device synchronization remains deferred.
-
-
-✅ [0058 — MOSS-TTS-Nano default synthesis](0058-moss-tts-nano.md): replaces the production Kokoro path with bounded local MOSS streaming. ❌ Physical-device acceptance remains pending.
-
-✅ ADR 0053 now records optional cloud authentication, official endpoint fallback and the visible default chat model. ❌ Model discovery cannot guarantee third-party chat compatibility.
-
-
-✅ [0059 — Structured wait scheduling](0059-structured-wait-scheduling.md): task-local groups, typed boundaries, module exclusion and cancellation. Supersedes module FIFO in ADR 0015 and the shared-lane scheduling portion of ADR 0018. ❌ Cross-task barriers, preemption and rollback remain deferred.
-
-✅ [0060 — Persistent conversation history](0060-persistent-conversation-history.md): actual user/raw model/request records, explicit logical conversation reset and title-only archival summaries. ❌ Live-model title quality and device performance remain unverified.
-
-✅ [0061 — Agent JSON v5](0061-agent-json-v5.md): Channel-grouped model Actions and code-owned internal permissions replace redundant hidden/text declarations. ❌ Full JSON Schema/native Tool streaming are not included.
-
-✅ [0062 — Optional output-token budgets](0062-default-chat-output-budget.md): provider defaults for Assistant, bounded local context and backward-compatible history records. ❌ Live-provider acceptance remains separate.
-
-✅ [0063 — Module directory consolidation](0063-module-directory-consolidation.md): Actions/Tools each own Runtime; Agents owns Core with independent AgentCore compilation. Its former App/Views ownership is superseded by ADR 0064's sibling UI module. ❌ No behavior change or new device acceptance is implied.
-
-- [ADR 0064 — App and UI boundaries](0064-app-ui-boundaries.md): explicit composition, independently compiled pages and application workflows.
-
-✅ [ADR 0065 — Action runtime contracts](0065-action-runtime-contracts.md): validated implementation metadata, startup coverage, consistent invocation, typed arguments, error separation and bounded diagnostics. ❌ Activity/resource ownership and full business Action style migration remain deferred.
-
-## 0066 — Action results and resources
-
-✅ [0066-action-results-resource-leases.md](0066-action-results-resource-leases.md) records bounded terminal feedback, typed activity completion, group leases/fences and the camera lifecycle integration. ❌ Durable feedback and all-device migration remain outstanding.
-
-## 0067 — Domain-owned behavior assembly
-
-✅ [0067-domain-owned-behavior-assembly.md](0067-domain-owned-behavior-assembly.md) records domain catalogs, typed capabilities and complete startup registry validation. ❌ Native capability additions still require host bindings.
-
-## Canonical Action entry audit
-
-✅ [0068-canonical-action-entrypoints.md](0068-canonical-action-entrypoints.md) records canonical UI/Speech namespaces, entry signatures and typed audio handles. ❌ Device/animation follow-ups remain separate.
-
-## Storage core/domain layout
-
-✅ [0069-storage-core-domain-layout.md](0069-storage-core-domain-layout.md) separates Storage core mechanisms from Audio/Chat domain targets.
-
-❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.
-
-✅ [0070 — NexArm USB diagnostic](0070-nexarm-usb-diagnostic.md): first bounded real-device Action, separate from production autonomous control. ❌ BLE/TCP and physical watchdog acceptance remain pending.
-
-✅ ADR 0070 extended with bounded Assistant base sweeps and typed host binding; ❌ hardware stop/watchdog remains unverified.
-
-✅ [0071 — iPhone NexArm BLE](0071-nexarm-iphone-ble.md): settings and root-owned BLE-to-Action chain. ❌ Unattended operation and physical stop/watchdog remain deferred.
-
-✅ ADR 0071 now records retained BLE connections with control admission closed when AT32 version is unavailable, and explicit read-only revalidation. ❌ Device-side readout stability remains unverified.
-
-✅ ADR 0071 includes one reset and bounded ID5 movement as explicit connection feedback, with joined cancellation and readiness only after position verification. ❌ Physical acceptance pending.
-
-✅ ADR 0071 revises the earlier strict BLE gate using physical USB/BLE evidence: named compatibility profile, stationary telemetry checks, missing-version disclosure, and one reset/ID5 ±8° indication. ❌ No claim of iPhone physical acceptance.
-
-✅ ADR 0071 includes the current BLE UX contract: no normal firmware query, name-independent discovery, one read-only recovery attempt on activation, persisted opt-out after manual disconnect/forget, and no motion replay.
-
-## NexArm entertainment skills (2026-09-30)
-
-- ✅ [0072 — NexArm entertainment skills](0072-nexarm-entertainment-skills.md): bounded presets, typed bindings, terminal feedback and no replay. ❌ Physical sequence acceptance pending.
-
-- ✅ [0073 — Peripheral detail controls](0073-peripheral-detail-controls.md): root-owned manual actions, sampled telemetry and bounded six-motor adjustments. ❌ Physical acceptance pending.
-
-✅ ADR 0073 amendment: preserve live Bluetooth connection after uncertain motion, with bounded read-only recovery and no replay. ❌ Physical acceptance pending.
-
-✅ ADR 0073 lifecycle amendment separates connection indication from protocol readiness, adds bounded native-link recovery and defines complete App-owned discovery/forget cleanup. ❌ Physical acceptance pending.
-
-- ✅ [0074 — NexArm live jog](0074-nexarm-live-jog.md): spring-return speed controls, bounded native no-response admission and priority reset. ❌ Physical acceptance pending.
-
-- ✅ [0075 — Fixed NexArm choreography](0075-nexarm-fixed-choreography.md): complete absolute presets and synchronized servo transitions; ❌ physical acceptance pending.
-
-- ✅ [0076 — NexArm controller preset transport](0076-nexarm-controller-preset-transport.md): use established CMD51 and preserve failure details; ❌ physical confirmation pending.
-
-- ✅ [0077 — Calibrated NexArm pose choreography](0077-nexarm-calibrated-pose-choreography.md): fixed physical poses, device IK and large/fast phone base sway; ❌ physical acceptance pending.
-
-- ✅ [0078 — Shared NexArm physical validation](0078-nexarm-shared-physical-validation.md): identical controller over USB/BLE, absolute pose commands and physical evidence; ❌ BLE timing/visual acceptance separate.
-
-✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
-
-✅ [0080 — Independent NexArm motion results](0080-nexarm-independent-motion-results.md) removes prior-result locks from new explicit preset requests; ❌ physical failure recovery acceptance remains pending.
-
-✅ [0081 — Settings immediate test control](0081-settings-immediate-test-control.md) records latest-request replacement without feedback waits; ❌ delivery is not completion.
-
-✅ [0082 — NexArm observation watchdogs](0082-nexarm-observation-watchdogs.md) bounds channel await without query-response blocking; ❌ no device-side stop guarantee.
-
-✅ ADR0082 clarifies whole-action budget composition after isolated USB dance reproduction: sum per-segment allowances without extending the fixed deadline during playback.
-
-- [0083 — Unified Action execution presentation](0083-action-execution-presentation.md): bounded scheduler snapshots, root-owned UI projection and honest cancellation/completion states.
-
-- ✅ [0084 — LLM output buffering](0084-llm-output-buffering.md): unbounded pending-event count for finite chat generation; other queue policies remain. ❌ Device acceptance pending.
-
-- ✅ [0085 — Reply-owned speech audio](0085-reply-owned-speech-audio.md): no queued/ready PCM expiry; completion/interruption cleanup follows the reply owner. ❌ Physical-device acceptance remains pending.
-
-✅ ADR 0070 now records retirement of the unused wrist diagnostic Action; direct controller diagnostics remain outside the Agent capability catalog.
-
-- [0086 — Domain-owned Action display metadata](0086-action-display-metadata.md): self-described execution records, subscription-only Workflow and generic UI presentation.
-
-✅ ADR 0082 extends the earlier head handoff protection to all conversation trajectory segments; ❌ physical celebration/dance jitter acceptance remains pending.
-
-- ✅ [0087 — Producer-owned speech deadline](0087-speech-producer-deadline.md): PCM reads follow producer completion/failure/cancellation without a default three-second cutoff; synthesis and hardware deadlines remain. ❌ Audible device acceptance remains pending.
-
-- ✅ [0088 — Settings-matched NexArm Cartesian playback](0088-nexarm-settings-matched-playback.md): shared finite plan/cadence, final-home observation and retained whole-Action exclusion; ❌ physical phone acceptance pending.
-
-- ✅ [0089: NexArm arm completion scope](0089-nexarm-arm-completion-scope.md) excludes unrelated gripper state from performance completion while retaining strict generic tracking.
-
-- ✅ [0090 — NexArm arm-only motion packets](0090-nexarm-arm-only-motion-packets.md): read-only device IK, explicit motors1–5, gripper-independent reset and Settings estimates. ❌ Loaded-arm/BLE endurance acceptance.
-
-## NexArm feedback execution — 2026-10-01
-
-✅ [0091](0091-nexarm-motor-scoped-feedback.md) records motor-scoped feedback execution, deadline skipping and connection-error priority. Physical acceptance is tracked separately from simulated verification.
-
-❌ Sustained real-device acceptance remains pending.
-
-## Atomic composition — ADR0092
-
-✅ [0092](0092-atomic-actions-and-composed-results.md) defines bounded child results, ordinary feedback-loss errors, resource-union execution and Channel failure isolation.
-
-❌ Sustained real-device acceptance and durable result delivery remain outstanding.
-
-- [0093 — NexArm PlatformKit and Action boundary](0093-nexarm-platform-action-boundary.md): business gestures and execution policies reside in Actions; PlatformKit remains an independent device SDK.
-
-- [0094 — Arrival profiles and behavior macros](0094-arrival-profiles-and-behavior-macros.md): immediate fresh arrival, per-motor tolerances, cooperative budgets and compile-time metadata.
-
-- [0095 — Remove retired device and behavior code](0095-remove-retired-device-and-behavior-code.md): production cleanup, historical test isolation and consistent native admission.
-
-- [0096 — Behavior-owned execution contracts](0096-behavior-owned-contracts.md)
-
-- [0097 — Opaque source identity for audio storage](0097-storage-audio-opaque-owner.md): remove AgentCore dependency while preserving ownership isolation.
-
-- [0098 — Independent runtime, workflow and audio boundaries](0098-independent-runtime-workflow-audio-boundaries.md): separate compilation without changing business behavior.
-
-- [ADR0099 — Shared Types grouped by category](0099-shared-types-layout.md)
+ADRs retain the context, decision and consequences at their recorded date. Read each record's status and supersession notes; an accepted historical decision does not make its original API, model or limits current.
+
+Current dependencies and flows belong to the [technical design](../../MobileHarness/README.md); module READMEs own current contracts. [Roadmap](../Roadmap.md) owns pending work and [validation](../README.md#experiments-tests-and-acceptance) owns experimental evidence.
+
+✅ Decisions are indexed by their stable number below.
+
+❌ Superseded records are historical evidence rather than current implementation requirements.
+
+| ID | Decision |
+| --- | --- |
+| 0001 | [ADR 0001 原生模块化 Runtime](0001-native-modular-runtime.md) |
+| 0002 | [ADR 0002 模型能力与后端解耦](0002-model-capabilities.md) |
+| 0003 | [ADR 0003 能力 SDK 与应用组装的编译边界](0003-capability-sdk-boundary.md) |
+| 0004 | [ADR 0004 系统语音网关闭环](0004-system-voice-loop.md) |
+| 0005 | [ADR 0005 按技术方案整理源码目录](0005-design-aligned-layout.md) |
+| 0006 | [ADR 0006 Nemotron 流式 ASR 与模型层目录纠正](0006-nemotron-streaming-asr.md) |
+| 0007 | [ADR 0007 App 使用 Nemotron ASR](0007-nemotron-app-binding.md) |
+| 0008 | [ADR 0008 Silero VAD capability 与输入分段](0008-silero-vad.md) |
+| 0009 | [ADR 0009 Audio8 原生 ASR adapter](0009-audio8-asr.md) |
+| 0010 | [ADR 0010 默认语音切换为 Audio8 + Silero](0010-audio8-app-binding.md) |
+| 0011 | [ADR 0011 有界长句识别与结束语义](0011-voice-turn-segmentation.md) |
+| 0012 | [ADR 0012：实时语音预览与圆环交互](0012-live-voice-orb.md) |
+| 0015 | [0015 · 分句 FunctionToken 与共享 Actions](0015-function-actions.md) |
+| 0016 | [ADR 0016 — Kokoro CoreAI 独立验证](0016-kokoro-validation.md) |
+| 0017 | [ADR 0017 · 新设计第一阶段：入口到 Gateway](0017-entry-gateway-migration.md) |
+| 0018 | [ADR 0018 · Agent 内双协议解析与 Channel 调度](0018-agent-protocols.md) |
+| 0019 | [ADR 0019 · Agent 独立 plist 配置与统一开发规范](0019-agent-configuration.md) |
+| 0020 | [ADR 0020：按正式 README 对齐实现目录与命名](0020-layout-alignment.md) |
+| 0021 | [ADR 0021: Remove Obsolete Voice Paths](0021-remove-obsolete-voice-paths.md) |
+| 0022 | [ADR 0022: JSON Capability Configuration v2](0022-json-capability-configuration.md) |
+| 0023 | [ADR 0023: Function Documentation and Model Visibility](0023-capability-doc-visibility.md) |
+| 0024 | [ADR 0024: Present expressions independently from captions](0024-orb-expressions.md) |
+| 0025 | [ADR 0025: One parameterized expression Action](0025-unified-expressions.md) |
+| 0026 | [ADR 0026: Separate Action guidance from native tools](0026-action-only-system-context.md) |
+| 0027 | [ADR 0027 — Qwen3.5 chat through MLX](0027-qwen35-mlx-chat.md) |
+| 0028 | [0028 — Gateway-mediated Internal Agent Communication](0028-inter-agent-communication.md) |
+| 0029 | [0029 — Exclusive Channel Ownership](0029-channel-lock.md) |
+| 0030 | [0030 — Shared Model Manager](0030-shared-model-manager.md) |
+| 0031 | [ADR 0031: Fixed local model resources](0031-fixed-local-model-resources.md) |
+| 0032 | [ADR 0032: ModelKit management and memory policy](0032-modelkit-admission-and-memory-policy.md) |
+| 0033 | [ADR 0033: ModelKit inside the project](0033-modelkit-project-boundary.md) |
+| 0034 | [ADR 0034: Internal default model assembly](0034-modelkit-default-assembly.md) |
+| 0035 | [ADR 0035: YOLOv8 Pose capability](0035-yolov8-pose.md) |
+| 0036 | [ADR 0036: Changed camera frames → Photographer → skeleton Action](0036-photographer-pipeline.md) |
+| 0037 | [ADR 0037 — Native camera frames and Vision pose inference](0037-native-vision-pose.md) |
+| 0038 | [ADR 0038 — Replace YOLOv8 with YOLO26n-Pose](0038-yolo26-pose.md) |
+| 0039 | [ADR 0039 — Platform Capability Domains](0039-platform-capability-domains.md) |
+| 0040 | [ADR 0040 — Pure Gateway and shared perception](0040-shared-perception-and-event-routing.md) |
+| 0041 | [ADR 0041 — Vision Perception Owns Skeleton Visualization](0041-vision-perception-skeleton-action.md) |
+| 0042 | [ADR 0042 — ShowPose as a Completion-Only Tool](0042-show-pose-completion-tool.md) |
+| 0043 | [ADR 0043 — Conversation turn presentation](0043-conversation-turn-presentation.md) |
+| 0044 | [ADR 0044 — Bounded Visual Freshness](0044-visual-freshness.md) |
+| 0045 | [ADR 0045 — Audio spectrum telemetry](0045-audio-spectrum-telemetry.md) |
+| 0046 | [ADR 0046 — Semantic eye expressions](0046-semantic-eye-expressions.md) |
+| 0047 | [ADR 0047 — Explicit input routing](0047-explicit-input-routing.md) |
+| 0048 | [ADR 0048 — Direct signal admission and Agent-owned inboxes](0048-direct-signal-admission.md) |
+| 0049 | [ADR 0049 — Perception-driven eye gaze](0049-perception-eye-gaze.md) |
+| 0050 | [0050 — Default Kokoro synthesis](0050-default-kokoro-synthesis.md) |
+| 0051 | [ADR 0051: OpenAI-compatible cloud chat](0051-openai-compatible-chat.md) |
+| 0052 | [0052 — Local Kokoro Core ML bilingual synthesis](0052-kokoro-coreml-bilingual.md) |
+| 0053 | [ADR 0053: Settings and immediate chat selection](0053-settings-live-chat.md) |
+| 0055 | [ADR 0055 — Directed synthesis Agent and transient audio handles](0055-synthesis-agent-audio-handles.md) |
+| 0056 | [ADR 0056 — Shared Storage core and PCM adapter](0056-storage-audio-migration.md) |
+| 0057 | [ADR 0057: Local settings persistence and cache synchronization](0057-local-settings-storage.md) |
+| 0058 | [0058 — Replace default Kokoro with MOSS-TTS-Nano](0058-moss-tts-nano.md) |
+| 0059 | [ADR 0059 — Structured wait groups for Action scheduling](0059-structured-wait-scheduling.md) |
+| 0060 | [ADR 0060 — Persistent conversation history and explicit conversation boundaries](0060-persistent-conversation-history.md) |
+| 0061 | [ADR 0061 — Channel-grouped model catalogs and code-owned internal behavior](0061-agent-json-v5.md) |
+| 0062 | [ADR 0062 — Optional chat output-token budgets](0062-default-chat-output-budget.md) |
+| 0063 | [ADR 0063 — Consolidate behavior runtimes, Agent source ownership and App views](0063-module-directory-consolidation.md) |
+| 0064 | [ADR 0064 — Separate App ownership and UI](0064-app-ui-boundaries.md) |
+| 0065 | [ADR 0065 — Action implementation contracts and execution diagnostics](0065-action-runtime-contracts.md) |
+| 0066 | [ADR 0066 — Action terminal feedback and resource leases](0066-action-results-resource-leases.md) |
+| 0067 | [ADR 0067 — Domain-owned behavior definitions and capability assembly](0067-domain-owned-behavior-assembly.md) |
+| 0068 | [ADR 0068 — Canonical Action entry points](0068-canonical-action-entrypoints.md) |
+| 0069 | [ADR 0069 — Storage core and domain directories](0069-storage-core-domain-layout.md) |
+| 0070 | [ADR 0070 — NexArm supervised USB Action](0070-nexarm-usb-diagnostic.md) |
+| 0071 | [ADR 0071 — Foreground iPhone NexArm BLE](0071-nexarm-iphone-ble.md) |
+| 0072 | [ADR 0072 — Bounded NexArm entertainment skills](0072-nexarm-entertainment-skills.md) |
+| 0073 | [ADR 0073 — Peripheral detail controls](0073-peripheral-detail-controls.md) |
+| 0074 | [ADR 0074 — NexArm live joystick control](0074-nexarm-live-jog.md) |
+| 0075 | [0075 — Fixed NexArm choreography](0075-nexarm-fixed-choreography.md) |
+| 0076 | [0076 — NexArm controller preset transport](0076-nexarm-controller-preset-transport.md) |
+| 0077 | [0077 — Calibrated physical pose choreography](0077-nexarm-calibrated-pose-choreography.md) |
+| 0078 | [0078 — Shared NexArm controller and physical validation](0078-nexarm-shared-physical-validation.md) |
+| 0079 | [0079 — Continuous NexArm manual jog](0079-nexarm-smooth-jog.md) |
+| 0080 | [0080 — Independent NexArm motion results](0080-nexarm-independent-motion-results.md) |
+| 0081 | [0081 — Settings immediate test control](0081-settings-immediate-test-control.md) |
+| 0082 | [0082 — NexArm channel observation and host watchdogs](0082-nexarm-observation-watchdogs.md) |
+| 0083 | [0083 — Unified Action execution presentation](0083-action-execution-presentation.md) |
+| 0084 | [ADR 0084 — LLM output buffering](0084-llm-output-buffering.md) |
+| 0085 | [ADR 0085 — Reply-owned speech audio](0085-reply-owned-speech-audio.md) |
+| 0086 | [ADR 0086 — Domain-owned Action display metadata](0086-action-display-metadata.md) |
+| 0087 | [ADR 0087 — Producer-owned speech deadline](0087-speech-producer-deadline.md) |
+| 0088 | [0088 — Settings-matched NexArm Cartesian playback](0088-nexarm-settings-matched-playback.md) |
+| 0089 | [ADR 0089 — NexArm performance completion covers arm axes](0089-nexarm-arm-completion-scope.md) |
+| 0090 | [ADR 0090 — NexArm gestures and home never address the gripper](0090-nexarm-arm-only-motion-packets.md) |
+| 0091 | [0091 — NexArm motor-scoped feedback execution](0091-nexarm-motor-scoped-feedback.md) |
+| 0092 | [0092 — Atomic actions and composed results](0092-atomic-actions-and-composed-results.md) |
+| 0093 | [ADR0093 — NexArm PlatformKit and Action boundary](0093-nexarm-platform-action-boundary.md) |
+| 0094 | [ADR0094 — Arrival profiles, dynamic execution budgets and behavior macros](0094-arrival-profiles-and-behavior-macros.md) |
+| 0095 | [ADR0095 — Remove retired device and behavior code](0095-remove-retired-device-and-behavior-code.md) |
+| 0096 | [ADR 0096 — Behavior-owned execution contracts](0096-behavior-owned-contracts.md) |
+| 0097 | [ADR 0097 — Opaque source identity for audio storage](0097-storage-audio-opaque-owner.md) |
+| 0098 | [ADR 0098 — Independent runtime, workflow and audio boundaries](0098-independent-runtime-workflow-audio-boundaries.md) |
+| 0099 | [ADR0099 — Shared Types grouped by category](0099-shared-types-layout.md) |

@@ -16,7 +16,7 @@ Planned lock control enters through OutputGateway runtime APIs, with outcomes th
 
 - Agent B sends facts, current state and optional advice to Agent A.
 - Agent A decides whether to request a lock; the runtime authorizes and performs takeover.
-- Signals never grant ownership. See the [general interaction](../../MobileHarness/Agents/Core/Communication/README.md#signals-and-control-takeover).
+- Signals never grant ownership. See the [general interaction](../../MobileHarness/Agents/Core/Communication/README.md).
 
 ## Takeover and physical boundaries
 
@@ -29,4 +29,4 @@ Channel names are logical scheduling scopes. Device control requires App-defined
 
 Expiry, release, owner/session termination and shutdown invalidate admission, stop/join affected work and follow resource-specific safe cleanup. Uncertain cleanup leaves the domain gated for supervisor recovery. Unlock never replays old Actions or automatically resumes motion. Hardware safety cannot rely on iOS remaining active.
 
-The normative overview is [section 20.1](../../MobileHarness/README.md#201-channel-lock--exclusive-agent-control); full lifecycle, bounds, scenario and required tests are in [Scheduling](../../MobileHarness/Gateway/Output/Scheduling/README.md#channel-lock-design). Runtime APIs and enforcement must be delivered together before making the ownership state mutable.
+The normative overview is [section 20.1](../../MobileHarness/Gateway/Output/Scheduling/README.md#channel-lock-design); full lifecycle, bounds, scenario and required tests are in [Scheduling](../../MobileHarness/Gateway/Output/Scheduling/README.md#channel-lock-design). Runtime APIs and enforcement must be delivered together before making the ownership state mutable.

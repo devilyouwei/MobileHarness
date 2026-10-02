@@ -6,7 +6,7 @@
 
 状态：采用。日期：2026-09-24。
 
-设计权威入口变为 MobileHarness/README.md，旧 TECH_DESIGN 文件名不再使用。保持设计原文及原始 Word 不变；原差异表后来并入 [MobileHarness/README.md 的项目结构](../../MobileHarness/README.md#project-structure)。
+设计权威入口变为 MobileHarness/README.md，旧 TECH_DESIGN 文件名不再使用。保持设计原文及原始 Word 不变；原差异表后来并入 [MobileHarness/README.md 的项目结构](../../MobileHarness/README.md#source-structure-and-compilation-map)。
 
 将 Actions/Display 改为 UI，Say.swift / SpeechActions.say 改为 Speak.swift / SpeechActions.speak；实际路径同步为 UI.* 和 Speech.speak。模型 alias say 与默认 Speech / Display Channel 保留，避免改变现有生成和播放行为。
 

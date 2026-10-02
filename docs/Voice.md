@@ -10,12 +10,11 @@ The simulator supports UI development but cannot establish ASR, TTS, acoustics o
 
 ## Repeatable repository checks
 
-- Run `./scripts/check.sh` for module boundaries, Swift tests and project metadata. Its speech tests use controlled model/device substitutes, including synthesis admission, audio-ID ownership, expiry, cache overflow and playback starvation.
+- Run `./scripts/check.sh` for module boundaries, Swift tests and project metadata. Its speech tests use controlled model/device substitutes, including synthesis admission, audio-ID ownership, reply cleanup, cache overflow and delayed producer progress.
 - Run `./scripts/test-silero.sh` for the opt-in real VAD check; use its documented Nemotron option when the local model artifact is available.
 - Run `./scripts/build-ios.sh` for four unsigned simulator builds. Build success is not evidence of device listening quality or latency.
-- Use the in-app Kokoro diagnostic screen and [Kokoro validation record](Kokoro-Validation.md) for model-level listening and timing. Those measurements do not replace the full conversation loop.
+- Use the in-app MOSS diagnostic screen and [MOSS validation record](Moss-Validation.md) for model-level listening and timing. Those measurements do not replace the full conversation loop.
 
-✅ As of 2026-09-28, repository checks and four iOS simulator build targets passed after the StorageAudio migration; the integration suite included 110 tests. ❌ No post-migration physical-device installation, acoustic review, Bluetooth route test or long-session memory/thermal acceptance has been recorded.
 
 ## Physical-device acceptance
 

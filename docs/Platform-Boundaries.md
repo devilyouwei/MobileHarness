@@ -2,6 +2,8 @@
 
 手机作为推理和感知中心，通过公开 API 控制本 App 获准访问的相机、音频、传感器、照片以及配对设备。普通 App 不能拥有任意系统管理权限，也不能通过通用 API 操作所有第三方 App 的界面。
 
+下表描述平台接入方向；照片、位置、系统集成、Network 连接和后台任务并不代表当前 App 已实现的功能。
+
 | 能力 | 接入方向 | 实施约束 |
 | --- | --- | --- |
 | 相机 / 音频输入输出（PlatformKit） | AVFoundation / AVFAudio | 按需权限，处理中断、前后台切换与热状态 |
@@ -13,8 +15,8 @@
 
 长期存活 actor 是进程内生命周期概念，不代表 App 被系统挂起后仍可无限执行。物理机器人的低层安全控制、运动限幅和 watchdog 必须落在外部控制器；手机失联时外部设备自行停机。手机不承担硬实时安全控制。
 
-当前生产语音由手机采集麦克风音频，使用本地 Nemotron/Silero 识别语音、Kokoro 合成回复，再由扬声器播放。旧 Apple ASR 联网调试路径不属于当前默认装配。麦克风在用户开始语音交互时申请权限；相机在正常前台启动时独立申请权限并默认使用前置摄像头。App 协调前后台与设备中断。
+当前生产语音由手机采集麦克风音频，使用本地 Nemotron/Silero 识别语音、MOSS-TTS-Nano 合成回复，再由扬声器播放。旧 Apple ASR 联网调试路径不属于当前默认装配。麦克风在用户开始语音交互时申请权限；相机在正常前台启动时独立申请权限并默认使用前置摄像头。App 协调前后台与设备中断。
 
-当前实现把设备输入输出、模型数据处理、Agent 决策和界面呈现分开。摄像头姿态感知已接入；摄影运镜与机器人动作仍是[未来提案](Photographer-Proposal.md)，不能把屏幕骨架显示当作机器人运动能力。Connectivity 目前只有传输契约，尚无真实机器人控制实现。内部模块边界见[技术方案](../MobileHarness/README.md)。
+当前实现把设备输入输出、模型数据处理、Agent 决策和界面呈现分开。摄像头姿态感知与前台 NexArm BLE 控制已接入；Actions 拥有运动业务与完成策略，PlatformKit 拥有连接、协议和设备反馈。自主摄影运镜仍是[未来提案](Photographer-Proposal.md)，骨架显示不等于已实现摄影跟随。内部模块边界见[技术方案](../MobileHarness/README.md)。
 
 依据（2026-09-22 查阅）：[Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)，[Background Tasks](https://developer.apple.com/documentation/backgroundtasks)。具体接入时按对应 SDK 文档核实。

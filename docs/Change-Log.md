@@ -17,7 +17,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 
 ## 2026-09-28 — Documentation ownership
 
-The internal source/target map is now part of [MobileHarness/README.md's Project Structure](../MobileHarness/README.md#project-structure). The unimplemented Photographer concept moved to [Photographer-Proposal.md](Photographer-Proposal.md). [Architecture.md](Architecture.md) now explains the product architecture externally, while source-directory READMEs own current module contracts. Dated UI/build observations moved to [Validation-History.md](Validation-History.md).
+The internal source/target map is now part of [MobileHarness/README.md's Project Structure](../MobileHarness/README.md#source-structure-and-compilation-map). The unimplemented Photographer concept moved to [Photographer-Proposal.md](Photographer-Proposal.md). [Architecture.md](Architecture.md) now explains the product architecture externally, while source-directory READMEs own current module contracts. Dated UI/build observations moved to [Validation-History.md](Validation-History.md).
 
 The full `docs/` review classified public architecture, roadmap, proposals, validation records, ADR history, original design sources and license notices. Historical technical designs and superseded ADRs now point to later decisions instead of presenting old models, UI, transport or Agent configuration as current. The original Word source and license texts remain unchanged.
 
@@ -38,3 +38,13 @@ Replaced redundant flat Agent declarations with version/id and Channel-grouped c
 Aligned source names with current ownership: ApplicationRuntime, VoiceSessionCoordinator, VisionSession, CameraConversationSurface, CompanionEyes, SpeechDiagnosticState and ChatValidationView. App/Adapters owns the current-chat binding wrapper; App/Workflows owns Debug chat diagnostic execution. Removed duplicate retained assembly values, the one-method AgentBootstrap wrapper, unused imports/errors and the obsolete legacy configuration writer while preserving migration reads and verified deletion.
 
 Fixed the MOSS editor's stale task comparison, which resolved to SwiftUI's task modifier and always disabled editing. Restored the camera toggle's existing accessibility identifier. Module READMEs now describe the actual toolbar placement, state/workflow ownership, selected chat binding, model residency and editable credential scope; earlier historical names in this log and ADRs remain dated evidence. See [ADR 0064](adr/0064-app-ui-boundaries.md).
+
+## 2026-10-02 — Runtime boundaries and documentation ownership
+
+- Independent ActionRuntime/ToolRuntime targets separate execution contracts from concrete behaviors; Gateway owns startup permission coverage and BehaviorAssembly constructs registries.
+- Shared audio values compile under Types/Audio. Six feature workflow targets and injected provider/title/preview operations narrow host dependencies; lifecycle owners receive role-specific services and Agent factories.
+- MobileHarness/README.md documents current architecture, module roles and complete cross-module technical flows. Eleven first-level module READMEs describe current ownership/contracts without accumulated update or acceptance records.
+- The project README is a product/setup entry point. docs/README.md categorizes requirements, concepts, public architecture, plans, evidence, decisions, history and notices. Requirements.md and Concepts.md summarize current goals and terminology; Architecture.md and Roadmap.md no longer contain accumulated historical implementation notes.
+- Earlier roadmap snapshots are preserved in Milestone-History.md; accumulated entry-page notes are preserved in Documentation-History.md. Original Word/Markdown sources, ADR bodies, validation data and license notices are retained.
+
+Build, test and installation observations are recorded in [Validation-History](Validation-History.md).

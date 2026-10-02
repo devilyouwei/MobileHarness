@@ -4,7 +4,7 @@
 
 代码格式由工具链自带 `swift format` 和 `.swift-format` 决定；提交前运行 `./scripts/check.sh`，具备 Xcode 时运行 `./scripts/build-ios.sh`。CI 使用 macos-26 runner 并要求 Xcode 27.0；若托管镜像未提供该版本，需要更新镜像或配置具有该工具链的 runner，不能跳过检查伪装成功。
 
-按 [MobileHarness/README.md 的项目结构](MobileHarness/README.md#project-structure)放置源码并核对 target 映射；docs/Tech_Design.md 与 Technical_Design.docx 保留为历史设计来源。MobileHarness/App 与 Experience 的 Swift 文件新增后加入 Xcode App target；其余模块由根 Package.swift 的显式 path 自动发现，不重复加入 App 的 Compile Sources。Xcode 导航分组也应同步更新。Tests 位于仓库根目录，使用 Swift Testing。依赖版本需要可复现；增加第三方依赖后提交相应 Package.resolved，并检查许可证。模型权重不入仓库，后续使用有校验和与许可证元数据的独立制品存储。
+按 [MobileHarness/README.md 的项目结构](MobileHarness/README.md#source-structure-and-compilation-map)放置源码并核对 target 映射；docs/Tech_Design.md 与 Technical_Design.docx 保留为历史设计来源。MobileHarness/App 中非 Package 管理的宿主 Swift 文件新增后加入 Xcode App target；独立 Workflows、BehaviorAssembly、UI 及其他共享模块由根 Package.swift 的显式 path 管理，不重复加入 App 的 Compile Sources。Xcode 导航分组也应同步更新。Tests 位于仓库根目录，使用 Swift Testing。依赖版本需要可复现；增加第三方依赖后提交相应 Package.resolved，并检查许可证。模型权重不入仓库，后续使用有校验和与许可证元数据的独立制品存储。
 
 不要将签名证书、Team 私钥、API key、真实用户音视频、设备令牌写入代码、日志或测试数据。当前未选择开源许可证，发布或对外分发前由项目所有者决定。
 
