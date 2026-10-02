@@ -24,51 +24,73 @@ ModelKit/
 └── README.md                 # Capability boundary
 ```
 
-## Upstream and downstream
+## External upstream and downstream
 
-Arrows show inference requests and results. Neither Gateway nor PlatformKit calls into the model layer directly. StorageAudio and ModelKit independently consume Types PCM values; StorageAudio has no model dependency.
+App is the composition and lifetime owner. It supplies the model resource root to `ModelKitDefaults`, obtains the process-wide `ModelManager`, resolves typed capability handles and injects only the capabilities required by each consumer. Consumers call capability protocols directly; Gateway does not proxy model work. PlatformKit has no ModelKit dependency: App adapts captured media at the boundary before admitting it to an Agent or model capability.
+
+Solid arrows below are implemented relationships. Dashed arrows are allowed injection points that currently have no concrete dependency.
 
 ```mermaid
 flowchart LR
-    App -->|Resource root and lifecycle| Assembly[Defaults / ModelManager]
-    Assembly -->|Capability handles| App
-    Agents -->|Speech, chat and pose requests| Capabilities[ModelKit capabilities]
-    Diagnostics[AppWorkflows explicit diagnostics] --> Capabilities
-    Titles[App-injected ConversationTitleGenerator] -->|Archived title generation| Capabilities
-    Capabilities --> Adapters[Concrete adapters]
-    Adapters --> Engines[MLX / CoreAI / Core ML / Apple speech]
-    Engines -->|Tokens, scores, joints or PCM| Adapters
-    Adapters -->|Typed results| Consumers[Agents / diagnostics]
+    Platform[PlatformKit media input] -->|PCM / native camera frame| Host[App lifecycle and adapters]
+    Resources[App model resource root] --> Composition[App composition]
+    Composition -->|assemble defaults| Defaults[ModelKitDefaults]
+    Defaults --> Runtime[ModelKitRuntime / ModelManager]
+    Runtime -->|typed capability handles| Composition
+
+    Composition -->|inject chat / ASR / VAD / TTS / pose| Agents[Agents]
+    Composition -->|inject diagnostic capability| Workflows[App diagnostic workflows]
+    Composition -->|inject chat capability| Titles[Conversation title operation]
+    Composition -.->|when a concrete behavior requires inference| Behaviors[Actions / Tools]
+
+    Host -->|adapt and admit observations| Agents
+    Agents -->|typed requests| Capability[ModelKit capability protocols]
+    Workflows -->|typed requests| Capability
+    Titles -->|typed request| Capability
+    Behaviors -.->|typed request| Capability
+    Capability -->|events / text / PCM / pose results / errors| Consumers[Calling consumer]
 ```
 
-## Internal structure and data flow
+The current `Agents` target consumes ModelKit; diagnostic workflows and title generation receive capabilities through App. Current Actions and Tools do not import ModelKit, although the architecture permits a narrowly injected capability for a concrete behavior. UI, Gateway and PlatformKit do not depend on ModelKit. ModelKit and StorageAudio independently depend on shared Types audio values; neither depends on the other.
 
-Dependency arrows below mean imports. Backends use engine-specific data; adapters translate to capability contracts.
+## Internal targets and processing flow
+
+Dependency arrows below point from a target to what it imports. Base `ModelKit` contains value/session contracts and capability protocols. Runtime management, default assembly, adapters and engine backends remain separate targets so consumers never acquire concrete engines.
 
 ```mermaid
 flowchart TD
-    Defaults[ModelKitDefaults] --> Manager[ModelKitRuntime]
+    Defaults[ModelKitDefaults] --> Runtime[ModelKitRuntime]
     Defaults --> Adapters[Speech / Qwen35 / OpenAI / YOLO adapters]
     Defaults --> Base[ModelKit contracts]
-    Manager --> Base
+    Runtime --> Base
     Adapters --> Base
     Adapters --> Backends[CoreAI / CoreML / MLX / FluidAudio / MossCoreML]
-    Backends --> SDKs[System and third-party engine SDKs]
-    Adapters --> Apple[Apple speech frameworks]
+    Adapters --> System[Apple speech frameworks]
+    Backends --> Engines[Core ML / MLX / third-party engine SDKs]
+    Base --> Types[Types shared values]
 ```
+
+One process-wide manager preserves provider identity and resource ownership. Capability acquisition may construct a provider but does not necessarily load weights. The provider acquires its model resource before inference; one active operation is allowed per model. Streaming output uses an `InferenceSession`, while single-result capabilities return typed values through the same cleanup boundary.
 
 ```mermaid
 flowchart LR
-    Root[App resource root] --> Defaults[Process-wide default assembly]
-    Defaults --> Manager[ModelManager.get]
-    Manager --> Provider[Shared provider and capability handle]
-    Request[Consumer request] --> Provider
-    Provider --> Lease[Acquire one model operation lease]
-    Lease --> Load[Shared resource load if needed]
-    Load --> Run[Adapter preprocessing / inference / postprocessing]
-    Run --> Result[Adapter-policy events or typed result]
-    Result --> Cleanup[Finish or cancel and join cleanup]
-    Cleanup --> Release[Release lease]
+    Root[Resource root] --> Defaults[Default registrations]
+    Defaults --> Manager[Process-wide ModelManager]
+    Manager -->|get by capability or model ID| Provider[Shared capability provider]
+    Consumer[Injected consumer] -->|typed request| Provider
+    Provider --> Admission{Model operation free?}
+    Admission -->|No| Busy[inputBusy]
+    Admission -->|Yes| Lease[Reserve one operation lease]
+    Lease --> Load[Load or reuse shared resource]
+    Load --> Adapter[Preprocess and invoke adapter]
+    Adapter --> Backend[Engine-specific backend]
+    Backend --> Output[Bounded events or typed result]
+    Output --> Consumer
+    Consumer -->|finish or cancel| Cleanup[Join backend cleanup]
+    Cleanup --> Release[Release matching lease]
+    Release --> Policy{Memory policy / lifecycle command}
+    Policy -->|retain| Ready[Keep resource ready]
+    Policy -->|unload, pressure or shutdown| Teardown[Release resource]
 ```
 
 ### Ownership and limits

@@ -1,28 +1,96 @@
 # PlatformKit — Device Input and Output
 
-Purpose: provide reusable hardware and operating-system I/O through public APIs. Design goals: permission-aware device lifetimes, bounded data/command admission, explicit cleanup and an independent foundational SDK. PlatformKit depends only on shared Types values; it has no business or model dependency.
+Provides reusable hardware and operating-system capabilities through public APIs. Its design goals are permission-aware lifetimes, bounded media and command admission, explicit cancellation/cleanup and neutral device facts. PlatformKit depends only on shared Types values; it has no Agent, Gateway, ActionRuntime, ToolRuntime, ModelKit, UI or business-workflow dependency.
+
+## Directory and ownership
 
 | Directory | Owns | Must not own |
 |---|---|---|
-| [Core](Core/README.md) | Documentation for future shared contracts; no compiled implementation | Business decisions or device workflow orchestration |
-| [Audio](Audio/README.md) | Capture, PCM conversion, native playback, measured spectrum | Speech Actions, model inference, conversation policy or UI animation choices |
-| [Vision](Vision/README.md) | Camera lifecycle, native preview binding, bounded frames and orientation-aware samples | Gesture/pose decisions, model inference, overlay content or preview cropping policy |
-| [Connectivity](Connectivity/README.md) | Links, device protocols, native command encoding, telemetry and connection diagnostics | Action wrappers, reset/home choices, motion recipes, preferred device ordering or localized UI messages |
+| [Core](Core/README.md) | Boundary for future contracts shared by multiple hardware domains; currently documentation only | Placeholder abstractions without real consumers or application policy |
+| [Audio](Audio/README.md) | Microphone capture, native playback, streaming PCM conversion and measured spectrum | Speech Actions, inference, conversation sequencing or presentation choices |
+| [Vision](Vision/README.md) | Camera authorization/lifecycle, native preview source, bounded frames and orientation-aware sampling | Pose decisions, inference, overlay content or preview layout policy |
+| [Connectivity](Connectivity/README.md) | Device discovery/link state, protocol framing, native command encoding, hardware limits and telemetry | Gestures, reset/home policy, motion recipes, preferred-device ordering or localized messages |
+
+## External upstream and downstream
+
+App owns device and scene lifetime, creates concrete PlatformKit services and adapts their values to feature workflows, Gateway inputs and presentation endpoints. Actions call injected device capabilities when executing observable behavior. Agents and Tools may receive a narrowly scoped PlatformKit capability when a concrete implementation needs one, but they do not locate services through App or a global container.
+
+Solid arrows below are implemented relationships. Dashed arrows are allowed injection points that currently have no concrete dependency.
 
 ```mermaid
 flowchart LR
-    Actions[Actions: behavior and completion policy] --> SDK[PlatformKit: device capabilities]
-    App[App: lifecycle and typed adapters] --> SDK
-    SDK <--> Hardware[OS / external hardware]
-    SDK --> Facts[Frames / PCM / telemetry / structured failures]
-    Facts --> App
-    App --> Consumers[Agents and presentation through owned interfaces]
+    Intent[User / scene / OS lifecycle] --> App[App lifecycle and workflows]
+    Gateway[OutputGateway scheduler] --> Actions[Actions]
+    Gateway --> Tools[Tools]
+
+    App -->|capture, playback, preview, discovery| Platform[PlatformKit]
+    Actions -->|native device requests| Platform
+    Agents[Agents] -.->|scoped device capability when required| Platform
+    Tools -->|injected host camera-control endpoint| App
+    Tools -.->|direct scoped capability when required| Platform
+
+    Platform <--> Systems[Apple OS APIs / microphone / camera]
+    Platform <--> Hardware[BLE / USB devices]
+    Platform -->|PCM, frames, telemetry, status, failures| App
+    Platform -->|command completion and telemetry| Actions
+
+    App -->|adapted external observations| Input[InputGateway]
+    Input --> Agents
+    App -->|typed state and preview adapter| UI[UI]
 ```
 
-✅ Audio capture/playback, stream resampling and FFT metering; foreground camera capture/preview and bounded native-frame delivery; adapter-owned authorization; NexArm USB/BLE and protocol support are implemented. Playback drain and transport admission describe device operations, not a business Action result. Fixed buffer capacities and hardware register ranges are capability constraints, not application choreography.
+The current App target uses audio, camera and connectivity capabilities; the current Actions target uses NexArm protocol/link capabilities. Current Camera Tools reach the App-owned camera coordinator through an injected `CameraControlCapability`; Tools still does not import PlatformKit or own the device session. Current Agents also has no PlatformKit import. ModelKit does not call PlatformKit: App bridges captured PCM or image frames to the appropriate Agent/model boundary. UI receives state and typed operations rather than native services.
 
-## Ownership boundary
+## Internal capability flow
 
-Manual jog/reset behavior, gestures and motion completion policy belong to Actions/NexArm/Support. App workflows own Bluetooth ordering/localization; App adapters choose preview layout. PlatformKit exposes native capabilities and device facts without selecting application behavior.
+PlatformKit is one target organized into three implemented device domains. Each domain owns its native adapter and bounds at the hardware boundary; App or Actions owns the policy that connects those facts to the rest of the product.
 
-❌ Additional device domains, general network transport, recording and a confirmed independent robot emergency-stop mechanism are not implemented. Physical safety cannot depend on App background execution.
+```mermaid
+flowchart TB
+    subgraph Audio[Audio capability]
+        Mic[Microphone / AVAudioEngine] --> Capture[AppleAudioIO capture]
+        Capture -->|bounded MicrophoneFrame stream| Convert[Streaming PCM resampler]
+        PCM[Bounded playback PCM] --> Playback[AppleAudioIO playback]
+        Playback -->|drain / timeout / cancel| PlaybackResult[Playback completion]
+        Capture --> Meter[AudioSpectrum]
+        Playback --> Meter
+        Playback --> Speaker[Speaker / output route]
+    end
+
+    subgraph Vision[Vision capability]
+        Camera[Camera / AVCaptureSession] --> AppleCamera[AppleCamera actor]
+        AppleCamera -->|native session source| Preview[Preview bridge]
+        AppleCamera -->|newest CameraFrame, capacity 1| Frames[Read-only native frame and gray sample]
+        AppleCamera -->|status / interruption / failure| CameraStatus[Camera events]
+    end
+
+    subgraph Connectivity[Connectivity capability]
+        Request[Connect or native command] --> Protocol[NexArm encoding and validation]
+        Protocol --> Link[USB / BLE link]
+        Link --> Device[NexArm firmware]
+        Device -->|feedback packets| Link
+        Link --> Decode[NexArm framing and decoding]
+        Decode -->|telemetry / link facts / structured failure| Feedback[Device feedback]
+    end
+
+    Convert --> AppBoundary[App admission and adaptation]
+    Meter --> AppBoundary
+    Preview --> AppBoundary
+    Frames --> AppBoundary
+    CameraStatus --> AppBoundary
+    PlaybackResult --> AppBoundary
+    Feedback --> ConsumerBoundary[App workflow or Action]
+```
+
+Audio capture exposes a 64-frame bounded stream and fails on overflow; playback admits one active stream with at most three scheduled buffers and completes after hardware drain. Camera delivery keeps only the newest native frame while preview uses the native session independently. Connectivity validates native packet and hardware bounds, never silently replays failed motion commands, and reports structured link/device facts. Child directory READMEs own the exact limits, concurrency and cancellation contracts.
+
+## Ownership boundary and delivery state
+
+Manual jog/reset behavior, gestures, motion composition and completion policy belong to Actions/NexArm. App workflows own Bluetooth selection/order/localization and foreground connection lifetime; App adapters own preview layout and media-to-Agent adaptation. PlatformKit exposes native capabilities and device facts without selecting business behavior.
+
+- ✅ Audio capture/playback, stream resampling and FFT metering.
+- ✅ Foreground camera capture, native preview and bounded native-frame delivery.
+- ✅ NexArm USB/BLE links, protocol encoding, hardware bounds and feedback.
+- ❌ Additional device domains, general network transport, recording and a confirmed independent robot emergency-stop mechanism.
+
+Playback drain and transport admission describe device operations, not a business Action result. Fixed buffer capacities and hardware register ranges are capability constraints, not application choreography. Physical safety cannot depend on App background execution.
