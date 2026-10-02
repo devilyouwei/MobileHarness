@@ -201,3 +201,5 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 ✅ Support/NexArmJointCommand maps tracking radians to five motor targets. NexArmActionController.aim requires a verified connection and returns on transport acceptance; it does not wait for arrival. ❌ Physical tracking acceptance remains pending.
 
 ✅ Tracking aim is an immediate target write, with capacity-one controller admission and motors1–5 ownership. A failed possible write requires explicit read-only recovery. Its target mapping is Support/NexArmJointCommand.swift; native encoding remains PlatformKit. ❌ Tracking arrival remains unmeasured.
+
+✅ Incremental tracking retains its speed/motion state in the Action controller; gestures, reset, arrival checks and five-motor/gripper boundaries keep their existing contracts.

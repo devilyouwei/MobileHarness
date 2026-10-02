@@ -41,12 +41,35 @@ private func armTargets(in frame: [UInt8]) throws -> [Int] {
     return (0..<5).map { Int(packet.payload[4 + $0 * 8]) | Int(packet.payload[5 + $0 * 8]) << 8 }
 }
 
+private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
+    var decoder = NexArmDecoder()
+    try decoder.append(frame)
+    let decoded = try decoder.next()
+    let packet = try #require(decoded)
+    return (0..<5).map { Int(packet.payload[8 + $0 * 8]) | Int(packet.payload[9 + $0 * 8]) << 8 }
+}
+
 @Test func aimFrameAddressesFiveArmMotorsAtHome() throws {
     let frame = try NexArmJointCommand.frame(positions: NexArmJointCommand.armHome)
     #expect(try armTargets(in: frame) == [2048, 2087, 1198, 1238, 2048])
     #expect(throws: NexArmControlError.invalidPosition) {
         try NexArmJointCommand.frame(positions: NexArmJointCommand.armHome + [1122])
     }
+}
+
+@Test func followUpStepUsesItsOwnDistanceForSpeed() throws {
+    let home = NexArmJointCommand.armHome
+    var previous = home
+    previous[0] = home[0] - 200
+    var positions = previous
+    positions[0] -= 10
+    let packet = try NexArmJointCommand.packet(positions: positions, previous: previous)
+    let speeds = try armSpeeds(in: packet.bytes)
+    #expect(speeds[0] == 63)
+    #expect(speeds[1] == 1)
+    #expect(speeds[2] == 1)
+    #expect(speeds[3] == 1)
+    #expect(speeds[4] == 1)
 }
 
 @Test func leftAndHighTargetsMoveOnlyPanAndWrist() throws {
@@ -117,8 +140,11 @@ private func armTargets(in frame: [UInt8]) throws -> [Int] {
     }
     let base = try #require(Double(call.arguments["base"] ?? ""))
     let pitch = try #require(Double(call.arguments["pitch"] ?? ""))
-    #expect(abs(base - 0.24) < 0.001)
-    #expect(abs(pitch - 0.24) < 0.001)
+    #expect(base > 0)
+    #expect(pitch > 0)
+    #expect(base < 0.2)
+    #expect(pitch < 0.2)
+    #expect(base > pitch)
     await agent.stop()
 }
 
@@ -131,6 +157,37 @@ private func armTargets(in frame: [UInt8]) throws -> [Int] {
     var stream = agent.outputs.makeAsyncIterator()
     await agent.stop()
     #expect(await stream.next() == nil)
+}
+
+@Test func centeredPersonDoesNotAim() async throws {
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    try await agent.start()
+    try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: session))
+    var stream = agent.outputs.makeAsyncIterator()
+    await agent.stop()
+    #expect(await stream.next() == nil)
+}
+
+@Test func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    try await agent.start()
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.25), session: session))
+    var stream = agent.outputs.makeAsyncIterator()
+    let first = try #require(await stream.next())
+    let second = try #require(await stream.next())
+    guard case .toolCall(let firstCall) = first.output, case .toolCall(let secondCall) = second.output else {
+        Issue.record("Missing aim")
+        return
+    }
+    let firstBase = try #require(Double(firstCall.arguments["base"] ?? ""))
+    let secondBase = try #require(Double(secondCall.arguments["base"] ?? ""))
+    #expect(firstBase < 0)
+    #expect(secondBase < firstBase)
+    #expect(secondBase > -0.3)
+    await agent.stop()
 }
 
 @Test func aimWaitsForTimeAndMovement() async throws {
@@ -284,4 +341,55 @@ private actor ArmAvailability {
     var sequences: [UInt64] = []
     for await output in agent.outputs { sequences.append(output.sequence) }
     #expect(sequences == [2])
+}
+
+@Test func controllerTrackingSpeedUsesPreviousAcceptedTarget() async throws {
+    let link = AimLink()
+    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+    _ = try await controller.verifyCompatibility()
+    try await controller.aim(base: -0.32, pitch: 0)
+    try await controller.aim(base: -0.33, pitch: 0)
+    let packets = await link.writes
+    let prior = try armTargets(in: packets[0].bytes)
+    let target = try armTargets(in: packets[1].bytes)
+    let speeds = try armSpeeds(in: packets[1].bytes)
+    #expect(speeds[0] == Int(ceil(Double(abs(target[0] - prior[0])) * 1250 / 200)))
+    #expect(speeds[0] < 100)
+    #expect(speeds.dropFirst().allSatisfy { $0 == 1 })
+}
+
+@Test func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    try await agent.start()
+    for sequence in 1...8 {
+        try await agent.receive(
+            observation(
+                try pose(noseX: 43, noseY: 50, sequence: UInt64(sequence), timestamp: Double(sequence)),
+                session: session))
+    }
+    await #expect(throws: HarnessError.queueFull) {
+        try await agent.receive(
+            observation(try pose(noseX: 43, noseY: 50, sequence: 9, timestamp: 9), session: session))
+    }
+    var iterator = agent.outputs.makeAsyncIterator()
+    var lastBase = 0.0
+    for _ in 0..<8 {
+        let output = try #require(await iterator.next())
+        guard case .toolCall(let call) = output.output else {
+            Issue.record("Missing aim")
+            return
+        }
+        lastBase = try #require(Double(call.arguments["base"] ?? ""))
+    }
+    try await agent.receive(observation(try pose(noseX: 43, noseY: 50, sequence: 10, timestamp: 10), session: session))
+    let resumed = try #require(await iterator.next())
+    guard case .toolCall(let call) = resumed.output else {
+        Issue.record("Missing aim")
+        return
+    }
+    let resumedBase = try #require(Double(call.arguments["base"] ?? ""))
+    // Filtered error -0.0225, gain1.15, elapsed capped0.4: only one admitted step.
+    #expect(abs(resumedBase - lastBase + 0.01035) < 0.000001)
+    await agent.stop()
 }

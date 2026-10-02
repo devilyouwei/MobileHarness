@@ -31,6 +31,7 @@ public actor NexArmActionController {
     private var armPlan: NexArmArmPlan?
     private var motorHomes: [Int: Int] = [:]
     private var connectionIndicationUsed = false
+    private var lastAimPositions: [Int]?
     public private(set) var cachedJoints: [Int] = []
     private var cachedPose: [Int] = []
     public var latestState: (joints: [Int], pose: [Int]) { (cachedJoints, cachedPose) }
@@ -95,7 +96,10 @@ public actor NexArmActionController {
         guard !faulted else { throw NexArmActionError.uncertainMotion }
         guard compatibility != nil else { throw NexArmError.firmwareUnavailable }
         guard let writer = link as? any NexArmWritableLink else { throw NexArmError.invalidMotion }
-        let packet = try NexArmJointCommand.aimPacket(base: base, pitch: pitch)
+        let positions = try NexArmJointCommand.positions(base: base, pitch: pitch)
+        let previous =
+            lastAimPositions ?? (cachedJoints.count >= 5 ? Array(cachedJoints.prefix(5)) : NexArmJointCommand.armHome)
+        let packet = try NexArmJointCommand.packet(positions: positions, previous: previous)
         busy = true
         lockedMotors = Set(1...5)
         motorResults = []
@@ -107,6 +111,7 @@ public actor NexArmActionController {
         motionFailure = .sending
         do {
             try await writer.write(packet)
+            lastAimPositions = positions
             motionFailure = nil
         } catch {
             faulted = true
@@ -174,6 +179,7 @@ public actor NexArmActionController {
 
     /// Read-only recovery after an unconfirmed movement. Never replays or rolls back a command.
     public func recoverState() async throws -> (joints: [Int], pose: [Int]) {
+        lastAimPositions = nil
         try Task.checkCancellation()
         guard !busy else { throw NexArmError.busy }
         busy = true
@@ -284,6 +290,7 @@ public actor NexArmActionController {
             completion: completion)
     }
     private func execute(_ plan: NexArmMotionPlan, policy suppliedPolicy: NexArmMotorCompletion? = nil) async throws {
+        lastAimPositions = nil
         guard let observable = link as? any NexArmObservableLink else { throw NexArmError.invalidMotion }
         guard lockedMotors.isDisjoint(with: plan.lockedMotors) else { throw NexArmError.busy }
         lockedMotors = plan.lockedMotors

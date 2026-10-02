@@ -6,7 +6,7 @@ import PlatformKit
 public enum NexArmJointCommand {
     public static let countsPerRadian = 4096.0 / (2 * Double.pi)
     /// Nominal duration used only to choose a legal motor speed. It is not a measured travel time.
-    public static let aimMilliseconds = 800
+    public static let aimMilliseconds = 200
     /// Production arm rest. The 2026-10-01 Bluetooth read sat on this pose; the gripper encoder is excluded.
     public static let armHome: [Int] = [2048, 2087, 1198, 1238, 2048]
 
@@ -22,17 +22,23 @@ public enum NexArmJointCommand {
     }
 
     /// Broadcast servo write listing IDs 1...5. No gripper byte is present.
-    public static func packet(positions: [Int]) throws -> NexArmPacket {
-        guard positions.count == 5,
-            zip(positions, NexArmMotorCommands.positionLimits.prefix(5)).allSatisfy({ $1.contains($0) })
+    /// Speed is based on the preceding target, preserving slow incremental tracking away from home.
+    public static func packet(positions: [Int], previous: [Int]) throws -> NexArmPacket {
+        guard positions.count == 5, previous.count == 5,
+            zip(positions, NexArmMotorCommands.positionLimits.prefix(5)).allSatisfy({ $1.contains($0) }),
+            zip(previous, NexArmMotorCommands.positionLimits.prefix(5)).allSatisfy({ $1.contains($0) })
         else { throw NexArmControlError.invalidPosition }
         let atoms = try positions.enumerated().map { index, position in
-            let distance = abs(position - armHome[index])
-            let speed = max(1, min(1400, Int(ceil(Double(distance) * 1250 / Double(aimMilliseconds)))))
+            let distance = abs(position - previous[index])
+            let speed = max(1, min(700, Int(ceil(Double(distance) * 1250 / Double(aimMilliseconds)))))
             return try NexArmMotorCommands.move(
                 motor: index + 1, target: position, options: NexArmMotorOptions(speed: speed))
         }
         return try NexArmMotorCommands.simultaneous(atoms)
+    }
+
+    public static func packet(positions: [Int]) throws -> NexArmPacket {
+        try packet(positions: positions, previous: armHome)
     }
 
     public static func frame(positions: [Int]) throws -> [UInt8] {

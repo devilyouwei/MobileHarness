@@ -56,3 +56,5 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [ADR0100](adr/0100-camera-control-tools.md) records foreground Camera Tool ownership, completion and lease policy; native Tool transport and physical camera acceptance remain pending.
 
 ✅ [ADR0103](adr/0103-agent-failure-isolation.md) defines Agent isolation, bounded delivery/execution outcomes and Photographer offline suppression. ❌ Physical fault acceptance remains pending.
+
+✅ Latest main-sh incremental Photographer tracking is integrated through [ADR0102](adr/0102-photographer-aim.md), preserving main’s module boundaries and failure isolation. ❌ Physical smoothness acceptance remains pending.

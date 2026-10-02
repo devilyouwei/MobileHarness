@@ -44,3 +44,5 @@ No delivery dates or physical safety certification are implied. Requirements bel
 ✅ Offline-robot tracking isolation, BLE connected/control-unready presentation and incremental Agent-resource refresh are implemented. ❌ Phone acceptance must verify pose display with an offline arm, query-timeout state and tracking after reconnect.
 
 ✅ Implemented: producer messaging failure isolation, completion Tool error results and Photographer control-availability gating. Outstanding: sustained iPhone disconnect/reconnect and voice-service failure acceptance.
+
+✅ Integrated latest feat/main-sh incremental Photographer tracking into main’s current Action/Tool boundaries; retained Agent isolation and Bluetooth control-readiness contracts. ❌ Hardware smoothness and disconnect/reconnect tracking acceptance remain pending.

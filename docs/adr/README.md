@@ -114,3 +114,5 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 ✅ [0102 — Photographer aim on shared pose](0102-photographer-aim.md) keeps aim business policy in Actions and independent ToolRuntime dispatch. ❌ Physical tracking acceptance remains pending.
 
 ✅ [0103 — Agent failure isolation](0103-agent-failure-isolation.md) defines nonfatal messaging/execution outcomes and Photographer offline suppression. ❌ Sustained device acceptance remains pending.
+
+✅ ADR0102 now includes incremental pose tracking and adjacent-target speed selection in Actions; existing Agent isolation remains governed by ADR0103.

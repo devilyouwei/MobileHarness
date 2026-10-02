@@ -27,3 +27,5 @@ flowchart LR
 ✅ NexArmJointCommand owns tracking rest/angle and speed policy; aim shares controller admission and motor ownership. Native encoding remains in PlatformKit. ❌ Tracking arrival is not measured.
 
 ✅ Tracking writes reject faulted controllers. Any failed/cancelled write that may have committed latches uncertainty; explicit recoverState verifies stationary feedback and never replays a command.
+
+✅ Tracking speed uses the previous accepted aim target over200ms, capped at700 native speed units. First/recovered aim uses available joint feedback; nontracking plans clear the aim baseline. Faulted writes still require explicit read-only recovery and are never replayed. Native encoding remains in PlatformKit.

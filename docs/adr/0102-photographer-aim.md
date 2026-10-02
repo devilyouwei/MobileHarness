@@ -29,3 +29,5 @@ Audit refinement: Robot.aim declares motors1–5 at the Tool macro boundary. Gat
 Connection troubleshooting retains native query timeout metadata in PlatformKit and localized verification stages in App. No query retry, timeout extension or motion replay is introduced; the reported physical response failure remains unverified.
 
 Photographer output failures are reported independently and never terminate VisionPerception/showPose. Final app Agent resources are compared with source, and incremental embedding is refreshed after branch changes. BLE read-only timeout retains the link but quarantines subsequent requests until reconnect, keeping connected state distinct from control verification.
+
+✅ Latest main-sh integration adds Photographer dead zone4%, filtered image error and rate-limited base/wrist accumulation at200ms admission cadence. Action-side speed uses adjacent targets (200ms nominal, cap700), encoded by native SDK APIs. Accumulation commits only admitted output; control-unavailable observations reset it. Main failure isolation, quarantine, resource guards and write-uncertainty recovery are retained. ❌ Physical tracking acceptance remains pending.
