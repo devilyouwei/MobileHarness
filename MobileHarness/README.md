@@ -60,7 +60,7 @@ Semantic fusion belongs to Agents. Gateway carries identities, contracts and des
 
 ### Composition and mediation boundaries
 
-App composes the running system; Agents compose task behavior; Gateway mediates Agent communication and execution. These are separate responsibilities:
+App composes the running system; Agents generate task behavior; Actions and Tools execute it; Gateway mediates Agent communication and execution. ModelKit and PlatformKit are foundational capability SDKs that may be injected into Agents, Actions or Tools when a concrete implementation requires them. The diagram expresses this allowed capability model; the compilation graph in the next section records the dependencies used by the current implementation.
 
 ```mermaid
 flowchart TB
@@ -75,18 +75,21 @@ flowchart TB
     External[User / microphone / camera / runtime] --> Input[InputGateway]
     Input --> Agents
     Agents -->|Model processing| ModelKit
+    Agents -.->|Platform capability when required| Platform
     Agents -->|Records and owned media| Storage
-    Agents -->|Messages / ActionCall / ToolCall| Output[OutputGateway]
+    Agents -->|Generate messages / ActionCall / ToolCall / scheduling| Output[OutputGateway]
     Output -->|Agent-to-Agent message| Input
     Output --> Behavior
-    Behavior -->|Device and presentation capabilities| Platform[PlatformKit / App endpoints]
+    Behavior -.->|Model capability when required| ModelKit
+    Behavior -->|Platform capability when required| Platform[PlatformKit / App endpoints]
     Output -->|ToolResult / ActionResult / ActivityEvent| Input
 ```
 
 - **App assembles and owns lifetime.** It constructs Agents, Gateways, behavior registries, workflows and shared services, then injects role-specific interfaces. It does not become a global container that modules query at runtime.
-- **Agents compose behavior.** They use injected foundational capabilities for cognition and internal state, then express Agent messages, Actions, Tools and scheduling through OutputGateway. The current Agents target uses ModelKit and StorageAudio/StorageChat and has no PlatformKit dependency. A future Agent may receive a narrowly scoped PlatformKit capability for a concrete sensing or device-query need; business device commands and other observable effects must still use permitted Actions or Tools rather than bypassing Gateway.
-- **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, executable Agent output, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit/Storage calls, narrowly scoped PlatformKit capability calls or App/UI feature-workflow operations.
-- **Actions and Tools execute effects.** They receive App-bound presentation/device capabilities; device-facing behavior reaches PlatformKit through those explicit bindings. App lifecycle code may also use PlatformKit directly for host-owned capture, preview and connection workflows.
+- **Agents generate behavior.** They interpret input, use injected foundational capabilities and emit resolved Agent messages, `ActionCall`, `ToolCall` and scheduling controls through OutputGateway. The current Agents target uses ModelKit and StorageAudio/StorageChat; the architecture also permits a scoped PlatformKit capability when an Agent has a concrete need.
+- **Actions and Tools execute behavior.** Either may use injected ModelKit or PlatformKit capabilities required by its contract. Current Actions uses PlatformKit; current Tools uses neither SDK and operates through App-bound endpoints. Adding a dependency requires a concrete implementation need and must preserve the Runtime targets' independence.
+- **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, generated Action/Tool calls, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit, PlatformKit or Storage capability calls, nor App/UI feature-workflow operations.
+- **Observable Agent-selected effects remain explicit.** An Agent may use foundational capabilities internally, but device commands, presentation changes and other complete business effects selected by the Agent are emitted as permitted Actions or Tools. App lifecycle code may use PlatformKit directly for host-owned capture, preview and connection workflows.
 
 ### Compilation dependencies
 
