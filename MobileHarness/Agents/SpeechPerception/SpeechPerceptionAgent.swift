@@ -142,7 +142,7 @@ public actor SpeechPerceptionAgent: Agent {
         guard lifecycle == .running || lifecycle == .paused, let parent = activeInput, let port else {
             throw CancellationError()
         }
-        _ = try await port.publish(.transcript(text, final: false), parent: parent)
+        _ = try await port.publishResult(.transcript(text, final: false), parent: parent)
         try presentTranscript(text, input: parent)
     }
     private func presentTranscript(_ text: String, input: AgentInput) throws {
@@ -212,13 +212,13 @@ public actor SpeechPerceptionAgent: Agent {
                 activeInput = input
                 if beganTurn && !result.isSpeaking {
                     try presentPhase(.speaking, input: input)
-                    _ = try await port.publish(.speechPhase(.speaking), parent: input)
+                    _ = try await port.publishResult(.speechPhase(.speaking), parent: input)
                 }
                 let newPhase: SpeechPhase = result.isSpeaking ? .speaking : .listening
                 if phase != newPhase {
                     phase = newPhase
                     try presentPhase(phase, input: input)
-                    _ = try await port.publish(.speechPhase(phase), parent: input)
+                    _ = try await port.publishResult(.speechPhase(phase), parent: input)
                 }
                 var events: [VoiceStreamEvent] = []
                 for event in result.streamEvents {
@@ -236,7 +236,7 @@ public actor SpeechPerceptionAgent: Agent {
                     queue.removeAll()
                     queuedSamples = 0
                     try presentPhase(.processing, input: input)
-                    _ = try await port.publish(.speechPhase(.processing), parent: input)
+                    _ = try await port.publishResult(.speechPhase(.processing), parent: input)
                     let text = try await turn.finish()
                     try Task.checkCancellation()
                     let close = try Self.finishTranscript.call([:])
@@ -248,11 +248,15 @@ public actor SpeechPerceptionAgent: Agent {
                         awaitingReply = false
                         phase = .listening
                         try presentPhase(.empty, input: input)
-                        _ = try await port.publish(.speechPhase(.empty), parent: input)
+                        _ = try await port.publishResult(.speechPhase(.empty), parent: input)
                     } else {
-                        let report = try await port.publish(.transcript(text, final: true), parent: input)
-                        guard !report.delivered.isEmpty, report.rejected.isEmpty else {
-                            throw CommunicationError.unavailableTarget
+                        let report = try await port.publishResult(.transcript(text, final: true), parent: input)
+                        if report.delivered.isEmpty || !report.rejected.isEmpty || report.failure != nil {
+                            awaitingReply = false
+                            phase = .listening
+                            try presentPhase(.empty, input: input)
+                            try await segmenter.reset()
+                            makeTurn()
                         }
                     }
                 }

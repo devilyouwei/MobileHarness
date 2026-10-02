@@ -98,6 +98,7 @@ public enum NexArmBluetoothStep: String, Sendable, Equatable {
 }
 public enum NexArmBluetoothFailure: Sendable, Equatable {
     case timeout(NexArmBluetoothStep)
+    case responseTimeout(command: UInt8, expectedBytes: Int, receivedBytes: Int)
     case incompatibleService(NexArmBluetoothStep)
     case native(step: NexArmBluetoothStep, domain: String, code: Int)
     case disconnectUnconfirmed
@@ -119,6 +120,7 @@ struct NexArmBLEReply {
     let id: UInt8
     let command: UInt8
     let count: Int
+    var readOnlyQuery = false
     var acknowledgmentOnly = false
     var acknowledged = false
     var response: NexArmPacket?
@@ -198,6 +200,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     private var requestID: UUID?
     private var reply: NexArmBLEReply?
     private var requestTimer: Task<Void, Never>?
+    private var queryTimeoutLatched = false
     private var liveControlID: UUID?
     private var retiredWriteAcknowledgment = false
     private var liveDrainUntil: ContinuousClock.Instant?
@@ -366,6 +369,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
             throw NexArmError.disconnected
         }
         guard request == nil else { throw NexArmError.busy }
+        guard !queryTimeoutLatched else { throw NexArmError.timeout }
         guard (0...253).contains(replyCount),
             packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withResponse)
         else {
@@ -376,6 +380,9 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         requestID = token
         reply = NexArmBLEReply(
             id: replyID, command: replyCommand, count: replyCount,
+            readOnlyQuery: packet.id == 255
+                && (([1, 11].contains(packet.command) && packet.payload.isEmpty)
+                    || (packet.command == 7 && packet.payload.count == 14)),
             acknowledgmentOnly: acknowledgmentOnly)
         // Internal completion token only; write() exposes no fabricated device reply.
         if acknowledgmentOnly { reply?.response = packet }
@@ -445,9 +452,28 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         pending?.resume(throwing: error)
     }
     private func fail(_ error: any Error) {
+        // Capture the pending query before failPending clears it. Never replay a timed-out request.
+        let keepConnection =
+            error as? NexArmError == .timeout && step == .response
+            && reply?.readOnlyQuery == true
+        let failure: NexArmBluetoothFailure?
+        if error as? NexArmError == .timeout, step == .response, let reply, !reply.acknowledgmentOnly {
+            failure = .responseTimeout(
+                command: reply.command, expectedBytes: reply.count, receivedBytes: reply.receivedBytes)
+        } else {
+            failure = error is CancellationError ? nil : NexArmBluetoothFailure(step: step, error: error)
+        }
         failPending(error)
-        snapshot.failure = error is CancellationError ? nil : NexArmBluetoothFailure(step: step, error: error)
+        snapshot.failure = failure
         if let failure = snapshot.failure { log.error("\(String(describing: failure), privacy: .public)") }
+        if keepConnection {
+            // No wire request IDs: quarantine queries until reconnect rather than allowing a late reply
+            // to satisfy a replacement request. Radio/notifications remain independently connected.
+            queryTimeoutLatched = true
+            snapshot.feedbackHealthy = false
+            publish()
+            return
+        }
         tx = nil
         rx = nil
         if let peripheral {
@@ -562,6 +588,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         connectionTimer?.cancel()
         connectionTimer = nil
         snapshot.phase = .connected
+        queryTimeoutLatched = false
         snapshot.feedbackHealthy = true
         feedbackWatchdog = NexArmFeedbackWatchdog(started: .now)
         feedbackMonitor?.cancel()
@@ -607,7 +634,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     }
     private func updateFeedbackHealth() {
         guard let feedbackWatchdog, snapshot.phase == .connected else { return }
-        let healthy = !feedbackWatchdog.isLost(at: .now)
+        let healthy = !queryTimeoutLatched && !feedbackWatchdog.isLost(at: .now)
         guard snapshot.feedbackHealthy != healthy else { return }
         snapshot.feedbackHealthy = healthy
         publish()

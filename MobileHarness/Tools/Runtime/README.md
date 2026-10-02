@@ -37,11 +37,11 @@ flowchart TD
     Lookup --> Completion[Completion handler]
     Returning -->|String or ordinary error| Result[Correlated ToolResponse]
     Completion -->|success| Done[Return nil]
-    Completion -->|failure| Throw[Throw to dispatcher]
+    Completion -->|failure| Result
     Result --> Input[Dispatcher routes through InputGateway]
 ```
 
-Registration selects feedback kind; call arguments cannot change it. An empty returned String still produces a result. Cancellation propagates rather than becoming an ordinary error result. Completion waits for the injected endpoint's stated acknowledgement, not necessarily rendered or physical completion.
+Registration selects feedback kind; call arguments cannot change it. An empty returned String still produces a result. Task cancellation propagates through the runtime; production Gateway consumers retain an independently cancelled operation as a failure outcome. Completion waits for the injected endpoint's stated acknowledgement, not necessarily rendered or physical completion.
 
 Gateway checks resource ownership through the same ResourceCoordinator used by Actions, but Tools remain outside Channel FIFO/wait. Runtime owns no work queue, deadline task or detached worker. An uncooperative handler can delay its caller; no generic timeout is implemented.
 
@@ -54,3 +54,5 @@ Gateway checks resource ownership through the same ResourceCoordinator used by A
 ❌ No change to scheduling, completion, resource arbitration or cleanup algorithms.
 
 ✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.
+
+✅ Completion handler ordinary exceptions now return correlated isError ToolResponse, matching returning Tools. Successful completion remains nil; cancellation remains a control signal and propagates.

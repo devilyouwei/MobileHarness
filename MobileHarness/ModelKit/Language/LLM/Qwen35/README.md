@@ -53,3 +53,5 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 ✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Qwen reports no native Tool support and rejects requests carrying tools. See [technical flow](../OpenAI/README.md).
+
+✅ Native Tool rejection is formatted under Swift 6.4 strict lint; local chat remains text-only.

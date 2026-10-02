@@ -23,7 +23,7 @@ flowchart LR
 
 ✅ Raw inputs have increasing sequence/timestamps and matching sessions. Grayscale compares previous examined frames. One worker processes a frame; one latest pending frame replaces older pending input. Pause suspends dequeue, stop cancels/joins inference and suppresses late outputs. Shared observations retain up to 300 people independently of the six-person display limit.
 
-✅ Publication uses a separate Agent-owned worker and one latest pending observation. Slow subscriber admission does not hold the inference worker or UI output. Pending observations are replaced explicitly (publicationReplacements); expired pending observations are skipped. Missing subscribers is allowed; unexpected publication errors still fail the Agent and are surfaced through terminal control. Pause holds pending publication; stop cancels and joins inference and publication before finishing outputs.
+✅ Publication uses a separate Agent-owned worker and one latest pending observation. Slow subscriber admission does not hold the inference worker or UI output. Pending observations are replaced explicitly (publicationReplacements); expired pending observations are skipped. Missing subscribers is allowed; ordinary publication errors remain recorded delivery outcomes and do not stop inference or display. Pause holds pending publication; stop cancels and joins inference and publication before finishing outputs.
 
 ✅ Presentation output is a capacity-two bufferingNewest stream: every inference emits showPose followed by moveEyes, including neutral gaze. Only these two replaceable presentation states can be superseded, with separate overlayReplacements/gazeReplacements counters; arbitrary commands fail overflow. App awaits the Tool and joins/retires each admitted Action before consuming the next state. This completion barrier is outside the replaceable buffer, so no accepted Action loses its finish. Terminal error may follow one buffered display state, finishes the stream, and cannot be overwritten by later results. OutputEnvelope holds correlation metadata rather than raw input media. A publication may retain its parent frame until delivery completes; active/pending publication slots bound that lifetime.
 
@@ -154,3 +154,7 @@ flowchart LR
 ## Action and Tool presentation boundary
 
 ✅ Gaze and skeleton are internal completion-only ToolCalls. Both are replaceable latest state, with explicit counters under the existing two-entry newest output bound. Neither enters Channel scheduling or Action history. ❌ No generic device-action coalescing is introduced.
+
+✅ Optional subscriber admission failures increment publicationRejections and never stop local inference/showPose. Ordinary port/routing failures remain recorded delivery outcomes; missing recipients remain permitted. Startup configuration validation remains strict. No device commands are coalesced by this observation policy.
+
+✅ All ordinary publication errors are recorded as outcomes, including closed ports and capacity rejection; visualization and inference continue. Explicit cancellation still stops owned work.

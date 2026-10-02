@@ -316,6 +316,8 @@ for folder, (target, allowed) in workflow_boundaries.items():
 for source in (ROOT / 'MobileHarness/App/Lifecycle').glob('*.swift'):
     if 'ApplicationRuntime' in source.read_text():
         errors.append(f'Lifecycle depends on whole application runtime: {source.relative_to(ROOT)}')
+    if re.search(r'\bPhotographerAgent\s*\(', source.read_text()):
+        errors.append(f'Lifecycle constructs Photographer instead of an injected factory: {source.relative_to(ROOT)}')
 # Tracking rest/angle and speed policy must stay with Action-side motion ownership.
 for source in (ROOT / 'MobileHarness/PlatformKit').rglob('*.swift'):
     if re.search(r'\bNexArmJointCommand\b|\bfunc\s+aim\s*\(', source.read_text()):

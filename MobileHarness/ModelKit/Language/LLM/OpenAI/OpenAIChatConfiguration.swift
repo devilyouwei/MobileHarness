@@ -103,12 +103,14 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
     }
 
     static func toolNames(_ tools: [ChatToolDefinition]) -> [String: String] {
-        Dictionary(uniqueKeysWithValues: tools.enumerated().map { index, tool in
-            let stem = tool.name.map { character in
-                character.isASCII && (character.isLetter || character.isNumber || character == "_") ? character : "_"
-            }
-            return (String(stem.prefix(48)) + "_" + String(index), tool.name)
-        })
+        Dictionary(
+            uniqueKeysWithValues: tools.enumerated().map { index, tool in
+                let stem = tool.name.map { character in
+                    character.isASCII && (character.isLetter || character.isNumber || character == "_")
+                        ? character : "_"
+                }
+                return (String(stem.prefix(48)) + "_" + String(index), tool.name)
+            })
     }
 
     func request(_ chat: ChatRequest) throws -> URLRequest {

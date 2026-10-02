@@ -55,3 +55,9 @@ Camera.open/close/flip Tools request the App camera owner through a typed capabi
 Cloud chat supports native function declarations from Agent JSON v5. Complete calls are resolved by the Agent and dispatched through OutputGateway; local chat remains text-only. Tool results use the existing InputGateway feedback contract, without automatic model continuation.
 
 Photographer subscribes to VisionPerception pose observations and emits internal Robot.aim through OutputGateway. App binds the foreground BLE workflow; Actions owns aim mapping and admission, while PlatformKit supplies native command encoding. Transport acceptance does not establish physical arrival.
+
+Tracking Tool resource metadata now admits motors1–5 at OutputGateway before the App sender. Composition supplies Photographer construction; lifecycle owns activation and partial-failure cleanup. Failed possible writes require explicit Action-controller recovery without replay.
+
+VisionPerception and Photographer share observations but have independent execution failure scopes. A rejected Robot.aim does not stop showPose. BLE connectivity and control verification are separate states; query timeout retains connectivity while quarantining control queries until reconnect.
+
+✅ Agent fault isolation: delivery failures are receipts; output execution failures are correlated results. Photographer suppresses commands while control is unavailable. Explicit stop/cancellation and invalid startup configuration remain lifecycle/assembly contracts.

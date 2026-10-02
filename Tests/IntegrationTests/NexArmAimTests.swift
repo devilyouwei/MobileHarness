@@ -162,6 +162,8 @@ private func armTargets(in frame: [UInt8]) throws -> [Int] {
 }
 
 private actor AimLink: NexArmWritableLink {
+    private var failWrite = false
+    func setWriteFailure(_ value: Bool) { failWrite = value }
     private(set) var exchanges = 0
     private(set) var writes: [NexArmPacket] = []
     func exchange(_ packet: NexArmPacket, replyID: UInt8, replyCommand: UInt8, replyCount: Int) async throws
@@ -181,7 +183,10 @@ private actor AimLink: NexArmWritableLink {
         }
         return try NexArmPacket(id: 255, command: 11, payload: payload)
     }
-    func write(_ packet: NexArmPacket) { writes.append(packet) }
+    func write(_ packet: NexArmPacket) throws {
+        writes.append(packet)
+        if failWrite { throw NexArmError.disconnected }
+    }
     func close() {}
 }
 
@@ -199,4 +204,84 @@ private actor AimLink: NexArmWritableLink {
     let packet = try #require(writes.first)
     #expect(try armTargets(in: packet.bytes) == NexArmJointCommand.positions(base: -0.32, pitch: 0))
     #expect(await link.exchanges == reads)
+}
+
+@Test func trackingWriteFailureRequiresExplicitRecoveryAndNeverReplays() async throws {
+    let link = AimLink()
+    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+    _ = try await controller.verifyCompatibility()
+    await link.setWriteFailure(true)
+    await #expect(throws: NexArmActionError.uncertainMotion) { try await controller.aim(base: 0, pitch: 0) }
+    await link.setWriteFailure(false)
+    await #expect(throws: NexArmActionError.uncertainMotion) { try await controller.aim(base: 0.1, pitch: 0) }
+    #expect(await link.writes.count == 1)
+    _ = try await controller.recoverState()
+    #expect(await link.writes.count == 1)
+    try await controller.aim(base: 0.1, pitch: 0)
+    #expect(await link.writes.count == 2)
+}
+
+@Test func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    try await agent.start()
+    for index in 0..<8 {
+        try await agent.receive(
+            observation(
+                try pose(
+                    noseX: index.isMultiple(of: 2) ? 10 : 90, noseY: 50,
+                    sequence: UInt64(index + 1), timestamp: Double(index)), session: session))
+    }
+    await #expect(throws: HarnessError.queueFull) {
+        try await agent.receive(
+            observation(
+                try pose(noseX: 10, noseY: 50, sequence: 9, timestamp: 8), session: session))
+    }
+    #expect(await agent.status().lifecycle == .running)
+    await agent.stop()
+    var accepted = 0
+    for await _ in agent.outputs { accepted += 1 }
+    #expect(accepted == 8)
+}
+
+@Test func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    try await agent.start()
+    let pose = try JSONDecoder().decode(
+        PoseObservation.self,
+        from: Data(
+            #"{"width":100,"height":100,"sequence":1,"timestamp":0,"rotation":1,"people":[[]]}"#.utf8))
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await agent.receive(observation(pose, session: session))
+    }
+    #expect(await agent.status().processedInputs == 0)
+    await agent.stop()
+}
+
+@Test func robotAimDeclaresEveryControlledMotorBeforeGatewayDispatch() async throws {
+    let module = RobotToolModule { _, _, _ in }
+    let registry = try ToolRegistry(modules: [module])
+    let resources = await registry.resources(for: "Robot.aim")
+    #expect(resources == Set((1...5).map { ToolResource(rawValue: "nexarm.motor.\($0)") }))
+}
+
+private actor ArmAvailability {
+    var ready = false
+    func enable() { ready = true }
+}
+
+@Test func photographerSuppressesOfflineCommandsAndResumesFromFreshPose() async throws {
+    let session = UUID()
+    let availability = ArmAvailability()
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true, controlAvailable: { await availability.ready })
+    try await agent.start()
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
+    await availability.enable()
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
+    await agent.stop()
+    var sequences: [UInt64] = []
+    for await output in agent.outputs { sequences.append(output.sequence) }
+    #expect(sequences == [2])
 }

@@ -83,3 +83,7 @@ See [external input delivery](../../../Gateway/Input/README.md#external-input-ad
 ## Action runtime stage 2
 
 ✅ The contract catalog includes runtime-only action.result/actionResult and activity.event/activityEvent inputs. JSON v5 shape is unchanged. Agent publication remains restricted to permitted observations; dedicated InputGateway methods bind these runtime messages to a specific owner incarnation/session. ❌ No generic activity subscription service.
+
+✅ AgentMessaging publishResult/sendResult return ordinary routing failures in DeliveryReport.failure; explicit task cancellation propagates; a cancelled delivery alone is a failed receipt. Each port retains128 correlated delivery receipts, evicts oldest with an explicit counter, and performs no retry. Legacy throwing methods remain low-level validation APIs.
+
+✅ DeliveryHistory retains a bounded outcome history; overflow evicts the oldest receipt and increments evictedCount. No accepted action is discarded.

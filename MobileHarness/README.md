@@ -180,7 +180,8 @@ MobileHarness/
 │   ├── Assistant/
 │   ├── SpeechPerception/
 │   ├── SpeechSynthesis/
-│   └── VisionPerception/
+│   ├── VisionPerception/
+│   └── Photographer/
 ├── Gateway/
 │   ├── Input/                   # External/internal admission and delivery
 │   └── Output/                  # Validation, routing, scheduling, results/resources
@@ -192,6 +193,8 @@ MobileHarness/
 ├── Tools/
 │   ├── Runtime/                 # Independent ToolRuntime and Contracts
 │   ├── System/
+│   ├── Camera/
+│   ├── Robot/
 │   └── UI/
 ├── Types/
 │   └── Audio/                   # Shared immutable PCM/microphone values
@@ -281,7 +284,7 @@ This section is an architectural directory. It describes why each module exists 
 | [Gateway](Gateway/README.md) | Validate input/output, route messages, schedule Actions and coordinate results/resources. | Coordination only; no inference or domain behavior implementation. | Neural pathways and motor coordination. |
 | [Actions](Actions/README.md) | Implement scheduled speech, expression and NexArm behavior. | Owns business parameters and completion policy; consumes injected native capabilities. | Learned motor skills. |
 | [ActionRuntime](Actions/Runtime/README.md) | Register and execute trusted Action invocations. | Neutral execution contracts; Channel/wait policy remains in Gateway. | Motor execution machinery. |
-| [Tools](Tools/README.md) | Implement direct System/UI functions with declared result semantics. | Current domains use injected endpoints and have no UI or PlatformKit import. | Immediate reflexes and focused functions. |
+| [Tools](Tools/README.md) | Implement direct System/UI/Camera/Robot functions with declared result semantics. | Current domains use injected endpoints and have no UI or PlatformKit import. | Immediate reflexes and focused functions. |
 | [ToolRuntime](Tools/Runtime/README.md) | Register and execute trusted Tool invocations. | No concrete Tool domain, Agent, UI or hardware dependency. | Direct function execution machinery. |
 | [ModelKit](ModelKit/README.md) | Expose typed speech, language and vision processing capabilities. | Base SDK knows neither Agent policy nor device I/O; engines live in adapters/backends. | Recognition and generation machinery. |
 | [PlatformKit](PlatformKit/README.md) | Capture/output media, manage links and expose native commands/feedback. | Device SDK only; no gestures, model inference, localization or workflow policy. | Sensory organs and effectors. |
@@ -655,4 +658,12 @@ Every queue or active-call pool has an explicit capacity and overflow rule in it
 
 Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; ToolResult retains existing feedback behavior. Local Qwen and automatic result-driven continuation remain unsupported.
 
-✅ Photographer consumes shared pose through InputGateway and emits internal Robot.aim through OutputGateway. Tools validates radians; App binds the verified foreground Bluetooth workflow; Actions/NexArm owns rest mapping and speed policy. PlatformKit only encodes native motor writes. ❌ Physical tracking acceptance remains pending.
+### Photographer tracking path
+
+Photographer consumes validated `vision.pose` through InputGateway and emits internal `Robot.aim` through OutputGateway. Its JSON v5 contains the subscription and empty model-callable catalogs; fixed internal permission and target-selection policy stay in Agent code. The output buffer holds eight calls and fails explicitly on overflow.
+
+RobotTools owns argument validation and macro metadata for motors1–5. Gateway authorizes and locks the resources; App supplies NexArmBehaviorAdapter and a composition-owned Photographer factory. VisionSession owns registration, output pumps and cleanup, including partial registration failure. Action-side aim policy maps the rest/angles and chooses speed; PlatformKit encodes native commands. Return means transport acceptance, not arrival. A possible failed write latches uncertainty until explicit read-only recovery. ❌ Physical tracking acceptance remains pending.
+
+✅ Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until explicit reconnect. Final App resource validation requires all five Agent JSON files.
+
+✅ Agent fault isolation: ordinary messaging and behavior execution failures are outcomes, never a reason to terminate sibling Agents. Photographer owns offline command suppression; Gateway retains bounded output/Action diagnostics. Startup configuration validation and explicit cancellation remain strict.

@@ -85,3 +85,7 @@ flowchart TD
 ✅ AppAssembly supplies the root CameraCoordinator to ApplicationRuntime; RuntimePresentation binds the CameraControlCapability required by BehaviorAssembly. It does not create a second camera owner.
 
 ✅ Photographer policy and internal Tool coverage are assembled alongside existing Agents. Robot.aim binds the foreground Bluetooth workflow without adding AgentCore to BehaviorAssembly.
+
+✅ ApplicationRuntime injects the Photographer factory into VisionRuntimeDependencies and grants Photographer motors1–5 only. Robot.aim binds NexArmBehaviorAdapter alongside existing gesture bindings.
+
+✅ Composition injects Photographer control availability as a read-only MainActor BluetoothWorkflow snapshot; Agents imports no device SDK or App service.

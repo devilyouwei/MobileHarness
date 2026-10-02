@@ -9,4 +9,7 @@ for scheme in MobileHarnessSimulator ModelKitRuntime ModelKitNemotron ModelKitSi
     xcodebuild -project MobileHarness.xcodeproj -scheme "$scheme" \
         -configuration Debug -destination 'generic/platform=iOS Simulator' \
         -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build
+    if [[ "$scheme" == MobileHarnessSimulator ]]; then
+        python3 scripts/verify-app-agent-resources.py build/DerivedData/Build/Products/Debug-iphonesimulator/MobileHarnessSimulator.app
+    fi
 done

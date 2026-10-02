@@ -1,15 +1,15 @@
-# Robot Tool Support
+# Robot Tool support
 
-Purpose: keep the aim registration out of the callable entry file. Design goals: one explicit module, an injected sender, and no device construction.
+Purpose: hold explicit Tool registration and domain errors. Design goals: independent ToolRuntime context, injected Sendable sender and no device construction.
 
 ```mermaid
 flowchart LR
-    Host[Host aim closure] --> Module[RobotToolModule]
-    Module --> Entry[RobotTools.aim]
+    Root[BehaviorAssembly sender] --> Module[RobotToolModule]
+    Module --> Definition[Macro definition and five-motor resources]
+    Definition --> Entry[RobotTools.aim]
+    Entry --> Host[App adapter]
 ```
 
-✅ `RobotToolModule` registers completion-only `Robot.aim`. The host supplies the sender. This directory adds no queue.
+✅ RobotToolModule binds one completion-only definition. RobotTypes owns invalidAngle/notConnected errors. Resource metadata belongs to the callable macro declaration; the module does not duplicate it. This directory adds no queue, AgentCore dependency or device owner.
 
-❌ The registration does not open Wi-Fi or call the production NexArm controller. The gripper is not addressed.
-
-✅ The macro-generated Tool definition uses independent ToolRuntime context. No AgentCore dependency is retained.
+❌ Registration does not validate hardware arrival or physical clearance. Connection/session lifetime stays in App and motion policy stays in Actions.

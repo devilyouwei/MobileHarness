@@ -128,7 +128,7 @@
         @Bindable var state: BluetoothSettingsState
         let controls: any BluetoothControlling
         let device: BluetoothDeviceRow
-        private var connected: Bool { state.selected?.id == device.id && state.controlReady }
+        private var connected: Bool { state.selected?.id == device.id && state.phase == .connected }
         var body: some View {
             List {
                 Section("当前状态") {
@@ -145,8 +145,8 @@
                         if let sampledAt = state.sampledAt {
                             LabeledContent("位置更新于") { Text(sampledAt, style: .time) }
                         }
-                        Button("刷新状态") { Task { await controls.refreshDevice() } }
-                            .disabled(!state.canControl)
+                        Button("刷新状态 / 验证控制") { Task { await controls.refreshDevice() } }
+                            .disabled(state.executing || state.refreshing || state.connectionBusy)
                     }
                     if let status = state.motionStatus, connected { Text(status).foregroundStyle(.secondary) }
                     if let error = state.error { Text(error).foregroundStyle(.red) }

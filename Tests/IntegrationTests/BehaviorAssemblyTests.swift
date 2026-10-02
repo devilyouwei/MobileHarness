@@ -151,10 +151,11 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         #expect(result == nil)
     }
     #expect(await endpoint.cameraCalls == ["open", "close", "flip"])
-    await #expect(throws: ToolArguments.ValidationError.invalidKeys) {
+    let invalid = try #require(
         try await executor.execute(
-            ToolCall(toolPath: "Camera.flip", arguments: ["unexpected": "yes"]), envelope: envelope)
-    }
+            ToolCall(toolPath: "Camera.flip", arguments: ["unexpected": "yes"]), envelope: envelope))
+    #expect(invalid.isError)
+    #expect(invalid.value.contains("invalidKeys"))
     #expect(await endpoint.cameraCalls.count == 3)
     let cancelled = Task {
         try Task.checkCancellation()
@@ -173,14 +174,14 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
     func flip(invocation: ToolInvocation) async throws { throw CameraControlError.disabled }
 }
 
-@Test func cameraToolsPropagateHostFailureWithoutSuccessFeedback() async throws {
+@Test func cameraToolsRecordHostFailureWithoutSuccessFeedback() async throws {
     let executor = ToolExecutor(
         registry: try ToolRegistry(modules: [CameraToolModule(camera: UnavailableCameraEndpoint())]))
     let envelope = behaviorInvocation("express").testEnvelope
-    await #expect(throws: CameraControlError.permissionDenied) {
-        try await executor.execute(ToolCall(toolPath: "Camera.open", arguments: [:]), envelope: envelope)
-    }
-    await #expect(throws: CameraControlError.disabled) {
-        try await executor.execute(ToolCall(toolPath: "Camera.flip", arguments: [:]), envelope: envelope)
-    }
+    let open = try #require(
+        try await executor.execute(ToolCall(toolPath: "Camera.open", arguments: [:]), envelope: envelope))
+    #expect(open.isError && open.value.contains("permissionDenied"))
+    let flip = try #require(
+        try await executor.execute(ToolCall(toolPath: "Camera.flip", arguments: [:]), envelope: envelope))
+    #expect(flip.isError && flip.value.contains("disabled"))
 }

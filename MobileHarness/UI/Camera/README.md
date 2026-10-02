@@ -32,3 +32,5 @@ flowchart LR
 ❌ Recording, exact preview-crop mapping of gaze, and physical-device visual, navigation, permission and performance acceptance.
 
 Sources compile once in the UI target; there is no App source membership for this directory.
+
+✅ CameraState keeps trackingMessage separate from camera/vision failures. The surface presents a tracking warning while preview and skeleton remain available; UI still receives values only.

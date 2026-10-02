@@ -9,13 +9,17 @@ public actor PhotographerAgent: Agent {
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let sessionID: UUID
     private let controlsArm: Bool
+    private let controlAvailable: @Sendable () async -> Bool
     private var lifecycle: AgentLifecycle = .registered
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var lastAim: (base: Double, pitch: Double, time: TimeInterval)?
     private var processed = 0
 
-    public init(sessionID: UUID, configuration: AgentConfiguration? = nil, controlsArm: Bool = false) throws {
+    public init(
+        sessionID: UUID, configuration: AgentConfiguration? = nil, controlsArm: Bool = false,
+        controlAvailable: @escaping @Sendable () async -> Bool = { true }
+    ) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
@@ -25,6 +29,7 @@ public actor PhotographerAgent: Agent {
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.sessionID = sessionID
         self.controlsArm = controlsArm
+        self.controlAvailable = controlAvailable
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
         outputs = stream.stream
         continuation = stream.continuation
@@ -54,10 +59,11 @@ public actor PhotographerAgent: Agent {
         AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)
     }
 
-    public func receive(_ input: AgentInput) throws {
+    public func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID else { throw CommunicationError.unauthorized }
         guard case .observation(.pose(let pose)) = input.payload else { throw HarnessError.unsupportedInput }
+        try pose.validate()
         guard lastSequence.map({ pose.sequence > $0 }) ?? true,
             lastTimestamp.map({ pose.timestamp >= $0 }) ?? true
         else { throw CommunicationError.outOfOrder }
@@ -65,7 +71,14 @@ public actor PhotographerAgent: Agent {
         lastSequence = pose.sequence
         lastTimestamp = pose.timestamp
         processed += 1
-        guard lifecycle == .running, let aim = nextAim(pose) else { return }
+        guard lifecycle == .running else { return }
+        let available = await controlAvailable()
+        guard lifecycle == .running, lastSequence == pose.sequence else { return }
+        guard available else {
+            lastAim = nil
+            return
+        }
+        guard let aim = nextAim(pose) else { return }
         let call = try Self.aimPermission.call(["base": String(aim.base), "pitch": String(aim.pitch)])
         try emit(.toolCall(call), input: input, sequence: pose.sequence)
         lastAim = (aim.base, aim.pitch, pose.timestamp)
@@ -104,10 +117,10 @@ public actor PhotographerAgent: Agent {
             OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: sequence))
         {
         case .enqueued: return
-        case .dropped, .terminated:
-            lifecycle = .failed
-            continuation.finish()
+        case .dropped:
             throw HarnessError.queueFull
+        case .terminated:
+            throw HarnessError.notRunning
         @unknown default: throw HarnessError.queueFull
         }
     }

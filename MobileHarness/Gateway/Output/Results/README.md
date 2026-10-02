@@ -16,7 +16,7 @@ flowchart LR
     Gateway -->|closed| History[Record delivery closure]
 ```
 
-`ActionFeedback` is none, failuresOnly or terminal. OutputGateway defaults to failuresOnly and enables feedback only for Agents accepting actionResult. A successful failuresOnly execution releases its reservation without sending. Rejected admission throws synchronously and has no execution result. A queued cancellation is cancelled/notStarted; failures/cancellation after execution begins conservatively report unknown; success reports contractCompleted. Failure codes are bounded enums, never raw error text or arguments. Activity start/stop completions carry an activity UUID; successful start does not mean the activity ended.
+`ActionFeedback` is none, failuresOnly or terminal. OutputGateway defaults to failuresOnly and enables feedback only for Agents accepting actionResult. A successful failuresOnly execution releases its reservation without sending. Low-level scheduler admission rejects synchronously; production OutputGateway.execute retains that rejection as an output result without starting effects. A queued cancellation is cancelled/notStarted; failures/cancellation after execution begins conservatively report unknown; success reports contractCompleted. Failure codes are bounded enums, never raw error text or arguments. Activity start/stop completions carry an activity UUID; successful start does not mean the activity ended.
 
 | Limit | Overflow / completion policy |
 | --- | --- |
@@ -27,7 +27,7 @@ flowchart LR
 | Delivery history | 256 records; evict oldest and count internally |
 | Agent result history | Default 128, configurable 1–512; deduplicate retained execution IDs, evict oldest and count |
 
-`InputGateway.deliverActionResult` returns accepted, retry (bounded admission full), or closed (owner/session/contract unavailable). Retries reuse the same execution ID and result. Public send/publish cannot forge runtime results. Delivery accepted is not a new model turn and does not imply business processing; current Agents store history only. A slow/uncooperative callback is cancelled but retained until it returns, so no unbounded abandoned callback tasks accumulate. Other pending messages can expire meanwhile. Session cancellation/shutdown closes matching pending feedback; original failure still propagates through the Action barrier. `resultSnapshot()` exposes delivery states separately from execution diagnostics.
+`InputGateway.deliverActionResult` returns accepted, retry (bounded admission full), or closed (owner/session/contract unavailable). Retries reuse the same execution ID and result. Public send/publish cannot forge runtime results. Delivery accepted is not a new model turn and does not imply business processing; current Agents store history only. A slow/uncooperative callback is cancelled but retained until it returns, so no unbounded abandoned callback tasks accumulate. Other pending messages can expire meanwhile. Session cancellation/shutdown closes matching pending feedback; the low-level Action barrier retains its failure; production OutputGateway.execute converts it into an output result. `resultSnapshot()` exposes delivery states separately from execution diagnostics.
 
 ❌ No durable delivery, crash recovery, unlimited replay, global exactly-once guarantee, persistent deduplication or automatic Agent/model recovery policy. History eviction ends the deduplication window. ActivityEvent has a validated direct route but no generic activity event outbox or subscription service. Physical effect uncertainty cannot be inferred away from a failed delivery.
 
@@ -42,3 +42,9 @@ See [resources](../Resources/README.md), [scheduling](../Scheduling/README.md) a
 ✅ The result ledger translates ActionCompletion into AgentActionCompletion before delivery, preserving every child result and execution-level failure.
 
 ✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
+
+✅ OutputGateway.execute returns an OutputExecutionResult for ordinary validation/admission/execution failures. executionResults combines256 retained correlated output outcomes with the existing bounded Action execution snapshot; oldest output eviction is counted. Terminal controls join Actions before returning normal/error completion. This history is in-memory diagnostics, not durable storage.
+
+Completion-only Tool errors remain execution outcomes and do not inject a new model-facing ToolResult; only returning Tools route data feedback.
+
+✅ executionResults can filter by source Agent and inputID so a terminal consumer retrieves that input’s accumulated output errors and Action completion records; eviction counters remain global and explicit.

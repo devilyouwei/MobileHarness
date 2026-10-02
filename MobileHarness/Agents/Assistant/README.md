@@ -10,7 +10,7 @@ Purpose: send user input to ChatCapability, maintain bounded history and interpr
 - ✅ /status resolves runtimeInfo. Tool results and event descriptions are escaped before text interpretation.
 - ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 generated Action/Tool calls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
 - ✅ Cancellation bypasses full/paused inbox admission, joins the worker and discards incomplete parsing state.
-- ❌ Native model tool deltas, durable inbox/runtime checkpoints, restart and long-running background execution. ToolCallParser exists, but ChatCapability produces text/completion events.
+- ❌ Local native Tool deltas, durable inbox/runtime checkpoints, restart and long-running background execution. Cloud ChatCapability produces complete native Tool calls; Assistant resolves them through the shared ToolCallParser before OutputGateway dispatch.
 
 ```mermaid
 flowchart TD
@@ -253,3 +253,7 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
 ❌ Local native tools, result-driven model continuation, persisted native tool-call transcripts and Responses API transport.
+
+✅ Formatting now satisfies Swift 6.4 strict lint. Runtime behavior and Agent JSON permissions are unchanged.
+
+✅ A rejected synthesis request is recorded by the messaging port and skips only its dependent playback Action; other generated outputs and later inputs continue.

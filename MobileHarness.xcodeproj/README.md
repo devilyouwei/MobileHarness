@@ -66,3 +66,5 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Navigation includes Actions/Runtime/Contracts and Tools/Runtime/Contracts, Gateway translation/scheduling context and App workflow adapters. SwiftPM remains the single source compilation map.
 
 ✅ Photographer navigation and JSON are retained; SwiftPM owns compilation of Robot Tools and Action-side aim support.
+
+✅ Scheme cleanup refreshes the generated embedded Agents bundle on incremental builds. Resource declarations remain in Package.swift; the final app is verified for every Agent config.

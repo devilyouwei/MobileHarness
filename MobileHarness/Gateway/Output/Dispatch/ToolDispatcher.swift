@@ -7,7 +7,7 @@ struct ToolDispatcher: Sendable {
     let input: InputGateway
     let resources: ResourceCoordinator?
 
-    func dispatch(_ call: ToolCall, envelope: OutputEnvelope, owner: ExecutionOwner) async throws {
+    func dispatch(_ call: ToolCall, envelope: OutputEnvelope, owner: ExecutionOwner) async throws -> ToolResponse? {
         let required = Set(await registry.resources(for: call.toolPath).map { ResourceID(rawValue: $0.rawValue) })
         let result: ToolResponse?
         if !required.isEmpty {
@@ -21,14 +21,22 @@ struct ToolDispatcher: Sendable {
             result = try await ToolExecutor(registry: registry).execute(
                 call.executionRequest, context: envelope.toolContext)
         }
-        guard let result else { return }
+        guard let result else { return nil }
         try Task.checkCancellation()
+        if case .completion? = await registry.handler(for: call.toolPath) { return result }
+        let acceptsResult = await input.acceptsToolResults(envelope.source)
+        guard acceptsResult else { return result }
         let report = try await input.send(
             AgentInput(
                 sessionID: envelope.sessionID,
                 payload: .toolResult(ToolResult(callID: result.callID, value: result.value, isError: result.isError)),
                 turn: envelope.turn),
             to: envelope.source)
-        guard report.rejected.isEmpty else { throw HarnessError.notRunning }
+        guard report.rejected.isEmpty else {
+            return ToolResponse(
+                callID: result.callID, value: result.value + "\nResult delivery rejected: \(report.rejected)",
+                isError: true)
+        }
+        return result
     }
 }

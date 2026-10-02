@@ -16,6 +16,7 @@ public final class CameraState {
     public var skeleton: PoseOverlay?
     public var gaze: CGSize = .zero
     public var visionMessage: String?
+    public var trackingMessage: String?
     public var changeThreshold = 0.03
     public init() {}
 }

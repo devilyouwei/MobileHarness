@@ -26,3 +26,7 @@ Developer rules: add protocol operations here only when they are reusable device
 ❌ No autonomous safety controller, physical emergency-stop proof, firmware calibration, arbitrary register configuration or guaranteed background execution. BLE/USB transport checks do not establish physical clearance or gesture quality.
 
 ✅ BLE failures carry typed step/cause/native domain/code data. Device snapshots contain transport facts; App owns name-priority ordering, placeholder filtering, localized text and recovery advice. Protocol names are bounded and normalized without localized placeholder interpretation.
+
+✅ BLE reply timeouts retain expected command/payload length and total received notification bytes before pending state is cleared. Zero notifications and unmatched data can be distinguished. The SDK never replays a request; read-only response timeouts preserve the link with quarantined exchanges, while write/native transport failures disconnect. App owns localized labels.
+
+✅ Read-only response timeout keeps the radio and notifications connected but quarantines exchanges until reconnect; feedback/control health stays false. This preserves connection truth without allowing a late response to satisfy a new request. Write/native transport failures still disconnect. No motion retry is introduced.

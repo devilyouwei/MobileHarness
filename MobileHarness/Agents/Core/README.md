@@ -85,3 +85,5 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ## Action runtime stage 2
 
 ✅ Shared output values now include ActionResult, ActivityEvent, ExecutionOwner and ResourceLease/ResourceControl; Runtime owns bounded receipt history and stop observation. AgentCore still has no dependency on Gateway, concrete Agents or device services. ❌ Persistent receipt delivery belongs to future work.
+
+✅ DeliveryHistory provides bounded communication outcomes without dependencies on transport or business Agents.

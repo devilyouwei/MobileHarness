@@ -16,6 +16,7 @@ import UI
 /// Root-owned communication assembly, available before voice models are ready.
 @MainActor
 final class ApplicationRuntime {
+    private let bluetooth: BluetoothWorkflow
     let conversations: ConversationHistoryStore
     let manager: AgentManager
     let input: InputGateway
@@ -46,6 +47,7 @@ final class ApplicationRuntime {
         let manager = AgentManager()
         let input = InputGateway(manager: manager, policy: policy)
         let presentation = RuntimePresentation(cameraControl: cameraControl)
+        self.bluetooth = bluetooth
         let resources = try ResourceCoordinator(
             definitions: [
                 ResourceDefinition(
@@ -55,7 +57,10 @@ final class ApplicationRuntime {
                 }
             ]
                 + (1...6).map { motor in
-                    ResourceDefinition(id: ResourceID(rawValue: "nexarm.motor.\(motor)"), allowedOwners: [.assistant]) {
+                    ResourceDefinition(
+                        id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
+                        allowedOwners: motor == 6 ? [.assistant] : [.assistant, .photographer]
+                    ) {
                         // Cancel and join software ownership; this is not a hardware stop acknowledgment.
                         await bluetooth.stopActions()
                     }
@@ -71,14 +76,7 @@ final class ApplicationRuntime {
             presentation: presentation, playback: presentation, pose: presentation, camera: presentation,
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
             shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) },
-            aim: { base, pitch, _ in
-                do { try await bluetooth.aim(base: base, pitch: pitch) } catch BluetoothWorkflowError.disconnected,
-                    BluetoothWorkflowError.controlNotReady,
-                    BluetoothWorkflowError.background
-                {
-                    throw RobotTools.AimError.notConnected
-                }
-            })
+            aim: { base, pitch, invocation in try await robot.aim(base, pitch, invocation) })
         try BehaviorCoverage.validate(
             actions: behaviors.actions, toolPaths: behaviors.toolPaths,
             capabilities: [
@@ -115,7 +113,12 @@ final class ApplicationRuntime {
             makePerception: { try SpeechPerceptionAgent(recognition: $0, vad: $1, sessionID: $2) })
     }
     var visionDependencies: VisionRuntimeDependencies {
-        .init(manager: manager, input: input, output: output, actions: actions, presentation: presentation)
+        .init(
+            makePhotographer: { [bluetooth] in
+                try PhotographerAgent(
+                    sessionID: $0, controlsArm: true, controlAvailable: { await bluetooth.state.controlReady })
+            },
+            manager: manager, input: input, output: output, actions: actions, presentation: presentation)
     }
     var cameraDependencies: CameraRuntimeDependencies { .init(resources: resources, actions: actions) }
 }

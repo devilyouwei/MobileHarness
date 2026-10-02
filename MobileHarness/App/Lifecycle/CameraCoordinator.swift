@@ -165,6 +165,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         state.gaze = .zero
         gazeSequence = nil
         state.visionMessage = nil
+        state.trackingMessage = nil
         visionSession = nil
         visionTask?.cancel()
         guard worker == nil else { return }
@@ -191,13 +192,21 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
                 self.state.skeleton = nil
                 self.state.gaze = .zero
                 self.gazeSequence = nil
-                self.state.visionMessage =
-                    error as? RobotTools.AimError == .notConnected
-                    ? "机械臂未连接或控制未就绪，瞄准没有发出" : "姿态识别暂不可用，请重试"
+                self.state.visionMessage = "姿态识别暂不可用，请重试"
                 self.log.error("Pose pipeline failed: \(String(describing: error), privacy: .private)")
             }
         }
     }
+    func visionStatus(_ message: String?, sessionID: UUID) {
+        guard visionSession == sessionID, foreground, state.isEnabled else { return }
+        state.visionMessage = message
+        if message != nil { state.skeleton = nil }
+    }
+    func trackingStatus(_ message: String?, sessionID: UUID) {
+        guard visionSession == sessionID, foreground, state.isEnabled else { return }
+        state.trackingMessage = message
+    }
+
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard visionSession == invocation.context.sessionID, foreground, state.isEnabled, state.isVisible else {

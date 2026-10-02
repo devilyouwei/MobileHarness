@@ -221,7 +221,7 @@ private actor Recorder {
     #expect(failure.isError)
 }
 
-@Test func completionToolsHaveNoFeedbackAndPropagateFailures() async throws {
+@Test func completionToolsReturnFailureOutcomesAndPropagateCancellation() async throws {
     let registry = ToolRegistry()
     let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
     let call = ToolCall(toolPath: "UI.showPose")
@@ -243,9 +243,10 @@ private actor Recorder {
     let result = try #require(try await ToolExecutor(registry: registry).execute(value, envelope: envelope))
     #expect(result.value.isEmpty)  // Empty data is still a result, unlike Void completion.
     try await registry.registerCompletion("failure") { _, _ in throw HarnessError.notRunning }
-    await #expect(throws: HarnessError.notRunning) {
-        try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "failure"), envelope: envelope)
-    }
+    let failed = try #require(
+        try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "failure"), envelope: envelope))
+    #expect(failed.isError)
+    #expect(failed.value.contains("notRunning"))
     try await registry.registerCompletion("cancel") { _, _ in throw CancellationError() }
     await #expect(throws: CancellationError.self) {
         try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "cancel"), envelope: envelope)
@@ -281,4 +282,43 @@ private actor Recorder {
             OutputEnvelope(source: .assistant, input: malformed, output: .control("assistant.finished")))
     }
     await gateway.shutdown()
+}
+
+@Test func messageFailureIsRecordedWithoutFailingProducer() async throws {
+    let port = AgentMessaging { _, _, _ in throw CommunicationError.scopeClosed }
+    let input = AgentInput(sessionID: UUID(), payload: .text("fixture"))
+    let report = try await port.publishResult(.transcript("hello", final: true), parent: input)
+    #expect(report.failure != nil)
+    let history = await port.history.snapshot()
+    #expect(history.count == 1)
+    #expect(history.first?.inputID == input.id)
+    #expect(history.first?.report.failure != nil)
+    for _ in 0..<128 {
+        _ = try await port.publishResult(.transcript("hello", final: true), parent: input)
+    }
+    #expect(await port.history.snapshot().count == 128)
+    #expect(await port.history.evictedCount == 1)
+}
+
+@Test func gatewayAccumulatesCompletionToolFailureAndContinuesOtherOutputs() async throws {
+    let manager = AgentManager()
+    let agent = try AssistantAgent(chat: FixedTextChat())
+    try await manager.register(agent)
+    _ = try await bindSpeechRequests(agent)
+    try await manager.start(.assistant)
+    let registry = ToolRegistry()
+    try await registry.registerCompletion("UI.print") { _, _ in throw HarnessError.notRunning }
+    try await registry.registerCompletion("UI.beginReplyTurn") { _, _ in }
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager), tools: registry, sink: { _ in })
+    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
+    let failedCall = try InternalTool(path: "UI.print", required: ["text"]).call(["text": "hello"])
+    let first = try await gateway.execute(
+        OutputEnvelope(source: .assistant, input: input, output: .toolCall(failedCall)))
+    #expect(first.isError)
+    let nextCall = try InternalTool(path: "UI.beginReplyTurn").call([:])
+    let second = try await gateway.execute(
+        OutputEnvelope(source: .assistant, input: input, output: .toolCall(nextCall)))
+    #expect(!second.isError)
+    #expect(await gateway.executionResults().outputs.count == 2)
 }

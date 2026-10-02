@@ -81,3 +81,5 @@ SpeechPerception owns LiveSpeechInput and VoiceActivitySegmenter. VisionPercepti
 ## Action runtime stage 2
 
 ✅ Dedicated deliverActionResult/deliverActivityEvent paths validate runtime payload, target incarnation/session and declared input contract, returning accepted/retry/closed. Public send/publish reject runtime feedback payloads. Existing bounded admission reports retry on capacity; stale owner returns closed. ❌ No durable feedback transport.
+
+✅ Tool result delivery consults the originating descriptor before routing; completion-only Agents retain error outcomes in Gateway diagnostics without creating unsupported input.

@@ -48,3 +48,9 @@ flowchart LR
 ✅ RuntimePresentation implements CameraControlCapability: requires the bound voice endpoint to validate the active Assistant session, then forwards to the root camera owner even when vision is currently off. Camera presentation remains separately bound by vision-session lifetime.
 
 ✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Qwen reports no native Tool support and rejects requests carrying tools. See [technical flow](../../../ModelKit/Language/LLM/OpenAI/README.md).
+
+✅ NexArmBehaviorAdapter binds the completion-only Robot.aim sender and converts connection/foreground availability errors to Tool errors. It neither selects targets nor constructs Agents.
+
+✅ CameraOutputHandling exposes session-scoped trackingStatus independently of skeleton/gaze delivery. Tracking failure never clears the accepted pose.
+
+✅ visionStatus scopes vision-only failure presentation separately from tracking and camera lifecycle.

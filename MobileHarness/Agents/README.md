@@ -53,11 +53,13 @@ flowchart TB
         Assistant[Assistant: context / generation / output parsing]
         Synth[SpeechSynthesis: directed serial synthesis]
         Vision[VisionPerception: frame filtering / pose interpretation]
+        Photographer[Photographer: shared-pose target selection]
     end
     Grants -.-> Speech
     Grants -.-> Assistant
     Grants -.-> Synth
     Grants -.-> Vision
+    Grants -.-> Photographer
 
     subgraph Capabilities[Injected model and storage interfaces]
         VAD[VoiceActivityCapability]
@@ -87,9 +89,11 @@ flowchart TB
     Input -->|Final speech / phase / ToolResult| Assistant
     Input -->|Directed synthesis / cancellation| Synth
     Input -->|Admitted image| Vision
+    Input -->|Published vision.pose| Photographer
     Speech -->|Observations and transcript / voice-state Tools| Output
     Assistant -->|Synthesis messages / resolved Actions and Tools / wait| Output
     Vision -->|Pose observations / gaze and display Tools| Output
+    Photographer -->|Internal Robot.aim| Output
     Output -->|Validated internal messages| Input
     Output --> Actions
     Output --> Tools
@@ -233,3 +237,11 @@ Fixed captions, transcript closure, voice phase, gaze and reply-turn initializat
 See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production configuration. Per-Agent limits and processing algorithms belong to their own READMEs.
 
 ✅ Photographer subscribes to vision.pose and emits internal Robot.aim with a bounded output stream. Camera lifecycle enables this Agent; physical tracking acceptance remains outstanding.
+
+✅ Photographer validates decoded pose before target selection; malformed values fail without indexing joints. Its eight-call output bound rejects excess calls without stopping the actor and retains previously accepted calls for normal stream consumption.
+
+✅ VisionPerception retains independent visualization when an optional subscriber rejects an observation. Photographer command failures remain scoped to its output consumer; Gateway authorization is not bypassed.
+
+✅ Every production producer uses publishResult/sendResult: delivery failure affects only dependent work. App output consumers use OutputGateway.execute to retain execution failures rather than terminating another Agent. Startup configuration errors and explicit cancellation retain their existing validation/cleanup semantics.
+
+✅ Output overflow rejects only the current unaccepted aim; Photographer remains running and queued accepted calls are retained.

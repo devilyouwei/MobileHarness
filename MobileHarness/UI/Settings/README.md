@@ -137,3 +137,5 @@ flowchart LR
 ✅ Settings labels the explicit motors1–5 reset as 整臂归位. UI consumes workflow status and connection-instability messages; it owns no executor, device lock or feedback policy.
 
 ❌ Sustained real-device acceptance remains pending.
+
+✅ Physical BLE connection and control readiness are presented separately. Connected devices with failed verification show 已连接，控制未就绪; actions remain disabled.

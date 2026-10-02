@@ -37,3 +37,5 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ✅ Built-in assembly requires CameraControlCapability and registers CameraToolModule. Camera controls are explicit host bindings; missing capabilities cannot silently succeed.
 
 ✅ RobotToolModule receives an explicit completion-only aim sender alongside CameraToolModule. Gateway continues to own startup permission coverage.
+
+✅ Robot Tool resource metadata is generated from its callable declaration; BehaviorAssembly binds the injected sender without duplicating resource or Agent permissions.

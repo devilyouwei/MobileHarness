@@ -2,6 +2,11 @@ import AgentCore
 import Foundation
 
 public actor InputGateway {
+    func acceptsToolResults(_ source: AgentID) async -> Bool {
+        guard let agent = try? await manager.agent(source) else { return false }
+        return agent.descriptor.inputs.contains(.toolResult)
+    }
+
     private var activeAdmissions = 0
     private var activeBranches = 0
     private var observationBytes = 0

@@ -207,7 +207,9 @@ public actor AssistantAgent: Agent {
                     guard let definition = registration.definition else { return nil }
                     return try ChatToolDefinition(declaration: JSONEncoder().encode(definition))
                 }
-            } else { tools = [] }
+            } else {
+                tools = []
+            }
             let request = try ChatRequest(
                 messages: messages,
                 context: InferenceContext(requestID: input.id, conversationID: input.sessionID),
@@ -322,9 +324,9 @@ public actor AssistantAgent: Agent {
                 guard let port else { throw CommunicationError.scopeClosed }
                 let request = try SpeechSynthesisInput(text: text)
                 let target = AgentID(rawValue: "speechSynthesis")
-                let report = try await port.send(.speechSynthesis(request), parent: input, to: target)
+                let report = try await port.sendResult(.speechSynthesis(request), parent: input, to: target)
                 guard report.delivered.contains(target), report.rejected.isEmpty else {
-                    throw CommunicationError.unavailableTarget
+                    continue
                 }
                 do {
                     try Task.checkCancellation()
@@ -334,7 +336,7 @@ public actor AssistantAgent: Agent {
                     // Explicit command admission has its own deadline and preserves the owning input ID.
                     let cleanup = input
                     let cleanupTask = Task.detached {
-                        try await port.send(.cancelSpeech(request.audioID), parent: cleanup, to: target)
+                        try await port.sendResult(.cancelSpeech(request.audioID), parent: cleanup, to: target)
                     }
                     _ = try? await cleanupTask.value
                     throw error

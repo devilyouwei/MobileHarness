@@ -23,3 +23,9 @@ The arm remains a Hiwonder NexArm. Production motion belongs to `Actions/NexArm/
 - A consumer cannot recover the old box-center fallback from `vision.pose` alone.
 
 The merge into the independent runtime layout keeps RobotToolModule in Tools and ToolRuntime contracts separate. Aim rest/angle mapping, speed selection and admission live in Actions/NexArm/Support; native register encoding uses PlatformKit NexArmMotorCommands. BluetoothWorkflow applies the existing five-motor resource fence; CameraTools remain available alongside Robot.aim.
+
+Audit refinement: Robot.aim declares motors1–5 at the Tool macro boundary. Gateway locks them with Photographer ownership; the App workflow reuses the held context. Composition injects the Photographer factory; lifecycle cleans up only successfully registered instances. Failed possible writes latch uncertainty until explicit recoverState; recovery is read-only and does not replay. The callable namespace is RobotTools.swift; errors and module registration belong in Support.
+
+Connection troubleshooting retains native query timeout metadata in PlatformKit and localized verification stages in App. No query retry, timeout extension or motion replay is introduced; the reported physical response failure remains unverified.
+
+Photographer output failures are reported independently and never terminate VisionPerception/showPose. Final app Agent resources are compared with source, and incremental embedding is refreshed after branch changes. BLE read-only timeout retains the link but quarantines subsequent requests until reconnect, keeping connected state distinct from control verification.

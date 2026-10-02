@@ -21,6 +21,7 @@ struct VoiceRuntimeDependencies {
 }
 @MainActor
 struct VisionRuntimeDependencies {
+    let makePhotographer: (UUID) throws -> PhotographerAgent
     let manager: AgentManager
     let input: InputGateway
     let output: OutputGateway

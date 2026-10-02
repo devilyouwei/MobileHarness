@@ -58,3 +58,13 @@ flowchart LR
 ✅ CameraCoordinator implements explicit setEnabled/flip Tool controls. Foreground and idle-worker admission are required; overlap fails busy, flip while disabled fails. Completion waits for reconciliation and checks revision, permission and capture state. Scene/UI supersession fails cancellation; close joins capture release and vision cleanup. VoiceSessionCoordinator validates Assistant source and active voice session. ❌ Open capture does not prove pose inference readiness; admitted intent is not rolled back on caller cancellation.
 
 ✅ VisionSession registers Photographer alongside the injected vision Agent, dispatches both output streams, and removes both during joined session cleanup.
+
+✅ Photographer construction is injected from composition. VisionSession tracks successful registration and cleans up its own Agents after partial activation failure; it never removes a pre-existing Photographer after registration rejection.
+
+✅ VisionSession treats tracking outputs as an independent subscriber. Each failed Tool is reported through session-scoped tracking status and does not stop frames, VisionPerception or showPose. Subscriber completion does not end the camera task group; cancellation still joins both producers. ❌ Physical tracking acceptance remains pending.
+
+✅ Voice and vision consumers use nonfatal Gateway execution outcomes. SpeechPerception failure stops only its capture worker and own actor, preserving Assistant/SpeechSynthesis lifetime; session/user cancellation retains full cleanup.
+
+✅ Vision failure updates only visionStatus and stops its frame admission; Photographer remains independently registered until explicit camera session cancellation. Capture/recognition failure does not cancel Assistant or Synthesis.
+
+✅ Assistant terminal failure leaves independently registered perception/synthesis alive; the host lifetime waits for explicit cancellation before full cleanup. Its idle wait has no producer and an explicit capacity1. Recognition resume failure stops only recognition/capture.

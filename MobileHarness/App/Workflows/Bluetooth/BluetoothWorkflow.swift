@@ -176,10 +176,9 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 motorInputs = Array(repeating: 0, count: 6)
                 liveTask?.cancel()
                 // The active executor reports feedbackLost, not cancellation or target timeout.
-            } else if !state.controlValidated {
-                state.controlValidated = true
-                if state.error == BluetoothWorkflowError.feedbackTimeout.localizedDescription { state.error = nil }
             }
+            // A healthy notification alone cannot replace the complete control verification.
+
         }
         if value.phase == .disconnected && controller != nil {
             recoverOnDisconnect = foreground && reconnectEnabled && !manualDisconnectPending && !forgetRequested
@@ -294,17 +293,21 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 await link.clearDiscovery()
                 try Task.checkCancellation()
                 guard foreground, token == generation else { throw CancellationError() }
-                try await verifyConnection(
-                    device: device,
-                    candidate: NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol),
-                    token: token, indicate: !automatically)
+                let candidate = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+                controller = candidate
+                try await verifyConnection(device: device, candidate: candidate, token: token, indicate: !automatically)
             } catch {
                 let failed = await link.status()
                 if token == generation {
-                    controller = nil
-                    state.phase = .failed
                     state.controlValidated = false
                     state.error = failed.failure.map(BluetoothPresentation.failure) ?? Self.message(error)
+                    if failed.phase == .connected {
+                        state.phase = .connected
+                        state.notice = "蓝牙已连接，控制未就绪；请断开后重新连接以重新验证"
+                        return
+                    }
+                    controller = nil
+                    state.phase = .failed
                 }
                 await link.disconnect()
                 if !automatically, reconnectEnabled, foreground, token == generation,
@@ -323,7 +326,9 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.controlValidated = false
         state.error = nil
         state.notice = nil
+        state.notice = "正在读取机械臂位置并验证连接…"
         _ = try await candidate.verifyCompatibility()
+        state.notice = "正在准备机械臂动作映射…"
         _ = try await candidate.prepareArmControl()
         try Task.checkCancellation()
         guard foreground, token == generation else { throw CancellationError() }
@@ -544,7 +549,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.sampledAt = Date()
     }
     public func refreshDevice() async {
-        guard foreground, state.controlReady, !state.executing, liveTask == nil, operation == nil,
+        guard foreground, state.phase == .connected, !state.executing, liveTask == nil, operation == nil,
             cleanup == nil, let controller
         else { return }
         let token = generation
@@ -554,10 +559,14 @@ public final class BluetoothWorkflow: BluetoothControlling {
             defer { state.refreshing = false }
             do {
                 let sample = try await controller.recoverState()
+                _ = try await controller.verifyCompatibility()
+                _ = try await controller.prepareArmControl()
                 try Task.checkCancellation()
-                guard token == generation, revision == controlRevision, state.controlReady else { return }
+                guard token == generation, revision == controlRevision, state.phase == .connected else { return }
                 updateTelemetry(sample)
+                state.controlValidated = true
                 state.error = nil
+                state.notice = "控制反馈验证通过"
             } catch {
                 if token == generation, revision == controlRevision { state.error = Self.message(error) }
             }

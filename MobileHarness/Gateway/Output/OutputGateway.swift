@@ -6,6 +6,8 @@ import ToolRuntime
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
     public typealias Sink = @Sendable (OutputEnvelope) async -> Void
+    private var outputResults: [OutputExecutionResult] = []
+    private var evictedOutputs: UInt64 = 0
     private let requests: InputGateway
     private let policy: CommunicationPolicy?
     private let observeEvent: (@Sendable (AgentInput) async throws -> Void)?
@@ -175,8 +177,47 @@ public actor OutputGateway {
         await manager.removeStopObserver(lifecycleObserverID)
     }
 
+    /// Production consumers isolate ordinary output failures; explicit cancellation still joins cleanup.
+    @discardableResult
+    public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+        let failure: String?
+        var tool: ToolResponse?
+        do {
+            tool = try await dispatch(envelope)
+            failure = nil
+        } catch is CancellationError { throw CancellationError() } catch {
+            try Task.checkCancellation()
+            failure = String(String(describing: error).prefix(512))
+        }
+        let result = OutputExecutionResult(
+            source: envelope.source, inputID: envelope.inputID,
+            sequence: envelope.sequence, tool: tool, failure: failure)
+        if outputResults.count == 256 {
+            outputResults.removeFirst()
+            evictedOutputs += 1
+        }
+        outputResults.append(result)
+        return result
+    }
+    public func executionResults(source: AgentID? = nil, inputID: UUID? = nil) async -> OutputExecutionSnapshot {
+        let snapshot = await actions.executor.executionSnapshot()
+        let matchingOutputs = outputResults.filter {
+            (source == nil || $0.source == source) && (inputID == nil || $0.inputID == inputID)
+        }
+        let matchingActions = snapshot.records.filter {
+            (source == nil || $0.source == source) && (inputID == nil || $0.inputID == inputID)
+        }
+        return OutputExecutionSnapshot(
+            outputs: matchingOutputs,
+            actions: ActionExecutionSnapshot(
+                revision: snapshot.revision, records: matchingActions, evictedCount: snapshot.evictedCount),
+            evictedOutputs: evictedOutputs)
+    }
+
     /// Admission is not playback completion. The terminal control joins accepted actions.
-    public func dispatch(_ envelope: OutputEnvelope) async throws {
+    @discardableResult
+    public func dispatch(_ envelope: OutputEnvelope) async throws -> ToolResponse? {
+        var toolResult: ToolResponse?
         try Task.checkCancellation()
         let descriptor = try await manager.agent(envelope.source).descriptor
         try Task.checkCancellation()
@@ -204,7 +245,7 @@ public actor OutputGateway {
                 throw error
             }
         case .tool(let call):
-            try await tools.dispatch(call, envelope: envelope, owner: executionOwner(envelope))
+            toolResult = try await tools.dispatch(call, envelope: envelope, owner: executionOwner(envelope))
         case .finish:
             do { try await actions.finish(envelope) } catch {
                 await actions.cancel(envelope)
@@ -216,5 +257,6 @@ public actor OutputGateway {
         }
         try Task.checkCancellation()
         await sink(envelope)
+        return toolResult
     }
 }

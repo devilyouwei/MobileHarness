@@ -9,9 +9,16 @@ public struct ToolExecutor: Sendable {
         }
         switch handler {
         case .completion(let handler):
-            try await handler(call, context)
-            try Task.checkCancellation()
-            return nil
+            do {
+                try await handler(call, context)
+                try Task.checkCancellation()
+                return nil
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                try Task.checkCancellation()
+                return ToolResponse(callID: call.id, value: String(describing: error), isError: true)
+            }
         case .returning(let handler):
             do {
                 let value = try await handler(call)

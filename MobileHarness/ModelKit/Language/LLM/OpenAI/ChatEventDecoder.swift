@@ -66,7 +66,8 @@ struct ChatEventDecoder {
         else { throw OpenAIChatError.unsupportedOutput }
         if let raw = delta["tool_calls"], !(raw is NSNull) {
             guard let fragments = raw as? [[String: Any]], !toolNames.isEmpty,
-                fragments.count <= 128 else { throw OpenAIChatError.unsupportedOutput }
+                fragments.count <= 128
+            else { throw OpenAIChatError.unsupportedOutput }
             for fragment in fragments {
                 guard let index = fragment["index"] as? Int, (0..<128).contains(index),
                     fragment["type"] == nil || fragment["type"] is NSNull || fragment["type"] as? String == "function",
@@ -85,7 +86,8 @@ struct ChatEventDecoder {
                     }
                 }
                 guard call.id.utf8.count <= 512, call.name.utf8.count <= 64,
-                    call.arguments.utf8.count <= 4096 else { throw OpenAIChatError.responseTooLarge }
+                    call.arguments.utf8.count <= 4096
+                else { throw OpenAIChatError.responseTooLarge }
                 calls[index] = call
             }
         }

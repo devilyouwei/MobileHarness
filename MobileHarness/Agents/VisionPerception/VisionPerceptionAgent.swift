@@ -30,6 +30,7 @@ public actor VisionPerceptionAgent: Agent {
     private var pendingPublication: Publication?
     private var publisher: Task<Void, Never>?
     public private(set) var publicationReplacements = 0
+    public private(set) var publicationRejections = 0
     public private(set) var overlayReplacements = 0
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
@@ -188,11 +189,10 @@ public actor VisionPerceptionAgent: Agent {
             do {
                 try Task.checkCancellation()
                 guard let port else { throw CommunicationError.unauthorized }
-                let report = try await port.publish(.pose(publication.observation), parent: publication.parent)
+                let report = try await port.publishResult(.pose(publication.observation), parent: publication.parent)
                 try Task.checkCancellation()
-                guard report.rejected.values.allSatisfy({ $0 == "superseded" || $0 == "expired" }) else {
-                    throw CommunicationError.unavailableTarget
-                }
+                // Optional subscribers own their admission failures; local perception/display continues.
+                publicationRejections += max(report.rejected.count, report.failure == nil ? 0 : 1)
             } catch CommunicationError.noRecipients {
                 // Optional business subscribers do not gate local visualization.
             } catch is CancellationError {

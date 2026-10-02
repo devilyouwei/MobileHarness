@@ -84,6 +84,6 @@ public protocol ChatCapability: Capability {
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent>
 }
 
-public extension ChatCapability {
-    var supportsToolCalls: Bool { get async { false } }
+extension ChatCapability {
+    public var supportsToolCalls: Bool { get async { false } }
 }

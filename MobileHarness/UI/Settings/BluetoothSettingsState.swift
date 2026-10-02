@@ -93,7 +93,7 @@ public final class BluetoothSettingsState {
     public func status(for id: UUID) -> String {
         guard selected?.id == id else { return "未连接" }
         switch phase {
-        case .connected: return controlReady ? (executing ? "动作执行中" : "已连接") : "控制待验证"
+        case .connected: return controlReady ? (executing ? "动作执行中" : "已连接") : "已连接，控制未就绪"
         case .connecting: return "正在连接…"
         case .verifying: return "正在检查…"
         case .indicating: return "正在复位 / 提示…"

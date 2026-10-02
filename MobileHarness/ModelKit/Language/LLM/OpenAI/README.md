@@ -66,3 +66,5 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
 ❌ Local native tools, result-driven model continuation, persisted native tool-call transcripts and Responses API transport.
+
+✅ SSE decoding and request declarations satisfy Swift 6.4 strict formatting; provider behavior is unchanged.

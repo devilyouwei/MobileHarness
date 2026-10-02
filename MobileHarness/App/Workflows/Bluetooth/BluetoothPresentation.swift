@@ -30,6 +30,16 @@ public enum BluetoothPresentation {
             }
         }
         switch value {
+        case .responseTimeout(let command, let expectedBytes, let receivedBytes):
+            let query: String
+            switch command {
+            case 11: query = "读取机械臂位置"
+            case 7: query = "准备机械臂动作"
+            case 1: query = "读取固件版本"
+            default: query = "设备查询"
+            }
+            let code = String(format: "0x%02X", command)
+            return "\(query)回复超时（\(code)，期望载荷\(expectedBytes)字节，收到通知\(receivedBytes)字节）"
         case .timeout(let step): return "\(title(step))超时"
         case .incompatibleService(let step): return "\(title(step))失败：蓝牙服务不兼容"
         case .native(let step, let domain, let code): return "\(title(step))失败（\(domain) \(code)）"

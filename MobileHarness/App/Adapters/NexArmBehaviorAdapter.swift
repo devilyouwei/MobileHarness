@@ -3,11 +3,21 @@ import Actions
 import AppWorkflows
 import Foundation
 import PlatformKit
+import ToolRuntime
+import Tools
 
 /// Host adaptation only; gesture/execution business policy remains in Actions.
 @MainActor
 struct NexArmBehaviorAdapter {
     let bluetooth: BluetoothWorkflow
+    func aim(_ base: Double, _ pitch: Double, _ invocation: ToolInvocation) async throws {
+        do { try await bluetooth.aim(base: base, pitch: pitch) } catch BluetoothWorkflowError.disconnected,
+            BluetoothWorkflowError.controlNotReady,
+            BluetoothWorkflowError.background
+        {
+            throw RobotTools.AimError.notConnected
+        }
+    }
     func gesture(_ request: NexArmActions.GestureRequest, _ invocation: ActionInvocation) async throws {
         let composition = try ActionComposition(
             .action("gesture", [], maximumResults: 100) {

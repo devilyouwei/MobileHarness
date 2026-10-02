@@ -74,3 +74,5 @@ The configured observer consumes only current speech state and has no unbounded 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
 ✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
+
+✅ Production consumers use execute rather than low-level dispatch: ordinary output failures become correlated outcomes. Permissions still validate before effects and cancellation still propagates.

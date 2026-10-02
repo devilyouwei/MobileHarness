@@ -540,3 +540,35 @@ private struct FailingSecondPose: PoseCapability {
     #expect(await agent.status().lifecycle == .running)
     try await manager.remove(.visionPerception)
 }
+
+@Test(.timeLimit(.minutes(1))) func rejectingPhotographerCannotStopPoseDisplay() async throws {
+    let session = UUID()
+    let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: session)
+    try await agent.bind(
+        AgentMessaging { _, _, _ in
+            DeliveryReport(rejected: [.photographer: "notRunning"])
+        })
+    try await agent.start()
+    var output = agent.outputs.makeAsyncIterator()
+    for sequence: UInt64 in 1...2 {
+        try await agent.receive(
+            AgentInput(
+                sessionID: session,
+                payload: .image(image(UInt8(sequence * 40), sequence: sequence))))
+        let envelope = try #require(await output.next())
+        guard case .toolCall(let call) = envelope.output else {
+            Issue.record("Subscriber rejection stopped pose output")
+            await agent.stop()
+            return
+        }
+        #expect(call.toolPath == "UI.showPose")
+        _ = await output.next()  // Independent gaze output.
+    }
+    for _ in 0..<10000 {
+        if await agent.publicationRejections >= 2 { break }
+        await Task.yield()
+    }
+    #expect(await agent.publicationRejections == 2)
+    #expect(await agent.status().lifecycle == .running)
+    await agent.stop()
+}

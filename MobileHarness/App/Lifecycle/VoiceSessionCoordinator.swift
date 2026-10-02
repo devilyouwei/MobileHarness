@@ -107,7 +107,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                 do {
                     let task = Task {
                         do {
-                            try await responses.dispatch(output)
+                            try await responses.execute(output)
                             // Dispatch joins Action completion/cancellation. Only then retire this reply's audio.
                             if case .control(let state) = output.output,
                                 state == "assistant.finished" || state == "agent.finished"
@@ -151,11 +151,15 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         } catch is CancellationError {} catch {
             record("运行错误：\(error)")
         }
-        stopVoice()
         let finalStatus = await agent.status()
-        if finalStatus.lifecycle == .failed {
-            record("Agent 输出队列已满或已关闭，请重新启动应用。")
+        if finalStatus.lifecycle == .failed, !Task.isCancelled {
+            record("Assistant 已停止，其他 Agent 继续运行；请重新加载以恢复回复。")
+            state.isReady = false
+            // Keep independently registered perception/synthesis alive until host cancellation.
+            let lifetime = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { _ in }
+            for await _ in lifetime {}
         }
+        stopVoice()
         state.isReady = false
         self.requests = nil
         await cleanupTask?.value
@@ -218,10 +222,12 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             speechTask = Task { [weak self] in
                 for await output in speech.outputs {
                     guard let self, self.voiceGeneration == generation else { return }
-                    do { try await responses.dispatch(output) } catch { self.stopVoice(message: "语音处理失败：\(error)") }
+                    do { try await responses.execute(output) } catch is CancellationError { return } catch {
+                        self.record("输出失败：\(error)")
+                    }
                 }
                 if await speech.status().lifecycle == .failed, let self, self.voiceGeneration == generation {
-                    self.stopVoice(message: "语音处理失败：输出已关闭")
+                    self.stopPerception(message: "语音识别已停止；其他 Agent 继续运行")
                 }
             }
             let frames = try audio.startCapture()
@@ -291,7 +297,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                     }
                 } catch is CancellationError {} catch {
                     guard let self, self.voiceGeneration == generation else { return }
-                    self.stopVoice(message: "录音中断：\(String(describing: error))")
+                    self.stopPerception(message: "录音中断：\(String(describing: error))")
                 }
             }
             interruptionTask = Task { [weak self] in
@@ -338,6 +344,16 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             return
         }
         startupTask = Task { [weak self] in await self?.startVoice() }
+    }
+
+    private func stopPerception(message: String) {
+        audio.stopCapture()
+        captureTask?.cancel()
+        captureTask = nil
+        let failedAgent = speech
+        Task { await failedAgent?.stop() }
+        state.voiceStatus = message
+        record(message)
     }
 
     func stopVoice(message: String = "语音已停止") {
@@ -410,7 +426,9 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     }
     private func resumeListening(generation: UUID) async throws {
         guard voiceGeneration == generation else { return }
-        try await speech?.resumeListening()
+        do { try await speech?.resumeListening() } catch is CancellationError { try Task.checkCancellation() } catch {
+            stopPerception(message: "语音识别恢复失败：\(error)")
+        }
         guard voiceGeneration == generation else { return }
         handlingTurn = false
     }

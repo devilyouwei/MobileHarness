@@ -11,3 +11,5 @@ flowchart LR
 ```
 
 ❌ No device effects, synthetic progress or durable execution history.
+
+✅ IndependentOutputWorkflow consumes an optional subscriber sequentially through an injected Gateway dispatch. Ordinary failures are reported per envelope and consumption continues; cancellation propagates. It adds no queue or device ownership.

@@ -92,6 +92,7 @@ public actor NexArmActionController {
     public func aim(base: Double, pitch: Double) async throws {
         try Task.checkCancellation()
         guard !busy else { throw NexArmError.busy }
+        guard !faulted else { throw NexArmActionError.uncertainMotion }
         guard compatibility != nil else { throw NexArmError.firmwareUnavailable }
         guard let writer = link as? any NexArmWritableLink else { throw NexArmError.invalidMotion }
         let packet = try NexArmJointCommand.aimPacket(base: base, pitch: pitch)
@@ -107,11 +108,10 @@ public actor NexArmActionController {
         do {
             try await writer.write(packet)
             motionFailure = nil
-        } catch is CancellationError {
-            throw CancellationError()
         } catch {
             faulted = true
             lastFailure = String(describing: error)
+            if error is CancellationError { throw CancellationError() }
             throw NexArmActionError.uncertainMotion
         }
     }
