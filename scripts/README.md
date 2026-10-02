@@ -79,3 +79,5 @@ flowchart LR
 ✅ Boundary validation requires StorageAudio dependencies to be Storage and Types only, and rejects other source imports including AgentCore.
 
 ✅ ADR0098 boundary checks require independent execution runtimes, shared Types, narrow feature workflow imports and role-specific Lifecycle dependencies; the complete project target graph is checked for cycles. ❌ Static checks complement compilation/regression tests and do not establish physical-device acceptance.
+
+✅ Boundary checks include CameraTools in forbidden concrete business-entry use outside domain catalogs; camera Tool directories follow the existing namespace/Support checks.

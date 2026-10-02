@@ -122,6 +122,8 @@ App supplies each consumer only the dependencies it needs. Storage owns consiste
 
 Window-root tasks own voice runtime and camera observation, so navigation does not recreate the Agent system. Entering Settings stops voice and suspends the camera; returning restores camera intent. Background transitions, audio interruptions and route changes stop voice. A settings transaction joins old work before updating the model binding. ApplicationRuntime and the journal outlive individual voice sessions; a model switch never erases conversation history.
 
+✅ The MainActor window host disables the system idle timer only while the foreground home conversation/eyes surface is visible, including its startup state. Opening Settings, running diagnostics or visual previews, or making the scene inactive/background restores automatic screen locking and dimming. Returning to the active home surface enables keep-awake again. Initial state and subsequent navigation/scene transitions apply the same policy; this presentation policy does not extend background runtime or device control.
+
 Cancellation order remains: close/stop producers, cancel and join generation, cancel audio handles and scheduled work, wait for handler cleanup, then release bindings. The synthesis Agent and shared PCM store are stopped at voice-runtime teardown. Camera replacement stops native capture and joins the previous vision task before admitting another session. No observer signal can invoke an unregistered UI/device effect.
 
 Speech completes only after actual playback drains. UI Actions complete when the current session/turn accepts state; animation completion is separate. Vision presentation uses awaited completion-only Tools with session/frame ordering checks. Late sessions/sequences cannot overwrite current output. RuntimePresentation is an endpoint holder with no queue; a missing/occupied role explicitly fails.
@@ -148,3 +150,5 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ Root composition, role-specific lifecycle dependencies, typed endpoints, six feature workflow targets and root-owned observations.
 
 ❌ Independent multi-window namespaces, background supervision and forced interruption of non-cooperative handlers are not implemented.
+
+✅ Camera.open/close/flip Tool bindings reuse the root-owned CameraCoordinator through RuntimePresentation after active Assistant session validation. Permission, foreground and camera lease policy stay in App lifecycle; closing confirms native stop and joins vision cleanup. ❌ Capture readiness does not imply pose-model readiness.

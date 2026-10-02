@@ -7,6 +7,7 @@ import Tools
 
 @MainActor
 protocol VoiceOutputHandling: AnyObject, Sendable {
+    func validateCameraControl(invocation: ToolInvocation) throws
     func play(audioID: UUID, invocation: ActionInvocation) async throws
     func present(_ text: String, invocation: ToolInvocation) throws
     func presentTranscript(_ text: String, invocation: ToolInvocation) throws
@@ -27,8 +28,20 @@ protocol CameraOutputHandling: AnyObject, Sendable {
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
 @MainActor
 final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
-    PosePresentationCapability
+    PosePresentationCapability, CameraControlCapability
 {
+    private let cameraControl: any CameraControlCapability
+    init(cameraControl: any CameraControlCapability) { self.cameraControl = cameraControl }
+    func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try voice.validateCameraControl(invocation: invocation)
+        try await cameraControl.setEnabled(enabled, invocation: invocation)
+    }
+    func flip(invocation: ToolInvocation) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try voice.validateCameraControl(invocation: invocation)
+        try await cameraControl.flip(invocation: invocation)
+    }
     private weak var voice: (any VoiceOutputHandling)?
     private weak var camera: (any CameraOutputHandling)?
     func bindVoice(_ value: any VoiceOutputHandling) throws {

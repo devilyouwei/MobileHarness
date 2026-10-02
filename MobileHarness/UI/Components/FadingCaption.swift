@@ -23,10 +23,25 @@
                         .font(.system(.title3, design: .default, weight: .medium))
                         .multilineTextAlignment(.center).lineSpacing(7)
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
                     }
                     Color.clear.frame(height: 1).id("captionEnd")
                 }
                 .scrollIndicators(.hidden)
+                .mask {
+                    GeometryReader { geometry in
+                        let fade = min(18 / max(geometry.size.height, 1), 0.25)
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black, location: fade),
+                                .init(color: .black, location: 1 - fade),
+                                .init(color: .clear, location: 1),
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    }
+                }
                 .onChange(of: text, initial: true) { _, new in
                     let next = Array(new.suffix(320))
                     let prefix = zip(characters, next).prefix { $0 == $1 }.count

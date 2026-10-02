@@ -99,7 +99,7 @@
                             .font(.caption).foregroundStyle(.white.opacity(0.7))
                         }
                     }
-                    .frame(width: min(geometry.size.width - 40, 440))
+                    .frame(width: geometry.size.width - 40)
                     .padding(.bottom, 16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
 

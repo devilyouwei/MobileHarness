@@ -47,7 +47,7 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 
 ## Unified channel execution display
 
-✅ `ActionActivityState` receives complete UI-owned display snapshots projected by AppWorkflows. The home footer replaces the robot-only motion label with up to3 channel summaries plus an overflow/history link; concurrent channels retain separate rows. Same-channel parallel work and queued work show counts. Nonfailure terminal summaries hide after3s while history remains available; failures persist until dismissed or superseded by a newer execution in that channel. Dismissal never removes runtime records or cancels Actions. Newer revisions replace older state; dismissed IDs are bounded by retained records.
+✅ `ActionActivityState` receives complete UI-owned display snapshots projected by AppWorkflows. The home footer replaces the robot-only motion label with up to3 channel summaries plus a bottom-right icon-only history button; concurrent channels retain separate rows. Same-channel parallel work and queued work show counts. Nonfailure terminal summaries hide after3s while history remains available; failures persist until dismissed or superseded by a newer execution in that channel. Dismissal never removes runtime records or cancels Actions. Newer revisions replace older state; dismissed IDs are bounded by retained records.
 
 ✅ `ActionActivityView` exposes a read-only sheet containing all retained active records and the latest100 terminal records, using definition-provided names, exact Channel strings, generic statuses and timestamps without execution IDs or raw arguments; errors display the bounded thrown description. Cancellation pending says “正在取消”; terminal cancellation says “执行前已取消” or “已取消” based on whether execution started; completed settings/state/activity operations do not claim physical completion. Connection readiness remains a separate fallback label, and Settings send-only tests do not feed this Action display. Views own only presentation selection and a wall-clock auto-hide refresh; long-lived observation remains in App. Dynamic Type, VoiceOver labels and system sheet controls are retained; no motion animation is required.
 
@@ -78,3 +78,5 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 ✅ Action details show whole-execution timeout separately from child issues, using the display strings supplied by App.
 
 ✅ ActionActivityItem and its Execution fields are UI-owned display data. AppWorkflows converts runtime observations and result details before state replacement. The action panel imports neither execution modules nor Agent result types.
+
+✅ 执行记录入口使用右下角 48 pt 纯图标按钮，保留 VoiceOver 标签。回复过程中的执行摘要、记录保留策略和原有执行记录 sheet 内容不变。字幕滚动窗口上下边缘使用透明度渐变，文字随滚动逐渐淡出/淡入。

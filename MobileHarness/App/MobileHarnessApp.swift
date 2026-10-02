@@ -1,6 +1,7 @@
 import AppWorkflows
 import SwiftUI
 import UI
+import UIKit
 
 @main
 @MainActor
@@ -71,6 +72,9 @@ struct MobileHarnessApp: App {
             .onChange(of: showingSettings) { _, showing in
                 if !isVisualPreview && !isDiagnostic { camera.setForeground(scenePhase == .active && !showing) }
             }
+            .onChange(of: keepsHomeScreenAwake, initial: true) { _, keepsAwake in
+                UIApplication.shared.isIdleTimerDisabled = keepsAwake
+            }
             .onChange(of: scenePhase) { _, phase in
                 if !isVisualPreview && !isDiagnostic {
                     camera.setForeground(phase == .active && !showingSettings)
@@ -85,6 +89,10 @@ struct MobileHarnessApp: App {
                 if !isVisualPreview { await prepare() }
             }
         }
+    }
+
+    private var keepsHomeScreenAwake: Bool {
+        scenePhase == .active && !showingSettings && !isDiagnostic && !isVisualPreview
     }
 
     @ViewBuilder

@@ -13,7 +13,7 @@ import UI
 
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
 @MainActor
-final class CameraCoordinator: CameraControlling, CameraOutputHandling {
+final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraControlCapability {
     static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
     private let captureOwner: ExecutionOwner
     private let makeRuntime: () throws -> CameraRuntimeDependencies
@@ -62,6 +62,51 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling {
         state.facing = state.facing == .front ? .back : .front
         state.message = nil
         reconcile()
+    }
+
+    /// Tool calls reject overlap rather than replacing another command's intent.
+    func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
+        try Task.checkCancellation()
+        guard foreground else { throw CameraControlError.notForeground }
+        guard worker == nil else { throw CameraControlError.busy }
+        if state.isEnabled == enabled {
+            if enabled, state.isVisible { return }
+            if !enabled, captureLease == nil {
+                guard !failed, !(await camera.isRunning()) else { throw CameraControlError.unavailable }
+                try Task.checkCancellation()
+                return
+            }
+        }
+        state.isEnabled = enabled
+        failed = false
+        state.message = nil
+        state.needsSettings = false
+        reconcile()
+        try await finishCameraControl(enabled: enabled)
+    }
+
+    func flip(invocation: ToolInvocation) async throws {
+        try Task.checkCancellation()
+        guard foreground else { throw CameraControlError.notForeground }
+        guard worker == nil else { throw CameraControlError.busy }
+        guard state.isEnabled else { throw CameraControlError.disabled }
+        switchCamera()
+        try await finishCameraControl(enabled: true)
+    }
+
+    private func finishCameraControl(enabled: Bool) async throws {
+        let expectedRevision = revision
+        await worker?.value
+        try Task.checkCancellation()
+        guard revision == expectedRevision else { throw CancellationError() }
+        guard foreground else { throw CameraControlError.notForeground }
+        let running = await camera.isRunning()
+        try Task.checkCancellation()
+        guard revision == expectedRevision else { throw CancellationError() }
+        if state.needsSettings { throw CameraControlError.permissionDenied }
+        guard enabled ? state.isVisible && running : captureLease == nil && !failed && !running else {
+            throw CameraControlError.unavailable
+        }
     }
 
     func setChangeThreshold(_ value: Double) {

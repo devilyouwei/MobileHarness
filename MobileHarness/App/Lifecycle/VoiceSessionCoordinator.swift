@@ -463,6 +463,13 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         session == voiceGeneration
     }
 
+    func validateCameraControl(invocation: ToolInvocation) throws {
+        try Task.checkCancellation()
+        guard invocation.context.source == AgentID.assistant.rawValue,
+            accepts(session: invocation.context.sessionID)
+        else { throw CancellationError() }
+    }
+
     func presentTranscript(_ text: String, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }

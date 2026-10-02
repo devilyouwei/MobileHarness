@@ -97,7 +97,7 @@ for source in (ROOT / 'MobileHarness/PlatformKit').rglob('*.swift'):
         errors.append(f'Preview layout policy in PlatformKit: {source.relative_to(ROOT)}')
 # The unified behavior libraries expose runtime APIs to Gateway, not direct behavior calls.
 for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
-    if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools)\b', source.read_text()):
+    if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools|CameraTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
 agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'Foundation'}
@@ -189,7 +189,7 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
     content = source.read_text()
     if re.search(r'\b(?:ActionDefinition|ToolDefinition)\s*\(|\.registerCompletion\s*\(', content):
         errors.append(f'App contains per-function behavior registration: {source.relative_to(ROOT)}')
-    if re.search(r'\b(?:UIActions|UITools|SystemTools)\.[a-z]\w*\s*\(', content):
+    if re.search(r'\b(?:UIActions|UITools|SystemTools|CameraTools)\.[a-z]\w*\s*\(', content):
         errors.append(f'App invokes a domain behavior helper: {source.relative_to(ROOT)}')
     if re.search(r'\bActionPath\s*\(|\.register\s*\(\s*"', content):
         errors.append(f'App contains a concrete behavior path: {source.relative_to(ROOT)}')

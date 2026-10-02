@@ -10,6 +10,7 @@ import ModelKit
 import PlatformKit
 import Storage
 import StorageChat
+import Tools
 import UI
 
 /// Root-owned communication assembly, available before voice models are ready.
@@ -24,7 +25,7 @@ final class ApplicationRuntime {
     let actionActivity: ActionActivityWorkflow
     let resources: ResourceCoordinator
 
-    init(camera: AppleCamera, bluetooth: BluetoothWorkflow) throws {
+    init(camera: AppleCamera, cameraControl: any CameraControlCapability, bluetooth: BluetoothWorkflow) throws {
         let root = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         var directory = root.appendingPathComponent("MobileHarness/Conversations", isDirectory: true)
@@ -43,7 +44,7 @@ final class ApplicationRuntime {
             })
         let manager = AgentManager()
         let input = InputGateway(manager: manager, policy: policy)
-        let presentation = RuntimePresentation()
+        let presentation = RuntimePresentation(cameraControl: cameraControl)
         let resources = try ResourceCoordinator(
             definitions: [
                 ResourceDefinition(
@@ -66,7 +67,7 @@ final class ApplicationRuntime {
         }
         let robot = NexArmBehaviorAdapter(bluetooth: bluetooth)
         let behaviors = try BehaviorAssembly(
-            presentation: presentation, playback: presentation, pose: presentation,
+            presentation: presentation, playback: presentation, pose: presentation, camera: presentation,
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
             shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) })
         try BehaviorCoverage.validate(

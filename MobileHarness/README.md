@@ -648,3 +648,5 @@ SwiftUI state is MainActor-isolated. Runtime services, Agents, stores, managers 
 | UI update | App accepted state for the active identity; rendered-frame acknowledgment is not implied. |
 
 Every queue or active-call pool has an explicit capacity and overflow rule in its owning module README. Cancellation is cooperative and propagates through structured tasks. Detached work, guessed success, silent device-action loss and unbounded retries are outside the architecture.
+
+✅ Tools/Camera follows the domain root + Support layout and binds Camera.open/close/flip through a required CameraControlCapability. App validates the active Assistant session and retains single-owner permission/foreground/capture-lease policy; completion confirms capture reconciliation or close cleanup, not pose readiness. Native model Tool event transport remains pending.

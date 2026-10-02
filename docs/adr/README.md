@@ -106,3 +106,5 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 | 0097 | [ADR 0097 — Opaque source identity for audio storage](0097-storage-audio-opaque-owner.md) |
 | 0098 | [ADR 0098 — Independent runtime, workflow and audio boundaries](0098-independent-runtime-workflow-audio-boundaries.md) |
 | 0099 | [ADR0099 — Shared Types grouped by category](0099-shared-types-layout.md) |
+
+| 0100 | [ADR0100 — Camera control Tools reuse the App owner](0100-camera-control-tools.md) |

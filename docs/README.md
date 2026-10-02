@@ -52,3 +52,5 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ Requirements, concepts, current design, proposals, evidence, history and notices have separate entry points.
 
 ❌ Undelivered proposals and unrecorded acceptance are not current implementation claims.
+
+✅ [ADR0100](adr/0100-camera-control-tools.md) records foreground Camera Tool ownership, completion and lease policy; native Tool transport and physical camera acceptance remain pending.

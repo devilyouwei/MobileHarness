@@ -419,6 +419,48 @@
         },
         "strict": true
       }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "Camera.open",
+        "description": "Enable foreground camera preview and vision processing. Requires camera permission and an available camera; completion confirms capture, not pose-model readiness.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "strict": true
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "Camera.close",
+        "description": "Disable camera preview and vision processing, and wait for capture and vision cleanup.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "strict": true
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "Camera.flip",
+        "description": "Switch the enabled foreground camera between front and rear lenses. Fails if disabled, busy or unavailable.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "strict": true
+      }
     }
   ],
   "communication": {

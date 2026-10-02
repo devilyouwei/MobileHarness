@@ -10,8 +10,13 @@ import ToolRuntime
 import Tools
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
-    PosePresentationCapability
+    PosePresentationCapability, CameraControlCapability
 {
+    private(set) var cameraCalls: [String] = []
+    func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
+        cameraCalls.append(enabled ? "open" : "close")
+    }
+    func flip(invocation: ToolInvocation) async throws { cameraCalls.append("flip") }
     private(set) var emotion: UIActions.Emotion?
     private(set) var pose: ToolPoseOverlay?
     func play(audioID: UUID, invocation: ActionInvocation) async throws {}
@@ -43,7 +48,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 @Test func builtInBehaviorAssemblyCoversAllAgentCatalogsAndPreservesTypedValidation() async throws {
     let endpoint = BehaviorEndpoint()
     let assembly = try BehaviorAssembly(
-        presentation: endpoint, playback: endpoint, pose: endpoint,
+        presentation: endpoint, playback: endpoint, pose: endpoint, camera: endpoint,
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() })
     try BehaviorCoverage.validate(
@@ -132,4 +137,48 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let result = try await ToolExecutor(registry: assembly.tools).execute(
         ToolCall(toolPath: "Fixture.read", arguments: [:]), envelope: invocation.testEnvelope)
     #expect(result?.value == "smile")
+}
+
+@Test func cameraToolsValidateBeforeEffectsAndKeepCompletionSemantics() async throws {
+    let endpoint = BehaviorEndpoint()
+    let executor = ToolExecutor(registry: try ToolRegistry(modules: [CameraToolModule(camera: endpoint)]))
+    let envelope = behaviorInvocation("express").testEnvelope
+    for name in ["open", "close", "flip"] {
+        let result = try await executor.execute(
+            ToolCall(toolPath: "Camera." + name, arguments: [:]), envelope: envelope)
+        #expect(result == nil)
+    }
+    #expect(await endpoint.cameraCalls == ["open", "close", "flip"])
+    await #expect(throws: ToolArguments.ValidationError.invalidKeys) {
+        try await executor.execute(
+            ToolCall(toolPath: "Camera.flip", arguments: ["unexpected": "yes"]), envelope: envelope)
+    }
+    #expect(await endpoint.cameraCalls.count == 3)
+    let cancelled = Task {
+        try Task.checkCancellation()
+        try await Task.sleep(for: .seconds(30))
+        return try await executor.execute(ToolCall(toolPath: "Camera.open", arguments: [:]), envelope: envelope)
+    }
+    cancelled.cancel()
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+    #expect(await endpoint.cameraCalls.count == 3)
+}
+
+private struct UnavailableCameraEndpoint: CameraControlCapability {
+    func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
+        throw CameraControlError.permissionDenied
+    }
+    func flip(invocation: ToolInvocation) async throws { throw CameraControlError.disabled }
+}
+
+@Test func cameraToolsPropagateHostFailureWithoutSuccessFeedback() async throws {
+    let executor = ToolExecutor(
+        registry: try ToolRegistry(modules: [CameraToolModule(camera: UnavailableCameraEndpoint())]))
+    let envelope = behaviorInvocation("express").testEnvelope
+    await #expect(throws: CameraControlError.permissionDenied) {
+        try await executor.execute(ToolCall(toolPath: "Camera.open", arguments: [:]), envelope: envelope)
+    }
+    await #expect(throws: CameraControlError.disabled) {
+        try await executor.execute(ToolCall(toolPath: "Camera.flip", arguments: [:]), envelope: envelope)
+    }
 }

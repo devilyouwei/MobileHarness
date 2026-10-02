@@ -83,7 +83,7 @@ final class AppAssembly {
     }
     private func runtime() throws -> ApplicationRuntime {
         if let runtimeValue { return runtimeValue }
-        let runtime = try ApplicationRuntime(camera: cameraDevice, bluetooth: bluetooth)
+        let runtime = try ApplicationRuntime(camera: cameraDevice, cameraControl: camera, bluetooth: bluetooth)
         runtimeValue = runtime
         return runtime
     }

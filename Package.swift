@@ -141,6 +141,7 @@ let package = Package(
             name: "Tools", dependencies: ["ToolRuntime", "BehaviorDefinitions"], path: "MobileHarness/Tools",
             exclude: [
                 "Runtime",
+                "Camera/README.md", "Camera/Support/README.md",
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),
         .target(name: "Types", path: "MobileHarness/Types", exclude: ["README.md", "Audio/README.md"]),

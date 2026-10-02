@@ -11,58 +11,66 @@
         public var body: some View {
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
                 let channels = state.summaries(at: context.date)
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(channels.prefix(3))) { channel in
-                        HStack(spacing: 10) {
-                            Button {
-                                showingHistory = true
-                            } label: {
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: channel.item.symbol)
-                                        .frame(width: 16)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("\(channel.item.channelTitle) · \(channel.item.title)")
-                                            .font(.caption.weight(.medium))
-                                        Text(channel.item.status + extra(channel))
-                                            .font(.caption2).foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 12) {
+                    if !channels.isEmpty || state.observationUnavailable {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(channels.prefix(3))) { channel in
+                                HStack(spacing: 10) {
+                                    Button {
+                                        showingHistory = true
+                                    } label: {
+                                        HStack(alignment: .top, spacing: 8) {
+                                            Image(systemName: channel.item.symbol)
+                                                .frame(width: 16)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("\(channel.item.channelTitle) · \(channel.item.title)")
+                                                    .font(.caption.weight(.medium))
+                                                Text(channel.item.status + extra(channel))
+                                                    .font(.caption2).foregroundStyle(.secondary)
+                                            }
+                                            Spacer(minLength: 0)
+                                        }
+                                        .foregroundStyle(
+                                            channel.item.isFailure ? Color.orange : Color.white.opacity(0.85)
+                                        )
+                                        .contentShape(Rectangle())
                                     }
-                                    Spacer(minLength: 0)
+                                    .buttonStyle(.plain)
+                                    if !channel.item.isActive {
+                                        Button {
+                                            state.dismiss(channel.item.id)
+                                        } label: {
+                                            Image(systemName: "xmark").font(.caption).padding(8)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("收起\(channel.item.title)状态")
+                                    }
                                 }
-                                .foregroundStyle(channel.item.isFailure ? Color.orange : Color.white.opacity(0.85))
-                                .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-                            if !channel.item.isActive {
-                                Button {
-                                    state.dismiss(channel.item.id)
-                                } label: {
-                                    Image(systemName: "xmark").font(.caption).padding(8)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("收起\(channel.item.title)状态")
+                            if state.observationUnavailable {
+                                Text("执行状态暂不可用").font(.caption).foregroundStyle(.orange)
                             }
                         }
-                    }
-                    if state.observationUnavailable {
-                        Text("执行状态暂不可用").font(.caption).foregroundStyle(.orange)
+                        .padding(12)
+                        .frame(maxWidth: 440)
+                        .modifier(ActionPanelGlass())
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
                     if !state.items.isEmpty {
                         Button {
                             showingHistory = true
                         } label: {
-                            HStack {
-                                Text(channels.count > 3 ? "另有 \(channels.count - 3) 项状态" : "执行记录")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                            }
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.6))
+                            Image(systemName: "list.bullet.rectangle")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .frame(width: 48, height: 48)
                         }
                         .buttonStyle(.plain)
+                        .modifier(ActionPanelGlass())
+                        .accessibilityLabel("执行记录")
+                        .accessibilityIdentifier("conversation.actions.history")
                     }
                 }
-                .padding(channels.isEmpty ? 8 : 12)
-                .modifier(ActionPanelGlass())
             }
             .accessibilityIdentifier("conversation.actions.status")
             .sheet(isPresented: $showingHistory) {

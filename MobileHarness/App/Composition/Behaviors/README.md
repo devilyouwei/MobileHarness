@@ -33,3 +33,5 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ✅ Gateway.BehaviorCoverage validates Agent permissions against module-owned definitions and the assembled immutable Tool path catalog before producers start. BehaviorAssembly and registries do not depend on Agent capability catalogs.
 
 ✅ toolPaths records the validated immutable startup catalog (at most128 paths). Assembly adds no task, queue or device owner. ❌ Runtime discovery and permission inference remain unsupported.
+
+✅ Built-in assembly requires CameraControlCapability and registers CameraToolModule. Camera controls are explicit host bindings; missing capabilities cannot silently succeed.

@@ -231,3 +231,5 @@ flowchart LR
 ✅ Robot JSONv5 exposes moveMotor/resetMotor and optional speed/acceleration on existing composites. Errors are terminal outcomes, not implicit cancellation of later Channel actions.
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ JSON v5 declares Camera.open, Camera.close and Camera.flip as no-argument native Tools, separately from Action Channels. They cross OutputGateway and reuse App camera lifecycle. ❌ Current ChatCapability still emits text/completion only; these declarations do not add provider-native Tool event transport.
