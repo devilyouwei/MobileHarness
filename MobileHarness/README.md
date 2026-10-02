@@ -46,6 +46,16 @@ flowchart LR
 
 App assembles concrete implementations but is not a service locator. Long-lived owners receive role-specific dependencies. UI receives observable state and typed operations. Agents receive model/storage capabilities and bound Gateway ports. Actions and Tools receive only the capabilities required by their registered handlers.
 
+### Coordination ownership
+
+| Owner | Governing question | Responsibility |
+| --- | --- | --- |
+| App | What runs, and for how long? | Assemble, start, stop and clean up application/session scopes and their resources. |
+| Agents | What should happen next, and why? | Interpret signals, retain cognitive state and express messages or permitted behavior. |
+| Gateway | How may accepted work communicate and execute? | Enforce identity, permission, admission, ordering, wait, feedback and resource rules. |
+
+Semantic fusion belongs to Agents. Gateway carries identities, contracts and destinations without interpreting observations or choosing business behavior.
+
 ### Compilation dependencies
 
 The graph below shows the principal project targets. System frameworks, concrete model backends and the `BehaviorDefinitions` compiler plugin are condensed for readability.
@@ -104,6 +114,9 @@ flowchart TB
 ```
 
 The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `AgentCore`, `ActionRuntime`, `ToolRuntime`, `Storage` and `Types` have no project dependencies. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit meet only at Types.
+
+<a id="37-project-structure"></a>
+<a id="project-structure"></a>
 
 ### Source structure and compilation map
 
@@ -280,7 +293,22 @@ Composition resolves configuration and registration errors before producers star
 
 Voice and camera have independent App-owned sessions. A stop closes producer admission, cancels and joins capture/perception, sends explicit Agent cancellation, retires owned media and Actions, and only then releases resources. Page navigation does not define runtime lifetime. Session IDs, Agent incarnations, turns and monotonic sequences fence stale input, feedback and presentation.
 
+### Signal and media representation
+
+Signal is the conceptual input abstraction; `AgentInput` is its implemented envelope. Media streams are successive typed inputs rather than a second transport protocol. JSON v5 configures Agent capabilities and communication permissions; it is not the audio or image format.
+
+| Payload | Meaning |
+| --- | --- |
+| Text / runtime event | User text or an explicit runtime control input. |
+| Audio / image | Bounded PCM or an App-owned native-image attachment. |
+| Perception observation | Typed transcript, speech phase or pose without the original media. |
+| ToolResult | A returned Tool value correlated to its originating call and session. |
+| ActionResult / ActivityEvent | Terminal execution feedback or a later activity observation with trusted ownership. |
+
+App adapters bridge PlatformKit frames into AgentCore values/attachments without adding ModelKit or PlatformKit dependencies to AgentCore. Payload bounds and attachment lifetimes remain in the InputGateway and AgentCore communication contracts.
+
 <a id="32-internal-agent-communication"></a>
+<a id="communication-framework"></a>
 
 ### Input and Agent communication
 
@@ -300,6 +328,20 @@ flowchart TD
 JSON declares supported inputs, exact subscriptions, publications and directed sends. Supporting a contract does not create a subscription. Broadcast target selection uses subscriptions; directed delivery still validates source, target, contract and session. There are no dynamic listeners, wildcards or implicit fallback recipients.
 
 Gateways perform bounded synchronous admission and metadata validation; Agent inboxes own pending work. Gateway has no independent message bus, persistent worker or delivery FIFO. A delivery receipt means the target accepted the input, not that inference or an effect completed. Discrete messages and device Actions are never silently replaced; only explicitly declared latest-state paths may coalesce.
+
+#### Current signal routes
+
+| Source | Contract | Receiver or observer |
+| --- | --- | --- |
+| `phone.microphone` | `media.audio` | SpeechPerception subscription |
+| `phone.camera` | `media.image` | VisionPerception subscription |
+| `user` | `user.text` | Assistant subscription; the current production UI has no text-entry field |
+| `speechPerception` | `speech.final`, `speech.phase` | Assistant subscription |
+| `speechPerception` | `speech.partial`, `speech.final`, `speech.phase` | Registered runtime observer for admission/lifecycle coordination, without UI mutation |
+| `visionPerception` | `vision.pose` | Declared business subscribers; gaze and skeleton presentation use independent Tools |
+| `runtime` | `ToolResult`, `ActionResult`, `ActivityEvent`, `assistant.cancel` | Original or explicitly selected Agent/session |
+
+Assistant sends directed `speech.synthesize` and `speech.cancel` messages to SpeechSynthesis. A publication with no Agent recipient fails unless a registered runtime observer accepts that contract. Agent messaging, Tool return and runtime Action feedback all re-enter through validated InputGateway paths, while retaining their distinct permissions and completion semantics.
 
 ### Capability declaration and output resolution
 
@@ -353,9 +395,14 @@ flowchart LR
     Runtime --> Result[Completion, failure or activity]
     Result --> Tree
     Result --> Feedback[Correlated feedback through InputGateway]
+    Tree --> Snapshot[ActionExecutionSnapshot]
+    Snapshot --> Presentation[AppPresentationWorkflow]
+    Presentation --> UI[Generic execution presentation]
 ```
 
 Each input owns a scheduling tree. Channels order work within that tree; equal names in other tasks do not create a global FIFO. A wait group joins its parent's preceding work and all children before releasing the continuation. Module exclusion is process-wide. Resource leases/fences coordinate Actions, Tools and App-owned paths across module boundaries. Capacity exhaustion rejects explicitly, and cancellation joins cooperative handlers.
+
+Gateway reserves bounded terminal-feedback capacity before admitting an Action that requests feedback. `ActionResult` is correlated to the originating Agent incarnation/session and describes the handler's declared completion boundary; `ActivityEvent` reports later ongoing activity. Retrying feedback never repeats the effect. Separately, the scheduler publishes payload-free `ActionExecutionSnapshot` values for App/UI observation. Their display name comes from validated Action metadata, while raw arguments, device telemetry and permission decisions are excluded.
 
 ### Voice, cognition and presentation
 
@@ -379,6 +426,39 @@ flowchart LR
 SpeechPerception converts admitted PCM into phase and transcript observations. Assistant reads bounded conversation context, streams chat generation, resolves behavior and persists completed turns. Recognition UI, reply UI and speech playback all use permitted outputs; runtime observers do not mutate presentation on an Agent's behalf.
 
 `ConversationTurn` and trusted output sequences travel through input, observations, calls and returned results. AppPresentationWorkflow admits only the active session/turn/sequence. Recognition previews may be replaced within their declared latest-state path; reply chunks and discrete behavior are preserved. Playback state reflects actual audio output rather than model generation completion.
+
+### Session, turn and UI boundaries
+
+```mermaid
+sequenceDiagram
+    participant App as App lifecycle
+    participant UI as Presentation state
+    participant Producers as Capture / perception
+    participant Input as InputGateway
+    participant Assistant
+    participant Audio as StorageAudio
+    participant Output as OutputGateway
+    participant Runtime as Actions / Tools
+    App->>UI: invalidate session and clear presentation
+    App->>Producers: close admission, cancel and join
+    App->>Input: directed assistant.cancel
+    Input->>Assistant: cancel and join reply work
+    App->>Audio: retire session-owned media
+    App->>Output: cancel session Actions
+    Output->>Runtime: cancel and join accepted handlers
+    App->>App: join response dispatch and retire session
+```
+
+| Boundary | Recognition caption | Reply / expression |
+| --- | --- | --- |
+| Confirmed new utterance | Latest partial replaces the preview | Assistant clears once through `beginReplyTurn` |
+| Endpoint reached, ASR pending | Preserve the preview | Await the reply |
+| Final or empty recognition | `finishTranscript` clears and seals | Produce a reply or return to listening |
+| Response and playback | Remains sealed | Append reply; speaking follows actual playback |
+| Reply completed | Empty | Retain until the next utterance |
+| Stop, background or failure | Clear and invalidate the session | Clear and invalidate the session |
+
+SpeechPerception owns recognition captions and voice phase presentation; Assistant owns reply captions, expression and atomic reply-turn start; VisionPerception owns pose/gaze presentation requests. All Agent-selected changes use permitted Actions or Tools. App may reset state for user/OS lifecycle and may present actual device telemetry through its adapters.
 
 ### Synthesis and playback ownership
 
@@ -506,6 +586,8 @@ flowchart LR
 ```
 
 Base ModelKit depends only on Types. ModelKitDefaults registers concrete providers and default bindings; ModelKitRuntime owns the process-wide manager, provider identity and load/unload/shutdown. Consumers receive capability protocols rather than concrete engines. Each model permits one active operation; overlapping work fails explicitly instead of entering an implicit inference queue. Cleanup retains the operation lease until the backend has actually finished.
+
+Stopping a voice session cancels its model work without automatically unloading weights. Explicit unload waits for active use; manager shutdown is terminal and cancels/joins owned work. Capability availability and resource residency are separate policies. App forwards coalesced memory-pressure handling, while manager construction/registration remains restricted to ModelAssembly SPI and isolated tests.
 
 ### Cross-module concurrency and completion
 
