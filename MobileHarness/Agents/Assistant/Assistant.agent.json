@@ -15,7 +15,7 @@
             "valueType": "string",
             "required": true,
             "description": "The emotion expressed by the two animated blue eyes; no emoji or text glyphs.",
-            "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear smoothly returns the eyes to neutral."
+            "constraints": "Exactly one of: smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear is invalid; use setExpression for persistent state or clearing."
           }
         ],
         "examples": [
@@ -23,7 +23,28 @@
           "<express emotion=\"happy\"/> That is wonderful!",
           "<express emotion=\"thinking\"/> Let me think."
         ],
-        "doc": "Smoothly change the procedural eye expression. clear returns to neutral. Never render an emoji as the expression. Does not modify captions or speech. The Assistant clears its previous expression on new user speech."
+        "doc": "Perform one eye expression, awaiting its transition and return to the current base expression. Each call is a fresh performance. Does not change captions or speech."
+      },
+      {
+        "alias": "setExpression",
+        "path": {
+          "module": "UI",
+          "function": "setExpression"
+        },
+        "parameters": [
+          {
+            "name": "emotion",
+            "valueType": "string",
+            "required": true,
+            "description": "The emotion expressed by the two animated blue eyes; no emoji or text glyphs.",
+            "constraints": "Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear resets the base to neutral."
+          }
+        ],
+        "examples": [
+          "<setExpression emotion=\"thinking\"/> Let me think.",
+          "<setExpression emotion=\"clear\"/>"
+        ],
+        "doc": "Set the persistent base eye expression until replaced, cleared or reset on new user speech. Completes on state acceptance, not animation completion. Repeating the same emotion is idempotent."
       }
     ],
     "Speech": [],

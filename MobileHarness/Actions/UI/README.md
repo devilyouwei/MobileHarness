@@ -1,40 +1,43 @@
-# UI — Scheduled Expression Action
+# UI — Scheduled Expressions
 
-Purpose: implement the model-callable `UI.express` Action. Design goals: typed validation, explicit scheduled completion and no SwiftUI dependency.
+Purpose: implement one-shot expression performances and persistent base expressions. Design goals: explicit finite/state completion, bounded lifecycle, typed injection and no SwiftUI dependency.
 
-- ✅ `UIActionModule` registers `express` as a state Action. `UIPresentationCapability` accepts a typed `UIActions.Emotion` and trusted ActionInvocation.
-- ✅ Required, case-sensitive emotion: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. Missing, extra or invalid arguments throw before presentation.
-- ✅ Cancellation is checked before and after the injected callback. Success means the presentation policy accepted the target, not that animation finished.
-- ✅ Assistant JSON declares the model alias and default Display channel. Explicit channel/wait scopes still apply. Its scheduled status appears in the Action panel, like every other Action.
-- ✅ Fixed caption, recognition, voice phase, gaze and turn lifecycle updates moved to [Tools/UI](../../Tools/UI/README.md). They have no Action definitions or channels. AppWorkflows.ConversationPresentation owns the acceptance policy shared by those tools and the expression endpoint.
-- ❌ Native model Tool output and animation-completion acknowledgments remain outside this change. Expression intentionally remains an Action until that model transport is supported.
+| Entry | Kind / parameters | Completion and lifetime |
+| --- | --- | --- |
+| UI.express | finite; required case-sensitive emotion, excluding clear | Await transition to the expression and restoration to the current base. Each call performs again, including the same emotion. Expected budget 2 seconds; timeout 5 seconds cancels and joins cleanup, never substitutes for an animation acknowledgment. |
+| UI.setExpression | state; required case-sensitive emotion, including clear | Commit the persistent base target. No animation acknowledgment is promised. Repetition is idempotent; clear removes the base. Replacement, next user turn and session teardown end the state. |
+
+Both reject unknown keys and malformed arguments before effects. Allowed emotions: smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. setExpression also accepts clear. Assistant JSON v5 owns both model aliases under Display. Both share the UI module exclusion key and Action scheduling; wait joins their respective handler contracts.
 
 ```mermaid
-flowchart LR
-    Model[Assistant expression tag] --> Resolve[Agent resolves ActionCall]
-    Resolve --> Gateway[OutputGateway]
-    Gateway --> Scheduler[Channel scheduling and observation]
-    Scheduler --> Validate[UIActions.express validation]
-    Validate --> Endpoint[App session and turn checks]
-    Endpoint --> State[MainActor expression state]
+flowchart TD
+    Gateway[OutputGateway / Channel scheduler] --> Entry[UIActions validation]
+    Entry --> Kind{Registered contract}
+    Kind --> Set[setExpression: commit base target]
+    Kind --> Perform[express: await target transition]
+    Perform --> Restore[Await restoration to current base]
+    Restore --> Done[Return / release module]
+    Set --> Done
+    Perform -->|failure or cancellation| Cleanup[Await invocation-owned override cleanup]
+    Cleanup --> Failure[Propagate failure / cancellation]
+    App[App session/turn-fenced presentation adapter] --> Render[UI transaction and completion callback]
+    Render -->|transaction identity acknowledgment| App
 ```
 
-The Action owns no task or queue. App rejects outdated sessions and turns; stale updates may complete as no-ops. Repeating the same expression sets the same target, without a one-shot restart contract. New user speech clears expression through the immediate beginReplyTurn Tool. No physical resource is declared.
+Actions owns the finite enter/restore sequence; App adapts it to UI transactions and retains one override owner and one pending acknowledgment, with no secondary queue. Conflicting activation fails busy. SwiftUI acknowledges removal of the actual transaction affecting both eyes; no guessed settling sleep is used. Restoration reads the current base rather than an old snapshot. Invocation and transaction IDs prevent delayed cleanup/callbacks from touching a replacement.
 
-## Source organization
+New-turn/session reset invalidates the override and resumes any waiter with cancellation. Cancellation releases only the calling invocation's override and restores the current base immediately without promising a completed cancelled animation. Hidden/inactive rendering cancels the waiting transition; a missing renderer rejects activation. A stale session/turn fails with cancellation rather than reporting an unperformed finite effect as success. Already displayed effects are not rolled back.
+
+Fixed captions, transcript, voice state, reply initialization, gaze/following and skeleton display remain completion-only Tools without Channels or Action history. beginReplyTurn resets expression as part of its existing atomic turn policy.
 
 | File | Responsibility |
 | --- | --- |
-| UIActions.swift | Canonical express entry and validation |
-| Support/UIActionTypes.swift | Emotion and ExpressionError, retaining UIActions nested names |
-| Support/UIActionModule.swift | Definition and UIPresentationCapability injection interface |
+| UIActions.swift | finite/state entry validation, enter/restore composition and deadline metadata |
+| Support/UIActionTypes.swift | Emotion and validation/busy/unavailable errors |
+| Support/UIActionModule.swift | Both generated definitions and explicit presentation capability binding |
 
-✅ Only the entry lives in the domain root; support declarations are not separate callable Actions. ❌ No rendering or animation lifecycle is added.
+✅ Runtime kind metadata remains finite/state; no new dispatch algorithm or activity is introduced. UI imports neither Actions nor ActionRuntime. App owns session lifetime; pages only render transactions and report completion/availability.
 
-✅ Action display names are declared in Support registrations and copied into scheduler snapshots. Adding a registered operation requires no corresponding ActionActivityWorkflow mapping. Completion and device behavior remain unchanged.
+❌ Physical-device animation, Reduce Motion and repeated-turn visual acceptance remain pending. Persistent looping performances and Activity control are not implemented.
 
-✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
-
-✅ Expressions consume ActionInvocation from Actions/Runtime/Contracts. Rendering and session acceptance remain in the injected App endpoint.
-
-✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+✅ A one-shot performance includes a 6% eye emphasis and return, so performing the same emotion as the base still has an animated endpoint; persistent base setting never adds this emphasis.

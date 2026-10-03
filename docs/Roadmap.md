@@ -46,3 +46,5 @@ No delivery dates or physical safety certification are implied. Requirements bel
 ✅ Implemented: producer messaging failure isolation, completion Tool error results and Photographer control-availability gating. Outstanding: sustained iPhone disconnect/reconnect and voice-service failure acceptance.
 
 ✅ Integrated latest feat/main-sh incremental Photographer tracking into main’s current Action/Tool boundaries; retained Agent isolation and Bluetooth control-readiness contracts. ❌ Hardware smoothness and disconnect/reconnect tracking acceptance remain pending.
+
+✅ Finite expression performance and persistent base state are separated; offline tests validate scheduler and cleanup contracts. ❌ iPhone acceptance must cover consecutive same/different expressions, wait ordering, Reduce Motion, hidden/background rendering, next-turn cancellation and base restoration.

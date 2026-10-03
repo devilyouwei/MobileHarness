@@ -151,10 +151,10 @@ UTF-8 `<AgentName>.agent.json` is limited to 64 KiB and accepts version 5 only. 
     "Display": [{
       "alias": "express",
       "path": {"module": "UI", "function": "express"},
-      "doc": "Change the eye expression.",
+      "doc": "Perform one expression and restore the current base.",
       "parameters": [{
         "name": "emotion", "valueType": "string", "required": true,
-        "description": "Requested expression.", "constraints": "smile or clear"
+        "description": "Requested expression.", "constraints": "smile"
       }],
       "examples": ["<express emotion=\"smile\"/>"]
     }],
@@ -193,7 +193,7 @@ JSON has no `channels`, `textActions`, `textOutput`, `internal`, `hidden` or per
 
 These declarations form the descriptor's immutable runtime capability snapshot together with the JSON model catalog. Internal calls are never resolved from model XML or native Tool names. All calls still pass OutputGateway permission validation, Action module exclusion/Channel/wait scheduling or the independent Tool runtime. App retains explicit implementation handlers. Internal permissions are mandatory code policy, not recovery for an invalid JSON resource.
 
-Assistant supplies a bounded text-mapping callback to AgentGenerator. It preserves sentence boundaries and event position, sends synthesis requests, and replaces each speech text call with audioID playback before Gateway admission. Only audioID playback is authorized downstream. Captions and speech keep Display/Speech defaults unless a Channel scope overrides them. The system prompt explains automatic audio and wait; it does not disclose internal methods or subtitle mechanics.
+Assistant supplies a bounded text-mapping callback to AgentGenerator. It preserves sentence boundaries and event position, sends synthesis requests, and replaces each speech text call with audioID playback before Gateway admission. Only audioID playback is authorized downstream. Speech retains its default Speech Channel unless a Channel scope overrides it. Captions are immediate Tools without a Channel or wait membership. The system prompt explains automatic audio and wait; it does not disclose internal methods or subtitle mechanics.
 
 ```mermaid
 flowchart LR
@@ -230,7 +230,7 @@ Assistant, SpeechPerception and VisionPerception accept action.result receipts w
 
 ✅ Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, StorageChat and StorageAudio.
 
-Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.express remains a scheduled model-callable Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
+Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.express is a scheduled finite model-callable Action; UI.setExpression is a scheduled state Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
 
 ❌ Configuration hot reload, full executable value schemas, local native Tool deltas, general request/reply, result-driven replanning and activity subscriptions are not implemented.
 

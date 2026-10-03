@@ -68,3 +68,5 @@ flowchart LR
 ✅ Vision failure updates only visionStatus and stops its frame admission; Photographer remains independently registered until explicit camera session cancellation. Capture/recognition failure does not cancel Assistant or Synthesis.
 
 ✅ Assistant terminal failure leaves independently registered perception/synthesis alive; the host lifetime waits for explicit cancellation before full cleanup. Its idle wait has no producer and an explicit capacity1. Recognition resume failure stops only recognition/capture.
+
+✅ Expression adaptation has capacity one override and one continuation, rejecting conflicting activation. SwiftUI transaction IDs acknowledge actual animation completion; cancellation, renderer disappearance, new turn and stop resume the waiter exactly once. Restoration is invocation-fenced and uses the current base. UI.express composition belongs to Actions; setExpression commits persistent state. ❌ Physical animation acceptance remains pending.

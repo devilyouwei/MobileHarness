@@ -54,3 +54,5 @@ flowchart LR
 ✅ CameraOutputHandling exposes session-scoped trackingStatus independently of skeleton/gaze delivery. Tracking failure never clears the accepted pose.
 
 ✅ visionStatus scopes vision-only failure presentation separately from tracking and camera lifecycle.
+
+✅ Expression adapter awaits finite transition/restore methods separately from synchronous base-state commitment. A complete role binding remains required; UI transaction callbacks contain only UI-owned values. ❌ No Activity transport is introduced.

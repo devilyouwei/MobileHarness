@@ -366,7 +366,7 @@ func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async 
     await store.shutdown()
 }
 
-@Test(arguments: [nil, "", "Happy", "unknown"])
+@Test(arguments: [nil, "", "Happy", "unknown", "clear"])
 func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async throws {
     let probe = VoiceProbe()
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
@@ -375,7 +375,8 @@ func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async
         parameters: emotion.map { ["emotion": $0] } ?? [:])
     let invocation = ActionInvocation(source: .assistant, input: input, call: call)
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
-        try await UIActions.express(invocation: invocation) { value, _ in await probe.displayed(value.rawValue) }
+        try await UIActions.express(
+            invocation: invocation, using: { value, _ in await probe.displayed(value.rawValue) }, restoring: { _ in })
     }
     #expect(await probe.displayedText.isEmpty)
 }
@@ -386,7 +387,8 @@ func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async
         actionPath: ActionPath(module: "UI", function: "express"), channel: "Display", parameters: ["emotion": "happy"])
     let invocation = ActionInvocation(source: .assistant, input: input, call: call)
     await #expect(throws: CancellationError.self) {
-        try await UIActions.express(invocation: invocation) { _, _ in throw CancellationError() }
+        try await UIActions.express(
+            invocation: invocation, using: { _, _ in throw CancellationError() }, restoring: { _ in })
     }
 }
 
@@ -396,7 +398,7 @@ func expressionPreservesSemanticIdentifier(_ emotion: UIActions.Emotion) async t
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
     let call = expectedActionCall(name: "express", parameters: ["emotion": emotion.rawValue])
     let invocation = ActionInvocation(source: .assistant, input: input, call: call)
-    try await UIActions.express(invocation: invocation) { value, _ in await probe.displayed(value.rawValue) }
+    try await UIActions.setExpression(invocation: invocation) { value, _ in await probe.displayed(value.rawValue) }
     #expect(await probe.displayedText == [emotion.rawValue])
     #expect(await probe.spokenText.isEmpty)
 }

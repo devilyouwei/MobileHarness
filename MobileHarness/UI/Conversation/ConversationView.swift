@@ -31,6 +31,15 @@
                             phase: state.voicePhase,
                             reduceMotion: reduceMotion,
                             expression: state.expression,
+                            expressionEmphasized: state.expressionEmphasized,
+                            expressionTransitionID: state.expressionTransitionID,
+                            expressionCompletion: { state.expressionAnimationCompletion?($0, $1) },
+                            expressionAvailability: { available in
+                                state.expressionRendererAvailable = available
+                                if !available, let id = state.expressionTransitionID {
+                                    state.expressionAnimationCompletion?(id, false)
+                                }
+                            },
                             gaze: eyeGaze,
                             faceWidth: min(geometry.size.width, 600)
                         )

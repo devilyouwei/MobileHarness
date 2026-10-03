@@ -268,9 +268,10 @@ private actor NexArmBaseFixture: NexArmWritableLink {
 
 private struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionDefinition] {
-        ["express", "beginReplyTurn", "print"].map {
+        ["express", "setExpression", "beginReplyTurn", "print"].map {
             ActionDefinition(
-                path: ActionPath(module: "UI", function: $0), displayName: "测试动作", kind: .state,
+                path: ActionPath(module: "UI", function: $0), displayName: "测试动作",
+                kind: $0 == "express" ? .finite : .state,
                 completion: "Test presentation accepted.", handler: { _ in })
         } + [
             ActionDefinition(

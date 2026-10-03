@@ -14,7 +14,9 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
     func finishTranscript(invocation: ToolInvocation) throws
     func beginReplyTurn(invocation: ToolInvocation) throws
     func presentVoiceState(_ state: UITools.VoiceState, invocation: ToolInvocation) throws
-    func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws
+    func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws
+    func restoreExpression(invocation: ActionInvocation) async throws
+    func setExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws
     func observeSpeech(_ input: AgentInput)
     func show(_ envelope: OutputEnvelope)
 }
@@ -86,7 +88,15 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     }
     func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
-        try voice.presentExpression(emotion, invocation: invocation)
+        try await voice.presentExpression(emotion, invocation: invocation)
+    }
+    func restoreExpression(invocation: ActionInvocation) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try await voice.restoreExpression(invocation: invocation)
+    }
+    func setExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try voice.setExpression(emotion, invocation: invocation)
     }
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }

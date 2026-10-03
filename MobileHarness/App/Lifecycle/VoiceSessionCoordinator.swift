@@ -23,6 +23,10 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     private var presentationPhase: VoicePhase = .loading { didSet { updatePhase() } }
     private var playbackActive = false { didSet { updatePhase() } }
     private var conversationPresentation = ConversationPresentation()
+    private var baseExpression: EyeExpression?
+    private var expressionOwner: UUID?
+    private var expressionWaiter: CheckedContinuation<Void, Error>?
+    private var expressionWaitID: UUID?
     private func updatePhase() { state.voicePhase = playbackActive ? .speaking : presentationPhase }
     private var changingSettings = false
     private var startupTask: Task<Void, Never>?
@@ -362,7 +366,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         let previousResponses = responses
         let previousAudioStore = speechAudioStore
         let previousResponse = responseTask
-        state.expression = nil
+        resetExpression()
         voiceGeneration = nil
         conversationPresentation = ConversationPresentation()
         playbackActive = false
@@ -507,7 +511,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.context, update: .beginReply) else { return }
         state.assistantReply = ""
-        state.expression = nil
+        resetExpression()
     }
 
     func presentVoiceState(_ voiceState: UITools.VoiceState, invocation: ToolInvocation) throws {
@@ -533,11 +537,85 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         }
     }
 
-    func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws {
+    func setExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
-        guard conversationPresentation.accept(invocation.context, update: .expression) else { return }
-        state.expression = emotion == .clear ? nil : EyeExpression(emotion)
+        guard conversationPresentation.accept(invocation.context, update: .expression) else {
+            throw CancellationError()
+        }
+        baseExpression = emotion == .clear ? nil : EyeExpression(emotion)
+        if expressionOwner == nil { state.expression = baseExpression }
+    }
+
+    func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
+        try Task.checkCancellation()
+        guard accepts(session: invocation.context.sessionID),
+            conversationPresentation.accept(invocation.context, update: .expression)
+        else { throw CancellationError() }
+        guard expressionOwner == nil else { throw UIActions.ExpressionError.busy }
+        expressionOwner = invocation.executionID
+        try await transitionExpression(to: EyeExpression(emotion), emphasized: true)
+    }
+
+    func restoreExpression(invocation: ActionInvocation) async throws {
+        guard expressionOwner == invocation.executionID else { return }
+        if Task.isCancelled || !state.expressionRendererAvailable || !accepts(session: invocation.context.sessionID)
+            || !conversationPresentation.isCurrent(invocation.context)
+        {
+            finishExpressionTransition(id: expressionWaitID, completed: false)
+            expressionOwner = nil
+            state.expressionEmphasized = false
+            state.expression = baseExpression
+            return
+        }
+        defer {
+            if expressionOwner == invocation.executionID {
+                expressionOwner = nil
+                state.expressionEmphasized = false
+                state.expression = baseExpression
+            }
+        }
+        try await transitionExpression(to: baseExpression)
+    }
+
+    private func transitionExpression(to target: EyeExpression?, emphasized: Bool = false) async throws {
+        try Task.checkCancellation()
+        guard state.expressionRendererAvailable else { throw UIActions.ExpressionError.rendererUnavailable }
+        guard expressionWaiter == nil else { throw UIActions.ExpressionError.busy }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { continuation in
+                expressionWaitID = id
+                expressionWaiter = continuation
+                state.expressionAnimationCompletion = { [weak self] id, completed in
+                    self?.finishExpressionTransition(id: id, completed: completed)
+                }
+                state.expressionTransitionID = id
+                state.expressionEmphasized = emphasized
+                state.expression = target
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.finishExpressionTransition(id: id, completed: false) }
+        }
+    }
+
+    private func finishExpressionTransition(id: UUID?, completed: Bool) {
+        guard let id, expressionWaitID == id else { return }
+        let waiter = expressionWaiter
+        expressionWaiter = nil
+        expressionWaitID = nil
+        state.expressionTransitionID = nil
+        state.expressionAnimationCompletion = nil
+        if completed { waiter?.resume() } else { waiter?.resume(throwing: CancellationError()) }
+    }
+
+    private func resetExpression() {
+        finishExpressionTransition(id: expressionWaitID, completed: false)
+        expressionOwner = nil
+        baseExpression = nil
+        state.expressionEmphasized = false
+        state.expression = nil
     }
 
     func present(_ text: String, invocation: ToolInvocation) throws {

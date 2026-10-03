@@ -3,10 +3,10 @@
 Purpose: send user input to ChatCapability, maintain bounded history and interpret generated output inside the Agent. Its local registry controls available capabilities; Gateway receives resolved calls.
 
 - ✅ AssistantAgent actor: 32 waiting inputs, 256 output envelopes and one generation worker; overflow fails explicitly.
-- ✅ Assistant.agent.json v5 exposes express under Display, six NexArm actions under Robot and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
+- ✅ Assistant.agent.json v5 exposes express and setExpression under Display, six NexArm actions under Robot and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
 - ✅ Each turn owns AgentGenerator state. Natural text uses Assistant.mapText; explicit XML resolves only JSON Actions. Channel scopes override defaults without moving wait boundaries.
 - ✅ CapabilityContextBuilder includes JSON Action aliases/docs/parameters/examples only. Speech behavior is an English Agent-owned instruction; internal methods and native Tools never enter system context.
-- ✅ express accepts clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful. It controls UI presentation only.
+- ✅ express performs smile, happy, laugh, thinking, surprised, sad, love, angry, scared or playful once and awaits restoration. setExpression accepts those values plus clear for the persistent base. Both control UI presentation only.
 - ✅ /status resolves runtimeInfo. Tool results and event descriptions are escaped before text interpretation.
 - ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 generated Action/Tool calls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
 - ✅ Cancellation bypasses full/paused inbox admission, joins the worker and discards incomplete parsing state.
@@ -77,7 +77,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ JSON v5 also subscribes to speech.phase. Speech onset emits UI.beginReplyTurn once per turn as an immediate Tool, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
 
-✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Tool exists if onset was missed. Every output has a monotonically increasing source sequence; text/expression survive normal reply completion until the next turn.
+✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Tool exists if onset was missed. Every output has a monotonically increasing source sequence; text/base expression survive normal reply completion until the next turn; finite expression overrides end after their performance.
 
 
 ## 输入、订阅与输出契约
@@ -125,7 +125,8 @@ flowchart LR
 | Agent 内部分段事件（尚未发送） | `Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.speak(audioID)`。 |
 | Action | `Speech.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用该文本段的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
 | 无返回值 Tool | `UI.print`，无 Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
-| Action | `express → UI.express / Display` | `parameters["emotion"]` 为 `clear / smile / happy / laugh / thinking / surprised / sad / love / angry / scared / playful`，设置或清除表情。 |
+| finite Action | `express → UI.express / Display` | `parameters["emotion"]` 为非 clear 的合法表情；等待单次目标过渡和恢复当前基础表情。 |
+| state Action | `setExpression → UI.setExpression / Display` | 同一表情集合加 clear；提交持续基础表情，clear 清除；不等待渲染结束。 |
 | 无返回值 Tool | `UI.beginReplyTurn`，无 Channel | 无参数；有 ConversationTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
 | 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。同时支持云端模型原生 Tool 调用。 |
 | control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
@@ -145,7 +146,7 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再
 
 ❌ 图像理解与 partial 驱动回答仍未实现。云端 Tool 增量由适配器聚合为完整调用。
 
-✅ express emits semantic eye emotions; Assistant.agent.json remains the production capability declaration. No emoji conversion is performed. clear smoothly returns to neutral. Three added values are angry/scared/playful; JSON schema is v5, with an additive parameter-domain extension.
+✅ express emits semantic eye emotions; Assistant.agent.json remains the production capability declaration. No emoji conversion is performed. setExpression(clear) clears the persistent base; express rejects clear. Three added values are angry/scared/playful; JSON schema is v5, with an additive parameter-domain extension.
 
 ✅ Conversation replies follow the user language (Mandarin/English speech), with short spoken sentences and no Markdown/emoji. Agent-owned text handling preserves mixed Mandarin/English; the synthesis provider validates text. Prompt wording does not guarantee compliance.
 

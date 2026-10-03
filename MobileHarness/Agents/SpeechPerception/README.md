@@ -1,15 +1,15 @@
 # Speech Perception
 
-Purpose: convert bounded microphone PCM into shared speech observations. Owns VAD, segmentation, streaming ASR and transcript merging; never owns microphone hardware or UI implementation; it selects recognition-caption behavior through configured Actions.
+Purpose: convert bounded microphone PCM into shared speech observations. Owns VAD, segmentation, streaming ASR and transcript merging; never owns microphone hardware or UI implementation; it selects recognition-caption behavior through code-owned internal Tools.
 
 ```mermaid
 flowchart LR
     InputGateway --> Inbox[128 frames / 64000 samples]
     Inbox --> VAD[VoiceActivitySegmenter]
     VAD --> ASR[LiveSpeechInput / recognition capability]
-    ASR --> Caption[Code-owned UI.setTranscript Action]
+    ASR --> Caption[Code-owned UI.setTranscript Tool]
     Caption --> OutputGateway
-    OutputGateway --> ActionExecution --> UI[App presentation handler]
+    OutputGateway --> ToolExecution --> UI[App presentation handler]
     ASR --> Port[Bound messaging port]
     Port --> OutputGateway
     OutputGateway --> InputGateway
@@ -23,14 +23,14 @@ flowchart LR
 
 ✅ Accepted input kinds derive from the JSON v5 communication snapshot; Swift retains handlers, not a duplicate production input registry.
 
-✅ Code declares UI.setTranscript on Transcript. Each preview publishes its shared observation and emits a resolved caption Action containing the last 320 characters. Recognition completion emits UI.finishTranscript before publishing final (also clears empty turns). No XML parsing of recognized text is needed: typed InternalAction calls carry the code-owned permission. Each update emits agent.finished to join its Action and release scheduler tracking.
+✅ Code declares UI.setTranscript as an internal Tool without a Channel. Each preview publishes its shared observation and emits a resolved caption ToolCall containing the last 320 characters. Recognition completion emits UI.finishTranscript before publishing final (also clears empty turns). No XML parsing of recognized text is needed: typed InternalTool calls carry the code-owned permission. App awaits each completion-only Tool handler before consuming the following agent.finished control; these UI updates never enter Action scheduling.
 
-✅ The output stream holds at most 32 envelopes; overflow fails the session rather than silently dropping Actions. App drains it serially through OutputGateway, including completion barriers. Stop cancels perception work, closes/drains output, cancels session Actions, and the App rejects stale-session presentation. Partial/final observations remain available to subscribers independently of UI Actions.
+✅ The output stream holds at most 32 envelopes; overflow fails the session rather than silently dropping ToolCalls. App drains it serially through OutputGateway, awaiting each Tool handler. Stop cancels perception work, closes/drains output, cancels session Actions, and the App rejects stale-session presentation. Partial/final observations remain available to subscribers independently of UI Tools.
 ❌ Sustained device caption timing and overload acceptance remain unverified.
 
-✅ UI.setVoiceState is code-declared for hearing/processing/listening presentation. Phase Signals only communicate facts: App uses them for capture admission, Assistant chooses its atomic beginReplyTurn Action on first onset. Resume emits a listening Action; each display update has a completion barrier. No UI changes occur in Signal observers.
+✅ UI.setVoiceState is code-declared for hearing/processing/listening presentation. Phase Signals only communicate facts: App uses them for capture admission, Assistant chooses its atomic beginReplyTurn Tool on first onset. Resume emits a listening Tool; completion acknowledges accepted presentation state. No UI changes occur in Signal observers.
 
-✅ ConversationTurn is allocated at the first confirmed onset/audio event and remains stable across maximum-duration segments and short VAD transitions. It propagates through shared observations and Action envelopes. Resume after reply (or empty recognition) arms a new utterance; ordinals increase within the capture session. Previews carry bounded text, finishTranscript seals it, and output sequences are monotonic.
+✅ ConversationTurn is allocated at the first confirmed onset/audio event and remains stable across maximum-duration segments and short VAD transitions. It propagates through shared observations and output envelopes. Resume after reply (or empty recognition) arms a new utterance; ordinals increase within the capture session. Previews carry bounded text, finishTranscript seals it, and output sequences are monotonic.
 
 
 ## 输入、订阅与输出契约
@@ -63,8 +63,8 @@ flowchart LR
     OG --> IG2[InputGateway]
     IG2 -->|speech.final / speech.phase| Assistant
     OG --> Observer[App: capture coordination / logging]
-    S -->|ActionCall and control| OG
-    OG --> AR[ActionExecution]
+    S -->|ToolCall and control| OG
+    OG --> AR[ToolExecution]
     AR --> UI[Transcript / voice-state handlers]
     App[App: reply completion] -.->|resumeListening| S
 ```
@@ -75,23 +75,23 @@ flowchart LR
 
 | contract / version | 类型与内容 | 发布时机 / 消费者 |
 | --- | --- | --- |
-| `speech.partial / 1` | `.transcript(text: String, final: false)`；文本最多 16300 UTF-8 字节且完整编码不超过 16 KiB | ASR 合并预览；可替换的最新状态。当前没有业务 Agent 订阅，App 注册观察端点；UI 字幕单独通过 Action 更新。 |
+| `speech.partial / 1` | `.transcript(text: String, final: false)`；文本最多 16300 UTF-8 字节且完整编码不超过 16 KiB | ASR 合并预览；可替换的最新状态。当前没有业务 Agent 订阅，App 注册观察端点；UI 字幕单独通过 Tool 更新。 |
 | `speech.final / 1` | `.transcript(text: String, final: true)`；非空、最多 4096 UTF-8 字节，编码仍受 16 KiB 限制 | 每个非空识别轮次一次，Assistant 订阅；要求至少一个 Agent 接纳且没有拒绝。空识别不发布 final。 |
 | `speech.phase / 1` | `.speechPhase(SpeechPhase)`，枚举 `listening / speaking / processing / empty` | VAD 阶段变化、端点处理、空识别等；Assistant 订阅并只对 speaking 做展示决策。App 观察用于采集协调。phase 是离散事件，不按 latest-state 合并。 |
 
-观测的 source 由绑定端口确定为 `speechPerception`，topic 为相同 contract。默认 partial 接纳期限 2 秒，final/phase 为 10 秒，子事件不能超出父输入期限。`resumeListening()` 当前直接发 listening 展示 Action，没有额外发布 listening 观测；订阅者不能假设每次恢复都有一个 phase 消息。
+观测的 source 由绑定端口确定为 `speechPerception`，topic 为相同 contract。默认 partial 接纳期限 2 秒，final/phase 为 10 秒，子事件不能超出父输入期限。`resumeListening()` 当前直接发 listening 展示 Tool，没有额外发布 listening 观测；订阅者不能假设每次恢复都有一个 phase 消息。
 
-### Action 与控制输出
+### Tool 与控制输出
 
-| 内部路径 / 默认 Channel | 参数结构 | 触发与语义 |
+| 内部 Tool 路径（无 Channel） | 参数结构 | 触发与语义 |
 | --- | --- | --- |
-| `setTranscript → UI.setTranscript / Transcript` | `["text": String]`；handler 上限 4096 UTF-8 字节 | 预览先发布 partial，再发 Action；当前投影保留最后 320 个字符。空串清空预览，但不封闭轮次。 |
-| `finishTranscript → UI.finishTranscript / Transcript` | `[:]` | 识别结束（包括空结果）清空并封闭本轮识别字幕，拒绝迟到的旧 partial；随后才发布非空 final。 |
-| `setVoiceState → UI.setVoiceState / Display` | `["state": "hearing"或"processing"或"listening"]` | speaking 映射 hearing，processing 同名，listening/empty 映射 listening；只改展示，不启动/停止设备。 |
-| control | `agent.finished` | 每次上述展示更新后发出，供输出处理等待该输入的动作并释放跟踪记录。 |
+| `UI.setTranscript` | `["text": String]`；handler 上限 4096 UTF-8 字节 | 预览先发布 partial，再发 ToolCall；当前投影保留最后 320 个字符。空串清空预览，但不封闭轮次。 |
+| `UI.finishTranscript` | `[:]` | 识别结束（包括空结果）清空并封闭本轮识别字幕，拒绝迟到的旧 partial；随后才发布非空 final。 |
+| `UI.setVoiceState` | `["state": "hearing"或"processing"或"listening"]` | speaking 映射 hearing，processing 同名，listening/empty 映射 listening；只改展示，不启动/停止设备。 |
+| control | `agent.finished` | 每次上述展示更新后发出，保留输入完成协议；前面的 Tool handler 已由串行输出处理等待完成，不创建 UI Action。 |
 | control | `agent.error: speech perception failed: …` | 感知失败尝试发出并关闭流；32 项输出缓冲满时不能保证错误消息入队，failed 状态仍可查询。 |
 
-Action/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, output)`；首次起音分配 `ConversationTurn(id: UUID, ordinal: UInt64)`，长语音切段不换轮。调用 Action 后发屏障不意味着另一条观测通路的接收者已经处理完毕，两个通路没有全局完成顺序。
+Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, output)`；首次起音分配 `ConversationTurn(id: UUID, ordinal: UInt64)`，长语音切段不换轮。Tool 完成后发送 control不意味着另一条观测通路的接收者已经处理完毕，两个通路没有全局完成顺序。
 
 ### Publish / send 边界
 

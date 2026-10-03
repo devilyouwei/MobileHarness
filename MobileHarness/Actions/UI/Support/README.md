@@ -7,7 +7,7 @@ UIActionModule and UIPresentationCapability define registration and host injecti
 ```mermaid
 flowchart LR
     Capability[Host presentation capability] --> Module[UIActionModule]
-    Module --> Entry[UIActions.express]
+    Module --> Entry[UIActions.express / setExpression]
     Types[Emotion / ExpressionError] --> Entry
 ```
 
@@ -24,3 +24,5 @@ flowchart LR
 ✅ Presentation capability contracts consume module-owned Action context, without importing UI or AgentCore.
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+
+✅ UIPresentationCapability separates awaited transition/restore from base-state commitment. Both entries share one module; unavailable/busy errors propagate without fallback. ❌ No looping Activity owner.

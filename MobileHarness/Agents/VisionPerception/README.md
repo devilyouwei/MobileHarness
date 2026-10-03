@@ -16,16 +16,16 @@ flowchart LR
     Overlay --> Generator[Code-owned UI.showPose permission]
     Generator --> Output[Latest skeleton / gaze pair]
     Output --> Gateway[OutputGateway / ToolExecution]
-    Gateway --> Action[UI.showPose Void tool / injected presentation handler]
+    Gateway --> Tool[UI.showPose completion-only Tool / injected presentation handler]
 ```
 
-✅ VisionPerception.agent.json v5 contains communication policy and empty model catalogs. Code declares UI.showPose as an internal Tool with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), constructs a typed internal ToolCall and emits one ToolCall per result. Empty people clears the overlay. No direct UI call or per-frame agent.finished is emitted; moveEyes is a separate resolved Action. The registered Void handler completes without ToolResult feedback.
+✅ VisionPerception.agent.json v5 contains communication policy and empty model catalogs. Code declares UI.showPose as an internal Tool with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), constructs a typed internal ToolCall and emits one ToolCall per result. Empty people clears the overlay. No direct UI call or per-frame agent.finished is emitted; moveEyes is a separate resolved ToolCall. The registered Void handler completes without ToolResult feedback.
 
 ✅ Raw inputs have increasing sequence/timestamps and matching sessions. Grayscale compares previous examined frames. One worker processes a frame; one latest pending frame replaces older pending input. Pause suspends dequeue, stop cancels/joins inference and suppresses late outputs. Shared observations retain up to 300 people independently of the six-person display limit.
 
 ✅ Publication uses a separate Agent-owned worker and one latest pending observation. Slow subscriber admission does not hold the inference worker or UI output. Pending observations are replaced explicitly (publicationReplacements); expired pending observations are skipped. Missing subscribers is allowed; ordinary publication errors remain recorded delivery outcomes and do not stop inference or display. Pause holds pending publication; stop cancels and joins inference and publication before finishing outputs.
 
-✅ Presentation output is a capacity-two bufferingNewest stream: every inference emits showPose followed by moveEyes, including neutral gaze. Only these two replaceable presentation states can be superseded, with separate overlayReplacements/gazeReplacements counters; arbitrary commands fail overflow. App awaits the Tool and joins/retires each admitted Action before consuming the next state. This completion barrier is outside the replaceable buffer, so no accepted Action loses its finish. Terminal error may follow one buffered display state, finishes the stream, and cannot be overwritten by later results. OutputEnvelope holds correlation metadata rather than raw input media. A publication may retain its parent frame until delivery completes; active/pending publication slots bound that lifetime.
+✅ Presentation output is a capacity-two bufferingNewest stream: every inference emits showPose followed by moveEyes, including neutral gaze. Only these two replaceable presentation states can be superseded, with separate overlayReplacements/gazeReplacements counters; arbitrary commands fail overflow. App awaits each admitted Tool handler before consuming the next state. The in-flight Tool remains outside the replaceable buffer and completes before the next state is dispatched. Terminal error may follow one buffered display state, finishes the stream, and cannot be overwritten by later results. OutputEnvelope holds correlation metadata rather than raw input media. A publication may retain its parent frame until delivery completes; active/pending publication slots bound that lifetime.
 
 ✅ FrameChangeConfiguration keeps adjacent-examined-frame comparison and optional minimumInterval. Optional maximumRefreshInterval bounds admission starvation: after that interval, the next newly captured frame is accepted even with unchanged gray samples. App uses 0.1 seconds; nil preserves pure change-triggered behavior. There is no timer, no repeated sequence and no inference without a new frame. This is an admission policy, not a guaranteed FPS or deadline under load; idle-camera inference and power use can increase.
 
@@ -115,12 +115,12 @@ Tool 经 `outputs → App transport pump → OutputGateway → Tools/Runtime →
 
 | 方向 | 数据标准与语义 |
 | --- | --- |
-| Action 输出 | `moveEyes → UI.moveEyes / Gaze`，`parameters["x"] / ["y"]` 为数值的十进制字符串，目标范围各为 -1...1；由 FaceGazeTracker 根据本帧脸部点位生成，未锁定目标时回中。它是显示方向，不是关节点像素坐标。与同一帧的 showPose ToolCall 组成可替换状态对。 |
+| Tool 输出 | `UI.moveEyes`，无 Channel，`arguments["x"] / ["y"]` 为数值的十进制字符串，目标范围各为 -1...1；由 FaceGazeTracker 根据本帧脸部点位生成，未锁定目标时回中。它是显示方向，不是关节点像素坐标。与同一帧的 showPose ToolCall 组成可替换状态对。 |
 | control 输出 | 推理失败发 `control("agent.error: pose processing failed")` 并终止流；不发每帧 `agent.finished`。终态控制不能被后续骨架覆盖。 |
-| publish | `communication.publications` 仅有 `vision.pose`；typed payload、坐标单位、人数与容量按上文“共享感知数据”段落。该发布与骨架 ToolCall/眼睛 Action 分离。 |
+| publish | `communication.publications` 仅有 `vision.pose`；typed payload、坐标单位、人数与容量按上文“共享感知数据”段落。该发布与骨架/眼睛 ToolCall 分离。 |
 | send | `communication.sends = []`，不向其他 Agent 定向发送消息；当前也没有其他业务 Agent 订阅 `vision.pose`。 |
 
-JSON `actions / tools` 均为空；代码声明 UI.moveEyes（Gaze）与 UI.showPose 内部权限。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
+JSON `actions / tools` 均为空；代码声明 UI.moveEyes 与 UI.showPose 的 InternalTool 权限（均无 Channel）。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
 
 ## Eye attention policy
 
@@ -135,11 +135,10 @@ flowchart LR
     Pose[Shared pose observation] --> Face[Confident facial points]
     Face --> Lock[Spatial lock / occlusion hold]
     Lock --> Filter[Deadband / adaptive smoothing]
-    Filter --> Resolve[Code-owned gaze Action]
+    Filter --> Resolve[Code-owned gaze ToolCall]
     Resolve --> Gateway[OutputGateway]
-    Gateway --> Channel[Gaze Channel / UI module exclusion]
-    Channel --> Action[UI.moveEyes validation]
-    Action --> Scene[Active camera session / sequence check]
+    Gateway --> Tool[Tools/Runtime: UI.moveEyes validation]
+    Tool --> Scene[Active camera session / sequence check]
     Scene --> Eyes[Native spring / stable eye shapes]
 ```
 

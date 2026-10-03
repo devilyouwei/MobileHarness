@@ -28,6 +28,10 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
         self.emotion = emotion
     }
+    func restoreExpression(invocation: ActionInvocation) async throws {}
+    func setExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
+        self.emotion = emotion
+    }
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) async throws {}
     func present(_ overlay: ToolPoseOverlay, sessionID: UUID) async throws { pose = overlay }
 }

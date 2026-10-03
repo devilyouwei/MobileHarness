@@ -27,7 +27,7 @@ flowchart LR
 
 ✅ Startup eyes are noninteractive while models prepare; progress, errors and retry remain visible. After preparation and Agent registration, tapping the eye region starts voice; tapping again stops recording/playback. No automatic microphone startup occurs. Entering Settings stops voice without destroying the root-owned runtime. Background/interruption/route cleanup belongs to App.
 
-✅ SpeechPerception Actions set/close recognition captions and phase; Assistant Actions begin replies, append captions and change expressions. OutputGateway is always crossed. Speech signals control capture admission/logging only. User/OS lifecycle resets and actual audio telemetry are App-owned state updates. Session/turn/sequence checks reject stale output.
+✅ SpeechPerception Tools set/close recognition captions and phase; Assistant Tools begin replies and append captions, while UI.express performs a finite expression and UI.setExpression commits a persistent base through scheduled Actions. OutputGateway is always crossed. Speech signals control capture admission/logging only. User/OS lifecycle resets and actual audio telemetry are App-owned state updates. Session/turn/sequence checks reject stale output.
 
 ✅ Recognition and reply share the lower caption slot. FadingCaption shows the last 320 characters, retains stable prefixes and fades revised suffixes over about 400 ms; VoiceOver receives the full text. Raw model history belongs to the durable journal, not a Gateway display buffer. Final recognition closes its caption, replies remain until the next onset, and actual playback selects the speaking phase independently of caption timing.
 
@@ -80,3 +80,5 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 ✅ ActionActivityItem and its Execution fields are UI-owned display data. AppWorkflows converts runtime observations and result details before state replacement. The action panel imports neither execution modules nor Agent result types.
 
 ✅ 执行记录入口使用右下角 48 pt 纯图标按钮，保留 VoiceOver 标签。回复过程中的执行摘要、记录保留策略和原有执行记录 sheet 内容不变。字幕滚动窗口上下边缘使用透明度渐变，文字随滚动逐渐淡出/淡入。
+
+✅ ConversationState carries expression transition ID, renderer availability and a transient completion callback. ConversationView forwards these to CompanionEyes. App owns the single continuation and invalidates it at turn/session reset. ❌ Physical-device interruption/animation acceptance remains pending.

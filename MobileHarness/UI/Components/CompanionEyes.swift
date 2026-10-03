@@ -11,6 +11,17 @@
         let phase: VoicePhase
         let reduceMotion: Bool
         var expression: EyeExpression? = nil
+        var expressionEmphasized = false
+        var expressionTransitionID: UUID? = nil
+        var expressionCompletion: (@MainActor (UUID, Bool) -> Void)? = nil
+        var expressionAvailability: (@MainActor (Bool) -> Void)? = nil
+        @State private var renderedExpression: EyeExpression? = nil
+        @State private var renderedExpressionEmphasized = false
+        private struct ExpressionTarget: Equatable {
+            let emotion: EyeExpression?
+            let id: UUID?
+            let emphasized: Bool
+        }
         var gaze: CGSize = .zero
         var faceWidth: CGFloat = 390
         @Environment(\.scenePhase) private var scenePhase
@@ -23,8 +34,8 @@
                 let distance = abs(cycle - 4.8) / 0.18
                 let blink = reduceMotion || distance >= 1 ? 1 : 1 - 0.94 * (1 + cos(distance * .pi)) / 2
                 HStack(spacing: faceWidth * 0.19) {
-                    eye(pose: EyePose.pair(for: expression ?? .clear).0, mirrored: false)
-                    eye(pose: EyePose.pair(for: expression ?? .clear).1, mirrored: true)
+                    eye(pose: EyePose.pair(for: renderedExpression ?? .clear).0, mirrored: false)
+                    eye(pose: EyePose.pair(for: renderedExpression ?? .clear).1, mirrored: true)
                 }
                 .scaleEffect(x: 1, y: blink)
                 .offset(
@@ -38,6 +49,26 @@
                     reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.32, dampingFraction: 0.86),
                     value: gaze)
             }
+            .scaleEffect(renderedExpressionEmphasized ? 1.06 : 1)
+            .onChange(
+                of: ExpressionTarget(emotion: expression, id: expressionTransitionID, emphasized: expressionEmphasized),
+                initial: true
+            ) {
+                _, target in
+                // The transaction covers both eyes and every animatable pose property.
+                withAnimation(
+                    reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.65, dampingFraction: 1),
+                    completionCriteria: .removed
+                ) {
+                    renderedExpression = target.emotion
+                    renderedExpressionEmphasized = target.emphasized
+                } completion: {
+                    if let id = target.id { expressionCompletion?(id, true) }
+                }
+            }
+            .onAppear { expressionAvailability?(scenePhase == .active) }
+            .onDisappear { expressionAvailability?(false) }
+            .onChange(of: scenePhase) { _, phase in expressionAvailability?(phase == .active) }
             .accessibilityHidden(true)
         }
 
@@ -50,9 +81,7 @@
                 .offset(x: pose.x * faceWidth, y: pose.y * faceWidth)
                 .shadow(color: .blue.opacity(0.65), radius: 14)
                 .shadow(color: .cyan.opacity(0.28), radius: 4)
-                // Interruption retargets the current rendered shape, never removes/recreates an eye.
-                .animation(
-                    reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.65, dampingFraction: 1), value: pose)
+            // Expression animation is owned by the acknowledged transaction above.
         }
     }
 

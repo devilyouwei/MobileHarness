@@ -112,7 +112,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(config.agentID == .assistant)
     #expect(
         config.capabilities.actions.map(\.alias) == [
-            "express", "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance", "nodHead",
+            "express", "setExpression", "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance",
+            "nodHead",
             "shakeHead", "resetArm", "moveMotor", "resetMotor",
         ])
     #expect(config.capabilities.channels == ["Display", "Robot", "Speech"])

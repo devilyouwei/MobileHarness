@@ -14,6 +14,11 @@ public final class ConversationState {
     public var liveTranscript = ""
     public var assistantReply = ""
     public var expression: EyeExpression?
+    /// Display transaction identity only; App owns the waiting operation.
+    public var expressionEmphasized = false
+    public var expressionTransitionID: UUID?
+    public var expressionRendererAvailable = false
+    @ObservationIgnored public var expressionAnimationCompletion: (@MainActor (UUID, Bool) -> Void)?
     public var playbackSpectrum = [Float](repeating: 0, count: 32)
     public var microphoneSpectrum = [Float](repeating: 0, count: 32)
     public var isReady = false

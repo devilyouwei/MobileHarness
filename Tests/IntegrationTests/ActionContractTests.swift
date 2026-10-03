@@ -164,7 +164,7 @@ private func contractDefinition(
             actionPath: .init(module: "UI", function: "express"), channel: "Display",
             parameters: ["emotion": "smile", "unexpected": "value"]))
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
-        try await UIActions.express(invocation: invocation) { _, _ in Issue.record("Unexpected effect") }
+        try await UIActions.setExpression(invocation: invocation) { _, _ in Issue.record("Unexpected effect") }
     }
 }
 
@@ -172,14 +172,14 @@ private func contractDefinition(
     let started = ContractGate()
     let release = ContractGate()
     let state = ContractState()
-    let setPath = ActionPath(module: "UI", function: "express")
+    let setPath = ActionPath(module: "UI", function: "setExpression")
     let registry = try ActionRegistry(definitions: [
         contractDefinition { _ in
             await started.release()
             await release.wait()
         },
         contractDefinition(path: setPath, kind: .state) { invocation in
-            try await UIActions.express(invocation: invocation) { _, _ in await state.setExpression() }
+            try await UIActions.setExpression(invocation: invocation) { _, _ in await state.setExpression() }
         },
     ])
     let scheduler = ChannelScheduler(registry: registry)
@@ -283,4 +283,98 @@ private enum ContractFailure: Error, Equatable { case failed }
     let snapshot = await scheduler.diagnosticSnapshot()
     #expect(snapshot.records.map(\.phase) == [.admitted, .started, .failed])
     #expect(snapshot.records.last?.effect == .unknown)
+}
+
+@Test func finiteExpressionRetainsModuleUntilPerformanceAndRestorationFinish() async throws {
+    let entered = ContractGate()
+    let animation = ContractGate()
+    let restoring = ContractGate()
+    let restored = ContractGate()
+    let state = ContractState()
+    let definition = UIActions.expressDefinition(handler: { invocation in
+        try await UIActions.express(
+            invocation: invocation,
+            using: { _, _ in
+                await entered.release()
+                await animation.wait()
+            },
+            restoring: { _ in
+                await restoring.release()
+                await restored.wait()
+            })
+    })
+    let setter = UIActions.setExpressionDefinition(handler: { invocation in
+        try await UIActions.setExpression(invocation: invocation) { _, _ in await state.setExpression() }
+    })
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [definition, setter]))
+    let input = AgentInput(sessionID: UUID(), payload: .event("expression"))
+    let perform = ActionInvocation(
+        source: .assistant, input: input,
+        call: ActionCall(
+            actionPath: .init(module: "UI", function: "express"), channel: "Display", parameters: ["emotion": "smile"]))
+    let set = ActionInvocation(
+        source: .assistant, input: input,
+        call: ActionCall(
+            actionPath: .init(module: "UI", function: "setExpression"), channel: "Another",
+            parameters: ["emotion": "thinking"]))
+    _ = try await scheduler.enqueue(invocation: perform)
+    await entered.wait()
+    _ = try await scheduler.enqueue(invocation: set)
+    #expect(await state.effects == 0)
+    await animation.release()
+    await restoring.wait()
+    #expect(await state.effects == 0)
+    await restored.release()
+    try await scheduler.finish(inputID: input.id)
+    #expect(await state.effects == 1)
+    #expect(definition.kind == .finite && setter.kind == .state)
+}
+
+@Test func finiteExpressionCancellationAwaitsCleanupAndPreservesCancellation() async throws {
+    let cleanupEntered = ContractGate()
+    let cleanupFinished = ContractGate()
+    let state = ContractState()
+    let invocation = ActionInvocation(
+        source: .assistant,
+        input: AgentInput(sessionID: UUID(), payload: .event("expression")),
+        call: ActionCall(
+            actionPath: .init(module: "UI", function: "express"), channel: "Display",
+            parameters: ["emotion": "smile"]))
+    let task = Task {
+        try await UIActions.express(
+            invocation: invocation,
+            using: { _, _ in
+                throw CancellationError()
+            },
+            restoring: { _ in
+                await cleanupEntered.release()
+                await cleanupFinished.wait()
+                await state.setExpression()
+            })
+    }
+    await cleanupEntered.wait()
+    #expect(await state.effects == 0)
+    await cleanupFinished.release()
+    await #expect(throws: CancellationError.self) { try await task.value }
+    #expect(await state.effects == 1)
+}
+
+@Test func expressionCleanupFailureRetainsBothErrors() async throws {
+    let invocation = ActionInvocation(
+        source: .assistant,
+        input: AgentInput(sessionID: UUID(), payload: .event("expression")),
+        call: ActionCall(
+            actionPath: .init(module: "UI", function: "express"), channel: "Display",
+            parameters: ["emotion": "smile"]))
+    do {
+        try await UIActions.express(
+            invocation: invocation,
+            using: { _, _ in
+                throw CancellationError()
+            }, restoring: { _ in throw UIActions.ExpressionError.rendererUnavailable })
+        Issue.record("Expected cleanup failure")
+    } catch let failure as UIActions.ExpressionCleanupFailure {
+        #expect(failure.primary is CancellationError)
+        #expect(failure.cleanup as? UIActions.ExpressionError == .rendererUnavailable)
+    }
 }

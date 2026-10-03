@@ -40,3 +40,5 @@ Conversation renders captions, eyes, spectra, generic Action execution state and
 ✅ Conversation, camera, settings/history and diagnostic pages expose typed operations and shared domain values.
 
 ❌ Cross-platform views and independent multi-window state routing are not implemented.
+
+✅ UI expression transactions expose display IDs, completion callbacks and renderer availability only. App owns Action waits and lifecycle; no runtime service or execution queue lives in a view. ❌ Device animation acceptance remains pending.

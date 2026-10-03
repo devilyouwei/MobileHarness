@@ -56,7 +56,7 @@ Every category has admission, execution and terminal success/failure/cancellatio
 
 ### State setting
 
-- Prefer `setExpression`, `setTarget`, `clearExpression` names for new APIs. Existing `UI.express` retains its published name; immediate `UI.moveEyes` belongs to Tools.
+- Prefer `setExpression`, `setTarget`, `clearExpression` names for new APIs. `UI.express` is a finite enter/restore performance; `UI.setExpression` commits the persistent base (clear removes it). Immediate `UI.moveEyes` belongs to Tools.
 - Return after the documented state/target acknowledgment. Do not wait until a persistent state is removed; do not promise visible interpolation or physical arrival unless actually acknowledged.
 - A committed state belongs to its state owner after return. Define replacement, reset, lifetime and repeated-setting semantics. Repeated same-value Set should be idempotent unless a documented reason requires another behavior; `toggle` is not equivalent to `setEnabled(true)`.
 - Distinguish requested target from observed state. `setTarget(90)` must not claim the arm has reached 90 degrees. Use a finite `moveTo(90)` or an explicit arrival observation/barrier for subsequent operations that require arrival.
@@ -210,14 +210,14 @@ Each domain README describes these fields for every callable entry:
 | Domain | Registered behavior | Ownership and completion |
 | --- | --- | --- |
 | [Speech](Speech/README.md) | Speech.speak(audioID) | Typed playback capability; completes after playback drains and the single-use audio is released. |
-| [UI](UI/README.md) | UI.express(emotion) | Typed presentation capability; accepts the expression target without joining animation. |
+| [UI](UI/README.md) | UI.express(emotion), UI.setExpression(emotion) | Finite performance awaits animation and restoration; state setting acknowledges base-target commitment. |
 | [NexArm](NexArm/README.md) | Motor move/reset, arm reset, base sweep and gestures | Domain Support owns business shaping/composition/completion; PlatformKit owns native protocol, limits and feedback. |
 
 ✅ SpeechActionModule, UIActionModule, NexArmBaseActionModule and NexArmGestureActionModule are explicitly registered. Concrete entries use immutable arguments and owner-backed capabilities. NexArm domains share one module exclusion key. Fixed captions, transcript state, gaze and pose belong to Tools/UI.
 
 Finite/state handlers can use the Void adapter to ActionCompletion.completed; activity start/stop handlers return the owner service's activity ID. Gateway correlates terminal feedback through InputGateway and shares resource leases/fences across declared Action, Tool and host paths. Handler completion and persistent effect lifetime are separate.
 
-❌ Camera recording Actions, generic activity supervision and audio resource-lease integration are not implemented. Current expressions acknowledge state acceptance; activity metadata alone does not create a supervised activity. Already executed effects are not rolled back.
+❌ Camera recording Actions, generic activity supervision and audio resource-lease integration are not implemented. Expression performance and base state have separate finite/state contracts; activity metadata alone does not create a supervised activity. Already executed effects are not rolled back.
 
 See [Runtime](Runtime/README.md) for registry/executor limits, [Results](../Gateway/Output/Results/README.md) for feedback and [Resources](../Gateway/Output/Resources/README.md) for lease/fence policy.
 
