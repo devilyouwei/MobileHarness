@@ -29,50 +29,56 @@
 
         public var body: some View {
             List {
-                if let modelResources {
+                Section("AI 模型") {
+                    if let modelResources {
+                        NavigationLink {
+                            ModelResourcesView(state: modelResources, group: .recognition)
+                        } label: {
+                            Label("音频识别", systemImage: "waveform")
+                        }
+                        .accessibilityIdentifier("settings.recognition.open")
+                        NavigationLink {
+                            ModelResourcesView(state: modelResources, group: .synthesis)
+                        } label: {
+                            Label("语音合成", systemImage: "speaker.wave.2")
+                        }
+                        .accessibilityIdentifier("settings.synthesis.open")
+                    }
                     NavigationLink {
-                        ModelResourcesView(state: modelResources, group: .recognition)
+                        LanguageModelSettingsView(settings: settings, modelResources: modelResources, save: save)
                     } label: {
-                        Label("音频识别", systemImage: "waveform")
+                        Label("大模型", systemImage: "brain")
                     }
-                    .accessibilityIdentifier("settings.recognition.open")
+                    .accessibilityIdentifier("settings.language.open")
+                    if let modelResources {
+                        NavigationLink {
+                            ModelResourcesView(state: modelResources, group: .vision)
+                        } label: {
+                            Label("视觉识别", systemImage: "viewfinder")
+                        }
+                        .accessibilityIdentifier("settings.vision.open")
+                    }
+                }
+                Section("外接设备") {
                     NavigationLink {
-                        ModelResourcesView(state: modelResources, group: .synthesis)
+                        BluetoothSettingsView(state: bluetooth, controls: bluetoothControls)
                     } label: {
-                        Label("语音合成", systemImage: "speaker.wave.2")
+                        HStack {
+                            Label("蓝牙外设", systemImage: "antenna.radiowaves.left.and.right")
+                            Spacer()
+                            Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline)
+                        }
                     }
-                    .accessibilityIdentifier("settings.synthesis.open")
+                    .accessibilityIdentifier("settings.bluetooth.open")
                 }
-                NavigationLink {
-                    LanguageModelSettingsView(settings: settings, modelResources: modelResources, save: save)
-                } label: {
-                    Label("大模型", systemImage: "brain")
-                }
-                .accessibilityIdentifier("settings.language.open")
-                if let modelResources {
+                Section("用户") {
                     NavigationLink {
-                        ModelResourcesView(state: modelResources, group: .vision)
+                        ConversationHistoryView(state: history, controls: historyControls)
                     } label: {
-                        Label("视觉识别", systemImage: "viewfinder")
+                        Label("对话历史", systemImage: "clock.arrow.circlepath")
                     }
-                    .accessibilityIdentifier("settings.vision.open")
+                    .accessibilityIdentifier("settings.conversation.history")
                 }
-                NavigationLink {
-                    BluetoothSettingsView(state: bluetooth, controls: bluetoothControls)
-                } label: {
-                    HStack {
-                        Label("蓝牙外设", systemImage: "antenna.radiowaves.left.and.right")
-                        Spacer()
-                        Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline)
-                    }
-                }
-                .accessibilityIdentifier("settings.bluetooth.open")
-                NavigationLink {
-                    ConversationHistoryView(state: history, controls: historyControls)
-                } label: {
-                    Label("对话历史", systemImage: "clock.arrow.circlepath")
-                }
-                .accessibilityIdentifier("settings.conversation.history")
             }
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)

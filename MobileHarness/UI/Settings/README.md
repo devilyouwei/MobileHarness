@@ -185,3 +185,7 @@ flowchart LR
 ✅ 下载源 appears within 自定义模型 / 本地大模型 with Hugging Face 官方, HF Mirror 中国镜像 and 自定义域名. YOLO has no source controls. No network toggle, save-source button or source footer remains. A single cancellable page task debounces endpoint edits by 600 ms; before download admission the state revalidates/persists the current endpoint using durable voice preferences. Failed saves prevent admission and retain the editable draft. Controls lock while saving; leaving the page cancels pending debounce without affecting background transfers. User guidance is brief and avoids implementation terminology.
 
 ✅ Settings helper copy is limited to short user guidance: model prerequisites/system fallback, local Qwen requirement, blank-URL default, conversation archiving/local privacy and Bluetooth connection/control behavior. The idle save instruction, developer explanations of context windows/record internals and model-page total storage row are removed. Each model retains its own size/status/license and progress; errors and destructive confirmations remain visible. ❌ Physical-page copy/layout acceptance remains pending.
+
+
+✅ 设置首页按三个原生 List 板块组织：AI 模型（音频识别、语音合成、大模型、视觉识别）、外接设备（蓝牙外设）、用户（对话历史）。保留现有入口顺序、导航和无障碍标识。
+❌ 三板块的真机视觉验收仍待完成。
