@@ -1,11 +1,8 @@
 # Speech synthesis
 
-Purpose: Define text-to-PCM sessions and implement system and local synthesis.
+Purpose: define text-to-PCM sessions and implement system and local synthesis. Design goals: managed ownership, bounded cancellable output and separation from playback.
 
-Design goals: explicit ownership, capability boundaries and no duplicate production sources.
-
-- ✅ Default Kokoro Core ML Mandarin/English synthesis and separately available Apple system voices, with bounded cancellable output.
-- ❌ Audio playback ownership and voice-conversation scheduling.
-
-
-✅ Default speech uses [MOSS Nano](MossNano/README.md) with pinned local graphs and Chinese/English preset voices. Kokoro is retained only for isolated historical tests; it is not registered or packaged by App. ❌ Device acceptance remains pending.
+- ✅ Defaults selects enabled installed available MOSS Nano, otherwise Apple AVSpeechSynthesizer; disabling custom synthesis forces Apple. Explicit MOSS access remains available to isolated callers.
+- ✅ Apple system voices produce PCM for the same App-owned playback pipeline.
+- ✅ Kokoro remains only for isolated historical tests, outside production registration and packaging.
+- ❌ Playback and conversation scheduling are outside this module. Real voice quality remains device acceptance work.

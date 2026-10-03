@@ -4,7 +4,7 @@ import ModelKitDefaults
 import ModelKitRuntime
 import Testing
 
-@Test func defaultAssemblyIsLazyAndSynthesisUsesMossNano() async throws {
+@Test func defaultAssemblyIsLazyAndSpeechHasManagedSystemFallback() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
     // Standalone Swift Testing does not expose its XCTest bundle to MLX's bundle search.
     let testResources = try #require(Bundle(for: TestBundleAnchor.self).resourceURL)
@@ -39,12 +39,10 @@ import Testing
     #expect(sameInstance)
     let mossNano = try await manager.get(ModelKitDefaults.mossNano, as: .synthesis, load: false)
     let sameMossNanoInstance = (synthesis as AnyObject) === (mossNano as AnyObject)
-    #expect(sameMossNanoInstance)
-    if case .available = await synthesis.availability {
-        Issue.record("Missing MossNano resources must not resolve to system speech")
-    }
-    await #expect(throws: (any Error).self) { try await manager.load(.synthesis) }
-    #expect(try await manager.status(.synthesis) == .unloaded)
+    #expect(!sameMossNanoInstance)
+    // Facade loading does not load missing custom weights; warmup selects system speech.
+    try await manager.load(.synthesis)
+    #expect(try await manager.status(.synthesis) == .unmanaged)
     #expect(try await manager.status(ModelKitDefaults.mossNano) == .unloaded)
     #expect(try await manager.status(.chat) == .registered)
     await #expect(throws: ModelRegistrationError.missingDefault(.judge)) { _ = try await manager.get(.judge) }

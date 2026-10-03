@@ -27,7 +27,12 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
                 case .unavailable: reason = "当前不可执行"
                 case .cancelled: reason = entry.status == .notStarted ? "已取消，未执行" : "执行已取消"
                 case .resultCapacityExceeded: reason = "结果数量超出声明上限"
-                case .handlerFailed, nil: reason = "执行失败"
+                case .handlerFailed, nil:
+                    if report.entries.count == 1, let detail = execution.failureDescription, !detail.isEmpty {
+                        reason = detail
+                    } else {
+                        reason = "执行失败"
+                    }
                 }
                 let motor = entry.motor.map { " · \($0)号电机" } ?? ""
                 let position: String

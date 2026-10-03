@@ -1,6 +1,6 @@
 # Settings
 
-> Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
+> Current status (2026-10-03): model settings are grouped into 音频识别、语音合成、大模型、视觉识别. Backend resource acquisition remains shared. Physical acceptance of this reorganization remains pending.
 
 
 Purpose: present App configuration with accessible native SwiftUI controls. Design goals: secure credentials, explicit model selection and immediate application without restarting.
@@ -8,17 +8,19 @@ Purpose: present App configuration with accessible native SwiftUI controls. Desi
 | File | Responsibility |
 | --- | --- |
 | SettingsState.swift | Editable CloudSettingsDraft, loading/saving/errors and SettingsOperating interface; invoke injected operations |
-| SettingsView.swift | Settings navigation and cloud form; forward save and cancel only page-scoped model discovery on disappearance |
+| SettingsView.swift | Feature navigation and 大模型 cloud/local form; forward save and cancel only page-scoped model discovery on disappearance |
+| ModelResourcesState.swift | Shared source draft, independent speech choices, resource-group presentation, operation admission and installation alerts |
+| ModelResourcesView.swift | Recognition/synthesis/vision destinations and reusable filtered download/source sections for 大模型 |
 | ConversationHistoryState.swift | History snapshot/status and ConversationHistoryControlling interface |
 | ConversationHistoryView.swift | Current/past lists, raw request/reply inspection, export and explicit mutation controls |
 
 App owns these state instances and injects workflows. UI imports Storage for record values; it receives no store or model capability. Credentials exist in the editable form state and SecureField; persistence and model requests belong to AppWorkflows.
 
-✅ SettingsView exposes the feature list; its Cloud LLM destination contains the enabled switch, URL and masked Key fields, model loading and picker. Editing credentials invalidates the old list. Enabling cloud requires a selected model; disabling and saving restores local chat while retaining credentials. Loading, saving and errors are visible. SettingsState owns form edits/status and receives SettingsOperating, implemented by AppWorkflows/SettingsWorkflow for storage/network/application effects.
+✅ SettingsView exposes the feature list; its 大模型 destination contains the enabled switch, URL and masked Key fields, model loading and picker. Editing credentials invalidates the old list. Enabling cloud requires a selected model; disabling and saving restores local chat while retaining credentials. Loading, saving and errors are visible. SettingsState owns form edits/status and receives SettingsOperating, implemented by AppWorkflows/SettingsWorkflow for storage/network/application effects.
 ✅ A standalone settings page is available from the home top-right controls even when voice startup fails. Key uses SecureField and privacySensitive. Saving is owned by App state and completes across navigation.
 ❌ Live provider and physical-device interaction acceptance require user configuration. No credentials are embedded; the visible default endpoint/model comes from the configured adapter defaults.
 
-✅ Settings is now a pushed standalone page with a first-level feature list and second-level Cloud LLM form. Back navigates to settings/home. The enabled switch selects cloud/local on Save while preserving credentials. Native PasteButton controls beside URL/Key read text only on explicit tap. No sheet or automatic clipboard read remains.
+✅ Settings is now a pushed standalone page with a first-level feature list and second-level 大模型 form. Back navigates to settings/home. The enabled switch selects cloud/local on Save while preserving credentials. Native PasteButton controls beside URL/Key read text only on explicit tap. No sheet or automatic clipboard read remains.
 
 ✅ Native NavigationStack back items replace custom dismiss buttons, restoring interactive leading-edge swipe at both settings levels. Native back navigation stays present during saves; App-owned save work continues if the user navigates back. Cancelled swipes remain on the current page. ❌ Physical-device gesture acceptance pending.
 
@@ -142,7 +144,7 @@ flowchart LR
 
 ## Local model resources — current contract
 
-✅ ModelResourcesView/State show download estimates, actual receipt-based installed sizes, progress, revision/license and download/cancel/retry/stop-and-delete. Official HF, hf-mirror.com and custom HTTPS domains plus cellular policy persist for new requests. UI imports no model SDK or services. Downloads survive page navigation; the page explains HF relaunch restart. ❌ Full iOS rendering/lifecycle acceptance remains pending.
+✅ ModelResourcesView/State show download estimates, actual receipt-based installed sizes, progress, revision/license and download/cancel/retry/stop-and-delete. Official HF, hf-mirror.com and custom HTTPS domains automatically persist for new requests; App allows all system-permitted networks. UI imports no model SDK or services. Downloads survive page navigation; source controls appear inside the model section, with no source footer or save button. ❌ Full iOS rendering/lifecycle acceptance remains pending.
 
 ✅ 下载阶段显示确定进度条和百分比；排队、提交、安装、删除和取消阶段显示对应状态与活动指示。点击下载立即锁定该模型的操作，下载期间只显示取消，取消处理中禁用按钮；重试/删除仅在空闲时可用。状态层同时拒绝重复请求，最多 32 个同时提交的操作，超限明确报错；刷新失败仍保留已提交下载的锁定。取消先等待提交完成，避免迟到的提交重新开始下载。
 ❌ 原生 iOS 进度布局和真实网络交互仍需设备验证。
@@ -151,3 +153,35 @@ flowchart LR
 
 
 ✅ Failed model transfers offer 继续下载; active rows remain cancel-only. Completed files are reused by the backend, while detailed network codes are surfaced by the injected App adapter. UI owns no download task.
+
+
+✅ 音频识别 and 语音合成 have independent 使用自定义识别模型 / 使用自定义模型 switches; missing required installations bounce the switch off and show an installation alert. Recognition requires Nemotron only, synthesis requires MOSS. 大模型 keeps cloud configuration and adds Qwen download/removal; 视觉识别 retains YOLO. The shared ModelResourceSections component filters by business group and retains background progress, cancellation-only busy controls, source settings and safe deletion.
+
+✅ Failed speech-preference saves restore both switches to the active durable policy. Prerequisite failures use an installation alert; other failures remain visible.
+
+
+✅ New installations default both custom speech switches off. Legacy preferDownloadedSpeech JSON migrates to the two flags; App validates actual installations before applying them. Download completion does not automatically enable a custom mode. Removing a required model automatically disables only its owning speech mode. Qwen local selection is guarded by installation in 大模型; cloud URL/Key/discovery/save remain unchanged.
+
+```mermaid
+flowchart LR
+    Settings --> ASR[音频识别 / Nemotron + Silero]
+    Settings --> TTS[语音合成 / MOSS]
+    Settings --> LLM[大模型 / cloud + Qwen]
+    Settings --> Vision[视觉识别 / YOLO]
+    ASR --> Resources[Shared model resource state and operations]
+    TTS --> Resources
+    LLM --> Resources
+    Vision --> Resources
+    Resources --> Workflow[Injected App settings workflow]
+```
+
+❌ Automated simulator page navigation is unavailable in this toolchain; compile/state tests do not establish physical visual acceptance.
+
+
+✅ Speech switches validate/persist against the saved download source, preserving unfinished endpoint edits in the form. Changing voice mode never implicitly commits a draft download domain. Missing prerequisites bounce the switch and present the installation notice.
+
+✅ Silero remains on the recognition page as an independent optional VAD download. Installing it selects Silero on the next session for either Apple or Nemotron; deleting it selects Energy without disabling custom ASR. Nemotron alone satisfies the ASR switch prerequisite. No model/storage dependency is added to UI.
+
+✅ 下载源 appears within 自定义模型 / 本地大模型 with Hugging Face 官方, HF Mirror 中国镜像 and 自定义域名. YOLO has no source controls. No network toggle, save-source button or source footer remains. A single cancellable page task debounces endpoint edits by 600 ms; before download admission the state revalidates/persists the current endpoint using durable voice preferences. Failed saves prevent admission and retain the editable draft. Controls lock while saving; leaving the page cancels pending debounce without affecting background transfers. User guidance is brief and avoids implementation terminology.
+
+✅ Settings helper copy is limited to short user guidance: model prerequisites/system fallback, local Qwen requirement, blank-URL default, conversation archiving/local privacy and Bluetooth connection/control behavior. The idle save instruction, developer explanations of context windows/record internals and model-page total storage row are removed. Each model retains its own size/status/license and progress; errors and destructive confirmations remain visible. ❌ Physical-page copy/layout acceptance remains pending.

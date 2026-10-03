@@ -13,11 +13,28 @@ public final class AppleSpeechSynthesis: SpeechSynthesisCapability {
     public var availability: CapabilityAvailability {
         AVSpeechSynthesisVoice.speechVoices().isEmpty ? .unavailable(reason: "未找到系统语音声音") : .available
     }
+    /// The shared speech contract uses auto for Chinese/English conversation replies.
+    nonisolated static func language(text: String, locale: String) -> String {
+        let normalized = locale.lowercased().replacingOccurrences(of: "_", with: "-")
+        switch normalized {
+        case "auto":
+            let chinese = text.unicodeScalars.contains {
+                (0x3400...0x4DBF).contains($0.value) || (0x4E00...0x9FFF).contains($0.value)
+                    || (0x20000...0x2FA1F).contains($0.value)
+            }
+            return chinese ? "zh-CN" : "en-US"
+        case "zh", "zh-hans": return "zh-CN"
+        case "zh-hant": return "zh-TW"
+        case "en": return "en-US"
+        default: return locale.replacingOccurrences(of: "_", with: "-")
+        }
+    }
     public func synthesize(_ request: SpeechSynthesisRequest) async throws -> InferenceSession<SynthesisEvent> {
         try Task.checkCancellation()
         guard request.text.utf8.count <= 2048 else { throw CapabilityError.invalidRequest("单次合成文本过长") }
-        guard let voice = AVSpeechSynthesisVoice(language: request.locale) else {
-            throw CapabilityError.unavailable("当前系统没有此语言的语音声音")
+        let language = Self.language(text: request.text, locale: request.locale)
+        guard let voice = AVSpeechSynthesisVoice(language: language) else {
+            throw CapabilityError.unavailable("当前系统没有 \(language) 的语音声音，请先在系统设置中添加对应语音")
         }
         guard activeWorker == nil else { throw CapabilityError.inputBusy }
         let lease = try await resource.acquire()

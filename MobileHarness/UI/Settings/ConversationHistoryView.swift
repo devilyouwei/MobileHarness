@@ -41,9 +41,9 @@
                 } header: {
                     Text("当前对话")
                 } footer: {
-                    Text("继续聊天会加载当前会话最近 10 轮完整对话。关闭录音或重启应用不会清空上下文；开始新对话才会归档并清空。")
+                    Text("开始新对话后，当前对话会移至历史记录。")
                 }
-                Section("过去的对话") {
+                Section {
                     if state.archive?.past.isEmpty == true { Text("暂无历史对话").foregroundStyle(.secondary) }
                     ForEach(state.archive?.past ?? []) { conversation in
                         NavigationLink {
@@ -61,12 +61,10 @@
                             }
                         }
                     }
-                }
-                Section {
-                    Text(
-                        "保存正式聊天的用户原文、实际请求上下文、模型文本分片、原生 Tool Call 输入输出和 token 用量。原始内容按纯文本显示，不执行历史 Action 或 Tool。失败、取消或中断时保留已接收部分；模型未提供的 token 用量显示为未提供，不包含 token ID 或 HTTP 数据。历史只保存在本机，容量用满后明确报错，可删除旧会话释放空间。"
-                    )
-                    .font(.footnote).foregroundStyle(.secondary)
+                } header: {
+                    Text("过去的对话")
+                } footer: {
+                    Text("对话历史仅保存在此设备。")
                 }
             }
             .navigationTitle("对话历史")
@@ -87,7 +85,7 @@
                     deleting = nil
                 }
             } message: {
-                Text("将删除该会话的用户输入、模型原文和请求记录，无法恢复。")
+                Text("删除后无法恢复。")
             }
         }
 

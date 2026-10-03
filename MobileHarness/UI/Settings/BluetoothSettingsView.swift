@@ -26,7 +26,7 @@
             .confirmationDialog("忽略这台机械臂？", isPresented: $forgetting, titleVisibility: .visible) {
                 Button("忽略设备", role: .destructive, action: controls.forget)
             } message: {
-                Text("会断开连接并移除本机记录。之后可重新搜索连接。")
+                Text("将断开连接并忘记此设备。")
             }
         }
         @ViewBuilder private var availabilitySection: some View {
@@ -37,7 +37,7 @@
                         .accessibilityIdentifier("settings.bluetooth.permission")
                 }
             } footer: {
-                Text("返回 App 时会自动恢复上次连接。手动断开后不再自动连接。")
+                Text("自动重连上次设备；手动断开后不再重连。")
             }
         }
         @ViewBuilder private var myDevicesSection: some View {
@@ -181,7 +181,7 @@
                 } header: {
                     Text("电机控制")
                 } footer: {
-                    Text("按住滑动控制方向和速度，离中心越远越快。松手停止，机械臂保持当前位置。")
+                    Text("滑动控制方向和速度，松手停止并保持当前位置。")
                 }
             }
             .navigationTitle(device.name)

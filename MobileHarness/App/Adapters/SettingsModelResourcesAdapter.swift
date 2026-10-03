@@ -5,8 +5,10 @@ import UI
 enum SettingsModelResourcesAdapter {
     static func validate(_ draft: ModelResourceSourceDraft) throws -> ModelResourceSourceDraft {
         do {
-            let source = try ModelDownloadSource(endpoint: draft.endpoint, allowsCellular: draft.allowsCellular)
-            return ModelResourceSourceDraft(endpoint: source.endpoint, allowsCellular: source.allowsCellular)
+            let source = try ModelDownloadSource(endpoint: draft.endpoint, allowsCellular: true)
+            return ModelResourceSourceDraft(
+                endpoint: source.endpoint, allowsCellular: source.allowsCellular,
+                useCustomRecognition: draft.useCustomRecognition, useCustomSynthesis: draft.useCustomSynthesis)
         } catch { throw SourceError() }
     }
     private struct SourceError: LocalizedError {

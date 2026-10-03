@@ -98,3 +98,9 @@ flowchart TD
 
 
 ✅ Nemotron downloads and registration now use the shared Core ML catalog entry, without CoreAI device validation.
+
+
+✅ AppAssembly restores speech preference before AppContainer construction. On changes it pauses voice through the lifecycle settings barrier, updates ModelKitDefaults policy, and releases the barrier. AppContainer uses stable default speech facades and diagnostics warms the selected synthesis; Qwen/YOLO are unchanged.
+
+
+✅ AppAssembly applies independent recognition/synthesis preferences through the lifecycle settings barrier and caches their pair to avoid repeated voice cancellation. Model capabilities remain independently registered; download/delete backends and chat configuration are unchanged.

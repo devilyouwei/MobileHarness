@@ -42,12 +42,12 @@ final class AppContainer {
         let chat = CurrentChatCapability(models: models)
         let vad = try await models.get(.voiceActivity, load: false)
         let synthesis = try await models.get(.synthesis, load: false)
-        let diagnosticID = ModelKitDefaults.mossNano
-        let validationModel = try await models.get(diagnosticID, as: .synthesis, load: false)
+        let validationModel = synthesis
         let diagnosticState = SpeechDiagnosticState()
         diagnostic = SpeechDiagnosticWorkflow(
             state: diagnosticState, player: AppleAudioIO(), provider: validationModel,
-            load: { try await models.warmup(diagnosticID) }, unload: { try await models.unload(diagnosticID) })
+            load: { try await models.warmup(.synthesis) },
+            unload: { try await ModelKitDefaults.unloadSpeechSynthesis(resources: resources) })
         #if DEBUG
             validateVoiceModels = {
                 try await ChatDiagnosticWorkflow.validate(chat: chat) {
@@ -67,7 +67,7 @@ final class AppContainer {
                 // Reload only resources evicted after startup; get/load reuse resident weights.
                 try await models.warmup(.recognition)
                 try await models.warmup(.chat)
-                try await models.load(.voiceActivity)
+                try await models.warmup(.voiceActivity)
                 try await models.warmup(.synthesis)
             }, voiceActivity: vad, chat: chat)
         self.lifecycle = lifecycle

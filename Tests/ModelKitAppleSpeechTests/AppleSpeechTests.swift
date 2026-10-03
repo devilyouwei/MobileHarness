@@ -5,18 +5,15 @@ import Testing
 
 @testable import ModelKitAppleSpeech
 
-@Test @MainActor func speechNetworkPolicyIsExplicitAndRequestsKeepTheirPolicy() throws {
-    let provider = try AppleSpeechRecognition(context: ModelContext())
-    #expect(provider.policy == .onDeviceOnly)
-    let offlineRequest = provider.policy.makeRequest()
-    #expect(offlineRequest.requiresOnDeviceRecognition)
-    provider.policy = .allowNetwork
-    let networkRequest = provider.policy.makeRequest()
-    #expect(!networkRequest.requiresOnDeviceRecognition)
-    #expect(offlineRequest.requiresOnDeviceRecognition)
-    provider.policy = .onDeviceOnly
-    #expect(provider.policy.makeRequest().requiresOnDeviceRecognition)
-    #expect(!networkRequest.requiresOnDeviceRecognition)
+@Test func modernAppleRecognitionRejectsInvalidPCMWithoutLoading() async throws {
+    guard #available(macOS 26, iOS 26, *) else { return }
+    let context = ModelContext()
+    let provider = try AppleSpeechRecognition(context: context)
+    let format = try AudioFormat(sampleRate: 24000, channels: 1, encoding: .float32)
+    await #expect(throws: CapabilityError.self) {
+        try await provider.transcribe(SpeechRecognitionRequest(locale: "zh-CN", format: format))
+    }
+    #expect(await context.status == .unloaded)
 }
 
 @Test func systemPCMIsCopiedAndDownmixed() throws {
@@ -90,4 +87,73 @@ import Testing
     #expect(chunks.map(\.sequence) == Array(UInt64(0)..<UInt64(10)))
     #expect(chunks.last!.timestamp > chunks.first!.timestamp)
     #expect(try accumulator.finish().isEmpty)
+}
+
+/// Real modern on-device ASR; opt-in because Apple may install system language assets.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_ASR_WAV"] != nil))
+func systemAnalyzerTranscribesFixtureAndReleasesLease() async throws {
+    guard #available(macOS 26, iOS 26, *) else { return }
+    let path = try #require(ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_ASR_WAV"])
+    let file = try AVAudioFile(forReading: URL(fileURLWithPath: path))
+    #expect(file.processingFormat.sampleRate == 16000)
+    let buffer = try #require(
+        AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))
+    try file.read(into: buffer)
+    let encoded = try PCMCodec.encode(buffer, sequence: 0)
+    let frame = try AudioFrame(
+        data: encoded.data + Data(repeating: 0, count: 32000 * 4), format: encoded.format, sequence: 0, timestamp: 0)
+    let context = ModelContext()
+    let provider = try AppleSpeechRecognition(context: context)
+    try await provider.warmup()
+    let session = try await provider.transcribe(SpeechRecognitionRequest(locale: "zh-CN", format: frame.format))
+    let reader = Task { () throws -> String in
+        var final = ""
+        for try await event in session.output.events { if event.isFinal { final = event.text } }
+        return final
+    }
+    do {
+        var offset = 0
+        var sequence: UInt64 = 0
+        while offset < frame.data.count {
+            let end = min(offset + 137 * 4, frame.data.count)
+            try await session.send(
+                AudioFrame(
+                    data: frame.data.subdata(in: offset..<end), format: frame.format, sequence: sequence,
+                    timestamp: Double(offset / 4) / 16000))
+            offset = end
+            sequence += 1
+        }
+        try await session.finishInput()
+        let text = try await reader.value
+        print("Apple SpeechAnalyzer fixture: \(text)")
+        #expect(!text.isEmpty)
+        let again = try await provider.transcribe(SpeechRecognitionRequest(locale: "zh-CN", format: frame.format))
+        await again.cancel()
+        try await context.unload()
+        #expect(await context.status == .unloaded)
+    } catch {
+        await session.cancel()
+        reader.cancel()
+        throw error
+    }
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_TTS"] == "1"))
+@MainActor func consecutiveSystemRepliesReleaseAdmissionBeforeNextRequest() async throws {
+    let provider = try AppleSpeechSynthesis(context: ModelContext())
+    for _ in 0..<4 {
+        let session = try await provider.synthesize(SpeechSynthesisRequest(text: "你好。", locale: "auto"))
+        var completed = false
+        for try await event in session.events { if case .finished = event { completed = true } }
+        session.cancel()
+        #expect(completed)
+    }
+}
+
+@Test func systemSpeechAutoLocaleResolvesChineseEnglishAndAliases() {
+    #expect(AppleSpeechSynthesis.language(text: "你好，hello。", locale: "auto") == "zh-CN")
+    #expect(AppleSpeechSynthesis.language(text: "Hello, 123.", locale: "auto") == "en-US")
+    #expect(AppleSpeechSynthesis.language(text: "𠀀", locale: "auto") == "zh-CN")
+    #expect(AppleSpeechSynthesis.language(text: "Hello", locale: "zh_Hant") == "zh-TW")
+    #expect(AppleSpeechSynthesis.language(text: "你好", locale: "en-GB") == "en-GB")
 }

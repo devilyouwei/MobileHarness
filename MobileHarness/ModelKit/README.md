@@ -17,7 +17,7 @@ ModelKit/
 ├── Speech/
 │   ├── ASR/                  # Recognition contract; Apple and Nemotron adapters
 │   ├── TTS/                  # Synthesis contract; Apple, MOSS and Kokoro adapters
-│   ├── VAD/                  # Voice activity contract and Silero adapter
+│   ├── VAD/                  # Voice activity contract, Silero and energy adapters
 │   └── Shared/Apple/         # Apple speech PCM helpers
 ├── Vision/                   # PoseCapability and separate YOLO adapter
 ├── Backends/                 # Separate CoreAI, CoreML, MLX, FluidAudio and MossCoreML targets
@@ -108,10 +108,10 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 
 | Capability | Current implementation |
 | --- | --- |
-| Speech recognition | ✅ Nemotron streaming ASR in the physical App; Apple adapter available separately |
-| Voice activity | ✅ Silero with per-session state |
+| Speech recognition | ✅ Installed available Nemotron or modern Apple SpeechAnalyzer; Settings can force Apple |
+| Voice activity | ✅ Installed available Silero or adaptive energy activity, with per-session state |
 | Chat | ✅ Qwen3.5-2B 4-bit MLX or explicitly configured OpenAI-compatible cloud, text and native Tool calls |
-| Speech synthesis | ✅ MOSS-TTS-Nano Core ML Mandarin/English TTS (beta) in conversation and diagnostics; Apple and Kokoro are separate optional adapters |
+| Speech synthesis | ✅ Installed available MOSS Nano or Apple PCM TTS, shared by conversation/diagnostics; Kokoro is historical test-only |
 | Pose | ✅ YOLO26n-Pose INT8 with end-to-end output through PoseCapability |
 | Judgment | ✅ Protocol; ❌ production provider |
 | Other capabilities | ❌ VLM input, embeddings and general video sessions |
@@ -119,7 +119,7 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 - ✅ Shared provider identity, coalesced loading, explicit unload/shutdown, memory-warning handling and release-when-idle policy.
 - ❌ Timed eviction, measured cross-model memory/thermal budgets and local native Tool-call events.
 
-The physical App requires iOS 27 and matching local artifacts. Simulator local chat reports unavailable; Core ML ASR validates local resources; explicitly configured cloud chat is supported. No automatic model or network fallback is provided.
+The physical App requires iOS 27. Speech defaults select enabled installed available local models or Apple ASR/TTS and energy VAD. Settings can force system speech while preserving downloaded artifacts. Simulator local chat reports unavailable; explicitly configured cloud chat is supported. Qwen/YOLO still require their own artifacts. No active-inference or network/cloud fallback is provided.
 
 ## Adapter boundaries
 
@@ -134,3 +134,6 @@ Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns
 ✅ Management implements schema-v2 source metadata, bounded installation/removal and Core maintenance barriers in ModelKitRuntime (ModelKit-only dependency). Concrete HF download calls belong to the independent ModelKitHub backend target; App injects it and Storage through Defaults. SDK resolution replaces bundled per-file links/hashes. App writes actual installation receipts; inference reads sandbox files. Capability/default ownership is unchanged.
 
 ✅ HF uses native background sessions and restores persisted staging/completed files. ❌ Full iPhone/server-resume acceptance remains pending (ADR 0108). See [Management](Management/README.md#local-model-resources--current-contract) and [ADR0105](../../docs/adr/0105-local-model-resource-management.md).
+
+
+✅ Independent custom recognition/synthesis switches default off; enabled recognition requires the Nemotron installation, enabled synthesis requires MOSS. Apple recognition uses SpeechTranscriber+SpeechDetector together; Silero or Energy provides external silence scores independently of the ASR choice because native detector normal events were unavailable in the real probe.

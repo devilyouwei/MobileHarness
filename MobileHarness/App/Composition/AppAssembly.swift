@@ -18,6 +18,7 @@ final class AppAssembly {
     @ObservationIgnored private let cameraDevice = AppleCamera()
     @ObservationIgnored private let resources = URL.applicationSupportDirectory.appendingPathComponent(
         "MobileHarness/Models/installed")
+    @ObservationIgnored private var speechPreference: [Bool]?
     @ObservationIgnored private var artifactAssembly: Task<ModelManager, Error>?
     private func artifactManager() async throws -> ModelManager {
         if let artifactAssembly { return try await artifactAssembly.value }
@@ -64,6 +65,15 @@ final class AppAssembly {
                 try await manager.removeArtifact(id) { [weak self] in
                     await self?.quiesceForModelRemoval(id)
                 }
+            },
+            apply: { [weak self] draft in
+                let preference = [draft.useCustomRecognition, draft.useCustomSynthesis]
+                guard let self, self.speechPreference != preference else { return }
+                await self.container?.lifecycle.beginSettingsChange()
+                await ModelKitDefaults.configureSpeech(
+                    recognition: draft.useCustomRecognition, synthesis: draft.useCustomSynthesis)
+                self.speechPreference = preference
+                self.container?.lifecycle.endSettingsChange()
             })
     }
     @ObservationIgnored lazy var modelResources = ModelResourcesState(operations: modelResourcesWorkflow)
@@ -150,6 +160,7 @@ final class AppAssembly {
     func prepare(progress: @MainActor (String) -> Void) async throws {
         guard container == nil else { return }
         _ = try await artifactManager()
+        _ = try await modelResourcesWorkflow.restoreSource()
         try await settings.restore()
         let workflow = settingsWorkflow
         let prepared = try await AppContainer(

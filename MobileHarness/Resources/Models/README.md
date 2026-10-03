@@ -41,3 +41,9 @@ flowchart LR
 
 
 ✅ Nemotron macOS and iOS provisioning use one pinned multilingual/2240ms Core ML source (22 files, 664,846,846 bytes). The obsolete nemotron-macos.download.json profile was removed. Existing old-revision installations require explicit deletion and re-download.
+
+
+✅ Nemotron, MOSS and Silero downloads are optional for speech: defaults use Apple ASR/TTS and energy VAD when missing/unavailable or Settings disables the corresponding ASR/TTS choice; installed available Silero is selected regardless of the recognition switch. Catalog/receipts still manage installed custom weights; Apple language assets are managed by the OS.
+
+
+✅ Settings groups catalog entries by business use without changing catalog IDs, weight acquisition, receipts or directory layout. Recognition needs Nemotron only before custom activation; synthesis needs MOSS. Downloading never auto-enables a voice mode.

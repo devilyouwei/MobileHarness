@@ -16,16 +16,21 @@ import UI
         cachedStore = value
         return value
     }
+    private let apply: @MainActor (ModelResourceSourceDraft) async -> Void
     private var saved: ModelResourceSourceDraft?
     private var changing = false
+    private var restoration: Task<ModelResourceSourceDraft, Error>?
+    private var restoreWaiters = 0
     public init(
         store: @escaping @MainActor () throws -> LocalDocumentStore<ModelResourceSourceDraft>,
         read: @escaping @MainActor () async throws -> [ModelResourceItem],
         validate: @escaping @MainActor (ModelResourceSourceDraft) throws -> ModelResourceSourceDraft,
         download: @escaping @MainActor (String, ModelResourceSourceDraft) async throws -> Void,
         cancel: @escaping @MainActor (String) async throws -> Void,
-        remove: @escaping @MainActor (String) async throws -> Void
+        remove: @escaping @MainActor (String) async throws -> Void,
+        apply: @escaping @MainActor (ModelResourceSourceDraft) async -> Void = { _ in }
     ) {
+        self.apply = apply
         self.makeStore = store
         self.read = read
         self.validate = validate
@@ -33,12 +38,49 @@ import UI
         cancelOperation = cancel
         removeOperation = remove
     }
-    public func refresh() async throws -> [ModelResourceItem] { try await read() }
+    public func refresh() async throws -> [ModelResourceItem] {
+        let items = try await read()
+        if let saved, !changing {
+            let next = normalized(saved, items: items)
+            if next.useCustomRecognition != saved.useCustomRecognition
+                || next.useCustomSynthesis != saved.useCustomSynthesis
+            {
+                try await saveSource(next)
+            }
+        }
+        return items
+    }
+    private func normalized(_ source: ModelResourceSourceDraft, items: [ModelResourceItem]) -> ModelResourceSourceDraft
+    {
+        var source = source
+        if !ModelResourceGroup.recognition.isInstalled(in: items) { source.useCustomRecognition = false }
+        if !ModelResourceGroup.synthesis.isInstalled(in: items) { source.useCustomSynthesis = false }
+        return source
+    }
     public func restoreSource() async throws -> ModelResourceSourceDraft {
         if let saved { return saved }
-        let value = try await persistence().load()?.value ?? ModelResourceSourceDraft()
+        guard restoreWaiters < 32 else { throw DocumentStorageError.conflict }
+        restoreWaiters += 1
+        defer { restoreWaiters -= 1 }
+        if let restoration { return try await restoration.value }
+        let task = Task { @MainActor in try await self.restoreInitialSource() }
+        restoration = task
+        defer { restoration = nil }
+        return try await task.value
+    }
+    private func restoreInitialSource() async throws -> ModelResourceSourceDraft {
+        let record = try await persistence().load()
+        let value = record?.value ?? ModelResourceSourceDraft()
         if let saved { return saved }
-        let valid = try validate(value)
+        let validated = try validate(value)
+        let valid = normalized(validated, items: try await read())
+        if valid.allowsCellular != value.allowsCellular
+            || valid.useCustomRecognition != value.useCustomRecognition
+            || valid.useCustomSynthesis != value.useCustomSynthesis
+        {
+            try await persistence().save(valid, expecting: record?.revision)
+        }
+        await apply(valid)
         saved = valid
         return valid
     }
@@ -47,8 +89,16 @@ import UI
         changing = true
         defer { changing = false }
         let value = try validate(source)
+        let items = try await read()
+        if value.useCustomRecognition && !ModelResourceGroup.recognition.isInstalled(in: items) {
+            throw ModelResourceSelectionError(group: .recognition)
+        }
+        if value.useCustomSynthesis && !ModelResourceGroup.synthesis.isInstalled(in: items) {
+            throw ModelResourceSelectionError(group: .synthesis)
+        }
         let current = try await persistence().load()
         try await persistence().save(value, expecting: current?.revision)
+        await apply(value)
         saved = value
     }
     public func download(_ id: String) async throws {
@@ -56,5 +106,8 @@ import UI
         try await downloadOperation(id, source)
     }
     public func cancel(_ id: String) async throws { try await cancelOperation(id) }
-    public func remove(_ id: String) async throws { try await removeOperation(id) }
+    public func remove(_ id: String) async throws {
+        try await removeOperation(id)
+        _ = try await refresh()
+    }
 }

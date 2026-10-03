@@ -14,3 +14,9 @@ The standalone test runner selects its bundled MLX Metal resource directory befo
 ✅ Pose default registration remains lazy and typed acquisition does not load absent weights.
 
 ✅ Repeated .pose acquisition returns the identical provider; camera pipeline incarnations share its model lifecycle.
+
+
+✅ SpeechSelectionTests uses isolated registration/storage fixtures to verify installed local selection, unavailable/missing artifact fallback and forced system preference. Default assembly tests verify stable facades and separate explicit MOSS identity.
+
+
+✅ SpeechSelection uses independent recognition/synthesis choices. Recognition depends only on Nemotron, VAD selects installed available Silero regardless of recognition preference, and synthesis depends only on MOSS. Concrete provider registrations remain separate.

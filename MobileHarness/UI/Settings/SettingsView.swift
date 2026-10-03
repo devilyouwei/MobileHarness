@@ -31,10 +31,31 @@
             List {
                 if let modelResources {
                     NavigationLink {
-                        ModelResourcesView(state: modelResources)
+                        ModelResourcesView(state: modelResources, group: .recognition)
                     } label: {
-                        Label("本地模型资源", systemImage: "externaldrive")
-                    }.accessibilityIdentifier("settings.models.open")
+                        Label("音频识别", systemImage: "waveform")
+                    }
+                    .accessibilityIdentifier("settings.recognition.open")
+                    NavigationLink {
+                        ModelResourcesView(state: modelResources, group: .synthesis)
+                    } label: {
+                        Label("语音合成", systemImage: "speaker.wave.2")
+                    }
+                    .accessibilityIdentifier("settings.synthesis.open")
+                }
+                NavigationLink {
+                    LanguageModelSettingsView(settings: settings, modelResources: modelResources, save: save)
+                } label: {
+                    Label("大模型", systemImage: "brain")
+                }
+                .accessibilityIdentifier("settings.language.open")
+                if let modelResources {
+                    NavigationLink {
+                        ModelResourcesView(state: modelResources, group: .vision)
+                    } label: {
+                        Label("视觉识别", systemImage: "viewfinder")
+                    }
+                    .accessibilityIdentifier("settings.vision.open")
                 }
                 NavigationLink {
                     BluetoothSettingsView(state: bluetooth, controls: bluetoothControls)
@@ -46,12 +67,6 @@
                     }
                 }
                 .accessibilityIdentifier("settings.bluetooth.open")
-                NavigationLink {
-                    CloudLLMSettingsView(settings: settings, save: save)
-                } label: {
-                    Label("云端 LLM", systemImage: "cloud")
-                }
-                .accessibilityIdentifier("settings.cloud.open")
                 NavigationLink {
                     ConversationHistoryView(state: history, controls: historyControls)
                 } label: {
@@ -67,17 +82,32 @@
     }
 
     @MainActor
-    private struct CloudLLMSettingsView: View {
+    private struct LanguageModelSettingsView: View {
         @Bindable var settings: SettingsState
+        let modelResources: ModelResourcesState?
         let save: () async -> Bool
+        @State private var missingLocalModel = false
 
         var body: some View {
             Form {
                 Section {
-                    Toggle("使用云端 LLM", isOn: $settings.isEnabled)
-                        .accessibilityIdentifier("settings.cloud.enabled")
+                    Toggle(
+                        "使用云端大模型",
+                        isOn: Binding(
+                            get: { settings.isEnabled },
+                            set: { value in
+                                if !value, let modelResources,
+                                    !ModelResourceGroup.language.isInstalled(in: modelResources.items)
+                                {
+                                    missingLocalModel = true
+                                } else {
+                                    settings.isEnabled = value
+                                }
+                            })
+                    )
+                    .accessibilityIdentifier("settings.cloud.enabled")
                 } footer: {
-                    Text("开启后使用所选云端模型，关闭后使用本地模型。保存后立即生效，关闭不会删除已有配置。")
+                    Text("关闭后使用本地 Qwen，需先下载模型。")
                 }
                 Section {
                     HStack {
@@ -130,28 +160,39 @@
                         LabeledContent("默认对话模型", value: settings.selectedModel)
                     }
                 } header: {
-                    Text("服务配置")
+                    Text("云端服务")
                 } footer: {
-                    Text("URL 留空使用 OpenAI 官方 API；Key 可为空，为空时不发送鉴权信息。加载后可选择聊天模型，尚未加载时使用默认模型。Key 安全保存在此设备中。")
+                    Text("URL 留空时使用 OpenAI 官方服务。")
                 }
-                Section {
-                    Text(settings.isSaving ? "正在保存…" : (settings.error ?? settings.notice ?? "配置修改后，点击右上角保存。"))
-                        .foregroundStyle(settings.error == nil ? Color.secondary : .red)
-                        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
-                        .accessibilityIdentifier("settings.status")
+                if settings.isSaving || settings.error != nil || settings.notice != nil {
+                    Section {
+                        Text(settings.isSaving ? "正在保存…" : (settings.error ?? settings.notice ?? ""))
+                            .foregroundStyle(settings.error == nil ? Color.secondary : .red)
+                            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+                            .accessibilityIdentifier("settings.status")
+                    }
+                    .transaction { $0.animation = nil }
                 }
-                .transaction { $0.animation = nil }
-
+                if let modelResources { ModelResourceSections(state: modelResources, group: .language) }
             }
             .disabled(settings.isSaving)
-            .navigationTitle("云端 LLM")
+            .navigationTitle("大模型")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             // Keep native back navigation mounted; the App-owned save continues across navigation.
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        Task { _ = await save() }
+                        Task {
+                            if !settings.isEnabled, let modelResources {
+                                await modelResources.refresh()
+                                guard ModelResourceGroup.language.isInstalled(in: modelResources.items) else {
+                                    missingLocalModel = true
+                                    return
+                                }
+                            }
+                            _ = await save()
+                        }
                     } label: {
                         Text("保存")
                             .opacity(settings.isSaving ? 0 : 1)
@@ -163,6 +204,11 @@
                     .disabled(!settings.canSave)
                     .accessibilityIdentifier("settings.save")
                 }
+            }
+            .alert("请先安装本地大模型", isPresented: $missingLocalModel) {
+                Button("知道了", role: .cancel) {}
+            } message: {
+                Text(ModelResourceGroup.language.installationMessage)
             }
             .onDisappear { settings.cancelDiscovery() }
         }

@@ -166,7 +166,7 @@ let package = Package(
                 "Core/README.md", "Management", "Defaults", "Speech/ASR/Apple", "Speech/TTS/Apple", "Speech/TTS/Kokoro",
                 "Speech/TTS/MossNano",
                 "Speech/Shared",
-                "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Vision/YOLO", "Vision/README.md",
+                "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Speech/VAD/Energy", "Vision/YOLO", "Vision/README.md",
             ]),
         .target(
             name: "ModelKitOpenAI", dependencies: ["ModelKit"],
@@ -178,11 +178,15 @@ let package = Package(
             name: "ModelKitDefaults",
             dependencies: [
                 "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero",
-                "ModelKitMossNano", "ModelKitQwen35", "ModelKitYOLOPose", "ModelKitOpenAI",
+                "ModelKitMossNano", "ModelKitQwen35", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
+                "ModelKitEnergy",
             ],
             path: "MobileHarness/ModelKit/Defaults", exclude: ["README.md"]),
         .target(
             name: "ModelKitRuntime", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit/Management",
+            exclude: ["README.md"]),
+        .target(
+            name: "ModelKitEnergy", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit/Speech/VAD/Energy",
             exclude: ["README.md"]),
         .target(
             name: "ModelKitAppleSpeech", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit/Speech",
@@ -217,6 +221,7 @@ let package = Package(
         .target(
             name: "ModelKitNemotron", dependencies: ["ModelKit", "ModelKitFluidAudio"],
             path: "MobileHarness/ModelKit/Speech/ASR/Nemotron", exclude: ["README.md"]),
+        .testTarget(name: "EnergyVADTests", dependencies: ["ModelKit", "ModelKitEnergy"], exclude: ["README.md"]),
         .testTarget(
             name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron", "ModelKitFluidAudio"],
             exclude: ["README.md"]),

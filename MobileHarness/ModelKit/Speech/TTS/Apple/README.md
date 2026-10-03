@@ -33,3 +33,9 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 ✅ The factory receives ModelContext from the shared ModelManager. The adapter registers its resource and retains only a managed handle. Load/unload decisions belong to the manager; request completion releases usage without unloading. Shutdown cancellation is connected to the active session; resource release follows worker cleanup. Consumers keep their capability interface across weight unload/reload.
 
 ✅ Overlap fails with inputBusy. Cancellation stops the worker before releasing its exclusive model lease; no request queue or automatic preemption is provided.
+
+
+✅ AVSpeechSynthesizer is the system synthesis provider selected by Defaults when MOSS is absent/unavailable or custom synthesis is disabled. Its managed PCM output uses the same App playback and explicit warmup pipeline.
+
+
+✅ Apple TTS resolves the production auto locale to zh-CN when text contains Han characters, otherwise en-US. Explicit locales retain their requested language/region, with zh/en script aliases normalized. Missing voices remain an explicit error with the resolved language. Consecutive real TTS integration uses auto rather than an explicit zh-CN fixture.

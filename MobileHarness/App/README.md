@@ -161,3 +161,9 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 
 
 ✅ HF model transfers now use native background sessions through ModelKitHub. ModelDownloadsAppDelegate handles stable session events and grants a bounded 25-second metadata/finalization window when backgrounding. System tasks own continued transport; voice still stops on background. ❌ Physical-phone lock-screen acceptance remains pending.
+
+
+✅ Downloaded speech is optional: Defaults selects installed available local speech or Apple/energy providers. App restores the saved preference before composing voice and stops current voice when changing it; the next start uses the selected mode. Qwen chat or explicitly configured cloud chat is still required for conversation.
+
+
+✅ Settings now routes model management through 音频识别、语音合成、大模型、视觉识别. Recognition/synthesis policy is independent and validated before apply; deleting prerequisites turns off only the owning choice. Native Apple ASR adds internal SpeechDetector, while Energy supplies business silence timing.

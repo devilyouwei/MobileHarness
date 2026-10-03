@@ -162,3 +162,13 @@ extension ActionActivityState {
     #expect(item.issueDescriptions[0].contains("1418"))
     #expect(item.issueDescriptions[1].contains("未收到位置反馈"))
 }
+
+@Test @MainActor func singleHandlerFailurePreservesUnderlyingSpeechDescription() throws {
+    let report = try AgentActionReport(entries: [.init(path: "root", status: .failed, code: .handlerFailed)])
+    let item = ActionActivityItem(
+        execution: ActionExecutionRecord(
+            id: UUID(), path: ActionPath(module: "Speech", function: "speak"), displayName: "朗读回复", source: .assistant,
+            sessionID: UUID(), inputID: UUID(), channel: "Speech", semantics: .finite, phase: .failed,
+            completion: .report(report), failureDescription: "语音合成返回了无效音频"))
+    #expect(item.issueDescriptions == ["第1项：语音合成返回了无效音频"])
+}

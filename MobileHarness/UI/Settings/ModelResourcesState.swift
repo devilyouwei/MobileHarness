@@ -35,12 +35,73 @@ public struct ModelResourceItem: Identifiable, Sendable {
         self.failure = failure
     }
 }
+public enum ModelResourceGroup: String, Sendable {
+    case recognition, synthesis, language, vision
+    public var title: String {
+        switch self {
+        case .recognition: "音频识别"
+        case .synthesis: "语音合成"
+        case .language: "大模型"
+        case .vision: "视觉识别"
+        }
+    }
+    public var modelIDs: Set<String> {
+        switch self {
+        case .recognition: ["nemotron", "silero"]
+        case .synthesis: ["moss-tts-nano"]
+        case .language: ["qwen35"]
+        case .vision: ["yolo26n-pose"]
+        }
+    }
+    public func isInstalled(in items: [ModelResourceItem]) -> Bool {
+        let required = self == .recognition ? Set(["nemotron"]) : modelIDs
+        return required.allSatisfy { id in items.contains { $0.id == id && $0.installed && !$0.active } }
+    }
+    public var installationMessage: String {
+        switch self {
+        case .recognition: "请先下载并安装 Nemotron 语音识别模型，再开启自定义识别模型。"
+        case .synthesis: "请先下载并安装 MOSS 语音合成模型，再开启自定义模型。"
+        case .language: "请先下载并安装 Qwen 大模型，再切换到本地模型。"
+        case .vision: "请先下载并安装 YOLO 姿态模型。"
+        }
+    }
+}
+public struct ModelResourceSelectionError: LocalizedError, Sendable {
+    public let group: ModelResourceGroup
+    public init(group: ModelResourceGroup) { self.group = group }
+    public var errorDescription: String? { group.installationMessage }
+}
 public struct ModelResourceSourceDraft: Codable, Sendable {
     public var endpoint: String
     public var allowsCellular: Bool
-    public init(endpoint: String = "https://huggingface.co", allowsCellular: Bool = false) {
+    public var useCustomRecognition: Bool
+    public var useCustomSynthesis: Bool
+    public init(
+        endpoint: String = "https://huggingface.co", allowsCellular: Bool = true,
+        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false
+    ) {
         self.endpoint = endpoint
         self.allowsCellular = allowsCellular
+        self.useCustomRecognition = useCustomRecognition
+        self.useCustomSynthesis = useCustomSynthesis
+    }
+    private enum CodingKeys: String, CodingKey {
+        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, preferDownloadedSpeech
+    }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        endpoint = try values.decode(String.self, forKey: .endpoint)
+        allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
+        let legacy = try values.decodeIfPresent(Bool.self, forKey: .preferDownloadedSpeech) ?? true
+        useCustomRecognition = try values.decodeIfPresent(Bool.self, forKey: .useCustomRecognition) ?? legacy
+        useCustomSynthesis = try values.decodeIfPresent(Bool.self, forKey: .useCustomSynthesis) ?? legacy
+    }
+    public func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(endpoint, forKey: .endpoint)
+        try values.encode(allowsCellular, forKey: .allowsCellular)
+        try values.encode(useCustomRecognition, forKey: .useCustomRecognition)
+        try values.encode(useCustomSynthesis, forKey: .useCustomSynthesis)
     }
 }
 @MainActor public protocol ModelResourcesOperating: AnyObject {
@@ -56,6 +117,8 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
     public private(set) var items: [ModelResourceItem] = []
     public private(set) var error: String?
     public private(set) var saving = false
+    public var installationNotice: String?
+    public private(set) var hasRestored = false
     private enum Operation { case download, remove }
     private var pending: [String: Operation] = [:]
     private var admitted: Set<String> = []
@@ -67,6 +130,7 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
     public func restore() async {
         do {
             source = try await operations.restoreSource()
+            hasRestored = true
             await refresh()
         } catch { self.error = error.localizedDescription }
     }
@@ -77,6 +141,11 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
             let updated = try await operations.refresh()
             guard generation == refreshGeneration else { return }
             items = updated
+            if !saving {
+                let saved = try await operations.restoreSource()
+                source.useCustomRecognition = saved.useCustomRecognition
+                source.useCustomSynthesis = saved.useCustomSynthesis
+            }
             admitted.subtract(updated.map(\.id))
         } catch {
             guard generation == refreshGeneration else { return }
@@ -91,7 +160,64 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
             try await operations.saveSource(source)
             source = try await operations.restoreSource()
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { await handleSaveFailure(error) }
+    }
+    /// Persist only the download endpoint; voice switches retain their durable values.
+    @discardableResult public func saveDownloadSource() async -> Bool {
+        guard hasRestored, !saving else { return false }
+        saving = true
+        defer { saving = false }
+        let endpoint = source.endpoint
+        do {
+            var draft = try await operations.restoreSource()
+            if draft.endpoint == endpoint && draft.allowsCellular {
+                error = nil
+                return true
+            }
+            draft.endpoint = endpoint
+            draft.allowsCellular = true
+            try await operations.saveSource(draft)
+            let saved = try await operations.restoreSource()
+            if source.endpoint == endpoint { source.endpoint = saved.endpoint }
+            source.allowsCellular = true
+            error = nil
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
+        }
+    }
+    private func handleSaveFailure(_ failure: any Error) async {
+        error = failure.localizedDescription
+        if failure is ModelResourceSelectionError {
+            installationNotice = failure.localizedDescription
+            error = nil
+        }
+        if let saved = try? await operations.restoreSource() {
+            source.useCustomRecognition = saved.useCustomRecognition
+            source.useCustomSynthesis = saved.useCustomSynthesis
+        }
+    }
+    public func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async {
+        guard !saving, group == .recognition || group == .synthesis else { return }
+        saving = true
+        defer { saving = false }
+        do {
+            // A voice switch must not save or validate an unfinished download-domain edit.
+            var draft = try await operations.restoreSource()
+            if group == .recognition {
+                draft.useCustomRecognition = enabled
+                source.useCustomRecognition = enabled
+            } else {
+                draft.useCustomSynthesis = enabled
+                source.useCustomSynthesis = enabled
+            }
+            try await operations.saveSource(draft)
+            let saved = try await operations.restoreSource()
+            source.useCustomRecognition = saved.useCustomRecognition
+            source.useCustomSynthesis = saved.useCustomSynthesis
+            error = nil
+        } catch { await handleSaveFailure(error) }
     }
     public func isDownloading(_ item: ModelResourceItem) -> Bool {
         pending[item.id] == .download || admitted.contains(item.id) || (item.active && item.activity != .deleting)
@@ -142,6 +268,9 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
         switch operation {
         case "download":
             guard !item.installed else { return }
+            if id != "yolo26n-pose" {
+                guard await saveDownloadSource(), !isBusy(item) else { return }
+            }
             command = .download
         case "remove": command = .remove
         default: return

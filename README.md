@@ -89,7 +89,7 @@ For offline development and opt-in Mac/model tests, the existing `scripts/downlo
 Select the **MobileHarness** scheme, choose your connected device, and build and run.
 
 - Grant camera permission for preview and pose perception; the camera runs independently of voice readiness.
-- Open Settings → 本地模型资源 and download Nemotron, Silero, Qwen (unless cloud chat is explicitly configured), and MOSS for voice; download YOLO for pose perception. Settings/history and camera preview remain accessible without these resources.
+- Open Settings → 音频识别 / 语音合成 / 大模型 / 视觉识别 to manage Nemotron, Silero, MOSS, Qwen and YOLO respectively. Nemotron and MOSS are optional custom speech providers; Silero is automatically used when installed and available, otherwise Energy. Apple ASR/TTS work without those custom weights. Settings/history and camera preview remain accessible without these resources.
 - Tap the central control to load/warm voice models and grant microphone permission.
 - Speak, then pause to finish your utterance. Recognition previews become a reply with speech and captions.
 - Tap again to stop recording and playback. Camera controls switch the lens or turn the preview off.
@@ -146,3 +146,9 @@ Camera control Tools are registered as Camera.open, Camera.close and Camera.flip
 ✅ Local-resource refinement: compact schema-v2 repository/selection declarations replace per-file links/hashes. ModelKitHub wraps swift-huggingface 0.9.0 outside Management; App injects it. Storage-backed receipts record actual installed files/sizes. ❌ HF foreground downloads restart after process relaunch; durable background/partial resume and iPhone acceptance remain pending. See [ADR0105](docs/adr/0105-local-model-resource-management.md).
 
 ✅ Hub download regression coverage checks regular-file selection, safe remote metadata and optional actual-network progress through the production adapter. Downloads use selected per-file Hub APIs without a permanent SDK cache. ❌ Real iPhone download UI acceptance remains separate.
+
+
+✅ Speech can run without HF voice-model downloads through Apple ASR/TTS and energy detection. Settings can force this mode without deleting weights; local Qwen or configured cloud chat is still needed for conversation. Apple ASR may need a first-use system language-asset download.
+
+
+✅ Model settings are grouped by use: 音频识别 (Nemotron+Silero), 语音合成 (MOSS), 大模型 (cloud service and Qwen), 视觉识别 (YOLO). Custom speech switches are independent and require only the respective ASR/TTS installation. Apple ASR uses native internal VAD; Silero is selected automatically when installed and available, otherwise Energy supplies silence scores; this is independent of the ASR switch.

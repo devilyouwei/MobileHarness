@@ -10,7 +10,7 @@ public protocol Capability: Sendable {
     var availability: CapabilityAvailability { get async }
 }
 
-public enum CapabilityError: Error, Equatable, Sendable {
+public enum CapabilityError: Error, Equatable, Sendable, LocalizedError {
     case invalidRequest(String)
     case unavailable(String)
     case bufferOverflow
@@ -19,6 +19,18 @@ public enum CapabilityError: Error, Equatable, Sendable {
     case multipleConsumers
     case inputFinished
     case inputBusy
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidRequest(let reason), .unavailable(let reason): reason
+        case .bufferOverflow: "Model stream buffer capacity exceeded (bufferOverflow)"
+        case .eventTooLarge: "Model output exceeds the event size limit (eventTooLarge)"
+        case .sessionClosed: "Model session is closed (sessionClosed)"
+        case .multipleConsumers: "Model stream already has a consumer (multipleConsumers)"
+        case .inputFinished: "Model input is already finished (inputFinished)"
+        case .inputBusy: "Model is processing another request (inputBusy)"
+        }
+    }
 }
 
 public struct InferenceContext: Equatable, Sendable {

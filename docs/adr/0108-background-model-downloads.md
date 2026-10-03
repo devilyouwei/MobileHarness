@@ -21,3 +21,6 @@ flowchart LR
 ```
 
 ✅ Full check.sh, four simulator scheme builds and signed iOS build passed; Mac official/mirror production transfer tests and offline completed-file restoration passed. 38 Management tests include interrupted-stage preservation, same-generation network retry and explicit cancellation cleanup; five Hub tests cover plan boundaries/reuse. The build is installed on the connected iPhone; physical lock-screen feedback is pending. ❌ Physical-phone lock-screen, system termination, large-file resume, signed-link expiry and throughput acceptance remain pending.
+
+
+✅ 2026-10-03 user acceptance: phone background downloading now continues successfully and observed speed improved. ❌ Forced-quit/system termination, signed-URL expiry and large-file range-resume traces remain unverified.

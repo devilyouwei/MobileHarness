@@ -131,7 +131,15 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 
 ✅ [0108: Durable background model downloads](0108-background-model-downloads.md).
 
+
+✅ [ADR 0109: Optional downloaded speech and modern Apple fallback](0109-system-speech-fallback.md) implements persisted speech-only switching, artifact-aware Defaults facades, SpeechAnalyzer/AssetInventory ASR, Apple PCM TTS and independent energy VAD. ❌ Physical-phone end-to-end acceptance remains pending.
+
+
+✅ [ADR 0110: Feature model settings and native Apple VAD](0110-feature-model-settings-and-native-vad.md) groups model UI by task, splits validated custom speech choices, preserves the download backend and integrates internal native VAD. Energy remains for silence endpoint timing because native normal activity events were unavailable. ❌ Physical settings/voice acceptance remains pending.
+
 ✅ ADR0103 now includes nonterminal unknown model calls and parameter rejection in shared execution outcomes. ❌ Real-provider acceptance remains pending.
+
+✅ [ADR 0111: Independent ASR/VAD selection](0111-independent-asr-vad-selection.md) decouples the ASR switch from automatic Silero/Energy selection. Nemotron alone satisfies custom recognition prerequisites; Silero removal preserves ASR preference. ❌ Sustained device combination acceptance remains pending.
 
 ✅ ADR0103 failure isolation refinement: retained Action reports preserve later exceptions; invocation/resource rejection is call-local; Tools distinguish execution and feedback failures, with joined cooperative deadlines and task-scoped cancellation. ❌ Uncooperative handlers and physical acceptance remain outstanding.
 

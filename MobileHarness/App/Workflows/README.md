@@ -255,3 +255,6 @@ flowchart LR
 ✅ ModelResourcesWorkflow is compiled inside existing AppSettingsWorkflow, with injected resource operations and source persistence; no seventh feature target or facade-owned runtime state was added.
 
 ❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../../ModelKit/Management/README.md).
+
+
+✅ Single-leaf handler failure details now preserve the captured domain error even when the completion also contains a generic report. No error catalog is duplicated in presentation.

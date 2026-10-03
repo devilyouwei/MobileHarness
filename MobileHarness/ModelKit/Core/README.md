@@ -69,3 +69,6 @@ Keep shared media values separate from model-specific tensors, preprocessing and
 ✅ ModelContext management SPI exposes beginMaintenance/endMaintenance. ModelResource rejects acquire/load through retained handles while maintenance spans unload and disk removal. Management closes all associated resources before App quiescence, drains/unloads and retains admission barriers until mutation completes; it releases partial reservations on failure. Ordinary unload remains reusable and shutdown terminal. Core owns no file/network/meta handling.
 
 ❌ Full iPhone acceptance and non-cooperative backend interruption remain outside this guarantee. See [Management](../Management/README.md#local-model-resources--current-contract).
+
+
+✅ CapabilityError conforms to LocalizedError so diagnostic consumers retain invalidRequest/unavailable reasons and explicit stream/lifecycle codes instead of numeric NSError descriptions. No UI or business dependency is added.

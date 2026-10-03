@@ -35,3 +35,14 @@ Purpose: test cross-module history operations using the real journal and a contr
 ✅ ModelResourcesWorkflowTests verifies source persistence and download use of saved endpoint/cellular policy; invalid edits leave prior durable configuration intact.
 
 ❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../../MobileHarness/ModelKit/Management/README.md). Earlier planned sections describe the full proposal; this current contract supersedes claims that downloads are entirely unimplemented.
+
+
+✅ Model resources preferences persist forced-system speech before apply; invalid edits do not change saved policy. Restore applies the default once and cache avoids redundant effects.
+
+
+✅ Single handler speech failure presentation preserves the underlying description rather than replacing it with 执行失败.
+
+
+✅ Resource policy tests reject missing Nemotron and MOSS before persistence, preserve independent toggles, keep recognition enabled after Silero removal and disable it after Nemotron removal, normalize stale preferences before apply, preserve endpoint/cellular policy and coalesce concurrent migration/apply.
+
+✅ Restoration tests verify legacy cellular restriction migration is persisted before a new download consumes it.

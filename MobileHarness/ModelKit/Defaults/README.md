@@ -5,11 +5,11 @@ Purpose: select and register the project's concrete model providers inside Model
 | Capability | Default |
 | --- | --- |
 | Chat | Qwen3.5-2B from Qwen35 |
-| Recognition | Nemotron from Nemotron |
-| Voice activity | Silero from Silero |
-| Synthesis | MOSS-TTS-Nano Core ML beta (Mandarin zh_1 / English en_2) |
+| Recognition | Installed Nemotron → Apple SpeechAnalyzer / SpeechTranscriber |
+| Voice activity | Installed Silero → EnergyVoiceActivity |
+| Synthesis | Installed MOSS-TTS-Nano → Apple AVSpeechSynthesizer |
 
-MOSS is the synthesis default and is accessible under ModelKitDefaults.mossNano; both return the same managed provider. Kokoro and Apple speech are not registered or used as fallback. Judgment has no provider and fails with missingDefault. Simulator local chat reports unavailable; Nemotron uses the same Core ML resource layout on Apple Silicon macOS and iOS; explicit cloud chat configuration is supported.
+Speech defaults are stable capability facades. Explicit ModelKitDefaults.mossNano returns the concrete local provider; the default synthesis facade selects it only when installed and available. Apple speech and energy VAD are registered lazily. Kokoro is not registered. Judgment has no provider and fails with missingDefault. Simulator local chat reports unavailable; Nemotron uses the same Core ML resource layout on Apple Silicon macOS and iOS; explicit cloud chat configuration is supported.
 
 ModelKitDefaults.manager(resources:) configures the MLX cache to 64 MiB and registers factories without loading weights. App supplies the sandbox installed resource root, obtains interfaces through manager.get(.chat), and forwards platform memory warnings. The Defaults target depends on management and adapters; ModelKitRuntime depends only on ModelKit. Models with large local weights opt into idle release on memory pressure.
 
@@ -22,9 +22,9 @@ flowchart LR
     Manager -->|Shared interface| App
 ```
 
-- ✅ Internal registration and fixed capability mapping; shared MOSS conversation/diagnostic binding.
+- ✅ Internal registration and artifact-aware speech selection; diagnostics use the same selected synthesis as conversation.
 - ✅ Lazy resource loading, fail-fast registration and teardown on assembly failure.
-- ❌ Judgment provider and automatic fallback.
+- ❌ Judgment provider and automatic fallback after an active inference fails.
 
 ## Process-wide ownership and admission
 
@@ -66,4 +66,25 @@ flowchart TD
 
 ✅ App injects ModelKitHub as the concrete HF SDK adapter. ModelKitRuntime depends only on ModelKit, and neither Defaults nor Management imports Storage. Initialization does not warm models; explicit voice start or diagnostics performs warmup.
 
-❌ Automatic variant/revision activation, fallback, guaranteed server resume and full iPhone acceptance remain pending. See [Management](../Management/README.md#local-model-resources--current-contract).
+❌ Automatic variant/revision activation, runtime-error fallback and guaranteed server resume remain pending. See [Management](../Management/README.md#local-model-resources--current-contract).
+
+## Speech selection
+
+✅ configureSpeech(recognition:synthesis:) controls two independent choices, initially false. Custom recognition requires installed Nemotron; custom synthesis requires installed MOSS. VAD automatically selects installed available Silero, otherwise Energy, irrespective of either preference. Each operation selects once: enabled, installed and available ASR/TTS provider, otherwise Apple ASR/TTS. Disabling one choice preserves artifacts and does not affect the other speech choice or chat/pose. Errors during an active operation propagate; no mid-session provider replacement or hidden cloud inference occurs. App pauses voice before applying a changed preference and restores it before constructing the conversation container.
+
+Apple ASR uses iOS/macOS 26+ SpeechAnalyzer and SpeechTranscriber with a medium-sensitivity SpeechDetector in the same analyzer. The native detector performs internal voice gating; normal activity results are not publicly usable in current runtime tests, so installed available Silero, otherwise Energy, supplies business silence-endpoint scores independently of the ASR choice. Explicit warmup installs missing language assets through AssetInventory; those assets are managed by Apple rather than the HF artifact store. Unsupported hardware/language remains an observable availability error. Energy VAD emits thresholded acoustic activity when Silero is unavailable; SpeechPerception owns onset, pre-roll, 800 ms silence and 12 s chunk limits.
+
+```mermaid
+flowchart LR
+    Settings[Persisted ASR/TTS preferences] --> Speech[ASR/TTS policy]
+    Receipts[Management installation snapshots] --> Speech
+    Receipts --> VAD[VAD policy independent of switches]
+    Speech --> Local[Enabled installed available Nemotron / MOSS]
+    Speech --> System[Apple ASR / Apple TTS]
+    VAD --> Silero[Installed available Silero]
+    VAD --> Energy[Otherwise Energy]
+    Local --> Session[One selected provider per operation]
+    System --> Session
+    Silero --> Session
+    Energy --> Session
+```
