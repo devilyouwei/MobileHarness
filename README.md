@@ -1,6 +1,10 @@
-# MobileHarness
+<p align="center">
+  <img src="MobileHarness/Resources/AppIconVariants/original.png" alt="MobileHarness app icon" width="160">
+</p>
 
-*An Apple-native, bio-inspired Agent harness.*
+<h1 align="center">MobileHarness</h1>
+
+<p align="center"><em>An Apple-native, bio-inspired Agent harness.</em></p>
 
 MobileHarness uses an iPhone as a host for stateful Agents, shared model capabilities and connected-device behavior. Its organizing loop is **Signal → Cognition → Action**: perceive input, interpret it and produce observable effects.
 
