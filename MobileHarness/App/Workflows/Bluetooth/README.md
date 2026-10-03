@@ -19,3 +19,5 @@ flowchart LR
 ✅ Failed control verification preserves a still-connected BLE link and its controller while marking control unready. The notice directs explicit disconnect/reconnect after a query timeout. A notification-health update alone cannot grant complete control validation.
 
 ✅ Explicit 刷新状态 / 验证控制 is available while connected but unready; it performs read-only recovery and control verification before granting control. Notification health alone does not restore readiness. Query quarantine still requires reconnect.
+
+✅ The merged aim-follow restart branch follows repository Swift formatting; this formatting change preserves restart and manual-control behavior.

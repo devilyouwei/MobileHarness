@@ -920,8 +920,11 @@ public final class BluetoothWorkflow: BluetoothControlling {
                     liveTask = nil
                     if state.motionStatus == "正在瞄准" { state.motionStatus = "瞄准跟随已停下" }
                 }
-                if restart { startAimFollow(controller) }
-                else if motorInputs.contains(where: { abs($0) > 0.04 }) { startLiveControl() }
+                if restart {
+                    startAimFollow(controller)
+                } else if motorInputs.contains(where: { abs($0) > 0.04 }) {
+                    startLiveControl()
+                }
             }
             do {
                 if let withMotorResources {
