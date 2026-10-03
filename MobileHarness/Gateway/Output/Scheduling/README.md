@@ -36,12 +36,12 @@ flowchart TD
     Release --> Active
     Release --> Join[Closed and empty: advance parent]
     Join --> Active
-    Cancel[Failure / cancel] --> Cleanup[Remove dormant work; cancel and join running handlers]
+    Cancel[Structural failure / explicit cancel] --> Cleanup[Remove dormant work; cancel and join running handlers]
 ```
 
 ## Completion and failure
 
-finish seals root input and joins all accepted work; unclosed wait scopes fail with invalidSchedule and cancel the task. Empty paired waits are valid barriers. A handler error cancels every queued/running Action belonging to that task, preserving the first error. A failed task remains admission-fenced until its producer finishes or explicitly cancels it; this prevents a still-generating producer from recreating a failed tree. Cancel/shutdown wait for cooperative handler cleanup; completion/cancellation releases the entire tree. Stop the producer before explicit cancellation. Once an explicitly completed/cancelled task has been released, IDs must not be reused by stale producers.
+finish seals root input and joins all accepted work; unclosed wait scopes fail with invalidSchedule and cancel the task. Empty paired waits are valid barriers. Handler errors record a terminal outcome and release the lane so remaining Actions continue. Structural scheduling failures close the owning task. Cancel/shutdown wait for cooperative handler cleanup; completion/cancellation releases the entire tree. Stop the producer before explicit cancellation. Once an explicitly completed/cancelled task has been released, IDs must not be reused by stale producers.
 
 Handler completion means the implementation's actual completion (including drained speech playback), not inference completion, XML closure or admission. Persistent presentation effects may remain after their handler returns. Already executed effects cannot be rolled back. A wait adds no timeout; individual Action hardware and model execution deadlines still apply. Speech synthesis runs outside Action scheduling: each executing job has a 60-second deadline, but queued/ready audio has no wall-clock expiry and remains owned by its reply until consumed or explicitly cleaned up. Production PCM reads have no independent starvation timer. Tools remain outside XML wait groups.
 
@@ -220,3 +220,5 @@ flowchart LR
 ✅ Scheduling and ActionDiagnostics operate on ScheduledAction. Only its ActionInvocation execution value crosses into Actions; Channel ordering, cancellation, admission identity and resource fencing remain unchanged.
 
 ✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
+
+✅ Stored child reports no longer replace subsequent exceptions or cancellation; the execution-level issue is retained before releasing the lane. ❌ No effect rollback.

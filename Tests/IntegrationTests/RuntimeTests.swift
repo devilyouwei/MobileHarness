@@ -248,9 +248,9 @@ private actor Recorder {
     #expect(failed.isError)
     #expect(failed.value.contains("notRunning"))
     try await registry.registerCompletion("cancel") { _, _ in throw CancellationError() }
-    await #expect(throws: CancellationError.self) {
-        try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "cancel"), envelope: envelope)
-    }
+    let cancelled = try #require(
+        try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "cancel"), envelope: envelope))
+    #expect(cancelled.isError)
 }
 
 @Test func gatewayForwardsWaitBoundariesAndRejectsUnbalancedCompletion() async throws {
@@ -258,8 +258,14 @@ private actor Recorder {
     try await manager.register(AssistantAgent(chat: FixedTextChat()))
     let recorder = Recorder()
     let scheduler = ChannelScheduler(
-        registry: try testActionRegistry(handlers: [
-            ActionPath(module: "UI", function: "express"): { _ in await recorder.act() }
+        registry: try ActionRegistry(definitions: [
+            ActionDefinition(
+                path: .init(module: "UI", function: "express"), displayName: "Expression",
+                kind: .finite, completion: "Acknowledged",
+                resolvingResources: { request in
+                    if request.parameters["emotion"] == "missing" { throw ResourceError.busy }
+                    return []
+                }, handler: { _ in await recorder.act() })
         ]))
     let gateway = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), actions: scheduler
@@ -336,8 +342,84 @@ private actor Recorder {
             #expect(rejected.isError)
         }
     }
+    let historyFailure = try await gateway.execute(
+        OutputEnvelope(source: .assistant, input: input, output: .control("assistant.historyError: fixture")))
+    #expect(historyFailure.isError)
     let continued = try await gateway.execute(
         OutputEnvelope(source: .assistant, input: input, output: .toolCall(nextCall)))
     #expect(!continued.isError)
-    #expect(await gateway.executionResults().outputs.count == 7)
+    #expect(await gateway.executionResults().outputs.count == 8)
+}
+
+@Test func toolDeadlineJoinsCleanupAndExplicitCancellationPropagates() async throws {
+    let registry = ToolRegistry()
+    let cleanup = Recorder()
+    try await registry.registerCompletion("slow") { _, _ in
+        do { try await Task.sleep(for: .seconds(60)) } catch {
+            await cleanup.act()
+            throw error
+        }
+    }
+    let call = ToolRequest(toolPath: "slow")
+    let context = ToolExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)
+    let result = try #require(
+        try await ToolExecutor(registry: registry, timeout: .milliseconds(10)).execute(
+            call, context: context))
+    #expect(result.isError)
+    #expect(result.value.contains("timed out"))
+    #expect(await cleanup.actions == 1)
+    let task = Task { try await ToolExecutor(registry: registry).execute(call, context: context) }
+    task.cancel()
+    await #expect(throws: CancellationError.self) { try await task.value }
+}
+
+@Test func toolFeedbackRejectionPreservesSuccessfulExecutionValue() async throws {
+    let manager = AgentManager()
+    let agent = try AssistantAgent(capacity: 1, chat: FixedTextChat())
+    try await manager.register(agent)
+    _ = try await bindSpeechRequests(agent)
+    try await manager.start(.assistant)
+    try await agent.pause()
+    let input = AgentInput(sessionID: UUID(), payload: .text("occupied"))
+    try await agent.receive(input)
+    let tools = ToolRegistry()
+    try await tools.register("UI.print") { _ in "completed value" }
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager), tools: tools, sink: { _ in })
+    let result = try await gateway.execute(
+        OutputEnvelope(
+            source: .assistant, input: input,
+            output: .toolCall(ToolCall(toolPath: "UI.print", arguments: ["text": "fixture"]))))
+    #expect(result.isError)
+    #expect(result.tool?.value == "completed value")
+    #expect(result.tool?.isError == false)
+    #expect(result.failure != nil)
+    await agent.stop()
+}
+
+private enum ToolTimeoutFixture {
+    @Tool(path: "Fixture.slow", title: "Slow fixture", timeout: .milliseconds(10))
+    static func slow() {}
+}
+private struct ToolTimeoutModule: ToolModule {
+    let definitions: [ToolDefinition]
+}
+@Test func toolDefinitionTimeoutOverridesRuntimeDefaultAndRejectsInvalidDefinition() async throws {
+    let definition = ToolTimeoutFixture.slowDefinition(completing: { _, _ in
+        try await Task.sleep(for: .seconds(60))
+    })
+    #expect(definition.timeout == .milliseconds(10))
+    let registry = try ToolRegistry(modules: [ToolTimeoutModule(definitions: [definition])])
+    let result = try #require(
+        try await ToolExecutor(registry: registry).execute(
+            ToolRequest(toolPath: "Fixture.slow"),
+            context: ToolExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
+    #expect(result.isError && result.value.contains("timed out"))
+    #expect(throws: ToolRegistrationError.invalidDefinition("Fixture.bad")) {
+        try ToolRegistry(modules: [
+            ToolTimeoutModule(definitions: [
+                ToolDefinition(path: "Fixture.bad", timeout: .zero, completing: { _, _ in })
+            ])
+        ])
+    }
 }

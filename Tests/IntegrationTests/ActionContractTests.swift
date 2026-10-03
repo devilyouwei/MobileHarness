@@ -378,3 +378,58 @@ private enum ContractFailure: Error, Equatable { case failed }
         #expect(failure.cleanup as? UIActions.ExpressionError == .rendererUnavailable)
     }
 }
+
+@Test(arguments: [false, true])
+func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async throws {
+    let invocation = contractInvocation()
+    let definition = contractDefinition { invocation in
+        try await invocation.results.record(ActionReport(entries: [.init(path: "first", status: .succeeded)]))
+        if reported { throw ActionReportedError(.failure(.disconnected)) }
+        throw HarnessError.notRunning
+    }
+    let executor = ActionExecutor(registry: try ActionRegistry(definitions: [definition]))
+    let completion = try await executor.execute(invocation)
+    guard case .report(let report) = completion else {
+        Issue.record("Expected report")
+        return
+    }
+    #expect(report.entries.count == 1)
+    #expect(report.executionFailure == (reported ? .disconnected : .handlerFailed))
+    #expect(report.status == .partialFailure)
+}
+
+@Test func schedulerStoredReportDoesNotMaskCancellationOrHandlerFailure() async throws {
+    let definition = contractDefinition { invocation in
+        try await invocation.results.record(ActionReport(entries: [.init(path: "first", status: .succeeded)]))
+        throw CancellationError()
+    }
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [definition]))
+    let invocation = contractInvocation()
+    try await scheduler.enqueue(invocation: invocation)
+    try await scheduler.finish(inputID: invocation.context.inputID)
+    let record = try #require(await scheduler.executionSnapshot().records.first)
+    #expect(record.phase == .cancelled)
+    guard case .report(let report)? = record.completion else {
+        Issue.record("Expected report")
+        return
+    }
+    #expect(report.entries.count == 1)
+    #expect(report.executionFailure == .cancelled)
+}
+
+@Test func actionDefinitionBudgetOverridesRuntimeDefault() async throws {
+    let definition = ActionDefinition(
+        path: contractPath.executionIdentifier, displayName: "Timeout fixture",
+        kind: .finite, completion: "Joined cleanup",
+        estimatingDuration: { _ in
+            try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(10))
+        }, handler: { _ in try await Task.sleep(for: .seconds(60)) })
+    let executor = ActionExecutor(registry: try ActionRegistry(definitions: [definition]))
+    let completion = try await executor.execute(contractInvocation())
+    guard case .report(let report) = completion else {
+        Issue.record("Expected timeout report")
+        return
+    }
+    #expect(report.executionFailure == .timedOut)
+    #expect(ActionExecutor.defaultTimeout == .seconds(30))
+}

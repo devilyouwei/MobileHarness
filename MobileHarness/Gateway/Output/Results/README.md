@@ -50,3 +50,20 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 ✅ executionResults can filter by source Agent and inputID so a terminal consumer retrieves that input’s accumulated output errors and Action completion records; eviction counters remain global and explicit.
 
 ✅ Unknown aliases and invalid model invocation parameters use the same bounded output outcomes as execution failures, preserving native Tool IDs without cancelling other outputs. ❌ No execution record is fabricated for rejected Actions.
+
+✅ Tool execution and delivery failure remain distinct: tool retains the handler outcome and failure retains feedback transport failure. Ordinary independently cancelled operations also produce output outcomes. ❌ Results remain in-memory.
+
+## Outcome fields and failure boundaries
+
+| Outcome | Retained result | Effect on other calls |
+| --- | --- | --- |
+| Unknown/invalid model Action | output.failure; no fabricated Action execution record | Generation and other admitted Actions continue |
+| Unknown/invalid native Tool | output.tool with original callID and isError=true | Generation continues; no model-facing ToolResult is injected |
+| Action handler failure/cancellation/timeout | Action execution record and retained child report plus execution-level issue | Lane advances after cleanup |
+| Tool handler failure/local cancellation/timeout | output.tool.isError=true | Other outputs continue after cleanup |
+| Returning Tool feedback rejection/exception | Original tool.value/isError plus tool.deliveryFailure copied to output.failure | No replay; completed effects are preserved |
+| Rejected Tool history-write error | Separate output.failure from assistant.historyError plus original rejection | Generation continues unless task cancellation/output overflow intervenes |
+| Permission, Action scheduling capacity/structure or identity rejection | output.failure; owning Action tree cancelled | Producer generation is not automatically cancelled by execute |
+| Cancellation of the executing task | Propagated cancellation; execute does not append a new output outcome | Owner performs shutdown/join; admitted Action records retain terminal cleanup |
+
+Output failure/delivery descriptions are bounded to512 characters. Tool data and durable native-call history remain separate contracts. Execution result retention is256 outputs with counted oldest eviction; Action history uses its existing scheduler bounds. ❌ No durable diagnostic replay or forced handler interruption.

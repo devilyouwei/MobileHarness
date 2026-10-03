@@ -93,7 +93,7 @@ For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression c
 
 Structural errors and limits terminate that parser/generator instance; it cannot be reused. Finish rejects incomplete UTF-8, entities, tags and unclosed Channel/wait scopes. Unknown entities, mismatched closing tags, duplicate attributes, invalid UTF-8 fail explicitly. Unknown Action aliases and invalid invocation parameters instead produce rejected-call events.
 
-Failure cannot roll back Actions already emitted and executed. If one append throws, its local result is not returned; the Agent reports failure and Gateway cancels remaining work for that input. Invalid streams may have different already-executed prefixes under different fragmentation. There is no automatic retry or persistent replay.
+Failure cannot roll back Actions already emitted and executed. If one append throws a structural/limit error, its local result is not returned; the Agent reports failure and Gateway cancels remaining work for that input. Invalid streams may have different already-executed prefixes under different fragmentation. There is no automatic retry or persistent replay.
 
 ## Implementation status
 
@@ -131,7 +131,7 @@ flowchart LR
 
 ## Non-executing generation trace
 
-✅ `GenerationTrace` is an independently tested, Sendable value owned by an explicit diagnostic consumer. It records exact text and fragment boundaries before calling the existing AgentGenerator. The first parser failure is retained with fragment/finish location, parsing stops, and raw collection continues. Successfully returned Actions and wait directives remain in interpretation order; events within an append that throws are not partially recovered. No dispatch or model dependency is introduced.
+✅ `GenerationTrace` is an independently tested, Sendable value owned by an explicit diagnostic consumer. It records exact text and fragment boundaries before calling the existing AgentGenerator. The first parser failure is retained with fragment/finish location, parsing stops, and raw collection continues. Successfully returned Actions, rejected calls and wait directives remain in interpretation order; events within an append that throws are not partially recovered. No dispatch or model dependency is introduced.
 
 Raw retention has a 256 KiB UTF-8 bound and 8192-fragment bound (including empty fragments); overflow throws limitExceeded and seals input without evicting existing text. The parser retains its existing bounds, including 120 calls. Finish flushes only on normal completion; consumers must not finish after model failure/cancellation. No extra worker, queue or persistence is involved. ❌ It is not an execution trace, tokenizer trace or automatic repair facility.
 
@@ -153,7 +153,7 @@ flowchart LR
 
 A wait waits for its parent's preceding work, executes internally by ordinary Channel rules, and releases its parent's continuation only once closed and all children complete. Nested waits apply the same rule locally. An open group may execute already received work. Completed XML is not physical completion; cancellation discards unfinished parsing state and Gateway cancels accepted work. Self-closing Actions never acquire paired start/stop semantics.
 
-GenerationTrace retains the full ordered event sequence for an indented wait/action preview, alongside its action-only convenience view. Parser failure still stops interpretation but continues exact raw capture; this preview never claims execution timing.
+GenerationTrace retains the full ordered event sequence for an indented wait/action/rejection preview, alongside its action-only convenience view. Parser failure still stops interpretation but continues exact raw capture; this preview never claims execution timing.
 
 ```mermaid
 flowchart LR

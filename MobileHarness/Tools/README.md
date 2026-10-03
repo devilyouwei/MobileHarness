@@ -30,13 +30,13 @@ flowchart LR
 
 ## Registration
 
-`@Tool(path:title:resources:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule, UIToolModule, CameraToolModule and RobotToolModule; BehaviorAssembly atomically constructs the registry; Gateway BehaviorCoverage checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
+`@Tool(path:title:resources:timeout:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule, UIToolModule, CameraToolModule and RobotToolModule; BehaviorAssembly atomically constructs the registry; Gateway BehaviorCoverage checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
 
 Public entry signatures remain explicit: UI updates receive ToolInvocation and an injected callback; showPose receives a request, execution context and presentation callback; runtimeInfo returns a String. Add an entry in its domain catalog; only adding a domain changes ToolModules.
 
 ## Execution contracts
 
-Tools bypass Channel FIFO and Action wait barriers. Returning functions produce ToolResponse values, including ordinary errors; Gateway converts them to Agent ToolResult values and delivers them through InputGateway. Completion-only functions return no feedback on success and throw failures to their dispatcher. Cancellation propagates for both kinds. There is no generic Tool timeout or replacement policy.
+Tools bypass Channel FIFO and Action wait barriers. Both returning and completion handlers convert ordinary exceptions and operation-local cancellation into correlated error ToolResponse values. Completion success returns nil; only returning Tools send data through InputGateway, when the source accepts toolResult. Tool definitions may declare an optional timeout through @Tool or ToolDefinition. ToolExecutor uses that definition timeout first, otherwise its30-second Runtime default. Definition timeouts are validated at registration: greater than zero and at most86400 seconds; an explicitly configured executor fallback is bounded to300 seconds. Timeout cancels and joins the handler before returning an error. Cancellation of the calling task propagates. ToolResponse.deliveryFailure preserves feedback transport errors separately from the original value/isError; no automatic replay or replacement policy is provided.
 
 Protected Tools declare resources and use Gateway's shared ResourceCoordinator. They cannot bypass ownership by avoiding Action scheduling. Current UI/System tools claim no hardware locks. App's output consumer awaits each call; there is no detached Tool worker or Tool-owned queue.
 

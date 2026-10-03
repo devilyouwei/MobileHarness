@@ -1,5 +1,5 @@
 import ToolRuntime
 
 @attached(peer, names: suffixed(Definition))
-public macro Tool(path: String, title: String, resources: Set<ToolResource> = []) =
+public macro Tool(path: String, title: String, resources: Set<ToolResource> = [], timeout: Duration? = nil) =
     #externalMacro(module: "BehaviorDefinitions", type: "BehaviorDefinitionMacro")

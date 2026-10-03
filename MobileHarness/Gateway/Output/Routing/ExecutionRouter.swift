@@ -19,7 +19,13 @@ enum ExecutionRouter {
         case .toolCall(let call): .tool(call)
         case .control("assistant.finished"), .control("agent.finished"): .finish
         case .control(let state) where state.hasPrefix("assistant.error:") || state.hasPrefix("agent.error:"): .cancel
+        case .control(let state) where state.hasPrefix("assistant.historyError:"):
+            throw OutputRecordingError(description: state)
         case .control: .observe
         }
     }
+}
+
+private struct OutputRecordingError: Error, CustomStringConvertible {
+    let description: String
 }

@@ -62,8 +62,19 @@ public struct ActionReport: Equatable, Sendable {
     public func withExecutionFailure(_ code: Entry.Code) -> Self {
         Self(validatedEntries: entries, executionFailure: code)
     }
+    /// Retain child outcomes while attaching an exception that happened after they were recorded.
+    public func recordingFailure(_ error: any Error) -> Self {
+        let reported = (error as? any ActionReportProviding)?.actionReport
+        let code =
+            reported?.executionFailure
+            ?? (reported?.isCancelled == true ? .cancelled : reported?.entries.first { $0.status == .failed }?.code)
+            ?? Self.code(for: error)
+        return withExecutionFailure(code)
+    }
     public var hasFailures: Bool { executionFailure != nil || entries.contains { $0.status == .failed } }
-    public var isCancelled: Bool { entries.contains { $0.status == .cancelled || $0.code == .cancelled } }
+    public var isCancelled: Bool {
+        executionFailure == .cancelled || entries.contains { $0.status == .cancelled || $0.code == .cancelled }
+    }
     public var status: ActionStatus {
         if isCancelled && executionFailure != .timedOut { return .cancelled }
         if hasFailures { return entries.contains { $0.status == .succeeded } ? .partialFailure : .failed }

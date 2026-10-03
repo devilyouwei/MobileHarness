@@ -132,3 +132,7 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [0108: Durable background model downloads](0108-background-model-downloads.md).
 
 ✅ ADR0103 now includes nonterminal unknown model calls and parameter rejection in shared execution outcomes. ❌ Real-provider acceptance remains pending.
+
+✅ ADR0103 failure isolation refinement: retained Action reports preserve later exceptions; invocation/resource rejection is call-local; Tools distinguish execution and feedback failures, with joined cooperative deadlines and task-scoped cancellation. ❌ Uncooperative handlers and physical acceptance remain outstanding.
+
+✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.

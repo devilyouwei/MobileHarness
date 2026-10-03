@@ -131,6 +131,8 @@ flowchart LR
 | 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。同时支持云端模型原生 Tool 调用。 |
 | control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
 | control | `agent.finished` | speaking 阶段的输入完成通知（初始化展示通过 Tool 执行），释放该输入的 Action 跟踪。 |
+| rejectedCall | Action/Tool alias、typed reason、可选 native Tool callID | unknownCapability 或 invalidParameters 只拒绝该调用；计入120次调用上限，经 Gateway 留存错误结果，继续本轮生成及其他 Actions。 |
+| control | `assistant.historyError: …` | 拒绝的 native Tool 失败记录写入失败；Gateway 留存非终止 output failure，不取消 Action 调度。 |
 | control | `assistant.error: …` | 生成、解析、即时输出等失败；输出流溢出会直接进入 failed 并关闭流，不能保证再塞入错误消息。 |
 
 Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再额外声明 `main`；跨轨同步使用 wait。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
@@ -161,7 +163,7 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再
 
 ## Durable conversation records and context
 
-✅ App injects a process-wide ConversationHistoryStore. The explicit default in-memory store is for isolated tests; production creates a protected local document. Assistant persists original user input and the exact system + ten-round + current-user request before inference, then persists each received text fragment before its bounded parser. Successful generation saves completion/finish reason; parser/provider/limit failure and cancellation save the received prefix and error. Persistence errors propagate, without resetting history or silently dropping received data. Store bounds can reject new work before inference.
+✅ App injects a process-wide ConversationHistoryStore. The explicit default in-memory store is for isolated tests; production creates a protected local document. Assistant persists original user input and the exact system + ten-round + current-user request before inference, then persists each received text fragment before its bounded parser. Successful generation saves completion/finish reason; parser/provider/limit failure and cancellation save the received prefix and error. Conversation admission, raw-fragment, request/usage and terminal persistence errors propagate without resetting history or silently dropping received data. If persisting a rejected native Tool outcome fails, Assistant emits assistant.historyError and then the original rejectedCall, continuing generation; output overflow and true task cancellation remain terminal. Store bounds can reject new work before inference.
 
 Logical conversation identity survives voice-session changes, stop/start and App restart. Only Start New archives the current conversation and resets context. History messages are model context only, never re-parsed for execution. No old audioID or Action is replayed. Model/provider context budgets still apply: an oversized ten-round request fails explicitly, rather than silently dropping rounds or altering stored originals.
 
@@ -265,3 +267,5 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ❌ Partial native SSE calls and automatic result-driven continuation remain unsupported; missing usage is not estimated.
 
 ✅ Unknown model-callable aliases and invalid invocation parameters emit rejectedCall and continue the same turn. Native Tool failures retain their durable failed Tool outcome and correlation ID. Rejections share the120-call limit; malformed markup, bounds and cancellation remain terminal. ❌ Automatic correction/retry is not implemented.
+
+✅ Failure to persist a rejected native Tool outcome emits a nonterminal assistant.historyError result and preserves the original call rejection. True cancellation and output overflow remain terminal. ❌ Conversation admission/raw history persistence are still strict.

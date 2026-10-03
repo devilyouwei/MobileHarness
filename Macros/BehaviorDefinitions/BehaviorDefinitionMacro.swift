@@ -50,13 +50,13 @@ public struct BehaviorDefinitionMacro: PeerMacro {
             DeclSyntax(
                 stringLiteral: """
                     public static func \(name)Definition(handler: @escaping ToolHandler) -> ToolDefinition {
-                        ToolDefinition(path: \(path), displayName: \(title), resources: \(values["resources"] ?? "[]"), handler: handler)
+                        ToolDefinition(path: \(path), displayName: \(title), resources: \(values["resources"] ?? "[]"), timeout: \(values["timeout"] ?? "nil"), handler: handler)
                     }
                     """),
             DeclSyntax(
                 stringLiteral: """
                     public static func \(name)Definition(completing handler: @escaping ToolCompletionHandler) -> ToolDefinition {
-                        ToolDefinition(path: \(path), displayName: \(title), resources: \(values["resources"] ?? "[]"), completing: handler)
+                        ToolDefinition(path: \(path), displayName: \(title), resources: \(values["resources"] ?? "[]"), timeout: \(values["timeout"] ?? "nil"), completing: handler)
                     }
                     """),
         ]

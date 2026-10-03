@@ -72,3 +72,9 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [Shared multilingual Nemotron Core ML runtime](adr/0107-nemotron-coreml-multilingual.md).
 
 ✅ Architecture and Roadmap document nonterminal model-call resolution failures and shared output result retention. ❌ Live-model acceptance remains pending.
+
+✅ ADR0103 failure isolation refinement: retained Action reports preserve later exceptions; invocation/resource rejection is call-local; Tools distinguish execution and feedback failures, with joined cooperative deadlines and task-scoped cancellation. ❌ Uncooperative handlers and physical acceptance remain outstanding.
+
+✅ Directory contract audit reconciles Tools, Gateway dispatch/routing/results/validation, Agent generation/output/history and App lifecycle documentation with ADR0103. ❌ Live-provider/device acceptance remains separate from documentation and unit validation.
+
+✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.

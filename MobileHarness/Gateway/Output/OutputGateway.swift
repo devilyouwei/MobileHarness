@@ -184,8 +184,8 @@ public actor OutputGateway {
         var tool: ToolResponse?
         do {
             tool = try await dispatch(envelope)
-            failure = nil
-        } catch is CancellationError { throw CancellationError() } catch {
+            failure = tool?.deliveryFailure
+        } catch {
             try Task.checkCancellation()
             failure = String(String(describing: error).prefix(512))
         }
@@ -241,7 +241,11 @@ public actor OutputGateway {
                     token, envelope: envelope, owner: owner,
                     feedback: descriptor.inputs.contains(.actionResult) ? actionFeedback : .none, lease: lease)
             } catch {
-                await actions.cancel(envelope)
+                // Invocation/availability failures reject only this call. Lifecycle and
+                // structural scheduling failures still close the owning Action tree.
+                if error is ActionSchedulingError || Task.isCancelled || error is CommunicationError {
+                    await actions.cancel(envelope)
+                }
                 throw error
             }
         case .scheduling(let directive):

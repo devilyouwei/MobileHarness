@@ -84,4 +84,4 @@ flowchart LR
 
 ❌ OS background scheduling/force quit, full iPhone acceptance and HF durable background recovery remain outstanding. See [Management](../../ModelKit/Management/README.md#local-model-resources--current-contract).
 
-✅ Rejected model calls remain Gateway execution outcomes and do not stop the voice session. Native Tool parse failures are persisted by Assistant before output. ❌ No automatic model repair is performed.
+✅ Rejected model calls remain Gateway execution outcomes and do not stop the voice session. Assistant attempts to persist native Tool parse failures before output; recording failure produces a separate nonterminal Gateway outcome, while the original rejection is still emitted. ❌ No automatic model repair is performed.

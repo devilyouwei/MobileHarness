@@ -1,6 +1,7 @@
 import Foundation
 
 public struct ActionExecutor: Sendable {
+    public static let defaultTimeout: Duration = .seconds(30)
     private let registry: ActionRegistry
     public init(registry: ActionRegistry) { self.registry = registry }
     @discardableResult
@@ -10,16 +11,17 @@ public struct ActionExecutor: Sendable {
         let handler = definition.handler
         let returned: ActionCompletion
         do {
-            if let estimate = definition.estimatingDuration {
-                let budget = try estimate(invocation.call)
-                returned = try await ActionDeadline.run(
-                    budget: budget, report: { await invocation.results.snapshot() },
-                    body: { try await handler(invocation) })
-            } else {
-                returned = try await handler(invocation)
-            }
+            let budget =
+                try definition.estimatingDuration?(invocation.call)
+                ?? ActionExecutionBudget(expected: .zero, timeout: Self.defaultTimeout)
+            returned = try await ActionDeadline.run(
+                budget: budget, report: { await invocation.results.snapshot() },
+                body: { try await handler(invocation) })
         } catch {
-            if let report = await invocation.results.snapshot(), definition.kind == .finite { return .report(report) }
+            try Task.checkCancellation()
+            if let report = await invocation.results.snapshot(), definition.kind == .finite {
+                return .report(report.recordingFailure(error))
+            }
             throw error
         }
         let completion: ActionCompletion

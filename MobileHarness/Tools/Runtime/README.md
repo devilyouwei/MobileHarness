@@ -14,7 +14,7 @@ Purpose: register and execute ToolRequests directly. Design goals: explicit feed
 
 Domain Support catalogs bind `@Tool`-generated factories to explicit capabilities. `ToolRegistry(modules:)` validates the execution catalog atomically: at most32 modules,128 handlers and8 resources per definition. Gateway.BehaviorCoverage checks up to128 Agent capability catalogs against registered paths before producers start. Path segments use the1–64-byte identifier grammar. Duplicate/invalid entries throw in the registry; missing implementations throw in assembly; no partial startup registration is published. Agent declarations remain the permission source.
 
-The registry retains handler and resource mappings. ToolDefinition also carries a display name; this metadata does not create an Action execution record. Dynamic registration APIs support explicit isolated runtimes; production uses the complete catalog constructor.
+The registry retains handler and resource mappings. ToolDefinition also carries an optional timeout and display name; this metadata does not create an Action execution record. Dynamic registration APIs support explicit isolated runtimes; production uses the complete catalog constructor.
 
 ```mermaid
 flowchart LR
@@ -32,6 +32,9 @@ flowchart LR
 ```mermaid
 flowchart TD
     Call[Authorized resolved ToolRequest] --> Lookup[Registry lookup]
+    Lookup --> Deadline[Bounded cooperative deadline]
+    Deadline -->|expiry| Cleanup[Cancel and join handler]
+    Cleanup --> Error
     Lookup -->|unknown| Error[Error ToolResponse]
     Lookup --> Returning[Returning handler]
     Lookup --> Completion[Completion handler]
@@ -41,9 +44,9 @@ flowchart TD
     Result --> Input[Dispatcher routes through InputGateway]
 ```
 
-Registration selects feedback kind; call arguments cannot change it. An empty returned String still produces a result. Task cancellation propagates through the runtime; production Gateway consumers retain an independently cancelled operation as a failure outcome. Completion waits for the injected endpoint's stated acknowledgement, not necessarily rendered or physical completion.
+Registration selects feedback kind; call arguments cannot change it. An empty returned String still produces a result. Cancellation of the calling task propagates; an independently cancelled handler returns an error ToolResponse. Completion waits for the injected endpoint's stated acknowledgement, not necessarily rendered or physical completion.
 
-Gateway checks resource ownership through the same ResourceCoordinator used by Actions, but Tools remain outside Channel FIFO/wait. Runtime owns no work queue, deadline task or detached worker. An uncooperative handler can delay its caller; no generic timeout is implemented.
+Gateway checks resource ownership through the same ResourceCoordinator used by Actions, but Tools remain outside Channel FIFO/wait. Runtime owns no work queue or detached worker. ToolExecutor uses one handler task and one timer per active call, with the definition timeout preferred over its30-second Runtime fallback. Registry validation rejects definition timeouts outside (0,86400] seconds; explicit executor fallback overrides remain bounded to300 seconds. Deadline expiry cancels and joins the handler before returning a timeout outcome. An uncooperative handler can still delay its caller.
 
 ✅ Macro factories, bounded registration, implementation coverage, resource declarations and both feedback kinds are implemented and tested.
 
@@ -51,8 +54,7 @@ Gateway checks resource ownership through the same ResourceCoordinator used by A
 
 ✅ ToolRuntime compiles this Runtime tree, including Contracts, without project dependencies. Domain catalogs and macro declarations compile in Tools; Gateway imports only runtime contracts.
 
-❌ No change to scheduling, completion, resource arbitration or cleanup algorithms.
 
 ✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.
 
-✅ Completion handler ordinary exceptions now return correlated isError ToolResponse, matching returning Tools. Successful completion remains nil; cancellation remains a control signal and propagates.
+✅ Completion handler ordinary exceptions now return correlated isError ToolResponse, matching returning Tools. Successful completion remains nil; cancellation propagates only when the calling task is cancelled.

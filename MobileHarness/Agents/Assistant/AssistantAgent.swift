@@ -274,9 +274,13 @@ public actor AssistantAgent: Agent {
                             capabilities: descriptor.capabilities)
                         try await emitFunctions([.tool(call)], for: input, count: &emittedCalls)
                     } catch {
-                        try await conversations.recordToolOutcome(
-                            callID, for: input.id, state: .failed,
-                            error: String(describing: error))
+                        do {
+                            try await conversations.recordToolOutcome(
+                                callID, for: input.id, state: .failed, error: String(describing: error))
+                        } catch {
+                            try Task.checkCancellation()
+                            emit(.control("assistant.historyError: \(error)"), for: input)
+                        }
                         guard let reason = error as? GenerationError,
                             reason == .unknownCapability || reason == .invalidParameters
                         else { throw error }

@@ -14,6 +14,8 @@ flowchart LR
     Router -->|actionCall / scheduling| Actions[ActionDispatcher]
     Router -->|toolCall| Tools[ToolDispatcher]
     Router -->|control| Lifecycle[Finish / cancel / observe]
+    Output -->|rejected Tool| Results[Bounded output outcomes]
+    Router -->|rejected Action / historyError| Results
 ```
 
 Update this README with changes to names, routing rules and ✅/❌ status.
@@ -23,4 +25,6 @@ Update this README with changes to names, routing rules and ✅/❌ status.
 
 ✅ ExecutionRouter has a scheduling route for typed wait begin/end directives, sent through ActionDispatcher. It never parses XML, assigns aliases or executes a barrier itself. ❌ Native Tools remain outside the wait tree.
 
-✅ Call rejection routing raises a typed failure outside Action cancellation handling; no invocation is executed. ❌ No automatic retry.
+✅ Action rejection routing raises a typed output failure outside Action cancellation handling. Gateway handles Tool rejection as a correlated error ToolResponse before routing; neither executes an invocation. ❌ No automatic retry.
+
+✅ assistant.historyError control is a nonterminal output failure retained in execution results; it does not cancel Actions. ❌ No durable recovery.

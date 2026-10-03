@@ -222,3 +222,5 @@ Finite/state handlers can use the Void adapter to ActionCompletion.completed; ac
 See [Runtime](Runtime/README.md) for registry/executor limits, [Results](../Gateway/Output/Results/README.md) for feedback and [Resources](../Gateway/Output/Resources/README.md) for lease/fence policy.
 
 ✅ NexArm owns tracking aim rest mapping, speed policy and controller admission; the completion-only Robot.aim Tool reaches this behavior through the App sender.
+
+✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.

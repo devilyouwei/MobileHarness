@@ -20,3 +20,9 @@ flowchart LR
 ❌ Cross-process serialization and durable execution replay are not provided.
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+
+✅ ActionReport executionFailure.cancelled makes the report cancelled even when retained child results succeeded. Other execution failures retain partial-success details. ❌ No effect rollback.
+
+✅ recordingFailure retains existing child entries and adds the reported execution failure, cancellation, first failed reported child code or mapped exception code. A successful stored prefix cannot erase a later thrown failure. ❌ Report retention does not establish physical rollback.
+
+✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.

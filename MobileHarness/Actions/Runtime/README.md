@@ -36,11 +36,11 @@ Kinds and normal successful completions:
 
 The Void handler adapter returns `completed`. Activity IDs refer to a service-owned lifetime; Runtime creates no background activity owner. A registered execution deadline can return a failure report for any kind.
 
-`ActionExecutionBudget` separates expected duration from the timeout upper bound. Estimates never impose a minimum wait. The executor starts its timer after scheduling/resource admission, cancels on expiry and joins the handler's cleanup before releasing ownership. `ActionReport.executionFailure` records parent timeout separately from all collected child entries. An uncooperative handler cannot be forcibly terminated; timeout does not justify releasing resources while effects are still running.
+`ActionExecutionBudget` separates expected duration from the timeout upper bound. Estimates never impose a minimum wait. The function-defined budget resolver takes precedence; when absent, ActionExecutor uses a30-second Runtime timeout with no expected-duration estimate. Invalid explicit budgets propagate without falling back. The executor starts its timer after scheduling/resource admission, cancels on expiry and joins the handler's cleanup before releasing ownership. `ActionReport.executionFailure` records parent timeout separately from all collected child entries. An uncooperative handler cannot be forcibly terminated; timeout does not justify releasing resources while effects are still running.
 
 ```mermaid
 flowchart TD
-    Admit[Gateway admission and resource fence] --> Execute[Invoke handler with optional dynamic budget]
+    Admit[Gateway admission and resource fence] --> Execute[Invoke handler with defined budget or Runtime fallback]
     Execute --> Done[Return completion or collected report]
     Execute -->|deadline| Cancel[Cancel and join handler]
     Cancel --> Preserve[Preserve children and record execution timeout]
@@ -82,6 +82,7 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 
 ✅ ActionRuntime compiles this Runtime tree, including Contracts, without project dependencies. Domain catalogs and macro declarations compile in Actions; Gateway imports only runtime contracts.
 
-❌ No change to scheduling, completion, resource arbitration or cleanup algorithms.
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+
+✅ Finite stored reports preserve subsequent handler failures as executionFailure; true task cancellation propagates to the scheduler for joined terminal recording. ❌ No forced termination of uncooperative handlers.

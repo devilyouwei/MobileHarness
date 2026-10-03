@@ -372,9 +372,14 @@ public actor ChannelScheduler {
                     }
                 }
                 if let report = await job.invocation.results.snapshot() {
-                    if case .success(.report(let terminal)) = outcome, let failure = terminal.executionFailure {
-                        outcome = .success(.report(report.withExecutionFailure(failure)))
-                    } else {
+                    switch outcome {
+                    case .failure(let error):
+                        outcome = .success(.report(report.recordingFailure(error)))
+                    case .success(.report(let terminal)):
+                        outcome = .success(
+                            .report(
+                                terminal.executionFailure.map { report.withExecutionFailure($0) } ?? report))
+                    case .success:
                         outcome = .success(.report(report))
                     }
                 }

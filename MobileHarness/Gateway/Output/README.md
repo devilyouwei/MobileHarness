@@ -8,7 +8,7 @@ Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter C
 - ✅ Session cancellation covers the session across Agents. ToolCalls bypass Action queues.
 - ✅ Resolved ActionCall/ToolCall inputs and runtime control notifications. Raw text and FunctionToken events are not accepted.
 - ✅ Task-local Channel FIFO and nested wait groups, bounded admission and process-wide module exclusion. Different channels may run concurrently when modules permit; main is an ordinary channel.
-- ✅ Imports the unified Actions module for Runtime APIs and App-registered handlers; never directly invokes concrete behavior helpers.
+- ✅ Imports independent ActionRuntime/ToolRuntime and AgentCore contracts; never imports concrete Actions/Tools or directly invokes behavior helpers.
 - ✅ Typed ActionResult feedback and declared resource leases/fences; details below.
 - ❌ Priority scheduling and generic activity subscriptions.
 
@@ -59,7 +59,7 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Speech synthesis/cancel commands are newly generated work with a fresh 10-second admission deadline, preserving parent ID, root, hops, session and turn. They do not inherit the original input’s sensor-routing expiration; source identity/session validation and sender generation cancellation still apply. Forwarded perception observations continue to inherit the parent deadline. This prevents late generated segments from failing merely because the already-admitted input is older than 10 seconds.
 
 
-✅ Actions and typed wait boundaries enter one task-local execution tree. beginWait joins parent-prefix work; endWait seals the group, and its completed subtree releases the parent continuation. Gateway cancels the task on validation, Action/boundary admission or terminal finish errors. All envelopes must be supplied in order by the output pump. ❌ Concurrent callers for the same task have no implicit ordering guarantee.
+✅ Actions and typed wait boundaries enter one task-local execution tree. beginWait joins parent-prefix work; endWait seals the group, and its completed subtree releases the parent continuation. Gateway cancels the task on permission validation, structural scheduling/identity or terminal finish errors. Invocation and resource availability rejection remain local to the Action. All ActionSchedulingError cases, including capacity/limit rejection, close the owning Action tree; overflow never silently discards device work. All envelopes must be supplied in order by the output pump. ❌ Concurrent callers for the same task have no implicit ordering guarantee.
 
 ✅ ADR 0065 adds implementation-contract registration, invocation consistency and scheduler diagnostics; OutputGateway still validates Agent permissions and joins work only at finish. The default no-Action scheduler uses an explicit empty registry. ❌ Diagnostic snapshots are not Agent-facing results or activity/resource ownership.
 
@@ -78,3 +78,5 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Production consumers use execute rather than low-level dispatch: ordinary output failures become correlated outcomes. Permissions still validate before effects and cancellation still propagates.
 
 ✅ Non-executable rejectedCall outputs enter the bounded executionResults history: Action rejection is an output failure; Tool rejection is a correlated error ToolResponse. Neither cancels queued Actions or sends a new model-facing ToolResult. ❌ Rejected calls have no scheduler execution record because they were never admitted.
+
+✅ Invocation lookup, argument and resource availability errors reject only that Action and remain output failures; structural scheduling and producer identity errors still close the input. Independent operation cancellation is an outcome, while cancellation of the executing task propagates. ❌ No automatic retries.
