@@ -9,6 +9,8 @@ public struct NexArmJogPlanner: Sendable {
     public static let maximumSpeed = 600.0
     public static let maximumAcceleration = 1800.0
     public static let maximumJerk = 12000.0
+    /// Tracking crawl. A full stick may still use `maximumSpeed`; aim must not sprint the whole gap.
+    public static let aimMaximumSpeed = 200.0
     private struct State: Sendable {
         var position: Double
         var velocity = 0.0
@@ -79,7 +81,9 @@ public struct NexArmJogPlanner: Sendable {
             velocity: velocity, acceleration: acceleration)
     }
 
-    /// One jerk-limited step toward an absolute count. Uses the same limits as manual jog.
+    /// One jerk-limited step toward an absolute count.
+    /// Speed follows the remaining distance and stays at `aimMaximumSpeed`. A direction change holds the
+    /// current count for one step so the previous speed is not carried into the reverse move.
     /// Returns nil once the joint is already on that count and no longer moving.
     public mutating func approach(id: Int, target: Int, elapsed: Double = period) throws -> Proposal? {
         guard (1...5).contains(id), Self.limits[id - 1].contains(target), elapsed.isFinite, elapsed > 0 else {
@@ -93,14 +97,30 @@ public struct NexArmJogPlanner: Sendable {
             return nil
         }
         func clamp(_ value: Double, _ lower: Double, _ upper: Double) -> Double { min(upper, max(lower, value)) }
-        let desiredVelocity = clamp(error / 0.2, -Self.maximumSpeed, Self.maximumSpeed)
+        if old.velocity * error < 0, abs(old.velocity) >= 8 {
+            let hold = clamp(old.position.rounded(), Double(Self.limits[index].lowerBound), Double(Self.limits[index].upperBound))
+            let holdCount = Int(hold)
+            let packet: NexArmPacket?
+            if holdCount == old.lastTarget {
+                packet = nil
+            } else {
+                packet = try NexArmPacket(
+                    id: UInt8(id), command: 3,
+                    payload: [41, 30, UInt8(holdCount & 255), UInt8(holdCount >> 8), 0, 0, 1, 0])
+            }
+            return Proposal(
+                id: id, packet: packet, target: Double(holdCount), position: hold,
+                velocity: 0, acceleration: 0)
+        }
+        let desiredVelocity = clamp(error / 0.5, -Self.aimMaximumSpeed, Self.aimMaximumSpeed)
         let desiredAcceleration = clamp(
             (desiredVelocity - old.velocity) * 8, -Self.maximumAcceleration, Self.maximumAcceleration)
         var acceleration =
             old.acceleration
             + clamp(desiredAcceleration - old.acceleration, -Self.maximumJerk * dt, Self.maximumJerk * dt)
         var velocity = clamp(
-            old.velocity + (old.acceleration + acceleration) * 0.5 * dt, -Self.maximumSpeed, Self.maximumSpeed)
+            old.velocity + (old.acceleration + acceleration) * 0.5 * dt, -Self.aimMaximumSpeed,
+            Self.aimMaximumSpeed)
         let lower = Double(Self.limits[index].lowerBound)
         let upper = Double(Self.limits[index].upperBound)
         let position = clamp(old.position + (old.velocity + velocity) * 0.5 * dt, lower, upper)

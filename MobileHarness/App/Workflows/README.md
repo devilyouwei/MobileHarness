@@ -7,7 +7,7 @@
 
 Purpose: implement cross-module application operations, independently of SwiftUI rendering. Design goals: explicit side effects, bounded operation admission, durable failure handling and injected dependencies. Root Package.swift compiles Settings, History, Bluetooth, Speech, Presentation and Diagnostics as independent feature targets. AppWorkflows is a state-free re-export facade; production code is compiled once in its owning feature target.
 
-✅ `BluetoothWorkflow.aim` keeps only the latest base and wrist-pitch target. The manual-control loop sends jerk-limited single-motor steps without waiting for each acknowledgment, and returns as soon as that target is stored. A newer aim replaces the previous one. ❌ It does not wait for the joints, and physical tracking acceptance remains pending.
+✅ `BluetoothWorkflow.aim` keeps only the latest base and wrist-pitch target. The manual-control loop sends jerk-limited single-motor steps without waiting for each acknowledgment, and returns as soon as that target is stored. Aim speed follows the remaining count, and a direction change stops for one step before reversing. A newer aim replaces the previous one. ❌ It does not wait for the joints, and physical tracking acceptance remains pending.
 
 ## Upstream and downstream
 
