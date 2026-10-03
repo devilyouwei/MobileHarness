@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate Xcode sandbox inputs/outputs from production download profiles."""
+"""Regenerate Xcode sandbox inputs/outputs for metadata-only model packaging."""
 import json
 from pathlib import Path
 
@@ -13,14 +13,8 @@ for platform in ["iphoneos", "iphonesimulator"]:
     inputs = ["$(SRCROOT)/scripts/stage-voice-models.sh"]
     outputs = {"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Models"}
     files = []
-    if platform == "iphoneos":
-        for name in profiles:
-            profile = json.loads((ROOT / "MobileHarness/Resources/Models" / (name + ".download.json")).read_text())
-            paths = profile.get("files") or profile["platforms"][profile["defaultPlatform"]]
-            for path in paths:
-                relative = profile["directory"] + "/" + path
-                files.append(("MobileHarness/Resources/Models/" + relative, relative))
-        files += [("docs/licenses/" + name + ".txt", "Licenses/" + name + ".txt") for name in licenses]
+    files = [("MobileHarness/Resources/Models/model-catalog.json", "model-catalog.json")]
+    files += [("docs/licenses/" + name + ".txt", "Licenses/" + name + ".txt") for name in licenses]
     for source, relative in files:
         inputs.append("$(SRCROOT)/" + source)
         destination = Path("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Models") / relative

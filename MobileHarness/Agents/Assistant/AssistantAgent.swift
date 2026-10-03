@@ -210,10 +210,12 @@ public actor AssistantAgent: Agent {
             } else {
                 tools = []
             }
+            try await conversations.recordToolDefinitions(
+                tools.map { String(decoding: $0.declaration, as: UTF8.self) }, for: input.id)
             let request = try ChatRequest(
                 messages: messages,
                 context: InferenceContext(requestID: input.id, conversationID: input.sessionID),
-                maximumOutputTokens: record.maximumOutputTokens, temperature: record.temperature, tools: tools)
+                temperature: record.temperature, tools: tools)
             _ = try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask { try await self.collect(request, input: input, using: chat) }
                 group.addTask {
@@ -260,10 +262,27 @@ public actor AssistantAgent: Agent {
                     text += delta
                     try await emitFunctions(generator.append(delta), for: input, count: &emittedCalls)
                 case .toolCall(let native):
-                    let call = try ToolCallParser.parse(
-                        id: UUID(), alias: native.name, argumentsJSON: Data(native.argumentsJSON.utf8),
-                        capabilities: descriptor.capabilities)
-                    try await emitFunctions([.tool(call)], for: input, count: &emittedCalls)
+                    let callID = UUID()
+                    try await conversations.recordToolCall(
+                        ConversationToolCall(
+                            id: callID, providerID: native.id, name: native.name,
+                            argumentsJSON: native.argumentsJSON), for: input.id)
+                    let call: ToolCall
+                    do {
+                        call = try ToolCallParser.parse(
+                            id: callID, alias: native.name, argumentsJSON: Data(native.argumentsJSON.utf8),
+                            capabilities: descriptor.capabilities)
+                        try await emitFunctions([.tool(call)], for: input, count: &emittedCalls)
+                    } catch {
+                        try await conversations.recordToolOutcome(
+                            callID, for: input.id, state: .failed,
+                            error: String(describing: error))
+                        throw error
+                    }
+                case .usage(let usage):
+                    try await conversations.recordTokenUsage(
+                        ConversationTokenUsage(input: usage.input, generated: usage.generated, total: usage.total),
+                        for: input.id)
                 case .finished(let reason):
                     switch reason {
                     case .stop: generationFinishReason = "stop"

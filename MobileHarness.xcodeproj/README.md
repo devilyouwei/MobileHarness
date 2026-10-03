@@ -9,7 +9,7 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 - ✅ UI owns iOS pages/components and portable presentation state/operation interfaces. AppWorkflows owns history, configuration and explicit speech/chat diagnostics. Native preview/image/value adapters compile with App.
 - ✅ App source membership includes CurrentChatCapability; ChatDiagnosticWorkflow is package-owned navigation only. VoiceSessionCoordinator, VisionSession, ApplicationRuntime and UI component file references match their current responsibilities.
 - ✅ Shared configuration, entitlements and privacy declarations retain their existing values. Local signing remains in ignored Config/Local.xcconfig.
-- ✅ Platform input/output file lists govern local model staging. The physical profile uses Nemotron, Qwen3.5, Silero, YOLO and MOSS; legacy Kokoro is not packaged. Simulator local models report unavailable; explicitly configured cloud chat remains supported.
+- ✅ Platform input/output file lists stage only the shared source catalog/license notices on both device and simulator. Physical inference uses sandbox-installed Nemotron, Qwen3.5, Silero, YOLO and MOSS; Kokoro is unregistered. Simulator local models report unavailable; explicitly configured cloud chat remains supported.
 
 ## Validation
 
@@ -68,3 +68,14 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Photographer navigation and JSON are retained; SwiftPM owns compilation of Robot Tools and Action-side aim support.
 
 ✅ Scheme cleanup refreshes the generated embedded Agents bundle on incremental builds. Resource declarations remain in Package.swift; the final app is verified for every Agent config.
+
+## Local model resources — current contract
+
+✅ Both App source phases include the new Storage/settings adapters. Navigation references the new Management/Storage/Settings source files; package-owned sources still compile only through existing root targets. Model staging inputs/outputs are metadata-only for device and simulator.
+
+❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../MobileHarness/ModelKit/Management/README.md). The independent ModelKitHub target is included in HarnessKit; App entry and composition inject it. HF durable background transfer is not implemented.
+
+✅ Models navigator references now show the shared catalog and separate Nemotron Mac profile; removed Audio8/Silero development references are cleaned up. Metadata-only staging is unchanged. ❌ Full Xcode build acceptance remains pending.
+
+
+✅ Nemotron navigator now includes FluidAudio/LocalNemotronEngine.swift; obsolete CoreAI-specific Nemotron model, mel, tokenizer, unavailable adapter and bundled mel resources were removed.

@@ -40,7 +40,7 @@ General fast/slow orchestration, automatic compute escalation and unattended/bac
 - A Mac with **Xcode 27+**, its matching SDKs, and **Swift 6.4+** tooling.
 - The Xcode **Metal Toolchain** for MLX compilation.
 - **Python 3** for model provisioning and repository checks.
-- For the full experience, an **iOS 27+ physical device compatible with the configured h18p model artifacts**, local model downloads and development signing.
+- For the full experience, an **iOS 27+ physical device**, local model downloads and development signing.
 
 The app targets iOS 27+. Shared package targets have lower base deployment versions; that does not make the full app compatible with older iOS releases. XcodeGen and CocoaPods are not required.
 
@@ -64,7 +64,7 @@ xcodebuild -downloadComponent MetalToolchain
 open MobileHarness.xcodeproj
 ```
 
-For UI development, select **MobileHarnessSimulator** and run on an iOS simulator. This target bundles no model weights; local ASR/chat are unavailable, while explicitly configured cloud chat is supported. It is useful for interface work, not end-to-end voice or camera-model validation. Explicit Debug previews use simulated state.
+For UI development, select **MobileHarnessSimulator** and run on an iOS simulator. This target bundles no model weights; local chat is unavailable; Core ML ASR requires downloaded resources, while explicitly configured cloud chat is supported. It is useful for interface work, not end-to-end voice or camera-model validation. Explicit Debug previews use simulated state.
 
 For the full physical-device application, continue below.
 
@@ -76,24 +76,17 @@ cp Config/Local.xcconfig.example Config/Local.xcconfig
 
 Set your `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in `Config/Local.xcconfig`. This file is ignored by Git.
 
-Download the artifacts required by the current device resource staging:
+Model weights are downloaded on the device through **Settings → 本地模型资源**. App builds bundle the pinned catalog and license notices only, so no model downloads are required before building. Choose the Hugging Face official source, the third-party HF-Mirror source, or paste a custom HTTPS download domain; production graph source revisions remain pinned. HF file resolution/metadata is handled by the SDK; only the independent YOLO ZIP has a bundled archive SHA-256. HF tasks survive page navigation but restart after process relaunch. GitHub-hosted YOLO uses its original download source.
 
-```sh
-python3 scripts/download-nemotron.py
-python3 scripts/download-silero.py
-python3 scripts/download-qwen35.py
-python3 scripts/download-yolo26-pose.py
-python3 scripts/download-moss-tts-nano.py
-```
-
-Downloads are several gigabytes. Nemotron defaults to the iOS export; Qwen defaults to the 2B model. MOSS-TTS-Nano supplies normal conversation speech and standalone diagnostics. Replies follow the user language; Mandarin/English speech and mixed-script segmentation are supported. Other speech languages remain unavailable. Model weights remain local and are not committed. See [model resources](MobileHarness/Resources/Models/README.md) for profiles, platform variants and redistribution notices.
+For offline development and opt-in Mac/model tests, the existing `scripts/download-*.py` wrappers still provision ignored local files, with `--endpoint` for Hugging Face downloads. See [model resources](MobileHarness/Resources/Models/README.md) for shared production declarations, the two separate Mac/comparison profiles, compatibility and notices.
 
 ### 4. Run on an iPhone
 
 Select the **MobileHarness** scheme, choose your connected device, and build and run.
 
 - Grant camera permission for preview and pose perception; the camera runs independently of voice readiness.
-- Wait for voice models to load and warm up, then tap the central control and grant microphone permission.
+- Open Settings → 本地模型资源 and download Nemotron, Silero, Qwen (unless cloud chat is explicitly configured), and MOSS for voice; download YOLO for pose perception. Settings/history and camera preview remain accessible without these resources.
+- Tap the central control to load/warm voice models and grant microphone permission.
 - Speak, then pause to finish your utterance. Recognition previews become a reply with speech and captions.
 - Tap again to stop recording and playback. Camera controls switch the lens or turn the preview off.
 
@@ -132,7 +125,7 @@ Good contributions include reproducible device reports, focused fixes, test cove
 
 ## Security and Privacy
 
-The default configuration processes voice and camera inputs on-device and requires no cloud inference API key. Enabling cloud chat in Settings sends chat requests, including the selected conversation context, to the configured provider; speech recognition, synthesis and camera perception remain local. Credentials are stored in the device Keychain, while settings and conversation history use local documents. Model provisioning downloads artifacts separately from runtime inference. Microphone and camera access require platform permission.
+The default configuration processes voice and camera inputs on-device and requires no cloud inference API key. Enabling cloud chat in Settings sends chat requests, including the selected conversation context, to the configured provider; speech recognition, synthesis and camera perception remain local. Credentials are stored in the device Keychain, while settings and conversation history use local documents. Settings downloads model artifacts separately from runtime inference, with explicit source selection and integrity verification. Microphone and camera access require platform permission.
 
 Do not commit or post credentials, signing settings, model weights, user recordings or other private media. Consult [SECURITY.md](SECURITY.md) before reporting sensitive issues; a private reporting channel has not yet been configured. Physical-device control requires independent hardware protections and must not rely on iOS background execution.
 
@@ -145,3 +138,7 @@ MobileHarness builds on the work behind Apple frameworks, MLX, Qwen, Nemotron, S
 Camera control Tools are registered as Camera.open, Camera.close and Camera.flip through the existing App-owned foreground camera lifecycle. Provider-native model Tool event transport remains unimplemented.
 
 ✅ Photographer subscribes to shared pose observations and sends completion-only five-axis BLE aim through Robot.aim. Physical tracking acceptance remains pending.
+
+✅ Local-resource refinement: compact schema-v2 repository/selection declarations replace per-file links/hashes. ModelKitHub wraps swift-huggingface 0.9.0 outside Management; App injects it. Storage-backed receipts record actual installed files/sizes. ❌ HF foreground downloads restart after process relaunch; durable background/partial resume and iPhone acceptance remain pending. See [ADR0105](docs/adr/0105-local-model-resource-management.md).
+
+✅ Hub download regression coverage checks regular-file selection, safe remote metadata and optional actual-network progress through the production adapter. Downloads use selected per-file Hub APIs without a permanent SDK cache. ❌ Real iPhone download UI acceptance remains separate.

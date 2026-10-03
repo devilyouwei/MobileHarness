@@ -1,6 +1,6 @@
 # FluidAudio Core ML backend
 
-Purpose: local Kokoro graph execution and Mandarin preprocessing behind ModelKit. Design goals: immutable provisioned resources, context-owned model state, no runtime downloads or global speech singleton.
+Purpose: provide the active multilingual Nemotron Core ML backend and optional, unregistered Kokoro graph execution and Mandarin preprocessing behind ModelKit. Current App and diagnostics use MOSS for synthesis; Kokoro has no repository downloader or cached weights. Explicit real-model tests provide an external resource root. Design goals: immutable provisioned resources, context-owned model state, no runtime downloads or global speech singleton.
 
 ✅ Pinned FluidAudio seven-stage Core ML pipeline with the OS 27 padded-input fix. Uses only public lower-level APIs after complete local resource validation. English and Mandarin stores are owned by one resource; NeMo binary trait disabled, Mandarin number normalization remains enabled.
 
@@ -23,3 +23,6 @@ flowchart LR
     Owner --> Graphs[Seven Core ML stages]
     Graphs --> PCM[24 kHz PCM]
 ```
+
+
+✅ LocalNemotronEngine is the active multilingual Core ML ASR backend. It validates all 22 local files and exact 2240 ms metadata, preloads resource-owned shared graphs with cpuAndNeuralEngine, and allocates fresh SDK recurrent state per session. LocalNemotronSession admits one operation with no queue, limits packets to 16,000 finite samples, total audio to 300 s, tokens to 16,384 and text to 64 KiB; cancellation joins native work before cleanup. The SDK native mel frontend and fused decoder_joint handle inference; no backend downloads. ❌ Sustained device acceptance remains pending.

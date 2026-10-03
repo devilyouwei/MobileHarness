@@ -4,6 +4,8 @@ public enum DocumentStorageError: Error, Equatable, Sendable {
     case invalidConfiguration, capacityExceeded, unsupportedVersion, conflict, invalidFile
 }
 
+public enum DocumentFileProtection: Sendable { case whileUnlocked, afterFirstUnlock }
+
 public struct DocumentSnapshot<Value: Sendable>: Sendable {
     public let revision: UUID
     public let value: Value
@@ -24,15 +26,19 @@ public actor LocalDocumentStore<Value: Codable & Sendable> {
     }
     private let url: URL
     private let maximumBytes: Int
+    private let protection: DocumentFileProtection
     private var cached: DocumentSnapshot<Value>?
     private var loaded = false
 
-    public init(url: URL, maximumBytes: Int = 65_536) throws {
+    public init(
+        url: URL, maximumBytes: Int = 65_536, protection: DocumentFileProtection = .whileUnlocked
+    ) throws {
         guard url.isFileURL, maximumBytes > 0, maximumBytes < Int.max else {
             throw DocumentStorageError.invalidConfiguration
         }
         self.url = url
         self.maximumBytes = maximumBytes
+        self.protection = protection
     }
 
     public func load() throws -> DocumentSnapshot<Value>? {
@@ -61,18 +67,37 @@ public actor LocalDocumentStore<Value: Codable & Sendable> {
         guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
         try DocumentFileAccess.lock.withLock {
             guard try readDisk()?.revision == revision else { throw DocumentStorageError.conflict }
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700])
-            #if os(iOS)
-                try data.write(to: url, options: [.atomic, .completeFileProtection])
-            #else
-                try data.write(to: url, options: .atomic)
-            #endif
+            try writeDisk(data)
         }
         cached = next
         loaded = true
         return next
+    }
+
+    /// Explicit last-writer-wins replacement for an authoritative single-owner snapshot.
+    /// Read/modify/write consumers must continue to use save(_:expecting:).
+    @discardableResult
+    public func replace(_ value: Value) throws -> DocumentSnapshot<Value> {
+        let next = DocumentSnapshot(revision: UUID(), value: value)
+        let data = try JSONEncoder().encode(Envelope(version: 1, revision: next.revision, value: value))
+        guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
+        try DocumentFileAccess.lock.withLock { try writeDisk(data) }
+        cached = next
+        loaded = true
+        return next
+    }
+    private func writeDisk(_ data: Data) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        #if os(iOS)
+            let protectionOption: Data.WritingOptions =
+                protection == .afterFirstUnlock
+                ? .completeFileProtectionUntilFirstUserAuthentication : .completeFileProtection
+            try data.write(to: url, options: [.atomic, protectionOption])
+        #else
+            try data.write(to: url, options: .atomic)
+        #endif
     }
 
     private func readDisk() throws -> DocumentSnapshot<Value>? {

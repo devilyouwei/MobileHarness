@@ -179,7 +179,7 @@ flowchart LR
 
 ✅ ConversationTitleGenerator generates titles from bounded excerpts as non-executable metadata. Its request is separate from Assistant conversation context and carries no Action instruction list. ❌ Storing raw responses does not guarantee that GPT-4.1 follows wait instructions or that Actions completed successfully; generation and execution status are distinct.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ## Action runtime stage 2
 
@@ -253,8 +253,13 @@ flowchart LR
 Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
 
 ✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
-❌ Local native tools, result-driven model continuation, persisted native tool-call transcripts and Responses API transport.
+❌ Local native tools, result-driven model continuation, partial native tool-call transcripts and Responses API transport.
 
 ✅ Formatting now satisfies Swift 6.4 strict lint. Runtime behavior and Agent JSON permissions are unchanged.
 
 ✅ A rejected synthesis request is recorded by the messaging port and skips only its dependent playback Action; other generated outputs and later inputs continue.
+
+## Durable native Tool and usage diagnostics
+
+✅ Assistant saves actual Tool declarations before chat, and complete native calls before resolution, preserving provider ID, runtime UUID and argument JSON. Resolution/admission errors are recorded against the same call; App supplies the actual Gateway execution outcome. ChatEvent.usage is stored before final completion. Ordinary chat requests omit maximumOutputTokens. XML and native calls may coexist; fixed internal caption Tools are excluded from model-native call history.
+❌ Partial native SSE calls and automatic result-driven continuation remain unsupported; missing usage is not estimated.

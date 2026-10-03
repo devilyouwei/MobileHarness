@@ -15,6 +15,34 @@ public struct ConversationMessage: Codable, Sendable, Equatable {
     }
 }
 
+public struct ConversationTokenUsage: Codable, Sendable, Equatable {
+    public let input: Int
+    public let generated: Int
+    public let total: Int
+    public init(input: Int, generated: Int, total: Int) {
+        self.input = input
+        self.generated = generated
+        self.total = total
+    }
+}
+
+public struct ConversationToolCall: Codable, Sendable, Identifiable {
+    public enum State: String, Codable, Sendable { case received, completed, failed, cancelled }
+    public let id: UUID
+    public let providerID: String
+    public let name: String
+    public let argumentsJSON: String
+    public var state: State = .received
+    public var output: String?
+    public var error: String?
+    public init(id: UUID, providerID: String, name: String, argumentsJSON: String) {
+        self.id = id
+        self.providerID = providerID
+        self.name = name
+        self.argumentsJSON = argumentsJSON
+    }
+}
+
 public struct ConversationRecord: Codable, Sendable, Identifiable {
     public enum State: String, Codable, Sendable { case generating, completed, failed, cancelled, interrupted }
     public let id: UUID
@@ -24,6 +52,10 @@ public struct ConversationRecord: Codable, Sendable, Identifiable {
     public let model: String
     public let maximumOutputTokens: Int?
     public let temperature: Double
+    // Optional additions keep version-1 records readable without migration.
+    public var toolDefinitions: [String]?
+    public var toolCalls: [ConversationToolCall]?
+    public var tokenUsage: ConversationTokenUsage?
     public var fragments: [String] = []
     public var state: State = .generating
     public var finishReason: String?
@@ -61,7 +93,7 @@ public struct ConversationArchive: Codable, Sendable {
 }
 
 /// One process-wide journal. A nil document is an explicit in-memory mode for isolated tests.
-/// Writes are serialized by an admission flag across the document actor await; no write queue exists.
+/// Writes are serialized across document awaits; at most 16 callers may wait, overflow fails busy.
 public actor ConversationHistoryStore {
     public static let maximumBytes = 32 * 1024 * 1024
     private let document: LocalDocumentStore<ConversationArchive>?
@@ -69,6 +101,20 @@ public actor ConversationHistoryStore {
     private var revision: UUID?
     private var loaded = false
     private var writing = false
+    private var writers: [CheckedContinuation<Void, Never>] = []
+
+    private func acquireWrite() async throws {
+        if !writing {
+            writing = true
+            return
+        }
+        guard writers.count < 16 else { throw ConversationHistoryError.busy }
+        await withCheckedContinuation { writers.append($0) }
+    }
+
+    private func releaseWrite() {
+        if writers.isEmpty { writing = false } else { writers.removeFirst().resume() }
+    }
 
     public init(document: LocalDocumentStore<ConversationArchive>? = nil) { self.document = document }
 
@@ -100,9 +146,8 @@ public actor ConversationHistoryStore {
     }
 
     public func snapshot() async throws -> ConversationArchive {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         return value
     }
@@ -112,9 +157,8 @@ public actor ConversationHistoryStore {
         id: UUID, user: String, system: String, model: String,
         maximumOutputTokens: Int? = nil, temperature: Double = 0.7
     ) async throws -> ConversationRecord {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         guard !value.current.turns.contains(where: { $0.state == .generating }) else {
             throw ConversationHistoryError.busy
@@ -138,10 +182,82 @@ public actor ConversationHistoryStore {
         return record
     }
 
+    private func updateTurn(
+        _ id: UUID, required: Bool = true, change: (inout ConversationRecord) throws -> Bool
+    ) async throws {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        var next = value
+        if let index = next.current.turns.firstIndex(where: { $0.id == id }) {
+            guard try change(&next.current.turns[index]) else { return }
+        } else if let archive = next.past.firstIndex(where: { $0.turns.contains(where: { $0.id == id }) }),
+            let index = next.past[archive].turns.firstIndex(where: { $0.id == id })
+        {
+            guard try change(&next.past[archive].turns[index]) else { return }
+        } else {
+            if required { throw ConversationHistoryError.missingTurn }
+            return
+        }
+        try await commit(next, reserve: 32768)
+    }
+
+    public func recordToolDefinitions(_ definitions: [String], for id: UUID) async throws {
+        guard definitions.count <= 128, definitions.reduce(0, { $0 + $1.utf8.count }) <= 65536 else {
+            throw ConversationHistoryError.capacityExceeded
+        }
+        try await updateTurn(id) {
+            $0.toolDefinitions = definitions
+            $0.toolCalls = []
+            return true
+        }
+    }
+
+    public func recordToolCall(_ call: ConversationToolCall, for id: UUID) async throws {
+        guard call.providerID.utf8.count <= 512, call.name.utf8.count <= 64,
+            call.argumentsJSON.utf8.count <= 4096
+        else { throw ConversationHistoryError.invalidRecord }
+        try await updateTurn(id) { turn in
+            var calls = turn.toolCalls ?? []
+            guard calls.count < 128, !calls.contains(where: { $0.id == call.id }) else {
+                throw ConversationHistoryError.capacityExceeded
+            }
+            calls.append(call)
+            turn.toolCalls = calls
+            return true
+        }
+    }
+
+    public func recordToolOutcome(
+        _ callID: UUID, for id: UUID, state: ConversationToolCall.State,
+        output: String? = nil, error: String? = nil
+    ) async throws {
+        guard state != .received, (output?.utf8.count ?? 0) <= 65536 else {
+            throw ConversationHistoryError.invalidRecord
+        }
+        try await updateTurn(id, required: false) { turn in
+            // Fixed internal UI Tools are deliberately absent from model-call history.
+            guard let index = turn.toolCalls?.firstIndex(where: { $0.id == callID }) else { return false }
+            turn.toolCalls?[index].state = state
+            turn.toolCalls?[index].output = output
+            turn.toolCalls?[index].error = error.map { String($0.prefix(4096)) }
+            return true
+        }
+    }
+
+    public func recordTokenUsage(_ usage: ConversationTokenUsage, for id: UUID) async throws {
+        guard usage.input >= 0, usage.generated >= 0, usage.total >= 0 else {
+            throw ConversationHistoryError.invalidRecord
+        }
+        try await updateTurn(id) {
+            $0.tokenUsage = usage
+            return true
+        }
+    }
+
     public func append(_ delta: String, to id: UUID) async throws {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         guard let index = value.current.turns.firstIndex(where: { $0.id == id }),
             value.current.turns[index].state == .generating
@@ -158,9 +274,8 @@ public actor ConversationHistoryStore {
     public func finish(
         _ id: UUID, state: ConversationRecord.State, reason: String? = nil, error: String? = nil
     ) async throws {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         guard let index = value.current.turns.firstIndex(where: { $0.id == id }), state != .generating else {
             throw ConversationHistoryError.missingTurn
@@ -182,9 +297,8 @@ public actor ConversationHistoryStore {
 
     /// Requires producer cancellation/cleanup before archival. An empty conversation is not archived.
     public func startNew() async throws -> StoredConversation? {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         guard !value.current.turns.contains(where: { $0.state == .generating }) else {
             throw ConversationHistoryError.busy
@@ -201,9 +315,8 @@ public actor ConversationHistoryStore {
     }
 
     public func setTitle(_ title: String?, error: String? = nil, for id: UUID) async throws {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         guard let index = value.past.firstIndex(where: { $0.id == id }) else {
             throw ConversationHistoryError.invalidRecord
@@ -220,9 +333,8 @@ public actor ConversationHistoryStore {
     }
 
     public func recordExecutionFailure(_ error: String, for id: UUID) async throws {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         guard let index = value.current.turns.firstIndex(where: { $0.id == id }) else { return }
         var next = value
@@ -231,9 +343,8 @@ public actor ConversationHistoryStore {
     }
 
     public func deleteArchived(_ id: UUID) async throws {
-        guard !writing else { throw ConversationHistoryError.busy }
-        writing = true
-        defer { writing = false }
+        try await acquireWrite()
+        defer { releaseWrite() }
         try await load()
         var next = value
         next.past.removeAll { $0.id == id }

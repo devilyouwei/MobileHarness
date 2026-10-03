@@ -159,7 +159,7 @@ func realSileroStreamingResetTailAndSilence() async throws {
         let asr = try NemotronASR(
             context: asrContext,
             artifacts: models.appendingPathComponent(
-                "Nemotron-macos"))
+                "Nemotron"))
         let recognition = try await asr.transcribe(SpeechRecognitionRequest(locale: "en-US", format: format))
         let reading = Task { () throws -> String in
             var text = ""

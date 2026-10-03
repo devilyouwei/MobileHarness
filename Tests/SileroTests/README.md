@@ -11,7 +11,7 @@ Maintain expected sample sequences and error assertions when changing stream con
 
 ✅ Adapter fixtures explicitly own ModelContext; managed weight teardown is independent of capability/session consumption. Shared registration/reuse tests live under root Tests/ModelKitRuntimeTests.
 
-✅ Local model fixtures use flat Models directories: Silero and Nemotron-macos. Required backend files are loaded directly; download profiles are development-only configuration.
+✅ Local model fixtures use flat Models directories: Silero and Nemotron. Required backend files are loaded directly; Silero provisioning shares model-catalog.json; Nemotron comparison uses the same 2240 ms Core ML catalog as iOS. App inference reads sandbox resources.
 
 ✅ Isolated adapter fixtures explicitly import ModelManagement SPI to own test lifecycle; production adapters receive their context from the manager.
 

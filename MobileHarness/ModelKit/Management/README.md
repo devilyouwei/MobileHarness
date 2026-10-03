@@ -68,7 +68,7 @@ No cancellation callback runs while holding a mutex. Resource load generations p
 
 Registration defaults to retain. releaseWhenIdle opts a model into handleMemoryPressure(): the manager examines at most 32 entries, gates one entry at a time, and atomically releases only a loaded resource with no leases, load or teardown in progress. Busy/loading/unconstructed resources are skipped without waiting, cancellation or deferred eviction. Existing capability handles reload on their next request; provider identity is retained. This is event-driven idle eviction, not a periodic timer or a guarantee of a particular number of freed bytes.
 
-ModelKitDefaults selects releaseWhenIdle for Nemotron, Qwen and diagnostic Kokoro. App’s memory-warning stream retains one pending event and coalesces repeated warnings; warnings carry no user data or device commands. Silero and system speech use retain. ModelManager does not depend on UIKit, MLX or OS notification APIs.
+ModelKitDefaults selects releaseWhenIdle for Nemotron, Qwen and MOSS synthesis. App’s memory-warning stream retains one pending event and coalesces repeated warnings; warnings carry no user data or device commands. Silero and system speech use retain. ModelManager does not depend on UIKit, MLX or OS notification APIs.
 
 ModelState is residency only. A provider without managed resources reports unmanaged. availability(id, for:) obtains a lightweight provider and checks its capability availability without loading weights; it can be unavailable even when residency is unmanaged. Availability is a snapshot and inference can still fail later.
 
@@ -110,3 +110,52 @@ flowchart LR
     Candidate -->|success| Close[Cancel and join old resource]
     Close --> Commit[Replace entry under same ID]
 ```
+
+## Local model resources — current contract
+
+Purpose: manage explicitly downloaded model artifacts independently from model residency. Design goals: compact bundled metadata, safe all-reference deletion, bounded operations and an independent Management target.
+
+- ✅ `ModelRegistration.swift` owns optional provider artifact associations, schema-v2 source/required-file values, download/status and injected downloader/storage protocols.
+- ✅ `ModelArtifactStore.swift` owns two active package slots, eight FIFO pending requests (overflow rejects), persistent request generations, cancellation/join, required-file validation and atomic publication through App-injected Storage. `ModelManager` fences every referencing resource during stop/drain/unload/delete; retained handles cannot reload until maintenance ends.
+- ✅ `Backends/HuggingFace/HuggingFaceArtifactDownloader.swift` is the concrete ModelKitHub adapter using swift-huggingface 0.9.0. Runtime depends only on ModelKit; the adapter depends on Runtime contracts and HuggingFace. App injects it through Defaults.
+- ✅ Schema v2 declares `source.kind`, HF `repoId`, optional source `revision` (default main), `allowPatterns`, optional `stripPrefix`; ordinary ZIP sources declare a URL and optional archive SHA256. No bundled per-file URLs, sizes or hashes. Production graph exports retain their tested source revision. License identity/compatibility and key `requiredFiles` remain metadata. Parsing bounds: 1 MiB, 32 packages, 128 selection patterns, 4096 required files; malformed/traversing declarations reject.
+- ✅ `estimatedBytes` is a storage/display estimate, not an integrity assertion. Hub resolves remote metadata and size-weighted progress. Installation checks a symlink-free tree (16384 entries, 32 GiB maximum) plus required files. SDK checks do not replace an independent static hash trust anchor. Ordinary ZIPs retain an optional archive trust anchor, safe path checks and 64 MiB compressed/256 MiB expanded limits.
+- ✅ Storage remains generic. App bridges `LocalFileStore` and a bounded transfer document, writes a local `.installation.json` receipt containing actual installed paths/sizes, and publishes `installed/<directory>` atomically. Startup validates receipt identity and actual file sizes; Settings shows receipt-based installed size. Deletion removes the installed tree; Hub has no separate permanent cache. The exact former filesystem-alias receipt defect is repaired only after complete identity/path/size validation. Other malformed/older receipts show a per-package failure with explicit deletion available; they are not silently reset.
+- ✅ Official HF, hf-mirror.com and custom HTTPS domains/cellular policy are persisted by Settings and applied to new downloads. HF uses stable native background sessions with up to three active file tasks per package. ZIP uses the existing background transport and original URL. Leaving Settings does not cancel process-owned work.
+- ✅ Relaunch restores persisted requests. Interrupted HF staging and generations are retained for OS task reattachment and completed-file reuse; completion is gated by generation and cancellation. ZIP OS task reassociation remains available. Explicit cancellation removes staging and joins work before deletion.
+- ✅ HF native background transfer and available system resume-data reuse are implemented. ❌ Physical-phone lifecycle/large-file acceptance and guaranteed server resume remain outstanding.
+- ❌ Batch acquisition, general orphan-stage collection, derived Core ML compilation size accounting, full Xcode/iPhone/network/mirror acceptance remain outstanding. Startup/history/settings stay available without weights; install never starts inference automatically.
+
+```mermaid
+flowchart LR
+    Meta[Bundled source declarations] --> App[App assembly]
+    App --> Defaults[Defaults: process manager]
+    Defaults --> Manager[Management: bounded artifact store]
+    Manager --> HF[Injected ModelKitHub adapter]
+    HF --> SDK[HubClient: resolve and download regular files]
+    SDK --> Stage[Selected staging files]
+    Stage --> Manager
+    Manager --> Check[Required files and local tree bounds]
+    Check --> Bridge[App storage adapter]
+    Bridge --> Storage[Storage: atomic install and removal]
+    Manager --> Barrier[Core maintenance barrier]
+    Barrier --> Quiesce[App voice / vision stop and join]
+```
+
+Workflow: read source metadata → admit explicit request → SDK downloads selected regular files → strip prefix/bookkeeping → validate required files/local tree → write actual receipt and publish → refresh availability. Delete closes resource admission → App stops related work → drain/unload → cancel/join transfers → remove files → reopen admission. Provider registration, capability binding and inference remain separate from artifact provisioning.
+
+Validation (2026-10-03): ModelKitHub builds; 41 isolated shared tests pass (33 Runtime, 2 Storage, 1 Settings workflow, 5 UI state). Boundary/provisioning/format/project checks pass; Defaults and App storage/settings adapter type checks pass. Full check.sh stops at missing Metal compiler; build-ios.sh requires full Xcode. Real HF/mirror/iPhone acceptance is unverified.
+
+✅ 下载取消会等待任务清理；已取消任务的底层 URLSession 错误不会被显示为下载失败。安装完成后到达的取消是无操作，保留安装状态与文件。❌ 真实网络取消时序仍需设备验证。
+
+Validation update (2026-10-03): with DEVELOPER_DIR pointing to full Xcode 27, check.sh and all four build-ios.sh schemes pass. Latest MobileHarness Debug device build succeeds, installs and launches on the paired iPhone 17 Pro. The packaged Models directory contains metadata only (104 KiB). Live download/progress/cancellation and mirror acceptance remain pending user testing.
+
+✅ Receipt-validated settled files determine installed status. Completion task-index write failures preserve installed state and report transferIndex; old failed cache states cannot override a valid installation. Successful publication clears old errors; failed removal remains visible separately. ❌ Phone records remain unavailable; the later host probe reproduces the reported 100%-then-failure behavior through invalid aliased receipt paths.
+
+Validation refinement (2026-10-03): the official production YOLO ZIP passes native extraction; the actual App storage adapter reproduced shifted receipt paths from /var versus /private/var enumeration. Normalized path derivation fixes publication/receipt validation. A host probe verifies installed status, 3261955 installed bytes, no pending transfer record, exact legacy-path repair and rejection of altered files. ❌ Physical iPhone confirmation remains pending connectivity.
+
+
+✅ Installed receipt revision mismatches remain observable as incompatible resources; Settings requires explicit deletion before downloading the replacement. Nemotron now points to one shared macOS/iOS Core ML source.
+
+
+✅ HF failure now preserves the transfer generation and staging; explicit retry reuses it, relaunch reattaches background tasks, and explicit cancel/delete joins work and discards staging. Two active/eight pending admission remains unchanged. Network failures retain numeric error codes. ❌ Server resume and phone lifecycle acceptance remain conditional/pending.

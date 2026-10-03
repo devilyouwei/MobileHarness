@@ -1,5 +1,7 @@
 # 0052 — Local Kokoro Core ML bilingual synthesis
 
+> Historical model/resource scope: current synthesis selection is [ADR0058](0058-moss-tts-nano.md); current metadata-only packaging, source declarations, explicit acquisition and safe removal are [ADR0105](0105-local-model-resource-management.md). Old bundle-weight, development-profile and Kokoro-default statements below are retained decision history, not current implementation contracts.
+
 Date: 2026-09-28. Supersedes ADR 0050's English-only synthesis selection.
 
 ## Decision

@@ -72,7 +72,7 @@ public actor Qwen35Chat: ChatCapability {
             let emitter = pair.emitter
             let task = Task {
                 do {
-                    let stopped = try await lease.model.generate(
+                    let generation = try await lease.model.generate(
                         tokens: tokens, maximumTokens: maximumTokens, temperature: request.temperature,
                         stopTokens: [248044, 248046]
                     ) { delta in
@@ -80,7 +80,12 @@ public actor Qwen35Chat: ChatCapability {
                     }
                     try Task.checkCancellation()
                     await resource.release(lease.id)
-                    try emitter.yield(.finished(stopped ? .stop : .lengthLimit))
+                    try emitter.yield(
+                        .usage(
+                            try ChatTokenUsage(
+                                input: tokens.count, generated: generation.generatedTokens,
+                                total: tokens.count + generation.generatedTokens)))
+                    try emitter.yield(.finished(generation.stopped ? .stop : .lengthLimit))
                     emitter.finish()
                 } catch {
                     await resource.release(lease.id)

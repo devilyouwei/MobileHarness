@@ -1,1 +1,12 @@
 $(SRCROOT)/scripts/stage-voice-models.sh
+$(SRCROOT)/MobileHarness/Resources/Models/model-catalog.json
+$(SRCROOT)/docs/licenses/Nemotron-OpenMDW-1.1.txt
+$(SRCROOT)/docs/licenses/CoreAIKit-BSD-3-Clause.txt
+$(SRCROOT)/docs/licenses/Qwen35-Apache-2.0.txt
+$(SRCROOT)/docs/licenses/MLX-Swift-MIT.txt
+$(SRCROOT)/docs/licenses/MLX-Swift-LM-MIT.txt
+$(SRCROOT)/docs/licenses/Silero-MIT.txt
+$(SRCROOT)/docs/licenses/Hugging-Mac-MIT.txt
+$(SRCROOT)/docs/licenses/MOSS-TTS-Nano-Apache-2.0.txt
+$(SRCROOT)/docs/licenses/FluidAudio-Apache-2.0.txt
+$(SRCROOT)/docs/licenses/YOLOPose-AGPL-3.0.txt

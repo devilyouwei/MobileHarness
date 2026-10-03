@@ -63,16 +63,32 @@ public struct ChatRequest: Sendable {
     }
 }
 
+public struct ChatTokenUsage: Equatable, Sendable {
+    public let input: Int
+    public let generated: Int
+    public let total: Int
+    public init(input: Int, generated: Int, total: Int) throws {
+        guard input >= 0, generated >= 0, total >= 0 else {
+            throw CapabilityError.invalidRequest("Invalid token usage")
+        }
+        self.input = input
+        self.generated = generated
+        self.total = total
+    }
+}
+
 public enum ChatEvent: Equatable, Sendable {
     public enum FinishReason: Sendable { case stop, lengthLimit, toolCalls }
     case text(String)
     case toolCall(ChatToolCall)
+    case usage(ChatTokenUsage)
     case finished(FinishReason)
 
     public var estimatedBytes: Int {
         switch self {
         case .text(let value): value.utf8.count + 32
         case .toolCall(let call): call.id.utf8.count + call.name.utf8.count + call.argumentsJSON.utf8.count + 64
+        case .usage: 56
         case .finished: 32
         }
     }

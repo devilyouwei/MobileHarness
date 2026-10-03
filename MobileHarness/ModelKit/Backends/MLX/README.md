@@ -46,3 +46,8 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 ✅ The Defaults assembly explicitly configures the process-wide MLX cache before registering models, using configureCache(limitBytes:). Its budget is 64 MiB. Engine initialization loads only its local model and never changes global allocator policy. Negative limits fail. The cache limit is not a cap on live weights or total process memory.
 
 ✅ The Defaults assembly explicitly configures the MLX cache before registering chat; backend initialization never changes the process-wide policy.
+
+## Generation accounting
+
+✅ generate returns MLXLanguageGeneration with stopped and generatedTokens, counted during the existing pull loop including a consumed stop token. Consumers do not retokenize decoded text to estimate usage. Callback ordering, GPU synchronization and per-operation admission remain unchanged.
+❌ Partial failure accounting is not exposed.

@@ -29,7 +29,7 @@ flowchart LR
     Audio --> Memory[MemoryLeaseStore and BoundedMemoryStream]
 ```
 
-Generic persistent media files and reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage; both consume independent Types values.
+Generic LocalFileStore now supports explicit persistent directory publication; reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage; both consume independent Types values.
 
 ## Local cache and persistence synchronization
 
@@ -61,7 +61,7 @@ sequenceDiagram
 
 MemoryLeaseStore accepts nil queueTTL/readyTTL for owner-managed values without arming expiry tasks. BoundedMemoryStream accepts a nil read timeout, leaving completion to producer finish/failure or cancellation. StorageAudio uses both owner-managed policies; bounded error tombstones expire separately.
 
-❌ Global cross-namespace byte budgets, reclaimable disk caches, persistent media, semantic memory and cross-device/cross-process synchronization are not implemented. Each instance supplies its own item/byte bound. Model weights belong to Resources.
+❌ Global cross-namespace byte budgets, reclaimable disk caches, persistent media, semantic memory and cross-device/cross-process synchronization are not implemented. Each instance supplies its own item/byte bound. Packaged model metadata belongs to Resources; downloaded model files use generic Storage through App injection, with Management owning their lifecycle.
 
 ## Directory and target ownership
 
@@ -93,3 +93,23 @@ The outer layer owns reusable cache, persistence and local synchronization mecha
 Domain targets depend on core mechanisms, never the reverse. App owns settings payload/credential policy and uses the generic document store. StorageAudio consumes Types values and opaque source identity; StorageChat consumes Storage alone.
 
 See [Chat](Chat/README.md) for the journal contract and [Audio](Audio/README.md) for PCM contracts.
+
+## Cooperation with local model resources
+
+✅ LocalFileStore provides generic confined staging, bounded reads/space reservations, non-overwriting directory publication and removal. Trusted root aliases are canonicalized; descendant symlinks/traversal reject. App bridges these primitives to Management and stores actual file/size receipts; bounded transfer/source documents use LocalDocumentStore. Storage remains Foundation-only and has no model JSON, network, provider selection or inference policy. Installed weights are user-managed persistent files.
+
+```mermaid
+flowchart LR
+    Management[ModelKit Management] --> Protocol[Management storage protocol]
+    Protocol --> Adapter[App storage adapter]
+    Adapter --> Files[LocalFileStore: files and publication]
+    Adapter --> Docs[LocalDocumentStore: bounded transfer records]
+```
+
+❌ Generic orphan-directory collection and file-protection acceptance remain pending. Model-specific recovery/maintenance stays in [Management](../ModelKit/Management/README.md#local-model-resources--current-contract).
+
+✅ iOS 本地目录通过原生文件属性 API 设置 completeUntilFirstUserAuthentication 保护，模型文件排除系统备份。❌ 设备锁定期间的真实下载生命周期仍需单独验证。
+
+✅ LocalDocumentStore.replace is an explicit bounded, atomic last-writer-wins operation for single-owner authoritative snapshots; read/modify/write clients retain revision-checked save. File protection defaults to whileUnlocked; an explicit afterFirstUnlock policy permits non-sensitive task bookkeeping while locked after initial unlock. ❌ Device lock-state acceptance remains separate from macOS storage tests.
+
+✅ LocalFileStore.relativePath normalizes both item/root URLs before confinement and relative-path derivation; native /var and /private/var spellings no longer produce shifted paths. ❌ Filesystem alias behavior on physical iOS remains part of device acceptance.

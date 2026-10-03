@@ -48,6 +48,16 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         preview = camera.preview
     }
 
+    func pauseVisionForModelMaintenance() async {
+        visionSession = nil
+        let task = visionTask
+        visionTask?.cancel()
+        await task?.value
+        visionTask = nil
+        state.skeleton = nil
+        state.visionMessage = "姿态模型已停用，可在设置中重新下载"
+    }
+
     func toggle() {
         state.isEnabled.toggle()
         failed = false

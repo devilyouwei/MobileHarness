@@ -208,7 +208,8 @@ MobileHarness/
 │   ├── Language/                 # Language capability and adapters
 │   ├── Speech/                   # Speech capabilities and adapters
 │   ├── Vision/                   # Vision capability and adapters
-│   └── Backends/                # Engine-specific targets
+│   └── Backends/                # Engine and resource acquisition targets
+│       └── HuggingFace/         # ModelKitHub: concrete Hub SDK adapter
 ├── PlatformKit/
 │   ├── Core/                    # Boundary documentation; no compiled placeholder
 │   ├── Audio/                   # OS audio capture and output
@@ -254,6 +255,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | ModelKit shared capability sources | ModelKit | Types |
 | `ModelKit/Management/` | ModelKitRuntime | ModelKit |
 | `ModelKit/Defaults/` | ModelKitDefaults | ModelKit, ModelKitRuntime, registered adapters |
+| `ModelKit/Backends/HuggingFace/` | ModelKitHub | ModelKitRuntime, HuggingFace product |
 | ModelKit adapters/backends | Separate targets | ModelKit or engine-specific backend targets |
 
 ### Architectural boundaries
@@ -636,6 +638,28 @@ Base ModelKit depends only on Types. ModelKitDefaults registers concrete provide
 
 Stopping a voice session cancels its model work without automatically unloading weights. Explicit unload waits for active use; manager shutdown is terminal and cancels/joins owned work. Capability availability and resource residency are separate policies. App forwards coalesced memory-pressure handling, while manager construction/registration remains restricted to ModelAssembly SPI and isolated tests.
 
+### Local model resource acquisition and removal
+
+✅ The App bundles schema-v2 source metadata/licenses, with no weights. App composes one Defaults manager, the generic Storage bridge and the independent ModelKitHub adapter. Management owns admission/state/install/delete; the adapter owns concrete HF SDK calls. Runtime retains its ModelKit-only dependency. The new backend target is a documented exception to the earlier existing-target-only proposal.
+
+```mermaid
+flowchart LR
+    UI[Settings] --> Workflow[Settings workflow]
+    Workflow --> App[App adapters]
+    App --> Manager[ModelKit Management]
+    Manager --> HF[Injected ModelKitHub]
+    HF --> Hub[HubClient: selected snapshot]
+    Hub --> Verify[Management: required files and bounds]
+    Verify --> Bridge[App storage adapter]
+    Bridge --> Storage[Storage: receipt and atomic publish]
+    Manager --> Barrier[Core maintenance]
+    Barrier --> Lifecycle[App voice/vision stop and join]
+```
+
+Startup reads compact repository/archive declarations and restores requests. Explicit download resolves files through HF SDK → stages selected assets → validates key files/tree bounds → writes actual file/size receipt → atomically publishes → refreshes availability. No provider is registered by JSON and no inference starts automatically. Settings/history remain usable without weights.
+
+Deletion closes every associated resource's admission, stops related App work, drains/unloads, cancels/joins transfers and removes the installed tree before releasing maintenance. Source settings support official HF, hf-mirror.com and custom HTTPS hosts/cellular policy. Installed sizes come from receipts; pre-download sizes are estimates. Receipt paths normalize filesystem aliases before deriving confined relative paths. The exact former staging-prefix defect is repaired only after identity/revision, required-file and size validation. Installation publication and transfer-record persistence have separate outcomes: bookkeeping failure cannot undo a valid installation. App atomically replaces its authoritative task snapshot with afterFirstUnlock protection; other document clients retain revision-checked writes and their existing protection. HF has three native file tasks per package, two active packages/eight pending requests; overflow rejects. HF background tasks survive suspension and restore persisted generations/completed files on relaunch, with available system resume data; ZIP transport retains OS background reassociation. ❌ Guaranteed server resume, batch acquisition and full iPhone acceptance remain pending. [Management](ModelKit/Management/README.md#local-model-resources--current-contract) owns the detailed contract; [ADR0105](../docs/adr/0105-local-model-resource-management.md) records the decision.
+
 ### Cross-module concurrency and completion
 
 SwiftUI state is MainActor-isolated. Runtime services, Agents, stores, managers and coordinators use actor isolation. Cross-module completion is always defined at the owning boundary:
@@ -669,3 +693,14 @@ RobotTools owns argument validation and macro metadata for motors1–5. Gateway 
 ✅ Agent fault isolation: ordinary messaging and behavior execution failures are outcomes, never a reason to terminate sibling Agents. Photographer owns offline command suppression; Gateway retains bounded output/Action diagnostics. Startup configuration validation and explicit cancellation remain strict.
 
 ✅ Expression behavior follows Actions Perform/Set: UI.express is finite and awaits enter/restore transaction acknowledgments; UI.setExpression is state and commits the persistent base (clear resets it). App adapts session/turn ownership with one pending acknowledgment; UI supplies display-only callbacks. Cancellation/new-turn teardown invalidates old callbacks. ❌ Physical-device visual acceptance remains pending. See ADR0104.
+
+### Conversation Tool diagnostics
+
+✅ Existing history records retain actual request Tool declarations, complete native calls and runtime-correlated Gateway outcomes, independently of generation completion. App adapts execution into StorageChat values; UI displays/exports these values without importing Gateway or ModelKit. Optional input/generated/total usage comes from cloud providers or the local backend. History removes max tokens display; normal Assistant requests omit that option. Storage writes use a bounded 16-waiter FIFO so output outcomes and generation fragments cannot overwrite one another. See [ADR0106](../docs/adr/0106-conversation-tool-diagnostics.md).
+❌ Partial native-call deltas and real-device/provider acceptance remain outstanding.
+
+
+✅ Nemotron recognition now downloads the shared multilingual/2240ms Core ML export through Management → Hub → App storage. The receipt fixes the installed revision; stale revisions prompt explicit deletion. ModelKitFluidAudio preloads shared graphs, the ASR adapter obtains a fresh recurrent session under one lease, ordered 16 kHz PCM produces bounded revisions, and finish/cancel drains native work before release. macOS and iOS use the same files. See ADR 0107 for the current runtime contract.
+
+
+✅ Model download workflow now resolves Hub metadata → persists a generation-bound plan → runs up to three native background file tasks per active package → moves completed files and schedules successors in delegate callbacks → validates and publishes through App storage. Failed/relaunched requests reuse completed files and available resume data; cancel/delete joins tasks then discards staging. App handles system events and a bounded preparation window. Phone lock-screen acceptance remains pending; see ADR 0108.

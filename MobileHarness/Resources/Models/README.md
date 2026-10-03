@@ -1,46 +1,43 @@
 # Local model resources
 
-Purpose: keep development download profiles beside ignored local model files. Design goals: one fixed production model per capability, predictable paths and no duplicate runtime artifact catalog.
+Purpose: keep the compact production source catalog and the local weights needed by opt-in Mac tests. Design goals: one production declaration per artifact, reproducible test exports and no weights in App resources or Git.
 
-| Directory | Use |
+## Configuration ownership
+
+- ✅ `model-catalog.json` schema v2 is the shared production source for App resource acquisition and developer download wrappers. It declares repositories/selection rules or a ZIP source, key required files, license/compatibility and advisory size. Per-file URLs/sizes/hashes are resolved at download time.
+- ✅ Only one separate development configuration remains: `qwen3.5-4b.download.json` (opt-in comparison/assessment variant). These do not redefine production resources.
+- ✅ Redundant production download JSONs and the inactive Audio8 profile/wrapper are removed. Historical Audio8 validation remains in docs.
+
+| Local directory retained | Mac test use |
 | --- | --- |
-| Nemotron | Production iOS ASR; native h18p export |
-| Nemotron-macos | Optional Mac ASR tests |
-| Qwen35 | Production Qwen3.5-2B 4-bit MLX chat |
-| Silero | Production Core ML VAD |
-| MossTTSNano | Default Mandarin/English streaming Core ML TTS (beta) and diagnostics |
-| KokoroCoreML | Legacy comparison download only; excluded from App staging |
-| Qwen35-4B / Audio8 | Download destinations for retained comparison profiles; not bundled |
+| Nemotron | Nemotron real streaming/cancellation and Silero comparison |
+| Qwen35 | Qwen generation/tokenizer/lifecycle and Agent prompt evaluation |
+| Silero | Real VAD streaming/reset tests |
+| MossTTSNano | Chinese/English synthesis and lifecycle |
+| YOLOPose | Opt-in real pose/lifecycle tests via YOLO_POSE_MODEL_ROOT |
 
-Required model files live directly inside each directory, preserving backend-required internal structure. Native model containers can contain their own metadata and hashes; these are part of the backend format. Production TTS uses MOSS-TTS-Nano Core ML with zh_1/en_2 presets. The moss-tts-nano profile installs into MossTTSNano. Kokoro is no longer staged.
+✅ Old unused `Kokoro` CoreAI weights and iPhone-only `Nemotron` h18p weights were removed locally (about 1.6 GiB). Other local model weights are retained for Mac validation. `Qwen35-4B` can be downloaded when requested but is not currently cached. These directories are ignored by Git and are never App build prerequisites.
 
-## Download configuration
+## Developer acquisition workflow
 
-Each *.download.json contains source (repository URL), revision (fixed upstream commit), directory and files (relative remote paths). Platform-specific exports use platforms plus defaultPlatform instead of files. Optional fileURLs map individual assets to separately pinned sources (the Kokoro Mandarin BERT vocabulary). Revisions exist only in development configuration, never as runtime directory names or Swift model constants.
-
-Run python3 scripts/download-qwen35.py for 2B; --size 4b downloads the comparison model. Nemotron defaults to iOS; --platform macos downloads Mac test assets. Audio8's profile and downloader remain available, but using it in App requires restoring its adapter and dependencies.
-
-Existing files are reused. Use --force when changing the configured revision or repairing an incomplete/corrupt file. A bounded pool of four workers downloads to temporary .partial files and atomically replaces completed files; failures propagate. Neither downloading nor inference compares per-file checksums. Backend loaders still reject missing or unsupported model data.
+Use the existing wrappers: `download-qwen35.py` defaults to 2B (`--size 4b` selects its separate test profile); `download-nemotron.py --platform macos` selects the Mac test export (default/ios reads the production catalog). Silero/MOSS/YOLO wrappers read the same production catalog as App. `--endpoint` supports official HF, mirror and custom HTTPS domains; `--force` refreshes reused local files.
 
 ```mermaid
 flowchart LR
-    Profile[Development JSON profile] -->|Source / revision / paths| Download[Four download workers]
-    Download -->|Temporary file then atomic replace| Local[Model-name directory]
-    Local -->|Selected directories and licenses| Stage[App resource staging]
-    Stage -->|Local directory| Adapter[Backend loader]
+    Catalog[Production source catalog] --> Resolve[Hub tree API: selected paths / sizes / LFS hashes]
+    Tests[Separate Mac / comparison profile] --> Download[Four bounded download workers]
+    Resolve --> Download
+    Download --> Local[Ignored local test weights]
+    ZIP[Catalog ZIP source] --> Verify[Archive hash / safe paths / required files / bounds]
+    Verify --> Local
+    Catalog --> Bundle[App: metadata and license notices only]
 ```
 
-- ✅ Flat resource paths, fixed production ASR/chat, development-only download profiles.
-- ✅ Audio8 and Qwen4B weights excluded; ONNX is not an App dependency.
-- ✅ Privacy declarations and redistribution licenses remain separate from model configuration.
-- ❌ In-app downloads, automatic fallback, multiple production variants and automatic cache repair.
+✅ Developer downloads use only Python standard library plus existing curl, bounded metadata pages/files, four workers, partial files and atomic replacement. ZIP installation preserves the previous model on failure. Runtime SDK/state/installation belongs to [Management](../../ModelKit/Management/README.md#local-model-resources--current-contract), not these scripts.
 
-Never commit weights, user recordings, credentials or local signing settings. Update this table and staging inputs when changing bundled resources.
+❌ Real network/mirror and iPhone acceptance remain pending. Local weights are reproducible test assets; do not commit them, user media, credentials or signing settings.
 
-✅ Supported chat download profiles are Qwen3.5-2B and optional 4B. Native CoreAI resources support ASR; MOSS-TTS-Nano TTS uses Core ML; Kokoro is a legacy comparison profile.
+✅ Unregistered Kokoro comparison provisioning is removed: download JSON, wrapper and local KokoroCoreML weights (about 330 MiB). Its optional adapter/contract tests remain; real-model tests must explicitly supply an external root.
 
-✅ yolo26-pose.download.json pins the official Ultralytics YOLO26n-Pose INT8 archive and extracted file hashes; download with scripts/download-yolo26-pose.py. The model metadata declares AGPL-3.0. ✅ Physical App staging includes these artifacts.
 
-✅ YOLOPose is now included in physical-device model staging for the camera pipeline. Download via scripts/download-yolo26-pose.py before device builds; weights stay ignored.
-
-✅ Current pose asset is official YOLO26n-Pose INT8/end2end. yolo26-pose.download.json pins the ZIP asset and every extracted member by SHA-256. The old Hugging Face YOLOv8 profile and installed package are removed; no weights are committed.
+✅ Nemotron macOS and iOS provisioning use one pinned multilingual/2240ms Core ML source (22 files, 664,846,846 bytes). The obsolete nemotron-macos.download.json profile was removed. Existing old-revision installations require explicit deletion and re-download.

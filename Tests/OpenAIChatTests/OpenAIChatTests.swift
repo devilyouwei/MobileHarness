@@ -354,3 +354,65 @@ private final class AnonymousModelListProtocol: URLProtocol, @unchecked Sendable
         try ChatRequest(messages: chat.messages, maximumOutputTokens: 0)
     }
 }
+
+@Test func streamRetainsTrailingUsageAndRequiresChoiceCompletion() throws {
+    let finish = "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+    let usage = "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2,\"total_tokens\":3}}\n\n"
+    #expect(
+        try decode(finish + usage + "data: [DONE]\n\n") == [
+            .finished(.stop), .usage(try ChatTokenUsage(input: 1, generated: 2, total: 3)),
+        ])
+    #expect(throws: OpenAIChatError.invalidResponse) { try decode(finish + usage + usage) }
+    #expect(throws: OpenAIChatError.invalidResponse) {
+        try decode(usage.replacingOccurrences(of: "\"prompt_tokens\":1", with: "\"prompt_tokens\":true"))
+    }
+    #expect(throws: OpenAIChatError.invalidResponse) {
+        try decode(usage.replacingOccurrences(of: "\"completion_tokens\":2", with: "\"completion_tokens\":-2"))
+    }
+    let request = try config().request(ChatRequest(messages: [.init(role: .user, content: "usage")]))
+    let data = try #require(request.httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect((body["stream_options"] as? [String: Bool])?["include_usage"] == true)
+    #expect(body["max_tokens"] == nil)
+}
+
+private final class UsageProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url,
+            let response = HTTPURLResponse(
+                url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/event-stream"])
+        else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        for chunk in [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hi\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":4,\"total_tokens\":16}}\n\n",
+            "data: [DONE]\n\n",
+        ] { client?.urlProtocol(self, didLoad: Data(chunk.utf8)) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@Test func capabilityEmitsTrailingUsageBeforeTerminalEvent() async throws {
+    let manager = ModelManager()
+    let configuration = try config()
+    try await manager.register(
+        ModelRegistration(id: ModelID("usage-fixture"), capabilities: [.chat]) { context in
+            ProvidedCapabilities(
+                chat: try OpenAIChat(
+                    context: context, configuration: configuration,
+                    sessionConfiguration: {
+                        let settings = URLSessionConfiguration.ephemeral
+                        settings.protocolClasses = [UsageProtocol.self]
+                        return settings
+                    }))
+        }, defaults: [.chat])
+    let session = try await manager.get(.chat).chat(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
+    var events: [ChatEvent] = []
+    for try await event in session.events { events.append(event) }
+    #expect(events == [.text("Hi"), .usage(try ChatTokenUsage(input: 12, generated: 4, total: 16)), .finished(.stop)])
+    await manager.shutdown()
+}

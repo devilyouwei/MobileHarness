@@ -13,7 +13,13 @@ public actor YOLOPose: PoseCapability {
             FileManager.default.fileExists(atPath: compiled.path)
             ? compiled : artifacts.appendingPathComponent("yolo26n-pose.mlpackage")
         self.url = url
-        resource = try context.resource { try CoreMLImageGraph(contentsOf: url) }
+        resource = try context.resource {
+            let compiled = artifacts.appendingPathComponent("yolo26n-pose.mlmodelc")
+            let current =
+                FileManager.default.fileExists(atPath: compiled.path)
+                ? compiled : artifacts.appendingPathComponent("yolo26n-pose.mlpackage")
+            return try CoreMLImageGraph(contentsOf: current)
+        }
     }
     public var availability: CapabilityAvailability {
         FileManager.default.fileExists(atPath: url.path)

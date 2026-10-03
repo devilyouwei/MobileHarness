@@ -1,5 +1,7 @@
 # Nemotron 接入验证（2026-09-23）
 
+> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
+
 这是分阶段验证记录：开头的“未注入 App”仅指首次独立能力测试；下方“App 切换后的追加验证”记录了后续接入。当前语音链路见 [Voice.md](Voice.md)。
 
 模型与制品固定版本、接口和资源上限见 [模型 README](../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md)，架构取舍见 [ADR 0006](adr/0006-nemotron-streaming-asr.md)。本次仅实现独立 capability，未注入 App/Gateway pipeline。
@@ -31,3 +33,11 @@
 `./scripts/build-ios.sh` 三个 scheme 均通过；MobileHarness 的 generic/platform=iOS 无签名构建通过。检查实际 App 的 Models 目录，32 个 iOS 制品逐一通过 manifest 的大小与 SHA-256 校验，约 1.2 GB；未打包 macos 制品。真机与模拟器使用独立输入输出文件清单，模拟器不依赖权重文件。
 
 尚未安装到 iPhone，麦克风 → Nemotron → 固定回复 → 扬声器的完整实机验收仍未完成。
+
+
+Current model replacement: ADR 0107 selects the multilingual 2240 ms Core ML export. Earlier CoreAI results below are historical and cannot establish acceptance of this model; new real-model results must be recorded separately.
+
+
+## 2026-10-03 multilingual Core ML replacement
+
+✅ Full check.sh, four simulator schemes and signed generic iOS build passed. The default Nemotron tests validate exact metadata, missing resources, PCM format and exclusive lease behavior; Management tests preserve incompatible-revision errors. ✅ All 22 downloaded files match Hub sizes; LFS weights match SHA-256 (664,846,846 bytes total). Real Mac Core ML tests passed in 12.42 s, including 137/4000/16000-sample packet transcript parity, warmup, cancel/unload/reload, final-event lifecycle and synthetic English/Chinese recognition. Chinese output: “你好, 这是一个语音识别测试”. ❌ Phone is disconnected; physical-device inference, sustained thermal/memory acceptance and measured end-to-end latency remain pending. Earlier results describe the superseded CoreAI export.

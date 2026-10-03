@@ -56,13 +56,12 @@ import Testing
     @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_KOKORO"] == "1"))
     @available(macOS 27, iOS 27, *)
     func realKokoroSynthesis() async throws {
-        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let models = repository.appendingPathComponent("MobileHarness/Resources/Models")
+        let path = try #require(ProcessInfo.processInfo.environment["HARNESS_KOKORO_MODEL_ROOT"])
+        let models = URL(fileURLWithPath: path)
         let providerContext = ModelContext()
         let provider = try KokoroSpeechSynthesis(
             context: providerContext,
-            artifacts: models.appendingPathComponent("KokoroCoreML"))
+            artifacts: models)
         let clock = ContinuousClock()
         let load = clock.now
         try await providerContext.load()

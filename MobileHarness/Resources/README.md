@@ -37,21 +37,28 @@ flowchart LR
 flowchart TD
     Profile[Models download profile] --> Download[Download to temporary files]
     Download --> Local[Ignored local model directory]
-    Local --> Stage[Select models and include licenses]
+    Catalog[Source declarations and licenses] --> Stage[Metadata-only staging]
     Privacy[PrivacyInfo.xcprivacy] --> Bundle[App resources]
     Icon[Assets.xcassets] --> Bundle
     Stage --> Bundle
-    Bundle --> Loader[Adapter validates and loads local files]
+    Bundle --> Acquire[Management and Hub SDK: explicit download]
+    Acquire --> Loader[Adapter loads sandbox files]
 ```
 
-The local configuration uses Nemotron ASR, Qwen3.5-2B chat, Silero VAD and YOLO26n-Pose; explicit cloud configuration selects the OpenAI-compatible chat provider. MOSS-TTS-Nano is default and diagnostic TTS (beta); Kokoro and Apple are not selected.  Audio8 and Qwen3.5-4B profiles are retained for comparison, not normal App inference. Profiles are development inputs, not runtime manifests.
+The local configuration uses Nemotron ASR, Qwen3.5-2B chat, Silero VAD and YOLO26n-Pose; explicit cloud configuration selects the OpenAI-compatible chat provider. MOSS-TTS-Nano is default and diagnostic TTS (beta); Kokoro and Apple are not selected.  Qwen3.5-4B retains a comparison profile; Audio8 and Kokoro provisioning are removed. Production developer wrappers share model-catalog.json, including the same Nemotron multilingual/2240ms Core ML export for Mac and iOS.
 
-Download scripts own bounded workers, temporary files and failures; [Models](Models/README.md) documents that workflow. YOLO's profile pins archive/member hashes. Other profiles pin revisions without universal per-file checksum verification. App/build settings choose packaged resources; ModelKit owns loading and execution.
+Download scripts own bounded workers, temporary files and failures; [Models](Models/README.md) documents that workflow. YOLO reads its archive source/hash from the shared catalog; HF wrappers resolve selected remote metadata. Separate test profiles retain their own explicit sources. App/build settings choose packaged resources; ModelKit owns loading and execution.
 
 ## Packaged scope
 
-- ✅ Privacy manifest, shared 1024 × 1024 app icon and model download profiles.
+- ✅ Privacy manifest, shared 1024 × 1024 app icon and model source metadata.
 - ✅ Original and robot-camera icons are preserved in [AppIconVariants](AppIconVariants/README.md); `scripts/select-app-icon.sh` selects the icon for the next build.
-- ✅ Local model staging with licenses; weights remain ignored by Git.
-- ❌ In-app model downloads, automatic cache repair and separate icon appearance variants.
+- ✅ Model metadata/license staging; weights remain ignored by Git.
+- ✅ In-app model downloads; ❌ automatic cache repair and separate icon appearance variants.
 - ❌ Dedicated Prompts collection; current Agent configuration is bundled from Agents.
+
+## Local model resources — current contract
+
+✅ Device/simulator staging includes only model-catalog.json schema-v2 source declarations and license notices. HF repositories/selection rules replace per-file links/hashes; weights/config/tokenizers/graphs/voice assets are installed in the sandbox via Management and ModelKitHub. Production developer wrappers share this catalog; only Qwen4B uses a separate test profile. Local weights are not build prerequisites.
+
+❌ Full iPhone/network acceptance and HF durable background/partial resume remain pending. See [Management](../ModelKit/Management/README.md#local-model-resources--current-contract).

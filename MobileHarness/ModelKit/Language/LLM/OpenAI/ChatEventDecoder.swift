@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 import ModelKit
 
@@ -16,6 +17,8 @@ struct ChatEventDecoder {
     private var total = 0
     private var previousCR = false
     private(set) var finished = false
+    private(set) var done = false
+    private var receivedUsage = false
 
     mutating func consume(_ byte: UInt8) throws -> [ChatEvent] {
         total += 1
@@ -53,11 +56,32 @@ struct ChatEventDecoder {
     }
 
     private mutating func decode(_ payload: String) throws -> [ChatEvent] {
-        guard payload != "[DONE]" else { throw OpenAIChatError.truncatedStream }
+        if payload == "[DONE]" {
+            guard finished else { throw OpenAIChatError.truncatedStream }
+            done = true
+            return []
+        }
+        guard !done else { throw OpenAIChatError.invalidResponse }
         guard let object = try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any],
             object["error"] == nil, let choices = object["choices"] as? [[String: Any]]
         else { throw OpenAIChatError.invalidResponse }
-        if choices.isEmpty { return [] }  // Optional usage event.
+        var usageEvents: [ChatEvent] = []
+        if let raw = object["usage"], !(raw is NSNull) {
+            guard !receivedUsage, let usage = raw as? [String: Any],
+                let input = usage["prompt_tokens"] as? Int,
+                let generated = usage["completion_tokens"] as? Int,
+                let total = usage["total_tokens"] as? Int,
+                input >= 0, generated >= 0, total >= 0,
+                ["prompt_tokens", "completion_tokens", "total_tokens"].allSatisfy({ key in
+                    guard let number = usage[key] as? NSNumber else { return false }
+                    return CFGetTypeID(number) != CFBooleanGetTypeID()
+                })
+            else { throw OpenAIChatError.invalidResponse }
+            receivedUsage = true
+            usageEvents = [.usage(try ChatTokenUsage(input: input, generated: generated, total: total))]
+        }
+        if choices.isEmpty { return usageEvents }
+        guard !finished else { throw OpenAIChatError.invalidResponse }
         guard choices.count == 1, let choice = choices.first, choice["index"] as? Int == 0,
             let delta = choice["delta"] as? [String: Any]
         else { throw OpenAIChatError.invalidResponse }
@@ -119,6 +143,6 @@ struct ChatEventDecoder {
             }
             finished = true
         }
-        return events
+        return events + usageEvents
     }
 }

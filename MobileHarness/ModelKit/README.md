@@ -119,7 +119,7 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 - ✅ Shared provider identity, coalesced loading, explicit unload/shutdown, memory-warning handling and release-when-idle policy.
 - ❌ Timed eviction, measured cross-model memory/thermal budgets and local native Tool-call events.
 
-The physical App requires iOS 27 and matching local artifacts. Simulator local ASR/chat report unavailable; explicitly configured cloud chat is supported. No automatic model or network fallback is provided.
+The physical App requires iOS 27 and matching local artifacts. Simulator local chat reports unavailable; Core ML ASR validates local resources; explicitly configured cloud chat is supported. No automatic model or network fallback is provided.
 
 ## Adapter boundaries
 
@@ -128,3 +128,9 @@ ModelKitOpenAI exposes explicitly configured endpoint/key/model chat over bounde
 Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns no Agent permissions, device I/O or business state. Streams define byte estimates, admission and cleanup; unsupported capabilities fail explicitly. Non-cooperative backend calls can delay cancellation/shutdown; no generic forced interruption is provided.
 
 ✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Qwen reports no native Tool support and rejects requests carrying tools. See [technical flow](Language/LLM/OpenAI/README.md).
+
+## Local model resources — current contract
+
+✅ Management implements schema-v2 source metadata, bounded installation/removal and Core maintenance barriers in ModelKitRuntime (ModelKit-only dependency). Concrete HF download calls belong to the independent ModelKitHub backend target; App injects it and Storage through Defaults. SDK resolution replaces bundled per-file links/hashes. App writes actual installation receipts; inference reads sandbox files. Capability/default ownership is unchanged.
+
+✅ HF uses native background sessions and restores persisted staging/completed files. ❌ Full iPhone/server-resume acceptance remains pending (ADR 0108). See [Management](Management/README.md#local-model-resources--current-contract) and [ADR0105](../../docs/adr/0105-local-model-resource-management.md).

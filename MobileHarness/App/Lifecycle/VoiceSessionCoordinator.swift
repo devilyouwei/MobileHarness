@@ -111,7 +111,15 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                 do {
                     let task = Task {
                         do {
-                            try await responses.execute(output)
+                            let result = try await responses.execute(output)
+                            if case .toolCall(let call) = output.output {
+                                do {
+                                    try await runtime.conversations.recordToolOutcome(
+                                        call.id, for: output.inputID,
+                                        state: result.isError ? .failed : .completed,
+                                        output: result.tool?.value, error: result.failure)
+                                } catch { record("保存 Tool 执行记录失败：\(error)") }
+                            }
                             // Dispatch joins Action completion/cancellation. Only then retire this reply's audio.
                             if case .control(let state) = output.output,
                                 state == "assistant.finished" || state == "agent.finished"
@@ -120,6 +128,14 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                                 await audioStore.cancel(inputID: output.inputID, source: output.source.rawValue)
                             }
                         } catch {
+                            if case .toolCall(let call) = output.output {
+                                do {
+                                    try await runtime.conversations.recordToolOutcome(
+                                        call.id, for: output.inputID,
+                                        state: error is CancellationError ? .cancelled : .failed,
+                                        error: String(describing: error))
+                                } catch { record("保存 Tool 执行记录失败：\(error)") }
+                            }
                             await audioStore.cancel(inputID: output.inputID, source: output.source.rawValue)
                             throw error
                         }

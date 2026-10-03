@@ -152,3 +152,12 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ❌ Independent multi-window namespaces, background supervision and forced interruption of non-cooperative handlers are not implemented.
 
 ✅ Camera.open/close/flip Tool bindings reuse the root-owned CameraCoordinator through RuntimePresentation after active Assistant session validation. Permission, foreground and camera lease policy stay in App lifecycle; closing confirms native stop and joins vision cleanup. ❌ Capture readiness does not imply pose-model readiness.
+
+## Local model resources — current contract
+
+✅ Root now composes sandbox model resources and the Settings management facade, supplies Storage adapters and coordinates explicit stop-and-delete. Model weights are acquired independently of App packaging; startup no longer requires installed voice models.
+
+❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../ModelKit/Management/README.md). HF foreground requests restart after process relaunch; ZIP background recovery remains OS-controlled. Both AppAssembly and the background delegate inject ModelKitHub when configuring the shared manager.
+
+
+✅ HF model transfers now use native background sessions through ModelKitHub. ModelDownloadsAppDelegate handles stable session events and grants a bounded 25-second metadata/finalization window when backgrounding. System tasks own continued transport; voice still stops on background. ❌ Physical-phone lock-screen acceptance remains pending.

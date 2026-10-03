@@ -48,3 +48,11 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ Storage core and domain tests retain existing root test locations; the source reorganization changes only the build/import map.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+
+## Local model provisioning cleanup
+
+✅ Six offline Python provisioning tests cover catalog routing, shared Nemotron Mac/iOS catalog and optional Qwen4B profile, mirror/prefix selection, metadata-derived sizes/hashes, missing-file/pagination rejection and safe ZIP replacement. Mac real-model test roots remain locally available: Nemotron, Qwen35, Silero, MossTTSNano and YOLOPose. ❌ Full model runs still require their opt-in flags, platform frameworks and complete Xcode where applicable.
+
+✅ ModelKitHubTests covers regular-file selection and remote metadata bounds. HARNESS_TEST_HUB_ENDPOINT opts into a real production-adapter Silero download with intermediate-progress/file assertions. ❌ macOS network integration is separate from iPhone UI acceptance.
+
+✅ HARNESS_TEST_YOLO_ARCHIVE verifies the real production ZIP checksum/native extraction, while Storage regressions cover aliased relative paths and concurrent authoritative snapshots. Actual App adapter host probing additionally verifies receipt publication, exact legacy-path repair and damaged-file rejection. ❌ Physical iPhone evidence remains separate.

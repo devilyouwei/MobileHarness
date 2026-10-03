@@ -1,5 +1,7 @@
 # Kokoro 验证记录
 
+> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
+
 历史默认：FluidAudio Core ML 中英双语；已因反复真机闪退由 MOSS 替换，见 ADR 0058 与 Moss-Validation.md。下面 CoreAI / 英语单语数据为历史记录，不能代表当前模型的结果。
 
 ## 历史 CoreAI 验证
@@ -26,9 +28,9 @@
 
 以上 Mac 数字不是 iPhone 性能。没有进行与 PyTorch 的独立频谱比对；上游模型卡的谱相关度结果不当作本适配器验收结果。样例音频由固定测试文本生成，位于 `/tmp/mobileharness-kokoro-0.wav` 和 `/tmp/mobileharness-kokoro-1.wav`。
 
-## 复现
+## 历史复现（入口已移除）
 
-1. `python3 scripts/download-kokoro.py`，可重复运行校验本地文件。
+1. 历史下载入口 `scripts/download-kokoro.py` 已移除；下列步骤记录当时流程，不能按当前仓库直接复现。现有可选测试需显式提供外部资源路径。
 2. Mac 使用匹配 Xcode 27：`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/test-kokoro.sh`。
 3. Xcode 选择 **KokoroValidation** scheme、iOS 27 真机，默认 Release。沿用项目本地签名设置。
 4. 点击“合成并试听”；显示加载、首段 PCM、总合成时间、音频时长、实时率与系统热状态。再次点击可测已加载状态。

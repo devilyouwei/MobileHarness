@@ -28,4 +28,4 @@ flowchart LR
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
-✅ Local model fixtures use flat Models directories: Silero. Required backend files are loaded directly; download profiles are development-only configuration.
+✅ Local model fixtures use flat Models directories: Silero. Required backend files are loaded directly; production developer provisioning shares model-catalog.json; Settings installs App weights in the sandbox.

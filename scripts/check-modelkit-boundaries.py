@@ -36,7 +36,7 @@ for target in package['targets']:
         name = values[0]
         if kind in ('byName', 'target') and not name.startswith('ModelKit') and name != 'Types':
             errors.append(f"{target['name']} depends on external project target {name}")
-        if kind == 'product' and target['name'] not in {'ModelKitMLXLanguage', 'ModelKitFluidAudio'}:
+        if kind == 'product' and target['name'] not in {'ModelKitMLXLanguage', 'ModelKitFluidAudio', 'ModelKitHub'}:
             errors.append(f"Third-party dependency outside a backend: {target['name']} -> {name}")
         if name in FORBIDDEN:
             errors.append(f"Forbidden target dependency: {target['name']} -> {name}")
@@ -44,6 +44,9 @@ for target in package['targets']:
         names = [next(iter(d.values()))[0] for d in dependencies]
         if names != ['ModelKit']:
             errors.append('ModelKitRuntime must depend only on ModelKit')
+hub_target = next(t for t in package['targets'] if t['name'] == 'ModelKitHub')
+if {next(iter(d.values()))[0] for d in hub_target['dependencies']} != {'ModelKitRuntime', 'HuggingFace'}:
+    errors.append('ModelKitHub must depend only on Management contracts and the concrete Hub SDK')
 # Consolidated source ownership must retain an acyclic, non-overlapping build map.
 targets = {t['name']: t for t in package['targets']}
 for name, path in [('ActionRuntime', 'Actions/Runtime'), ('ToolRuntime', 'Tools/Runtime')]:
@@ -344,3 +347,25 @@ for name in targets:
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')
+# Runtime model catalog is the only model payload staged into either App variant.
+model_catalog = ROOT / 'MobileHarness/Resources/Models/model-catalog.json'
+if not model_catalog.is_file():
+    raise SystemExit('Missing runtime model catalog')
+catalog = json.loads(model_catalog.read_text())
+if catalog.get('schemaVersion') != 2 or len(catalog.get('packages', [])) != 5:
+    raise SystemExit('Invalid production model catalog')
+for entry in catalog['packages']:
+    source = entry['source']
+    if 'files' in entry or not entry.get('requiredFiles'):
+        raise SystemExit('Catalog must declare sources and required files, not resolved file manifests')
+    if source['kind'] == 'huggingface':
+        if not source.get('repoId') or not source.get('allowPatterns') or 'url' in source or 'sha256' in source:
+            raise SystemExit('Invalid declarative Hub source')
+    elif source['kind'] != 'urlArchive' or not source.get('url'):
+        raise SystemExit('Invalid archive source')
+for platform in ('iphoneos', 'iphonesimulator'):
+    content = (ROOT / f'Config/Voice-Models-{platform}-Inputs.xcfilelist').read_text()
+    model_inputs = [line for line in content.splitlines() if '/Resources/Models/' in line]
+    if model_inputs != ['$(SRCROOT)/MobileHarness/Resources/Models/model-catalog.json']:
+        raise SystemExit('App staging must not depend on model weights')
+print('Model resources: declarative catalog and metadata-only App staging passed.')

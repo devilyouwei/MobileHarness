@@ -64,6 +64,46 @@ class ModelArchiveTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 install_archive(config, archive, root/'installed')
 
+class SourceCatalogTests(unittest.TestCase):
+    def test_production_profiles_share_catalog_and_nemotron_is_cross_platform(self):
+        from model_download import load_config
+        for name in ('nemotron', 'silero', 'moss-tts-nano', 'qwen3.5-2b', 'yolo26-pose'):
+            config = load_config(name)
+            self.assertIn('declaration', config)
+            self.assertNotIn('files', config)
+        mac = load_config('nemotron', 'macos')
+        self.assertEqual(mac, load_config('nemotron', 'ios'))
+        self.assertEqual(mac['directory'], 'Nemotron')
+        self.assertEqual(mac['declaration']['stripPrefix'], 'multilingual/2240ms')
+        self.assertEqual(mac['declaration']['allowPatterns'], ['multilingual/2240ms/**'])
+        self.assertEqual(load_config('qwen3.5-4b')['directory'], 'Qwen35-4B')
+
+    def test_hub_selection_prefix_metadata_and_mirror(self):
+        from model_download import resolve_hub
+        config = {'directory': 'Fixture', 'requiredFiles': ['model.bin'], 'declaration': {
+            'repoId': 'owner/repo', 'revision': 'fixed', 'allowPatterns': ['ios/model.bin'], 'stripPrefix': 'ios'}}
+        def read(url):
+            self.assertTrue(url.startswith('https://hf-mirror.com/api/models/owner/repo/tree/fixed'))
+            return [{'type': 'file', 'path': 'ios/model.bin', 'size': 3, 'lfs': {'size': 3, 'oid': 'a' * 64}},
+                    {'type': 'file', 'path': 'macos/model.bin', 'size': 4}], None
+        resolved = resolve_hub(config, 'https://hf-mirror.com', read)
+        self.assertEqual(resolved['files'], ['model.bin'])
+        self.assertEqual(resolved['fileSizes'], {'model.bin': 3})
+        self.assertEqual(resolved['sha256'], {'model.bin': 'a' * 64})
+        self.assertEqual(resolved['fileURLs']['model.bin'], 'https://hf-mirror.com/owner/repo/resolve/fixed/ios/model.bin')
+        with self.assertRaises(ValueError):
+            resolve_hub(config, 'https://hf-mirror.com', lambda _: ([], None))
+        with self.assertRaises(ValueError):
+            resolve_hub(config, 'https://hf-mirror.com', lambda _: ([], 'https://other.example/page'))
+
+    def test_archive_catalog_uses_required_files_without_static_member_manifest(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            archive, legacy, name = ModelArchiveTests().fixture(root)
+            config = {'archive': {'sha256': legacy['archive']['sha256']}, 'requiredFiles': [name]}
+            install_archive(config, archive, root/'installed')
+            self.assertTrue((root/'installed'/name).is_file())
+
 
 if __name__ == '__main__':
     unittest.main()

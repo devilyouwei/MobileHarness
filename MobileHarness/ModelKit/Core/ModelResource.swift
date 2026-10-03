@@ -30,6 +30,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
     private var activeLease: ActiveLease?
     private var unloading = false
+    private var maintenance = false
     private var closed = false
     private var unloadFinished: CheckedContinuation<Void, Never>?
     private var drained: CheckedContinuation<Void, Never>?
@@ -41,14 +42,14 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     public func acquire() async throws -> (id: UUID, model: Model) {
         try Task.checkCancellation()
         guard !closed else { throw CapabilityError.sessionClosed }
-        guard !unloading else { throw CapabilityError.unavailable("Model is unloading") }
+        guard !unloading, !maintenance else { throw CapabilityError.unavailable("Model is under maintenance") }
         guard activeLease == nil else { throw CapabilityError.inputBusy }
         let id = UUID()
         activeLease = ActiveLease(id: id)
         do {
             let model = try await ensureLoaded()
             try Task.checkCancellation()
-            guard !closed, !unloading else { throw CancellationError() }
+            guard !closed, !unloading, !maintenance else { throw CancellationError() }
             return (id, model)
         } catch {
             release(id)
@@ -72,7 +73,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
 
     private func ensureLoaded() async throws -> Model {
         guard !closed else { throw CapabilityError.sessionClosed }
-        guard !unloading else { throw CapabilityError.unavailable("Model is unloading") }
+        guard !unloading, !maintenance else { throw CapabilityError.unavailable("Model is under maintenance") }
         if let model { return model }
         guard waiters < 32 else { throw CapabilityError.inputBusy }
         waiters += 1
@@ -92,7 +93,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
                 loadID = nil
             }
             try Task.checkCancellation()
-            guard !closed, !unloading, let model else { throw CancellationError() }
+            guard !closed, !unloading, !maintenance, let model else { throw CancellationError() }
             return model
         } catch {
             if loadID == id {
@@ -103,9 +104,15 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         }
     }
 
+    fileprivate func beginMaintenance() throws {
+        guard !closed, !unloading, !maintenance else { throw CapabilityError.inputBusy }
+        maintenance = true
+    }
+    fileprivate func endMaintenance() { maintenance = false }
+
     fileprivate var state: ModelState {
         if closed { return .closed }
-        if unloading { return .unloading }
+        if unloading || maintenance { return .unloading }
         if loading != nil { return .loading }
         return model == nil ? .unloaded : .ready
     }
@@ -136,7 +143,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
 
     fileprivate func unloadIfIdle() -> Bool {
-        guard !closed, !unloading, loading == nil, activeLease == nil, model != nil else { return false }
+        guard !closed, !unloading, !maintenance, loading == nil, activeLease == nil, model != nil else { return false }
         model = nil
         return true
     }
@@ -157,6 +164,8 @@ private protocol ModelResourceLifecycle: Sendable {
     func unload() async throws
     func shutdown() async
     func unloadIfIdle() async -> Bool
+    func beginMaintenance() async throws
+    func endMaintenance() async
 }
 
 /// One context per registration, created by ModelManager and injected into its factory.
@@ -186,6 +195,12 @@ public final class ModelContext: Sendable {
 
     @_spi(ModelManagement) public var status: ModelState {
         get async { await state.withLock { $0.resource }?.state ?? .unmanaged }
+    }
+    @_spi(ModelManagement) public func beginMaintenance() async throws {
+        try await state.withLock { $0.resource }?.beginMaintenance()
+    }
+    @_spi(ModelManagement) public func endMaintenance() async {
+        await state.withLock { $0.resource }?.endMaintenance()
     }
     @_spi(ModelManagement) public func seal() { state.withLock { $0.sealed = true } }
     @_spi(ModelManagement) public func load() async throws { try await state.withLock { $0.resource }?.load() }

@@ -1,5 +1,7 @@
 # ADR 0006 Nemotron 流式 ASR 与模型层目录纠正
 
+> Historical model/resource scope: current synthesis selection is [ADR0058](0058-moss-tts-nano.md); current metadata-only packaging, source declarations, explicit acquisition and safe removal are [ADR0105](0105-local-model-resource-management.md). Old bundle-weight, development-profile and Kokoro-default statements below are retained decision history, not current implementation contracts.
+
 状态：已实施，未接入应用 pipeline，iOS 真机运行待验收。日期：2026-09-23。
 
 按 Tech_Design.md 第 11、16 节，注册绑定由 Runtime/Bindings 移至 Management；Apple 实现移至 Speech/ASR/Apple、Speech/TTS/Apple 与 Speech/Shared/Apple。Runtime 只容纳推理后端，本次实现 CoreAI。此决策修正 ADR 0005 的模型层归档，不改变独立 SDK、能力注入和模块无环约束。

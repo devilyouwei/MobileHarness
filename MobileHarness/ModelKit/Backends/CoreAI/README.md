@@ -6,12 +6,12 @@ GraphModel owns AIModel and InferenceFunction. TensorValue copies values and val
 
 ```mermaid
 flowchart LR
-    Adapter[Nemotron] -->|Named tensors| Graph[GraphModel actor]
+    Adapter[Optional native graph caller] -->|Named tensors| Graph[GraphModel actor]
     Graph -->|Native graph calls| CoreAI[Apple CoreAI]
     CoreAI -->|Tensor results| Adapter
 ```
 
-- ✅ Native graph execution for Nemotron without a third-party language package.
+- ✅ Independent native graph execution and tensor utilities; no current default capability binding.
 - ✅ Platform availability checks and tensor conversion.
 - ❌ Generic language generation, downloading and cross-model scheduling.
 

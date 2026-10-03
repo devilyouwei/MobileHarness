@@ -1,13 +1,9 @@
 # NemotronTests
 
-Purpose: validate streaming mel/tokenizer behavior, managed resources and opt-in real Nemotron inference. Design goals: deterministic contract tests and explicit separation of real-model acceptance.
+Purpose: validate the Core ML multilingual ASR adapter. Design goals: deterministic metadata/input/lifecycle checks and explicit real-weight acceptance.
 
-- ✅ Tests use explicit contexts for isolated adapters; shared-container behavior is tested in ModelKitRuntimeTests.
-- ✅ Invalid inputs and lifecycle failures remain observable; no production fallback implementations are added for tests.
-- ❌ Default test success does not establish physical-device quality or stability. Real-weight tests require local artifacts and opt-in flags.
+- ✅ Strict 2240 ms metadata and prompt mapping, missing-resource availability, invalid PCM format and exclusive lease/unload checks.
+- ✅ Optional scripts/test-nemotron.sh uses ignored Resources/Models/Nemotron, shared with iOS catalog provisioning, for packet parity, cancel/reload and synthetic English/Chinese checks.
+- ❌ Default tests skip real weights; they do not prove phone accuracy, streaming latency or sustained stability.
 
-Update this README when test scope or lifecycle contracts change.
-
-✅ Local model fixtures use flat Models directories: Nemotron-macos. Required backend files are loaded directly; download profiles are development-only configuration.
-
-✅ Isolated adapter fixtures explicitly import ModelManagement SPI to own test lifecycle; production adapters receive their context from the manager.
+✅ 2026-10-03 opt-in Mac run passed all four tests in 12.42 s with verified 2240 ms artifacts. Phone acceptance remains outstanding.

@@ -58,7 +58,7 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 
 ✅ JSON v5 uses Channel-grouped callable Actions; Assistant text interpretation uses Assistant.mapText rather than JSON aliases. Regression coverage checks internal permissions cannot be called through model markup and preserves wait event order. ❌ Live-model/device acceptance is separate from automated checks.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ✅ Source location: `MobileHarness/UI/Settings`; compiled by `UI`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
 
@@ -139,3 +139,15 @@ flowchart LR
 ❌ Sustained real-device acceptance remains pending.
 
 ✅ Physical BLE connection and control readiness are presented separately. Connected devices with failed verification show 已连接，控制未就绪; actions remain disabled.
+
+## Local model resources — current contract
+
+✅ ModelResourcesView/State show download estimates, actual receipt-based installed sizes, progress, revision/license and download/cancel/retry/stop-and-delete. Official HF, hf-mirror.com and custom HTTPS domains plus cellular policy persist for new requests. UI imports no model SDK or services. Downloads survive page navigation; the page explains HF relaunch restart. ❌ Full iOS rendering/lifecycle acceptance remains pending.
+
+✅ 下载阶段显示确定进度条和百分比；排队、提交、安装、删除和取消阶段显示对应状态与活动指示。点击下载立即锁定该模型的操作，下载期间只显示取消，取消处理中禁用按钮；重试/删除仅在空闲时可用。状态层同时拒绝重复请求，最多 32 个同时提交的操作，超限明确报错；刷新失败仍保留已提交下载的锁定。取消先等待提交完成，避免迟到的提交重新开始下载。
+❌ 原生 iOS 进度布局和真实网络交互仍需设备验证。
+
+✅ 下载尚未收到数据时显示连接等待指示；收到数据后显示一位小数百分比，小于 0.1% 时显示 <0.1%，避免整数截断导致大型模型长期显示 0%。❌ 手机实际网络与界面验收仍需连接设备执行。
+
+
+✅ Failed model transfers offer 继续下载; active rows remain cancel-only. Completed files are reused by the backend, while detailed network codes are surfaced by the injected App adapter. UI owns no download task.

@@ -228,3 +228,103 @@ private actor HistoryModel: ChatCapability {
         ConversationRecord.self, from: JSONSerialization.data(withJSONObject: legacy))
     #expect(restored.maximumOutputTokens == 256)
 }
+
+@Test func toolJournalPersistsInputsUsageAndLateArchivedOutcomes() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("history.json")
+    let store = try journal(at: url)
+    let id = UUID()
+    _ = try await store.begin(id: id, user: "打开摄像头", system: "system", model: "fixture")
+    try await store.recordToolDefinitions(["camera declaration"], for: id)
+    let call = ConversationToolCall(id: UUID(), providerID: "provider-1", name: "Camera.open", argumentsJSON: "{}")
+    try await store.recordToolCall(call, for: id)
+    try await store.recordTokenUsage(ConversationTokenUsage(input: 12, generated: 4, total: 16), for: id)
+    try await store.finish(id, state: .completed, reason: "toolCalls")
+    _ = try await store.startNew()
+    try await store.recordToolOutcome(call.id, for: id, state: .completed)
+    let restored = try #require(try await journal(at: url).snapshot().past.first?.turns.first)
+    #expect(restored.toolDefinitions == ["camera declaration"])
+    #expect(restored.tokenUsage == ConversationTokenUsage(input: 12, generated: 4, total: 16))
+    let result = try #require(restored.toolCalls?.first)
+    #expect(result.providerID == "provider-1" && result.argumentsJSON == "{}" && result.state == .completed)
+    #expect(result.output == nil)
+    try await store.recordToolOutcome(call.id, for: id, state: .failed, output: "permission denied", error: "fixture")
+    #expect(try await store.snapshot().past.first?.turns.first?.toolCalls?.first?.output == "permission denied")
+    // An internal UI Tool or non-journal input does not create a model-call record.
+    try await store.recordToolOutcome(UUID(), for: UUID(), state: .completed)
+}
+
+@Test func oldConversationRecordDecodesWithoutToolOrUsageFields() async throws {
+    let store = ConversationHistoryStore()
+    let record = try await store.begin(id: UUID(), user: "legacy", system: "system", model: "fixture")
+    let restored = try JSONDecoder().decode(ConversationRecord.self, from: JSONEncoder().encode(record))
+    #expect(restored.toolCalls == nil && restored.toolDefinitions == nil && restored.tokenUsage == nil)
+}
+
+private struct NativeCameraHistoryChat: ChatCapability {
+    var availability: CapabilityAvailability { .available }
+    var supportsToolCalls: Bool { true }
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        #expect(request.maximumOutputTokens == nil)
+        #expect(request.tools.contains { $0.name == "Camera.open" })
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        try pair.emitter.yield(.text("<express emotion=\"smile\"/>"))
+        try pair.emitter.yield(.toolCall(ChatToolCall(id: "cloud-camera", name: "Camera.open", argumentsJSON: "{}")))
+        try pair.emitter.yield(.usage(try ChatTokenUsage(input: 100, generated: 20, total: 120)))
+        try pair.emitter.yield(.finished(.toolCalls))
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+
+@Test func assistantJournalsMixedActionNativeToolAndUsageWithRuntimeCorrelation() async throws {
+    let store = ConversationHistoryStore()
+    let agent = try AssistantAgent(chat: NativeCameraHistoryChat(), conversations: store)
+    try await agent.start()
+    let input = AgentInput(sessionID: UUID(), payload: .text("打开摄像头并微笑"))
+    try await agent.receive(input)
+    var outputs = agent.outputs.makeAsyncIterator()
+    guard case .actionCall = await outputs.next()?.output else {
+        Issue.record("Missing XML action")
+        return
+    }
+    guard case .toolCall(let call) = await outputs.next()?.output else {
+        Issue.record("Missing native tool")
+        return
+    }
+    #expect(call.toolPath == "Camera.open")
+    #expect(await outputs.next()?.output == .control("assistant.finished"))
+    let record = try #require(try await store.snapshot().current.turns.first)
+    #expect(record.state == .completed && record.finishReason == "toolCalls")
+    #expect(record.toolCalls?.first?.id == call.id)
+    #expect(record.toolCalls?.first?.providerID == "cloud-camera")
+    #expect(record.toolCalls?.first?.state == .received)
+    #expect(record.tokenUsage?.generated == 20)
+    #expect(record.toolDefinitions?.contains { $0.contains("Camera.open") } == true)
+    await agent.stop()
+}
+
+@Test func concurrentGenerationAndToolOutcomesPreserveBothDurableUpdates() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("history.json")
+    let store = try journal(at: url)
+    let id = UUID()
+    _ = try await store.begin(id: id, user: "concurrent fixture", system: "system", model: "fixture")
+    let call = ConversationToolCall(id: UUID(), providerID: "cloud", name: "Camera.close", argumentsJSON: "{}")
+    try await store.recordToolCall(call, for: id)
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        for index in 0..<8 { group.addTask { try await store.append("fragment-\(index)", to: id) } }
+        group.addTask { try await store.recordToolOutcome(call.id, for: id, state: .completed) }
+        group.addTask {
+            try await store.recordTokenUsage(ConversationTokenUsage(input: 1, generated: 2, total: 3), for: id)
+        }
+        try await group.waitForAll()
+    }
+    try await store.finish(id, state: .completed)
+    let restored = try #require(try await journal(at: url).snapshot().current.turns.first)
+    #expect(Set(restored.fragments) == Set((0..<8).map { "fragment-\($0)" }))
+    #expect(restored.toolCalls?.first?.state == .completed)
+    #expect(restored.tokenUsage?.total == 3)
+}

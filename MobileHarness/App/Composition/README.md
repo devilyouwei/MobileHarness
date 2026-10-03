@@ -89,3 +89,12 @@ flowchart TD
 ✅ ApplicationRuntime injects the Photographer factory into VisionRuntimeDependencies and grants Photographer motors1–5 only. Robot.aim binds NexArmBehaviorAdapter alongside existing gesture bindings.
 
 ✅ Composition injects Photographer control availability as a read-only MainActor BluetoothWorkflow snapshot; Agents imports no device SDK or App service.
+
+## Local model resources — current contract
+
+✅ AppAssembly injects ModelKitHub and the Storage adapter through Defaults into one process manager. Catalog schema v2 declares sources; the resource root is Application Support/MobileHarness/Models/installed. Settings state outlives pages; voice preparation is explicit. ❌ HF foreground requests restart after process relaunch; full iPhone acceptance remains pending.
+
+✅ 本地模型工作流注入的同步校验与存储构造遵循 MainActor 隔离，真机构建使用 App 现有签名配置。❌ 安装成功不等于下载网络与交互验收完成。
+
+
+✅ Nemotron downloads and registration now use the shared Core ML catalog entry, without CoreAI device validation.

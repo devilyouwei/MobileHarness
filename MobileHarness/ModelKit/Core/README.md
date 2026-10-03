@@ -63,3 +63,9 @@ Keep shared media values separate from model-specific tensors, preprocessing and
 ✅ Cloud and local LLM adapters explicitly select no event-count cap. Pending fragments drain in order after normal completion; cancellation, errors, per-event size checks and single-consumer ownership still apply. yieldSuspending does not wait for capacity in this mode. Generation/response limits belong to the adapter; this is a user-requested exception to bounded event queues. ❌ This does not remove downstream parser, journal or Action limits or promise bounded total memory for arbitrary unbounded producers.
 
 ✅ ADR0098: Audio values are defined once in Types and exported here. ModelKit preserves the original audio constructor labels and CapabilityError validation behavior through forwarding initializers.
+
+## Disk-maintenance admission
+
+✅ ModelContext management SPI exposes beginMaintenance/endMaintenance. ModelResource rejects acquire/load through retained handles while maintenance spans unload and disk removal. Management closes all associated resources before App quiescence, drains/unloads and retains admission barriers until mutation completes; it releases partial reservations on failure. Ordinary unload remains reusable and shutdown terminal. Core owns no file/network/meta handling.
+
+❌ Full iPhone acceptance and non-cooperative backend interruption remain outside this guarantee. See [Management](../Management/README.md#local-model-resources--current-contract).

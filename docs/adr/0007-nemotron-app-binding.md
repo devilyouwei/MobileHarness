@@ -1,5 +1,7 @@
 # ADR 0007 App 使用 Nemotron ASR
 
+> Historical model/resource scope: current synthesis selection is [ADR0058](0058-moss-tts-nano.md); current metadata-only packaging, source declarations, explicit acquisition and safe removal are [ADR0105](0105-local-model-resource-management.md). Old bundle-weight, development-profile and Kokoro-default statements below are retained decision history, not current implementation contracts.
+
 状态：已实施，真机运行待验收。日期：2026-09-23。
 
 用户要求将当前 App ASR 切换为 Nemotron。AppContainer 构造并通过 SpeechRecognitionCapability 注入；RequestGateway、Agent 和 ResponseGateway 不变，TTS 继续使用 AppleSpeechSynthesis。移除联网识别开关与系统 Speech 授权，仅请求麦克风权限。不支持 iOS 27 / CoreAI / h18p 时明确失败，不退到 Apple 或云端。

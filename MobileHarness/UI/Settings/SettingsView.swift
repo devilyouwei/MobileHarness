@@ -9,23 +9,33 @@
         let bluetoothControls: any BluetoothControlling
         let history: ConversationHistoryState
         let historyControls: any ConversationHistoryControlling
+        let modelResources: ModelResourcesState?
         let save: () async -> Bool
 
         public init(
             settings: SettingsState, bluetooth: BluetoothSettingsState, bluetoothControls: any BluetoothControlling,
             history: ConversationHistoryState,
-            historyControls: any ConversationHistoryControlling, save: @escaping () async -> Bool
+            historyControls: any ConversationHistoryControlling, modelResources: ModelResourcesState? = nil,
+            save: @escaping () async -> Bool
         ) {
             self.settings = settings
             self.bluetooth = bluetooth
             self.bluetoothControls = bluetoothControls
             self.history = history
             self.historyControls = historyControls
+            self.modelResources = modelResources
             self.save = save
         }
 
         public var body: some View {
             List {
+                if let modelResources {
+                    NavigationLink {
+                        ModelResourcesView(state: modelResources)
+                    } label: {
+                        Label("本地模型资源", systemImage: "externaldrive")
+                    }.accessibilityIdentifier("settings.models.open")
+                }
                 NavigationLink {
                     BluetoothSettingsView(state: bluetooth, controls: bluetoothControls)
                 } label: {

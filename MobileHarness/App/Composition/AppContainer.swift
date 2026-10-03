@@ -56,16 +56,8 @@ final class AppContainer {
                 }
             }
         #endif
-        if !ProcessInfo.processInfo.arguments.contains("-moss-benchmark") {
-            progress("正在加载语音识别模型…")
-            try await models.warmup(.recognition)
-            progress("正在加载对话模型…")
-            try await models.warmup(.chat)
-            progress("正在加载语音检测模型…")
-            try await models.load(.voiceActivity)
-            progress("正在准备语音合成…")
-            try await models.warmup(.synthesis)
-        }
+        // Preparation is deferred to explicit voice admission; missing downloads do not block Settings/history.
+        progress("本地模型可在设置中下载")
         try Task.checkCancellation()
         let state = ConversationState()
         let lifecycle = VoiceSessionCoordinator(
@@ -73,10 +65,10 @@ final class AppContainer {
             audio: AppleAudioIO(), recognition: recognition, synthesis: synthesis,
             prepareRecognition: {
                 // Reload only resources evicted after startup; get/load reuse resident weights.
-                try await models.load(.recognition)
-                try await models.load(.chat)
+                try await models.warmup(.recognition)
+                try await models.warmup(.chat)
                 try await models.load(.voiceActivity)
-                try await models.load(.synthesis)
+                try await models.warmup(.synthesis)
             }, voiceActivity: vad, chat: chat)
         self.lifecycle = lifecycle
         conversation = state

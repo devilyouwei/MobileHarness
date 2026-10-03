@@ -118,3 +118,15 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 ✅ ADR0102 now includes incremental pose tracking and adjacent-target speed selection in Actions; existing Agent isolation remains governed by ADR0103.
 
 ✅ [0104 — Expression Perform and Set contracts](0104-expression-perform-and-state.md) separates awaited finite expression performance from persistent base state. ❌ Physical animation acceptance remains pending.
+
+❌ [0105 — Local model resource management](0105-local-model-resource-management.md) records first-release Management-owned downloads/deletion with App-injected Storage and metadata-only packaging; device acceptance remains pending.
+
+- [0106: Conversation Tool diagnostics and token usage](0106-conversation-tool-diagnostics.md) — durable native calls, actual execution outcomes, optional usage and bounded journal serialization.
+
+Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier model selection/provisioning decisions; ADR0058 owns current MOSS selection and ADR0105 owns current source metadata, installation/removal and background limitations. Historical bundle-weight statements are not current contracts.
+
+✅ ADR0105 refinements document selected regular-file Hub acquisition and distinguish committed model installation from transfer-index bookkeeping failures. ❌ Live iPhone download/lock-state acceptance remains separate.
+
+✅ [0107: Shared multilingual Nemotron Core ML ASR](0107-nemotron-coreml-multilingual.md).
+
+✅ [0108: Durable background model downloads](0108-background-model-downloads.md).

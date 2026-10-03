@@ -4,7 +4,7 @@ Purpose: independent PoseCapability backed by the official Ultralytics YOLO26n-P
 
 ## Provisioning and contract
 
-Run `python3 scripts/download-yolo26-pose.py`. `Resources/Models/yolo26-pose.download.json` pins release v8.3.0 asset 487599229 by archive and per-file SHA-256; the release tag alone is not treated as immutable. ZIP digest: `a809a889f1d324299090c6d9f4211ddd3588cc525f5f78d79691de45bd12f042`. Weights remain ignored. The model metadata declares AGPL-3.0; the existing license is staged with the App.
+Run `python3 scripts/download-yolo26-pose.py`. `Resources/Models/model-catalog.json` declares the release v8.3.0 asset URL, archive SHA-256 and required files; the release tag alone is not treated as immutable. ZIP digest: `a809a889f1d324299090c6d9f4211ddd3588cc525f5f78d79691de45bd12f042`. Weights remain ignored. The model metadata declares AGPL-3.0; the existing license is staged with the App.
 
 Defaults registers only `yolo26n-pose`. YOLOPose accepts the new `.mlmodelc` or `.mlpackage`, with no old-model fallback. Package compilation is local preparation, not PyTorch conversion. App supplies resources and obtains the shared `.pose` capability. One lease covers preparation, prediction and decoding; shutdown/cancellation joins native work, and unload waits.
 
@@ -29,3 +29,9 @@ flowchart LR
 ❌ Human-image/device accuracy, sustained thermal/pool pressure, s/m variants and multi-model sharing remain unverified. Historical YOLOv8 timings do not apply to this model.
 
 References: [official model download script](https://github.com/ultralytics/yolo-ios-app/blob/main/scripts/download-models.sh), [official output layout](https://github.com/ultralytics/yolo-ios-app/blob/main/Sources/UltralyticsYOLO/PoseEstimator.swift). No upstream SDK implementation is copied or linked.
+
+## Local model resources — current contract
+
+✅ Resource load now resolves compiled-vs-package input each time weights reload, so deletion/reinstallation does not retain an obsolete init-time loader path. Settings validates the ZIP archive hash, safe extraction bounds and required files before installation; there is no bundled per-member hash manifest.
+
+❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../../Management/README.md).

@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 2,
+  "packages": [
+    {
+      "id": "nemotron",
+      "name": "Nemotron 语音识别",
+      "capability": "recognition",
+      "directory": "Nemotron",
+      "minimumOS": 18,
+      "requiresPhysicalDevice": false,
+      "deviceRequirement": null,
+      "license": "OpenMDW-1.1",
+      "estimatedBytes": 664846846,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "FluidInference/Nemotron-3.5-ASR-Streaming-Multilingual-0.6b-CoreML",
+        "revision": "1a41b75758b0337ff67db7d5408280aaaf23074e",
+        "allowPatterns": [
+          "multilingual/2240ms/**"
+        ],
+        "stripPrefix": "multilingual/2240ms"
+      },
+      "requiredFiles": [
+        "metadata.json",
+        "tokenizer.json",
+        "preprocessor.mlmodelc/model.mil",
+        "preprocessor.mlmodelc/coremldata.bin",
+        "preprocessor.mlmodelc/analytics/coremldata.bin",
+        "preprocessor.mlmodelc/weights/weight.bin",
+        "encoder.mlmodelc/model.mil",
+        "encoder.mlmodelc/coremldata.bin",
+        "encoder.mlmodelc/analytics/coremldata.bin",
+        "encoder.mlmodelc/weights/weight.bin",
+        "decoder.mlmodelc/model.mil",
+        "decoder.mlmodelc/coremldata.bin",
+        "decoder.mlmodelc/analytics/coremldata.bin",
+        "decoder.mlmodelc/weights/weight.bin",
+        "joint.mlmodelc/model.mil",
+        "joint.mlmodelc/coremldata.bin",
+        "joint.mlmodelc/analytics/coremldata.bin",
+        "joint.mlmodelc/weights/weight.bin",
+        "decoder_joint.mlmodelc/model.mil",
+        "decoder_joint.mlmodelc/coremldata.bin",
+        "decoder_joint.mlmodelc/analytics/coremldata.bin",
+        "decoder_joint.mlmodelc/weights/weight.bin"
+      ]
+    },
+    {
+      "id": "silero",
+      "name": "Silero 语音检测",
+      "capability": "voiceActivity",
+      "directory": "Silero",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": false,
+      "deviceRequirement": null,
+      "license": "MIT",
+      "estimatedBytes": 644679,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "aufklarer/Silero-VAD-v6.2.1-CoreML",
+        "revision": "523876545a57961474fee9df913e833e130560b8",
+        "allowPatterns": [
+          "README.md",
+          "config.json",
+          "silero_vad.mlmodelc/**"
+        ]
+      },
+      "requiredFiles": [
+        "config.json",
+        "silero_vad.mlmodelc/model.mil",
+        "silero_vad.mlmodelc/weights/weight.bin"
+      ]
+    },
+    {
+      "id": "qwen35",
+      "name": "Qwen3.5 本地对话",
+      "capability": "chat",
+      "directory": "Qwen35",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": true,
+      "deviceRequirement": null,
+      "license": "Apache-2.0",
+      "estimatedBytes": 1749080357,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "mlx-community/Qwen3.5-2B-4bit",
+        "revision": "674aaa7240b91e8012fcad5d791b7dfe5ba90207",
+        "allowPatterns": [
+          "README.md",
+          "chat_template.jinja",
+          "config.json",
+          "model.safetensors",
+          "model.safetensors.index.json",
+          "preprocessor_config.json",
+          "processor_config.json",
+          "tokenizer.json",
+          "tokenizer_config.json",
+          "video_preprocessor_config.json",
+          "vocab.json"
+        ]
+      },
+      "requiredFiles": [
+        "chat_template.jinja",
+        "config.json",
+        "model.safetensors",
+        "model.safetensors.index.json",
+        "preprocessor_config.json",
+        "processor_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "video_preprocessor_config.json",
+        "vocab.json"
+      ]
+    },
+    {
+      "id": "moss-tts-nano",
+      "name": "MOSS 语音合成",
+      "capability": "synthesis",
+      "directory": "MossTTSNano",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": false,
+      "deviceRequirement": null,
+      "license": "Apache-2.0",
+      "estimatedBytes": 533801775,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "FluidInference/moss-tts-nano-coreml",
+        "revision": "408475d01c46c9290b6546edf31e9cc5cbb202cd",
+        "allowPatterns": [
+          "LICENSE",
+          "MossNano-CodecStep-fp16.mlmodelc/**",
+          "MossNano-Frame-fp16.mlmodelc/**",
+          "MossNano-Prefill-T512-M1024-fp16.mlmodelc/**",
+          "MossNano-Step-M1024-fp16.mlmodelc/**",
+          "config.json",
+          "tokenizer.model",
+          "tokenizer_test_vectors.json",
+          "voices/en_2.json",
+          "voices/zh_1.json"
+        ]
+      },
+      "requiredFiles": [
+        "MossNano-CodecStep-fp16.mlmodelc/model.mil",
+        "MossNano-CodecStep-fp16.mlmodelc/weights/weight.bin",
+        "MossNano-Frame-fp16.mlmodelc/model.mil",
+        "MossNano-Frame-fp16.mlmodelc/weights/weight.bin",
+        "MossNano-Prefill-T512-M1024-fp16.mlmodelc/model.mil",
+        "MossNano-Prefill-T512-M1024-fp16.mlmodelc/weights/weight.bin",
+        "MossNano-Step-M1024-fp16.mlmodelc/model.mil",
+        "MossNano-Step-M1024-fp16.mlmodelc/weights/weight.bin",
+        "config.json",
+        "tokenizer.model",
+        "tokenizer_test_vectors.json",
+        "voices/en_2.json",
+        "voices/zh_1.json"
+      ]
+    },
+    {
+      "id": "yolo26n-pose",
+      "name": "YOLO 姿态识别",
+      "capability": "pose",
+      "directory": "YOLOPose",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": false,
+      "deviceRequirement": null,
+      "license": "AGPL-3.0",
+      "estimatedBytes": 3261955,
+      "source": {
+        "kind": "urlArchive",
+        "url": "https://github.com/ultralytics/yolo-ios-app/releases/download/v8.3.0/yolo26n-pose.mlpackage.zip",
+        "revision": "release-v8.3.0-asset-487599229",
+        "sha256": "a809a889f1d324299090c6d9f4211ddd3588cc525f5f78d79691de45bd12f042"
+      },
+      "requiredFiles": [
+        "yolo26n-pose.mlpackage/Data/com.apple.CoreML/model.mlmodel"
+      ]
+    }
+  ]
+}

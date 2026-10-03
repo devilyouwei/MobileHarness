@@ -127,3 +127,26 @@ import Testing
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
     await #expect(throws: DocumentStorageError.invalidFile) { try await store.save("new", expecting: nil) }
 }
+
+@Test func authoritativeDocumentReplacementAllowsConcurrentSnapshots() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let url = root.appendingPathComponent("document.json")
+    let first = try LocalDocumentStore<Int>(url: url, maximumBytes: 128, protection: .afterFirstUnlock)
+    let second = try LocalDocumentStore<Int>(url: url, maximumBytes: 128)
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        for value in 0..<20 {
+            group.addTask { _ = try await (value.isMultiple(of: 2) ? first : second).replace(value) }
+        }
+        try await group.waitForAll()
+    }
+    let saved = try #require(await first.refresh())
+    #expect((0..<20).contains(saved.value))
+    #expect(try await second.refresh()?.revision == saved.revision)
+    await #expect(throws: DocumentStorageError.conflict) { try await first.save(100, expecting: nil) }
+    await #expect(throws: DocumentStorageError.capacityExceeded) {
+        let bounded = try LocalDocumentStore<String>(
+            url: root.appendingPathComponent("bounded.json"), maximumBytes: 128)
+        try await bounded.replace(String(repeating: "x", count: 200))
+    }
+}

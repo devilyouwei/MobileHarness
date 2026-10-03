@@ -23,6 +23,17 @@ public enum ModelKitDefaults {
         try await process.manager(resources: resources, cloudChat: cloudChat)
     }
 
+    /// App supplies metadata and storage without acquiring assembly SPI or registering providers.
+    @available(iOS 27, macOS 27, *)
+    public static func configureArtifacts(
+        resources: URL, catalog: ModelArtifactCatalog, storage: any ModelArtifactStorage,
+        downloader: (any ModelArtifactDownloader)? = nil
+    ) async throws -> ModelManager {
+        let manager = try await process.manager(resources: resources, cloudChat: nil)
+        try await manager.configureArtifacts(catalog: catalog, storage: storage, downloader: downloader)
+        return manager
+    }
+
     /// Explicit settings update; preserves the process manager and unrelated model instances.
     @available(iOS 27, macOS 27, *)
     public static func configureChat(resources: URL, configuration: OpenAIChatConfiguration?) async throws {
@@ -33,7 +44,10 @@ public enum ModelKitDefaults {
     fileprivate static func chatRegistration(resources: URL, configuration: OpenAIChatConfiguration?) throws
         -> ModelRegistration
     {
-        try ModelRegistration(id: ModelID("chat"), capabilities: [.chat], memoryPolicy: .releaseWhenIdle) { context in
+        try ModelRegistration(
+            id: ModelID("chat"), capabilities: [.chat], memoryPolicy: .releaseWhenIdle,
+            artifactID: configuration == nil ? "qwen35" : nil
+        ) { context in
             if let configuration {
                 return ProvidedCapabilities(chat: try OpenAIChat(context: context, configuration: configuration))
             }
@@ -53,33 +67,37 @@ public enum ModelKitDefaults {
         let manager = ModelManager()
         do {
             try await manager.register(
-                ModelRegistration(id: ModelID("silero"), capabilities: [.voiceActivity]) { context in
+                ModelRegistration(id: ModelID("silero"), capabilities: [.voiceActivity], artifactID: "silero") {
+                    context in
                     ProvidedCapabilities(
                         voiceActivity: try SileroVAD(
                             context: context, artifacts: resources.appendingPathComponent("Silero")))
                 }, defaults: [.voiceActivity])
             try await manager.register(
                 ModelRegistration(
-                    id: ModelID("recognition"), capabilities: [.recognition], memoryPolicy: .releaseWhenIdle
+                    id: ModelID("recognition"), capabilities: [.recognition], memoryPolicy: .releaseWhenIdle,
+                    artifactID: "nemotron"
                 ) { context in
-                    #if targetEnvironment(simulator)
-                        return ProvidedCapabilities(recognition: UnsupportedRecognition())
-                    #else
-                        let model = try NemotronASR(
-                            context: context, artifacts: resources.appendingPathComponent("Nemotron"))
-                        return ProvidedCapabilities(warmup: { try await model.warmup() }, recognition: model)
-                    #endif
+                    let model = try NemotronASR(
+                        context: context, artifacts: resources.appendingPathComponent("Nemotron"))
+                    return ProvidedCapabilities(warmup: { try await model.warmup() }, recognition: model)
                 }, defaults: [.recognition])
             try await manager.register(
                 chatRegistration(resources: resources, configuration: cloudChat), defaults: [.chat])
             try await manager.register(
-                ModelRegistration(id: mossNano, capabilities: [.synthesis], memoryPolicy: .releaseWhenIdle) { context in
+                ModelRegistration(
+                    id: mossNano, capabilities: [.synthesis], memoryPolicy: .releaseWhenIdle,
+                    artifactID: "moss-tts-nano"
+                ) { context in
                     let model = try MossSpeechSynthesis(
                         context: context, artifacts: resources.appendingPathComponent("MossTTSNano"))
                     return ProvidedCapabilities(warmup: { try await model.warmup() }, synthesis: model)
                 }, defaults: [.synthesis])
             try await manager.register(
-                ModelRegistration(id: ModelID("yolo26n-pose"), capabilities: [.pose], memoryPolicy: .releaseWhenIdle) {
+                ModelRegistration(
+                    id: ModelID("yolo26n-pose"), capabilities: [.pose], memoryPolicy: .releaseWhenIdle,
+                    artifactID: "yolo26n-pose"
+                ) {
                     context in
                     ProvidedCapabilities(
                         pose: try YOLOPose(context: context, artifacts: resources.appendingPathComponent("YOLOPose")))
@@ -99,12 +117,7 @@ public enum ModelKitDefaults {
             throw CapabilityError.unavailable("Qwen3.5 MLX requires a physical device")
         }
     }
-    private struct UnsupportedRecognition: SpeechRecognitionCapability {
-        var availability: CapabilityAvailability { .unavailable(reason: "Nemotron ASR requires a physical device") }
-        func transcribe(_ request: SpeechRecognitionRequest) async throws -> SpeechRecognitionSession {
-            throw CapabilityError.unavailable("Nemotron ASR requires a physical device")
-        }
-    }
+
 #endif
 
 public enum ModelKitConfigurationError: Error, Equatable, Sendable {

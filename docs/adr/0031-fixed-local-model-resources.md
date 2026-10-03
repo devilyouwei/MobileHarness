@@ -1,5 +1,7 @@
 # ADR 0031: Fixed local model resources
 
+> Historical model/resource scope: current synthesis selection is [ADR0058](0058-moss-tts-nano.md); current metadata-only packaging, source declarations, explicit acquisition and safe removal are [ADR0105](0105-local-model-resource-management.md). Old bundle-weight, development-profile and Kokoro-default statements below are retained decision history, not current implementation contracts.
+
 > Historical scope: Fixed-provider snapshot. Later decisions changed default synthesis to bilingual Kokoro and added explicit cloud chat selection; see [ADR 0052](0052-kokoro-coreml-bilingual.md) and [ADR 0053](0053-settings-live-chat.md).
 
 Status: accepted.

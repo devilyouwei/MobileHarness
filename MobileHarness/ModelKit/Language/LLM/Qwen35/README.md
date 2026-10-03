@@ -18,7 +18,7 @@ flowchart LR
     Qwen35Chat -->|ChatEvent stream without count cap| Consumer
 ```
 
-Run scripts/download-qwen35.py before testing. The root project package declares this adapter; the base SDK does not depend on MLX or concrete models. Real quality and latency are acceptance measurements, separate from compilation and protocol-contract tests.
+Run scripts/download-qwen35.py before opt-in local real-model testing; production App acquires Qwen through Settings from the shared catalog. The root project package declares this adapter; the base SDK does not depend on MLX or concrete models. Real quality and latency are acceptance measurements, separate from compilation and protocol-contract tests.
 
 ✅ The adapter takes a local directory. Optional 4B comparison files use Models/Qwen35-4B; HARNESS_QWEN35_SIZE=4B selects that directory in tests only.
 
@@ -50,8 +50,13 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ The Defaults assembly registers Qwen as chat and selects its resource directory. Capability consumers and App do not construct Qwen35Chat.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History shows 模型默认 for omitted values and preserves older explicit budgets. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Qwen reports no native Tool support and rejects requests carrying tools. See [technical flow](../OpenAI/README.md).
 
 ✅ Native Tool rejection is formatted under Swift 6.4 strict lint; local chat remains text-only.
+
+## Local token usage
+
+✅ Normal completion emits ChatEvent.usage before finished, using the actual chat-template input token count and MLX generated-token count. A consumed stop token counts as generated even though it contributes no text. Remaining context still limits local generation; no fixed Assistant output budget is introduced.
+❌ Failed/cancelled operations do not synthesize token usage; physical-model acceptance remains separate.

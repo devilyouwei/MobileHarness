@@ -1,23 +1,12 @@
 # Build configuration
 
-Purpose: own shared Xcode settings, local-signing templates and explicit model resource inputs/outputs.
+Purpose: own shared Xcode settings, local-signing templates and explicit metadata resource inputs/outputs. Design goals: reproducible builds without local model weights, confined staging and private signing configuration.
 
-✅ Shared Swift 6 / iOS 27 settings; local signing stays in ignored Local.xcconfig.
-✅ Physical-device resource lists include Qwen3.5 MLX 2B weights, tokenizer and licenses alongside Nemotron, Silero and standalone Kokoro assets.
-✅ The generated Models output directory permits cleanup before staging the selected model directories; source model artifacts are never removed.
-❌ Configuration alone does not establish device performance or compatibility; these require signed-device validation.
+- ✅ Shared Swift 6 / iOS 27 settings; local signing stays in ignored Local.xcconfig.
+- ✅ Both device and simulator Voice-Models file lists stage only model-catalog.json and license notices. No model graphs, weights, tokenizers or voice assets are build inputs or packaged outputs.
+- ✅ Regenerate lists with scripts/update-model-filelists.py after changing staging metadata/licenses. The pre-build cleanup removes obsolete Models output from incremental App builds; staging never removes developer source artifacts.
+- ✅ Physical App requests com.apple.developer.kernel.increased-memory-limit. It is not a memory-availability guarantee; simulator does not request it.
+- ✅ NSCameraUsageDescription covers local preview and pose inference. Camera denial does not block Settings/history or voice preparation.
+- ❌ Signed-device performance, export compatibility and background transfer acceptance require separate validation; configuration/build success is not that evidence.
 
-✅ MobileHarness.entitlements requests com.apple.developer.kernel.increased-memory-limit on the physical app target, matching the official MLX LLMBasic example. It is not a guarantee of memory availability, and the simulator target does not request it.
-
-✅ Run python3 scripts/update-model-filelists.py after editing production download profiles. It generates explicit Xcode sandbox file inputs and outputs; staging copies only those required files and licenses.
-
-✅ Shared.xcconfig includes NSCameraUsageDescription for local preview and on-device pose inference. The camera is optional; denial leaves the background black and does not block voice model preparation.
-
-✅ Device resource file lists now stage the pinned YOLOPose mlpackage and upstream model card. Camera permission text describes local pose inference; no uploads or recording.
-
-✅ Physical model file lists now stage yolo26n-pose.mlpackage only. The generated App Models cleanup and declared-file copy prevent the retired YOLOv8 package from shipping.
-
-✅ Voice model file lists now stage KokoroCoreML Mandarin/English graphs, local pronunciation resources and FluidAudio license. Regenerate with scripts/update-model-filelists.py.
-
-
-✅ Voice model file lists now stage only the four MOSS streaming graphs, preset voice codes and supporting metadata for TTS. Kokoro resources are excluded. ❌ Physical-device acceptance remains pending.
+Weights are acquired in Settings through Management/ModelKitHub and installed in the sandbox. Separate Mac/comparison provisioning profiles are not App resource inputs. See [Management](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).

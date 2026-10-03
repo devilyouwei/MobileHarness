@@ -60,3 +60,13 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ Latest main-sh incremental Photographer tracking is integrated through [ADR0102](adr/0102-photographer-aim.md), preserving main’s module boundaries and failure isolation. ❌ Physical smoothness acceptance remains pending.
 
 ✅ [ADR0104](adr/0104-expression-perform-and-state.md) documents finite expression and persistent base-state contracts; physical visual acceptance remains on the Roadmap.
+
+✅ Conversation Tool history and usage contract: [ADR0106](adr/0106-conversation-tool-diagnostics.md); physical-provider/UI acceptance remains outstanding.
+
+✅ Audio8 validation remains a historical record; its unused provisioning profile/wrapper was removed during local model cleanup. Mac real-model test fixtures remain retained; shared production source ownership is documented in Resources/Models.
+
+✅ Model-resource documentation audit (2026-10-03): current READMEs describe source declarations, metadata-only builds, sandbox receipts, explicit voice warmup and HF foreground/ZIP background limits. Older model packaging/default-provider ADRs and validation reports are explicitly historical and point to ADR0105/current module contracts; original Technical_Design.docx remains unchanged.
+
+✅ Architecture, Roadmap and ADR0105 distinguish successful model publication from task-record persistence failure and describe the targeted Storage policy. ❌ Phone incident attribution is not claimed from isolated regression tests.
+
+✅ [Shared multilingual Nemotron Core ML runtime](adr/0107-nemotron-coreml-multilingual.md).

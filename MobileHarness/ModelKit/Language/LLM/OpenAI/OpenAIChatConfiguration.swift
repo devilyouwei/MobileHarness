@@ -129,6 +129,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
             "messages": chat.messages.map { ["role": $0.role.rawValue, "content": $0.content] },
             "temperature": chat.temperature, "stream": true,
         ]
+        body["stream_options"] = ["include_usage": true]
         if let maximum = chat.maximumOutputTokens { body["max_tokens"] = maximum }
         if !chat.tools.isEmpty {
             let names = Self.toolNames(chat.tools)

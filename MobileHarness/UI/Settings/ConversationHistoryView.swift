@@ -64,7 +64,7 @@
                 }
                 Section {
                     Text(
-                        "保存正式聊天的用户原文、实际请求上下文和模型文本分片。原始内容按纯文本显示，不执行历史 Action。失败、取消或中断时保留已接收部分；不包含模型未公开的推理、token ID 或 HTTP 数据。历史只保存在本机，容量用满后明确报错，可删除旧会话释放空间。"
+                        "保存正式聊天的用户原文、实际请求上下文、模型文本分片、原生 Tool Call 输入输出和 token 用量。原始内容按纯文本显示，不执行历史 Action 或 Tool。失败、取消或中断时保留已接收部分；模型未提供的 token 用量显示为未提供，不包含 token ID 或 HTTP 数据。历史只保存在本机，容量用满后明确报错，可删除旧会话释放空间。"
                     )
                     .font(.footnote).foregroundStyle(.secondary)
                 }
@@ -115,8 +115,7 @@
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(verbatim: turn.user).lineLimit(3)
-                            Text(verbatim: turn.raw.isEmpty ? "（无模型输出）" : turn.raw).lineLimit(3).foregroundStyle(
-                                .secondary)
+                            Text(verbatim: turn.outputSummary).lineLimit(3).foregroundStyle(.secondary)
                             Text("\(turn.date.formatted()) · \(turn.state.rawValue)").font(.caption)
                         }
                     }
@@ -127,7 +126,7 @@
         }
         private var export: String {
             conversation.turns.map { turn in
-                "USER\n\(turn.user)\n\nASSISTANT RAW\n\(turn.raw)\n\nSTATE: \(turn.state.rawValue)\nERROR: \(turn.error ?? "none")"
+                "USER\n\(turn.user)\n\nASSISTANT RAW\n\(turn.raw)\n\nTOOLS\n\(turn.toolReport)\n\nTOKENS: \(turn.tokenReport)\nSTATE: \(turn.state.rawValue)\nERROR: \(turn.error ?? "none")"
             }.joined(separator: "\n\n---\n\n")
         }
     }
@@ -149,11 +148,35 @@
                     Text("模型：\(turn.model)")
                     Text("状态：\(turn.state.rawValue)；结束原因：\(turn.finishReason ?? "未收到")")
                     Text("\(turn.raw.utf8.count) 字节 · \(turn.fragments.count) 分片")
-                    Text(
-                        "max tokens: \(turn.maximumOutputTokens.map(String.init) ?? "模型默认") · temperature: \(turn.temperature)"
-                    )
+                    Text("temperature: \(turn.temperature)")
+                    Text(turn.tokenReport)
                     if let error = turn.error { selectable(error) }
                     if let error = turn.executionError { selectable("执行失败：" + error) }
+                }
+                if let calls = turn.toolCalls, !calls.isEmpty {
+                    Section("Tool Call 输入 / 输出") {
+                        ForEach(calls) { call in
+                            DisclosureGroup("\(call.name) · \(call.state.rawValue)") {
+                                selectable("模型调用 ID：" + call.providerID)
+                                selectable("执行调用 ID：" + call.id.uuidString)
+                                Text("输入参数").font(.caption)
+                                selectable(call.argumentsJSON)
+                                Text("输出结果").font(.caption)
+                                selectable(
+                                    call.output
+                                        ?? (call.state == .completed
+                                            ? "执行完成，无返回数据" : "未收到执行结果"))
+                                if let error = call.error { selectable("失败原因：" + error) }
+                            }
+                        }
+                    }
+                    if let definitions = turn.toolDefinitions, !definitions.isEmpty {
+                        Section("实际发送的 Tool 声明") {
+                            ForEach(Array(definitions.enumerated()), id: \.offset) { index, definition in
+                                DisclosureGroup("Tool \(index + 1)") { selectable(definition) }
+                            }
+                        }
+                    }
                 }
                 Section("实际发送的上下文（含系统提示词）") {
                     ForEach(Array(turn.request.enumerated()), id: \.offset) { _, message in
@@ -183,12 +206,19 @@
                 Model: \(turn.model)
                 Date: \(turn.date)
                 State: \(turn.state.rawValue); finish: \(turn.finishReason ?? "none")
-                Maximum tokens: \(turn.maximumOutputTokens.map(String.init) ?? "模型默认"); temperature: \(turn.temperature)
+                Temperature: \(turn.temperature)
+                Tokens: \(turn.tokenReport)
                 Generation error: \(turn.error ?? "none")
                 Execution error: \(turn.executionError ?? "none")
 
                 ACTUAL REQUEST
                 \(messages)
+
+                ACTUAL TOOL DEFINITIONS
+                \((turn.toolDefinitions ?? []).joined(separator: "\n\n"))
+
+                TOOL CALL INPUT / OUTPUT
+                \(turn.toolReport)
 
                 RAW MODEL TEXT
                 \(turn.raw)
@@ -204,6 +234,32 @@
         private func selectable(_ text: String) -> some View {
             Text(verbatim: text.isEmpty ? "（空）" : text)
                 .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+        }
+    }
+
+    extension ConversationRecord {
+        fileprivate var outputSummary: String {
+            if !raw.isEmpty { return raw }
+            guard let calls = toolCalls, !calls.isEmpty else { return "（无模型输出）" }
+            return "Tool Call：" + calls.map(\.name).joined(separator: "、")
+        }
+        fileprivate var tokenReport: String {
+            guard let usage = tokenUsage else { return "Token 用量：未提供" }
+            return "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
+        }
+        fileprivate var toolReport: String {
+            guard let calls = toolCalls else { return "未保存 Tool Call 数据" }
+            if calls.isEmpty { return "本轮无 Tool Call" }
+            return calls.map { call in
+                """
+                Name: \(call.name)
+                Provider ID: \(call.providerID); runtime ID: \(call.id)
+                State: \(call.state.rawValue)
+                Input: \(call.argumentsJSON)
+                Output: \(call.output ?? (call.state == .completed ? "Completed without return data" : "No execution result received"))
+                Error: \(call.error ?? "none")
+                """
+            }.joined(separator: "\n\n")
         }
     }
 

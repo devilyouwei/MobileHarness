@@ -19,6 +19,6 @@
 
 模型是整句自回归 ASR，send 不触发声学推理；不能用本测试宣称支持实时 partial。官方完整 iOS 制品不同于 hugging-mac 的 Core ML + PyTorch 混合制品；本项目不需要 PyTorch。
 
-当时的复现流程是先运行 `python3 scripts/download-audio8.py`，再用完整 Xcode 工具链运行 `./scripts/test-audio8.sh`。后者已随 Audio8 adapter 移除，当前仓库不能直接重跑此历史测试；常规 CI 不下载或执行该模型权重。
+当时的复现流程是先运行 `python3 scripts/download-audio8.py`，再用完整 Xcode 工具链运行 `./scripts/test-audio8.sh`。两个脚本均已随 adapter 移除及后续资源清理而移除，当前仓库不能直接重跑此历史测试；常规 CI 不下载或执行该模型权重。
 
 默认 App 切换验证：scripts/check.sh 通过；真实 Audio8 中英文及取消/重载测试通过；iOS 27 模拟器安装启动成功，界面显示 Audio8 + Silero。模拟器麦克风连续对话与真机运行未验收。

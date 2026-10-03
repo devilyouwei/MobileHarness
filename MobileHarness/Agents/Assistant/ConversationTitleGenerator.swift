@@ -41,6 +41,7 @@ public enum ConversationTitleGenerator {
                                 throw CapabilityError.eventTooLarge
                             }
                             title += delta
+                        case .usage: break
                         case .toolCall:
                             throw CapabilityError.invalidRequest("Unexpected title tool call")
                         case .finished(let reason):

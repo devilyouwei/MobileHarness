@@ -1,5 +1,7 @@
 # 0050 — Default Kokoro synthesis
 
+> Historical model/resource scope: current synthesis selection is [ADR0058](0058-moss-tts-nano.md); current metadata-only packaging, source declarations, explicit acquisition and safe removal are [ADR0105](0105-local-model-resource-management.md). Old bundle-weight, development-profile and Kokoro-default statements below are retained decision history, not current implementation contracts.
+
 > Historical scope: Historical English-only Kokoro default. [ADR 0052](0052-kokoro-coreml-bilingual.md) replaced its model path and language selection with the bilingual Core ML implementation.
 
 Date: 2026-09-28. Supersedes ADR 0016's diagnostic-only selection, not its model limits.

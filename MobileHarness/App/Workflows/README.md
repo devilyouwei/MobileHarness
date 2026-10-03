@@ -249,3 +249,9 @@ flowchart LR
 ❌ The facade is not a service locator and owns no runtime state; independent multi-window arbitration remains future work.
 
 ✅ Presentation provides a state-free independent subscriber consumer for tracking failure reporting. Vision frame processing remains lifecycle-owned and does not depend on robot availability.
+
+## Local model resources — current contract
+
+✅ ModelResourcesWorkflow is compiled inside existing AppSettingsWorkflow, with injected resource operations and source persistence; no seventh feature target or facade-owned runtime state was added.
+
+❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../../ModelKit/Management/README.md).

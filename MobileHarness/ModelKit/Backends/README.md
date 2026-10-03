@@ -1,12 +1,13 @@
-# Inference backends
+# Inference and resource backends
 
-Purpose: isolate native graph execution and MLX language generation. Design goals: backend-specific types stay behind adapters; no Agent, Gateway, Action, UI or device orchestration dependency.
+Purpose: isolate native graph execution, MLX language generation and concrete Hub acquisition. Design goals: backend-specific types stay behind adapters; no Agent, Gateway, Action, UI or device orchestration dependency.
 
 | Directory | Responsibility |
 | --- | --- |
-| CoreAI | Native graph and tensor execution for Nemotron |
+| HuggingFace | Independent ModelKitHub adapter for declarative artifact acquisition |
+| CoreAI | Optional native graph and tensor utilities; not the current Nemotron backend |
 | CoreML | Validated Core ML graph execution for Silero |
-| FluidAudio | Pinned Kokoro Core ML graphs and local Mandarin frontend |
+| FluidAudio | Shared multilingual Nemotron Core ML graphs, optional Kokoro and local Mandarin frontend |
 | MLX | Local Qwen generation, tokenizer bridge and explicit allocator configuration |
 
 ```mermaid
@@ -22,4 +23,4 @@ flowchart LR
 - ❌ A universal backend interchange format or cross-model scheduler.
 
 
-✅ [MossCoreML](MossCoreML/README.md) contains the pinned, narrowly adapted MOSS beta graph loop and tokenizer. No runtime downloader or new third-party package is introduced. ❌ iPhone stability/performance acceptance remains pending.
+✅ [MossCoreML](MossCoreML/README.md) contains the pinned, narrowly adapted MOSS beta graph loop and tokenizer. MossCoreML does not implement downloading; ModelKitHub owns the separate resource acquisition adapter. ❌ iPhone stability/performance acceptance remains pending.

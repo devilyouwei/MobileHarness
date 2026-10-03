@@ -64,7 +64,7 @@ public actor OpenAIChat: ChatCapability {
                     for event in try decoder.consume(byte) {
                         if case .finished = event { finish = event } else { try emitter.yield(event) }
                     }
-                    if decoder.finished { break }
+                    if decoder.done { break }
                 }
                 guard let finish else { throw OpenAIChatError.truncatedStream }
                 try Task.checkCancellation()

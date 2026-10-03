@@ -1,4 +1,7 @@
 import AppWorkflows
+import ModelKitDefaults
+import ModelKitHub
+import ModelKitRuntime
 import SwiftUI
 import UI
 import UIKit
@@ -6,6 +9,7 @@ import UIKit
 @main
 @MainActor
 struct MobileHarnessApp: App {
+    @UIApplicationDelegateAdaptor(ModelDownloadsAppDelegate.self) private var downloadsDelegate
     @State private var assembly = AppAssembly()
     private var camera: CameraCoordinator { assembly.camera }
     private var container: AppContainer? { assembly.container }
@@ -44,7 +48,7 @@ struct MobileHarnessApp: App {
                     SettingsView(
                         settings: assembly.settings, bluetooth: assembly.bluetooth.state,
                         bluetoothControls: assembly.bluetooth, history: assembly.history.state,
-                        historyControls: assembly.history
+                        historyControls: assembly.history, modelResources: assembly.modelResources
                     ) {
                         let applied = await assembly.settings.save()
                         if applied, container == nil {
@@ -168,6 +172,68 @@ struct MobileHarnessApp: App {
                 state: container.conversation, robot: assembly.bluetooth.state, activity: container.actionActivity,
                 toggleVoice: container.lifecycle.toggleVoice)
         }
+    }
+
+}
+
+@MainActor
+final class ModelDownloadsAppDelegate: NSObject, UIApplicationDelegate {
+    private var completions: [String: (UUID, () -> Void)] = [:]
+    private var preparationTime: UIBackgroundTaskIdentifier = .invalid
+    private var preparationTimer: Task<Void, Never>?
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        finishPreparationTime()
+        preparationTime = application.beginBackgroundTask(withName: "Model download preparation") { [weak self] in
+            self?.finishPreparationTime()
+        }
+        preparationTimer = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(25)) } catch { return }
+            self?.finishPreparationTime()
+        }
+    }
+    func applicationWillEnterForeground(_ application: UIApplication) { finishPreparationTime() }
+    private func finishPreparationTime() {
+        preparationTimer?.cancel()
+        preparationTimer = nil
+        if preparationTime != .invalid {
+            UIApplication.shared.endBackgroundTask(preparationTime)
+            preparationTime = .invalid
+        }
+    }
+
+    func application(
+        _ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard identifier.hasPrefix("dev.mobileharness.artifacts.") else {
+            completionHandler()
+            return
+        }
+        completions.removeValue(forKey: identifier)?.1()
+        let generation = UUID()
+        completions[identifier] = (generation, completionHandler)
+        Task {
+            do {
+                let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness/Models")
+                let catalog = try ModelArtifactCatalog.read(
+                    Bundle.main.bundleURL.appendingPathComponent("Models/model-catalog.json"))
+                let storage = try ModelArtifactStorageAdapter(root: root)
+                let manager = try await ModelKitDefaults.configureArtifacts(
+                    resources: root.appendingPathComponent("installed"), catalog: catalog, storage: storage,
+                    downloader: HuggingFaceArtifactDownloader())
+                _ = try await manager.artifactSnapshots()
+            } catch {
+                // Persisted index/catalog failures are surfaced again by the resource settings page.
+                finish(identifier, generation: generation)
+            }
+        }
+        ModelArtifactBackgroundEvents.register(identifier) { [weak self] in
+            Task { @MainActor in self?.finish(identifier, generation: generation) }
+        }
+    }
+    private func finish(_ identifier: String, generation: UUID) {
+        guard completions[identifier]?.0 == generation else { return }
+        completions.removeValue(forKey: identifier)?.1()
     }
 
 }

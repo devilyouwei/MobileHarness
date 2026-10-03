@@ -2,6 +2,8 @@
 
 Date: 2026-09-28. Supersedes ADR 0052's default synthesis and resource selection.
 
+Current resource delivery is [ADR0105](0105-local-model-resource-management.md): App bundles metadata/licenses only and installs MOSS through Settings; explicit voice admission performs warmup. Kokoro comparison code/tests remain optional, but its repository provisioning profile/wrapper/local weights are removed; real comparison tests require an external HARNESS_KOKORO_MODEL_ROOT.
+
 The user repeatedly reproduced a process crash on iPhone 17 Pro / iOS 27 before Kokoro speech began and explicitly requested MOSS-TTS-Nano Core ML. A Swift error fallback cannot recover a process abort. Remove Kokoro from production registration and packaged TTS resources; keep its isolated comparison code/tests without exposing an App fallback.
 
 ModelKitDefaults registers ModelID("moss-tts-nano") as the only synthesis default. ModelKitMossNano owns request/session admission, bounded mono PCM and the managed resource. ModelKitMossCoreML contains the graph loop and text processing adapted from FluidAudio PR #917 at abbde6b9b80c0e7c2c488f35b0b225c0e8cab08f. The public high-level manager was unsuitable: it downloads resources and uses an unbounded stream. Copy only the relevant licensed implementation, retain attribution, and add synchronous throwing emission, per-graph cancellation, per-frame autorelease cleanup and explicit failure on missing stop token. Existing FluidAudio dependency is not updated; no new package is introduced.

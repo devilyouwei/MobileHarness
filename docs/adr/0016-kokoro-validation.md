@@ -1,5 +1,7 @@
 # ADR 0016 — Kokoro CoreAI 独立验证
 
+> Historical model/resource scope: current synthesis selection is [ADR0058](0058-moss-tts-nano.md); current metadata-only packaging, source declarations, explicit acquisition and safe removal are [ADR0105](0105-local-model-resource-management.md). Old bundle-weight, development-profile and Kokoro-default statements below are retained decision history, not current implementation contracts.
+
 2026-09-24，用户选择 mlboydaisuke/Kokoro-82M-CoreAI 先验证本地 TTS。
 
 增加 ModelKitKokoro → ModelKit / ModelKitCoreAI，沿用 SpeechSynthesisCapability 和现有图后端；不引入完整 coreai-kit 或业务依赖。固定模型 revision、代码来源、SHA-256 和 Apache/BSD 许可。只下载 af_heart 与必要运行资源，权重不入 Git。

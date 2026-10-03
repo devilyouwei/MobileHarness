@@ -13,7 +13,7 @@ let package = Package(
                 "AgentCore", "Gateway", "Agents", "Actions", "Tools", "ActionRuntime", "ToolRuntime", "Types",
                 "ModelKit",
                 "Storage", "StorageChat", "StorageAudio", "UI", "AppWorkflows", "BehaviorAssembly",
-                "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults",
+                "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults", "ModelKitHub",
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
                 "PlatformKit",
             ]),
@@ -28,6 +28,7 @@ let package = Package(
         .library(name: "ModelKitAppleSpeech", targets: ["ModelKitAppleSpeech"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/huggingface/swift-huggingface", exact: "0.9.0"),
         .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "603.0.2"),
         .package(
             url: "https://github.com/FluidInference/FluidAudio", revision: "20d4f0bd46d11d7f50a6eb4f7835cfdbd2b4ba14",
@@ -37,6 +38,10 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.1.0"),
     ],
     targets: [
+        .target(
+            name: "ModelKitHub",
+            dependencies: ["ModelKitRuntime", .product(name: "HuggingFace", package: "swift-huggingface")],
+            path: "MobileHarness/ModelKit/Backends/HuggingFace", exclude: ["README.md"]),
         .macro(
             name: "BehaviorDefinitions",
             dependencies: [
@@ -80,6 +85,11 @@ let package = Package(
                 "AppPresentationWorkflow", "AppDiagnosticWorkflow",
             ], path: "MobileHarness/App/Workflows",
             exclude: ["README.md", "Settings", "History", "Bluetooth", "Speech", "Presentation", "Diagnostics"]),
+        .testTarget(
+            name: "ModelKitHubTests",
+            dependencies: [
+                "ModelKitHub", "ModelKitRuntime", .product(name: "HuggingFace", package: "swift-huggingface"),
+            ], exclude: ["README.md"]),
         .testTarget(name: "UITests", dependencies: ["UI"], exclude: ["README.md"]),
         .testTarget(
             name: "AppWorkflowTests",
@@ -205,10 +215,11 @@ let package = Package(
         .target(
             name: "ModelKitCoreAI", path: "MobileHarness/ModelKit/Backends/CoreAI", exclude: ["README.md"]),
         .target(
-            name: "ModelKitNemotron", dependencies: ["ModelKit", "ModelKitCoreAI"],
-            path: "MobileHarness/ModelKit/Speech/ASR/Nemotron", exclude: ["README.md"],
-            resources: [.process("Resources")]),
-        .testTarget(name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron"], exclude: ["README.md"]),
+            name: "ModelKitNemotron", dependencies: ["ModelKit", "ModelKitFluidAudio"],
+            path: "MobileHarness/ModelKit/Speech/ASR/Nemotron", exclude: ["README.md"]),
+        .testTarget(
+            name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron", "ModelKitFluidAudio"],
+            exclude: ["README.md"]),
         .target(name: "ModelKitMossCoreML", path: "MobileHarness/ModelKit/Backends/MossCoreML", exclude: ["README.md"]),
         .target(
             name: "ModelKitMossNano", dependencies: ["ModelKit", "ModelKitMossCoreML"],

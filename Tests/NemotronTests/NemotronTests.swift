@@ -1,6 +1,7 @@
 import AVFAudio
 import Foundation
 @_spi(ModelManagement) import ModelKit
+import ModelKitFluidAudio
 import Testing
 
 @testable import ModelKitNemotron
@@ -8,25 +9,38 @@ import Testing
 private var repository: URL {
     URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 }
-private func melFilters() throws -> [Float] {
-    let url = repository.appendingPathComponent("MobileHarness/ModelKit/Speech/ASR/Nemotron/Resources/mel_filters.f32")
-    return try Data(contentsOf: url).withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+private func metadata(chunkFrames: Int = 224) throws -> Data {
+    try JSONSerialization.data(
+        withJSONObject: [
+            "sample_rate": 16000, "mel_features": 128, "chunk_mel_frames": chunkFrames,
+            "pre_encode_cache": 9, "total_mel_frames": 233, "vocab_size": 13087, "blank_idx": 13087,
+            "encoder_dim": 1024, "decoder_hidden": 640, "decoder_layers": 2,
+            "cache_channel_shape": [1, 24, 42, 1024], "cache_time_shape": [1, 24, 1024, 8],
+            "num_prompts": 128, "default_prompt_id": 101,
+            "prompt_dictionary": ["auto": 101, "en-US": 0, "zh-CN": 20],
+        ] as [String: Any])
 }
-
-@Test func melIsIndependentOfPacketBoundaries() throws {
-    let filters = try melFilters()
-    let samples = (0..<16_000).map { Float(sin(Double($0) * 0.037) * 0.2) }
-    let whole = NemotronMelStream(melFilters: filters).push(samples)
-    let streaming = NemotronMelStream(melFilters: filters)
-    var chunked: [[Float]] = []
-    for i in stride(from: 0, to: samples.count, by: 137) {
-        chunked += streaming.push(Array(samples[i..<min(samples.count, i + 137)]))
+@Test func coreMLMetadataSelects2240msMultilingualAndRejectsOtherTiers() throws {
+    let prompts = try LocalNemotronEngine.validateMetadata(metadata())
+    #expect(prompts["auto"] == 101)
+    #expect(prompts["zh-CN"] == 20)
+    #expect(throws: LocalNemotronEngine.Failure.self) {
+        try LocalNemotronEngine.validateMetadata(metadata(chunkFrames: 112))
     }
-    #expect(whole == chunked)
-    #expect(whole.first?.count == 25 * 128)
-    #expect(whole.dropFirst().allSatisfy { $0.count == 32 * 128 })
-    let silence = NemotronMelStream(melFilters: filters).push(Array(repeating: 0, count: 5000))
-    #expect(silence[0].allSatisfy { abs($0 - log(pow(2, -24))) < 0.00001 })
+    #expect(throws: LocalNemotronEngine.Failure.self) {
+        try LocalNemotronEngine.validateMetadata(Data("{}".utf8))
+    }
+}
+@Test func coreMLRecognitionReportsMissingResourcesWithoutLoading() async throws {
+    let context = ModelContext()
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let provider = try NemotronASR(context: context, artifacts: root)
+    if case .available = await provider.availability { Issue.record("Missing files must not report available") }
+    #expect(await context.status == .unloaded)
+    let format = try AudioFormat(sampleRate: 24000, channels: 1, encoding: .float32)
+    await #expect(throws: CapabilityError.self) {
+        try await provider.transcribe(SpeechRecognitionRequest(locale: "auto", format: format))
+    }
 }
 
 @Test func modelLeaseRejectsConcurrentAdmissionAndAllowsUnload() async throws {
@@ -42,34 +56,15 @@ private func melFilters() throws -> [Float] {
     await manager.release(next.id)
 }
 
-@Test func tokenizerMetaspacePreservesChineseAndPunctuation() throws {
-    var vocab: [String: Int] = [:]
-    for i in 0..<13_087 { vocab["unused\(i)"] = i }
-    for (id, token) in ["▁hello", "▁world", "!", "你", "好"].enumerated() {
-        vocab.removeValue(forKey: "unused\(id)")
-        vocab[token] = id
-    }
-    let file: [String: Any] = [
-        "model": ["type": "BPE", "vocab": vocab],
-        "decoder": ["type": "Metaspace", "replacement": "▁", "prepend_scheme": "always"],
-    ]
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
-    try JSONSerialization.data(withJSONObject: file).write(to: url)
-    defer { try? FileManager.default.removeItem(at: url) }
-    let tokenizer = try NemotronTokenizer(url: url)
-    #expect(tokenizer.decode(tokens: [0, 1, 2]) == "hello world!")
-    #expect(tokenizer.decode(tokens: [3, 4, 2]) == "你好!")
-}
-
-/// Opt-in local GPU test; uses generated fixture speech, no microphone or network.
+/// Opt-in local Core ML test; uses generated fixture speech, no microphone or network.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_NEMOTRON"] == "1"))
-@available(macOS 27, iOS 27, *)
+@available(macOS 15, iOS 18, *)
 func realModelStreamingPacketParityAndCancellation() async throws {
     let models = repository.appendingPathComponent("MobileHarness/Resources/Models")
     let providerContext = ModelContext()
     let provider = try NemotronASR(
         context: providerContext,
-        artifacts: models.appendingPathComponent("Nemotron-macos"))
+        artifacts: models.appendingPathComponent("Nemotron"))
     let file = try AVAudioFile(forReading: URL(fileURLWithPath: "/tmp/nemotron-fixture.wav"))
     let buffer = try #require(
         AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))

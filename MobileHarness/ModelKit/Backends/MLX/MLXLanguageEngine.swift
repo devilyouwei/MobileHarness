@@ -5,6 +5,11 @@ import MLXLLM
 import MLXLMCommon
 import Tokenizers
 
+public struct MLXLanguageGeneration: Sendable {
+    public let stopped: Bool
+    public let generatedTokens: Int
+}
+
 public struct MLXLanguageTurn: Sendable {
     public let role: String
     public let content: String
@@ -41,7 +46,7 @@ public actor MLXLanguageEngine {
     public func generate(
         tokens: [Int], maximumTokens: Int, temperature: Double, stopTokens: Set<Int>,
         emit: @escaping @Sendable (String) throws -> Void
-    ) async throws -> Bool {
+    ) async throws -> MLXLanguageGeneration {
         guard !active else { throw MLXLanguageError.busy }
         active = true
         defer { active = false }
@@ -58,8 +63,12 @@ public actor MLXLanguageEngine {
             var previous = ""
             while generated.count < maximumTokens {
                 try Task.checkCancellation()
-                guard let token = iterator.next() else { return false }
-                if stopTokens.contains(token) { return true }
+                guard let token = iterator.next() else {
+                    return MLXLanguageGeneration(stopped: false, generatedTokens: generated.count)
+                }
+                if stopTokens.contains(token) {
+                    return MLXLanguageGeneration(stopped: true, generatedTokens: generated.count + 1)
+                }
                 generated.append(token)
                 var decoded = context.tokenizer.decode(tokenIds: generated)
                 while decoded.last == "\u{FFFD}" { decoded.removeLast() }
@@ -69,7 +78,7 @@ public actor MLXLanguageEngine {
                 if !delta.isEmpty { try emit(delta) }
             }
             try Task.checkCancellation()
-            return false
+            return MLXLanguageGeneration(stopped: false, generatedTokens: generated.count)
         }
     }
 }

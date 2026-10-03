@@ -16,6 +16,9 @@ public actor ModelManager {
         }
     }
     private let loadGate = ModelLoadGate()
+    private var artifacts: ModelArtifactStore?
+    private var artifactConfiguration: [String: String]?
+    private var artifactIDs: Set<String>?
     private var entries: [ModelID: Entry] = [:]
     private var defaults: [ProvidedCapability: ModelID] = [:]
     private var replacements: [ModelID: Entry] = [:]
@@ -24,10 +27,69 @@ public actor ModelManager {
     private var shutdownTask: Task<Void, Never>?
     @_spi(ModelAssembly) public init() {}
 
+    @_spi(ModelAssembly) public func configureArtifacts(
+        catalog: ModelArtifactCatalog, storage: any ModelArtifactStorage,
+        downloader: (any ModelArtifactDownloader)? = nil
+    ) throws {
+        guard !closed else { throw CapabilityError.sessionClosed }
+        let configuration = Dictionary(
+            uniqueKeysWithValues: catalog.packages.map { ($0.id, $0.revision + "/" + $0.directory) })
+        if let artifactConfiguration {
+            guard artifactConfiguration == configuration else { throw ModelArtifactError.invalidCatalog }
+            return
+        }
+        let ids = Set(catalog.packages.map(\.id))
+        guard entries.values.allSatisfy({ $0.registration.artifactID.map(ids.contains) ?? true }) else {
+            throw ModelArtifactError.invalidCatalog
+        }
+        artifactConfiguration = configuration
+        artifactIDs = ids
+        artifacts = ModelArtifactStore(catalog: catalog, storage: storage, downloader: downloader)
+    }
+    public func artifactSnapshots() async throws -> [ModelArtifactSnapshot] {
+        guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
+        return try await artifacts.snapshots()
+    }
+    public func downloadArtifact(_ id: String, source: ModelDownloadSource) async throws {
+        guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
+        try await artifacts.download(id, source: source)
+    }
+    public func cancelArtifact(_ id: String) async throws {
+        guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
+        try await artifacts.cancel(id)
+    }
+    public func removeArtifact(_ id: String, quiesce: @Sendable () async throws -> Void) async throws {
+        guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
+        guard artifactIDs?.contains(id) == true else { throw ModelArtifactError.missingArtifact }
+        let affected = entries.values.filter { $0.registration.artifactID == id }
+        guard affected.allSatisfy({ !$0.unloading }) else { throw ModelArtifactError.busy }
+        for entry in affected { entry.unloading = true }
+        var fenced: [Entry] = []
+        do {
+            for entry in affected {
+                if let task = entry.construction?.task { _ = try await task.value }
+                try await entry.context.beginMaintenance()
+                fenced.append(entry)
+            }
+            try await quiesce()
+            for entry in fenced { try await entry.context.unload() }
+            try await artifacts.remove(id)
+        } catch {
+            for entry in fenced { await entry.context.endMaintenance() }
+            for entry in affected { entry.unloading = false }
+            throw error
+        }
+        for entry in fenced { await entry.context.endMaintenance() }
+        for entry in affected { entry.unloading = false }
+    }
+
     @_spi(ModelAssembly) public func register(
         _ registration: ModelRegistration, defaults selected: Set<ProvidedCapability> = []
     ) throws {
         guard !closed else { throw CapabilityError.sessionClosed }
+        if let artifactIDs, let id = registration.artifactID, !artifactIDs.contains(id) {
+            throw ModelArtifactError.invalidCatalog
+        }
         guard entries[registration.id] == nil else { throw ModelRegistrationError.duplicateModel(registration.id) }
         guard entries.count < 32 else { throw CapabilityError.inputBusy }
         guard selected.isSubset(of: registration.capabilities) else { throw ModelRegistrationError.invalidRegistration }
@@ -41,6 +103,9 @@ public actor ModelManager {
     /// Assembly-only replacement. Old resource-backed handles become terminal after success.
     /// Candidate construction failure preserves the old registration. No pending replacement queue.
     @_spi(ModelAssembly) public func replace(_ registration: ModelRegistration) async throws {
+        if let artifactIDs, let id = registration.artifactID, !artifactIDs.contains(id) {
+            throw ModelArtifactError.invalidCatalog
+        }
         let old = try entry(registration.id)
         guard !old.unloading else { throw CapabilityError.inputBusy }
         guard old.registration.capabilities == registration.capabilities else {
@@ -175,6 +240,7 @@ public actor ModelManager {
             return
         }
         closed = true
+        await artifacts?.cancelAll()
         let work = (Array(entries.values) + Array(replacements.values)).map { ($0.context, $0.construction?.task) }
         let task = Task {
             await withTaskGroup(of: Void.self) { group in
