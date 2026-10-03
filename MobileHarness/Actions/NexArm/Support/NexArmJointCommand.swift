@@ -7,10 +7,20 @@ public enum NexArmJointCommand {
     public static let countsPerRadian = 4096.0 / (2 * Double.pi)
     /// Nominal duration used only to choose a legal motor speed. It is not a measured travel time.
     public static let aimMilliseconds = 200
-    /// Production arm rest. The 2026-10-01 Bluetooth read sat on this pose; the gripper encoder is excluded.
-    public static let armHome: [Int] = [2048, 2087, 1198, 1238, 2048]
+    /// Tracking rest and highest camera position, read over Bluetooth on 2026-10-03 (X299 Z327 mm, end pitch -1.9°).
+    /// The gripper encoder (1630) is excluded: the suction cup occupies it.
+    public static let armHome: [Int] = [2047, 2087, 1984, 2045, 2048]
+    /// Measured 2026-10-03: with the wrist fixed, shoulder_lift + elbow_flex of 4067…4071 holds the forearm level.
+    /// Each 11.3 counts of difference tilts it 1°.
+    public static var forearmLevelSum: Int { armHome[1] + armHome[2] }
+    /// Lowest shoulder_lift tracking may use (Z about 100 mm). The measured physical low is 1038 (Z 62 mm).
+    public static let reachLiftMinimum = 1150
+    /// Wrist pitch (radians, camera looking down) at which the arm starts to extend, and where it is fully extended.
+    public static let reachPitchThreshold = 0.25
+    public static let reachPitchLimit = 0.7
 
     /// Logical 0 is each joint's arm-home count. Positive radians increase the raw count.
+    /// Shoulder lift follows wrist pitch and the elbow levels the forearm; wrist roll and the gripper stay put.
     public static func positions(base: Double, pitch: Double) throws -> [Int] {
         guard base.isFinite, pitch.isFinite, abs(base) <= 4 * .pi, abs(pitch) <= 4 * .pi else {
             throw NexArmControlError.invalidAngle
@@ -18,7 +28,18 @@ public enum NexArmJointCommand {
         var positions = armHome
         positions[0] = raw(armHome[0], offset: base, joint: 0)
         positions[3] = raw(armHome[3], offset: pitch, joint: 3)
+        positions[1] = reachLift(pitch: pitch)
+        positions[2] = forearmLevelSum - positions[1]
         return positions
+    }
+
+    /// Looking down far enough extends the arm forward, which lowers the camera. The rest is already the highest
+    /// position, so looking up never raises the shoulder above it.
+    public static func reachLift(pitch: Double) -> Int {
+        let travel = Double(armHome[1] - reachLiftMinimum)
+        let span = reachPitchLimit - reachPitchThreshold
+        let fraction = min(1, max(0, (pitch - reachPitchThreshold) / span))
+        return armHome[1] - Int((travel * fraction).rounded())
     }
 
     /// Broadcast servo write listing IDs 1...5. No gripper byte is present.
@@ -63,4 +84,33 @@ public enum NexArmJointCommand {
 public enum NexArmControlError: Error, Equatable, Sendable {
     case invalidAngle
     case invalidPosition
+}
+
+/// Elbow command that keeps the forearm level for a shoulder lift.
+/// Measured 2026-10-03: when the elbow count rises (forearm lifts against gravity) it only starts after the command
+/// leads it by about 40 counts and then stays about 40 short. Lowering is accurate. The lead is therefore added
+/// while the lift target is extending and removed once it retracts.
+public struct NexArmForearmLeveler: Sendable {
+    public static let lead = 40
+    public static let hysteresis = 6
+    private var reference: Int?
+    private var current = 0
+    public init() {}
+
+    public mutating func elbow(forLift lift: Int) -> Int {
+        let level = NexArmJointCommand.forearmLevelSum - lift
+        if let reference {
+            if level >= reference + Self.hysteresis {
+                current = Self.lead
+                self.reference = level
+            } else if level <= reference - Self.hysteresis {
+                current = 0
+                self.reference = level
+            }
+        } else {
+            reference = level
+        }
+        let limits = NexArmMotorCommands.positionLimits[2]
+        return min(limits.upperBound, max(limits.lowerBound, level + current))
+    }
 }

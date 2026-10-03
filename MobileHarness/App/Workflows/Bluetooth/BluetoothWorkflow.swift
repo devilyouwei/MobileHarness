@@ -67,6 +67,15 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private var liveTask: Task<Void, Never>?
     private var motorInputs = Array(repeating: 0.0, count: 6)
     private var jogPlanner: NexArmJogPlanner?
+    private struct AimGoal: Equatable, Sendable {
+        var base: Int
+        var lift: Int
+        var elbow: Int
+        var pitch: Int
+    }
+    private var aimGoal: AimGoal?
+    private var forearmLeveler = NexArmForearmLeveler()
+    private var followingAim = false
     private var controlRevision = UUID()
     private var pendingArmAction: BluetoothArmAction?
     private var settingsWorker: Task<Void, Never>?
@@ -174,6 +183,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 state.error = BluetoothWorkflowError.feedbackTimeout.localizedDescription
                 pendingArmAction = nil
                 motorInputs = Array(repeating: 0, count: 6)
+                aimGoal = nil
                 liveTask?.cancel()
                 // The active executor reports feedbackLost, not cancellation or target timeout.
             }
@@ -582,6 +592,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             return
         }
         motorInputs = Array(repeating: 0, count: 6)
+        aimGoal = nil
         liveTask?.cancel()
         motion?.cancel()
         pendingArmAction = action  // Capacity one; Settings explicitly replaces its previous request.
@@ -640,6 +651,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
         }
         cancelTestSequence()
         pendingArmAction = nil
+        aimGoal = nil
+        if followingAim { liveTask?.cancel() }
         state.resetting = false
         motorInputs[id - 1] = min(1, max(-1, value))
         startLiveControl()
@@ -652,6 +665,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
     }
     public func stopMotorControl() {
         motorInputs = Array(repeating: 0, count: 6)
+        aimGoal = nil
         cancelTestSequence()
     }
     private func startLiveControl() {
@@ -789,10 +803,138 @@ public final class BluetoothWorkflow: BluetoothControlling {
             try await $0.performGesture(gesture, repetitions: repetitions, speed: speed, acceleration: acceleration)
         }
     }
-    /// Foreground BLE write of one five-axis aim. Returns when the link accepts it, not when the arm arrives.
+    /// Keeps only the latest aim. The manual-control loop streams it; this returns without waiting for the arm.
     public func aim(base: Double, pitch: Double) async throws {
-        try await runMotion(label: "瞄准", returnsHome: false) { try await $0.aim(base: base, pitch: pitch) }
-        state.motionStatus = "瞄准指令已发送"
+        try Task.checkCancellation()
+        guard foreground else { throw BluetoothWorkflowError.background }
+        guard motion == nil, operation == nil, cleanup == nil else { throw BluetoothWorkflowError.busy }
+        guard motorInputs.allSatisfy({ abs($0) <= 0.04 }) else { throw BluetoothWorkflowError.busy }
+        guard state.phase == .connected, let controller else { throw BluetoothWorkflowError.disconnected }
+        guard state.controlReady else { throw BluetoothWorkflowError.controlNotReady }
+        guard liveTask == nil || followingAim else { throw BluetoothWorkflowError.busy }
+        if !followingAim { forearmLeveler = NexArmForearmLeveler() }
+        let positions = try NexArmJointCommand.positions(base: base, pitch: pitch)
+        aimGoal = AimGoal(
+            base: positions[0], lift: positions[1], elbow: forearmLeveler.elbow(forLift: positions[1]),
+            pitch: positions[3])
+        state.motionStatus = "正在瞄准"
+        guard !followingAim else { return }
+        startAimFollow(controller)
+    }
+    /// Same 30 ms admission as a slider. Base, shoulder lift, elbow and wrist pitch move, one motor at a time in
+    /// turn; wrist roll and the gripper stay put. A newer aim replaces the previous one.
+    private func startAimFollow(_ controller: NexArmActionController) {
+        guard liveTask == nil else { return }
+        controlRevision = UUID()
+        let revision = controlRevision
+        let connectedGeneration = generation
+        followingAim = true
+        liveTask = Task {
+            let operation: @Sendable () async throws -> Void = { @MainActor [self] in
+                var session: UUID?
+                var failed = false
+                var settled: AimGoal?
+                var nextAimIndex = 0
+                do {
+                    if let movement = motion { _ = await movement.result }
+                    try Task.checkCancellation()
+                    let token = try await link.beginLiveControl()
+                    session = token
+                    let joints = await controller.cachedJoints
+                    if joints.count == 6 {
+                        jogPlanner = try NexArmJogPlanner(positions: joints)
+                    } else if jogPlanner == nil {
+                        throw NexArmError.invalidMotion
+                    }
+                    var stalledSince: ContinuousClock.Instant?
+                    var idleSince: ContinuousClock.Instant?
+                    var lastTick = ContinuousClock.now.advanced(by: .milliseconds(-30))
+                    while true {
+                        let tickStart = ContinuousClock.now
+                        let duration = tickStart - lastTick
+                        let elapsed =
+                            Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+                        lastTick = tickStart
+                        try Task.checkCancellation()
+                        guard foreground, generation == connectedGeneration, state.controlReady, aimGoal != nil else {
+                            throw CancellationError()
+                        }
+                        guard let goal = aimGoal else { break }
+                        var resting = true
+                        // Base and wrist follow the image; shoulder and elbow are slower so the arm never sweeps.
+                        let steps: [(id: Int, target: Int, speed: Double)] = [
+                            (1, goal.base, NexArmJogPlanner.aimMaximumSpeed),
+                            (2, goal.lift, NexArmJogPlanner.aimReachSpeed),
+                            (3, goal.elbow, NexArmJogPlanner.aimReachSpeed),
+                            (4, goal.pitch, NexArmJogPlanner.aimMaximumSpeed),
+                        ]
+                        for offset in 0..<steps.count {
+                            let index = (nextAimIndex + offset) % steps.count
+                            let step = steps[index]
+                            guard
+                                let proposed = try jogPlanner?.approach(
+                                    id: step.id, target: step.target, elapsed: elapsed, speedLimit: step.speed)
+                            else { continue }
+                            resting = false
+                            guard let packet = proposed.packet else {
+                                jogPlanner?.accept(proposed)
+                                continue
+                            }
+                            if try await link.sendLive(packet, session: token) {
+                                jogPlanner?.accept(proposed)
+                                nextAimIndex = (index + 1) % steps.count
+                                stalledSince = nil
+                            } else {
+                                stalledSince = stalledSince ?? .now
+                                nextAimIndex = index
+                                break
+                            }
+                        }
+                        if let stalledSince, ContinuousClock.now - stalledSince > .seconds(2) {
+                            throw NexArmError.timeout
+                        }
+                        if resting {
+                            idleSince = idleSince ?? .now
+                            if let idleSince, ContinuousClock.now - idleSince > .milliseconds(300) {
+                                settled = aimGoal
+                                break
+                            }
+                        } else {
+                            idleSince = nil
+                        }
+                        try await Task.sleep(until: tickStart.advanced(by: .milliseconds(30)), clock: .continuous)
+                    }
+                } catch {
+                    failed = true
+                    if !(error is CancellationError), generation == connectedGeneration {
+                        state.error = Self.message(error)
+                    }
+                }
+                if let session { await link.endLiveControl(session) }
+                for id in 1...4 { jogPlanner?.stop(id: id) }
+                let restart =
+                    !failed && foreground && generation == connectedGeneration && revision == controlRevision
+                    && state.controlReady && aimGoal != nil && aimGoal != settled
+                if revision == controlRevision {
+                    followingAim = false
+                    liveTask = nil
+                    if state.motionStatus == "正在瞄准" { state.motionStatus = "瞄准跟随已停下" }
+                }
+                if restart { startAimFollow(controller) }
+                else if motorInputs.contains(where: { abs($0) > 0.04 }) { startLiveControl() }
+            }
+            do {
+                if let withMotorResources {
+                    try await withMotorResources([1, 2, 3, 4], operation)
+                } else {
+                    try await operation()
+                }
+            } catch {
+                followingAim = false
+                liveTask = nil
+                state.error = Self.message(error)
+            }
+        }
     }
     private func runMotion(
         label: String, returnsHome: Bool = true, motors: Set<Int> = Set(1...5),

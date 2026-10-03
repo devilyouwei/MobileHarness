@@ -12,7 +12,7 @@ flowchart LR
 
 ❌ Physical safety still requires device-side support and sustained real-device acceptance.
 
-✅ Tracking aim uses the verified foreground NexArmActionController and the existing motors 1–5 resource fence. Return means transport acceptance, not arrival.
+✅ Tracking aim uses the verified foreground NexArmActionController for the tracking start pose and holds motors 1–4 (base, shoulder lift, elbow, wrist pitch) on the live loop; the Tool boundary still declares motors 1–5. The four motors are sent in turn within one 30 ms tick. Return means transport acceptance, not arrival.
 
 ✅ Connection verification shows separate position-read and action-mapping preparation stages. Query timeout errors include native command and received-notification byte count; this diagnostic does not claim a transport/firmware cause.
 

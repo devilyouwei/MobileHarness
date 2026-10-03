@@ -1154,6 +1154,69 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     await observer.value
 }
 
+@Test func aimFollowApproachesTheLatestCountWithoutJumpingThere() throws {
+    var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
+    let start = Int(planner.targets[0])
+    let goal = start - 80
+    var last = start
+    var moved = false
+    for _ in 0..<100 {
+        guard let proposal = try planner.approach(id: 1, target: goal) else { break }
+        if let packet = proposal.packet {
+            #expect(packet.isLiveControl)
+            #expect(packet.id == 1)
+            let position = Int(packet.payload[2]) | Int(packet.payload[3]) << 8
+            #expect(abs(position - last) <= 40)
+            last = position
+            moved = true
+        }
+        planner.accept(proposal)
+        #expect(abs(planner.accelerations[0]) <= NexArmJogPlanner.maximumAcceleration)
+    }
+    #expect(moved)
+    #expect(abs(Int(planner.targets[0]) - goal) <= 2)
+    #expect(try planner.approach(id: 1, target: goal) == nil)
+    #expect(throws: NexArmError.invalidMotion) { try planner.approach(id: 6, target: goal) }
+}
+
+@Test func aimFollowBrakesBeforeReversing() throws {
+    var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
+    let start = Int(planner.targets[0])
+    for _ in 0..<25 {
+        if let proposal = try planner.approach(id: 4, target: start + 200) {
+            planner.accept(proposal)
+        }
+    }
+    #expect(planner.velocities[3] > 8)
+    let lead = planner.targets[3]
+    let brake = try #require(try planner.approach(id: 4, target: start))
+    if let packet = brake.packet {
+        let position = Int(packet.payload[2]) | Int(packet.payload[3]) << 8
+        #expect(position <= Int(lead))
+        #expect(packet.id == 4)
+    }
+    planner.accept(brake)
+    #expect(planner.velocities[3] == 0)
+    #expect(planner.targets[3] <= lead)
+}
+
+@Test func aimReachMotorsStayBelowTheirSlowerSpeedLimit() throws {
+    var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
+    let start = Int(planner.targets[1])
+    for _ in 0..<80 {
+        guard
+            let proposal = try planner.approach(
+                id: 2, target: start - 300, speedLimit: NexArmJogPlanner.aimReachSpeed)
+        else { break }
+        planner.accept(proposal)
+        #expect(abs(planner.velocities[1]) <= NexArmJogPlanner.aimReachSpeed)
+    }
+    #expect(planner.targets[1] < Double(start - 20))
+    #expect(throws: NexArmError.invalidMotion) {
+        try planner.approach(id: 2, target: start - 300, speedLimit: NexArmJogPlanner.maximumSpeed + 1)
+    }
+}
+
 @Test func bluetoothJogShapesVelocityAndRejectsConfigurationWrites() throws {
     var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     var previousAcceleration = 0.0

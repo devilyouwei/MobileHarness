@@ -51,7 +51,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test func aimFrameAddressesFiveArmMotorsAtHome() throws {
     let frame = try NexArmJointCommand.frame(positions: NexArmJointCommand.armHome)
-    #expect(try armTargets(in: frame) == [2048, 2087, 1198, 1238, 2048])
+    #expect(try armTargets(in: frame) == [2047, 2087, 1984, 2045, 2048])
     #expect(throws: NexArmControlError.invalidPosition) {
         try NexArmJointCommand.frame(positions: NexArmJointCommand.armHome + [1122])
     }
@@ -83,6 +83,37 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let high = try NexArmJointCommand.positions(base: 0, pitch: -0.32)
     #expect(high[3] < home[3])
     #expect(throws: NexArmControlError.invalidAngle) { try NexArmJointCommand.positions(base: .nan, pitch: 0) }
+}
+
+@Test func lookingDownExtendsTheArmAndTheElbowKeepsTheForearmLevel() throws {
+    let home = NexArmJointCommand.armHome
+    let level = NexArmJointCommand.forearmLevelSum
+    #expect(level == 4071)
+    let shallow = try NexArmJointCommand.positions(base: 0, pitch: 0.2)
+    #expect(shallow[1] == home[1] && shallow[2] == home[2])
+    let up = try NexArmJointCommand.positions(base: 0, pitch: -0.7)
+    #expect(up[1] == home[1] && up[2] == home[2])
+    var previous = home[1]
+    for pitch in [0.3, 0.4, 0.5, 0.6] {
+        let joints = try NexArmJointCommand.positions(base: 0, pitch: pitch)
+        #expect(joints[1] < previous)
+        #expect(joints[1] + joints[2] == level)
+        #expect(joints[4] == home[4])
+        previous = joints[1]
+    }
+    let low = try NexArmJointCommand.positions(base: 0, pitch: 0.7)
+    #expect(low[1] == NexArmJointCommand.reachLiftMinimum)
+    #expect(low[1] + low[2] == level)
+    _ = try NexArmJointCommand.packet(positions: low)
+}
+
+@Test func forearmLevelerLeadsOnlyWhileTheArmExtends() {
+    var leveler = NexArmForearmLeveler()
+    let home = NexArmJointCommand.armHome
+    #expect(leveler.elbow(forLift: home[1]) == home[2])
+    #expect(leveler.elbow(forLift: home[1] - 100) == home[2] + 100 + NexArmForearmLeveler.lead)
+    #expect(leveler.elbow(forLift: home[1] - 103) == home[2] + 103 + NexArmForearmLeveler.lead)
+    #expect(leveler.elbow(forLift: home[1] - 50) == home[2] + 50)
 }
 
 @Test func photographerPolicyAcceptsVisionPose() throws {
