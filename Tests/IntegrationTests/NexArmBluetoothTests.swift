@@ -1200,6 +1200,23 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     #expect(planner.targets[3] <= lead)
 }
 
+@Test func aimReachMotorsStayBelowTheirSlowerSpeedLimit() throws {
+    var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
+    let start = Int(planner.targets[1])
+    for _ in 0..<80 {
+        guard
+            let proposal = try planner.approach(
+                id: 2, target: start - 300, speedLimit: NexArmJogPlanner.aimReachSpeed)
+        else { break }
+        planner.accept(proposal)
+        #expect(abs(planner.velocities[1]) <= NexArmJogPlanner.aimReachSpeed)
+    }
+    #expect(planner.targets[1] < Double(start - 20))
+    #expect(throws: NexArmError.invalidMotion) {
+        try planner.approach(id: 2, target: start - 300, speedLimit: NexArmJogPlanner.maximumSpeed + 1)
+    }
+}
+
 @Test func bluetoothJogShapesVelocityAndRejectsConfigurationWrites() throws {
     var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     var previousAcceleration = 0.0
