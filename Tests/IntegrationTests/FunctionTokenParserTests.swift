@@ -119,13 +119,21 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
         textMapping: { text, channel in
             [.action(try camera.resolveAction("say", parameters: ["text": text], channel: channel))]
         })
-    #expect(throws: GenerationError.unknownCapability) { try xmlTool.append("<lookup query='x'/>") }
+    #expect(
+        try xmlTool.append("<lookup query='x'/>") == [
+            .rejected(
+                CallRejection(kind: .action, alias: "lookup", reason: .unknownCapability))
+        ])
     var forbidden = try generator()
     #expect(throws: GenerationError.forbiddenChannel) {
         try forbidden.append("<channel.robot><express emotion='smile'/>")
     }
     var missing = try generator()
-    #expect(throws: GenerationError.invalidParameters) { try missing.append("<express/>") }
+    #expect(
+        try missing.append("<express/>") == [
+            .rejected(
+                CallRejection(kind: .action, alias: "express", reason: .invalidParameters))
+        ])
 }
 
 private struct MarkupChat: ChatCapability {
@@ -335,4 +343,18 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
             .scheduling(.endWait), .control("assistant.finished"),
         ])
     await agent.stop()
+}
+
+@Test func rejectedActionsPreserveValidCallsAndWaitBoundaries() throws {
+    var parser = try generator()
+    let events =
+        try parser.append(
+            "<wait><express emotion='smile'/><unknown/><express/><express emotion='sad'/></wait>")
+        + parser.finish()
+    #expect(events.count == 6)
+    #expect(events.first == .scheduling(.beginWait))
+    #expect(events.last == .scheduling(.endWait))
+    #expect(events.compactMap(\.actionCall).count == 2)
+    #expect(events[2] == .rejected(CallRejection(kind: .action, alias: "unknown", reason: .unknownCapability)))
+    #expect(events[3] == .rejected(CallRejection(kind: .action, alias: "express", reason: .invalidParameters)))
 }

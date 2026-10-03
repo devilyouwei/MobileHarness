@@ -22,3 +22,5 @@ Update this README with changes to names, routing rules and ✅/❌ status.
 
 
 ✅ ExecutionRouter has a scheduling route for typed wait begin/end directives, sent through ActionDispatcher. It never parses XML, assigns aliases or executes a barrier itself. ❌ Native Tools remain outside the wait tree.
+
+✅ Call rejection routing raises a typed failure outside Action cancellation handling; no invocation is executed. ❌ No automatic retry.

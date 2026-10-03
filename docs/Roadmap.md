@@ -70,3 +70,5 @@ Validation (2026-10-03): 35 isolated shared tests passed (32 ModelKitRuntime, 2 
 
 
 ✅ HF model background transport, preserved completed files, system resume-data reuse, bounded retries and three concurrent files/package implemented. ❌ Validate physical-phone lock-screen, system termination, forced quit, signed-URL expiry and large-file resume/speed with actual network traces.
+
+✅ Unknown model Action/Tool calls and invalid invocation parameters now retain failure outcomes without aborting the current reply or cancelling its other Actions. ❌ Live-model acceptance and automatic repair remain pending.

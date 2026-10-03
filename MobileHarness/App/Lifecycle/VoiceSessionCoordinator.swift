@@ -654,7 +654,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                 stopVoice(
                     message: "回复生成失败：" + String(state.dropFirst("assistant.error:".count)))
             }
-        case .actionCall, .scheduling: break
+        case .actionCall, .scheduling, .rejectedCall: break
         }
     }
     private func record(_ text: String) {

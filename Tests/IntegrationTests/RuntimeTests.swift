@@ -271,6 +271,12 @@ private actor Recorder {
             OutputEnvelope(
                 source: .assistant, input: input,
                 output: .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"]))))
+        let rejection = try await gateway.execute(
+            OutputEnvelope(
+                source: .assistant, input: input,
+                output: .rejectedCall(
+                    CallRejection(kind: .action, alias: "unknown", reason: .unknownCapability))))
+        #expect(rejection.isError)
         try await gateway.dispatch(OutputEnvelope(source: .assistant, input: input, output: .scheduling(.endWait)))
     }
     try await gateway.dispatch(OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished")))
@@ -320,5 +326,18 @@ private actor Recorder {
     let second = try await gateway.execute(
         OutputEnvelope(source: .assistant, input: input, output: .toolCall(nextCall)))
     #expect(!second.isError)
-    #expect(await gateway.executionResults().outputs.count == 2)
+    for kind in [CallRejection.Kind.action, .tool] {
+        for reason in [GenerationError.unknownCapability, .invalidParameters] {
+            let rejected = try await gateway.execute(
+                OutputEnvelope(
+                    source: .assistant, input: input,
+                    output: .rejectedCall(
+                        CallRejection(kind: kind, alias: "bad", callID: UUID(), reason: reason))))
+            #expect(rejected.isError)
+        }
+    }
+    let continued = try await gateway.execute(
+        OutputEnvelope(source: .assistant, input: input, output: .toolCall(nextCall)))
+    #expect(!continued.isError)
+    #expect(await gateway.executionResults().outputs.count == 7)
 }

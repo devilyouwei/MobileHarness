@@ -83,3 +83,5 @@ flowchart LR
 ✅ MobileHarnessApp forwards native ZIP and HF background session events and restores generation-bound task associations independently of page navigation. App composition injects the same ModelKitHub adapter. HF preserves completed files and available system resume data across relaunch; explicit cancel/delete drains before discarding staging. A bounded App preparation window supports metadata/final installation. Phone/server-resume acceptance remains pending; no background robot execution is granted.
 
 ❌ OS background scheduling/force quit, full iPhone acceptance and HF durable background recovery remain outstanding. See [Management](../../ModelKit/Management/README.md#local-model-resources--current-contract).
+
+✅ Rejected model calls remain Gateway execution outcomes and do not stop the voice session. Native Tool parse failures are persisted by Assistant before output. ❌ No automatic model repair is performed.

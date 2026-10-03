@@ -704,3 +704,5 @@ RobotTools owns argument validation and macro metadata for motors1–5. Gateway 
 
 
 ✅ Model download workflow now resolves Hub metadata → persists a generation-bound plan → runs up to three native background file tasks per active package → moves completed files and schedules successors in delegate callbacks → validates and publishes through App storage. Failed/relaunched requests reuse completed files and available resume data; cancel/delete joins tasks then discards staging. App handles system events and a bounded preparation window. Phone lock-screen acceptance remains pending; see ADR 0108.
+
+✅ Model invocation resolution failures (unknown alias / invalid parameters) produce non-executable rejectedCall outputs. Gateway retains Action failures / correlated ToolResponse errors in the existing bounded executionResults list; generation and other scheduled Actions continue. Structural parsing failures, permission failures, limits and cancellation keep their terminal semantics. ❌ Automatic model correction is not implemented.

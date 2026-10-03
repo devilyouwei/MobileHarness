@@ -225,6 +225,11 @@ public actor OutputGateway {
             await actions.cancel(envelope)
             throw error
         }
+        if case .rejectedCall(let rejection) = envelope.output, rejection.kind == .tool {
+            return ToolResponse(
+                callID: rejection.callID ?? UUID(),
+                value: "\(rejection.reason): \(rejection.alias)", isError: true)
+        }
         switch try ExecutionRouter.route(envelope.output) {
         case .action(let token):
             do {

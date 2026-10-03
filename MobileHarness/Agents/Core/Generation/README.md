@@ -91,7 +91,7 @@ For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression c
 | Resolved calls per generation | 120; Assistant separately buffers 256 output envelopes including wait boundaries and runtime notifications |
 | Complete native tool argument JSON | 4096 UTF-8 bytes; string values only |
 
-Errors and limits terminate that parser/generator instance; it cannot be reused. Finish rejects incomplete UTF-8, entities, tags and unclosed Channel/wait scopes. Unknown entities, mismatched closing tags, duplicate attributes, invalid UTF-8, unknown capabilities and invalid parameters fail explicitly.
+Structural errors and limits terminate that parser/generator instance; it cannot be reused. Finish rejects incomplete UTF-8, entities, tags and unclosed Channel/wait scopes. Unknown entities, mismatched closing tags, duplicate attributes, invalid UTF-8 fail explicitly. Unknown Action aliases and invalid invocation parameters instead produce rejected-call events.
 
 Failure cannot roll back Actions already emitted and executed. If one append throws, its local result is not returned; the Agent reports failure and Gateway cancels remaining work for that input. Invalid streams may have different already-executed prefixes under different fragmentation. There is no automatic retry or persistent replay.
 
@@ -169,3 +169,5 @@ flowchart LR
 ## Action and Tool presentation boundary
 
 ✅ TextMapping now returns ordered GenerationEvents containing ActionCalls or ToolCalls. Each chunk yields at most8 events and a generation at most120 calls. Assistant supplies a speech Action and append-caption Tool. Tool events retain unique call IDs but have no channel/wait membership. XML still resolves only model-declared Action aliases; native Tool parsing remains separate. ❌ The change does not invent XML Tool aliases or model-native transport.
+
+✅ Unknown Action aliases and invocation parameter validation emit ordered CallRejection events and continue generation; rejected calls count toward the120-call bound. Native Tool parsing still throws typed resolution errors for the consumer to convert. ❌ Malformed XML, forbidden Channels, cancellation and resource limits remain terminal.

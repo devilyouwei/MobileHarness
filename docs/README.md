@@ -70,3 +70,5 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ Architecture, Roadmap and ADR0105 distinguish successful model publication from task-record persistence failure and describe the targeted Storage policy. ❌ Phone incident attribution is not claimed from isolated regression tests.
 
 ✅ [Shared multilingual Nemotron Core ML runtime](adr/0107-nemotron-coreml-multilingual.md).
+
+✅ Architecture and Roadmap document nonterminal model-call resolution failures and shared output result retention. ❌ Live-model acceptance remains pending.

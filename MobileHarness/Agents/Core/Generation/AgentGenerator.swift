@@ -69,7 +69,12 @@ public struct AgentGenerator: Sendable {
             case .action(let alias, let parameters, let channel):
                 result += try flush()
                 try reserve(1)
-                result.append(.action(try capabilities.resolveAction(alias, parameters: parameters, channel: channel)))
+                do {
+                    result.append(
+                        .action(try capabilities.resolveAction(alias, parameters: parameters, channel: channel)))
+                } catch let error as GenerationError where error == .unknownCapability || error == .invalidParameters {
+                    result.append(.rejected(CallRejection(kind: .action, alias: alias, reason: error)))
+                }
             }
         }
         return result

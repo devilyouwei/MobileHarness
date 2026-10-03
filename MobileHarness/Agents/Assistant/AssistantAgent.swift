@@ -277,7 +277,12 @@ public actor AssistantAgent: Agent {
                         try await conversations.recordToolOutcome(
                             callID, for: input.id, state: .failed,
                             error: String(describing: error))
-                        throw error
+                        guard let reason = error as? GenerationError,
+                            reason == .unknownCapability || reason == .invalidParameters
+                        else { throw error }
+                        try await emitFunctions(
+                            [.rejected(CallRejection(kind: .tool, alias: native.name, callID: callID, reason: reason))],
+                            for: input, count: &emittedCalls)
                     }
                 case .usage(let usage):
                     try await conversations.recordTokenUsage(
@@ -321,6 +326,13 @@ public actor AssistantAgent: Agent {
     }
     private func emitFunctions(_ calls: [GenerationEvent], for input: AgentInput, count: inout Int) async throws {
         for event in calls {
+            if case .rejected(let rejection) = event {
+                try Task.checkCancellation()
+                guard count < 120 else { throw GenerationError.limitExceeded }
+                count += 1
+                guard emit(.rejectedCall(rejection), for: input) else { throw HarnessError.queueFull }
+                continue
+            }
             if case .scheduling(let directive) = event {
                 try Task.checkCancellation()
                 guard emit(.scheduling(directive), for: input) else { throw HarnessError.queueFull }

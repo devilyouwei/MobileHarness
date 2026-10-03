@@ -263,3 +263,5 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ✅ Assistant saves actual Tool declarations before chat, and complete native calls before resolution, preserving provider ID, runtime UUID and argument JSON. Resolution/admission errors are recorded against the same call; App supplies the actual Gateway execution outcome. ChatEvent.usage is stored before final completion. Ordinary chat requests omit maximumOutputTokens. XML and native calls may coexist; fixed internal caption Tools are excluded from model-native call history.
 ❌ Partial native SSE calls and automatic result-driven continuation remain unsupported; missing usage is not estimated.
+
+✅ Unknown model-callable aliases and invalid invocation parameters emit rejectedCall and continue the same turn. Native Tool failures retain their durable failed Tool outcome and correlation ID. Rejections share the120-call limit; malformed markup, bounds and cancellation remain terminal. ❌ Automatic correction/retry is not implemented.

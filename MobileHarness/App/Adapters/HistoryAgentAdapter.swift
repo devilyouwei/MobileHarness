@@ -21,6 +21,7 @@ enum HistoryAgentAdapter {
                     depth += 1
                     return prefix + "<wait>"
                 case .scheduling(.endWait): return prefix + "</wait>"
+                case .rejected(let rejection): return prefix + "[Rejected] \(rejection.alias): \(rejection.reason)"
                 case .tool(let call): return prefix + "[Tool] \(call.toolPath) \(call.arguments)"
                 case .action(let call): return prefix + "[\(call.channel)] \(call.actionPath) \(call.parameters)"
                 }

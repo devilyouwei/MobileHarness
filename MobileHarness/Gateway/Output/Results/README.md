@@ -48,3 +48,5 @@ See [resources](../Resources/README.md), [scheduling](../Scheduling/README.md) a
 Completion-only Tool errors remain execution outcomes and do not inject a new model-facing ToolResult; only returning Tools route data feedback.
 
 ✅ executionResults can filter by source Agent and inputID so a terminal consumer retrieves that input’s accumulated output errors and Action completion records; eviction counters remain global and explicit.
+
+✅ Unknown aliases and invalid model invocation parameters use the same bounded output outcomes as execution failures, preserving native Tool IDs without cancelling other outputs. ❌ No execution record is fabricated for rejected Actions.

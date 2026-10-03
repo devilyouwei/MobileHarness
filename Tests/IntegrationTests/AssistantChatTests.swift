@@ -156,7 +156,7 @@ private actor MalformedChatFixture: ChatCapability {
 @Test(
     .timeLimit(.minutes(1)),
     arguments: [
-        "<express></express>", "<channel.main>unfinished", "&bogus;", "<unknown/>",
+        "<express></express>", "<channel.main>unfinished", "&bogus;",
     ])
 func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async throws {
     let model = MalformedChatFixture(malformed)
@@ -227,4 +227,49 @@ private struct LongReplyChat: ChatCapability {
     }
     #expect(captions.utf8.count > 2000)
     #expect(captions == String(repeating: LongReplyChat.fragment, count: 40))
+}
+
+@Test(arguments: ["<unknown/>", "<express/>"])
+func assistantCompletesTurnAfterRejectedAction(_ markup: String) async throws {
+    let agent = try AssistantAgent(chat: MalformedChatFixture(markup))
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    var iterator = agent.outputs.makeAsyncIterator()
+    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("fixture")))
+    let outputs = try await completedTurn(&iterator)
+    #expect(outputs.contains { if case .rejectedCall = $0.output { true } else { false } })
+    #expect(outputs.last?.output == .control("assistant.finished"))
+    await agent.stop()
+}
+
+private struct RejectedToolChatFixture: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    let name: String
+    let arguments: String
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        try pair.emitter.yield(.toolCall(ChatToolCall(id: "fixture", name: name, argumentsJSON: arguments)))
+        try pair.emitter.yield(.text("Continued."))
+        try pair.emitter.yield(.finished(.stop))
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+
+@Test(arguments: ["{}", "{invalid"])
+func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws {
+    let agent = try AssistantAgent(chat: RejectedToolChatFixture(name: "unknown", arguments: arguments))
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    var iterator = agent.outputs.makeAsyncIterator()
+    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("fixture")))
+    let outputs = try await completedTurn(&iterator)
+    let rejected = outputs.compactMap { envelope -> CallRejection? in
+        if case .rejectedCall(let value) = envelope.output { value } else { nil }
+    }
+    #expect(rejected.count == 1)
+    #expect(rejected.first?.kind == .tool)
+    #expect(rejected.first?.callID != nil)
+    #expect(outputs.last?.output == .control("assistant.finished"))
+    await agent.stop()
 }

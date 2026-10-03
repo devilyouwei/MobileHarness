@@ -130,3 +130,5 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [0107: Shared multilingual Nemotron Core ML ASR](0107-nemotron-coreml-multilingual.md).
 
 ✅ [0108: Durable background model downloads](0108-background-model-downloads.md).
+
+✅ ADR0103 now includes nonterminal unknown model calls and parameter rejection in shared execution outcomes. ❌ Real-provider acceptance remains pending.

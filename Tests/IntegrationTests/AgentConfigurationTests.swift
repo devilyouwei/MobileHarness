@@ -134,7 +134,11 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     for name in ["say", "print", "playAudio", "beginReplyTurn"] {
         #expect(throws: GenerationError.unknownCapability) { try registry.resolveAction(name, parameters: [:]) }
         var generator = AgentGenerator(capabilities: registry, textMapping: AssistantAgent.mapText)
-        #expect(throws: GenerationError.unknownCapability) { try generator.append("<\(name)/>") }
+        #expect(
+            try generator.append("<\(name)/>") == [
+                .rejected(
+                    CallRejection(kind: .action, alias: name, reason: .unknownCapability))
+            ])
     }
     for name in ["SpeechPerception", "VisionPerception", "SpeechSynthesis"] {
         let other = try AgentConfigurations.load(named: name)

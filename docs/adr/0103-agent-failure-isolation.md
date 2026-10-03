@@ -31,3 +31,7 @@ flowchart LR
 Completion-only Tool errors remain execution outcomes and do not inject a new model-facing ToolResult; only returning Tools route data feedback.
 
 Assistant terminal output failure likewise retains perception/synthesis registration until host cancellation; recognition resume failure remains recognition-local. The idle lifetime wait has capacity1, no producer and no queued business work.
+
+2026-10-03 extension: unknown model Action/Tool aliases and invalid invocation parameters are isolated per call. Agents resolve aliases and emit non-executable CallRejection values; Gateway checks the corresponding output permission and records them through existing OutputExecutionResult retention. Action rejection is an output failure, Tool rejection is a correlated error ToolResponse. No rejected call reaches a handler or consumes a scheduler execution slot; existing valid calls and wait boundaries remain ordered. Assistant persists failed native Tool history and continues generation. Rejected calls count against existing generation/output bounds. Structural parser errors, forbidden Channels, configuration failures and cancellation stay strict.
+
+✅ Integration regressions cover same-turn continuation, mixed valid/rejected Actions inside waits, native Tool argument decoding and common error result retention. ❌ Automatic correction and real-provider acceptance remain deferred.
