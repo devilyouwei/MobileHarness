@@ -24,6 +24,7 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 
 | Direction | Boundary before implementation |
 | --- | --- |
+| [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions/Tools 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
 | Local native Tool events and result-driven request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |
