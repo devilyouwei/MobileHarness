@@ -602,6 +602,8 @@ func bluetoothMissingVersionStillRejectsInvalidPoseBeforeAnyMotion() async throw
     #expect(!workflow.state.controlReady)
     #expect(await link.feedbackCommands.isEmpty)
     #expect(await link.writes == 0)
+    #expect(workflow.state.error?.contains("位置读取/协议检查") == true)
+    #expect(workflow.state.error?.contains("设备坐标 [") == true)
     observer.cancel()
     await observer.value
 }

@@ -10,6 +10,7 @@
         let preview: () -> Preview
         @Environment(\.openURL) private var openURL
         let openSettings: () -> Void
+        @State private var statisticsExpanded = true
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @ViewBuilder let content: () -> Content
 
@@ -97,24 +98,45 @@
             }
             .overlay(alignment: .topLeading) {
                 if camera.isVisible, let statistics = camera.skeleton?.statistics {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("YOLO · \(metric(statistics.framesPerSecond, suffix: "FPS"))")
-                            .fontWeight(.semibold)
-                        Text("间隔 \(metric(statistics.detectionIntervalMilliseconds, suffix: "ms"))")
-                        Text("画面运动 \(statistics.imageMotion.map { String(format: "%.2f", $0) } ?? "—")")
-                        Text("等待 \(metric(statistics.queueMilliseconds, suffix: "ms"))")
-                        Text("推理 \(metric(statistics.inferenceMilliseconds, suffix: "ms"))")
-                        Text("总延迟 \(metric(statistics.totalMilliseconds, suffix: "ms"))")
-                        Text("替换 \(statistics.replacements) 帧")
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                                statisticsExpanded.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text("YOLO · \(metric(statistics.framesPerSecond, suffix: "FPS"))")
+                                    .fontWeight(.semibold)
+                                Image(systemName: statisticsExpanded ? "chevron.up" : "chevron.down")
+                            }
+                            .padding(.horizontal, 8)
+                            .frame(height: 48)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(statisticsExpanded ? "收起性能数据" : "展开性能数据")
+                        .accessibilityValue(statisticsExpanded ? "已展开" : "已收起")
+                        .accessibilityIdentifier("camera.poseStatistics.toggle")
+                        if statisticsExpanded {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("间隔 \(metric(statistics.detectionIntervalMilliseconds, suffix: "ms"))")
+                                Text("画面运动 \(statistics.imageMotion.map { String(format: "%.2f", $0) } ?? "—")")
+                                Text("等待 \(metric(statistics.queueMilliseconds, suffix: "ms"))")
+                                Text("推理 \(metric(statistics.inferenceMilliseconds, suffix: "ms"))")
+                                Text("总延迟 \(metric(statistics.totalMilliseconds, suffix: "ms"))")
+                                Text("跳过 \(statistics.replacements) 帧")
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 8)
+                            .allowsHitTesting(false)
+                        }
                     }
                     .font(.system(size: 11, design: .monospaced))
                     .monospacedDigit()
                     .foregroundStyle(.white)
-                    .padding(8)
                     .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
-                    .padding(.leading, 12)
-                    .padding(.top, 68)
-                    .allowsHitTesting(false)
+                    .padding(.leading, 20)
+                    .padding(.top, 8)
                     .accessibilityIdentifier("camera.poseStatistics")
                 }
             }

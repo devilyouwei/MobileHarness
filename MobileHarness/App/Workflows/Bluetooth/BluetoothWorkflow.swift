@@ -322,7 +322,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 let failed = await link.status()
                 if token == generation {
                     state.controlValidated = false
-                    state.error = failed.failure.map(BluetoothPresentation.failure) ?? Self.message(error)
+                    state.error =
+                        failed.failure.map(BluetoothPresentation.failure) ?? state.error ?? Self.message(error)
                     if failed.phase == .connected {
                         state.phase = .connected
                         state.notice = "蓝牙已连接，控制未就绪；请断开后重新连接以重新验证"
@@ -349,9 +350,25 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.error = nil
         state.notice = nil
         state.notice = "正在读取机械臂位置并验证连接…"
-        _ = try await candidate.verifyCompatibility()
+        do {
+            _ = try await candidate.verifyCompatibility()
+        } catch {
+            if token == generation, !(error is CancellationError) {
+                let sample = await candidate.latestState
+                let telemetry = sample.pose.map(String.init).joined(separator: ", ")
+                state.error = "连接验证失败（位置读取/协议检查）：\(Self.message(error))；设备坐标 [\(telemetry)]"
+            }
+            throw error
+        }
         state.notice = "正在准备机械臂动作映射…"
-        _ = try await candidate.prepareArmControl()
+        do {
+            _ = try await candidate.prepareArmControl()
+        } catch {
+            if token == generation, !(error is CancellationError) {
+                state.error = "连接验证失败（预设动作映射）：\(Self.message(error))"
+            }
+            throw error
+        }
         try Task.checkCancellation()
         guard foreground, token == generation else { throw CancellationError() }
         reconnectEnabled = true
