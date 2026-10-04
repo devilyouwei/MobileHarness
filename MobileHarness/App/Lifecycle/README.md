@@ -107,3 +107,5 @@ flowchart LR
 ✅ CameraCoordinator reports out-of-order presentation admission with CommunicationError.outOfOrder; AgentCore ImageInputError is limited to malformed frame values. ❌ No camera or model lifetime changes.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+
+✅ VoiceSessionCoordinator requests spatial-capable microphone capture, transports native layout/PTS/monotonic capture time through InputGateway and uses W only for existing spectrum telemetry. Existing reply admission suppresses all sound/ASR inputs. Voice cleanup awaits async microphone shutdown; SpeechDiagnosticWorkflow also joins audio cleanup. ❌ No sound direction is consumed or presented by App; route/coexistence acceptance remains physical-device work.

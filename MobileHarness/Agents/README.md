@@ -265,3 +265,5 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 ✅ Capability callers own SDK data adaptation: VisionPerception converts retained CameraFrame to ModelKit ImageFrame; SpeechPerception selects/resamples native-rate transport to ModelKit PCM; SpeechSynthesis converts model PCM into StorageAudio values. App injects capabilities and transports inputs, without injecting model input conversion closures. ❌ No model-specific tensor preprocessing is moved out of ModelKit adapters.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+
+✅ SpeechPerception additionally estimates the single dominant direction of any obvious sound in its listening interval and publishes sound.source. Its deterministic estimator is separate from ASR/VAD, and Communication owns the immutable observation. ❌ Source identity, multiple-source separation and Photographer audio-driven movement are unimplemented.

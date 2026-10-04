@@ -33,6 +33,13 @@ public actor SpeechPerceptionAgent: Agent {
     private var turnOrdinal: UInt64 = 0
     private var outputSequence: UInt64 = 0
     private var phase: SpeechPhase = .listening
+    private var soundEstimator = SoundSourceEstimator()
+    private var soundLayout: AudioChannelLayout?
+    private var soundRate: Int?
+    private var pendingSound: (value: SoundSourceObservation, parent: AgentInput, capturedAt: ContinuousClock.Instant)?
+    private var soundPublisher: Task<Void, Never>?
+    public private(set) var soundPublicationRejections = 0
+    public private(set) var soundPublicationReplacements = 0
 
     public init(
         recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
@@ -76,10 +83,15 @@ public actor SpeechPerceptionAgent: Agent {
     public func pause() throws {
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
+        pendingSound = nil
+        soundPublisher?.cancel()
+        soundEstimator.reset()
     }
     public func resume() throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
         lifecycle = .running
+        soundLayout = nil
+        soundRate = nil
         drain()
     }
     /// Runtime flow control, independent of a full audio inbox.
@@ -99,6 +111,10 @@ public actor SpeechPerceptionAgent: Agent {
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
         await worker?.value
+        soundPublisher?.cancel()
+        await soundPublisher?.value
+        pendingSound = nil
+        soundEstimator.reset()
         recognitionTurn = nil
         segmenter = nil
         activeInput = nil
@@ -168,6 +184,9 @@ public actor SpeechPerceptionAgent: Agent {
         if publish, let port { _ = try await port.publishResult(.speechPhase(next), parent: input) }
     }
     private func resetListening(after input: AgentInput) async throws {
+        soundEstimator.reset()
+        soundLayout = nil
+        soundRate = nil
         await resampler.reset()
         try await segmenter?.reset()
         prepareRecognitionTurn()
@@ -216,11 +235,38 @@ public actor SpeechPerceptionAgent: Agent {
         let samples = audio.samples.withUnsafeBytes { bytes in
             stride(from: 0, to: bytes.count, by: 4).map { bytes.loadUnaligned(fromByteOffset: $0, as: Float.self) }
         }
+        try Task.checkCancellation()
+        if soundLayout != audio.layout || soundRate != audio.sampleRate {
+            soundEstimator.reset()
+            await resampler.reset()
+            soundLayout = audio.layout
+            soundRate = audio.sampleRate
+            if audio.layout == .mono {
+                enqueueSound(
+                    .init(state: .unavailable, timestamp: audio.timestamp, duration: 0), parent: input,
+                    capturedAt: audio.capturedAt)
+            }
+        }
+        // Spatial DSP is independent of the speech detector and uses native-rate channels.
+        if audio.layout == .firstOrderAmbisonicsACNSN3D {
+            for index in stride(from: 0, to: samples.count, by: 4) {
+                if let value = try soundEstimator.consume(
+                    w: samples[index], y: samples[index + 1], z: samples[index + 2], x: samples[index + 3],
+                    sampleRate: audio.sampleRate,
+                    timestamp: audio.timestamp + Double(index / 4) / Double(audio.sampleRate)
+                ) {
+                    let captureOffset = value.timestamp + value.duration - audio.timestamp
+                    enqueueSound(
+                        value, parent: input, capturedAt: audio.capturedAt.advanced(by: .seconds(captureOffset)))
+                }
+            }
+        }
+        let mono = audio.layout == .mono ? samples : stride(from: 0, to: samples.count, by: 4).map { samples[$0] }
         var timestamp = audio.timestamp
-        for offset in stride(from: 0, to: samples.count, by: 8192) {
+        for offset in stride(from: 0, to: mono.count, by: 8192) {
             let packets = try await resampler.process(
                 MicrophoneFrame(
-                    samples: Array(samples[offset..<min(offset + 8192, samples.count)]),
+                    samples: Array(mono[offset..<min(offset + 8192, mono.count)]),
                     sampleRate: audio.sampleRate, sequence: audio.sequence))
             for packet in packets {
                 guard !awaitingReply else { break }
@@ -284,6 +330,12 @@ public actor SpeechPerceptionAgent: Agent {
         input: AgentInput, recognitionTurn: SpeechRecognitionTurn, port: AgentMessaging
     ) async throws {
         awaitingReply = true
+        soundEstimator.reset()
+        if soundLayout == .firstOrderAmbisonicsACNSN3D, case .audio(let audio) = input.payload {
+            enqueueSound(
+                .init(state: .inactive, timestamp: audio.timestamp, duration: 0), parent: input,
+                capturedAt: audio.capturedAt)
+        }
         // Buffered post-endpoint audio belongs to the explicitly suppressed reply interval.
         clearPendingAudio()
         try await transition(to: .processing, input: input)
@@ -305,6 +357,10 @@ public actor SpeechPerceptionAgent: Agent {
     }
     private func fail(_ error: any Error) async {
         lifecycle = .failed
+        pendingSound = nil
+        soundPublisher?.cancel()
+        await soundPublisher?.value
+        soundEstimator.reset()
         clearPendingAudio()
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
@@ -317,6 +373,52 @@ public actor SpeechPerceptionAgent: Agent {
                     output: .control("agent.error: speech perception failed: \(error)"), sequence: outputSequence))
         }
         continuation.finish()
+    }
+
+    private func enqueueSound(
+        _ value: SoundSourceObservation, parent: AgentInput, capturedAt: ContinuousClock.Instant
+    ) {
+        guard lifecycle == .running else { return }
+        if pendingSound != nil { soundPublicationReplacements += 1 }
+        let metadata = parent.metadata
+        let scopedParent = AgentInput(
+            id: parent.id, sessionID: parent.sessionID, payload: parent.payload,
+            metadata: InputMetadata(
+                payload: parent.payload, source: metadata.source, incarnation: metadata.incarnation,
+                capturedAt: metadata.capturedAt, sequence: metadata.sequence, rootID: metadata.rootID,
+                parentID: metadata.parentID, hops: metadata.hops,
+                deadline: min(metadata.deadline, capturedAt.advanced(by: .milliseconds(500)))),
+            turn: parent.turn)
+        pendingSound = (value, scopedParent, capturedAt)
+        if soundPublisher == nil { soundPublisher = Task { await self.publishSound() } }
+    }
+    private func publishSound() async {
+        defer {
+            soundPublisher = nil
+            if lifecycle == .running, pendingSound != nil {
+                soundPublisher = Task { await self.publishSound() }
+            }
+        }
+        while lifecycle == .running, let publication = pendingSound {
+            pendingSound = nil
+            guard !publication.parent.metadata.expired,
+                publication.capturedAt.duration(to: .now) <= .milliseconds(500)
+            else { continue }
+            do {
+                try Task.checkCancellation()
+                guard let port else { return }
+                let report = try await port.publishResult(.soundSource(publication.value), parent: publication.parent)
+                try Task.checkCancellation()
+                // No subscribers and rejected subscribers do not gate either perception branch.
+                let failure = report.failure
+                let failed = failure != nil && failure != String(describing: CommunicationError.noRecipients)
+                soundPublicationRejections += report.rejected.count + (failed ? 1 : 0)
+            } catch is CancellationError {
+                return
+            } catch {
+                soundPublicationRejections += 1
+            }
+        }
     }
 
 }

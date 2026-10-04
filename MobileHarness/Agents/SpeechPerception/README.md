@@ -1,6 +1,6 @@
 # Speech Perception
 
-Purpose: convert bounded microphone PCM into shared speech observations. Owns VAD, segmentation, streaming ASR and transcript merging; never owns microphone hardware or UI implementation; it selects recognition-caption behavior through code-owned internal Tools.
+Purpose: convert bounded microphone PCM into shared speech observations. Owns VAD, segmentation, streaming ASR, transcript merging and dominant sound direction; never owns microphone hardware or UI implementation; it selects recognition-caption behavior through code-owned internal Tools.
 
 ```mermaid
 flowchart LR
@@ -46,14 +46,16 @@ flowchart LR
 ```swift
 // 结构摘要；真实定义在 Agents/Core/Input/AudioInput.swift 与 Agents/Communication/AgentContracts.swift。
 AudioInput {
-    samples: Data       // 原生采集速率、单声道 Float32 PCM
+    samples: Data       // 原生速率、交错 Float32 PCM
     sampleRate: Int    // 8000...192000 Hz
+    layout: AudioChannelLayout // mono 或四声道 ACN/SN3D
+    capturedAt: ContinuousClock.Instant // 首个采样的单调采集时刻
     sequence: UInt64
     timestamp: TimeInterval // 秒；采集时钟
 }
 ```
 
-AudioInput 保留真实 sampleRate；SpeechPerception 选择 16 kHz，使用 PlatformKit 的通用有状态转换器重采样，再构造 ModelKit.AudioFrame。App 只包装采集数据与入站元数据。单帧非空、字节数为 4 的倍数且最多 64000 字节（16000 样本）。Agent 待处理队列另外限制 128 帧 / 64000 样本；不能把字节上限与队列样本上限混同。ASR 内部另有 128 项 / 64000 样本队列，一轮累计最多 60 秒。
+AudioInput 保留真实 sampleRate；SpeechPerception 选择 16 kHz，使用 PlatformKit 的通用有状态转换器重采样，再构造 ModelKit.AudioFrame。App 只包装采集数据与入站元数据。单帧非空、字节数为 4 的倍数且最多 64000 字节（16000 样本）。Agent 待处理队列另外限制 128 帧 / 64000 样本；不能把字节上限与队列样本上限混同。FOA 输入上限按全部声道的标量样本计数；ASR 内部另有 128 项 / 64000 单声道样本队列，一轮累计最多 60 秒。
 
 ```mermaid
 flowchart LR
@@ -78,6 +80,7 @@ flowchart LR
 | --- | --- | --- |
 | `speech.partial / 1` | `.transcript(text: String, final: false)`；文本最多 16300 UTF-8 字节且完整编码不超过 16 KiB | ASR 合并预览；可替换的最新状态。当前没有业务 Agent 订阅，App 注册观察端点；UI 字幕单独通过 Tool 更新。 |
 | `speech.final / 1` | `.transcript(text: String, final: true)`；非空、最多 4096 UTF-8 字节，编码仍受 16 KiB 限制 | 每个非空识别轮次一次，Assistant 订阅；要求至少一个 Agent 接纳且没有拒绝。空识别不发布 final。 |
+| `sound.source / 1` | `.soundSource(SoundSourceObservation)`；active/inactive/uncertain/unavailable，采集声场方向、相关质量和 RMS | 明显声音的100ms分析窗，最多10Hz；仅最新待发布状态，500ms采集期限，无业务订阅者也继续。非语音声音不依赖 VAD。 |
 | `speech.phase / 1` | `.speechPhase(SpeechPhase)`，枚举 `listening / speaking / processing / empty` | VAD 阶段变化、端点处理、空识别等；Assistant 订阅并只对 speaking 做展示决策。App 观察用于采集协调。phase 是离散事件，不按 latest-state 合并。 |
 
 观测的 source 由绑定端口确定为 `speechPerception`，topic 为相同 contract。默认 partial 接纳期限 2 秒，final/phase 为 10 秒，子事件不能超出父输入期限。`resumeListening()` 当前直接发 listening 展示 Tool，没有额外发布 listening 观测；订阅者不能假设每次恢复都有一个 phase 消息。
@@ -96,7 +99,7 @@ Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, ou
 
 ### Publish / send 边界
 
-`communication.publications` 仅包含上表三个 `speech.*` contract，typed payload、长度、触发时机和消费者均按“共享观测输出”表；它们不携带 PCM，也不作为 Agent `outputs` 流的 Action。`communication.sends = []`：SpeechPerception 不发送定向 Agent 消息；Assistant 接收 final/phase 是订阅广播，不是 send。JSON `actions / tools` 均为空；内部展示权限由代码声明，无 ToolResult 输入；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。
+`communication.publications` 包含上表三个 `speech.*` contract 和 `sound.source`，typed payload、长度、触发时机和消费者均按“共享观测输出”表；它们不携带 PCM，也不作为 Agent `outputs` 流的 Action。`communication.sends = []`：SpeechPerception 不发送定向 Agent 消息；Assistant 接收 final/phase 是订阅广播，不是 send。JSON `actions / tools` 均为空；内部展示权限由代码声明，无 ToolResult 输入；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。
 
 ✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v5. ❌ Activity/resource ownership is not introduced.
 
@@ -108,6 +111,7 @@ Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, ou
 | VoiceActivitySegmenter.swift | VAD session, contiguous score/PCM validation, pending samples and conversion to segmentation events. |
 | SpeechBoundaryPolicy.swift | Pure sample-count onset, pre-roll, silence, padding and maximum-duration policy. No model session or presentation. |
 | SpeechRecognitionTurn.swift | Internal per-utterance ASR sessions, bounded event queue, cross-chunk text, finish timeout and joined cancellation. |
+| SoundSourceEstimator.swift | 原生 FOA 的样本计数与伪声强相关统计；无模型、Gateway、UI 或硬件依赖。 |
 | TranscriptAccumulator.swift | Internal pure segment/revision ordering, final sealing and bounded preview merging. Rejected events do not change retained state. |
 | SpeechPerception.agent.json | Versioned communication and model-callable declarations; internal Tools remain code-owned. |
 
@@ -131,4 +135,27 @@ flowchart LR
 
 ❌ Result-driven retry/replanning, activity/resource ownership, barge-in and background listening remain unimplemented. Sustained physical-device caption timing and overload acceptance remain outstanding.
 
-✅ 本 Agent 所有模型输入适配：按原生速率解码 Float32，逐段最多 8192 个样本进入 caller-configured StreamingMonoPCMResampler，输出 16 kHz ModelKit.AudioFrame；不增加异步队列。现有 128 项／64000 原生样本入站上限保持显式拒绝。恢复聆听时清空转换器状态，取消／停止仍加入唯一处理 worker。❌ 采集与硬件播放不属于 Agent。
+✅ 本 Agent 所有模型输入适配：按原生速率解码 Float32 并选取单声道或全向 W，逐段最多 8192 个样本进入 caller-configured StreamingMonoPCMResampler，输出 16 kHz ModelKit.AudioFrame；不增加异步队列。现有 128 项／64000 原生样本入站上限保持显式拒绝。恢复聆听时清空转换器状态，取消／停止仍加入唯一处理 worker。❌ 采集与硬件播放不属于 Agent。
+
+## Sound source perception
+
+```mermaid
+flowchart LR
+    Platform[PlatformKit native mono or FOA] --> App[App transport adaptation]
+    App --> IG[InputGateway]
+    IG --> Agent[SpeechPerception: one PCM worker]
+    Agent --> DSP[SoundSourceEstimator: W/Y/Z/X correlations]
+    Agent --> W[Omnidirectional W]
+    W --> Resample[Existing16kHz conversion / VAD / ASR]
+    DSP --> Latest[One latest pending observation / one publisher]
+    Latest --> OG[OutputGateway]
+    OG --> IG2[InputGateway: optional sound.source subscribers]
+```
+
+✅ SoundSourceEstimator is independent of speech VAD and retains only scalar statistics for at most one 100 ms window. Native sample counts round upward when rate/10 is fractional; maximum observation duration is 101 ms, never above 10 Hz. RMS threshold is −50 dBFS; correlation quality threshold is 0.6. Quality is a heuristic, not probability. Quiet windows clear direction to uncertain immediately, then inactive after 200 ms. W/Y/Z/X ACN/SN3D maps to X front, Y left, Z up in the captured sound field; azimuth/elevation are radians. No distance, person identity, robot transform or camera mirror mapping is implied.
+
+✅ SpeechPerception feeds W into existing mono ASR/VAD conversion while calculating direction from all four native channels. Mono emits unavailable once per listening/format epoch and still runs ASR. Layout/rate changes and listening resume reset DSP; processing/reply closes admission and enqueues inactive to clear FOA direction. No UI/Tool/Action output is added. Sound observations retain the original capture input causality; arbitrary sounds do not create speech turns.
+
+✅ Pending sound state has capacity 1 with latest replacement and a single publisher task. Raw audio remains 128 packets/64,000 scalar samples with explicit rejection, including all four channels. Freshness is 500 ms from analysis-window end, with the parent deadline capped before publication; queued stale states are skipped. Sender identity/topic/session come from the bound port. No subscribers is an ordinary result; receiver rejection does not stop either perception branch. Stop/failure cancels and joins the publisher, and pause clears its pending state.
+
+❌ Physical angle calibration, microphone route behavior, real acoustic precision, reverberant/multiple simultaneous sound sources, camera coexistence and sustained power/latency acceptance remain pending. This is one dominant acoustic direction, not separated sound-source tracking. Photographer has no subscription or turning behavior yet.

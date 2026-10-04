@@ -27,14 +27,15 @@
         }
         public func start() {
             guard !state.isRunning, !state.isStopping else { return }
-            player.stop()
             state.isRunning = true
             task = Task {
+                await player.stop()
                 defer {
                     task = nil
                     state.isRunning = false
                 }
                 do {
+                    try Task.checkCancellation()
                     #if targetEnvironment(simulator)
                         throw CapabilityError.unavailable("请使用 iOS 27 真机运行 MossValidation")
                     #else
@@ -121,9 +122,9 @@
             state.isStopping = true
             session?.cancel()
             task?.cancel()
-            player.stop()
             let pending = task
             Task {
+                await player.stop()
                 await pending?.value
                 #if !targetEnvironment(simulator)
                     try? await unload()

@@ -247,15 +247,18 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                     }
                 }
                 if await speech.status().lifecycle == .failed, let self, self.voiceGeneration == generation {
-                    self.stopPerception(message: "语音识别已停止；其他 Agent 继续运行")
+                    await self.stopPerception(message: "语音识别已停止；其他 Agent 继续运行")
                 }
             }
-            let frames = try audio.startCapture()
+            let frames = try await audio.startCapture(preferSpatial: true)
+            guard voiceGeneration == generation, !Task.isCancelled else {
+                await audio.stopCapture()
+                return
+            }
             handlingTurn = false
             presentationPhase = .listening
             state.voiceStatus = "正在聆听 · 停顿后自动识别"
             captureTask = Task { [weak self] in
-                var timestamp = 0.0
                 var sequence: UInt64 = 0
                 var meterSamples: [Float] = []
                 let meterClock = ContinuousClock()
@@ -271,7 +274,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                                 self.state.microphoneSpectrum = AudioSpectrum.silence
                                 meterRate = frame.sampleRate
                             }
-                            meterSamples.append(contentsOf: frame.samples.suffix(AudioSpectrum.sampleCount))
+                            meterSamples.append(
+                                contentsOf: frame.omnidirectionalSamples.suffix(AudioSpectrum.sampleCount))
                             if meterSamples.count > AudioSpectrum.sampleCount {
                                 meterSamples.removeFirst(meterSamples.count - AudioSpectrum.sampleCount)
                             }
@@ -289,8 +293,9 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                         }
                         let audioInput = try AudioInput(
                             samples: frame.samples.withUnsafeBytes { Data($0) }, sampleRate: frame.sampleRate,
-                            sequence: sequence, timestamp: timestamp)
-                        timestamp += frame.duration
+                            sequence: sequence, timestamp: frame.timestamp,
+                            layout: frame.layout == .mono ? .mono : .firstOrderAmbisonicsACNSN3D,
+                            capturedAt: frame.capturedAt)
                         sequence += 1
                         let report = try await requests.publish(
                             MediaInputAdapter.audio(audioInput, sessionID: generation))
@@ -307,7 +312,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                     }
                 } catch is CancellationError {} catch {
                     guard let self, self.voiceGeneration == generation else { return }
-                    self.stopPerception(message: "录音中断：\(String(describing: error))")
+                    await self.stopPerception(message: "录音中断：\(String(describing: error))")
                 }
             }
             interruptionTask = Task { [weak self] in
@@ -356,8 +361,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         startupTask = Task { [weak self] in await self?.startVoice() }
     }
 
-    private func stopPerception(message: String) {
-        audio.stopCapture()
+    private func stopPerception(message: String) async {
+        await audio.stopCapture()
         captureTask?.cancel()
         captureTask = nil
         let failedAgent = speech
@@ -392,6 +397,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         let previousManager = manager
         cleanupTask = Task {
             await previousCleanup?.value
+            await audio.stop()
             await previousStartup?.value
             if previousSpeech != nil { try? await previousManager?.stop(.speechPerception) }
             await previousSpeech?.stop()
@@ -416,7 +422,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         interruptionTask = nil
         routeTask?.cancel()
         routeTask = nil
-        audio.stop()
         state.microphoneSpectrum = AudioSpectrum.silence
         handlingTurn = false
         state.voiceStatus = message
@@ -431,13 +436,13 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             // Runtime capture admission only. Signals never mutate presentation state.
             if phase == .processing { handlingTurn = true }
             if phase == .empty { handlingTurn = false }
-        case .pose, .speechSynthesis, .cancelSpeech: break
+        case .soundSource, .pose, .speechSynthesis, .cancelSpeech: break
         }
     }
     private func resumeListening(generation: UUID) async throws {
         guard voiceGeneration == generation else { return }
         do { try await speech?.resumeListening() } catch is CancellationError { try Task.checkCancellation() } catch {
-            stopPerception(message: "语音识别恢复失败：\(error)")
+            await stopPerception(message: "语音识别恢复失败：\(error)")
         }
         guard voiceGeneration == generation else { return }
         handlingTurn = false

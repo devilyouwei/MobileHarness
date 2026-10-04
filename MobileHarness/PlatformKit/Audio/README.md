@@ -64,3 +64,21 @@ flowchart LR
 ✅ Responsibility audit: audio capture, device playback/drain, PCM conversion and measured spectrum remain device capabilities. No speech Action, Agent inference or conversation choreography lives here. Presentation and speech sequencing belong to their owning modules.
 
 ✅ MicrophoneFrame is defined in PlatformKit, retaining samples/rate/sequence, duration and RMS behavior. StreamingMonoPCMResampler requires an explicit outputSampleRate (8–192 kHz); reset clears converter, source rate and sequence. SpeechPerception selects 16 kHz, rather than App or the device SDK imposing an ASR format.
+
+## Spatial microphone capture
+
+✅ AppleAudioIO.startCapture(preferSpatial:) asynchronously chooses an audio-only SpatialAudioCapture backend on a built-in route supporting firstOrderAmbisonics, otherwise the existing mono AVAudioEngine. Spatial capture uses AVCaptureAudioDataOutput with HOA_ACN_SN3D|4 and verifies actual layout, native PCM format and capture PTS. No video input or second concurrent microphone engine is opened. Four channels are converted to interleaved Float32 without localization or activity classification. MicrophoneFrame carries native layout, PTS and monotonic capturedAt; mono initializer defaults remain available. Metering uses omnidirectional W, and the generic resampler rejects multichannel input until its caller extracts mono.
+
+✅ Spatial callbacks are serial and bridge to a64-packet bufferingOldest stream. Native callbacks are limited to8192 sample frames and split into at most4000 frames/16000 scalar samples per transport packet. Overflow fails explicitly. AVFoundation may drop sufficiently late callbacks; PTS continuity checks detect gaps beyond two samples and fail with overflow. Unexpected layouts/formats, interruptions and runtime errors fail the active capture rather than silently downgrading. Unsupported graph/mode before startup returns mono fallback. stopCapture/stop are async and join spatial callbacks before replacement; cancellation fences an in-flight startup.
+
+```mermaid
+flowchart LR
+    Capability[Built-in route / runtime FOA support] --> Select[AppleAudioIO]
+    Select --> FOA[SpatialAudioCapture: serial AVCaptureSession]
+    Select --> Mono[Existing AVAudioEngine mono fallback]
+    FOA --> Frames[64 bounded native PCM packets]
+    Mono --> Frames
+    Frames --> App[App input adapter]
+```
+
+❌ Physical device support, actual channel axes, late-drop tolerance, camera/playback coexistence and external-route behavior require device acceptance. No angle estimate belongs to PlatformKit.

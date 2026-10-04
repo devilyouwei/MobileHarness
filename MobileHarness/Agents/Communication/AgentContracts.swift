@@ -11,6 +11,7 @@ extension AgentID {
 public enum PerceptionMessage: Codable, Sendable, Equatable {
     case transcript(String, final: Bool)
     case speechPhase(SpeechPhase)
+    case soundSource(SoundSourceObservation)
     case pose(PoseObservation)
     case speechSynthesis(SpeechSynthesisInput)
     case cancelSpeech(UUID)
@@ -19,6 +20,7 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
         case .transcript(_, true): "speech.final"
         case .transcript(_, false): "speech.partial"
         case .speechPhase: "speech.phase"
+        case .soundSource: "sound.source"
         case .pose: "vision.pose"
         case .speechSynthesis: "speech.synthesize"
         case .cancelSpeech: "speech.cancel"
@@ -33,6 +35,8 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
         case .speechSynthesis(let request):
             do { try request.validate() } catch { throw CommunicationError.invalidPayload }
         case .cancelSpeech, .speechPhase: break
+        case .soundSource(let value):
+            do { try value.validate() } catch { throw CommunicationError.invalidPayload }
         case .pose(let pose):
             do { try pose.validate() } catch { throw CommunicationError.invalidPayload }
         }
@@ -44,6 +48,7 @@ extension AgentMessage {
     public var perception: PerceptionMessage? { content(as: PerceptionMessage.self) }
     public static func transcript(_ text: String, final: Bool) -> AgentMessage { wrap(.transcript(text, final: final)) }
     public static func speechPhase(_ phase: SpeechPhase) -> AgentMessage { wrap(.speechPhase(phase)) }
+    public static func soundSource(_ value: SoundSourceObservation) -> AgentMessage { wrap(.soundSource(value)) }
     public static func pose(_ pose: PoseObservation) -> AgentMessage { wrap(.pose(pose)) }
     public static func speechSynthesis(_ request: SpeechSynthesisInput) -> AgentMessage {
         wrap(.speechSynthesis(request))
@@ -63,6 +68,7 @@ public enum AgentContracts {
         get throws {
             try CommunicationContracts(additional: [
                 contract("speech.final"), contract("speech.partial", lifetime: 2), contract("speech.phase"),
+                contract("sound.source", lifetime: 0.5),
                 contract("vision.pose", lifetime: 1, maximumBytes: 262_144),
                 contract("speech.synthesize", startsNewWork: true), contract("speech.cancel", startsNewWork: true),
             ])

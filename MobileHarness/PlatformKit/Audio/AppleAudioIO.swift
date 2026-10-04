@@ -24,6 +24,8 @@
         private let captureEngine = AVAudioEngine()
         private let playbackEngine = AVAudioEngine()
         private let player = AVAudioPlayerNode()
+        private var captureToken: UUID?
+        private var spatialCapture: SpatialAudioCapture?
         private var capture: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation?
         private var hasTap = false
         private var playbackFormat: AVAudioFormat?
@@ -63,11 +65,29 @@
 
         }
 
-        public func startCapture() throws -> AsyncThrowingStream<MicrophoneFrame, Error> {
-            stop()
+        public func startCapture(preferSpatial: Bool = false) async throws -> AsyncThrowingStream<
+            MicrophoneFrame, Error
+        > {
+            await stop()
+            let token = UUID()
+            captureToken = token
+            try Task.checkCancellation()
             let audio = AVAudioSession.sharedInstance()
             try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try audio.setActive(true)
+            if preferSpatial, audio.currentRoute.inputs.contains(where: { $0.portType == .builtInMic }) {
+                let backend = SpatialAudioCapture()
+                spatialCapture = backend
+                if let frames = try await backend.start() {
+                    guard captureToken == token, !Task.isCancelled else {
+                        await backend.stop()
+                        throw CancellationError()
+                    }
+                    return frames
+                }
+                guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
+                spatialCapture = nil
+            }
             let node = captureEngine.inputNode
             let format = node.outputFormat(forBus: 0)
             guard format.channelCount > 0, format.sampleRate >= 8000 else { throw AudioIOError.invalidFormat }
@@ -75,7 +95,7 @@
             capture = pair.continuation
             let counter = Mutex<UInt64>(0)
             let continuation = pair.continuation
-            node.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in
+            node.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, when in
                 guard let source = buffer.floatChannelData?[0], buffer.frameLength > 0, buffer.frameLength <= 8192
                 else {
                     continuation.finish(throwing: AudioIOError.invalidFormat)
@@ -88,7 +108,10 @@
                     return value
                 }
                 let frame = MicrophoneFrame(
-                    samples: samples, sampleRate: Int(buffer.format.sampleRate), sequence: number)
+                    samples: samples, sampleRate: Int(buffer.format.sampleRate), sequence: number,
+                    timestamp: when.isHostTimeValid
+                        ? AVAudioTime.seconds(forHostTime: when.hostTime) : ProcessInfo.processInfo.systemUptime,
+                    capturedAt: .now)
                 if case .dropped = continuation.yield(frame) { continuation.finish(throwing: AudioIOError.overflow) }
             }
             hasTap = true
@@ -96,7 +119,7 @@
                 captureEngine.prepare()
                 try captureEngine.start()
             } catch {
-                stop()
+                await stop()
                 throw error
             }
             return pair.stream
@@ -205,7 +228,11 @@
             space?.resume(throwing: error)
             telemetry.value.withLock { $0.samples.removeAll() }
         }
-        public func stopCapture() {
+        public func stopCapture() async {
+            captureToken = nil
+            let backend = spatialCapture
+            spatialCapture = nil
+            await backend?.stop()
             if hasTap {
                 captureEngine.inputNode.removeTap(onBus: 0)
                 hasTap = false
@@ -214,8 +241,8 @@
             capture?.finish()
             capture = nil
         }
-        public func stop() {
-            stopCapture()
+        public func stop() async {
+            await stopCapture()
             if let token = playbackToken { cancelPlayback(token: token) }
             player.stop()
             playbackEngine.stop()

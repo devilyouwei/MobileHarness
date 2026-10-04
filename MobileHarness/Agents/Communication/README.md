@@ -38,6 +38,8 @@ flowchart LR
 
 ## Current compilation boundary
 
-✅ This directory compiles into the single Agents target with the five business Agents. PerceptionMessage is currently one Codable union for transcript, speech phase, pose, synthesis and cancellation; AgentContracts registers the whole catalog. AgentCore is a separate Foundation-only target and contains no concrete schema names or application Agent identities.
+✅ This directory compiles into the single Agents target with the five business Agents. PerceptionMessage is currently one Codable union for transcript, speech phase, sound source, pose, synthesis and cancellation; AgentContracts registers the whole catalog. AgentCore is a separate Foundation-only target and contains no concrete schema names or application Agent identities.
 
 ❌ Communication domains and individual business Agents are not separate compilation targets. This document does not claim per-Agent import isolation; independent target/domain splitting is not implemented.
+
+✅ SoundSourceObservation is the immutable sound.source/1 domain value. active requires a finite unit direction with consistent radian azimuth/elevation; inactive/uncertain/unavailable prohibit a direction. RMS, correlation quality, capture timestamp/window duration and fixed ambisonic coordinate convention are validated. The catalog registers a 500 ms observation lifetime; factories and JSON permissions remain Agent-owned. No PCM is broadcast. ❌ Photographer has no sound.source subscription yet.

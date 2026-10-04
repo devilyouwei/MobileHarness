@@ -150,3 +150,5 @@ Camera control Tools are registered as Camera.open, Camera.close and Camera.flip
 
 
 ✅ Model settings are grouped by use: 音频识别 (Nemotron+Silero), 语音合成 (MOSS), 大模型 (cloud service and Gemma 4 E2B), 视觉识别 (YOLO). Custom speech switches are independent and require only the respective ASR/TTS installation. Apple ASR uses native internal VAD; Silero is selected automatically when installed and available, otherwise Energy supplies silence scores; this is independent of the ASR switch.
+
+Sound direction: supported built-in microphone routes can provide FOA for SpeechPerception's dominant-direction calculation and sound.source broadcast. Mono routes preserve speech recognition and report direction unavailable. Synthetic tests and builds do not establish physical angle accuracy; no consumer or presentation is connected yet.

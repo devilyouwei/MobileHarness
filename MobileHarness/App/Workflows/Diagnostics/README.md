@@ -11,3 +11,5 @@ flowchart LR
 ```
 
 ❌ Physical-device diagnostic acceptance is separate.
+
+✅ Speech diagnostics now await AppleAudioIO shutdown inside their owned start/stop tasks, joining capture/playback cleanup before unload or replacement. ❌ No spatial analysis or sound-source UI belongs to this workflow.

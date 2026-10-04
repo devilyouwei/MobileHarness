@@ -366,7 +366,7 @@ for source in (ROOT / 'MobileHarness/Agents/Core').rglob('*.swift'):
 for directory in ('MobileHarness/Agents/Core', 'MobileHarness/Gateway'):
     for source in (ROOT / directory).rglob('*.swift'):
         content = source.read_text()
-        if any(marker in content for marker in ('"speech.', '"vision.', '"phone.', 'gray64', 'PerceptionMessage')):
+        if any(marker in content for marker in ('"speech.', '"vision.', '"sound.', '"phone.', 'gray64', 'PerceptionMessage')):
             errors.append(f'Domain communication policy in generic infrastructure: {source.relative_to(ROOT)}')
 if (ROOT / 'MobileHarness/Agents/Core/Communication/PerceptionInput.swift').exists() or (ROOT / 'MobileHarness/Agents/Core/ImageInput.swift').exists():
     errors.append('Domain/media input definitions must not return to Core')
@@ -394,6 +394,10 @@ for name in ('VoiceActivitySegmenter', 'SpeechBoundaryPolicy', 'SpeechRecognitio
         errors.append(f'{name} must not import transport, UI or device modules')
 if (speech_root / 'LiveSpeechInput.swift').exists():
     errors.append('Obsolete LiveSpeechInput must not duplicate SpeechRecognitionTurn')
+
+sound_estimator = ROOT / 'MobileHarness/Agents/SpeechPerception/SoundSourceEstimator.swift'
+if not sound_estimator.exists() or set(re.findall(r'^import (\w+)', sound_estimator.read_text(), re.MULTILINE)) - {'Foundation'}:
+    errors.append('SoundSourceEstimator must remain pure Foundation-only Agent policy')
 
 if errors:
     raise SystemExit('\n'.join(errors))

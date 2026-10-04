@@ -11,3 +11,5 @@ flowchart LR
     Caller --> InputGateway --> AgentInput --> Perception
     Perception --> ModelKit
 ```
+
+✅ AudioInput supports interleaved mono and first-order ACN/SN3D channel layouts, native sample rate and monotonic capturedAt. Byte alignment includes every channel; sampleCount counts scalar values, frameCount counts time samples. The existing per-input limit remains 64000 bytes and mono initializers remain compatible. ❌ No sound-source observation or localization policy lives in Core.

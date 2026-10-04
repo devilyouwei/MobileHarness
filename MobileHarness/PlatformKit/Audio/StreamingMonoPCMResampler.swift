@@ -20,7 +20,7 @@ public actor StreamingMonoPCMResampler {
     }
     public func process(_ frame: MicrophoneFrame) throws -> [MicrophoneFrame] {
         try Task.checkCancellation()
-        guard (8000...192000).contains(frame.sampleRate), !frame.samples.isEmpty,
+        guard frame.layout == .mono, (8000...192000).contains(frame.sampleRate), !frame.samples.isEmpty,
             frame.samples.count <= 8192, frame.samples.allSatisfy(\.isFinite),
             sourceRate == nil || sourceRate == frame.sampleRate
         else { throw ConversionError.invalidInput }
