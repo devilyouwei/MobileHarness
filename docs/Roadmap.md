@@ -171,6 +171,8 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ❌ Device acceptance: permission denial/retry, built-in/headset route, supported versus actual FOA/fallback reason, real front/back/left/right axes, camera coexistence, stop/restart, navigation/background and continuous latency. Synthetic tests do not establish angular precision.
 
+❌ Known physical-device issue (2026-10-05): the user's iPhone 17 Pro reports built-in microphone / spatial capability supported, but spatial startup fails and detection completes with mono audio and unavailable direction. This is not a device-unsupported result. The failed stage/native error is unresolved; preserve that evidence and actual PCM format before changing the capture configuration. See [the reported diagnostic snapshot and investigation criteria](Validation-History.md#2026-10-05--open-issue-supported-iphone-foa-capture-falls-back-to-mono). Successful FOA capture/physical direction acceptance remains blocked by this issue; ordinary mono recording remains available.
+
 ### Audio detection validation — 2026-10-05
 
 ✅ Final targeted audio/detection regression: 32 tests passed (UI freshness 3, workflow lifetime 3, speech/source/capture/resampler integration 25, capability resampler 1). Whole-repository strict Swift formatting, architecture boundary checks, Python tests (6), diff whitespace and plist metadata validation passed. The final unsigned MobileHarness generic iOS device build passed, including the App-owned diagnostic endpoint and native Settings section.

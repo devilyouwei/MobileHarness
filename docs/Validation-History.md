@@ -2,6 +2,28 @@
 
 Purpose: preserve dated test, UI and packaging observations that were previously embedded in module READMEs. These are records of what was checked at the time, not current implementation contracts or substitutes for physical-device acceptance.
 
+## 2026-10-05 — Open issue: supported iPhone FOA capture falls back to mono
+
+Status: ❌ Open; spatial capture has not passed physical acceptance. Evidence: the user's screenshot of Settings → 音频识别 → 音频检测, dated 2026-10-05 01:15, from an iPhone 17 Pro. The iOS version and exact application build were not supplied. The screenshot/user media is not stored in the repository.
+
+| Reported diagnostic field | Observed value |
+| --- | --- |
+| Microphone | 内置麦克风 |
+| Spatial capture capability | 支持 |
+| Startup outcome | 空间采集启动失败，改用普通录音。 |
+| Actual capture | 普通录音 · 单声道 |
+| PCM status | 音频正常 |
+| Sound direction | 方向不可用 |
+| Diagnostic lifecycle | 检测完成 |
+
+The capability result maps to `AVCaptureDeviceInput.isMultichannelAudioModeSupported(.firstOrderAmbisonics) == true`. The attempt nevertheless failed before spatial first-frame readiness, and the mono fallback completed. Direction is unavailable because the estimator requires validated four-channel FOA input. This is evidence of a failed App spatial capture attempt, not evidence that the iPhone lacks spatial recording capability. Apple lists Spatial Audio recording for [iPhone 17 Pro](https://www.apple.com/nz/iphone-17-pro/specs/).
+
+Root cause remains unknown. The current startupFailed category merges capture-session setup/running/interruption and PCM-format/validation failures; the screenshot does not identify which stage failed. It is distinct from the startupTimeout category. At diagnostic completion the meter is intentionally cleared, so the empty level bar in this screenshot does not independently establish a recording failure. The user's earlier confirmation that ordinary recording works does not establish successful FOA capture.
+
+Next investigation: retain the original native error domain/code and capture failure stage (including AVCaptureSession runtime-error/interruption details); inspect the actual first sample-buffer channel layout, ASBD and failed validation condition; compare session/input/output configuration with Apple's public FOA requirements. Capture diagnostic metadata only, without retaining user PCM. Do not assign a root cause to device support, session configuration or PCM validation before obtaining that evidence.
+
+Acceptance remains open until this iPhone can receive validated four-channel FOA and produce fresh observations for controlled sound directions. Also verify repeated start/stop, route changes and that failure still preserves normal mono recognition. Physical axes and angular precision require separate acceptance; no Photographer or robot behavior is added by this investigation. Current architecture remains [ADR0124](adr/0124-sound-source-perception.md) and [ADR0128](adr/0128-settings-audio-detection.md).
+
 ## 2026-10-04 — Microphone startup readiness correction
 
 Following the reported silent-listening regression after FOA capture was introduced, spatial startup now enables native microphone configuration and waits for actual validated PCM delivery. Both capture backends have one startup waiter/result and a cancellable 3-second first-frame timer. Failed spatial startup is closed and joined before mono retry; cancellation never retries. App clears listening on capture failure or unexpected stream completion and rejects late voice-state Tools after capture admission closes.

@@ -2,6 +2,8 @@
 
 ✅ [ADR0124](adr/0124-sound-source-perception.md) records bounded microphone first-frame startup, pre-admission mono fallback and capture-failure presentation. ❌ Physical acoustic and coexistence acceptance remains separate from builds and synthetic tests.
 
+❌ [Open iPhone 17 Pro spatial-capture issue](Validation-History.md#2026-10-05--open-issue-supported-iphone-foa-capture-falls-back-to-mono): runtime capability reports supported, but startup falls back to mono. The diagnostic screenshot establishes the observed state; native failure stage and root cause remain unresolved.
+
 ## Requirements and public explanations
 
 | Document | Purpose |
