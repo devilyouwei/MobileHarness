@@ -11,7 +11,9 @@ Purpose: capture and play audio through public Apple APIs and convert capture PC
 ```mermaid
 flowchart LR
     OS[Apple audio hardware] -->|PCM| Audio[PlatformKit Audio]
-    Audio -->|Resampled PCM via App| Gateway
+    Audio -->|Native-rate PCM via App| Gateway
+    Gateway --> Speech[SpeechPerception]
+    Speech -->|Select output sample rate| Convert[Platform PCM converter]
     Actions -->|Synthesized PCM via App| Audio
     Audio -->|Playback| OS
 ```
@@ -61,4 +63,4 @@ flowchart LR
 
 ✅ Responsibility audit: audio capture, device playback/drain, PCM conversion and measured spectrum remain device capabilities. No speech Action, Agent inference or conversation choreography lives here. Presentation and speech sequencing belong to their owning modules.
 
-✅ ADR0098: MicrophoneFrame is exported from shared Types with unchanged samples/rate/sequence, duration and RMS behavior; capture/player algorithms are unchanged.
+✅ MicrophoneFrame is defined in PlatformKit, retaining samples/rate/sequence, duration and RMS behavior. StreamingMonoPCMResampler requires an explicit outputSampleRate (8–192 kHz); reset clears converter, source rate and sequence. SpeechPerception selects 16 kHz, rather than App or the device SDK imposing an ASR format.

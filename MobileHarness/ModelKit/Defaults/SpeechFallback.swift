@@ -43,7 +43,7 @@ actor FallbackRecognition: SpeechRecognitionCapability {
     var availability: CapabilityAvailability {
         get async {
             do { return try await manager.availability(selected(), for: .recognition) } catch {
-                return .unavailable(reason: "语音资源准备失败：\(error)")
+                return .unavailable(reason: "Speech resource preparation failed: \(error)")
             }
         }
     }
@@ -68,7 +68,7 @@ actor FallbackSynthesis: SpeechSynthesisCapability {
     var availability: CapabilityAvailability {
         get async {
             do { return try await manager.availability(selected(), for: .synthesis) } catch {
-                return .unavailable(reason: "语音资源准备失败：\(error)")
+                return .unavailable(reason: "Speech resource preparation failed: \(error)")
             }
         }
     }
@@ -93,7 +93,7 @@ actor FallbackVoiceActivity: VoiceActivityCapability {
     var availability: CapabilityAvailability {
         get async {
             do { return try await manager.availability(selected(), for: .voiceActivity) } catch {
-                return .unavailable(reason: "语音资源准备失败：\(error)")
+                return .unavailable(reason: "Speech resource preparation failed: \(error)")
             }
         }
     }

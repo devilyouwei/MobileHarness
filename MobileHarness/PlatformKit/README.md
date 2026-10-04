@@ -1,6 +1,6 @@
 # PlatformKit — Device Input and Output
 
-Provides reusable hardware and operating-system capabilities through public APIs. Its design goals are permission-aware lifetimes, bounded media and command admission, explicit cancellation/cleanup and neutral device facts. PlatformKit depends only on shared Types values; it has no Agent, Gateway, ActionRuntime, ToolRuntime, ModelKit, UI or business-workflow dependency.
+Provides reusable hardware and operating-system capabilities through public APIs. Its design goals are permission-aware lifetimes, bounded media and command admission, explicit cancellation/cleanup and neutral device facts. PlatformKit has no project or third-party target dependencies; it has no Agent, Gateway, ActionRuntime, ToolRuntime, ModelKit, UI or business-workflow dependency.
 
 ## Directory and ownership
 
@@ -25,7 +25,7 @@ flowchart LR
 
     App -->|capture, playback, preview, discovery| Platform[PlatformKit]
     Actions -->|native device requests| Platform
-    Agents[Agents] -.->|scoped device capability when required| Platform
+    Agents[Agents] -->|device values / caller-selected PCM conversion| Platform
     Tools -->|injected host camera-control endpoint| App
     Tools -.->|direct scoped capability when required| Platform
 
@@ -39,7 +39,7 @@ flowchart LR
     App -->|typed state and preview adapter| UI[UI]
 ```
 
-The current App target uses audio, camera and connectivity capabilities; the current Actions target uses NexArm protocol/link capabilities. Current Camera Tools reach the App-owned camera coordinator through an injected `CameraControlCapability`; Tools still does not import PlatformKit or own the device session. Current Agents also has no PlatformKit import. ModelKit does not call PlatformKit: App bridges captured PCM or image frames to the appropriate Agent/model boundary. UI receives state and typed operations rather than native services.
+The current App target uses audio, camera and connectivity capabilities; the current Actions target uses NexArm protocol/link capabilities. Current Camera Tools reach the App-owned camera coordinator through an injected `CameraControlCapability`; Tools still does not import PlatformKit or own the device session. VisionPerception consumes CameraFrame and SpeechPerception consumes caller-configured PCM conversion through PlatformKit. ModelKit does not call PlatformKit: App transports captured data, and each calling Agent builds its model input. UI receives state and typed operations rather than native services.
 
 ## Internal capability flow
 
@@ -49,7 +49,8 @@ PlatformKit is one target organized into three implemented device domains. Each 
 flowchart TB
     subgraph Audio[Audio capability]
         Mic[Microphone / AVAudioEngine] --> Capture[AppleAudioIO capture]
-        Capture -->|bounded MicrophoneFrame stream| Convert[Streaming PCM resampler]
+        Capture -->|bounded native MicrophoneFrame stream| AppBoundary[App admission and transport]
+        AgentCaller[SpeechPerception selects output rate] --> Convert[Streaming PCM resampler]
         PCM[Bounded playback PCM] --> Playback[AppleAudioIO playback]
         Playback -->|drain / timeout / cancel| PlaybackResult[Playback completion]
         Capture --> Meter[AudioSpectrum]
@@ -73,7 +74,7 @@ flowchart TB
         Decode -->|telemetry / link facts / structured failure| Feedback[Device feedback]
     end
 
-    Convert --> AppBoundary[App admission and adaptation]
+    Convert --> AgentCaller
     Meter --> AppBoundary
     Preview --> AppBoundary
     Frames --> AppBoundary

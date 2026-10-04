@@ -1,6 +1,5 @@
 import AgentCore
 import Foundation
-import Types
 
 /// Application Agent names; the framework only defines the identity value type.
 extension AgentID {

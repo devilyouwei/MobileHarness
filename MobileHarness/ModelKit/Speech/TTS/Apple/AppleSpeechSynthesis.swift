@@ -11,7 +11,8 @@ public final class AppleSpeechSynthesis: SpeechSynthesisCapability {
         resource = try context.resource { () }
     }
     public var availability: CapabilityAvailability {
-        AVSpeechSynthesisVoice.speechVoices().isEmpty ? .unavailable(reason: "未找到系统语音声音") : .available
+        AVSpeechSynthesisVoice.speechVoices().isEmpty
+            ? .unavailable(reason: "No system synthesis voices are available") : .available
     }
     /// The shared speech contract uses auto for Chinese/English conversation replies.
     nonisolated static func language(text: String, locale: String) -> String {
@@ -31,10 +32,12 @@ public final class AppleSpeechSynthesis: SpeechSynthesisCapability {
     }
     public func synthesize(_ request: SpeechSynthesisRequest) async throws -> InferenceSession<SynthesisEvent> {
         try Task.checkCancellation()
-        guard request.text.utf8.count <= 2048 else { throw CapabilityError.invalidRequest("单次合成文本过长") }
+        guard request.text.utf8.count <= 2048 else {
+            throw CapabilityError.invalidRequest("Synthesis text exceeds the request size limit")
+        }
         let language = Self.language(text: request.text, locale: request.locale)
         guard let voice = AVSpeechSynthesisVoice(language: language) else {
-            throw CapabilityError.unavailable("当前系统没有 \(language) 的语音声音，请先在系统设置中添加对应语音")
+            throw CapabilityError.unavailable("No system synthesis voice is available for locale \(language)")
         }
         guard activeWorker == nil else { throw CapabilityError.inputBusy }
         let lease = try await resource.acquire()
@@ -76,7 +79,7 @@ private final class SynthesisWorker {
         let emitter = emitter
         timeout = Task {
             do { try await Task.sleep(for: .seconds(30)) } catch { return }
-            emitter.fail(CapabilityError.unavailable("语音合成超时"))
+            emitter.fail(CapabilityError.unavailable("Apple speech synthesis timed out"))
         }
     }
     nonisolated private static func handler(emitter: InferenceEmitter<SynthesisEvent>)
@@ -85,7 +88,7 @@ private final class SynthesisWorker {
         let accumulator = Mutex(SynthesisPCMAccumulator())
         return { buffer in
             guard let pcm = buffer as? AVAudioPCMBuffer else {
-                emitter.fail(CapabilityError.invalidRequest("系统语音返回了非 PCM 音频"))
+                emitter.fail(CapabilityError.invalidRequest("System synthesis returned non-PCM audio"))
                 return
             }
             do {

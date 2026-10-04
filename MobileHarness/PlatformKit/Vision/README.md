@@ -40,3 +40,5 @@ The Vision directory is a capability domain, distinct from Apple’s Vision fram
 ✅ Responsibility audit: native preview binding remains here, while resizeAspectFill is selected by App/Adapters/CameraPreviewAdapter. Camera capture/frame conversion are device capabilities; overlay content, view layout and perception decisions are outside PlatformKit.
 
 ✅ CameraFrame carries a ContinuousClock capture-callback instant alongside its unchanged media presentation timestamp. It measures callback-to-consumer latency without assuming media and host clocks share an epoch. ❌ Sensor exposure latency is not measured.
+
+✅ CameraFrame retains private native pixel storage and an internal device-side initializer; consumers use withPixelBuffer. VisionPerception builds ModelKit input after admission, while App transports the capture without inference conversion. ❌ No ModelKit or Types dependency is introduced.

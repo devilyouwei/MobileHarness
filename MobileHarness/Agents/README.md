@@ -1,6 +1,6 @@
 # Agents — Perception and Business Policy
 
-Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit, StorageChat and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
+Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit, PlatformKit, StorageChat and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
 
 ## Directory structure
 
@@ -21,7 +21,7 @@ Each implemented Agent has `<AgentName>.agent.json`, an actor implementation and
 
 ## Upstream and downstream
 
-Arrows show runtime data flow; Agents never call concrete Actions or Tools. Compile-time dependencies are `AgentCore` (contracts, permissions and parsers), `ModelKit` (capability protocols), `StorageChat` (conversation history) and `StorageAudio` (shared PCM handles). App injects the production services; neither storage service delivers Agent messages.
+Arrows show runtime data flow; Agents never call concrete Actions or Tools. Compile-time dependencies are `AgentCore` (contracts, permissions and parsers), `ModelKit` (capability protocols), `PlatformKit` (device values and caller-selected conversion), `StorageChat` (conversation history) and `StorageAudio` (shared PCM handles). App injects the production services; neither storage service delivers Agent messages.
 
 ```mermaid
 flowchart LR
@@ -31,6 +31,7 @@ flowchart LR
     Storage -->|Last ten completed rounds| Agents
     Agents -->|Register and write synthesized PCM| Audio[StorageAudio SpeechAudioStore]
     Audio -->|Scoped audioID checkout| Playback[AppSpeechPlayback endpoint]
+    Agents -->|Device values / PCM conversion| PlatformKit
     Agents -->|Inference| ModelKit
     ModelKit -->|Typed results| Agents
     Agents -->|Resolved calls and typed events| Output[OutputGateway]
@@ -229,7 +230,7 @@ Assistant, SpeechPerception and VisionPerception accept action.result receipts w
 
 ## Implemented scope and limitations
 
-✅ Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, StorageChat and StorageAudio.
+✅ Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio.
 
 Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.express is a scheduled finite model-callable Action; UI.setExpression is a scheduled state Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
 
@@ -247,8 +248,12 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 
 ✅ Output overflow rejects only the current unaccepted aim; Photographer remains running and queued accepted calls are retained.
 
-✅ Business Agents may depend explicitly on Types for immutable shared domain values. VisionPerception builds Types/Vision PoseOverlay; AgentCore retains generic runtime contracts. This does not allow UI/service imports or bypass OutputGateway.
+✅ Business Agents own their domain values and output payloads. VisionPerception builds PoseOverlayPayload; AgentCore retains generic runtime contracts. This does not allow UI/service imports or bypass OutputGateway.
 
-✅ Communication/AgentContracts.swift owns built-in application Agent names as AgentID extensions. Core defines only the raw identity type. Shared pose and speech values are explicitly imported from Types; output syntax stays Core-owned while speech policy stays Assistant-owned.
+✅ Communication/AgentContracts.swift owns built-in application Agent names as AgentID extensions. Core defines only the raw identity type. Shared pose and speech message values belong to Communication/SpeechValues.swift and PoseObservation.swift; output syntax stays Core-owned while speech policy stays Assistant-owned.
 
-✅ Shared application messages and registry metadata are grouped in Communication/AgentContracts.swift. Core exposes generic messages/schema registration only. Media values are grouped in Types; host input adapters supply device sources/deadlines. No per-domain file or compatibility alias remains under Core.
+✅ Shared application messages and registry metadata are grouped in Communication/AgentContracts.swift. Core exposes generic messages/schema registration only. Generic media inputs are grouped in AgentCore/Input; host input adapters supply device sources/deadlines. No per-domain file or compatibility alias remains under Core.
+
+✅ Capability callers own SDK data adaptation: VisionPerception converts retained CameraFrame to ModelKit ImageFrame; SpeechPerception selects/resamples native-rate transport to ModelKit PCM; SpeechSynthesis converts model PCM into StorageAudio values. App injects capabilities and transports inputs, without injecting model input conversion closures. ❌ No model-specific tensor preprocessing is moved out of ModelKit adapters.
+
+✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

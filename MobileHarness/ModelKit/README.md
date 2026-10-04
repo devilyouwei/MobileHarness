@@ -2,7 +2,7 @@
 
 Processes supplied data through typed model capabilities. The goal is to keep recognition, generation and pose inference independent of Agent policy, UI and device I/O. Consumers receive capability protocols; internal assembly selects concrete models.
 
-The physical directory contains several Swift targets. Base ModelKit depends only on the independent Types value module. ModelKitRuntime depends only on ModelKit; adapters and backends compile separately. Root Package.swift owns all targets and the source targets share one root build map.
+The physical directory contains several Swift targets. Base ModelKit has no project or third-party target dependencies and owns its public input/output values. ModelKitRuntime depends only on ModelKit; adapters and backends compile separately. Root Package.swift owns all targets and the source targets share one root build map.
 
 ## Directory structure
 
@@ -26,7 +26,7 @@ ModelKit/
 
 ## External upstream and downstream
 
-App is the composition and lifetime owner. It supplies the model resource root to `ModelKitDefaults`, obtains the process-wide `ModelManager`, resolves typed capability handles and injects only the capabilities required by each consumer. Consumers call capability protocols directly; Gateway does not proxy model work. PlatformKit has no ModelKit dependency: App adapts captured media at the boundary before admitting it to an Agent or model capability.
+App is the composition and lifetime owner. It supplies the model resource root to `ModelKitDefaults`, obtains the process-wide `ModelManager`, resolves typed capability handles and injects only the capabilities required by each consumer. Consumers call capability protocols directly; Gateway does not proxy model work. PlatformKit has no ModelKit dependency: App packages captured media for Agent transport; the calling Agent adapts that transport into ModelKit inputs.
 
 Solid arrows below are implemented relationships. Dashed arrows are allowed injection points that currently have no concrete dependency.
 
@@ -51,7 +51,7 @@ flowchart LR
     Capability -->|events / text / PCM / pose results / errors| Consumers[Calling consumer]
 ```
 
-The current `Agents` target consumes ModelKit; diagnostic workflows and title generation receive capabilities through App. Current Actions and Tools do not import ModelKit, although the architecture permits a narrowly injected capability for a concrete behavior. UI, Gateway and PlatformKit do not depend on ModelKit. ModelKit and StorageAudio independently depend on shared Types audio values; neither depends on the other.
+The current `Agents` target consumes ModelKit; diagnostic workflows and title generation receive capabilities through App. Current Actions and Tools do not import ModelKit, although the architecture permits a narrowly injected capability for a concrete behavior. UI, Gateway and PlatformKit do not depend on ModelKit. ModelKit and StorageAudio own distinct PCM values; SpeechSynthesis converts model output into the storage contract. Neither SDK depends on the other or on Types.
 
 ## Internal targets and processing flow
 
@@ -67,7 +67,6 @@ flowchart TD
     Adapters --> Backends[CoreAI / CoreML / FluidAudio / MossCoreML]
     Adapters --> System[Apple speech frameworks]
     Backends --> Engines[CoreAI / Core ML / third-party engine SDKs]
-    Base --> Types[Types shared values]
 ```
 
 One process-wide manager preserves provider identity and resource ownership. Capability acquisition may construct a provider but does not necessarily load weights. The provider acquires its model resource before inference; one active operation is allowed per model. Streaming output uses an `InferenceSession`, while single-result capabilities return typed values through the same cleanup boundary.
@@ -98,7 +97,7 @@ flowchart LR
 - ModelKitDefaults owns fixed registrations and default bindings. Production uses one process-wide manager; construction/registration require ModelAssembly SPI for internal assembly and isolated tests.
 - ModelManager retains provider identity. `get` acquires a typed capability; deferred acquisition need not load weights. Unload releases resources without replacing the handle. Shutdown is terminal.
 - Each model permits one active operation. Overlap fails with `inputBusy`; there is no waiting inference queue or cross-model scheduler. A lease ends after cleanup, not merely after cancellation is requested.
-- Types/Audio owns AudioFrame values, re-exported through Core with ModelKit validation compatibility. Core owns ImageFrame/native image values and single-consumer InferenceSession streams. Default stream limits are 64 events and 4096 estimated bytes per event; adapters can set explicit alternatives. Cloud/local LLM adapters use no event-count cap, with generation/response bounds retained. Other streams remain bounded; oversize or bounded-stream overflow fails rather than dropping model output.
+- ModelKit/Core owns AudioFormat and AudioFrame, including validation and CapabilityError; no application values are re-exported. Core owns ImageFrame/native image values and single-consumer InferenceSession streams. Default stream limits are 64 events and 4096 estimated bytes per event; adapters can set explicit alternatives. Cloud/local LLM adapters use no event-count cap, with generation/response bounds retained. Other streams remain bounded; oversize or bounded-stream overflow fails rather than dropping model output.
 - ModelManager defaults allow 32 registrations, four concurrent factories/loaders and 32 construction/load waiters per model/resource; excess work is rejected. Unload waits for active work; shutdown cancels and joins it.
 - Session cancellation cannot retract delivered output. Adapters must cooperate and retain admission until backend cleanup completes. Device capture and playback stay in PlatformKit.
 
@@ -137,3 +136,5 @@ Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns
 
 
 ✅ Independent custom recognition/synthesis switches default off; enabled recognition requires the Nemotron installation, enabled synthesis requires MOSS. Apple recognition uses SpeechTranscriber+SpeechDetector together; Silero or Energy provides external silence scores independently of the ASR choice because native detector normal events were unavailable in the real probe.
+
+✅ Errors and availability expose typed outcomes plus neutral technical diagnostics. Consumers own localization and recovery guidance. Chinese warm-up utterances are model input fixtures, not display text. ❌ SDK diagnostics must not prescribe App settings or UI workflows.

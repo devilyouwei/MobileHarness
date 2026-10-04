@@ -1,5 +1,3 @@
-import Types
-
 extension PoseOverlay.Joint {
     /// Undo upright rotation; native preview conversion subsequently handles crop/mirroring.
     public func sensorPoint(rotation: Int) -> (x: Double, y: Double) {

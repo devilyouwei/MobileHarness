@@ -1,7 +1,6 @@
 import ActionRuntime
 import Actions
 import AgentCore
-import Agents
 import AppWorkflows
 import Foundation
 import Gateway
@@ -12,7 +11,8 @@ import Synchronization
 import Testing
 import ToolRuntime
 import Tools
-import Types
+
+@testable import Agents
 
 private struct RecognitionFixture: SpeechRecognitionCapability {
     let text: String
@@ -42,10 +42,10 @@ private struct RecognitionFixture: SpeechRecognitionCapability {
 private actor VoiceProbe {
     var spokenText: [String] = []
     var displayedText: [String] = []
-    var audio: [AudioFrame] = []
+    var audio: [SpeechPCMFrame] = []
     func synthesized(_ text: String) { spokenText.append(text) }
     func displayed(_ text: String) { displayedText.append(text) }
-    func played(_ frame: AudioFrame) { audio.append(frame) }
+    func played(_ frame: SpeechPCMFrame) { audio.append(frame) }
 }
 
 private struct SynthesisFixture: SpeechSynthesisCapability {
@@ -132,7 +132,7 @@ private func preparedSpeech(
     try await agent.start()
     let recognition = RecognitionFixture(text: "你好", includeFinal: true)
     let sessionID = UUID()
-    let turn = LiveSpeechInput(recognition: recognition, sessionID: sessionID) { _ in }
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: sessionID) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     let text = try await turn.finish()
     await probe.displayed(text)
@@ -164,7 +164,7 @@ private func preparedSpeech(
     try await manager.register(agent)
     try await agent.start()
     let recognition = RecognitionFixture(text: "", includeFinal: false)
-    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID()) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     #expect(try await turn.finish().isEmpty)
     #expect(await agent.status().processedInputs == 0)
@@ -228,7 +228,7 @@ private func preparedSpeech(
     let gateway = InputGateway(manager: manager)
     let recognition = RecognitionFixture(text: "一段", includeFinal: true)
     let id = UUID()
-    let turn = LiveSpeechInput(recognition: recognition, sessionID: id) { _ in }
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: id) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.maximumDuration)])
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     let text = try await turn.finish()
@@ -261,7 +261,7 @@ private actor BlockedRecognition: SpeechRecognitionCapability {
 @Test func voiceQueueOverflowIsExplicitAndCancellationReleasesGateway() async throws {
     let model = BlockedRecognition()
     let recognition = model
-    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID()) { _ in }
     try await turn.enqueue([.audio([sampleFrame()]), .end(.maximumDuration)])
     var started = model.started.stream.makeAsyncIterator()
     _ = await started.next()
@@ -271,7 +271,7 @@ private actor BlockedRecognition: SpeechRecognitionCapability {
     }
     await turn.cancel()
     await #expect(throws: CapabilityError.self) { try await turn.finish() }
-    let next = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
+    let next = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID()) { _ in }
     try await next.enqueue([.audio([sampleFrame()]), .end(.silence)])
     _ = await started.next()
     await next.cancel()
@@ -305,7 +305,7 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
     try await agent.start()
     let recognition = LiveRecognitionFixture()
     let previews = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(8))
-    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { previews.continuation.yield($0) }
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID()) { previews.continuation.yield($0) }
     try await turn.enqueue([.audio([sampleFrame()])])
     var iterator = previews.stream.makeAsyncIterator()
     #expect(await iterator.next() == "你好")
@@ -323,13 +323,13 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
 @Test func cancellingLivePreviewClosesAdmissionAndAllowsNextSession() async throws {
     let recognition = LiveRecognitionFixture()
     let previews = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(8))
-    let turn = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { previews.continuation.yield($0) }
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID()) { previews.continuation.yield($0) }
     try await turn.enqueue([.audio([sampleFrame()])])
     var iterator = previews.stream.makeAsyncIterator()
     _ = await iterator.next()
     await turn.cancel()
     await #expect(throws: CapabilityError.self) { try await turn.enqueue([.end(.silence)]) }
-    let next = LiveSpeechInput(recognition: recognition, sessionID: UUID()) { _ in }
+    let next = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID()) { _ in }
     try await next.enqueue([.audio([sampleFrame()]), .end(.silence)])
     #expect(try await next.finish() == "你好世界")
     previews.continuation.finish()
@@ -468,8 +468,10 @@ private actor EndpointVADSession: VoiceActivitySession {
     let outputTask = Task {
         for await envelope in speech.outputs { try await output.dispatch(envelope) }
     }
-    let first = try AudioInput(samples: Data(repeating: 0, count: 1536 * 4), sequence: 0, timestamp: 0)
-    let second = try AudioInput(samples: Data(repeating: 0, count: 12800 * 4), sequence: 1, timestamp: 0.096)
+    let first = try AudioInput(
+        samples: Data(repeating: 0, count: 1536 * 4), sampleRate: 16000, sequence: 0, timestamp: 0)
+    let second = try AudioInput(
+        samples: Data(repeating: 0, count: 12800 * 4), sampleRate: 16000, sequence: 1, timestamp: 0.096)
     _ = try await input.publish(
         AgentInput(
             sessionID: session, payload: .audio(first),
@@ -523,10 +525,12 @@ private actor EndpointVADSession: VoiceActivitySession {
     try await speech.start()
     try await speech.pause()
     for i: UInt64 in 0..<4 {
-        let audio = try AudioInput(samples: Data(repeating: 0, count: 64000), sequence: i, timestamp: Double(i))
+        let audio = try AudioInput(
+            samples: Data(repeating: 0, count: 64000), sampleRate: 16000, sequence: i, timestamp: Double(i))
         try await speech.receive(AgentInput(sessionID: session, payload: .audio(audio)))
     }
-    let payload = InputPayload.audio(try AudioInput(samples: Data(repeating: 0, count: 4), sequence: 4, timestamp: 4))
+    let payload = InputPayload.audio(
+        try AudioInput(samples: Data(repeating: 0, count: 4), sampleRate: 16000, sequence: 4, timestamp: 4))
     await #expect(throws: HarnessError.queueFull) {
         try await speech.receive(AgentInput(sessionID: session, payload: payload))
     }
@@ -593,7 +597,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     let parent = AgentInput(
         sessionID: session,
         payload: .audio(
-            try AudioInput(samples: Data(repeating: 0, count: 4), sequence: 0, timestamp: 0)),
+            try AudioInput(samples: Data(repeating: 0, count: 4), sampleRate: 16000, sequence: 0, timestamp: 0)),
         turn: AgentTurn(ordinal: 1))
     let report = try await port.publish(.speechPhase(.speaking), parent: parent)
     #expect(report.delivered == [.assistant])
@@ -715,4 +719,99 @@ private actor EndpointVADSession: VoiceActivitySession {
         levels = next
     }
     #expect(levels == AudioSpectrum.silence)
+}
+
+@Test func speechTranscriptAccumulatorRetainsOrderAndSealsFinalSegments() throws {
+    var transcript = TranscriptAccumulator(prefix: "前段")
+    let first = UUID()
+    let second = UUID()
+    #expect(
+        try transcript.accept(TranscriptionEvent(segmentID: first, revision: 2, text: "新", isFinal: false)) == "前段 新")
+    #expect(try transcript.accept(TranscriptionEvent(segmentID: first, revision: 1, text: "旧", isFinal: false)) == nil)
+    #expect(
+        try transcript.accept(TranscriptionEvent(segmentID: second, revision: 0, text: "后", isFinal: true)) == "前段 新 后")
+    #expect(transcript.finalText == "后")
+    #expect(
+        try transcript.accept(TranscriptionEvent(segmentID: first, revision: 3, text: "完成", isFinal: true)) == "前段 完成 后"
+    )
+    #expect(try transcript.accept(TranscriptionEvent(segmentID: first, revision: 4, text: "迟到", isFinal: true)) == nil)
+    #expect(transcript.finalText == "完成 后")
+}
+
+@Test func speechTranscriptAccumulatorRejectsOversizeWithoutRetainingRevision() throws {
+    var transcript = TranscriptAccumulator(prefix: String(repeating: "x", count: 65530))
+    let segment = UUID()
+    #expect(throws: CapabilityError.self) {
+        try transcript.accept(TranscriptionEvent(segmentID: segment, revision: 9, text: "overflow", isFinal: true))
+    }
+    #expect(
+        try transcript.accept(TranscriptionEvent(segmentID: segment, revision: 1, text: "ok", isFinal: true)) != nil)
+    #expect(transcript.finalText == "ok")
+}
+
+@Test func speechBoundaryPaddingUsesSampleBudgetForVariableWindows() throws {
+    var policy = SpeechBoundaryPolicy()
+    let format = try AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    var position = 0
+    func frame(_ samples: Int) throws -> AudioFrame {
+        defer { position += samples }
+        return try AudioFrame(
+            data: Data(repeating: 0, count: samples * 4), format: format,
+            sequence: UInt64(position), timestamp: Double(position) / 16000)
+    }
+    _ = policy.consume(try frame(1536), probability: 1, threshold: 0.5)
+    for _ in 0..<13 { _ = policy.consume(try frame(1024), probability: 0, threshold: 0.5) }
+    let padding = policy.streamEvents.reduce(0) { total, event in
+        if case .audio(let frames) = event { return total + frames.reduce(0) { $0 + $1.sampleCount } }
+        return total
+    }
+    #expect(padding == 3072)
+    #expect(!policy.isSpeaking)
+    #expect(
+        policy.streamEvents.contains {
+            if case .end(.silence) = $0 { return true }
+            return false
+        })
+}
+
+private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession {
+    nonisolated let availability: CapabilityAvailability = .available
+    private(set) var requestedRate: Int?
+    private(set) var receivedRate: Int?
+    private(set) var receivedSamples = 0
+    func detectVoiceActivity(format: AudioFormat) -> any VoiceActivitySession {
+        requestedRate = format.sampleRate
+        return self
+    }
+    func process(_ frame: AudioFrame) -> [VoiceActivityScore] {
+        receivedRate = frame.format.sampleRate
+        receivedSamples += frame.sampleCount
+        return []
+    }
+    func finish() -> [VoiceActivityScore] { [] }
+    func reset() {}
+    func cancel() {}
+}
+
+@Test(.timeLimit(.minutes(1))) func speechPerceptionPreparesNativeRateTransportForItsModel() async throws {
+    let probe = NativeRateVADProbe()
+    let session = UUID()
+    let agent = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: probe, sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
+    try await agent.start()
+    let samples = [Float](repeating: 0.1, count: 8192)
+    let audio = try AudioInput(
+        samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 48000, sequence: 0, timestamp: 0)
+    try await agent.receive(AgentInput(sessionID: session, payload: .audio(audio)))
+    for _ in 0..<1000 {
+        if await probe.receivedSamples > 0 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await probe.requestedRate == 16000)
+    #expect(await probe.receivedRate == 16000)
+    let receivedSamples = await probe.receivedSamples
+    #expect(receivedSamples > 0 && receivedSamples < 8192)
+    #expect(await agent.status().lifecycle == .running)
+    await agent.stop()
 }

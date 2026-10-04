@@ -187,11 +187,11 @@ flowchart TD
 | 接收方式 | contract / version / kind | source / topic | 处理 |
 | --- | --- | --- | --- |
 | 静态订阅 | `media.image / 1 / image` | `phone.camera / media.image` | `AgentInput.payload = .image(ImageInput)`，来自 App VisionSession 的摄像帧适配，经 InputGateway 路由。匹配 session、严格递增 sequence、非倒退 timestamp，并检查接纳期限。 |
-| 初始化注入，不是业务消息 | `PoseCapability`、`resolveImage`、`FrameSamplingConfiguration` | App | 能力执行一次姿态推理，resolver 将传输附件转换为 ModelKit ImageFrame；配置提供默认 0...250ms 自适应间隔（初始 100ms）；启动时对最新帧判断，图像运动、结果运动/置信度、耗时及总延迟反馈更新节奏，不恢复固定灰度百分比筛帧。 |
+| 初始化注入，不是业务消息 | `PoseCapability`、`FrameSamplingConfiguration` | App | 能力执行一次姿态推理，VisionPerception 内部将传输附件转换为 ModelKit ImageFrame；配置提供默认 0...250ms 自适应间隔（初始 100ms）；启动时对最新帧判断，图像运动、结果运动/置信度、耗时及总延迟反馈更新节奏，不恢复固定灰度百分比筛帧。 |
 | 生命周期，不是订阅 | `bind / start / pause / resume / stop` | App / AgentManager | 注入消息端口、管理两条有界 worker；没有外部指令或 ToolResult 输入。 |
 
 ```swift
-// 结构摘要；真实定义在 Types/Vision/VisionValues.swift。
+// 输入结构摘要；真实定义在 Agents/Core/Input/ImageInput.swift。
 ImageInput {
     width: Int; height: Int  // 正向推理图像的尺寸
     sequence: UInt64; timestamp: TimeInterval
@@ -202,7 +202,7 @@ ImageInput {
 }
 ```
 
-RGB 路径为正向、未镜像 RGB8，宽高各 1...640，字节数必须为 width × height × 3。当前摄像头走 sampled 路径：gray64 固定 4096 字节，附件不透明地持有原生帧；宽高各 1...4096、总像素不超过 4194304。Gateway 不解析原生附件或执行模型预处理；App 注入 resolver。默认 image 接纳期限 1 秒，过期帧不进入推理/输出；帧率节奏由 Agent 内部控制；gray64 由 Agent 内的 FrameMotionAnalyzer 复用作运动证据，只影响检测时机，不改变最新帧的保存和选取规则。
+RGB 路径为正向、未镜像 RGB8，宽高各 1...640，字节数必须为 width × height × 3。当前摄像头走 attachment 路径：CameraImageAttachment 持有原生 CameraFrame；宽高各 1...4096、总像素不超过 4194304。Gateway 不解析原生附件或执行模型预处理；VisionPerception 验证原生附件后构造模型输入。默认 image 接纳期限 1 秒，过期帧不进入推理/输出；帧率节奏由 Agent 内部控制；gray64 由 PlatformKit 在采集回调中生成，Agent 内的 FrameMotionAnalyzer 使用它作为运动证据，只影响检测时机，不改变最新帧的保存和选取规则。
 
 ```mermaid
 flowchart LR
@@ -309,8 +309,14 @@ flowchart LR
 
 ✅ Each showPose payload includes optional statistics: capture callback to capability start (including upstream/queue/preparation), capability-call duration, callback-to-result total latency, successful fresh-result FPS over windows of at least one second, and cumulative latest-slot replacements the next adaptive detection interval and optional normalized image-motion activity (0...1, not changed-pixel percentage). ContinuousClock measures elapsed time independently of image media timestamps. FPS is absent until the first window completes; session recreation resets counters. No timer, frame queue or extra output worker is added. ❌ UI rendering/sensor exposure delay and physical sustained performance are not measured.
 
-✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](../../../docs/adr/0114-vision-presentation-values.md).
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
 
-✅ PoseObservation is imported from Types/Vision alongside PoseOverlay. COCO value validation is shared data; cadence, gaze and observation projection remain here. AgentCore owns neither pose-value schema nor detection algorithms.
+✅ PoseObservation is owned by Agents/Communication, while PoseOverlay remains in UI/Camera. COCO value validation belongs to the Agent message contract; cadence, gaze and observation projection remain here. AgentCore owns neither pose-value schema nor detection algorithms.
 
 ✅ Generic image transport carries an opaque attachment. SampledImageAttachment and the gray64 convenience initializer are grouped with FrameMotionAnalyzer; only this Agent requires a 4096-byte sample. Generic messages expose PerceptionMessage.pose through the business communication module. The scheduling algorithm and Tool payload are unchanged.
+
+✅ CameraImageAttachment retains PlatformKit.CameraFrame without conversion. After cadence admission, VisionPerception validates transport dimensions, orientation, sequence and time against the capture and constructs ModelKit.ImageFrame from the retained buffer. RGB transport follows the same caller-owned conversion. App supplies no resolveImage closure. YOLO resizing/normalization/tensor conversion remains inside ModelKitYOLOPose. ❌ No device capture lifecycle is added.
+
+✅ Input ordering/session rejection uses generic CommunicationError.outOfOrder/scopeClosed at this receiving Agent and cadence helper. ImageInputError.invalidFrame validates transport geometry/storage only; the types no longer contain receiver policy. ❌ No cadence or output serialization behavior changes.
+
+✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

@@ -8,7 +8,6 @@ import ModelKitRuntime
 import Observation
 import PlatformKit
 import Storage
-import Types
 import UI
 
 /// The scene's composition root. Runtime services are lazy but never discovered by consumers.
@@ -121,8 +120,7 @@ final class AppAssembly {
                 return try VisionSession(runtime: self.runtime().visionDependencies) {
                     sessionID, configuration, mirroredGaze in
                     try VisionPerceptionAgent(
-                        pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze,
-                        resolveImage: CameraImageAttachment.resolve)
+                        pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze)
                 }
             })
     }

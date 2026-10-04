@@ -25,7 +25,7 @@ The system is divided into four groups. App is the composition root and lifetime
 | Host and interaction | App, UI | Assemble the process, own application/session lifetime and present state. |
 | Cognition and coordination | Agents, AgentCore, Gateway | Interpret signals, retain cognitive state and validate communication/execution. |
 | Behavior execution | Actions, Tools, ActionRuntime, ToolRuntime | Define concrete skills and execute trusted invocations. |
-| Foundations | ModelKit, PlatformKit, Storage, Types, Resources | Supply processing, device I/O, retained data, shared values and packaged artifacts. |
+| Foundations | ModelKit, PlatformKit, Storage, Resources | Supply processing, device I/O, retained data and packaged artifacts. |
 
 ```mermaid
 flowchart LR
@@ -105,11 +105,10 @@ flowchart TB
     App --> UI
     App --> PlatformKit
 
-    UI --> Types
     UI --> StorageChat
 
     Agents --> AgentCore
-    AgentCore --> Types
+    Agents --> PlatformKit
     Agents --> ModelKit
     Agents --> StorageChat
     Agents --> StorageAudio
@@ -139,9 +138,6 @@ flowchart TB
 
     StorageChat --> Storage
     StorageAudio --> Storage
-    StorageAudio --> Types
-    PlatformKit --> Types
-    ModelKit --> Types
     Defaults --> ModelKit
     Defaults --> ModelKitRuntime
     Defaults --> Adapters[Model adapters]
@@ -149,7 +145,7 @@ flowchart TB
     Adapters --> ModelKit
 ```
 
-The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `ActionRuntime`, `ToolRuntime`, `Storage` and `Types` have no project dependencies; AgentCore depends only on Types values. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit meet only at Types.
+The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `ActionRuntime`, `ToolRuntime`, `Storage` and `AgentCore` have no project dependencies. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -174,6 +170,7 @@ MobileHarness/
 ├── Agents/
 │   ├── Communication/          # Domain message schemas and built-in identities
 │   ├── Core/                    # Independent AgentCore target
+│   │   ├── Input/               # Generic audio/image input transport
 │   │   ├── Runtime/             # Registry, manager and lifecycle contracts
 │   │   ├── Capability/          # JSON declarations and permissions
 │   │   ├── Generation/          # Function Token, Channel/wait and Tool parsers
@@ -198,10 +195,6 @@ MobileHarness/
 │   ├── Camera/
 │   ├── Robot/
 │   └── UI/
-├── Types/
-│   ├── Audio/                   # Shared immutable PCM/microphone values
-│   ├── Vision/                  # Shared pose and skeleton presentation/statistics values
-│   └── Speech/                  # Shared speech phases and synthesis requests
 ├── Storage/
 │   ├── Audio/                   # StorageAudio: transient PCM ownership
 │   └── Chat/                    # StorageChat: conversation journal
@@ -243,20 +236,19 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `App/Workflows/Speech/` | AppSpeechPlayback | ActionRuntime, StorageAudio |
 | `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime, ToolRuntime |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
-| `UI/` | UI | Types, StorageChat |
-| `Agents/Core/` | AgentCore | Types |
-| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio, Types |
+| `UI/` | UI | StorageChat |
+| `Agents/Core/` | AgentCore | None |
+| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, PlatformKit, StorageChat, StorageAudio |
 | `Gateway/` | Gateway | AgentCore, ActionRuntime, ToolRuntime |
 | `Actions/Runtime/` | ActionRuntime | None |
 | `Actions/` excluding `Runtime/` | Actions | ActionRuntime, PlatformKit, BehaviorDefinitions |
 | `Tools/Runtime/` | ToolRuntime | None |
 | `Tools/` excluding `Runtime/` | Tools | ToolRuntime, BehaviorDefinitions |
-| `Types/` | Types | None |
 | `Storage/` core | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
-| `Storage/Audio/` | StorageAudio | Storage, Types |
-| `PlatformKit/` | PlatformKit | Types |
-| ModelKit shared capability sources | ModelKit | Types |
+| `Storage/Audio/` | StorageAudio | Storage |
+| `PlatformKit/` | PlatformKit | None |
+| ModelKit shared capability sources | ModelKit | None |
 | `ModelKit/Management/` | ModelKitRuntime | ModelKit |
 | `ModelKit/Defaults/` | ModelKitDefaults | ModelKit, ModelKitRuntime, registered adapters |
 | `ModelKit/Speech/VAD/Energy/` | ModelKitEnergy | ModelKit |
@@ -266,17 +258,17 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 ### Architectural boundaries
 
 - App owns concrete assembly, adaptation and application/session lifetime. Feature workflows expose typed operations and retain no global container access.
-- UI imports only Types and StorageChat domain values. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
+- UI imports only StorageChat domain values and owns presentation values. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
 - AgentCore is independent of concrete Agents, UI, model engines and device adapters.
 - All external inputs, Tool results and Action/runtime feedback enter through InputGateway; all Agent messages and executable outputs leave through OutputGateway.
 - Actions owns business behavior, motion shaping, composition and completion policy. PlatformKit owns native I/O, protocol encoding, hardware limits and device feedback.
 - ActionRuntime and ToolRuntime own neutral execution contracts. Gateway owns scheduling, admission, result routing and shared resource coordination.
 - ModelKit is a capability SDK. Provider registration/default selection belongs to ModelKitDefaults; process-wide model ownership belongs to ModelKitRuntime.
-- Types contains shared immutable values grouped by category. Storage owns lifetime and retention, not inference or business policy.
+- AgentCore/Input owns generic input transport; UI owns presentation values. Storage owns lifetime and retention, not inference or business policy.
 
-✅ The current source graph implements the independent runtime, workflow, UI, AgentCore, ModelKit, PlatformKit, Storage and Types boundaries shown above.
+✅ The current source graph implements the independent runtime, workflow, UI, AgentCore, ModelKit, PlatformKit, Storage boundaries shown above.
 
-❌ Additional shared Types categories, semantic media storage, local native model Tool events, multi-window state routing and unattended device operation remain outside the implemented architecture; their delivery state belongs in the [Roadmap](../docs/Roadmap.md).
+❌ semantic media storage, local native model Tool events, multi-window state routing and unattended device operation remain outside the implemented architecture; their delivery state belongs in the [Roadmap](../docs/Roadmap.md).
 
 ## Part II — Module Responsibilities
 
@@ -296,7 +288,6 @@ This section is an architectural directory. It describes why each module exists 
 | [ModelKit](ModelKit/README.md) | Expose typed speech, language and vision processing capabilities. | Base SDK knows neither Agent policy nor device I/O; engines live in adapters/backends. | Recognition and generation machinery. |
 | [PlatformKit](PlatformKit/README.md) | Capture/output media, manage links and expose native commands/feedback. | Device SDK only; no gestures, model inference, localization or workflow policy. | Sensory organs and effectors. |
 | [Storage](Storage/README.md) | Provide bounded transient storage and durable local records. | StorageAudio owns PCM handles; StorageChat owns conversation records; no routing or inference. | Short- and long-term retained material. |
-| [Types](Types/README.md) | Share immutable values across otherwise independent SDKs. | Values and validation only; no queues, services or lifecycle. | Common signal vocabulary. |
 | [Resources](Resources/README.md) | Hold privacy declarations, assets and local model profiles/artifacts. | Packaging input supplied by App; no runtime ownership. | Materials consumed by the organism. |
 
 ### Key internal module groups
@@ -307,7 +298,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **Behavior.** Actions are scheduled, ordered skills with a completion boundary. Tools are direct calls with either a returned value or completion-only semantics. Their independent Runtime targets keep Gateway free from concrete behavior catalogs. BehaviorAssembly binds explicit domain modules without importing AgentCore.
 
-**Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates reusable mechanisms from Chat and Audio domains. Types is the dependency leaf shared by ModelKit, PlatformKit and StorageAudio.
+**Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates reusable mechanisms from Chat and Audio domains. ModelKit, PlatformKit and StorageAudio own their separate capability/storage contracts.
 
 <a id="part-iii--key-techniques"></a>
 
@@ -620,7 +611,7 @@ Conversation history keeps one current conversation and archived records. Starti
 | Adaptation | Capture format and device orientation | Model resize, normalization and result decoding |
 | Owned resources | Device sessions, links and I/O buffers | Weights, graphs, providers and operation leases |
 
-App bridges device values into processing inputs. Agents decide when and why to process or act; Gateway validates and routes without performing inference. Neither SDK owns Agent policy, presentation or conversation state.
+App packages device output for input transport; the calling Agent converts it into ModelKit processing input. Agents decide when and why to process or act; Gateway validates and routes without performing inference. Neither SDK owns Agent policy, presentation or conversation state.
 
 ### Model lifecycle and processing boundary
 
@@ -639,7 +630,7 @@ flowchart LR
     Cleanup --> Release[Release operation lease]
 ```
 
-Base ModelKit depends only on Types. ModelKitDefaults registers concrete providers and default bindings; ModelKitRuntime owns the process-wide manager, provider identity and load/unload/shutdown. Consumers receive capability protocols rather than concrete engines. Each model permits one active operation; overlapping work fails explicitly instead of entering an implicit inference queue. Cleanup retains the operation lease until the backend has actually finished.
+Base ModelKit has no project dependencies and owns all capability values. ModelKitDefaults registers concrete providers and default bindings; ModelKitRuntime owns the process-wide manager, provider identity and load/unload/shutdown. Consumers receive capability protocols rather than concrete engines. Each model permits one active operation; overlapping work fails explicitly instead of entering an implicit inference queue. Cleanup retains the operation lease until the backend has actually finished.
 
 Stopping a voice session cancels its model work without automatically unloading weights. Explicit unload waits for active use; manager shutdown is terminal and cancels/joins owned work. Capability availability and resource residency are separate policies. App forwards coalesced memory-pressure handling, while manager construction/registration remains restricted to ModelAssembly SPI and isolated tests.
 
@@ -711,7 +702,7 @@ RobotTools owns argument validation and macro metadata for motors1–5. Gateway 
 ✅ Model download workflow now resolves Hub metadata → persists a generation-bound plan → runs up to three native background file tasks per active package → moves completed files and schedules successors in delegate callbacks → validates and publishes through App storage. Failed/relaunched requests reuse completed files and available resume data; cancel/delete joins tasks then discards staging. App handles system events and a bounded preparation window. Phone lock-screen acceptance remains pending; see ADR 0108.
 
 
-✅ Speech resource workflow: restore independent useCustomRecognition/useCustomSynthesis (new defaults false; legacy single switch migrates with installation validation) → Defaults stable capability facades → installed/available local Nemotron/MOSS/Silero or Apple SpeechAnalyzer/AVSpeechSynthesizer/energy VAD → existing SpeechPerception endpoint → normal conversation. Disabled ASR/TTS choices select Apple speech independently and preserve weights; VAD selects installed available Silero regardless of those choices, otherwise Energy; Gemma 4 E2B/YOLO are unchanged. App stops voice before policy changes. Apple language assets are system-managed and may download during first warmup. ModelKitEnergy is the independent Types/ModelKit-only VAD adapter; SpeechFallback.swift belongs to Defaults, not Management.
+✅ Speech resource workflow: restore independent useCustomRecognition/useCustomSynthesis (new defaults false; legacy single switch migrates with installation validation) → Defaults stable capability facades → installed/available local Nemotron/MOSS/Silero or Apple SpeechAnalyzer/AVSpeechSynthesizer/energy VAD → existing SpeechPerception endpoint → normal conversation. Disabled ASR/TTS choices select Apple speech independently and preserve weights; VAD selects installed available Silero regardless of those choices, otherwise Energy; Gemma 4 E2B/YOLO are unchanged. App stops voice before policy changes. Apple language assets are system-managed and may download during first warmup. ModelKitEnergy is the independent ModelKit-only VAD adapter; SpeechFallback.swift belongs to Defaults, not Management.
 
 ✅ Model invocation resolution failures (unknown alias / invalid parameters) produce non-executable rejectedCall outputs. Gateway retains Action failures / correlated ToolResponse errors in the existing bounded executionResults list; generation and other scheduled Actions continue. Structural parsing failures, permission failures, limits and cancellation keep their terminal semantics. ❌ Automatic model correction is not implemented.
 
@@ -732,7 +723,7 @@ Assistant records rejected native Tools when possible; failure to write that out
 
 VisionPerception retains every valid newest capture in its capacity-one slot. The worker consumes the newest slot at start, with expiry validation and adaptive cadence (initial 100ms, default bounds 0...250ms). Native clocked inputs also enforce the monotonic inter-start gap. Fixed grayscale percentage filtering and its UI controls are removed; model calls never overlap.
 
-YOLO diagnostics share the bounded UI.showPose payload: callback-to-model wait, capability-call time, callback-to-result latency, one-second-window successful FPS and replacement count. App converts Tool values to Types/Vision presentation values; UI displays these without runtime dependencies. Capture timing uses ContinuousClock, not assumptions about media timestamp epochs.
+YOLO diagnostics share the bounded UI.showPose payload: callback-to-model wait, capability-call time, callback-to-result latency, one-second-window successful FPS and replacement count. App converts Tool values to UI/Camera presentation values; UI displays these without runtime dependencies. Capture timing uses ContinuousClock, not assumptions about media timestamp epochs.
 
 VisionPerception owns bounded latest-image motion, pose-motion/confidence/loss feedback and inference/total-latency budgeting for adaptive cadence. At most six skeleton snapshots are retained; fast changes accelerate immediately, stable targets relax gradually, and empty scenes retain periodic search. App injects bounds; next-interval statistics travel with pose through UI.showPose. See [ADR 0113](../docs/adr/0113-adaptive-pose-cadence.md).
 
@@ -740,10 +731,10 @@ FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-f
 
 ✅ Urgent YOLO detection now permits a zero scheduling interval. The single inference worker processes only the newest pending capture after the active call completes. Normal inference duration adds no scheduling floor; compute-dominated freshness pressure can temporarily impose a bounded cost floor. Camera close already clears skeleton and its statistics; no source-stall timer is added.
 
-✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](../docs/adr/0114-vision-presentation-values.md).
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
 
-✅ Core/domain separation stage 1: Types/Vision owns PoseObservation, Types/Speech owns SpeechPhase/SpeechSynthesisInput, Agents owns built-in identity constants, and Assistant owns automatic speech prompt policy. AgentCore consumes Types only; scheduler source identity is explicit. ✅ Stage 2 now provides generic message/schema registration and moves domain expiry to the business catalog, device-source/media expiry to App, and sampling to VisionPerception. See [ADR0115](../docs/adr/0115-agentcore-domain-separation.md).
+✅ Current Core/domain ownership: Agents/Communication owns PoseObservation, SpeechPhase and SpeechSynthesisInput, Agents owns built-in identity constants, and Assistant owns automatic speech prompt policy. AgentCore has zero project dependencies; scheduler source identity is explicit. ✅ Stage 2 now provides generic message/schema registration and moves domain expiry to the business catalog, device-source/media expiry to App, and sampling to VisionPerception. See [ADR0115](../docs/adr/0115-agentcore-domain-separation.md).
 
-✅ Core communication has one generic typed-message container and one immutable schema registry. Application schemas/identities are grouped in Agents/Communication/AgentContracts.swift, visual values in Types/Vision/VisionValues.swift, and native source/deadline conversion in App/Adapters/MediaInputAdapter.swift. AgentTurn is a generic interaction identity. See [ADR0116](../docs/adr/0116-generic-agent-communication.md).
+✅ Core communication has one generic typed-message container and one immutable schema registry. Application schemas/identities are grouped in Agents/Communication/AgentContracts.swift, Agent-domain speech/pose values in Agents/Communication and image inputs in Agents/Core/Input/ImageInput.swift and presentation values in UI/Camera/PoseOverlay.swift, and native source/deadline conversion in App/Adapters/MediaInputAdapter.swift. AgentTurn is a generic interaction identity. See [ADR0116](../docs/adr/0116-generic-agent-communication.md).
 
 ✅ Core residual boundary (ADR0118): concrete resource names belong to App; reports carry bounded producer-owned details/error identifiers; text soft limits belong to the consuming Agent. Existing file categories are reused, with no new forwarding files.

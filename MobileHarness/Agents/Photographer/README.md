@@ -37,6 +37,6 @@ flowchart LR
 
 ✅ Tracking accumulation advances only after output admission; an overflow cannot advance an unsent target. Control-unavailable input resets filters and accumulation; fresh poses resume with bounded steps. Dead-zone hold and axis saturation emit no redundant command. Offline gating and independent failure scopes remain intact.
 
-✅ PoseObservation is imported from Types/Vision; association and robot-selection business policy remain here. Concrete AgentID constants are compiled in the business Agents target.
+✅ PoseObservation is owned by Agents/Communication; association and robot-selection business policy remain here. Concrete AgentID constants are compiled in the business Agents target.
 
 ✅ Photographer extracts the business PerceptionMessage.pose from generic AgentMessage. Shared pose validation still precedes indexing; no robot behavior changes are made.

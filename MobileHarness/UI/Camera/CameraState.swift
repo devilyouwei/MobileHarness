@@ -1,7 +1,6 @@
 import CoreGraphics
 import Foundation
 import Observation
-import Types
 
 public enum CameraDirection: Sendable { case front, back }
 

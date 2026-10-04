@@ -105,7 +105,7 @@ For diagnostic and acceptance steps, see [Voice](docs/Voice.md) and [MOSS valida
 
 Repository checks cover dependency boundaries, provisioning, formatting, tests and metadata. The build script compiles four unsigned simulator schemes with full Xcode. Real-model and physical-device trials use their documented opt-in resources and procedures.
 
-Root Package.swift maps the shared source tree into independent targets; tests live under root Tests/. Module READMEs own implementation contracts, while the [technical design](MobileHarness/README.md) owns cross-module architecture and flows.
+Root Package.swift maps the shared source tree into independent targets; tests live under root Tests/. ModelKit and PlatformKit own their capability data contracts and have no project dependencies; callers adapt their inputs and outputs explicitly. Module READMEs own implementation contracts, while the [technical design](MobileHarness/README.md) owns cross-module architecture and flows.
 
 ## Documentation
 
@@ -141,7 +141,7 @@ Camera control Tools are registered as Camera.open, Camera.close and Camera.flip
 
 ✅ Photographer subscribes to shared pose observations and sends completion-only five-axis BLE aim through Robot.aim. Physical tracking acceptance remains pending.
 
-✅ Local-resource refinement: compact schema-v2 repository/selection declarations replace per-file links/hashes. ModelKitHub wraps swift-huggingface 0.9.0 outside Management; App injects it. Storage-backed receipts record actual installed files/sizes. ❌ HF foreground downloads restart after process relaunch; durable background/partial resume and iPhone acceptance remain pending. See [ADR0105](docs/adr/0105-local-model-resource-management.md).
+✅ Local-resource refinement: compact schema-v2 repository/selection declarations replace per-file links/hashes. ModelKitHub wraps swift-huggingface 0.9.0 outside Management; App injects it. Storage-backed receipts record actual installed files/sizes. ✅ Native iOS background transfers persist file plans, generations and available resume data across relaunch. ❌ Real iPhone background/server-resume acceptance remains pending. See [ADR0105](docs/adr/0105-local-model-resource-management.md).
 
 ✅ Hub download regression coverage checks regular-file selection, safe remote metadata and optional actual-network progress through the production adapter. Downloads use selected per-file Hub APIs without a permanent SDK cache. ❌ Real iPhone download UI acceptance remains separate.
 

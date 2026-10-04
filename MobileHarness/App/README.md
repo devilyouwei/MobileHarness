@@ -169,3 +169,7 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ Settings now routes model management through 音频识别、语音合成、大模型、视觉识别. Recognition/synthesis policy is independent and validated before apply; deleting prerequisites turns off only the owning choice. Native Apple ASR adds internal SpeechDetector, while Energy supplies business silence timing.
 
 ✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.
+
+✅ ADR0119: App transports native camera frames and native-rate microphone samples with session/source/deadline metadata. Calling perception Agents own conversion into ModelKit inputs; composition no longer injects image conversion. SDK inputs/outputs are owned by ModelKit or PlatformKit, without Types dependencies. ❌ No physical-device acceptance is implied.
+
+✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

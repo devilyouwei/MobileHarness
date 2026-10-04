@@ -12,7 +12,6 @@ import PlatformKit
 import StorageAudio
 import ToolRuntime
 import Tools
-import Types
 import UI
 
 @MainActor
@@ -256,10 +255,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             presentationPhase = .listening
             state.voiceStatus = "正在聆听 · 停顿后自动识别"
             captureTask = Task { [weak self] in
-                let resampler = StreamingMonoPCMResampler()
                 var timestamp = 0.0
                 var sequence: UInt64 = 0
-                var suspended = false
                 var meterSamples: [Float] = []
                 let meterClock = ContinuousClock()
                 var lastMeterUpdate = meterClock.now
@@ -286,34 +283,26 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                             }
                         }
                         guard !self.handlingTurn else {
-                            if !suspended {
-                                meterSamples.removeAll(keepingCapacity: true)
-                                self.state.microphoneSpectrum = AudioSpectrum.silence
-                                await resampler.reset()
-                                suspended = true
-                            }
+                            meterSamples.removeAll(keepingCapacity: true)
+                            self.state.microphoneSpectrum = AudioSpectrum.silence
                             continue
                         }
-                        suspended = false
-                        for packet in try await resampler.process(frame) {
-                            guard !self.handlingTurn else { break }
-                            let audioInput = try AudioInput(
-                                samples: packet.samples.withUnsafeBytes { Data($0) },
-                                sequence: sequence, timestamp: timestamp)
-                            timestamp += packet.duration
-                            sequence += 1
-                            let report = try await requests.publish(
-                                MediaInputAdapter.audio(audioInput, sessionID: generation))
-                            // Endpoint processing can close admission while the last capture packet is in flight.
-                            guard self.voiceGeneration == generation else { return }
-                            if !report.rejected.isEmpty {
-                                if report.rejected.values.allSatisfy({
-                                    $0 == String(describing: CapabilityError.inputBusy)
-                                }) {
-                                    break
-                                }
-                                throw CommunicationError.unavailableTarget
+                        let audioInput = try AudioInput(
+                            samples: frame.samples.withUnsafeBytes { Data($0) }, sampleRate: frame.sampleRate,
+                            sequence: sequence, timestamp: timestamp)
+                        timestamp += frame.duration
+                        sequence += 1
+                        let report = try await requests.publish(
+                            MediaInputAdapter.audio(audioInput, sessionID: generation))
+                        // Endpoint processing can close admission while the last capture packet is in flight.
+                        guard self.voiceGeneration == generation else { return }
+                        if !report.rejected.isEmpty {
+                            if report.rejected.values.allSatisfy({
+                                $0 == String(describing: CapabilityError.inputBusy)
+                            }) {
+                                continue
                             }
+                            throw CommunicationError.unavailableTarget
                         }
                     }
                 } catch is CancellationError {} catch {

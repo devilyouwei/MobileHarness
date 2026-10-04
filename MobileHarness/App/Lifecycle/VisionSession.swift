@@ -3,11 +3,9 @@ import Agents
 import AppWorkflows
 import Foundation
 import Gateway
-import ModelKit
 import OSLog
 import PlatformKit
 import Tools
-import Types
 
 /// Owns one vision Agent session: frames enter InputGateway, effects leave through OutputGateway.
 @MainActor
@@ -47,10 +45,7 @@ final class VisionSession {
                         try Task.checkCancellation()
                         let image = try ImageInput(
                             width: frame.width, height: frame.height, gray64: frame.gray64,
-                            attachment: CameraImageAttachment(
-                                image: try frame.withPixelBuffer {
-                                    try ImageFrame(pixelBuffer: $0, rotation: frame.rotation)
-                                }),
+                            attachment: CameraImageAttachment(frame: frame),
                             sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation,
                             capturedAt: frame.capturedAt)
                         let report = try await input.publish(MediaInputAdapter.image(image, sessionID: sessionID))

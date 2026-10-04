@@ -10,12 +10,19 @@ import StorageAudio
 import Testing
 import ToolRuntime
 import Tools
-import Types
 
 private func pcm(_ sequence: UInt64 = 0) throws -> AudioFrame {
     try AudioFrame(
         data: Data(repeating: 0, count: 16), format: AudioFormat(sampleRate: 24000, channels: 1, encoding: .float32),
         sequence: sequence, timestamp: 0)
+}
+private func storedPCM() throws -> SpeechPCMFrame {
+    let frame = try pcm()
+    return try SpeechPCMFrame(
+        data: frame.data,
+        format: SpeechPCMFormat(
+            sampleRate: frame.format.sampleRate, channels: frame.format.channels, encoding: .float32),
+        sequence: frame.sequence, timestamp: frame.timestamp)
 }
 private actor PlaybackSynthesisFixture: SpeechSynthesisCapability {
     nonisolated let availability: CapabilityAvailability = .available
@@ -61,7 +68,12 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
     for job in [three, one, two] {
         try await playback.play(job.2) { audio, _ in
             var frames: [UInt64] = []
-            while let frame = try await audio.next() { frames.append(frame.sequence) }
+            while let frame = try await audio.next() {
+                frames.append(frame.sequence)
+                #expect(
+                    frame.format.sampleRate == 24000 && frame.format.channels == 1 && frame.format.encoding == .float32)
+                #expect(frame.data == Data(repeating: 0, count: 16) && frame.timestamp == 0)
+            }
             #expect(frames == [0, 1])
         }
     }
@@ -93,7 +105,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
         try await store.register(UUID(), owner: owner, cancel: {})
     }
     let audio = try await store.begin(id)
-    try await audio.append(pcm())
+    try await audio.append(storedPCM())
     await store.complete(id)
     await #expect(throws: SpeechAudioError.forbidden) {
         _ = try await store.checkout(
@@ -120,7 +132,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
     try await store.register(queued, owner: owner, cancel: {})
     try await store.register(ready, owner: owner, cancel: {})
     let audio = try await store.begin(ready)
-    try await audio.append(pcm())
+    try await audio.append(storedPCM())
     await store.complete(ready)
     // Exercise production defaults beyond the removed TTL, without an injected shorter policy.
     try await Task.sleep(for: .seconds(61))
@@ -147,7 +159,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
     for (id, owner) in zip(ids, owners) {
         try await store.register(id, owner: owner, cancel: {})
         let audio = try await store.begin(id)
-        try await audio.append(pcm())
+        try await audio.append(storedPCM())
         await store.complete(id)
     }
     await store.cancel(inputID: owners[0].input, source: owners[0].source)
@@ -180,7 +192,7 @@ private struct NeverCompletingSpeech: SpeechSynthesisCapability {
     await agent.stop()
     await store.shutdown()
     let audio = SpeechAudio(waitTimeout: .milliseconds(20))
-    try await audio.append(pcm())
+    try await audio.append(storedPCM())
     _ = try await audio.next()
     await #expect(throws: SpeechAudioError.timedOut) { _ = try await audio.next() }
 }
@@ -299,7 +311,7 @@ private actor ReplyCompletionGate {
     let id = UUID()
     try await store.register(id, owner: owner, cancel: {})
     let audio = try await store.begin(id)
-    try await audio.append(pcm())
+    try await audio.append(storedPCM())
     await store.complete(id)
     let started = ReplyCompletionGate()
     let release = ReplyCompletionGate()

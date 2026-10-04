@@ -76,7 +76,7 @@ private struct BoundaryRecorder {
 
 @Test func streamingResamplerPreservesFilterHistory() async throws {
     for rate in [16000, 44100, 48000] {
-        let resampler = StreamingMonoPCMResampler()
+        let resampler = try StreamingMonoPCMResampler(outputSampleRate: 16000)
         let samples = (0..<rate).map { Float(sin(2 * Double.pi * 440 * Double($0) / Double(rate))) * 0.2 }
         var converted: [Float] = []
         for offset in stride(from: 0, to: rate, by: 1024) {

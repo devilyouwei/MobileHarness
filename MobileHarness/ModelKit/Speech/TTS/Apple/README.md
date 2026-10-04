@@ -39,3 +39,5 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 
 ✅ Apple TTS resolves the production auto locale to zh-CN when text contains Han characters, otherwise en-US. Explicit locales retain their requested language/region, with zh/en script aliases normalized. Missing voices remain an explicit error with the resolved language. Consecutive real TTS integration uses auto rather than an explicit zh-CN fixture.
+
+✅ Capability failures retain typed CapabilityError/CapabilityAvailability outcomes with neutral technical diagnostics. User-facing localization, retry guidance and settings instructions belong to consumers. ❌ No presentation policy is introduced into this adapter.

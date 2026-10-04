@@ -15,7 +15,7 @@ UI/
 
 ## Upstream and downstream
 
-UI is a separate SwiftPM target. Its only project dependencies are Types (PoseOverlay values) and StorageChat (conversation record values). It does not import App, AppWorkflows, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit. Platform rendering content is supplied by App; no full service container is passed to a page.
+UI is a separate SwiftPM target. Its only project dependencies are StorageChat (conversation record values). It does not import App, AppWorkflows, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit. Platform rendering content is supplied by App; no full service container is passed to a page.
 
 [Actions/UI](../Actions/UI/README.md) and [Tools/UI](../Tools/UI/README.md) declare executable behavior in their owning modules. They reach this UI module's state through App-bound handlers; their `UI.*` call paths are protocol names, independent of the Swift module name.
 
@@ -43,4 +43,6 @@ Conversation renders captions, eyes, spectra, generic Action execution state and
 
 ✅ UI expression transactions expose display IDs, completion callbacks and renderer availability only. App owns Action waits and lifecycle; no runtime service or execution queue lives in a view. ❌ Device animation acceptance remains pending.
 
-✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](../../docs/adr/0114-vision-presentation-values.md).
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+
+✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

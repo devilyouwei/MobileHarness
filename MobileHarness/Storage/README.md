@@ -1,6 +1,6 @@
 # Storage — Shared Local Storage
 
-Purpose: provide one project-wide home for transient and durable data used by multiple domains. Storage concerns ownership, lifetime, capacity and retrieval. Agents decide what is worth remembering; ModelKit produces model results using shared media values; PlatformKit operates devices. Storage does not perform inference, choose Actions or control hardware.
+Purpose: provide one project-wide home for transient and durable data used by multiple domains. Storage concerns ownership, lifetime, capacity and retrieval. Agents decide what is worth remembering; ModelKit produces results using its own capability values; PlatformKit operates devices. Storage does not perform inference, choose Actions or control hardware.
 
 ## Design goals
 
@@ -29,7 +29,7 @@ flowchart LR
     Audio --> Memory[MemoryLeaseStore and BoundedMemoryStream]
 ```
 
-Generic LocalFileStore now supports explicit persistent directory publication; reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage; both consume independent Types values.
+Generic LocalFileStore now supports explicit persistent directory publication; reclaimable disk caches remain planned; the current durable implementation stores settings and conversation records. ModelKit and PlatformKit do not depend on Storage; both own their SDK values without a Types dependency.
 
 ## Local cache and persistence synchronization
 
@@ -72,6 +72,7 @@ Storage/                         # Storage target: reusable storage mechanisms o
 ├── LocalDocumentStore.swift      # Persistent JSON, cached snapshot and revision synchronization
 ├── README.md
 ├── Audio/                       # StorageAudio: audio lifetime and PCM contracts
+│   ├── SpeechPCM.swift          # Storage-owned format/frame values
 │   ├── SpeechAudio.swift
 │   ├── SpeechAudioStore.swift
 │   └── README.md
@@ -90,7 +91,7 @@ The outer layer owns reusable cache, persistence and local synchronization mecha
 | Video/ | ❌ Planned only: video files, finalization and retention |
 | Memory/ | ❌ Planned only: semantic memory records, provenance, retrieval and forgetting; not the core MemoryLeaseStore |
 
-Domain targets depend on core mechanisms, never the reverse. App owns settings payload/credential policy and uses the generic document store. StorageAudio consumes Types values and opaque source identity; StorageChat consumes Storage alone.
+Domain targets depend on core mechanisms, never the reverse. App owns settings payload/credential policy and uses the generic document store. StorageAudio owns PCM values and opaque source identity; both StorageAudio and StorageChat depend only on the internal Storage core. Neither imports Types or another capability/business module.
 
 See [Chat](Chat/README.md) for the journal contract and [Audio](Audio/README.md) for PCM contracts.
 
@@ -113,3 +114,22 @@ flowchart LR
 ✅ LocalDocumentStore.replace is an explicit bounded, atomic last-writer-wins operation for single-owner authoritative snapshots; read/modify/write clients retain revision-checked save. File protection defaults to whileUnlocked; an explicit afterFirstUnlock policy permits non-sensitive task bookkeeping while locked after initial unlock. ❌ Device lock-state acceptance remains separate from macOS storage tests.
 
 ✅ LocalFileStore.relativePath normalizes both item/root URLs before confinement and relative-path derivation; native /var and /private/var spellings no longer produce shifted paths. ❌ Filesystem alias behavior on physical iOS remains part of device acceptance.
+
+## Foundation dependency contract
+
+✅ Storage core has no project/product dependencies and imports Foundation only. StorageChat and StorageAudio use only Foundation and the internal Storage target; their public records, errors, PCM formats/frames and ownership values are declared within Storage. There are no external typealiases or re-exports.
+
+✅ Generic Codable/Sendable payloads, Error values and injected size/cancellation/removal callbacks use standard Swift contracts. Callers supply implementations through these contracts; Storage never names or locates their concrete Agent, model, platform or App functions. App and Agents own conversion between capability values and storage values.
+
+❌ No concrete external service lookup or implicit model/device/business dependency is permitted.
+
+## Planned business decoupling
+
+Storage is a foundational storage capability. Storage owns data retention, bounds, ownership, atomic persistence and retrieval; callers own business decisions and UI presentation. The following migration is planned, not implemented in this change:
+
+- ❌ Move ConversationHistoryStore.begin's completed-turn selection, ten-turn context limit and system/user/assistant request assembly into Assistant or its owning business layer. Storage should persist the exact request supplied by the caller and expose stored records for retrieval.
+- ❌ Move StoredConversation.title selection and localized fallback titles into UI or the owning business workflow. Storage should retain raw user text, summaryTitle and archive metadata only.
+- ❌ Move SpeechAudioError's localized messages into consumer presentation; move synthesisTimedOut and synthesis validation policy into SpeechSynthesis. Storage retains storage errors and conveys caller-supplied producer failures through standard Error contracts.
+- ❌ Audit remaining storage-side workflow policy before splitting business adapters out of Storage. Preserve persisted schema compatibility, atomic revision checks, explicit capacities and ownership/cleanup semantics during migration.
+
+✅ Storage core remains Foundation-only; StorageChat and StorageAudio currently depend only on Storage. This dependency independence does not imply the above semantic decoupling is complete. No Storage runtime or payload format changes are made in this step.

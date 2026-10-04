@@ -7,7 +7,6 @@ import PlatformKit
 import Testing
 import ToolRuntime
 import Tools
-import Types
 
 private func pose(
     noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,

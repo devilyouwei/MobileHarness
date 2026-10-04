@@ -71,7 +71,7 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 
 
 
-✅ Visual skeleton presentation and detection statistics belong to Types/Vision, not AgentCore. Output contains generic invocation/runtime contracts only; no pose-specific presentation policy or preview conversion remains.
+✅ Visual skeleton presentation and detection statistics belong to UI/Camera, not AgentCore. Output contains generic invocation/runtime contracts only; no pose-specific presentation policy or preview conversion remains.
 
 ## Generic resource and result boundary
 

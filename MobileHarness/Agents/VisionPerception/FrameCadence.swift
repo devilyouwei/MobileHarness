@@ -1,6 +1,5 @@
 import AgentCore
 import Foundation
-import Types
 
 /// Agent-owned scheduling bounds. App supplies configuration, never motion policy.
 public struct FrameSamplingConfiguration: Sendable {
@@ -69,7 +68,7 @@ public struct FrameCadence: Sendable {
     public mutating func accepts(_ frame: ImageInput, at now: ContinuousClock.Instant? = nil) throws -> Bool {
         guard lastSequence.map({ frame.sequence > $0 }) ?? true,
             lastTimestamp.map({ frame.timestamp >= $0 }) ?? true
-        else { throw ImageInputError.outOfOrder }
+        else { throw CommunicationError.outOfOrder }
         lastSequence = frame.sequence
         lastTimestamp = frame.timestamp
         resetGeometry([frame.width, frame.height, frame.rotation])

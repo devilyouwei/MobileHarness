@@ -14,6 +14,19 @@ public struct CameraFrame: @unchecked Sendable {
     /// Monotonic callback arrival, independent of the media presentation clock.
     public let capturedAt: ContinuousClock.Instant
     public let rotation: Int
+    init(
+        width: Int, height: Int, pixels: CVPixelBuffer, gray64: Data, sequence: UInt64,
+        timestamp: TimeInterval, capturedAt: ContinuousClock.Instant, rotation: Int
+    ) {
+        self.width = width
+        self.height = height
+        self.pixels = pixels
+        self.gray64 = gray64
+        self.sequence = sequence
+        self.timestamp = timestamp
+        self.capturedAt = capturedAt
+        self.rotation = rotation
+    }
 }
 
 #if os(iOS)

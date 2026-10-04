@@ -1,6 +1,5 @@
 import Foundation
 import Storage
-import Types
 
 public enum SpeechAudioError: Error, Equatable, Sendable, LocalizedError {
     case capacityExceeded, missingAudio, timedOut, invalidAudio, duplicate, closed, expired, forbidden,
@@ -38,7 +37,7 @@ extension SpeechAudioError {
 /// Shared PCM adapter over a bounded, single-reader Storage stream.
 public final class SpeechAudio: Sendable {
     public let id: UUID
-    private let stream: BoundedMemoryStream<AudioFrame>
+    private let stream: BoundedMemoryStream<SpeechPCMFrame>
 
     public init(id: UUID = UUID(), maximumBytes: Int = 1_048_576, waitTimeout: Duration? = nil) {
         self.id = id
@@ -49,11 +48,11 @@ public final class SpeechAudio: Sendable {
 
     public var bufferedBytes: Int { get async { await stream.bufferedBytes } }
 
-    public func append(_ frame: AudioFrame) async throws {
+    public func append(_ frame: SpeechPCMFrame) async throws {
         do { try await stream.append(frame) } catch { throw SpeechAudioError.translating(error) }
     }
 
-    public func next() async throws -> AudioFrame? {
+    public func next() async throws -> SpeechPCMFrame? {
         do { return try await stream.next() } catch { throw SpeechAudioError.translating(error) }
     }
 

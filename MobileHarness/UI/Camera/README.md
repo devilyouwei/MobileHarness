@@ -10,7 +10,7 @@ Purpose: present the camera surface and user controls around startup/conversatio
 
 ## Upstream and downstream
 
-App supplies CameraState, CameraControlling and the native preview view. [CameraCoordinator](../../App/Lifecycle/README.md) owns permissions and capture/inference lifetimes. [CameraPreviewAdapter](../../App/Adapters/README.md) owns native layer connection, rotation/mirroring and skeleton drawing. UI imports Types for PoseOverlay values; it imports no platform service.
+App supplies CameraState, CameraControlling and the native preview view. [CameraCoordinator](../../App/Lifecycle/README.md) owns permissions and capture/inference lifetimes. [CameraPreviewAdapter](../../App/Adapters/README.md) owns native layer connection, rotation/mirroring and skeleton drawing. UI owns PoseOverlay values; it imports no platform service.
 
 ```mermaid
 flowchart LR
@@ -44,4 +44,6 @@ Sources compile once in the UI target; there is no App source membership for thi
 
 ✅ The upper-left panel also displays optional 0...1 image-motion activity with two decimals. This is Agent-supplied normalized evidence, not a threshold control or raw pixel-change percentage; UI still renders values only.
 
-✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](../../../docs/adr/0114-vision-presentation-values.md).
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+
+✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

@@ -270,7 +270,7 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ✅ Failure to persist a rejected native Tool outcome emits a nonterminal assistant.historyError result and preserves the original call rejection. True cancellation and output overflow remain terminal. ❌ Conversation admission/raw history persistence are still strict.
 
-✅ AssistantAgent.outputContext appends Assistant-owned text-to-synthesis/playback guidance to generic CapabilityContextBuilder scheduling/catalog text. SpeechSynthesisInput is imported from Types/Speech; JSON catalogs and existing bounded messaging/playback behavior are preserved.
+✅ AssistantAgent.outputContext appends Assistant-owned text-to-synthesis/playback guidance to generic CapabilityContextBuilder scheduling/catalog text. SpeechSynthesisInput is owned by Agents/Communication/SpeechValues.swift; JSON catalogs and existing bounded messaging/playback behavior are preserved.
 
 ✅ Assistant extracts PerceptionMessage from the generic message envelope after schema validation. Prompt policy and text admission helpers are grouped in AssistantAgent.swift; no separate prompt-only file is retained.
 

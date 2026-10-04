@@ -1,7 +1,7 @@
 import AgentCore
 import Foundation
 import ModelKit
-import Types
+import PlatformKit
 
 /// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven gaze Tools.
 public actor VisionPerceptionAgent: Agent {
@@ -19,7 +19,6 @@ public actor VisionPerceptionAgent: Agent {
     public private(set) var replacements = 0
     public private(set) var expiredInputs = 0
     private let pose: any PoseCapability
-    private let resolveImage: @Sendable (ImageInput) throws -> ImageFrame
     private let sessionID: UUID
     private var lifecycle: AgentLifecycle = .registered
     private var pending: AgentInput?
@@ -42,11 +41,7 @@ public actor VisionPerceptionAgent: Agent {
 
     public init(
         pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil,
-        sampling: FrameSamplingConfiguration? = nil, mirroredGaze: Bool = false,
-        resolveImage: @escaping @Sendable (ImageInput) throws -> ImageFrame = { input in
-            guard case .rgb(let rgb) = input.content else { throw ImageInputError.invalidFrame }
-            return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
-        }
+        sampling: FrameSamplingConfiguration? = nil, mirroredGaze: Bool = false
     ) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "VisionPerception")
         guard configuration.agentID == .visionPerception else { throw AgentConfigurationError.identityMismatch }
@@ -58,7 +53,6 @@ public actor VisionPerceptionAgent: Agent {
         self.cadence = FrameCadence(configuration: try sampling ?? FrameSamplingConfiguration())
         self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
         self.pose = pose
-        self.resolveImage = resolveImage
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingNewest(2))
         outputs = stream.stream
@@ -103,7 +97,7 @@ public actor VisionPerceptionAgent: Agent {
     }
     public func receive(_ input: AgentInput) throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-        guard input.sessionID == sessionID else { throw ImageInputError.wrongSession }
+        guard input.sessionID == sessionID else { throw CommunicationError.scopeClosed }
         guard !input.metadata.expired else {
             expiredInputs += 1
             throw CommunicationError.expired
@@ -118,7 +112,7 @@ public actor VisionPerceptionAgent: Agent {
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
         guard lastSequence.map({ image.sequence > $0 }) ?? true,
             lastTimestamp.map({ image.timestamp >= $0 }) ?? true
-        else { throw ImageInputError.outOfOrder }
+        else { throw CommunicationError.outOfOrder }
         lastSequence = image.sequence
         lastTimestamp = image.timestamp
         if pending != nil { replacements += 1 }
@@ -154,7 +148,7 @@ public actor VisionPerceptionAgent: Agent {
                 return
             }
             let context = InferenceContext(requestID: input.id, conversationID: input.sessionID)
-            let resolved = try resolveImage(image)
+            let resolved = try Self.resolveImage(image)
             guard resolved.width == image.width, resolved.height == image.height else {
                 throw ImageInputError.invalidFrame
             }
@@ -196,7 +190,7 @@ public actor VisionPerceptionAgent: Agent {
                     fpsCompletions = 0
                 }
             }
-            let statistics = PoseOverlay.Statistics(
+            let statistics = PoseOverlayPayload.Statistics(
                 queueMilliseconds: image.capturedAt.map { Self.milliseconds($0.duration(to: startedAt)) },
                 inferenceMilliseconds: Self.milliseconds(startedAt.duration(to: finishedAt)),
                 totalMilliseconds: image.capturedAt.map { Self.milliseconds($0.duration(to: finishedAt)) },
@@ -253,12 +247,26 @@ public actor VisionPerceptionAgent: Agent {
                 source: descriptor.id, input: input, output: .control("agent.error: pose processing failed")))
         continuation.finish()
     }
+    private static func resolveImage(_ input: ImageInput) throws -> ImageFrame {
+        switch input.content {
+        case .rgb(let rgb): return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
+        case .attachment(let attachment):
+            guard let sample = attachment as? SampledImageAttachment,
+                let camera = sample.source as? CameraImageAttachment,
+                camera.frame.width == input.width, camera.frame.height == input.height,
+                camera.frame.rotation == input.rotation,
+                camera.frame.sequence == input.sequence, camera.frame.timestamp == input.timestamp,
+                camera.frame.capturedAt == input.capturedAt, camera.frame.gray64 == sample.gray64
+            else { throw ImageInputError.invalidFrame }
+            return try camera.frame.withPixelBuffer { try ImageFrame(pixelBuffer: $0, rotation: input.rotation) }
+        }
+    }
     private static func milliseconds(_ duration: Duration) -> Double {
         let components = duration.components
         return max(0, Double(components.seconds) * 1000 + Double(components.attoseconds) / 1e15)
     }
     private func emitOverlay(
-        _ image: PoseObservation, input: AgentInput, statistics: PoseOverlay.Statistics
+        _ image: PoseObservation, input: AgentInput, statistics: PoseOverlayPayload.Statistics
     ) throws {
         let people = try image.people.prefix(6).map { person in
             guard person.count == 17 else { throw CommunicationError.invalidPayload }
@@ -270,13 +278,13 @@ public actor VisionPerceptionAgent: Agent {
                 let y = Double(point.y) / Double(image.height)
                 // Bounded off-image transport; invisible points stay low confidence.
                 let visible = (0...1).contains(x) && (0...1).contains(y)
-                return PoseOverlay.Joint(
+                return PoseOverlayPayload.Joint(
                     x: Int((max(-1, min(2, x)) * 10000).rounded()),
                     y: Int((max(-1, min(2, y)) * 10000).rounded()),
                     confidence: visible ? Int((point.confidence * 1000).rounded()) : 0)
             }
         }
-        let overlay = PoseOverlay(
+        let overlay = PoseOverlayPayload(
             sequence: image.sequence, timestamp: image.timestamp, rotation: image.rotation, people: people,
             statistics: statistics)
         let data = try JSONEncoder().encode(overlay)
@@ -304,4 +312,10 @@ public actor VisionPerceptionAgent: Agent {
         @unknown default: throw HarnessError.queueFull
         }
     }
+}
+
+/// Agent transport retains the unconverted device output; only the inference worker constructs ModelKit input.
+public struct CameraImageAttachment: ImageAttachment {
+    public let frame: CameraFrame
+    public init(frame: CameraFrame) { self.frame = frame }
 }

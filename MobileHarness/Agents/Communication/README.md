@@ -16,3 +16,22 @@ flowchart LR
     Policy --> Gateway
     Gateway --> Receive[Agent receives typed domain content]
 ```
+
+## Domain value ownership
+
+✅ SpeechValues.swift owns SpeechPhase, SpeechSynthesisInput and SpeechValidationError; PoseObservation.swift owns the COCO-17 observation/Joint and VisionValidationError. These values are shared by business Agents inside one target, with the same Codable shape and validation limits. They have Foundation-only imports and are not re-exported from Types or Core.
+
+```mermaid
+flowchart LR
+    Perception[SpeechPerception] --> Speech[Communication SpeechPhase]
+    Speech --> Assistant
+    Assistant --> Request[Communication SpeechSynthesisInput]
+    Request --> Synthesis[SpeechSynthesis]
+    Vision[VisionPerception] --> Pose[Communication PoseObservation]
+    Pose --> Photographer
+    Speech --> Message[Generic AgentCore message transport]
+    Request --> Message
+    Pose --> Message
+```
+
+✅ Image transport geometry errors remain ImageInputError.invalidFrame in Types; Agent/cadence input ordering rejects CommunicationError.outOfOrder and session mismatch rejects CommunicationError.scopeClosed. ❌ No compatibility aliases, new queues or serialization migration is introduced.

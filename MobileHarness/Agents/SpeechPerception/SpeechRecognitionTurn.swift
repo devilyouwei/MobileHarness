@@ -2,7 +2,7 @@ import Foundation
 import ModelKit
 
 /// Live, VAD-committed PCM -> capability events. Preview never submits an Agent input.
-public actor LiveSpeechInput {
+actor SpeechRecognitionTurn {
     private let recognition: any SpeechRecognitionCapability
     private let sessionID: UUID
     private let preview: @Sendable (String) async throws -> Void
@@ -17,7 +17,7 @@ public actor LiveSpeechInput {
     private var sealed = false
     private var cancelled = false
 
-    public init(
+    init(
         recognition: any SpeechRecognitionCapability, sessionID: UUID,
         preview: @escaping @Sendable (String) async throws -> Void
     ) {
@@ -27,7 +27,7 @@ public actor LiveSpeechInput {
     }
 
     /// At most 128 work items / four seconds of queued PCM, one minute per turn.
-    public func enqueue(_ events: [VoiceStreamEvent]) throws {
+    func enqueue(_ events: [VoiceStreamEvent]) throws {
         guard !sealed, !cancelled else { throw CapabilityError.sessionClosed }
         if let failure { throw failure }
         var count = 0
@@ -65,23 +65,12 @@ public actor LiveSpeechInput {
         let prefix = completed
         let preview = preview
         reader = Task {
-            var segments: [UUID: TranscriptionEvent] = [:]
-            var order: [UUID] = []
+            var transcript = TranscriptAccumulator(prefix: prefix)
             for try await event in stream.output.events {
                 try Task.checkCancellation()
-                guard event.text.utf8.count <= 16384 else { throw CapabilityError.eventTooLarge }
-                if let old = segments[event.segmentID], old.isFinal || old.revision >= event.revision { continue }
-                if segments[event.segmentID] == nil {
-                    guard order.count < 64 else { throw CapabilityError.eventTooLarge }
-                    order.append(event.segmentID)
-                }
-                segments[event.segmentID] = event
-                let current = order.compactMap { segments[$0]?.text }.joined(separator: " ")
-                let visible = Self.join(prefix, current)
-                guard visible.utf8.count <= 65536 else { throw CapabilityError.eventTooLarge }
-                try await preview(visible)
+                if let visible = try transcript.accept(event) { try await preview(visible) }
             }
-            return order.compactMap { segments[$0].flatMap { $0.isFinal ? $0.text : nil } }.joined(separator: " ")
+            return transcript.finalText
         }
     }
 
@@ -123,7 +112,7 @@ public actor LiveSpeechInput {
         }
     }
 
-    public func finish() async throws -> String {
+    func finish() async throws -> String {
         guard !sealed, !cancelled else { throw CapabilityError.sessionClosed }
         sealed = true
         return try await withTaskCancellationHandler {
@@ -149,7 +138,7 @@ public actor LiveSpeechInput {
         try await endSegment()
         return completed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    public func cancel() async {
+    func cancel() async {
         cancelled = true
         sealed = true
         queue.removeAll()

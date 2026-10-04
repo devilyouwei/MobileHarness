@@ -1,5 +1,6 @@
 import Foundation
 
+/// Unavailability reasons are technical diagnostics; consumers own localized presentation.
 public enum CapabilityAvailability: Equatable, Sendable {
     case available
     case unavailable(reason: String)
@@ -10,6 +11,7 @@ public protocol Capability: Sendable {
     var availability: CapabilityAvailability { get async }
 }
 
+/// Typed capability failures with diagnostic details, not user-facing copy or recovery instructions.
 public enum CapabilityError: Error, Equatable, Sendable, LocalizedError {
     case invalidRequest(String)
     case unavailable(String)

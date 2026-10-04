@@ -2,14 +2,16 @@ import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CoreVideo
 import Foundation
 import Gateway
 import ModelKit
 import Testing
 import ToolRuntime
 import Tools
-import Types
 import UI
+
+@testable import PlatformKit
 
 private func image(_ value: UInt8, sequence: UInt64, rotation: Int = 1) throws -> ImageInput {
     try ImageInput(
@@ -26,6 +28,8 @@ private actor ControlledPose: PoseCapability {
     private(set) var calls: [UInt8] = []
     private(set) var active = 0
     private(set) var maximumActive = 0
+    private(set) var receivedNative = false
+    private(set) var nativeIdentity: ObjectIdentifier?
     init() {
         let pair = AsyncStream<UInt8>.makeStream(bufferingPolicy: .bufferingOldest(16))
         started = pair.stream
@@ -35,6 +39,8 @@ private actor ControlledPose: PoseCapability {
         active += 1
         maximumActive = max(maximumActive, active)
         defer { active -= 1 }
+        receivedNative = request.image.native != nil
+        nativeIdentity = request.image.native?.withPixelBuffer { ObjectIdentifier($0) }
         let value = request.image.rgb?.first ?? 0
         calls.append(value)
         await withCheckedContinuation { waiter in
@@ -67,7 +73,7 @@ private actor ControlledPose: PoseCapability {
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(2, sequence: 2))))
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(3, sequence: 3))))
     #expect(await agent.status().queuedInputs == 1)
-    await #expect(throws: ImageInputError.outOfOrder) {
+    await #expect(throws: CommunicationError.outOfOrder) {
         try await agent.receive(AgentInput(sessionID: session, payload: .image(image(3, sequence: 3))))
     }
     await model.release()
@@ -302,7 +308,7 @@ private struct CrowdPose: PoseCapability {
     let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: session)
     try await agent.bind(AgentMessaging { _, _, _ in throw CommunicationError.noRecipients })
     try await agent.start()
-    await #expect(throws: ImageInputError.wrongSession) {
+    await #expect(throws: CommunicationError.scopeClosed) {
         try await agent.receive(AgentInput(sessionID: UUID(), payload: .image(image(40, sequence: 1))))
     }
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(40, sequence: 1))))
@@ -361,20 +367,28 @@ private struct CrowdPose: PoseCapability {
     await agent.stop()
 }
 
-private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
+private func nativeCameraInput(
+    width: Int = 640, height: Int = 480, gray: UInt8 = 100, sequence: UInt64,
+    time: Double, capturedAt: ContinuousClock.Instant = .now, rotation: Int = 0
+) throws -> ImageInput {
+    var pixels: CVPixelBuffer?
+    let status = CVPixelBufferCreate(
+        kCFAllocatorDefault, rotation % 2 == 0 ? width : height, rotation % 2 == 0 ? height : width,
+        kCVPixelFormatType_32BGRA, nil, &pixels)
+    #expect(status == kCVReturnSuccess)
+    let buffer = try #require(pixels)
+    let sample = Data(repeating: gray, count: 4096)
+    let frame = CameraFrame(
+        width: width, height: height, pixels: buffer, gray64: sample, sequence: sequence,
+        timestamp: time, capturedAt: capturedAt, rotation: rotation)
+    return try ImageInput(
+        width: width, height: height, gray64: sample, attachment: CameraImageAttachment(frame: frame),
+        sequence: sequence, timestamp: time, rotation: rotation, capturedAt: capturedAt)
+}
 @Test(.timeLimit(.minutes(1))) func visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation() async throws {
     let model = ControlledPose()
     let session = UUID()
-    let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session,
-        resolveImage: { input in
-            guard case .attachment(let value) = input.content, let sample = value as? SampledImageAttachment,
-                let attachment = sample.source as? PoseImageAttachment
-            else {
-                throw ImageInputError.invalidFrame
-            }
-            return attachment.image
-        })
+    let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
     let observed = AsyncStream<AgentMessage>.makeStream(bufferingPolicy: .bufferingOldest(1))
     try await agent.bind(
         AgentMessaging { value, _, _ in
@@ -382,13 +396,16 @@ private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
             return DeliveryReport()
         })
     try await agent.start()
-    let frame = try ImageInput(
-        width: 4, height: 4, gray64: Data(repeating: 22, count: 4096),
-        attachment: PoseImageAttachment(image: ImageFrame(width: 4, height: 4, rgb: Data(repeating: 22, count: 48))),
-        sequence: 1, timestamp: 1, rotation: 0)
+    let frame = try nativeCameraInput(width: 4, height: 4, gray: 22, sequence: 1, time: 1)
     try await agent.receive(AgentInput(sessionID: session, payload: .image(frame)))
     var started = model.started.makeAsyncIterator()
-    #expect(await started.next() == 22)
+    #expect(await started.next() == 0)
+    #expect(await model.receivedNative)
+    guard case .attachment(let value) = frame.content,
+        let sampled = value as? SampledImageAttachment,
+        let captured = sampled.source as? CameraImageAttachment
+    else { throw ImageInputError.invalidFrame }
+    #expect(await model.nativeIdentity == captured.frame.withPixelBuffer { ObjectIdentifier($0) })
     await model.release()
     var values = observed.stream.makeAsyncIterator()
     guard case .pose(let pose)? = try #require(await values.next()).perception else {
@@ -412,7 +429,7 @@ private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
     #expect(try cadence.accepts(frame(4, 0.11, 0)))
     #expect(try !cadence.accepts(frame(5, 0.14, 255)))
     #expect(try cadence.accepts(frame(6, 0.22, 0)))
-    #expect(throws: ImageInputError.outOfOrder) { try cadence.accepts(frame(6, 0.22, 0)) }
+    #expect(throws: CommunicationError.outOfOrder) { try cadence.accepts(frame(6, 0.22, 0)) }
     #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(minimumInterval: .nan) }
     #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(minimumInterval: -0.1) }
     #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(minimumInterval: 1.1) }
@@ -598,8 +615,14 @@ private struct FailingSecondPose: PoseCapability {
         await agent.stop()
         return
     }
+    let payload = try #require(call.arguments["payload"])
+    let presentation = try JSONDecoder().decode(PoseOverlay.self, from: Data(payload.utf8))
+    #expect(presentation.sequence == frame.sequence)
+    #expect(presentation.rotation == frame.rotation)
     try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
         let statistics = try #require(overlay.statistics)
+        #expect(presentation.people.count == overlay.people.count)
+        #expect(presentation.statistics?.inferenceMilliseconds == statistics.inferenceMilliseconds)
         #expect(statistics.isValid)
         #expect(try #require(statistics.queueMilliseconds) >= 20)
         #expect(try #require(statistics.totalMilliseconds) >= 20)
@@ -711,7 +734,7 @@ private func cadencePose(
     // Media timestamps can advance while delivery bursts. Actual start gap still limits admission.
     #expect(try !cadence.accepts(image(255, sequence: 2), at: now.advanced(by: .milliseconds(10))))
     #expect(try cadence.accepts(image(0, sequence: 3), at: now.advanced(by: .milliseconds(110))))
-    #expect(throws: ImageInputError.outOfOrder) {
+    #expect(throws: CommunicationError.outOfOrder) {
         try cadence.accepts(image(255, sequence: 2), at: now.advanced(by: .milliseconds(220)))
     }
 }
@@ -867,8 +890,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.03),
-        resolveImage: { _ in try ImageFrame(width: 640, height: 480, rgb: Data(repeating: 0, count: 640 * 480 * 3)) })
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.03))
     try await agent.bind(
         AgentMessaging { _, parent, _ in
             guard case .image(let frame) = parent.payload else { throw CommunicationError.invalidPayload }
@@ -877,9 +899,8 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
         })
     try await agent.start()
     var started = model.started.makeAsyncIterator()
-    let pixels = [UInt8](repeating: 100, count: 4096)
     try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(motionFrame(pixels, sequence: 1, time: 0, capturedAt: .now))))
+        AgentInput(sessionID: session, payload: .image(nativeCameraInput(sequence: 1, time: 0, capturedAt: .now))))
     #expect(await started.next() == 0)
     try await Task.sleep(for: .milliseconds(50))
     await model.release()
@@ -890,7 +911,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(await agent.expiredInputs == 1)
     try await Task.sleep(for: .milliseconds(200))
     try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(motionFrame(pixels, sequence: 2, time: 1, capturedAt: .now))))
+        AgentInput(sessionID: session, payload: .image(nativeCameraInput(sequence: 2, time: 1, capturedAt: .now))))
     #expect(await started.next() == 0)
     await model.release()
     var outputs = agent.outputs.makeAsyncIterator()
@@ -928,4 +949,28 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(throws: DecodingError.self) {
         try decoder.decode(PoseOverlay.Joint.self, from: Data("[1,2]".utf8))
     }
+}
+
+@Test(.timeLimit(.minutes(1))) func visionRejectsMismatchedCaptureBeforeCallingModel() async throws {
+    let model = ControlledPose()
+    let session = UUID()
+    let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
+    try await agent.start()
+    let original = try nativeCameraInput(width: 4, height: 4, sequence: 1, time: 1)
+    guard case .attachment(let attachment) = original.content else { throw ImageInputError.invalidFrame }
+    let mismatched = try ImageInput(
+        width: original.width, height: original.height, attachment: attachment,
+        sequence: 2, timestamp: original.timestamp, rotation: original.rotation, capturedAt: original.capturedAt)
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(mismatched)))
+    var output = agent.outputs.makeAsyncIterator()
+    let failure = try #require(await output.next())
+    guard case .control(let message) = failure.output else {
+        Issue.record("Expected terminal input error")
+        return
+    }
+    #expect(message.hasPrefix("agent.error:"))
+    #expect(await model.calls.isEmpty)
+    #expect(await agent.status().lifecycle == .failed)
+    await agent.stop()
 }

@@ -29,3 +29,5 @@ flowchart LR
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
 ✅ Local model fixtures use flat Models directories: Silero. Required backend files are loaded directly; production developer provisioning shares model-catalog.json; Settings installs App weights in the sandbox.
+
+✅ Capability failures retain typed CapabilityError/CapabilityAvailability outcomes with neutral technical diagnostics. User-facing localization, retry guidance and settings instructions belong to consumers. ❌ No presentation policy is introduced into this adapter.

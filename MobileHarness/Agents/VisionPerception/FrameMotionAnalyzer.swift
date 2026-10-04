@@ -1,6 +1,5 @@
 import AgentCore
 import Foundation
-import Types
 
 /// Cheap image evidence; holds one inference reference and one union mask, each 64x64.
 /// YOLO cadence's fixed sample is a business attachment, not a framework image variant.

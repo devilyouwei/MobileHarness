@@ -5,7 +5,7 @@ Purpose: connect existing module contracts to platform and presentation implemen
 | File | Boundary |
 | --- | --- |
 | RuntimePresentation.swift | Registry handlers to one complete VoiceOutputHandling or CameraOutputHandling endpoint; App lifetime owners validate session/turn/sequence |
-| MediaInputAdapter.swift | Native image conversion and explicit host microphone/camera source/deadline adaptation; Types owns media values |
+| MediaInputAdapter.swift | Explicit host microphone/camera transport packaging and source/deadline adaptation; AgentCore/Input owns media transport values |
 | CameraPreviewAdapter.swift | PlatformKit preview source to native layer, rotation/mirroring and skeleton drawing; supplied as view content to UI |
 | EyeExpression.swift | Exhaustive UI Action emotion to UI value conversion |
 | CurrentChatCapability.swift | ChatCapability to the current ModelManager chat binding; resolve on each request so saved model changes take effect without replacing consumers |
@@ -80,10 +80,12 @@ flowchart LR
 
 ✅ Download preference validation always permits cellular use while respecting OS permissions. The former UI network restriction is no longer configurable; model transport contracts remain unchanged.
 
-✅ CameraPreviewAdapter consumes Types/Vision and UI-owned sensor-point projection. Native preview conversion/crop/mirroring remain here.
+✅ CameraPreviewAdapter consumes UI/Camera and UI-owned sensor-point projection. Native preview conversion/crop/mirroring remain here.
 
 ✅ RuntimePresentation retains application-owned source acceptance using configured raw Agent names; it does not require business Agent constants from AgentCore.
 
-✅ MediaInputAdapter groups native image attachment conversion with media admission metadata. It supplies phone source names, 60s microphone / 1s camera deadlines and root IDs equal to each new input ID. App composition injects its source allowlist into generic CommunicationPolicy.
+✅ MediaInputAdapter owns media admission metadata only; CameraImageAttachment and model input conversion belong to VisionPerception. It supplies phone source names, 60s microphone / 1s camera deadlines and root IDs equal to each new input ID. App composition injects its source allowlist into generic CommunicationPolicy.
 
 ✅ HistoryAgentAdapter injects Assistant textSegmentation into GenerationTrace so preview and live parsing use identical business chunk limits. ❌ Preview does not execute generated calls.
+
+✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

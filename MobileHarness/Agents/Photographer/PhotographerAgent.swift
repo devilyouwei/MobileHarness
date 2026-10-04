@@ -1,6 +1,5 @@
 import AgentCore
 import Foundation
-import Types
 
 /// Camera-motion policy. Consumes published pose observations and, when enabled, emits one arm Tool.
 public actor PhotographerAgent: Agent {

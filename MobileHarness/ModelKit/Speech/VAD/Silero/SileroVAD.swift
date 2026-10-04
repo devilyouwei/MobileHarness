@@ -16,7 +16,7 @@ public actor SileroVAD: VoiceActivityCapability {
     }
     public var availability: CapabilityAvailability {
         FileManager.default.fileExists(atPath: root.appendingPathComponent("silero_vad.mlmodelc").path)
-            ? .available : .unavailable(reason: "Silero 模型制品未安装")
+            ? .available : .unavailable(reason: "Silero model artifacts are not installed")
     }
     public func detectVoiceActivity(format: AudioFormat) async throws -> any VoiceActivitySession {
         guard format.sampleRate == 16000, format.channels == 1, format.encoding == .float32 else {

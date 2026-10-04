@@ -14,7 +14,7 @@ public actor AppleSpeechRecognition: SpeechRecognitionCapability {
         resource = try context.resource {
             guard SpeechTranscriber.isAvailable,
                 let supported = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: locale))
-            else { throw CapabilityError.unavailable("系统不支持此语言的端侧语音识别") }
+            else { throw CapabilityError.unavailable("On-device speech recognition is unsupported for this locale") }
             let module = SpeechTranscriber(locale: supported, preset: .progressiveTranscription)
             if let installation = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
                 try await installation.downloadAndInstall()
@@ -27,7 +27,9 @@ public actor AppleSpeechRecognition: SpeechRecognitionCapability {
         get async {
             guard SpeechTranscriber.isAvailable,
                 await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: locale)) != nil
-            else { return .unavailable(reason: "此设备或语言不支持系统端侧语音识别") }
+            else {
+                return .unavailable(reason: "On-device speech recognition is unavailable for this device or locale")
+            }
             return .available
         }
     }
@@ -38,13 +40,15 @@ public actor AppleSpeechRecognition: SpeechRecognitionCapability {
     public func transcribe(_ request: SpeechRecognitionRequest) async throws -> SpeechRecognitionSession {
         guard request.locale == locale || request.locale == "auto", request.format.channels == 1,
             request.format.encoding == .float32, request.format.sampleRate == 16000
-        else { throw CapabilityError.invalidRequest("系统识别要求 16 kHz 单声道 PCM 和配置的语言") }
+        else {
+            throw CapabilityError.invalidRequest("Apple recognition requires 16 kHz mono PCM and the configured locale")
+        }
         let lease = try await resource.acquire()
         do {
             let module = SpeechTranscriber(locale: lease.model, preset: .progressiveTranscription)
             let detector = SpeechDetector(detectionOptions: .init(sensitivityLevel: .medium), reportResults: false)
             guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module, detector]) else {
-                throw CapabilityError.unavailable("系统没有可用的语音分析格式")
+                throw CapabilityError.unavailable("No compatible speech analyzer audio format is available")
             }
             let resource = resource
             let worker = try AnalyzerWorker(
@@ -105,7 +109,7 @@ private actor AnalyzerWorker {
             let input = AVAudioFormat(
                 commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false),
             let converter = AVAudioConverter(from: input, to: format)
-        else { throw CapabilityError.unavailable("系统语音格式无法转换") }
+        else { throw CapabilityError.unavailable("Speech analyzer audio format conversion is unavailable") }
         self.converter = converter
     }
     func start(emitter: InferenceEmitter<TranscriptionEvent>) async throws {
@@ -137,7 +141,7 @@ private actor AnalyzerWorker {
             frame.format.encoding == .float32, frame.sampleCount <= 16000,
             samples <= 4_800_000 - frame.sampleCount
         else {
-            throw CapabilityError.invalidRequest("系统识别输入过长")
+            throw CapabilityError.invalidRequest("Apple recognition input exceeds the duration limit")
         }
         let input = try PCMCodec.decode(frame)
         guard let channel = input.floatChannelData?[0],
@@ -162,7 +166,7 @@ private actor AnalyzerWorker {
             return box.buffer
         }
         if let error { throw error }
-        guard status != .error else { throw CapabilityError.invalidRequest("音频格式转换失败") }
+        guard status != .error else { throw CapabilityError.invalidRequest("Audio format conversion failed") }
         samples += frame.sampleCount
         if output.frameLength > 0 {
             try await inputs.emitter.yieldSuspending(AnalyzerInput(buffer: output))
@@ -193,7 +197,7 @@ private actor AnalyzerWorker {
         inputs.emitter.finish()
         deadline = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(25)) } catch { return }
-            await self?.failed(CapabilityError.unavailable("系统识别结束超时"))
+            await self?.failed(CapabilityError.unavailable("Apple recognition finalization timed out"))
         }
         do {
             try await analyzer.finalizeAndFinishThroughEndOfInput()

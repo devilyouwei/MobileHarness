@@ -88,4 +88,6 @@ sequenceDiagram
 
 ✅ SpeechSynthesis passes the trusted directed sender string into StorageAudio; audio storage does not import AgentCore. Ownership still includes the originating session and parent input.
 
-✅ SpeechSynthesisInput is imported from Types/Speech with unchanged text/locale contract and queue policy. Domain value validation is independent of AgentCore; message admission maps errors to the existing transport rejection.
+✅ SpeechSynthesisInput is owned by Agents/Communication/SpeechValues.swift with unchanged text/locale contract and queue policy. Domain value validation is independent of AgentCore; message admission maps errors to the existing transport rejection.
+
+✅ Synthesis owns the ModelKit.AudioFrame → StorageAudio.SpeechPCMFrame conversion, preserving bytes, format, sequence and timestamp after existing format/order validation. Storage owns its PCM types; it does not import ModelKit or Types. ❌ No playback/device preparation belongs to synthesis.

@@ -2,7 +2,6 @@ import AgentCore
 import Foundation
 import ModelKit
 import StorageChat
-import Types
 
 /// Model-backed assistant; concrete model selection belongs exclusively to the composition root.
 public actor AssistantAgent: Agent {

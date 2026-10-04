@@ -9,7 +9,6 @@ import OSLog
 import PlatformKit
 import ToolRuntime
 import Tools
-import Types
 import UI
 
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
@@ -227,7 +226,9 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         guard visionSession == sessionID, foreground, state.isEnabled, state.isVisible else {
             throw CancellationError()
         }
-        guard state.skeleton.map({ overlay.sequence > $0.sequence }) ?? true else { throw ImageInputError.outOfOrder }
+        guard state.skeleton.map({ overlay.sequence > $0.sequence }) ?? true else {
+            throw CommunicationError.outOfOrder
+        }
         state.skeleton = PoseOverlay(
             sequence: overlay.sequence, timestamp: overlay.timestamp, rotation: overlay.rotation,
             people: overlay.people.map { $0.map { PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) } },

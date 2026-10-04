@@ -155,5 +155,12 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 
 - [0116 — Generic Agent communication and coherent ownership](0116-generic-agent-communication.md)
 
+- ✅ [0117: SpeechPerception file ownership](0117-speech-perception-file-ownership.md) separates pure boundary/text policy from model sessions and centralized Agent transitions; ❌ sustained device acceptance remains pending.
 
 - [0118 — Generic resource/results and Agent-owned text segmentation](0118-core-residual-policy-separation.md)
+
+- [0119 — SDK-owned values and caller adaptation](0119-sdk-owned-values-and-caller-adaptation.md): remove SDK Types dependencies and place model preparation in the actual caller.
+
+- [0120 — Agent-domain value ownership](0120-agent-domain-value-ownership.md): keep business speech/pose messages in Agents; Types retains cross-target transport/presentation.
+
+- [0121 — Remove shared Types](0121-remove-shared-types.md): input, Agent payload and UI value ownership.

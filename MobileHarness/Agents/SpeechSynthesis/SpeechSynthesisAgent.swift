@@ -2,7 +2,6 @@ import AgentCore
 import Foundation
 import ModelKit
 import StorageAudio
-import Types
 
 /// Shared directed synthesis service. One FIFO worker, independent of playback Channels.
 public actor SpeechSynthesisAgent: Agent {
@@ -136,7 +135,13 @@ public actor SpeechSynthesisAgent: Agent {
                         format = frame.format
                         sequence = frame.sequence
                         bytes += frame.data.count
-                        try await audio.append(frame)
+                        let storedFormat = try SpeechPCMFormat(
+                            sampleRate: frame.format.sampleRate, channels: frame.format.channels,
+                            encoding: frame.format.encoding == .float32 ? .float32 : .signedInt16)
+                        try await audio.append(
+                            SpeechPCMFrame(
+                                data: frame.data, format: storedFormat, sequence: frame.sequence,
+                                timestamp: frame.timestamp))
                     case .finished: finished = true
                     }
                 }

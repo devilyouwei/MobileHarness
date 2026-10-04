@@ -28,3 +28,5 @@ Sources: [Apple SpeechAnalyzer session](https://developer.apple.com/videos/play/
 ✅ The final combined-module integration test recognizes the Chinese fixture under dense 137-sample input plus trailing silence and permits session reuse. ❌ Native detector quality/power and physical-phone end-to-end behavior still need acceptance.
 
 Source: [SpeechDetector](https://developer.apple.com/documentation/speech/speechdetector).
+
+✅ Capability failures retain typed CapabilityError/CapabilityAvailability outcomes with neutral technical diagnostics. User-facing localization, retry guidance and settings instructions belong to consumers. ❌ No presentation policy is introduced into this adapter.

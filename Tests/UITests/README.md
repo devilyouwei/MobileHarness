@@ -27,3 +27,5 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ Automatic source tests verify persistence before admission, durable voice preference preservation, cellular permission, failed-save admission rejection and retry with the retained endpoint.
 
 ✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.
+
+✅ Settings state tests use UI and Foundation directly; no unused AgentCore import remains. ❌ Native UI automation is separate.

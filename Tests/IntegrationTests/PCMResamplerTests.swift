@@ -10,7 +10,7 @@ import Testing
                 samples: Array(samples[offset..<min(offset + 1024, samples.count)]), sampleRate: rate,
                 sequence: UInt64(index))
         }
-        let resampler = StreamingMonoPCMResampler()
+        let resampler = try StreamingMonoPCMResampler(outputSampleRate: 16000)
         var output: [MicrophoneFrame] = []
         for frame in frames { output += try await resampler.process(frame) }
         let values = output.flatMap(\.samples)
@@ -28,9 +28,25 @@ import Testing
         MicrophoneFrame(samples: [0.1], sampleRate: 48000, sequence: 0),
         MicrophoneFrame(samples: [0.1], sampleRate: 44100, sequence: 1),
     ]
-    let resampler = StreamingMonoPCMResampler()
+    let resampler = try StreamingMonoPCMResampler(outputSampleRate: 16000)
     _ = try await resampler.process(frames[0])
     await #expect(throws: StreamingMonoPCMResampler.ConversionError.self) {
         try await resampler.process(frames[1])
+    }
+}
+
+@Test func microphoneResamplingUsesCallerRateAndResetAcceptsNewHardwareFormat() async throws {
+    let converter = try StreamingMonoPCMResampler(outputSampleRate: 24000)
+    let first = try await converter.process(
+        MicrophoneFrame(samples: Array(repeating: 0.1, count: 4800), sampleRate: 48000, sequence: 0))
+    #expect(first.allSatisfy { $0.sampleRate == 24000 })
+    // The native converter retains its filter tail until later packets.
+    #expect(!first.isEmpty && first.reduce(0) { $0 + $1.samples.count } > 2000)
+    await converter.reset()
+    let second = try await converter.process(
+        MicrophoneFrame(samples: Array(repeating: 0.1, count: 2400), sampleRate: 24000, sequence: 1))
+    #expect(second.count == 1 && second[0].sequence == 0 && second[0].samples.count == 2400)
+    #expect(throws: StreamingMonoPCMResampler.ConversionError.self) {
+        try StreamingMonoPCMResampler(outputSampleRate: 0)
     }
 }

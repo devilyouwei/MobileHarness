@@ -88,3 +88,5 @@ flowchart LR
     Silero --> Session
     Energy --> Session
 ```
+
+✅ Capability failures retain typed CapabilityError/CapabilityAvailability outcomes with neutral technical diagnostics. User-facing localization, retry guidance and settings instructions belong to consumers. ❌ No presentation policy is introduced into this adapter.

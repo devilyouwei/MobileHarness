@@ -50,7 +50,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 Core owns model-independent audio, image and video data contracts. These types describe validated payloads and metadata; they do not capture devices, read files, render UI or own inference engines. Platform adapters convert framework-specific buffers at their boundary.
 
 - ✅ AudioFrame.swift defines AudioFormat and AudioFrame: PCM encoding, sample rate, channels, payload, sequence and timestamp, with size/alignment validation and duration calculation.
-- ❌ Image and video contracts will be added here when a concrete capability needs them; no placeholder types are created. Their design must specify representation, dimensions, timing where applicable, payload bounds and ownership.
+- ✅ ImageFrame and NativeImageBuffer own validated model image input. ❌ General video transport remains unimplemented.
 
 Keep shared media values separate from model-specific tensors, preprocessing and business message types.
 
@@ -62,7 +62,7 @@ Keep shared media values separate from model-specific tensors, preprocessing and
 
 ✅ Cloud and local LLM adapters explicitly select no event-count cap. Pending fragments drain in order after normal completion; cancellation, errors, per-event size checks and single-consumer ownership still apply. yieldSuspending does not wait for capacity in this mode. Generation/response limits belong to the adapter; this is a user-requested exception to bounded event queues. ❌ This does not remove downstream parser, journal or Action limits or promise bounded total memory for arbitrary unbounded producers.
 
-✅ ADR0098: Audio values are defined once in Types and exported here. ModelKit preserves the original audio constructor labels and CapabilityError validation behavior through forwarding initializers.
+✅ AudioFormat and AudioFrame are defined in Core with the original constructor labels and CapabilityError validation. The previous Types forwarding contract is superseded by ADR0119.
 
 ## Disk-maintenance admission
 
@@ -72,3 +72,5 @@ Keep shared media values separate from model-specific tensors, preprocessing and
 
 
 ✅ CapabilityError conforms to LocalizedError so diagnostic consumers retain invalidRequest/unavailable reasons and explicit stream/lifecycle codes instead of numeric NSError descriptions. No UI or business dependency is added.
+
+✅ Errors and availability expose typed outcomes plus neutral technical diagnostics. Consumers own localization and recovery guidance. Chinese warm-up utterances are model input fixtures, not display text. ❌ SDK diagnostics must not prescribe App settings or UI workflows.

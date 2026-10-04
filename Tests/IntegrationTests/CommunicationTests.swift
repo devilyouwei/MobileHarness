@@ -5,7 +5,6 @@ import Gateway
 import Testing
 import ToolRuntime
 import Tools
-import Types
 
 func communicationConfiguration(_ id: String, subscribes: Bool = false, publishes: Bool = false) throws
     -> AgentConfiguration

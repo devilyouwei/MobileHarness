@@ -108,3 +108,7 @@ flowchart TD
 ✅ ApplicationRuntime injects AgentContracts.communication and MediaInputAdapter.externalSources into CommunicationPolicy. Agent JSON parsing uses the same application schema catalog; Core/Gateway know no concrete speech/vision schema names.
 
 ✅ Camera resource registration uses CameraCoordinator.captureResource rather than a concrete constant in AgentCore. Existing lease ownership and stop acknowledgment remain unchanged. ❌ No new resource policy.
+
+✅ ADR0119: App transports native camera frames and native-rate microphone samples with session/source/deadline metadata. Calling perception Agents own conversion into ModelKit inputs; composition no longer injects image conversion. SDK inputs/outputs are owned by ModelKit or PlatformKit, without Types dependencies. ❌ No physical-device acceptance is implied.
+
+✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

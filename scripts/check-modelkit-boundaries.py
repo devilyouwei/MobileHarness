@@ -8,7 +8,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageChat', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly'}
+FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageChat', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
 errors = []
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
@@ -29,12 +29,12 @@ for target in package['targets']:
     if not target['name'].startswith('ModelKit') or target['type'] != 'regular':
         continue
     dependencies = target.get('dependencies', [])
-    if target['name'] == 'ModelKit' and [next(iter(d.values()))[0] for d in dependencies] != ['Types']:
-        errors.append('The base ModelKit target may depend only on Types')
+    if target['name'] == 'ModelKit' and dependencies:
+        errors.append('The base ModelKit target must have no project/product dependencies')
     for dependency in dependencies:
         kind, values = next(iter(dependency.items()))
         name = values[0]
-        if kind in ('byName', 'target') and not name.startswith('ModelKit') and name != 'Types':
+        if kind in ('byName', 'target') and not name.startswith('ModelKit'):
             errors.append(f"{target['name']} depends on external project target {name}")
         if kind == 'product' and target['name'] not in {'ModelKitCoreAI', 'ModelKitFluidAudio', 'ModelKitHub'}:
             errors.append(f"Third-party dependency outside a backend: {target['name']} -> {name}")
@@ -67,7 +67,7 @@ for name in ('Actions', 'Tools'):
         errors.append(f'Missing consolidated {name}/Runtime')
 # Gateway is transport-only; AgentCore remains independent of models/platform/business.
 for module, forbidden in {
-    'PlatformKit': {'Actions', 'Tools', 'Agents', 'AgentCore', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly'},
+    'PlatformKit': {'Types', 'Storage', 'StorageChat', 'StorageAudio', 'Actions', 'Tools', 'Agents', 'AgentCore', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly'},
     'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'PlatformKit', 'Actions', 'Tools'},
     'AgentCore': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Gateway', 'Agents', 'PlatformKit', 'SwiftUI', 'UIKit', 'CoreVideo'},
 }.items():
@@ -83,8 +83,8 @@ for module, forbidden in {
         name = next(iter(dependency.values()))[0]
         if name in forbidden or name.startswith('ModelKit'):
             errors.append(f'Forbidden {module} dependency: {name}')
-if [next(iter(d.values()))[0] for d in targets['PlatformKit'].get('dependencies', [])] != ['Types']:
-    errors.append('PlatformKit may depend only on shared Types')
+if [next(iter(d.values()))[0] for d in targets['PlatformKit'].get('dependencies', [])] != []:
+    errors.append('PlatformKit must have no project/product dependencies')
 # Device SDK must not regain choreography or Action completion policy.
 for source in (ROOT / 'MobileHarness/PlatformKit/Connectivity/NexArm').glob('*.swift'):
     if re.search(r'\b(?:NexArmGesture|NexArmArmPlan|NexArmActionController|NexArmMotionPlan|NexArmSegmentTracker|NexArmMotorCompletion|NexArmMotorResult|NexArmActionError|NexArmJogPlanner|NexArmMotorReset)\b', source.read_text()):
@@ -103,7 +103,7 @@ for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools|CameraTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'Types', 'Foundation'}
+agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'PlatformKit', 'Foundation'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     if 'Core' in source.relative_to(ROOT / 'MobileHarness/Agents').parts:
         continue
@@ -113,14 +113,16 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
 agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
 for dependency in agent_target.get('dependencies', []):
     name = next(iter(dependency.values()))[0]
-    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'Types'}:
+    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'PlatformKit'}:
         errors.append(f'Forbidden Agents dependency: {name}')
-# Storage core stays Foundation-only; media adapters may use the corresponding domain contracts.
+# Storage owns its values/functions; domain targets may use only the internal core.
 storage_target = next(t for t in package['targets'] if t['name'] == 'Storage')
 if storage_target.get('dependencies'):
     errors.append('Storage must have no target/product dependencies')
-for source in (ROOT / 'MobileHarness/Storage').glob('*.swift'):
-    for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+for source in (ROOT / 'MobileHarness/Storage').rglob('*.swift'):
+    if source.relative_to(ROOT / 'MobileHarness/Storage').parts[0] in {'Audio', 'Chat'}:
+        continue
+    for imported in re.findall(r'\bimport\s+(?:(?:class|struct|enum|protocol|func|var|let|typealias)\s+)?(\w+)', source.read_text()):
         if imported != 'Foundation':
             errors.append(f'Forbidden Storage import {imported}: {source.relative_to(ROOT)}')
 # Business storage domains cannot be compiled into the generic core.
@@ -130,7 +132,7 @@ chat_target = targets.get('StorageChat', {})
 if chat_target.get('path') != 'MobileHarness/Storage/Chat' or [next(iter(d.values()))[0] for d in chat_target.get('dependencies', [])] != ['Storage']:
     errors.append('StorageChat must compile Storage/Chat and depend only on Storage')
 for source in (ROOT / 'MobileHarness/Storage/Chat').rglob('*.swift'):
-    for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
+    for imported in re.findall(r'\bimport\s+(?:(?:class|struct|enum|protocol|func|var|let|typealias)\s+)?(\w+)', source.read_text()):
         if imported not in {'Foundation', 'Storage'}:
             errors.append(f'Forbidden StorageChat import {imported}: {source.relative_to(ROOT)}')
 for path, directories, files in os.walk(ROOT / 'MobileHarness/Storage'):
@@ -138,11 +140,11 @@ for path, directories, files in os.walk(ROOT / 'MobileHarness/Storage'):
         errors.append(f'Missing Storage directory README: {Path(path).relative_to(ROOT)}')
 audio_target = next(t for t in package['targets'] if t['name'] == 'StorageAudio')
 audio_dependencies = [next(iter(d.values()))[0] for d in audio_target.get('dependencies', [])]
-if audio_dependencies != ['Storage', 'Types']:
-    errors.append('StorageAudio must depend only on Storage and Types')
+if audio_dependencies != ['Storage']:
+    errors.append('StorageAudio must depend only on Storage')
 for source in (ROOT / 'MobileHarness/Storage/Audio').rglob('*.swift'):
-    for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
-        if imported not in {'Foundation', 'Storage', 'Types'}:
+    for imported in re.findall(r'\bimport\s+(?:(?:class|struct|enum|protocol|func|var|let|typealias)\s+)?(\w+)', source.read_text()):
+        if imported not in {'Foundation', 'Storage'}:
             errors.append(f'Forbidden StorageAudio import {imported}: {source.relative_to(ROOT)}')
 # Speech signal observation is runtime admission/logging, never a UI-command side channel.
 coordinator = (ROOT / 'MobileHarness/App/Lifecycle/VoiceSessionCoordinator.swift').read_text()
@@ -155,9 +157,9 @@ ui = targets.get('UI', {})
 if ui.get('path') != 'MobileHarness/UI':
     errors.append('UI must compile MobileHarness/UI')
 ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])]
-if ui_dependencies != ['Types', 'StorageChat']:
-    errors.append('UI may depend only on shared Types/StorageChat value contracts')
-allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit', 'Types', 'StorageChat'}
+if ui_dependencies != ['StorageChat']:
+    errors.append('UI may depend only on StorageChat values and its own presentation contracts')
+allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit', 'StorageChat'}
 for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     content = source.read_text()
     for imported in re.findall(r'\bimport\s+(\w+)', content):
@@ -292,14 +294,12 @@ for module in ('Actions', 'Tools'):
     if dependency_names & forbidden:
         errors.append(f'{module} has reverse execution dependencies: {dependency_names & forbidden}')
 
-# Shared Types values cannot regain model, Agent or device ownership.
-if targets['Types']['path'] != 'MobileHarness/Types' or 'AudioTypes' in targets:
-    errors.append('Shared values must compile once under the category-based Types target')
-if targets['Types'].get('dependencies'):
-    errors.append('Types must have no dependencies')
-for source in (ROOT / 'MobileHarness/Types').rglob('*.swift'):
-    if any(module != 'Foundation' for module in re.findall(r'\bimport\s+(\w+)', source.read_text())):
-        errors.append(f'Forbidden Types import: {source.relative_to(ROOT)}')
+# Retired shared-value module must not return through targets or imports.
+if 'Types' in targets or 'AudioTypes' in targets or (ROOT / 'MobileHarness/Types').exists():
+    errors.append('Types is retired; contracts belong to their owning modules')
+for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Tests').rglob('*.swift')):
+    if re.search(r'\bimport\s+Types\b', source.read_text()):
+        errors.append(f'Retired Types import: {source.relative_to(ROOT)}')
 workflow_boundaries = {
     'Settings': ('AppSettingsWorkflow', {'UI', 'Storage'}),
     'History': ('AppHistoryWorkflow', {'UI', 'StorageChat'}),
@@ -346,12 +346,12 @@ for name in targets:
     visit(name)
 # Feature-specific presentation contracts must not return to Agent infrastructure.
 if (ROOT / "MobileHarness/Agents/Core/Output/PoseOverlay.swift").exists():
-    errors.append("PoseOverlay belongs to Types/Vision, not AgentCore")
+    errors.append("PoseOverlay belongs to UI/Camera, not AgentCore")
 
-# Core may consume immutable domain values, never define built-in application Agents or speech policy.
+# Core owns generic contracts, never built-in application Agents or speech policy.
 core_dependencies = [next(iter(d.values()))[0] for d in targets['AgentCore'].get('dependencies', [])]
-if core_dependencies != ['Types']:
-    errors.append('AgentCore may depend only on shared Types values')
+if core_dependencies != []:
+    errors.append('AgentCore must have zero project dependencies')
 core_identity = (ROOT / 'MobileHarness/Agents/Core/AgentID.swift').read_text()
 if 'public static let' in core_identity:
     errors.append('Concrete application Agent identities belong to Agents')
@@ -360,7 +360,7 @@ if any(marker in core_prompt for marker in ('speechChannel', 'audio playback', '
     errors.append('Assistant speech policy must not enter AgentCore prompt construction')
 for source in (ROOT / 'MobileHarness/Agents/Core').rglob('*.swift'):
     if re.search(r'public (?:struct|enum) (?:PoseObservation|SpeechPhase|SpeechSynthesisInput)\b', source.read_text()):
-        errors.append('Shared visual/speech values belong to Types')
+        errors.append('Agent communication domain values belong to Agents/Communication')
 
 # Generic communication infrastructure must not regain application domain schemas or camera samples.
 for directory in ('MobileHarness/Agents/Core', 'MobileHarness/Gateway'):
@@ -382,6 +382,18 @@ sentence_source = (ROOT / 'MobileHarness/Agents/Core/Generation/SentenceFunction
 if re.search(r'containsHanzi\s*\?\s*60\s*:\s*120', sentence_source):
     errors.append('Assistant soft text limits must not be fixed in Core')
 
+# Speech helpers own perception only, independently of Agent transport/presentation.
+speech_root = ROOT / 'MobileHarness/Agents/SpeechPerception'
+for name in ('VoiceActivitySegmenter', 'SpeechBoundaryPolicy', 'SpeechRecognitionTurn', 'TranscriptAccumulator'):
+    source = speech_root / f'{name}.swift'
+    if not source.is_file():
+        errors.append(f'Missing speech helper: {name}')
+        continue
+    imports = re.findall(r'^import (\w+)', source.read_text(), re.MULTILINE)
+    if set(imports) - {'Foundation', 'ModelKit'}:
+        errors.append(f'{name} must not import transport, UI or device modules')
+if (speech_root / 'LiveSpeechInput.swift').exists():
+    errors.append('Obsolete LiveSpeechInput must not duplicate SpeechRecognitionTurn')
 
 if errors:
     raise SystemExit('\n'.join(errors))
@@ -408,3 +420,53 @@ for platform in ('iphoneos', 'iphonesimulator'):
     if model_inputs != ['$(SRCROOT)/MobileHarness/Resources/Models/model-catalog.json']:
         raise SystemExit('App staging must not depend on model weights')
 print('Model resources: declarative catalog and metadata-only App staging passed.')
+
+# SDK contracts must be owned by the SDK, never aliases or re-exported application values.
+for directory in ('ModelKit', 'PlatformKit'):
+    for source in (ROOT / 'MobileHarness' / directory).rglob('*.swift'):
+        if re.search(r'@_exported\s+import\s+Types|\bTypes\.', source.read_text()):
+            raise SystemExit(f'SDK exports application values: {source.relative_to(ROOT)}')
+if (ROOT / 'MobileHarness/Types/Audio/MicrophoneFrame.swift').exists():
+    raise SystemExit('MicrophoneFrame must be owned by PlatformKit')
+for source in list((ROOT / 'MobileHarness/App/Lifecycle').glob('*.swift')) + [ROOT / 'MobileHarness/App/Adapters/MediaInputAdapter.swift']:
+    if re.search(r'\bImageFrame\s*\(|\bStreamingMonoPCMResampler\s*\(', source.read_text()):
+        raise SystemExit(f'Model input preparation belongs to the calling Agent: {source.relative_to(ROOT)}')
+if 'resolveImage:' in (ROOT / 'MobileHarness/App/Composition/AppAssembly.swift').read_text():
+    raise SystemExit('App must not inject model image conversion into VisionPerception')
+print('SDK-owned values and caller-owned model input adaptation passed.')
+
+# Generic input contracts cannot own business Agent messages.
+domain_names = {'SpeechPhase', 'SpeechSynthesisInput', 'SpeechValidationError', 'PoseObservation', 'VisionValidationError'}
+for source in (ROOT / 'MobileHarness/Agents/Core/Input').rglob('*.swift'):
+    declared = set(re.findall(r'\b(?:struct|enum|protocol|typealias)\s+(\w+)', source.read_text()))
+    if declared & domain_names:
+        raise SystemExit(f'Agent-domain value in generic input contracts: {source.relative_to(ROOT)}')
+for name, filename in [('SpeechPhase', 'SpeechValues.swift'), ('SpeechSynthesisInput', 'SpeechValues.swift'), ('PoseObservation', 'PoseObservation.swift')]:
+    source = ROOT / 'MobileHarness/Agents/Communication' / filename
+    if not source.is_file() or not re.search(r'public (?:struct|enum) ' + name + r'\b', source.read_text()):
+        raise SystemExit(f'Missing Agent-owned domain value: {name}')
+if re.search(r'\b(?:outOfOrder|wrongSession)\b', (ROOT / 'MobileHarness/Agents/Core/Input/ImageInput.swift').read_text()):
+    raise SystemExit('Image transport values must not own receiver ordering/session policy')
+print('Agent-domain values and transport/presentation ownership passed.')
+
+if not (ROOT / "MobileHarness/UI/Camera/PoseOverlay.swift").is_file():
+    raise SystemExit("Missing UI-owned PoseOverlay")
+
+for filename, names in [('AudioInput.swift', {'AudioInput', 'AudioValidationError'}), ('ImageInput.swift', {'ImageInput', 'ImageAttachment', 'ImageInputError'})]:
+    source = ROOT / 'MobileHarness/Agents/Core/Input' / filename
+    declarations = set(re.findall(r'public (?:struct|enum|protocol) (\w+)', source.read_text()))
+    if not names <= declarations:
+        raise SystemExit(f'Missing generic input contracts in {filename}')
+    if set(re.findall(r'\bimport\s+(\w+)', source.read_text())) - {'Foundation'}:
+        raise SystemExit(f'Input contracts must import Foundation only: {filename}')
+for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
+    if re.search(r'\b(?:struct|enum|typealias)\s+PoseOverlay\b', source.read_text()):
+        raise SystemExit(f'Presentation value belongs to UI: {source.relative_to(ROOT)}')
+print('Retired Types and module-owned input/presentation contracts passed.')
+
+# SDK failures carry diagnostics; localized presentation belongs to consumers.
+for source in KIT.rglob('*.swift'):
+    content = source.read_text()
+    if re.search(r'(?:reason:\s*|CapabilityError\.(?:unavailable|invalidRequest)\(\s*)"[^"\n]*[\u4e00-\u9fff]', content):
+        raise SystemExit(f'Localized capability diagnostic in ModelKit: {source.relative_to(ROOT)}')
+print('ModelKit diagnostics remain independent of localized presentation.')

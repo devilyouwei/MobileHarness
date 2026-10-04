@@ -6,7 +6,7 @@ Purpose: convert bounded microphone PCM into shared speech observations. Owns VA
 flowchart LR
     InputGateway --> Inbox[128 frames / 64000 samples]
     Inbox --> VAD[VoiceActivitySegmenter]
-    VAD --> ASR[LiveSpeechInput / recognition capability]
+    VAD --> ASR[SpeechRecognitionTurn / recognition capability]
     ASR --> Caption[Code-owned UI.setTranscript Tool]
     Caption --> OutputGateway
     OutputGateway --> ToolExecution --> UI[App presentation handler]
@@ -30,7 +30,7 @@ flowchart LR
 
 ✅ UI.setVoiceState is code-declared for hearing/processing/listening presentation. Phase Signals only communicate facts: App uses them for capture admission, Assistant chooses its atomic beginReplyTurn Tool on first onset. Resume emits a listening Tool; completion acknowledges accepted presentation state. No UI changes occur in Signal observers.
 
-✅ ConversationTurn is allocated at the first confirmed onset/audio event and remains stable across maximum-duration segments and short VAD transitions. It propagates through shared observations and output envelopes. Resume after reply (or empty recognition) arms a new utterance; ordinals increase within the capture session. Previews carry bounded text, finishTranscript seals it, and output sequences are monotonic.
+✅ AgentTurn is allocated at the first confirmed onset/audio event and remains stable across maximum-duration segments and short VAD transitions. It propagates through shared observations and output envelopes. Resume after reply (or empty recognition) arms a new utterance; ordinals increase within the capture session. Previews carry bounded text, finishTranscript seals it, and output sequences are monotonic.
 
 
 ## 输入、订阅与输出契约
@@ -44,19 +44,20 @@ flowchart LR
 | 生命周期，不是业务输入 | `bind / start / pause / resume / stop` | App / AgentManager | 注入发布端口及管理任务；不扩展 communication.inputs。 |
 
 ```swift
-// 结构摘要；真实定义在 Agents/Core/Communication/PerceptionInput.swift。
+// 结构摘要；真实定义在 Agents/Core/Input/AudioInput.swift 与 Agents/Communication/AgentContracts.swift。
 AudioInput {
-    samples: Data       // 当前 App 输入为 16 kHz、单声道 Float32 PCM
+    samples: Data       // 原生采集速率、单声道 Float32 PCM
+    sampleRate: Int    // 8000...192000 Hz
     sequence: UInt64
     timestamp: TimeInterval // 秒；采集时钟
 }
 ```
 
-AudioInput 不携带格式字段；上述格式由 App 适配与 Agent 中的 AudioFrame 构造约定。单帧非空、字节数为 4 的倍数且最多 64000 字节（16000 样本）。Agent 待处理队列另外限制 128 帧 / 64000 样本；不能把字节上限与队列样本上限混同。ASR 内部另有 128 项 / 64000 样本队列，一轮累计最多 60 秒。
+AudioInput 保留真实 sampleRate；SpeechPerception 选择 16 kHz，使用 PlatformKit 的通用有状态转换器重采样，再构造 ModelKit.AudioFrame。App 只包装采集数据与入站元数据。单帧非空、字节数为 4 的倍数且最多 64000 字节（16000 样本）。Agent 待处理队列另外限制 128 帧 / 64000 样本；不能把字节上限与队列样本上限混同。ASR 内部另有 128 项 / 64000 样本队列，一轮累计最多 60 秒。
 
 ```mermaid
 flowchart LR
-    Mic[PlatformKit microphone] --> Adapt[App: PCM adaptation]
+    Mic[PlatformKit microphone] --> Adapt[App: native-rate PCM transport]
     Adapt -->|media.audio| IG[InputGateway]
     IG --> S[SpeechPerception: VAD / ASR]
     S -->|typed observations via bound port| OG[OutputGateway]
@@ -91,7 +92,7 @@ flowchart LR
 | control | `agent.finished` | 每次上述展示更新后发出，保留输入完成协议；前面的 Tool handler 已由串行输出处理等待完成，不创建 UI Action。 |
 | control | `agent.error: speech perception failed: …` | 感知失败尝试发出并关闭流；32 项输出缓冲满时不能保证错误消息入队，failed 状态仍可查询。 |
 
-Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, output)`；首次起音分配 `ConversationTurn(id: UUID, ordinal: UInt64)`，长语音切段不换轮。Tool 完成后发送 control不意味着另一条观测通路的接收者已经处理完毕，两个通路没有全局完成顺序。
+Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, output)`；首次起音分配 `AgentTurn(id: UUID, ordinal: UInt64)`，长语音切段不换轮。Tool 完成后发送 control不意味着另一条观测通路的接收者已经处理完毕，两个通路没有全局完成顺序。
 
 ### Publish / send 边界
 
@@ -99,15 +100,35 @@ Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, ou
 
 ✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v5. ❌ Activity/resource ownership is not introduced.
 
-## Action runtime stage 2
+## File ownership and state transitions
 
-✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and returns without inference or output emission. actionResults() exposes bounded retained history. ❌ Automatic retry/replanning based on a result is not implemented.
+| File | Owned responsibilities |
+| --- | --- |
+| SpeechPerceptionAgent.swift | Agent admission/lifecycle, one utterance identity, input/output bounds, observations, internal presentation requests and reply gating. processAudio, finishUtterance, resetListening and fail keep these steps explicit in one actor. |
+| VoiceActivitySegmenter.swift | VAD session, contiguous score/PCM validation, pending samples and conversion to segmentation events. |
+| SpeechBoundaryPolicy.swift | Pure sample-count onset, pre-roll, silence, padding and maximum-duration policy. No model session or presentation. |
+| SpeechRecognitionTurn.swift | Internal per-utterance ASR sessions, bounded event queue, cross-chunk text, finish timeout and joined cancellation. |
+| TranscriptAccumulator.swift | Internal pure segment/revision ordering, final sealing and bounded preview merging. Rejected events do not change retained state. |
+| SpeechPerception.agent.json | Versioned communication and model-callable declarations; internal Tools remain code-owned. |
 
-## Action and Tool presentation boundary
+```mermaid
+flowchart LR
+    Agent[SpeechPerceptionAgent] --> Segmenter[VoiceActivitySegmenter]
+    Segmenter --> Boundary[SpeechBoundaryPolicy]
+    Segmenter --> VAD[VAD capability]
+    Agent --> Recognition[SpeechRecognitionTurn]
+    Recognition --> ASR[ASR capability]
+    Recognition --> Text[TranscriptAccumulator]
+    Recognition -->|preview| Agent
+    Agent --> Gateway[OutputGateway: observations / Tools]
+```
 
-✅ Transcript preview, finish and voice phase are internal ToolCalls without channels. setTranscript replaces the current preview tail (up to320 characters), including explicit empty clears; it is not a delta append. The bounded output stream fails on overflow instead of dropping transcript/closure events. ❌ Recognition model behavior is unchanged.
+✅ transition owns phase assignment and presentation, with explicit observation publication. Normal onset/listening, endpoint processing and empty recognition publish phase facts. App-triggered resume and final-delivery recovery retain presentation-only transitions; no additional phase broadcast is introduced. SpeechPhase.empty is an emitted outcome; retained phase and UI normalize to listening, preserving the next-input transition behavior. Input gating remains awaitingReply, independently of presentation.
 
-✅ Messaging failures are delivery outcomes and do not fail ASR/VAD. Rejected final transcript delivery releases awaitingReply and resets segmentation for the next utterance; other Agents continue.
+✅ Boundary durations use named sample limits. Endpoint padding and next pre-roll select whole windows within 3072/4096 samples, rather than assuming six/eight 512-sample windows. Standard 512-sample VAD behavior is preserved; larger windows cannot exceed these padding budgets. SpeechRecognitionTurn and TranscriptAccumulator are internal implementation details; public segmentation types remain available to existing consumers.
 
+✅ action.result validates runtime source and owner/session, stores bounded ActionResultInbox history and returns without inference. Messaging delivery outcomes remain isolated: rejected final delivery releases reply gating and resets recognition; other Agents continue. SpeechPhase belongs to Agents/Communication/SpeechValues.swift.
 
-✅ Shared SpeechPhase and AudioInput values belong to Types; AgentCore supplies generic AgentTurn and messaging only. Concrete speech messages/schema policy belong to Agents/Communication. ❌ Real-device sustained recognition acceptance remains pending.
+❌ Result-driven retry/replanning, activity/resource ownership, barge-in and background listening remain unimplemented. Sustained physical-device caption timing and overload acceptance remain outstanding.
+
+✅ 本 Agent 所有模型输入适配：按原生速率解码 Float32，逐段最多 8192 个样本进入 caller-configured StreamingMonoPCMResampler，输出 16 kHz ModelKit.AudioFrame；不增加异步队列。现有 128 项／64000 原生样本入站上限保持显式拒绝。恢复聆听时清空转换器状态，取消／停止仍加入唯一处理 worker。❌ 采集与硬件播放不属于 Agent。
