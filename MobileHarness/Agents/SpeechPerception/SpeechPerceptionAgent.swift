@@ -1,6 +1,7 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Types
 
 /// Streaming perception only. Device capture and playback remain composition-owned.
 public actor SpeechPerceptionAgent: Agent {
@@ -27,7 +28,7 @@ public actor SpeechPerceptionAgent: Agent {
     private var processed = 0
     private var awaitingReply = false
     private var activeInput: AgentInput?
-    private var currentTurn: ConversationTurn?
+    private var currentTurn: AgentTurn?
     private var turnOrdinal: UInt64 = 0
     private var outputSequence: UInt64 = 0
     private var phase: SpeechPhase = .listening
@@ -204,7 +205,7 @@ public actor SpeechPerceptionAgent: Agent {
                         })
                 if beganTurn {
                     turnOrdinal += 1
-                    currentTurn = ConversationTurn(ordinal: turnOrdinal)
+                    currentTurn = AgentTurn(ordinal: turnOrdinal)
                 }
                 input = AgentInput(
                     id: input.id, sessionID: input.sessionID, payload: input.payload,

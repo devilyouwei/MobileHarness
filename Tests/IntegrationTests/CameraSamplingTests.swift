@@ -1,6 +1,8 @@
 import AgentCore
+import Agents
 import Foundation
 import Testing
+import Types
 
 @testable import PlatformKit
 
@@ -27,11 +29,11 @@ private struct SampleAttachment: ImageAttachment {}
     let input = try ImageInput(
         width: 720, height: 1280, gray64: sample, attachment: SampleAttachment(),
         sequence: 1, timestamp: 0, rotation: 1)
-    guard case .sampled(let gray, _) = input.content else {
+    guard case .attachment(let value) = input.content, let sampleAttachment = value as? SampledImageAttachment else {
         Issue.record("Missing native attachment transport")
         return
     }
-    #expect(gray == sample)
+    #expect(sampleAttachment.gray64 == sample)
     #expect(throws: ImageInputError.self) {
         try ImageInput(
             width: 720, height: 1280, gray64: Data(), attachment: SampleAttachment(), sequence: 1, timestamp: 0,

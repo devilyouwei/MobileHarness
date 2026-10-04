@@ -104,3 +104,7 @@ flowchart TD
 
 
 ✅ AppAssembly applies independent recognition/synthesis preferences through the lifecycle settings barrier and caches their pair to avoid repeated voice cancellation. Model capabilities remain independently registered; download/delete backends and chat configuration are unchanged.
+
+✅ ApplicationRuntime injects AgentContracts.communication and MediaInputAdapter.externalSources into CommunicationPolicy. Agent JSON parsing uses the same application schema catalog; Core/Gateway know no concrete speech/vision schema names.
+
+✅ Camera resource registration uses CameraCoordinator.captureResource rather than a concrete constant in AgentCore. Existing lease ownership and stop acknowledgment remain unchanged. ❌ No new resource policy.

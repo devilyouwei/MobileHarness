@@ -111,7 +111,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         voice.observeSpeech(input)
     }
     func output(_ envelope: OutputEnvelope) async {
-        guard envelope.source == .assistant || envelope.source == .speechPerception else { return }
+        guard envelope.source.rawValue == "assistant" || envelope.source.rawValue == "speechPerception" else { return }
         voice?.show(envelope)
     }
 }

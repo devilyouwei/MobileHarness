@@ -6,7 +6,7 @@ Purpose: validate Agent configuration and resolve model-local names without depe
 - ✅ Group keys supply Channel defaults; empty groups declare Channels. Old channels/textActions/hidden/defaultChannel fields fail validation.
 - ✅ Action examples are parsed and resolved against the model-only catalog. Group traversal is sorted for deterministic prompt assembly; aliases are globally unique within an Agent.
 - ✅ InternalAction and InternalTool define code-owned paths and argument names without aliases/docs. Registry permits checks include internal grants, but resolveAction/resolveTool never search them.
-- ✅ CapabilityContextBuilder produces English Channel/module/wait instructions and callable Action details. The owning Agent supplies its speech Channel policy. Internal metadata and Tools never enter this text.
+- ✅ CapabilityContextBuilder produces English Channel/module/wait instructions and callable Action details. The owning Agent adds its own natural-text policy outside Core. Internal metadata and Tools never enter this text.
 - ✅ NativeToolDefinition preserves the OpenAI Chat Completions envelope. Current argument transport supports string properties, optional enums and required-name checks. Unsupported schemas fail explicitly.
 - ❌ Full JSON Schema, provider-native Tool streaming, configuration hot reload and physical-device authorization remain outside this module.
 
@@ -36,3 +36,7 @@ No Channel is implicitly main or blocking. DefaultChannel remains an internal ru
 ✅ CallArguments provides shared, bounded transport decoding for Action and Tool domains. Actions retains the ActionArguments compatibility name; Tools has no Actions dependency. ❌ Domain-specific defaults/meaning remain outside this decoder.
 
 ✅ Capability permissions remain Agent-owned. Execution argument readers live separately in Actions/Runtime/Contracts and Tools/Runtime/Contracts; the unused AgentCore reader was removed.
+
+✅ CapabilityContextBuilder contains no automatic synthesis/playback assumptions. AssistantAgent.outputContext adds that Agent’s Speech-channel, wait/playback guidance and examples. Catalog metadata is still resolved solely from versioned Agent JSON.
+
+✅ AgentConfiguration receives CommunicationContracts from its caller and validates JSON declarations against that registry. The standard registry has no speech/vision entries; business AgentConfigurations selects the application catalog explicitly.

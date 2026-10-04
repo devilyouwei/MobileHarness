@@ -97,7 +97,7 @@ let package = Package(
             ],
             exclude: ["README.md"]),
         .target(
-            name: "AgentCore", path: "MobileHarness/Agents/Core",
+            name: "AgentCore", dependencies: ["Types"], path: "MobileHarness/Agents/Core",
             exclude: [
                 "Communication/README.md", "Capability/README.md", "Generation/README.md", "Output/README.md",
                 "README.md",
@@ -127,7 +127,7 @@ let package = Package(
             name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageChat", "StorageAudio", "Types"],
             path: "MobileHarness/Agents",
             exclude: [
-                "Core", "SpeechSynthesis/README.md", "Assistant/README.md",
+                "Core", "Communication/README.md", "SpeechSynthesis/README.md", "Assistant/README.md",
                 "SpeechPerception/README.md",
                 "VisionPerception/README.md", "Photographer/README.md", "README.md",
             ],
@@ -156,7 +156,8 @@ let package = Package(
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),
         .target(
-            name: "Types", path: "MobileHarness/Types", exclude: ["README.md", "Audio/README.md", "Vision/README.md"]),
+            name: "Types", path: "MobileHarness/Types",
+            exclude: ["README.md", "Audio/README.md", "Vision/README.md", "Speech/README.md"]),
         .target(
             name: "ModelKit", dependencies: ["Types"], path: "MobileHarness/ModelKit",
             exclude: [

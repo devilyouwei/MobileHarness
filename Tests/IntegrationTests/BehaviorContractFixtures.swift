@@ -27,7 +27,7 @@ extension ActionInvocation {
             input: AgentInput(
                 id: context.inputID, sessionID: context.sessionID, payload: .event("test"),
                 turn: context.correlationID.flatMap { id in
-                    context.ordinal.map { ConversationTurn(id: id, ordinal: $0) }
+                    context.ordinal.map { AgentTurn(id: id, ordinal: $0) }
                 }),
             output: .actionCall(
                 ActionCall(

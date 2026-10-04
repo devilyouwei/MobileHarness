@@ -1,6 +1,7 @@
 import ActionRuntime
 import Actions
 import AgentCore
+import Agents
 import Foundation
 import Gateway
 import PlatformKit
@@ -361,7 +362,7 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
                     actionPath: ActionPath(module: "NexArm", function: function),
                     channel: channel, parameters: ["cycles": "1"])))
     }
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     #expect(await link.writes == 14)
     #expect(await link.queries == 0)
     #expect(await controller.lockedMotors.isEmpty)

@@ -6,7 +6,8 @@ import Testing
 
 private func generator() throws -> AgentGenerator {
     try AgentGenerator(
-        capabilities: AgentConfigurations.load(named: "Assistant").capabilities, textMapping: AssistantAgent.mapText)
+        capabilities: AgentConfigurations.load(named: "Assistant").capabilities, textMapping: AssistantAgent.mapText,
+        segmentation: try AssistantAgent.textSegmentation)
 }
 
 @Test func functionTokenParserEveryByteSplitPreservesActionsTextAndNestedChannels() throws {
@@ -200,7 +201,9 @@ private struct MarkupChat: ChatCapability {
 
 private func generationTrace() throws -> GenerationTrace {
     let configuration = try AgentConfigurations.load(named: "Assistant")
-    return GenerationTrace(capabilities: configuration.capabilities, textMapping: AssistantAgent.mapText)
+    return GenerationTrace(
+        capabilities: configuration.capabilities, textMapping: AssistantAgent.mapText,
+        segmentation: try AssistantAgent.textSegmentation)
 }
 
 @Test func generationTraceRetainsRawFragmentsAndResolvedChannels() throws {

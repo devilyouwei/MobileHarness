@@ -30,7 +30,7 @@ public actor InputGateway {
         guard input.metadata.incarnation != nil else { throw CommunicationError.unauthorized }
         return try await deliver(input, targets: targets.map { ($0.0, Optional($0.1)) })
     }
-    private func validatePayload(_ input: AgentInput) throws {
+    private func validatePayload(_ input: AgentInput) throws -> Int {
         guard !input.metadata.expired else { throw CommunicationError.expired }
         guard input.metadata.contract == InputMetadata(payload: input.payload).contract,
             input.metadata.version == 1, input.metadata.hops >= 0, input.metadata.hops <= 8,
@@ -47,11 +47,12 @@ public actor InputGateway {
             guard event.owner.sessionID == input.sessionID, event.owner.agent.rawValue.utf8.count <= 64,
                 event.sequence > 0
             else { throw CommunicationError.invalidPayload }
-        case .observation(let value): _ = try value.validatedSize()
+        case .observation(let value): return try (policy?.contracts ?? .standard).validatedSize(value)
         case .text(let value): guard value.utf8.count <= 4096 else { throw CommunicationError.invalidPayload }
         case .event(let value): guard value.utf8.count <= 16384 else { throw CommunicationError.invalidPayload }
         default: break
         }
+        return 0
     }
     public func publish(_ input: AgentInput) async throws -> DeliveryReport {
         try rejectRuntimePayload(input)
@@ -104,22 +105,17 @@ public actor InputGateway {
 
     private func deliver(_ input: AgentInput, targets: [(AgentID, UUID?)]) async throws -> DeliveryReport {
         try Task.checkCancellation()
-        try validatePayload(input)
+        let encodedBytes = try validatePayload(input)
         guard !targets.isEmpty else { throw CommunicationError.noRecipients }
         guard targets.count <= 16, Set(targets.map(\.0)).count == targets.count else {
             throw CommunicationError.capacityExceeded
         }
         if input.metadata.incarnation == nil {
-            guard ["user", "phone.microphone", "phone.camera", "runtime"].contains(input.metadata.source) else {
+            guard (policy?.externalSources ?? ["user", "runtime"]).contains(input.metadata.source) else {
                 throw CommunicationError.unauthorized
             }
         }
-        let retainedBytes: Int
-        if case .observation(let value) = input.payload {
-            retainedBytes = try value.validatedSize() * targets.count
-        } else {
-            retainedBytes = 0
-        }
+        let retainedBytes = encodedBytes * targets.count
         guard activeAdmissions < 128, activeBranches + targets.count <= 256,
             observationBytes + retainedBytes <= 8 * 1024 * 1024
         else { throw CommunicationError.capacityExceeded }

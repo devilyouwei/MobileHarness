@@ -1397,7 +1397,7 @@ func bluetoothSettingsAndOwnedActionsShareResourceFenceWithoutReacquisition() as
     }
     #expect(workflow.state.error == nil)
     #expect(workflow.lastActionReport?.entries.count == 6)
-    #expect(workflow.lastActionReport?.entries.allSatisfy { $0.motor == 4 } == true)
+    #expect(workflow.lastActionReport?.entries.allSatisfy { $0.details["motor"] == "4" } == true)
     workflow.disconnect()
     await workflow.waitUntilIdle()
     observer.cancel()

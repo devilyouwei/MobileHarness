@@ -1,6 +1,7 @@
 import ActionRuntime
 import Actions
 import AgentCore
+import Agents
 import AppWorkflows
 import Foundation
 import Testing
@@ -38,7 +39,7 @@ private actor CaptionEndpoint {
 
 @Test func immediateCaptionToolsPreserveAppendReplacementAndTurnFences() async throws {
     let endpoint = CaptionEndpoint()
-    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"), turn: ConversationTurn(ordinal: 1))
+    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"), turn: AgentTurn(ordinal: 1))
     func invocation(_ function: String, text: String? = nil, source: AgentID, sequence: UInt64) -> ToolInvocation {
         let call = ToolCall(toolPath: "UI." + function, arguments: text.map { ["text": $0] } ?? [:])
         return ToolInvocation(

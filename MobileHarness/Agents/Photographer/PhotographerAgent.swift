@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Types
 
 /// Camera-motion policy. Consumes published pose observations and, when enabled, emits one arm Tool.
 public actor PhotographerAgent: Agent {
@@ -66,8 +67,8 @@ public actor PhotographerAgent: Agent {
     public func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID else { throw CommunicationError.unauthorized }
-        guard case .observation(.pose(let pose)) = input.payload else { throw HarnessError.unsupportedInput }
-        try pose.validate()
+        guard case .pose(let pose)? = input.payload.perception else { throw HarnessError.unsupportedInput }
+        do { try pose.validate() } catch { throw CommunicationError.invalidPayload }
         guard lastSequence.map({ pose.sequence > $0 }) ?? true,
             lastTimestamp.map({ pose.timestamp >= $0 }) ?? true
         else { throw CommunicationError.outOfOrder }

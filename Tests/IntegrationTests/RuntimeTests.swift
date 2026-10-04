@@ -59,6 +59,7 @@ import Tools
 
 private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) throws -> AgentConfiguration {
     try AgentConfiguration(
+        contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
             "version": 5, "id": id, "actions": [String: [String]](), "tools": [],
             "communication": [
@@ -76,9 +77,12 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
     try await manager.register(agent)
     await #expect(throws: HarnessError.duplicateAgent) { try await manager.register(agent) }
     try await manager.start(.assistant)
-    let policy = try CommunicationPolicy(configurations: [
-        textRoutingConfiguration("assistant"), textRoutingConfiguration("missing"),
-    ])
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+        configurations: [
+            textRoutingConfiguration("assistant"), textRoutingConfiguration("missing"),
+        ])
     let gateway = InputGateway(manager: manager, policy: policy)
     let report = try await gateway.publish(AgentInput(sessionID: UUID(), payload: .text("hello")))
     #expect(report.delivered == [.assistant])
@@ -107,7 +111,10 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
     try await manager.start(.assistant)
-    let policy = try CommunicationPolicy(configurations: [textRoutingConfiguration("assistant", subscribes: false)])
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+        configurations: [textRoutingConfiguration("assistant", subscribes: false)])
     let gateway = InputGateway(manager: manager, policy: policy)
     let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
     await #expect(throws: CommunicationError.noRecipients) { try await gateway.publish(input) }

@@ -191,7 +191,7 @@ flowchart TD
 | 生命周期，不是订阅 | `bind / start / pause / resume / stop` | App / AgentManager | 注入消息端口、管理两条有界 worker；没有外部指令或 ToolResult 输入。 |
 
 ```swift
-// 结构摘要；真实定义在 Agents/Core/ImageInput.swift。
+// 结构摘要；真实定义在 Types/Vision/VisionValues.swift。
 ImageInput {
     width: Int; height: Int  // 正向推理图像的尺寸
     sequence: UInt64; timestamp: TimeInterval
@@ -310,3 +310,7 @@ flowchart LR
 ✅ Each showPose payload includes optional statistics: capture callback to capability start (including upstream/queue/preparation), capability-call duration, callback-to-result total latency, successful fresh-result FPS over windows of at least one second, and cumulative latest-slot replacements the next adaptive detection interval and optional normalized image-motion activity (0...1, not changed-pixel percentage). ContinuousClock measures elapsed time independently of image media timestamps. FPS is absent until the first window completes; session recreation resets counters. No timer, frame queue or extra output worker is added. ❌ UI rendering/sensor exposure delay and physical sustained performance are not measured.
 
 ✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](../../../docs/adr/0114-vision-presentation-values.md).
+
+✅ PoseObservation is imported from Types/Vision alongside PoseOverlay. COCO value validation is shared data; cadence, gaze and observation projection remain here. AgentCore owns neither pose-value schema nor detection algorithms.
+
+✅ Generic image transport carries an opaque attachment. SampledImageAttachment and the gray64 convenience initializer are grouped with FrameMotionAnalyzer; only this Agent requires a 4096-byte sample. Generic messages expose PerceptionMessage.pose through the business communication module. The scheduling algorithm and Tool payload are unchanged.

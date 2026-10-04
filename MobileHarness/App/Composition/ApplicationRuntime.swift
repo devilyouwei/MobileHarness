@@ -40,6 +40,7 @@ final class ApplicationRuntime {
             maximumBytes: ConversationHistoryStore.maximumBytes)
         conversations = ConversationHistoryStore(document: document)
         let policy = try CommunicationPolicy(
+            contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
             configurations: ["Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis"]
                 .map {
                     try AgentConfigurations.load(named: $0)
@@ -51,7 +52,8 @@ final class ApplicationRuntime {
         let resources = try ResourceCoordinator(
             definitions: [
                 ResourceDefinition(
-                    id: .cameraCapture, allowedOwners: [CameraCoordinator.resourceOwnerID], requiresLease: true
+                    id: CameraCoordinator.captureResource, allowedOwners: [CameraCoordinator.resourceOwnerID],
+                    requiresLease: true
                 ) {
                     await camera.stop()
                 }

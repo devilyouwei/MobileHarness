@@ -75,7 +75,7 @@ public struct ActionComposition: Sendable {
                 path: "\(path).\($0.path)",
                 status: report.executionFailure == .timedOut && $0.code == .cancelled ? .failed : $0.status,
                 code: report.executionFailure == .timedOut && $0.code == .cancelled ? .timedOut : $0.code,
-                motor: $0.motor, target: $0.target, observed: $0.observed)
+                details: $0.details)
         }
         if let code = report.executionFailure {
             entries.append(.init(path: "\(path).execution", status: .failed, code: code))

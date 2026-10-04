@@ -318,6 +318,8 @@ private func runNexArmAssistantMarkup(
     let session = UUID()
     try await manager.register(assistant, sessionID: session)
     let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
         configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception"].map {
             try AgentConfigurations.load(named: $0)
         })

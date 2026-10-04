@@ -40,3 +40,19 @@ public struct AudioFrame: Equatable, Sendable {
 public enum AudioValidationError: Error, Equatable, Sendable {
     case invalidRequest(String)
 }
+
+/// Transport-owned PCM. ModelKit conversion belongs to composition/perception, never Gateway.
+public struct AudioInput: Sendable {
+    public let samples: Data
+    public let sequence: UInt64
+    public let timestamp: TimeInterval
+    public var sampleCount: Int { samples.count / 4 }
+    public init(samples: Data, sequence: UInt64, timestamp: TimeInterval) throws {
+        guard !samples.isEmpty, samples.count <= 64_000, samples.count.isMultiple(of: 4),
+            timestamp.isFinite, timestamp >= 0
+        else { throw AudioValidationError.invalidRequest("Invalid PCM transport") }
+        self.samples = samples
+        self.sequence = sequence
+        self.timestamp = timestamp
+    }
+}

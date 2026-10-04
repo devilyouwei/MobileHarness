@@ -11,19 +11,18 @@ public struct ActionReport: Equatable, Sendable {
         public let path: String
         public let status: Status
         public let code: Code?
-        public let motor: Int?
-        public let target: Int?
-        public let observed: Int?
+        /// Producer-owned scalar details; framework transports keys without interpreting them.
+        public let details: [String: String]
         public init(
-            path: String, status: Status, code: Code? = nil, motor: Int? = nil,
-            target: Int? = nil, observed: Int? = nil
+            path: String, status: Status, code: Code? = nil, details: [String: String] = [:]
         ) {
             self.path = path
             self.status = status
             self.code = code
-            self.motor = motor
-            self.target = target
-            self.observed = observed
+            precondition(
+                details.count <= 16
+                    && details.allSatisfy { !$0.key.isEmpty && $0.key.utf8.count <= 64 && $0.value.utf8.count <= 512 })
+            self.details = details
         }
     }
     public enum ValidationError: Error { case capacity, invalidPath }

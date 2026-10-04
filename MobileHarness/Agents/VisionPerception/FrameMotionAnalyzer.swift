@@ -1,7 +1,30 @@
 import AgentCore
 import Foundation
+import Types
 
 /// Cheap image evidence; holds one inference reference and one union mask, each 64x64.
+/// YOLO cadence's fixed sample is a business attachment, not a framework image variant.
+public struct SampledImageAttachment: ImageAttachment {
+    public let gray64: Data
+    public let source: any ImageAttachment
+    public init(gray64: Data, source: any ImageAttachment) throws {
+        guard gray64.count == 4096 else { throw ImageInputError.invalidFrame }
+        self.gray64 = gray64
+        self.source = source
+    }
+}
+
+extension ImageInput {
+    public init(
+        width: Int, height: Int, gray64: Data, attachment: any ImageAttachment,
+        sequence: UInt64, timestamp: TimeInterval, rotation: Int, capturedAt: ContinuousClock.Instant? = nil
+    ) throws {
+        try self.init(
+            width: width, height: height, attachment: SampledImageAttachment(gray64: gray64, source: attachment),
+            sequence: sequence, timestamp: timestamp, rotation: rotation, capturedAt: capturedAt)
+    }
+}
+
 struct FrameMotionAnalyzer: Sendable {
     private var reference: [UInt8]?
     private var referenceTime: TimeInterval?
@@ -79,9 +102,11 @@ struct FrameMotionAnalyzer: Sendable {
             }
         }
     }
-    static func sample(_ frame: ImageInput) -> [UInt8] {
+    static func sample(_ frame: ImageInput) throws -> [UInt8] {
         switch frame.content {
-        case .sampled(let gray, _): return Array(gray)
+        case .attachment(let attachment):
+            guard let value = attachment as? SampledImageAttachment else { throw ImageInputError.invalidFrame }
+            return Array(value.gray64)
         case .rgb(let rgb):
             // Match PlatformKit's luminance weights and pixel-center sampling; no image/backend imports.
             var gray = [UInt8](repeating: 0, count: 4096)

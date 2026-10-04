@@ -9,7 +9,7 @@ enum HistoryAgentAdapter {
             let configuration = try AgentConfigurations.load(named: "Assistant")
             var trace = try GenerationTrace(
                 capabilities: AssistantAgent.runtimeCapabilities(configuration.capabilities),
-                textMapping: AssistantAgent.mapText)
+                textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
             for delta in turn.fragments { try trace.append(delta) }
             if turn.finishReason != nil { trace.finish() }
             var depth = 0

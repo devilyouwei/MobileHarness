@@ -49,7 +49,7 @@ struct AgentModelEvaluationTests {
                 do {
                     var generator = try AgentGenerator(
                         capabilities: AssistantAgent.runtimeCapabilities(configuration.capabilities),
-                        textMapping: AssistantAgent.mapText)
+                        textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
                     _ = try generator.append(answer) + generator.finish()
                 } catch let failure { error = String(describing: failure) }
                 results.append([

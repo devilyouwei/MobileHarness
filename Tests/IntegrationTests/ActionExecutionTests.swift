@@ -1,6 +1,7 @@
 import ActionRuntime
 import Actions
 import AgentCore
+import Agents
 import Foundation
 import Gateway
 import Testing
@@ -67,7 +68,7 @@ private func actionInvocation(
     try await executor.enqueue(invocation: actionInvocation("first", input: input, path: printPath))
     await displayFinished.wait()
     #expect(await log.values == ["first:start", "print"])
-    let finishing = Task { try await executor.finish(inputID: input.id) }
+    let finishing = Task { try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant")) }
     await releaseSpeech.open()
     try await finishing.value
     #expect(await log.values == ["first:start", "print", "first:end", "second:start", "second:end"])
@@ -88,9 +89,9 @@ private func actionInvocation(
         try await executor.enqueue(invocation: actionInvocation("two", input: second, path: printPath))
     }
     await gate.open()
-    try await executor.finish(inputID: first.id)
+    try await executor.finish(inputID: first.id, source: AgentID(rawValue: "assistant"))
     try await executor.enqueue(invocation: actionInvocation("two", input: second, path: printPath))
-    try await executor.finish(inputID: second.id)
+    try await executor.finish(inputID: second.id, source: AgentID(rawValue: "assistant"))
     await #expect(throws: ActionExecutionError.missingHandler(ActionIdentifier(module: "Device", function: "move"))) {
         try await executor.enqueue(
             invocation: actionInvocation("three", input: second, path: ActionPath(module: "Device", function: "move")))
@@ -108,7 +109,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
         for _ in 0..<2 {
             group.addTask {
                 do {
-                    try await executor.finish(inputID: input.id)
+                    try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
                     return "completed"
                 } catch ActionSchedulingError.duplicateFinish {
                     return "duplicate"
@@ -146,8 +147,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("must not run", input: failedInput))
     try await executor.enqueue(invocation: actionInvocation("other input", input: otherInput))
     await release.open()
-    try await executor.finish(inputID: failedInput.id)
-    try await executor.finish(inputID: otherInput.id)
+    try await executor.finish(inputID: failedInput.id, source: AgentID(rawValue: "assistant"))
+    try await executor.finish(inputID: otherInput.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["fail", "must not run", "other input"])
 }
 
@@ -177,7 +178,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("old", input: old))
     await started.wait()
     try await executor.enqueue(invocation: actionInvocation("discard", input: old))
-    let finishing = Task { try await executor.finish(inputID: old.id) }
+    let finishing = Task { try await executor.finish(inputID: old.id, source: AgentID(rawValue: "assistant")) }
     finishing.cancel()
     await sawCancellation.wait()
     #expect(await log.values == ["old:start"])
@@ -185,7 +186,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     #expect(await log.values == ["old:start"])
     await releaseCleanup.open()
     await #expect(throws: CancellationError.self) { try await finishing.value }
-    try await executor.finish(inputID: next.id)
+    try await executor.finish(inputID: next.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["old:start", "old:end", "new:start", "new:end"])
 }
 
@@ -227,7 +228,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     await displayStarted.wait()
     let cancellation = Task { await executor.cancel(sessionID: first.sessionID) }
     // A second cancellation waits on the same completion tasks instead of registering unbounded waiters.
-    let alsoCancel = Task { await executor.cancel(inputID: first.id) }
+    let alsoCancel = Task { await executor.cancel(inputID: first.id, source: AgentID(rawValue: "assistant")) }
     await speechCancelled.wait()
     await displayCancelled.wait()
     await release.open()
@@ -235,7 +236,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     await alsoCancel.value
     let next = AgentInput(sessionID: UUID(), payload: .text("next"))
     try await executor.enqueue(invocation: actionInvocation("next", input: next, path: printPath))
-    try await executor.finish(inputID: next.id)
+    try await executor.finish(inputID: next.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["display"])
     await executor.shutdown()
     await #expect(throws: ActionSchedulingError.shutdown) {
@@ -262,7 +263,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("second:one", input: shared, source: secondAgent))
     await started.wait()
     // This must finish while the other agent's handler is still blocked.
-    try await executor.finish(inputID: shared.id)
+    try await executor.finish(inputID: shared.id, source: AgentID(rawValue: "assistant"))
     try await executor.enqueue(invocation: actionInvocation("second:two", input: shared, source: secondAgent))
     await release.open()
     try await executor.finish(inputID: shared.id, source: secondAgent)
@@ -292,7 +293,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("must not run", input: shared))
     try await executor.enqueue(invocation: actionInvocation("other agent", input: shared, source: secondAgent))
     await release.open()
-    try await executor.finish(inputID: shared.id)
+    try await executor.finish(inputID: shared.id, source: AgentID(rawValue: "assistant"))
     try await executor.finish(inputID: shared.id, source: secondAgent)
     #expect(await log.values == ["fail", "must not run", "other agent"])
 }
@@ -325,7 +326,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     await independent.wait()
     #expect(await log.values == ["say:start", "default"])
     await release.open()
-    try await executor.finish(inputID: input.id)
+    try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["say:start", "default", "say:end", "same-channel"])
 }
 
@@ -339,9 +340,9 @@ private enum ActionTestFailure: Error, Equatable { case playback }
         try await executor.enqueue(invocation: actionInvocation("two", input: input, channel: "other"))
     }
     await release.open()
-    try await executor.finish(inputID: input.id)
+    try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     try await executor.enqueue(invocation: actionInvocation("three", input: input, channel: "other"))
-    try await executor.finish(inputID: input.id)
+    try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
 }
 
 @Test func samePhysicalModuleNeverOverlapsAcrossDifferentChannels() async throws {
@@ -366,7 +367,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("second", input: input, channel: "Speech"))
     #expect(await log.values == ["first:start"])
     await release.open()
-    try await executor.finish(inputID: input.id)
+    try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["first:start", "first:end", "second:start", "second:end"])
 }
 
@@ -418,7 +419,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     try await scheduler.enqueue(invocation: actionInvocation("after", input: input, path: printPath))
     // Dormant UI jobs do not obstruct another task using the same channel and module.
     try await scheduler.enqueue(invocation: actionInvocation("other", input: other, path: printPath))
-    try await scheduler.finish(inputID: other.id)
+    try await scheduler.finish(inputID: other.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["before:start", "other:start", "other:end"])
     await releaseBefore.open()
     await insideStarted.wait()
@@ -426,7 +427,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     #expect(!(await log.values).contains("after:start"))
     await releaseInside.open()
     await releaseDisplay.open()
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     let values = await log.values
     #expect(values.firstIndex(of: "after:start")! > values.firstIndex(of: "inside:end")!)
     #expect(values.firstIndex(of: "after:start")! > values.firstIndex(of: "display:end")!)
@@ -461,7 +462,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     try await scheduler.enqueue(invocation: actionInvocation("D", input: input))
     #expect(await log.values == ["A", "B"])
     await release.open()
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["A", "B", "C", "D"])
 }
 
@@ -478,14 +479,16 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     await #expect(throws: ActionSchedulingError.waitGroupLimitExceeded) {
         try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
     }
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
-    await #expect(throws: ActionSchedulingError.invalidSchedule) { try await scheduler.finish(inputID: input.id) }
+    await #expect(throws: ActionSchedulingError.invalidSchedule) {
+        try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+    }
     for _ in 0..<8 { try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input)) }
     await #expect(throws: ActionSchedulingError.waitGroupLimitExceeded) {
         try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
     }
-    await scheduler.cancel(inputID: input.id)
+    await scheduler.cancel(inputID: input.id, source: AgentID(rawValue: "assistant"))
 }
 
 @Test func waitFailureReleasesDormantGroupsAndAllowsLateAdmission() async throws {
@@ -514,9 +517,9 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     // Acquiring the same module proves the failed handler was released and its task fenced.
     let probe = AgentInput(sessionID: UUID(), payload: .text("probe"))
     try await scheduler.enqueue(invocation: actionInvocation("probe", input: probe))
-    try await scheduler.finish(inputID: probe.id)
+    try await scheduler.finish(inputID: probe.id, source: AgentID(rawValue: "assistant"))
     try await scheduler.enqueue(invocation: actionInvocation("late", input: input, path: printPath))
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["unexpected", "unexpected"])
 }
 
@@ -546,14 +549,14 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
     try await scheduler.enqueue(invocation: actionInvocation("must not run", input: input, path: printPath))
     let cancellation = Task {
-        await scheduler.cancel(inputID: input.id)
+        await scheduler.cancel(inputID: input.id, source: AgentID(rawValue: "assistant"))
         await log.append("cancel returned")
     }
     await cancelling.wait()
     #expect(await log.values.isEmpty)
     let other = AgentInput(sessionID: UUID(), payload: .text("other"))
     try await scheduler.enqueue(invocation: actionInvocation("other", input: other, path: printPath))
-    try await scheduler.finish(inputID: other.id)
+    try await scheduler.finish(inputID: other.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["other"])
     await release.open()
     await cancellation.value
@@ -570,7 +573,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     await #expect(throws: ActionSchedulingError.taskActionLimitExceeded) {
         try await scheduler.enqueue(invocation: actionInvocation("excess", input: input))
     }
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
 
     let release = ActionTestGate()
     let bounded = ChannelScheduler(
@@ -584,5 +587,17 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
         try await bounded.enqueue(invocation: actionInvocation("overflow", input: other, path: printPath))
     }
     await release.open()
-    await bounded.cancel(inputID: input.id)
+    await bounded.cancel(inputID: input.id, source: AgentID(rawValue: "assistant"))
+}
+
+@Test func schedulingCompletionRequiresTheActualCustomAgentSource() async throws {
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: try testActionRegistry(handlers: [printPath: { _ in await log.append("custom") }]))
+    let source = AgentID(rawValue: "customAgent")
+    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
+    try await scheduler.enqueue(invocation: actionInvocation("test", input: input, source: source, path: printPath))
+    try await scheduler.finish(inputID: input.id, source: source)
+    #expect(await log.values == ["custom"])
+    await scheduler.shutdown()
 }

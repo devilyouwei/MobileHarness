@@ -7,6 +7,7 @@ import PlatformKit
 import Testing
 import ToolRuntime
 import Tools
+import Types
 
 private func pose(
     noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,
@@ -117,10 +118,13 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test func photographerPolicyAcceptsVisionPose() throws {
-    let policy = try CommunicationPolicy(configurations: [
-        AgentConfigurations.load(named: "VisionPerception"),
-        AgentConfigurations.load(named: "Photographer"),
-    ])
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+        configurations: [
+            AgentConfigurations.load(named: "VisionPerception"),
+            AgentConfigurations.load(named: "Photographer"),
+        ])
     let input = observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: UUID())
     #expect(policy.destinations(for: input) == [.photographer])
 }

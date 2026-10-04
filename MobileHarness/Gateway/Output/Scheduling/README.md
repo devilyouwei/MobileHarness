@@ -222,3 +222,5 @@ flowchart LR
 ✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
 
 ✅ Stored child reports no longer replace subsequent exceptions or cancellation; the execution-level issue is retained before releasing the lane. ❌ No effect rollback.
+
+✅ ChannelScheduler.finish/cancel(inputID:source:) require explicit source identity, removing an implicit Assistant default. Input keys and cancellation fences remain unchanged; production Gateway callers already supply the source.

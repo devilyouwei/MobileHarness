@@ -4,7 +4,8 @@ Purpose: own shared immutable Sendable values used by independent SDKs. Design g
 
 | Directory | Implemented contracts |
 | --- | --- |
-| [Vision](Vision/README.md) | Skeleton presentation and detection statistics |
+| [Vision](Vision/README.md) | Shared pose observations, skeleton presentation and detection statistics |
+| [Speech](Speech/README.md) | Speech phases and validated synthesis requests |
 | [Audio](Audio/README.md) | PCM formats/frames, microphone samples and validation errors |
 
 ```mermaid
@@ -13,6 +14,9 @@ flowchart LR
     PlatformKit --> Types
     StorageAudio --> Types
     Types --> Audio[Audio values]
+    AgentCore --> Types
+    Types --> Speech[Speech values]
+    Types --> Vision[Vision values]
 ```
 
 ## Contracts and scope

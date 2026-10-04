@@ -109,6 +109,7 @@ flowchart TB
     UI --> StorageChat
 
     Agents --> AgentCore
+    AgentCore --> Types
     Agents --> ModelKit
     Agents --> StorageChat
     Agents --> StorageAudio
@@ -148,7 +149,7 @@ flowchart TB
     Adapters --> ModelKit
 ```
 
-The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `AgentCore`, `ActionRuntime`, `ToolRuntime`, `Storage` and `Types` have no project dependencies. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit meet only at Types.
+The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `ActionRuntime`, `ToolRuntime`, `Storage` and `Types` have no project dependencies; AgentCore depends only on Types values. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit meet only at Types.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -171,6 +172,7 @@ MobileHarness/
 │   └── Adapters/                # Presentation, media and native preview bridges
 ├── UI/                          # Independent MainActor state, pages and controls
 ├── Agents/
+│   ├── Communication/          # Domain message schemas and built-in identities
 │   ├── Core/                    # Independent AgentCore target
 │   │   ├── Runtime/             # Registry, manager and lifecycle contracts
 │   │   ├── Capability/          # JSON declarations and permissions
@@ -198,7 +200,8 @@ MobileHarness/
 │   └── UI/
 ├── Types/
 │   ├── Audio/                   # Shared immutable PCM/microphone values
-│   └── Vision/                  # Shared skeleton presentation/statistics values
+│   ├── Vision/                  # Shared pose and skeleton presentation/statistics values
+│   └── Speech/                  # Shared speech phases and synthesis requests
 ├── Storage/
 │   ├── Audio/                   # StorageAudio: transient PCM ownership
 │   └── Chat/                    # StorageChat: conversation journal
@@ -241,7 +244,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime, ToolRuntime |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
 | `UI/` | UI | Types, StorageChat |
-| `Agents/Core/` | AgentCore | None |
+| `Agents/Core/` | AgentCore | Types |
 | `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio, Types |
 | `Gateway/` | Gateway | AgentCore, ActionRuntime, ToolRuntime |
 | `Actions/Runtime/` | ActionRuntime | None |
@@ -468,9 +471,9 @@ flowchart LR
     Behavior --> Speaker[AppSpeechPlayback / PlatformKit audio]
 ```
 
-SpeechPerception converts admitted PCM into phase and transcript observations. Assistant reads bounded conversation context, streams chat generation, resolves behavior and persists completed turns. Recognition UI, reply UI and speech playback all use permitted outputs; runtime observers do not mutate presentation on an Agent's behalf.
+SpeechPerception converts admitted PCM into phase and transcript observations. Its Agent actor owns admission, utterance identity, phase transitions and reply gating; VoiceActivitySegmenter adapts VAD scores, SpeechBoundaryPolicy owns sample-count boundaries, internal SpeechRecognitionTurn owns ASR sessions, and internal TranscriptAccumulator owns revision merging. See [ADR 0117](../docs/adr/0117-speech-perception-file-ownership.md). Assistant reads bounded conversation context, streams chat generation, resolves behavior and persists completed turns. Recognition UI, reply UI and speech playback all use permitted outputs; runtime observers do not mutate presentation on an Agent's behalf.
 
-`ConversationTurn` and trusted output sequences travel through input, observations, calls and returned results. AppPresentationWorkflow admits only the active session/turn/sequence. Recognition previews may be replaced within their declared latest-state path; reply chunks and discrete behavior are preserved. Playback state reflects actual audio output rather than model generation completion.
+`AgentTurn` and trusted output sequences travel through input, observations, calls and returned results. AppPresentationWorkflow admits only the active session/turn/sequence. Recognition previews may be replaced within their declared latest-state path; reply chunks and discrete behavior are preserved. Playback state reflects actual audio output rather than model generation completion.
 
 ### Session, turn and UI boundaries
 
@@ -738,3 +741,9 @@ FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-f
 ✅ Urgent YOLO detection now permits a zero scheduling interval. The single inference worker processes only the newest pending capture after the active call completes. Normal inference duration adds no scheduling floor; compute-dominated freshness pressure can temporarily impose a bounded cost floor. Camera close already clears skeleton and its statistics; no source-stall timer is added.
 
 ✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](../docs/adr/0114-vision-presentation-values.md).
+
+✅ Core/domain separation stage 1: Types/Vision owns PoseObservation, Types/Speech owns SpeechPhase/SpeechSynthesisInput, Agents owns built-in identity constants, and Assistant owns automatic speech prompt policy. AgentCore consumes Types only; scheduler source identity is explicit. ✅ Stage 2 now provides generic message/schema registration and moves domain expiry to the business catalog, device-source/media expiry to App, and sampling to VisionPerception. See [ADR0115](../docs/adr/0115-agentcore-domain-separation.md).
+
+✅ Core communication has one generic typed-message container and one immutable schema registry. Application schemas/identities are grouped in Agents/Communication/AgentContracts.swift, visual values in Types/Vision/VisionValues.swift, and native source/deadline conversion in App/Adapters/MediaInputAdapter.swift. AgentTurn is a generic interaction identity. See [ADR0116](../docs/adr/0116-generic-agent-communication.md).
+
+✅ Core residual boundary (ADR0118): concrete resource names belong to App; reports carry bounded producer-owned details/error identifiers; text soft limits belong to the consuming Agent. Existing file categories are reused, with no new forwarding files.

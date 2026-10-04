@@ -27,7 +27,7 @@ App/
 ├── Adapters/                # Typed effect endpoints, native preview and value conversion
 │   ├── RuntimePresentation.swift
 │   ├── CurrentChatCapability.swift
-│   ├── CameraImageAttachment.swift
+│   ├── MediaInputAdapter.swift
 │   ├── CameraPreviewAdapter.swift
 │   ├── EyeExpression.swift
 │   ├── NexArmBehaviorAdapter.swift

@@ -46,3 +46,7 @@ Purpose: test cross-module history operations using the real journal and a contr
 ✅ Resource policy tests reject missing Nemotron and MOSS before persistence, preserve independent toggles, keep recognition enabled after Silero removal and disable it after Nemotron removal, normalize stale preferences before apply, preserve endpoint/cellular policy and coalesce concurrent migration/apply.
 
 ✅ Restoration tests verify legacy cellular restriction migration is persisted before a new download consumes it.
+
+✅ Workflow fixtures import built-in application identities from Agents rather than AgentCore. Production feature workflows keep their own source-selection policy without depending on concrete Agents.
+
+✅ Presentation regression tests use opaque provider codes/details while preserving motor failure display and unknown-code fallback. ❌ These tests perform no device effects.

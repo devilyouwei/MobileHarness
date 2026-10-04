@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import StorageChat
+import Types
 
 /// Model-backed assistant; concrete model selection belongs exclusively to the composition root.
 public actor AssistantAgent: Agent {
@@ -23,7 +24,7 @@ public actor AssistantAgent: Agent {
     private var worker: Task<Void, Never>?
     private var activeInput: AgentInput?
     private var begunSession: UUID?
-    private var begunTurn: ConversationTurn?
+    private var begunTurn: AgentTurn?
     private var outputSequence: UInt64 = 0
     private let conversations: ConversationHistoryStore
     private let modelName: @Sendable () async throws -> String
@@ -55,7 +56,7 @@ public actor AssistantAgent: Agent {
         -> String
     {
         "You are a voice assistant on a phone. Answer directly and concisely, usually in no more than three short sentences. Reply in the user's language; speech currently supports Mandarin and English. Ordinary replies should be natural text; all text is automatically converted to audio and played. Use tags when an Action or explicit ordering is needed. Output speakable plain text and declared Action tags only, without Markdown, emoji or reasoning commentary. Spell out English decimals and currency in words. Do not claim an operation succeeded without confirmation.\n"
-            + (try CapabilityContextBuilder.build(capabilities, speechChannel: "Speech"))
+            + (try outputContext(capabilities))
     }
 
     private static let beginReply = InternalTool(path: "UI.beginReplyTurn")
@@ -67,6 +68,11 @@ public actor AssistantAgent: Agent {
         try model.adding(internalActions: [playback], internalTools: [beginReply, caption])
     }
 
+    /// Assistant speech/caption latency policy, independent of shared lexical parsing.
+    public nonisolated static var textSegmentation: TextSegmentationPolicy {
+        get throws { try TextSegmentationPolicy(hanziLimit: 60, otherLimit: 120) }
+    }
+
     /// Agent-owned text expansion. Speech text is replaced with an audioID before Gateway admission.
     public nonisolated static func mapText(_ text: String, channel: String?) throws -> [GenerationEvent] {
         [
@@ -74,6 +80,29 @@ public actor AssistantAgent: Agent {
                 ActionCall(actionPath: playback.path, channel: channel ?? playback.channel, parameters: ["text": text])),
             .tool(try caption.call(["text": text])),
         ]
+    }
+
+    private static func outputContext(_ registry: CapabilityRegistry) throws -> String {
+        let speechChannel = "Speech"
+        guard registry.channels.contains(speechChannel) else { throw GenerationError.forbiddenChannel }
+        var lines = [try CapabilityContextBuilder.build(registry)]
+        lines.append("ASSISTANT TEXT AND SPEECH POLICY")
+        lines.append(
+            "All natural text is automatically converted to audio and played on the independent \(speechChannel) Channel by default. Audio playback may run in parallel with Actions on other Channels. Use wait whenever speech must finish before an Action starts."
+        )
+        lines.append("Channel \(speechChannel) — automatic audio playback")
+        lines.append(
+            "When the user asks for sequential behavior, encode the order with wait groups. To speak first and then act, put the entire spoken text inside <wait>...</wait> and put the Action after </wait>. Merely writing text before an Action does NOT wait for audio playback. Putting both inside the same wait does NOT make them sequential. Use consecutive wait groups for consecutive steps."
+        )
+        lines.append(
+            "A wait containing text waits for its audio playback to finish. Emitting a tag is a request, not proof that its effect occurred. Wait coordinates only the current task; it adds no implicit timeout or rollback."
+        )
+        if let example = registry.actions.first?.documentation?.examples.first {
+            lines.append("Speak-then-act example: <wait>I will finish speaking first.</wait>" + example)
+            lines.append(
+                "In this example, everything after the first </wait> starts only after that sentence finishes playing.")
+        }
+        return lines.joined(separator: "\n")
     }
 
     public func start() throws {
@@ -111,7 +140,8 @@ public actor AssistantAgent: Agent {
             return
         }
         if case .observation(let observation) = input.payload {
-            switch observation {
+            guard let content = observation.perception else { throw HarnessError.unsupportedInput }
+            switch content {
             case .transcript(_, final: true), .speechPhase: break
             default: throw HarnessError.unsupportedInput
             }
@@ -134,6 +164,17 @@ public actor AssistantAgent: Agent {
         queue.append(input)
         if lifecycle == .running { drain() }
     }
+    private func handleText(_ text: String, input: AgentInput) -> Bool {
+        if text == "/status" {
+            do {
+                emit(.toolCall(try descriptor.capabilities.resolveTool("runtimeInfo", arguments: [:])), for: input)
+            } catch { emit(.control("assistant.error: \(error)"), for: input) }
+            return false
+        }
+        activeInput = input
+        worker = Task { await self.generate(text, input: input, using: chat) }
+        return true
+    }
     private func drain() {
         guard worker == nil else { return }
         while lifecycle == .running && !queue.isEmpty {
@@ -141,25 +182,21 @@ public actor AssistantAgent: Agent {
             if input.metadata.expired { continue }
             processed += 1
             switch input.payload {
-            case .text(let text), .observation(.transcript(let text, final: true)):
-                if text == "/status" {
+            case .text(let text):
+                if handleText(text, input: input) { return }
+            case .observation(let message):
+                switch message.perception {
+                case .some(.transcript(let text, final: true)):
+                    if handleText(text, input: input) { return }
+                case .some(.speechPhase(.speaking)):
                     do {
-                        emit(
-                            .toolCall(try descriptor.capabilities.resolveTool("runtimeInfo", arguments: [:])),
-                            for: input)
+                        try beginReplyTurn(input)
+                        emit(.control("agent.finished"), for: input)
                     } catch { emit(.control("assistant.error: \(error)"), for: input) }
-                } else {
-                    activeInput = input
-                    worker = Task { await self.generate(text, input: input, using: chat) }
-                    return
+                default: break
                 }
-            case .observation(.speechPhase(.speaking)):
-                do {
-                    try beginReplyTurn(input)
-                    emit(.control("agent.finished"), for: input)
-                } catch { emit(.control("assistant.error: \(error)"), for: input) }
             // Unsupported input is rejected by the descriptor; receipts are handled before this switch.
-            case .image, .audio, .observation, .actionResult, .activityEvent: break
+            case .image, .audio, .actionResult, .activityEvent: break
             case .event(let event):
                 activeInput = input
                 worker = Task { await self.emitImmediate("事件：\(event)", for: input) }
@@ -251,7 +288,9 @@ public actor AssistantAgent: Agent {
         return try await withTaskCancellationHandler {
             var text = ""
             var finished = false
-            var generator = AgentGenerator(capabilities: descriptor.capabilities, textMapping: Self.mapText)
+            var generator = AgentGenerator(
+                capabilities: descriptor.capabilities, textMapping: Self.mapText,
+                segmentation: try Self.textSegmentation)
             var emittedCalls = 0
             for try await event in session.events {
                 try Task.checkCancellation()
@@ -319,7 +358,9 @@ public actor AssistantAgent: Agent {
         }
         do {
             guard text.utf8.count <= 2000 else { throw CapabilityError.eventTooLarge }
-            var generator = AgentGenerator(capabilities: descriptor.capabilities, textMapping: Self.mapText)
+            var generator = AgentGenerator(
+                capabilities: descriptor.capabilities, textMapping: Self.mapText,
+                segmentation: try Self.textSegmentation)
             var count = 0
             try await emitFunctions(
                 generator.append(AgentGenerator.escapeText(text)) + generator.finish(), for: input, count: &count)

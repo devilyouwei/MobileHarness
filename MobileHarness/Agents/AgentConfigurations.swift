@@ -10,6 +10,6 @@ public enum AgentConfigurations {
         let file = try FileHandle(forReadingFrom: url)
         defer { try? file.close() }
         let data = try file.read(upToCount: 65_537) ?? Data()
-        return try AgentConfiguration(data: data)
+        return try AgentConfiguration(contracts: AgentContracts.communication, data: data)
     }
 }

@@ -1,6 +1,7 @@
 import ActionRuntime
 import Actions
 import AgentCore
+import Agents
 import Foundation
 import Gateway
 import Testing
@@ -13,8 +14,10 @@ private actor CompositionCounter {
 @Test func compositionPreservesEveryFailureAndContinuesNestedActions() async throws {
     let counter = CompositionCounter()
     let first = try ActionReport(entries: [
-        .init(path: "motor3", status: .failed, code: .targetNotReached, motor: 3, target: 1443, observed: 1418),
-        .init(path: "motor5", status: .failed, code: .feedbackLost, motor: 5, target: 2048),
+        .init(
+            path: "motor3", status: .failed, code: .targetNotReached,
+            details: ["motor": "3", "target": "1443", "observed": "1418"]),
+        .init(path: "motor5", status: .failed, code: .feedbackLost, details: ["motor": "5", "target": "2048"]),
     ])
     let composition = try ActionComposition(
         .sequence([
@@ -31,7 +34,7 @@ private actor CompositionCounter {
     #expect(report.status == .partialFailure)
     #expect(report.entries.count == 5)
     #expect(report.entries.compactMap(\.code) == [.targetNotReached, .feedbackLost])
-    #expect(report.entries[0].observed == 1418)
+    #expect(report.entries[0].details["observed"] == "1418")
     #expect(await counter.count == 2)
     #expect(composition.resources == [ActionResource(rawValue: "nexarm.motor.3")])
 }
@@ -72,7 +75,7 @@ private actor CompositionCounter {
             output: .actionCall(ActionCall(actionPath: path, channel: "Robot", parameters: ["first": String(first)])))
         try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))
     }
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     await scheduler.finishResultDelivery()
     #expect(await counter.count == 1)
     let results = await scheduler.resultSnapshot().compactMap(\.result)

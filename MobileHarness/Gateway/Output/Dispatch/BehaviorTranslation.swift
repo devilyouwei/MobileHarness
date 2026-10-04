@@ -52,26 +52,13 @@ extension ActionReport {
         AgentActionReport(
             delivering: entries.map {
                 .init(
-                    path: $0.path, status: $0.status.agentValue, code: $0.code?.agentValue, motor: $0.motor,
-                    target: $0.target, observed: $0.observed)
+                    path: $0.path, status: $0.status.agentValue, code: $0.code?.agentValue, details: $0.details)
             }, executionFailure: executionFailure?.agentValue)
     }
 }
 extension ActionFailure {
     var observationFailure: ActionExecutionRecord.Failure {
-        switch self {
-        case .operationFailed: .operationFailed
-        case .resourceUnavailable: .resourceUnavailable
-        case .disconnected: .disconnected
-        case .busy: .busy
-        case .background: .background
-        case .invalidPose: .invalidPose
-        case .unconfirmed: .unconfirmed
-        case .controlNotReady: .controlNotReady
-        case .feedbackTimeout: .feedbackTimeout
-        case .completionTimeout: .completionTimeout
-        case .invalidArguments: .invalidArguments
-        }
+        .init(rawValue: rawValue)
     }
 }
 extension ToolCall {
@@ -91,18 +78,7 @@ extension ActionReport.Entry.Status {
 
 extension ActionReport.Entry.Code {
     var agentValue: AgentActionReport.Entry.Code {
-        switch self {
-        case .targetNotReached: .targetNotReached
-        case .feedbackLost: .feedbackLost
-        case .disconnected: .disconnected
-        case .sendingFailed: .sendingFailed
-        case .timedOut: .timedOut
-        case .invalidArguments: .invalidArguments
-        case .unavailable: .unavailable
-        case .handlerFailed: .handlerFailed
-        case .cancelled: .cancelled
-        case .resultCapacityExceeded: .resultCapacityExceeded
-        }
+        .init(rawValue: rawValue)
     }
 }
 

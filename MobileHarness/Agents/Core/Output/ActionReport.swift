@@ -4,26 +4,31 @@ import Foundation
 public struct AgentActionReport: Equatable, Sendable {
     public struct Entry: Equatable, Sendable {
         public enum Status: String, Sendable { case succeeded, failed, cancelled, notStarted }
-        public enum Code: String, Sendable {
-            case targetNotReached, feedbackLost, disconnected, sendingFailed, timedOut
-            case invalidArguments, unavailable, handlerFailed, cancelled, resultCapacityExceeded
+        public struct Code: RawRepresentable, Equatable, Sendable {
+            public let rawValue: String
+            public init(rawValue: String) {
+                precondition(!rawValue.isEmpty && rawValue.utf8.count <= 64)
+                self.rawValue = rawValue
+            }
+            public static let timedOut = Self(rawValue: "timedOut")
+            public static let handlerFailed = Self(rawValue: "handlerFailed")
+            public static let cancelled = Self(rawValue: "cancelled")
         }
         public let path: String
         public let status: Status
         public let code: Code?
-        public let motor: Int?
-        public let target: Int?
-        public let observed: Int?
+        /// Producer-owned scalar details; framework transports keys without interpreting them.
+        public let details: [String: String]
         public init(
-            path: String, status: Status, code: Code? = nil, motor: Int? = nil,
-            target: Int? = nil, observed: Int? = nil
+            path: String, status: Status, code: Code? = nil, details: [String: String] = [:]
         ) {
             self.path = path
             self.status = status
             self.code = code
-            self.motor = motor
-            self.target = target
-            self.observed = observed
+            precondition(
+                details.count <= 16
+                    && details.allSatisfy { !$0.key.isEmpty && $0.key.utf8.count <= 64 && $0.value.utf8.count <= 512 })
+            self.details = details
         }
     }
     public enum ValidationError: Error { case capacity, invalidPath }
@@ -57,7 +62,9 @@ public struct AgentActionReport: Equatable, Sendable {
         Self(validatedEntries: entries, executionFailure: code)
     }
     public var hasFailures: Bool { executionFailure != nil || entries.contains { $0.status == .failed } }
-    public var isCancelled: Bool { entries.contains { $0.status == .cancelled || $0.code == .cancelled } }
+    public var isCancelled: Bool {
+        executionFailure == .cancelled || entries.contains { $0.status == .cancelled || $0.code == .cancelled }
+    }
     public var status: ActionResult.Status {
         if isCancelled && executionFailure != .timedOut { return .cancelled }
         if hasFailures { return entries.contains { $0.status == .succeeded } ? .partialFailure : .failed }

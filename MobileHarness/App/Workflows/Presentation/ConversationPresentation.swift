@@ -8,7 +8,7 @@ public struct ConversationPresentation: Sendable {
     public enum Update: Hashable, Sendable {
         case transcript, finishTranscript, voiceState, beginReply, reply, expression
     }
-    public private(set) var turn: ConversationTurn?
+    public private(set) var turn: AgentTurn?
     public private(set) var transcriptClosed = false
     private var replyBegun = false
     private var sequences: [Update: UInt64] = [:]
@@ -22,12 +22,12 @@ public struct ConversationPresentation: Sendable {
     public mutating func accept(_ envelope: OutputEnvelope, update: Update) -> Bool {
         accept(source: envelope.source.rawValue, turn: envelope.turn, sequence: envelope.sequence, update: update)
     }
-    private mutating func accept(source: String, turn incomingTurn: ConversationTurn?, sequence: UInt64, update: Update)
+    private mutating func accept(source: String, turn incomingTurn: AgentTurn?, sequence: UInt64, update: Update)
         -> Bool
     {
         guard let incoming = incomingTurn, incoming.ordinal > 0, sequence > 0 else { return false }
         let speech = update == .transcript || update == .finishTranscript || update == .voiceState
-        guard source == (speech ? AgentID.speechPerception.rawValue : AgentID.assistant.rawValue) else { return false }
+        guard source == (speech ? "speechPerception" : "assistant") else { return false }
         if incoming != turn {
             guard incoming.ordinal > (turn?.ordinal ?? 0),
                 speech || update == .beginReply
@@ -72,6 +72,6 @@ extension ConversationPresentation {
     ) -> Bool {
         guard let id, let ordinal else { return false }
         return accept(
-            source: source, turn: ConversationTurn(id: id, ordinal: ordinal), sequence: sequence, update: update)
+            source: source, turn: AgentTurn(id: id, ordinal: ordinal), sequence: sequence, update: update)
     }
 }

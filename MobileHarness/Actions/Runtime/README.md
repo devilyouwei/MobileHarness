@@ -86,3 +86,5 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
 
 ✅ Finite stored reports preserve subsequent handler failures as executionFailure; true task cancellation propagates to the scheduler for joined terminal recording. ❌ No forced termination of uncooperative handlers.
+
+✅ ActionComposition preserves bounded producer-owned report details when flattening child paths, replacing dedicated motor/target/observed fields. ❌ Runtime does not interpret business detail keys.

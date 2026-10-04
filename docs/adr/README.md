@@ -150,3 +150,10 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [ADR 0113: Adaptive latest-frame pose detection](0113-adaptive-pose-cadence.md) documents Agent-owned image/pose/confidence/cost/freshness scheduling and existing Tool statistics. ❌ Physical-phone calibration remains pending.
 
 - [0114 — Visual presentation values outside AgentCore](0114-vision-presentation-values.md)
+
+- [0115 — AgentCore and domain separation, stage 1](0115-agentcore-domain-separation.md)
+
+- [0116 — Generic Agent communication and coherent ownership](0116-generic-agent-communication.md)
+
+
+- [0118 — Generic resource/results and Agent-owned text segmentation](0118-core-residual-policy-separation.md)

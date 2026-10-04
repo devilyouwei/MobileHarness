@@ -51,7 +51,7 @@ The configured observer consumes only current speech state and has no unbounded 
 
 ✅ Tool dispatch supports explicitly registered Void completion handlers. UI.showPose executes directly without Channel admission or ToolResult feedback; normal data tools continue returning through InputGateway.
 
-✅ Typed event publication preserves the parent ConversationTurn; Gateway does not interpret presentation policy.
+✅ Typed event publication preserves the parent AgentTurn; Gateway does not interpret presentation policy.
 
 
 ✅ Directed speech.synthesize/speech.cancel requests use the authorized send path. Gateway validates Action declarations and performs Channel admission only. Audio ID lookup, ownership and readiness checks happen inside the scheduled playback handler. The output consumer handles rejected-admission resources; session owners handle cache cancellation independently of Gateway. ❌ Synthesis readiness is not a delivery receipt.
@@ -80,3 +80,5 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Non-executable rejectedCall outputs enter the bounded executionResults history: Action rejection is an output failure; Tool rejection is a correlated error ToolResponse. Neither cancels queued Actions or sends a new model-facing ToolResult. ❌ Rejected calls have no scheduler execution record because they were never admitted.
 
 ✅ Invocation lookup, argument and resource availability errors reject only that Action and remain output failures; structural scheduling and producer identity errors still close the input. Independent operation cancellation is an outcome, while cancellation of the executing task propagates. ❌ No automatic retries.
+
+✅ Published message freshness and generated-work policy come from the registered CommunicationContract. Gateway contains no speech/vision string cases. Generic messages carry typed domain values without queueing or replay; existing parent/source/session/AgentTurn correlation remains.

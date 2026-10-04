@@ -15,6 +15,7 @@ import UI
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
 @MainActor
 final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraControlCapability {
+    static let captureResource = ResourceID(rawValue: "camera.capture")
     static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
     private let captureOwner: ExecutionOwner
     private let makeRuntime: () throws -> CameraRuntimeDependencies
@@ -249,20 +250,21 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         resourceRuntime = runtime
         if recoverRequested {
             recoverRequested = false
-            if await runtime.resources.snapshot()[.cameraCapture] == .faulted {
-                try await runtime.resources.recover([.cameraCapture])
+            if await runtime.resources.snapshot()[CameraCoordinator.captureResource] == .faulted {
+                try await runtime.resources.recover([CameraCoordinator.captureResource])
             }
         }
         let lease = try await runtime.resources.acquire(
-            resources: [.cameraCapture], owner: captureOwner, duration: .seconds(60)
+            resources: [CameraCoordinator.captureResource], owner: captureOwner, duration: .seconds(60)
         ) {
             await runtime.actions.cancel(resources: $0)
         }
         captureLease = lease
         let camera = self.camera
         do {
-            let frames = try await runtime.resources.run(resources: [.cameraCapture], owner: captureOwner, lease: lease)
-            {
+            let frames = try await runtime.resources.run(
+                resources: [CameraCoordinator.captureResource], owner: captureOwner, lease: lease
+            ) {
                 let frames = try await camera.start(facing: facing)
                 guard await camera.isRunning() else { throw CameraError.unavailable }
                 return frames
@@ -303,7 +305,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
             recordCapture(.stopped, id: lease.id)
             return true
         } catch ResourceError.staleLease {
-            let current = await runtime.resources.snapshot()[.cameraCapture]
+            let current = await runtime.resources.snapshot()[CameraCoordinator.captureResource]
             if current == .available
                 || {
                     if case .leased = current { return true }

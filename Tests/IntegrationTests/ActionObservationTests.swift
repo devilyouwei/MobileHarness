@@ -1,6 +1,7 @@
 import ActionRuntime
 import Actions
 import AgentCore
+import Agents
 import AppWorkflows
 import Foundation
 import Testing
@@ -66,7 +67,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     #expect(snapshot.records.first { $0.id == queuedID }?.phase == .queued)
     await arm.release()
     await speech.release()
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     // Even if intermediate notifications coalesce, the full latest snapshot retains every terminal record.
     let latest = try #require(await iterator.next())
     #expect(latest.records.count == 3)
@@ -91,7 +92,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     await gate.waitForEntry()
     let queuedID = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
     let stream = try await scheduler.observeExecutions()
-    let cancel = Task { await scheduler.cancel(inputID: input.id) }
+    let cancel = Task { await scheduler.cancel(inputID: input.id, source: AgentID(rawValue: "assistant")) }
     for await snapshot in stream {
         if snapshot.records.first(where: { $0.id == activeID })?.phase == .cancelling { break }
     }
@@ -148,10 +149,10 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     await #expect(throws: ChannelScheduler.ObservationError.self) { try await scheduler.observeExecutions() }
     let input = AgentInput(sessionID: UUID(), payload: .event("failure"))
     try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     let result = try #require(await scheduler.executionSnapshot().records.first)
     #expect(result.phase == .failed)
-    #expect(result.failure == .feedbackTimeout)
+    #expect(result.failure?.rawValue == "feedbackTimeout")
     #expect(result.failureDescription == BluetoothWorkflowError.feedbackTimeout.localizedDescription)
     await scheduler.shutdown()
     var iterator = streams[0].makeAsyncIterator()
@@ -173,7 +174,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     workflow.start { try await scheduler.observeExecutions() }
     let input = AgentInput(sessionID: UUID(), payload: .event("metadata fixture"))
     let id = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "CustomLane"))
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     let snapshot = await scheduler.executionSnapshot()
     let deadline = ContinuousClock.now.advanced(by: .seconds(2))
     while state.revision != snapshot.revision, ContinuousClock.now < deadline { await Task.yield() }

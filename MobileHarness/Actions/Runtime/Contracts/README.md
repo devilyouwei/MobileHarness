@@ -26,3 +26,5 @@ flowchart LR
 ✅ recordingFailure retains existing child entries and adds the reported execution failure, cancellation, first failed reported child code or mapped exception code. A successful stored prefix cannot erase a later thrown failure. ❌ Report retention does not establish physical rollback.
 
 ✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
+
+✅ ActionReport.Entry carries immutable producer-owned details: at most16 nonempty keys (64 UTF-8 bytes) and512 UTF-8 bytes per value; invalid programmer values fail a precondition without dropping data. Dedicated motor/target/observed fields are removed. ❌ Business detail schemas remain producer-owned.

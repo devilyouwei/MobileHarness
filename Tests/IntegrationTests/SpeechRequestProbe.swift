@@ -5,7 +5,9 @@ import Agents
 actor SpeechRequestProbe {
     var requests: [String: String] = [:]
     func receive(_ message: AgentMessage) {
-        if case .speechSynthesis(let request) = message { requests[request.audioID.uuidString] = request.text }
+        if case .speechSynthesis(let request)? = message.perception {
+            requests[request.audioID.uuidString] = request.text
+        }
     }
     func text(_ id: String) -> String? { requests[id] }
     func restored(_ output: AgentOutput) -> AgentOutput {

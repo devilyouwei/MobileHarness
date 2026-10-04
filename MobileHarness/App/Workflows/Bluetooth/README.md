@@ -21,3 +21,5 @@ flowchart LR
 ✅ Explicit 刷新状态 / 验证控制 is available while connected but unready; it performs read-only recovery and control verification before granting control. Notification health alone does not restore readiness. Query quarantine still requires reconnect.
 
 ✅ The merged aim-follow restart branch follows repository Swift formatting; this formatting change preserves restart and manual-control behavior.
+
+✅ BluetoothWorkflow translates NexArm motor results into producer-owned report details (motor/target/observed strings); generic runtimes preserve them without device fields. Execution behavior and position feedback policy are unchanged. ❌ No hardware validation is implied by this transport change.

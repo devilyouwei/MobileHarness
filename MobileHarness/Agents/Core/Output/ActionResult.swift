@@ -30,7 +30,7 @@ public struct ActionResult: Sendable, Equatable {
     public let executionID: UUID
     public let owner: ExecutionOwner
     public let inputID: UUID
-    public let turn: ConversationTurn?
+    public let turn: AgentTurn?
     public let path: ActionPath
     public let status: Status
     public let effect: Effect
@@ -42,7 +42,7 @@ public struct ActionResult: Sendable, Equatable {
     }
 
     public init(
-        executionID: UUID, owner: ExecutionOwner, inputID: UUID, turn: ConversationTurn?, path: ActionPath,
+        executionID: UUID, owner: ExecutionOwner, inputID: UUID, turn: AgentTurn?, path: ActionPath,
         status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil
     ) {
         self.executionID = executionID

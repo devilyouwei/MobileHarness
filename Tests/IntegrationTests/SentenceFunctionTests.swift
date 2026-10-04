@@ -77,7 +77,7 @@ private actor StreamingSentenceChat: ChatCapability {
 
 @Test func multilingualSentencesPreserveTextAcrossEveryUnicodeScalarBoundary() throws {
     let text = "“你好👨‍👩‍👧！ ”English 3.14, U.S. test; العربية، نعم؟ हिन्दी। 次へ、最後\n尾巴 e\u{301}"
-    var buffer = SentenceFunctionBuffer()
+    var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
     var sentences: [String] = []
     for scalar in text.unicodeScalars { sentences += try buffer.append(String(scalar)) }
     sentences += buffer.finish()
@@ -89,7 +89,7 @@ private actor StreamingSentenceChat: ChatCapability {
 }
 
 @Test func sentenceBufferRejectsUnboundedUnpunctuatedText() throws {
-    var buffer = SentenceFunctionBuffer()
+    var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
     _ = try buffer.append(String(repeating: "a", count: 2000))
     #expect(throws: GenerationError.limitExceeded) { try buffer.append("b") }
 }
@@ -132,12 +132,12 @@ private struct ExcessiveSentencesChat: ChatCapability {
 }
 
 @Test func speechChunksKeepWeakPunctuationAndWaitForSentenceContinuation() throws {
-    var buffer = SentenceFunctionBuffer()
+    var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
     #expect(try buffer.append("你好，我想说：苹果、香蕉，还有梨，").isEmpty)
     #expect(try buffer.append("都很好。” ").isEmpty)
     #expect(try buffer.append("下一句") == ["你好，我想说：苹果、香蕉，还有梨，都很好。” "])
     #expect(buffer.finish() == ["下一句"])
-    var symbols = SentenceFunctionBuffer()
+    var symbols = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
     #expect(try symbols.append("，、： ").isEmpty)
     #expect(symbols.finish().isEmpty)
 }
@@ -147,10 +147,10 @@ private struct ExcessiveSentencesChat: ChatCapability {
     let english = String(repeating: "hello ", count: 25) + "world"
     let decimalAtLimit = String(repeating: "a ", count: 59) + " 3.14 is a number. Next"
     for source in [chinese, english, decimalAtLimit, "Dr. Smith says 3.14 is fine, really: yes! Next"] {
-        var whole = SentenceFunctionBuffer()
+        var whole = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
         let expected = try whole.append(source) + whole.finish()
         for split in 0...source.count {
-            var streaming = SentenceFunctionBuffer()
+            var streaming = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
             let index = source.index(source.startIndex, offsetBy: split)
             let actual =
                 try streaming.append(String(source[..<index]))
@@ -170,7 +170,9 @@ private struct ExcessiveSentencesChat: ChatCapability {
 
 @Test func speechXMLBoundariesFlushShortUnpunctuatedTextInOrder() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    var generator = AgentGenerator(capabilities: config.capabilities, textMapping: AssistantAgent.mapText)
+    var generator = AgentGenerator(
+        capabilities: config.capabilities, textMapping: AssistantAgent.mapText,
+        segmentation: try AssistantAgent.textSegmentation)
     #expect(try generator.append("你好，先想一下").isEmpty)
     let events =
         try generator.append("<express emotion='thinking'/><channel.Speech>然后回答</channel.Speech>尾巴")
@@ -180,4 +182,21 @@ private struct ExcessiveSentencesChat: ChatCapability {
     #expect(calls[0].parameters["text"] == "你好，先想一下")
     #expect(calls[2].channel == "Speech" && calls[2].parameters["text"] == "然后回答")
     #expect(calls[3].parameters["text"] == "尾巴")
+}
+
+@Test func sharedSegmentationDefaultsToSentenceBoundariesAndAcceptsExplicitLimits() throws {
+    let text = String(repeating: "你", count: 125)
+    var shared = SentenceFunctionBuffer()
+    #expect(try shared.append(text).isEmpty)
+    #expect(shared.finish() == [text])
+    var custom = SentenceFunctionBuffer(policy: try TextSegmentationPolicy(hanziLimit: 10, otherLimit: 20))
+    let chunks = try custom.append(text) + custom.finish()
+    #expect(chunks.map(\.count) == Array(repeating: 10, count: 12) + [5])
+    #expect(chunks.joined() == text)
+    #expect(throws: GenerationError.limitExceeded) {
+        try TextSegmentationPolicy(hanziLimit: 0, otherLimit: 20)
+    }
+    #expect(throws: GenerationError.limitExceeded) {
+        try TextSegmentationPolicy(hanziLimit: 10, otherLimit: 2001)
+    }
 }

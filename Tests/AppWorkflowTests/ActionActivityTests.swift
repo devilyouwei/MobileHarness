@@ -1,4 +1,5 @@
 import AgentCore
+import Agents
 import AppWorkflows
 import Foundation
 import Testing
@@ -40,7 +41,7 @@ private func activityRecord(
 @Test @MainActor func actionActivityFailuresPersistUntilDismissedOrReplacedAndNeverResurface() {
     let state = ActionActivityState()
     let now = Date()
-    let failure = activityRecord(phase: .failed, at: now, failure: .feedbackTimeout)
+    let failure = activityRecord(phase: .failed, at: now, failure: .init(rawValue: "feedbackTimeout"))
     state.replace(revision: 1, records: [failure], evictedCount: 0)
     #expect(state.summaries(at: now.addingTimeInterval(30)).count == 1)
     state.dismiss(failure.id)
@@ -71,7 +72,8 @@ private func activityRecord(
     let stop = ActionActivityItem(
         execution: activityRecord(phase: .succeeded, semantics: .activityStop, completion: .activityStopped(UUID())))
     #expect(stop.status == "已结束")
-    let failure = ActionActivityItem(execution: activityRecord(phase: .failed, failure: .feedbackTimeout))
+    let failure = ActionActivityItem(
+        execution: activityRecord(phase: .failed, failure: .init(rawValue: "feedbackTimeout")))
     #expect(failure.status == "执行未完成")
     #expect(failure.title == "跳舞")
 }
@@ -119,7 +121,7 @@ private func activityRecord(
 }
 
 @Test @MainActor func actionActivityUsesThrownDescriptionWithoutAnErrorCatalog() {
-    var record = activityRecord(phase: .failed, failure: .invalidArguments)
+    var record = activityRecord(phase: .failed, failure: .init(rawValue: "invalidArguments"))
     record.failureDescription = "跳舞次数必须是 1 到 3 之间的整数"
     #expect(ActionActivityItem(execution: record).status == record.failureDescription)
     record.failure = .operationFailed
@@ -147,8 +149,10 @@ extension ActionActivityState {
 
 @Test @MainActor func composedActionIssuesRemainVisibleBeyondSummary() throws {
     let report = try AgentActionReport(entries: [
-        .init(path: "one", status: .failed, code: .targetNotReached, motor: 3, target: 1443, observed: 1418),
-        .init(path: "two", status: .failed, code: .feedbackLost, motor: 4),
+        .init(
+            path: "one", status: .failed, code: .init(rawValue: "targetNotReached"),
+            details: ["motor": "3", "target": "1443", "observed": "1418"]),
+        .init(path: "two", status: .failed, code: .init(rawValue: "feedbackLost"), details: ["motor": "4"]),
         .init(path: "three", status: .succeeded),
     ])
     let item = ActionActivityItem(
@@ -171,4 +175,15 @@ extension ActionActivityState {
             sessionID: UUID(), inputID: UUID(), channel: "Speech", semantics: .finite, phase: .failed,
             completion: .report(report), failureDescription: "语音合成返回了无效音频"))
     #expect(item.issueDescriptions == ["第1项：语音合成返回了无效音频"])
+}
+
+@Test @MainActor func unknownProviderFailureHasSafePresentationFallback() throws {
+    let report = try AgentActionReport(entries: [
+        .init(
+            path: "fixture", status: .failed, code: .init(rawValue: "fixture.unknown"),
+            details: ["sensor": "depth"])
+    ])
+    let item = ActionActivityItem(
+        execution: activityRecord(phase: .failed, completion: .report(report)))
+    #expect(item.issueDescriptions == ["第1项：执行失败"])
 }

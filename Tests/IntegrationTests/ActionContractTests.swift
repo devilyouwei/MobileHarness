@@ -198,7 +198,7 @@ private func contractDefinition(
     #expect(before.records.filter { $0.executionID == secondID }.map(\.phase) == [.admitted])
     #expect(await state.effects == 0)
     await release.release()
-    try await scheduler.finish(inputID: first.testEnvelope.inputID)
+    try await scheduler.finish(inputID: first.testEnvelope.inputID, source: AgentID(rawValue: "assistant"))
     #expect(await state.effects == 1)
     #expect(await state.animationPending)
     let after = await scheduler.diagnosticSnapshot()
@@ -219,7 +219,7 @@ private func contractDefinition(
     let first = try await scheduler.enqueue(invocation: invocation)
     let second = try await scheduler.enqueue(invocation: invocation)
     #expect(first != second)
-    try await scheduler.finish(inputID: invocation.testEnvelope.inputID)
+    try await scheduler.finish(inputID: invocation.testEnvelope.inputID, source: AgentID(rawValue: "assistant"))
     #expect(await state.effects == 2)
     #expect(await state.lastExecutionID == second)
     let snapshot = await scheduler.diagnosticSnapshot()
@@ -254,7 +254,9 @@ private func contractDefinition(
     let running = try await scheduler.enqueue(invocation: invocation)
     await committed.wait()
     let queued = try await scheduler.enqueue(invocation: invocation)
-    let cancellation = Task { await scheduler.cancel(inputID: invocation.testEnvelope.inputID) }
+    let cancellation = Task {
+        await scheduler.cancel(inputID: invocation.testEnvelope.inputID, source: AgentID(rawValue: "assistant"))
+    }
     await cancelled.wait()
     let during = await scheduler.diagnosticSnapshot()
     #expect(during.records.last?.executionID == queued)
@@ -279,7 +281,7 @@ private enum ContractFailure: Error, Equatable { case failed }
         ]))
     let invocation = contractInvocation()
     try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.testEnvelope.inputID)
+    try await scheduler.finish(inputID: invocation.testEnvelope.inputID, source: AgentID(rawValue: "assistant"))
     let snapshot = await scheduler.diagnosticSnapshot()
     #expect(snapshot.records.map(\.phase) == [.admitted, .started, .failed])
     #expect(snapshot.records.last?.effect == .unknown)
@@ -325,7 +327,7 @@ private enum ContractFailure: Error, Equatable { case failed }
     await restoring.wait()
     #expect(await state.effects == 0)
     await restored.release()
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     #expect(await state.effects == 1)
     #expect(definition.kind == .finite && setter.kind == .state)
 }
@@ -406,7 +408,7 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [definition]))
     let invocation = contractInvocation()
     try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.context.inputID)
+    try await scheduler.finish(inputID: invocation.context.inputID, source: AgentID(rawValue: "assistant"))
     let record = try #require(await scheduler.executionSnapshot().records.first)
     #expect(record.phase == .cancelled)
     guard case .report(let report)? = record.completion else {

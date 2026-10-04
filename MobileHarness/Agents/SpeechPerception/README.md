@@ -108,3 +108,6 @@ Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, ou
 ✅ Transcript preview, finish and voice phase are internal ToolCalls without channels. setTranscript replaces the current preview tail (up to320 characters), including explicit empty clears; it is not a delta append. The bounded output stream fails on overflow instead of dropping transcript/closure events. ❌ Recognition model behavior is unchanged.
 
 ✅ Messaging failures are delivery outcomes and do not fail ASR/VAD. Rejected final transcript delivery releases awaitingReply and resets segmentation for the next utterance; other Agents continue.
+
+
+✅ Shared SpeechPhase and AudioInput values belong to Types; AgentCore supplies generic AgentTurn and messaging only. Concrete speech messages/schema policy belong to Agents/Communication. ❌ Real-device sustained recognition acceptance remains pending.

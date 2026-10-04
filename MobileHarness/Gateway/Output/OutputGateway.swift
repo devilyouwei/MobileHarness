@@ -54,7 +54,7 @@ public actor OutputGateway {
         }
     }
     private func emit(
-        _ observation: PerceptionObservation, parent: AgentInput, source: AgentID,
+        _ observation: AgentMessage, parent: AgentInput, source: AgentID,
         incarnation: UUID, target: AgentID?
     ) async throws -> DeliveryReport {
         try Task.checkCancellation()
@@ -65,7 +65,10 @@ public actor OutputGateway {
         emitting[source, default: 0] += 1
         defer { emitting[source, default: 1] -= 1 }
         try await manager.validate(source, incarnation: incarnation, sessionID: parent.sessionID)
-        _ = try observation.validatedSize()
+        _ = try policy.contracts.validatedSize(observation)
+        guard let contract = policy.contracts[observation.contract] else {
+            throw CommunicationError.unsupportedContract
+        }
         if let target {
             guard
                 declaration.sends.contains(where: {
@@ -79,7 +82,7 @@ public actor OutputGateway {
         }
         // These commands are newly produced work, not forwarded sensor observations. Their
         // admission deadline starts now; the accepted input may outlive its original routing TTL.
-        let generatedCommand = observation.contract == "speech.synthesize" || observation.contract == "speech.cancel"
+        let generatedCommand = contract.startsNewWork
         guard (0..<8).contains(parent.metadata.hops) else { throw CommunicationError.hopLimitExceeded }
         guard generatedCommand || !parent.metadata.expired else { throw CommunicationError.expired }
         sequences[source, default: 0] += 1
@@ -91,11 +94,8 @@ public actor OutputGateway {
                 capturedAt: parent.metadata.capturedAt, sequence: sequences[source]!, rootID: parent.metadata.rootID,
                 parentID: parent.id, hops: parent.metadata.hops + 1,
                 deadline: min(
-                    generatedCommand ? .now.advanced(by: .seconds(10)) : parent.metadata.deadline,
-                    .now.advanced(
-                        by: .seconds(
-                            observation.contract == "vision.pose"
-                                ? 1 : observation.contract == "speech.partial" ? 2 : 10)))),
+                    generatedCommand ? .now.advanced(by: .seconds(contract.lifetime)) : parent.metadata.deadline,
+                    .now.advanced(by: .seconds(contract.lifetime)))),
             turn: parent.turn)
         let destinations = target.map { [$0] } ?? policy.destinations(for: input)
         let observed = target == nil && observedContracts.contains(observation.contract) && observeEvent != nil

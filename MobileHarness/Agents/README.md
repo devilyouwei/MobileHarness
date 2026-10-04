@@ -7,6 +7,7 @@ Implements stateful actors that interpret input, request model capabilities and 
 ```text
 Agents/
 ├── Core/                     # Independent AgentCore compilation boundary
+├── Communication/            # Shared domain messages, schema policy and built-in identities
 ├── AgentConfigurations.swift  # Load versioned JSON from package resources
 ├── Assistant/                 # Chat, reply history and resolved speech Actions and UI Tools
 ├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
@@ -119,7 +120,7 @@ Each actor documents its own capacity, overflow, pause, stop and cleanup rules: 
 | publish | `communication.publications` 的 contract、typed `AgentMessage` payload、发送时机、消费者、可替换/丢失策略和接纳回执含义 | `AgentMessaging.publish(..., parent:)` 经 OutputGateway → InputGateway 广播；不是 Action/Tool 输出。 |
 | send | `communication.sends` 的 contract/target、typed payload 字段、因果与所有权、接纳/取消/超时语义 | `AgentMessaging.send(..., parent:, to:)` 走同一双 Gateway 链路，但只定向一个 Agent。 |
 
-公共 `AgentInput` 包含 `id: UUID`、`sessionID: UUID`、`turn: ConversationTurn?` 和 `InputMetadata(contract, version, topic, source, incarnation, capturedAt, sequence, rootID, parentID, hops, deadline)`。publish/send 的端口绑定发送方身份，以 `parent` 继承会话、轮次和因果关系；接收方不能从业务 payload 自行推断授权身份。`DeliveryReport.delivered / rejected` 只表示目标 Agent 的接纳或拒绝，不代表推理、合成、Action 或播放完成。`OutputEnvelope` 含 `source / inputID / sessionID / turn / sequence / output`；它与共享观测消息是两条不同的输出通路。某方向没有声明或实现时，明确写“无”，不要把缓存副作用或本地方法误记为 publish/send。
+公共 `AgentInput` 包含 `id: UUID`、`sessionID: UUID`、`turn: AgentTurn?` 和 `InputMetadata(contract, version, topic, source, incarnation, capturedAt, sequence, rootID, parentID, hops, deadline)`。publish/send 的端口绑定发送方身份，以 `parent` 继承会话、轮次和因果关系；接收方不能从业务 payload 自行推断授权身份。`DeliveryReport.delivered / rejected` 只表示目标 Agent 的接纳或拒绝，不代表推理、合成、Action 或播放完成。`OutputEnvelope` 含 `source / inputID / sessionID / turn / sequence / output`；它与共享观测消息是两条不同的输出通路。某方向没有声明或实现时，明确写“无”，不要把缓存副作用或本地方法误记为 publish/send。
 
 ### 业务输出与系统功能调用边界
 
@@ -247,3 +248,7 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 ✅ Output overflow rejects only the current unaccepted aim; Photographer remains running and queued accepted calls are retained.
 
 ✅ Business Agents may depend explicitly on Types for immutable shared domain values. VisionPerception builds Types/Vision PoseOverlay; AgentCore retains generic runtime contracts. This does not allow UI/service imports or bypass OutputGateway.
+
+✅ Communication/AgentContracts.swift owns built-in application Agent names as AgentID extensions. Core defines only the raw identity type. Shared pose and speech values are explicitly imported from Types; output syntax stays Core-owned while speech policy stays Assistant-owned.
+
+✅ Shared application messages and registry metadata are grouped in Communication/AgentContracts.swift. Core exposes generic messages/schema registration only. Media values are grouped in Types; host input adapters supply device sources/deadlines. No per-domain file or compatibility alias remains under Core.

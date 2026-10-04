@@ -1,6 +1,7 @@
 import ActionRuntime
 import Actions
 import AgentCore
+import Agents
 import Foundation
 import Gateway
 import Testing
@@ -115,7 +116,7 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     let scheduler = ChannelScheduler(registry: registry) { await input.deliverActionResult($0) }
     let invocation = try lifecycleInvocation(owner: owner)
     let execution = try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.envelope.inputID)
+    try await scheduler.finish(inputID: invocation.envelope.inputID, source: AgentID(rawValue: "assistant"))
     await scheduler.finishResultDelivery()
     let results = await agent.results()
     #expect(results.count == 1 && results.first?.executionID == execution)
@@ -177,14 +178,14 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     let owner = lifecycleOwner()
     let first = try lifecycleInvocation(owner: owner)
     try await scheduler.enqueue(invocation: first)
-    try await scheduler.finish(inputID: first.envelope.inputID)
+    try await scheduler.finish(inputID: first.envelope.inputID, source: AgentID(rawValue: "assistant"))
     await deliveryStarted.wait()
     await #expect(throws: ActionSchedulingError.resultCapacityExceeded) {
         try await scheduler.enqueue(invocation: lifecycleInvocation(owner: owner))
     }
     let noFeedback = try lifecycleInvocation(owner: owner, feedback: .none)
     try await scheduler.enqueue(invocation: noFeedback)
-    try await scheduler.finish(inputID: noFeedback.envelope.inputID)
+    try await scheduler.finish(inputID: noFeedback.envelope.inputID, source: AgentID(rawValue: "assistant"))
     #expect(await counter.value == 2)
     await releaseDelivery.release()
     await scheduler.finishResultDelivery()
@@ -202,7 +203,7 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     let scheduler = ChannelScheduler(registry: registry) { _ in .accepted }
     let invocation = try lifecycleInvocation(owner: lifecycleOwner())
     try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.envelope.inputID)
+    try await scheduler.finish(inputID: invocation.envelope.inputID, source: AgentID(rawValue: "assistant"))
     await scheduler.finishResultDelivery()
     #expect(await scheduler.resultSnapshot().last?.result?.completion == .activityStarted(activityID))
 }

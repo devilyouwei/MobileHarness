@@ -54,7 +54,7 @@ private actor ControlledPose: PoseCapability {
     let session = UUID()
     let agent = try VisionPerceptionAgent(
         pose: model, sessionID: session, sampling: FrameSamplingConfiguration(minimumInterval: 0))
-    let observations = AsyncStream<PerceptionObservation>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let observations = AsyncStream<AgentMessage>.makeStream(bufferingPolicy: .bufferingOldest(8))
     try await agent.bind(
         AgentMessaging { value, _, _ in
             observations.continuation.yield(value)
@@ -73,7 +73,7 @@ private actor ControlledPose: PoseCapability {
     await model.release()
     var stream = observations.stream.makeAsyncIterator()
     let first = try #require(await stream.next())
-    guard case .pose(let firstPose) = first else {
+    guard case .pose(let firstPose)? = first.perception else {
         Issue.record("Missing pose")
         return
     }
@@ -81,7 +81,7 @@ private actor ControlledPose: PoseCapability {
     #expect(await started.next() == 3)
     await model.release()
     for sequence: UInt64 in [3] {
-        guard case .pose(let pose) = try #require(await stream.next()) else {
+        guard case .pose(let pose)? = try #require(await stream.next()).perception else {
             Issue.record("Missing pose")
             return
         }
@@ -168,6 +168,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let second = ObservationRecorder(id: "second")
     let third = ObservationRecorder(id: "third")
     let secondConfig = try AgentConfiguration(
+        contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
             "version": 5, "id": "second", "actions": [String: [String]](), "tools": [],
             "communication": [
@@ -177,6 +178,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
             ],
         ]))
     let thirdConfig = try AgentConfiguration(
+        contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
             "version": 5, "id": "third", "actions": [String: [String]](), "tools": [],
             "communication": [
@@ -186,6 +188,8 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
             ],
         ]))
     let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
         configurations: [AgentConfigurations.load(named: "VisionPerception")]
             + (withSubscribers ? [secondConfig, thirdConfig] : []))
     try await manager.register(third, sessionID: session)
@@ -217,7 +221,9 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     var started = model.started.makeAsyncIterator()
     for i: UInt64 in 1...3 {
         let report = try await input.publish(
-            AgentInput(sessionID: session, payload: .image(image(UInt8(i * 40), sequence: i))))
+            AgentInput(
+                sessionID: session, payload: .image(image(UInt8(i * 40), sequence: i)),
+                metadata: InputMetadata(payload: .image(image(UInt8(i * 40), sequence: i)), source: "phone.camera")))
         #expect(report.delivered == [.visionPerception])
         #expect(await started.next() == UInt8(i * 40))
         await model.release()
@@ -362,13 +368,14 @@ private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
     let agent = try VisionPerceptionAgent(
         pose: model, sessionID: session,
         resolveImage: { input in
-            guard case .sampled(_, let attachment) = input.content, let attachment = attachment as? PoseImageAttachment
+            guard case .attachment(let value) = input.content, let sample = value as? SampledImageAttachment,
+                let attachment = sample.source as? PoseImageAttachment
             else {
                 throw ImageInputError.invalidFrame
             }
             return attachment.image
         })
-    let observed = AsyncStream<PerceptionObservation>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let observed = AsyncStream<AgentMessage>.makeStream(bufferingPolicy: .bufferingOldest(1))
     try await agent.bind(
         AgentMessaging { value, _, _ in
             observed.continuation.yield(value)
@@ -384,7 +391,7 @@ private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
     #expect(await started.next() == 22)
     await model.release()
     var values = observed.stream.makeAsyncIterator()
-    guard case .pose(let pose) = try #require(await values.next()) else {
+    guard case .pose(let pose)? = try #require(await values.next()).perception else {
         Issue.record("Missing pose")
         return
     }
@@ -420,8 +427,8 @@ private actor BlockedPosePublication {
         started = pair.stream
         continuation = pair.continuation
     }
-    func publish(_ observation: PerceptionObservation) async throws -> DeliveryReport {
-        guard case .pose(let pose) = observation else { throw CommunicationError.invalidPayload }
+    func publish(_ observation: AgentMessage) async throws -> DeliveryReport {
+        guard case .pose(let pose)? = observation.perception else { throw CommunicationError.invalidPayload }
         await withCheckedContinuation { waiter in
             self.waiter = waiter
             continuation.yield(pose.sequence)

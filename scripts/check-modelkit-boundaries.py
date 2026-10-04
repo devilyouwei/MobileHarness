@@ -344,6 +344,45 @@ def visit(name):
     visited.add(name)
 for name in targets:
     visit(name)
+# Feature-specific presentation contracts must not return to Agent infrastructure.
+if (ROOT / "MobileHarness/Agents/Core/Output/PoseOverlay.swift").exists():
+    errors.append("PoseOverlay belongs to Types/Vision, not AgentCore")
+
+# Core may consume immutable domain values, never define built-in application Agents or speech policy.
+core_dependencies = [next(iter(d.values()))[0] for d in targets['AgentCore'].get('dependencies', [])]
+if core_dependencies != ['Types']:
+    errors.append('AgentCore may depend only on shared Types values')
+core_identity = (ROOT / 'MobileHarness/Agents/Core/AgentID.swift').read_text()
+if 'public static let' in core_identity:
+    errors.append('Concrete application Agent identities belong to Agents')
+core_prompt = (ROOT / 'MobileHarness/Agents/Core/Capability/CapabilityContextBuilder.swift').read_text()
+if any(marker in core_prompt for marker in ('speechChannel', 'audio playback', 'Speak-then-act')):
+    errors.append('Assistant speech policy must not enter AgentCore prompt construction')
+for source in (ROOT / 'MobileHarness/Agents/Core').rglob('*.swift'):
+    if re.search(r'public (?:struct|enum) (?:PoseObservation|SpeechPhase|SpeechSynthesisInput)\b', source.read_text()):
+        errors.append('Shared visual/speech values belong to Types')
+
+# Generic communication infrastructure must not regain application domain schemas or camera samples.
+for directory in ('MobileHarness/Agents/Core', 'MobileHarness/Gateway'):
+    for source in (ROOT / directory).rglob('*.swift'):
+        content = source.read_text()
+        if any(marker in content for marker in ('"speech.', '"vision.', '"phone.', 'gray64', 'PerceptionMessage')):
+            errors.append(f'Domain communication policy in generic infrastructure: {source.relative_to(ROOT)}')
+if (ROOT / 'MobileHarness/Agents/Core/Communication/PerceptionInput.swift').exists() or (ROOT / 'MobileHarness/Agents/Core/ImageInput.swift').exists():
+    errors.append('Domain/media input definitions must not return to Core')
+if 'public enum AgentMessage' in (ROOT / 'MobileHarness/Agents/Core/Communication/AgentMessaging.swift').read_text():
+    errors.append('Core AgentMessage must remain generic, not a closed business enum')
+
+# Core resources/results and lexical parsing must remain business-neutral.
+for source in [*(ROOT / 'MobileHarness/Agents/Core').rglob('*.swift'), *(ROOT / 'MobileHarness/Gateway').rglob('*.swift')]:
+    content = source.read_text()
+    if any(marker in content for marker in ('"camera.capture"', 'cameraCapture', 'public let motor: Int', 'public let target: Int', 'public let observed: Int', 'case targetNotReached', 'case invalidPose', 'controlNotReady', 'feedbackTimeout')):
+        errors.append(f'Concrete resource/result policy in generic infrastructure: {source.relative_to(ROOT)}')
+sentence_source = (ROOT / 'MobileHarness/Agents/Core/Generation/SentenceFunctionBuffer.swift').read_text()
+if re.search(r'containsHanzi\s*\?\s*60\s*:\s*120', sentence_source):
+    errors.append('Assistant soft text limits must not be fixed in Core')
+
+
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')
@@ -369,7 +408,3 @@ for platform in ('iphoneos', 'iphonesimulator'):
     if model_inputs != ['$(SRCROOT)/MobileHarness/Resources/Models/model-catalog.json']:
         raise SystemExit('App staging must not depend on model weights')
 print('Model resources: declarative catalog and metadata-only App staging passed.')
-
-# Feature-specific presentation contracts must not return to Agent infrastructure.
-if (ROOT / "MobileHarness/Agents/Core/Output/PoseOverlay.swift").exists():
-    raise SystemExit("PoseOverlay belongs to Types/Vision, not AgentCore")

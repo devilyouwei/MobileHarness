@@ -122,3 +122,10 @@ Adaptive validation: 21 filtered vision/UI tests, source formatting, module/reso
 Fusion validation: 28 explicitly selected vision/UI tests, module/resource boundaries, changed-source formatting, project plist and unsigned generic iOS device build passed. Full check.sh was excluded by the user’s no-robot-test instruction; the known simulator CoreAI limitation remains. No robot tests or hardware actions were run. Physical small-target/exposure sensitivity, sustained latency/thermal behavior and UI acceptance remain pending.
 
 ✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](adr/0114-vision-presentation-values.md).
+
+✅ AgentCore/domain separation stage 1 moves pose and speech values to Types, application Agent names to Agents, and automatic speech guidance to Assistant. Core depends only on immutable Types; scheduling completion requires explicit source. ✅ Generic message/schema registration, domain freshness policy, explicit host input adaptation and Agent-owned sample transport are implemented in stage 2. See [ADR0115](adr/0115-agentcore-domain-separation.md).
+
+✅ Application domain contracts and identities are consolidated in Agents/Communication/AgentContracts.swift; Core/Gateway contain no speech/vision/phone contract cases. Vision media/observation/presentation values share VisionValues.swift; Assistant prompt policy stays in AssistantAgent.swift. Unknown/spoofed schemas reject admission. ❌ Dynamic registry reload, remote codecs and durable communication remain pending. See [ADR0116](adr/0116-generic-agent-communication.md).
+
+
+✅ Core residual cleanup (ADR0118): camera resource names moved to App; motor report fields replaced by bounded detail values; device error enums removed from Core; Assistant owns soft text segmentation limits. ❌ Provider-specific detail validation and remote serialization remain outside Core.

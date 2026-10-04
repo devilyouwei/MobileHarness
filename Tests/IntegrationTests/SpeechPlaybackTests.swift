@@ -10,6 +10,7 @@ import StorageAudio
 import Testing
 import ToolRuntime
 import Tools
+import Types
 
 private func pcm(_ sequence: UInt64 = 0) throws -> AudioFrame {
     try AudioFrame(
@@ -215,6 +216,7 @@ private actor SynthesisClient: Agent {
 }
 private func synthesisClientConfiguration(_ name: String, permitted: Bool) throws -> AgentConfiguration {
     try AgentConfiguration(
+        contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
             "version": 5, "id": name, "actions": [String: [String]](), "tools": [],
             "communication": [
@@ -228,7 +230,9 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
         synthesisClientConfiguration("alpha", permitted: true), synthesisClientConfiguration("beta", permitted: true),
         synthesisClientConfiguration("denied", permitted: false), AgentConfigurations.load(named: "SpeechSynthesis"),
     ]
-    let policy = try CommunicationPolicy(configurations: configs)
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"], configurations: configs)
     let manager = AgentManager()
     let store = SpeechAudioStore()
     let model = PlaybackSynthesisFixture()

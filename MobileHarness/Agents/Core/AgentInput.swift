@@ -1,4 +1,5 @@
 import Foundation
+import Types
 
 public enum InputPayload: Sendable {
     case text(String)
@@ -8,7 +9,7 @@ public enum InputPayload: Sendable {
     case activityEvent(ActivityEvent)
     case image(ImageInput)
     case audio(AudioInput)
-    case observation(PerceptionObservation)
+    case observation(AgentMessage)
     public var kind: InputKind {
         switch self {
         case .audio: .audio
@@ -23,8 +24,8 @@ public enum InputPayload: Sendable {
     }
 }
 
-/// Session-local utterance identity, assigned once at first confirmed speech onset.
-public struct ConversationTurn: Sendable, Equatable {
+/// Session-local interaction identity; the producing workflow assigns its meaning and ordinal.
+public struct AgentTurn: Sendable, Equatable {
     public let id: UUID
     public let ordinal: UInt64
     public init(id: UUID = UUID(), ordinal: UInt64) {
@@ -38,10 +39,10 @@ public struct AgentInput: Sendable {
     public let sessionID: UUID
     public let metadata: InputMetadata
     public let payload: InputPayload
-    public let turn: ConversationTurn?
+    public let turn: AgentTurn?
     public init(
         id: UUID = UUID(), sessionID: UUID, payload: InputPayload, metadata: InputMetadata? = nil,
-        turn: ConversationTurn? = nil
+        turn: AgentTurn? = nil
     ) {
         self.turn = turn
         self.id = id
@@ -70,7 +71,7 @@ public struct InputMetadata: Sendable {
     ) {
         let contract: String
         var defaultSource = "runtime"
-        var lifetime: Double = 10
+        let lifetime: Double = 10
         switch payload {
         case .text:
             contract = "user.text"
@@ -81,16 +82,12 @@ public struct InputMetadata: Sendable {
         case .activityEvent: contract = "activity.event"
         case .audio:
             contract = "media.audio"
-            defaultSource = "phone.microphone"
-            lifetime = 60
+
         case .image:
             contract = "media.image"
-            defaultSource = "phone.camera"
-            lifetime = 1
+
         case .observation(let observation):
             contract = observation.contract
-            if contract == "vision.pose" { lifetime = 1 }
-            if contract == "speech.partial" { lifetime = 2 }
         }
         self.contract = contract
         version = 1

@@ -1047,11 +1047,13 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 case .cancelled: code = .cancelled
                 case nil: code = nil
                 }
+                var details = ["motor": String(result.motor), "target": String(result.target)]
+                if let observed = result.observed { details["observed"] = String(observed) }
                 return .init(
                     path: "step.\(result.step).motor.\(result.motor)",
                     status: result.failure == .cancelled
                         ? (result.started ? .cancelled : .notStarted) : (result.failure == nil ? .succeeded : .failed),
-                    code: code, motor: result.motor, target: result.target, observed: result.observed)
+                    code: code, details: details)
             })
     }
     public func moveMotor(id: Int, target: Int?, speed: Int, acceleration: Int) async throws {

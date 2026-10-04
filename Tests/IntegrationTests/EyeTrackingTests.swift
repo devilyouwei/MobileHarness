@@ -5,6 +5,7 @@ import Foundation
 import Testing
 import ToolRuntime
 import Tools
+import Types
 
 @testable import Agents
 

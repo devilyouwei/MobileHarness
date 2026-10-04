@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import StorageAudio
+import Types
 
 /// Shared directed synthesis service. One FIFO worker, independent of playback Channels.
 public actor SpeechSynthesisAgent: Agent {
@@ -56,14 +57,14 @@ public actor SpeechSynthesisAgent: Agent {
         let owner = SpeechAudioStore.Owner(
             source: input.metadata.source,
             session: input.sessionID, input: input.metadata.parentID ?? input.id)
-        if case .observation(.cancelSpeech(let id)) = input.payload {
+        if case .cancelSpeech(let id)? = input.payload.perception {
             try await store.cancel(id, owner: owner)
             return
         }
-        guard case .observation(.speechSynthesis(let request)) = input.payload else {
+        guard case .speechSynthesis(let request)? = input.payload.perception else {
             throw HarnessError.unsupportedInput
         }
-        try request.validate()
+        do { try request.validate() } catch { throw CommunicationError.invalidPayload }
         guard queue.count + admitting < 32 else { throw HarnessError.queueFull }
         admitting += 1
         defer { admitting -= 1 }

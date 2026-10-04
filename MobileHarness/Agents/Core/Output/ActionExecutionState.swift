@@ -4,9 +4,14 @@ import Foundation
 public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     public enum Phase: String, Sendable { case queued, running, cancelling, succeeded, failed, cancelled }
     public enum Semantics: String, Sendable { case finite, state, activityStart, activityUpdate, activityStop }
-    public enum Failure: String, Sendable {
-        case operationFailed, resourceUnavailable, disconnected, busy, background, invalidPose
-        case unconfirmed, controlNotReady, feedbackTimeout, completionTimeout, invalidArguments
+    public struct Failure: RawRepresentable, Equatable, Sendable {
+        public let rawValue: String
+        public init(rawValue: String) {
+            precondition(!rawValue.isEmpty && rawValue.utf8.count <= 64)
+            self.rawValue = rawValue
+        }
+        public static let operationFailed = Self(rawValue: "operationFailed")
+        public static let resourceUnavailable = Self(rawValue: "resourceUnavailable")
     }
     public let id: UUID
     public let path: ActionPath

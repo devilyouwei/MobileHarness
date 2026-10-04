@@ -15,8 +15,11 @@ public struct GenerationTrace: Sendable {
     private var closed = false
     private var generator: AgentGenerator
 
-    public init(capabilities: CapabilityRegistry, textMapping: AgentGenerator.TextMapping? = nil) {
-        generator = AgentGenerator(capabilities: capabilities, textMapping: textMapping)
+    public init(
+        capabilities: CapabilityRegistry, textMapping: AgentGenerator.TextMapping? = nil,
+        segmentation: TextSegmentationPolicy = .sentences
+    ) {
+        generator = AgentGenerator(capabilities: capabilities, textMapping: textMapping, segmentation: segmentation)
     }
 
     public mutating func append(_ delta: String) throws {

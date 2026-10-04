@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Types
 
 /// Agent-owned scheduling bounds. App supplies configuration, never motion policy.
 public struct FrameSamplingConfiguration: Sendable {
@@ -79,7 +80,7 @@ public struct FrameCadence: Sendable {
                 return false
             }
         }
-        let sample = FrameMotionAnalyzer.sample(frame)
+        let sample = try FrameMotionAnalyzer.sample(frame)
         imageActivity = imageMotion.measure(sample, at: frame.timestamp, learnNoise: poseStableForNoise)
         if let imageActivity, imageActivity >= 0.1 {
             let activity = min(1, (imageActivity - 0.1) / 0.4)

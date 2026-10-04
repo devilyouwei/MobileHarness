@@ -101,7 +101,7 @@ Failure cannot roll back Actions already emitted and executed. If one append thr
 - ✅ FunctionToken.swift: parsed tokens, GenerationEvent, SchedulingDirective and generation errors.
 - ✅ ChannelParser.swift: unified Channel/wait nesting, matching closure and Channel restoration.
 - ✅ AgentGenerator.swift: alias binding, effective channels and code-owned text mappings.
-- ✅ SentenceFunctionBuffer.swift: progressive multilingual sentence segmentation, including punctuation, quotes, decimals and abbreviations.
+- ✅ SentenceFunctionBuffer.swift: validated TextSegmentationPolicy and progressive multilingual sentence segmentation, including punctuation, quotes, decimals and abbreviations.
 - ✅ ToolCallParser.swift: complete native tool arguments and registered capability resolution.
 - ❌ Incremental native tool-argument assembly and full JSON Schema. ChatEvent currently exposes text/completion only; the existing /status tool route remains separate.
 
@@ -113,7 +113,7 @@ Update this README when changing syntax, names, bounds, ordering or completion/c
 
 ✅ Natural text is submitted at sentence endings (`。！？.!?`, semicolons, paragraph breaks and supported multilingual sentence marks), XML Action/Channel/wait boundaries, or normal generation completion. Commas, enumeration commas and colons no longer trigger short clauses. Adjacent punctuation, closing quotes and whitespace stay with the preceding text; one following content character disambiguates a streaming boundary. Decimal/abbreviation protection remains.
 
-✅ A soft length boundary is 60 Characters when the current prefix contains Hanzi, otherwise 120 Characters. It waits for a safe word boundary, never splitting a contiguous non-CJK word, number, apostrophe or hyphenated word. These are text Characters, not model tokens. Pending text retains its 2000 UTF-8-byte hard bound; an oversized unbreakable word fails explicitly. No timer or new queue is introduced. Cancellation still discards pending text.
+✅ Assistant supplies TextSegmentationPolicy with a soft length boundary of 60 Characters when the current prefix contains Hanzi, otherwise 120 Characters. Core defaults to sentence-boundary segmentation without a soft length limit. It waits for a safe word boundary, never splitting a contiguous non-CJK word, number, apostrophe or hyphenated word. These are text Characters, not model tokens. Pending text retains its 2000 UTF-8-byte hard bound; an oversized unbreakable word fails explicitly. No timer or new queue is introduced. Cancellation still discards pending text.
 
 ✅ The shared mechanism emits the same chunks to Agent-owned speech/caption mapping. Explicit XML Action parameters retain their own function validation and are not resegmented here. Kokoro's internal language switches and model input constraints remain independent backend adaptation. ❌ First-chunk special handling and timeout flushing are not implemented.
 
@@ -171,3 +171,13 @@ flowchart LR
 ✅ TextMapping now returns ordered GenerationEvents containing ActionCalls or ToolCalls. Each chunk yields at most8 events and a generation at most120 calls. Assistant supplies a speech Action and append-caption Tool. Tool events retain unique call IDs but have no channel/wait membership. XML still resolves only model-declared Action aliases; native Tool parsing remains separate. ❌ The change does not invent XML Tool aliases or model-native transport.
 
 ✅ Unknown Action aliases and invocation parameter validation emit ordered CallRejection events and continue generation; rejected calls count toward the120-call bound. Native Tool parsing still throws typed resolution errors for the consumer to convert. ❌ Malformed XML, forbidden Channels, cancellation and resource limits remain terminal.
+
+✅ TextSegmentationPolicy validates explicit soft limits in1…2000 Characters. AgentGenerator and GenerationTrace receive the same immutable policy; no device/Agent defaults are baked into the buffer. ❌ Timer-based flushing remains absent.
+
+```mermaid
+flowchart LR
+    Agent[Agent: choose latency / chunk limits] --> Policy[Validated TextSegmentationPolicy]
+    Policy --> Buffer[Shared sentence / safe word boundary mechanism]
+    Buffer --> Mapping[Agent-owned text mapping]
+    Policy --> Trace[History preview: identical policy]
+```

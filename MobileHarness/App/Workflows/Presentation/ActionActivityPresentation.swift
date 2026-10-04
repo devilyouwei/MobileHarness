@@ -1,3 +1,4 @@
+import ActionRuntime
 import AgentCore
 import Foundation
 import UI
@@ -17,7 +18,7 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
             + report.entries.enumerated().compactMap { index, entry in
                 guard entry.status != .succeeded else { return nil }
                 let reason: String
-                switch entry.code {
+                switch entry.code.flatMap({ ActionReport.Entry.Code(rawValue: $0.rawValue) }) {
                 case .targetNotReached: reason = "稳定后仍未到位"
                 case .feedbackLost: reason = "未收到位置反馈"
                 case .disconnected: reason = "机械臂连接不可用"
@@ -34,9 +35,9 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
                         reason = "执行失败"
                     }
                 }
-                let motor = entry.motor.map { " · \($0)号电机" } ?? ""
+                let motor = entry.details["motor"].map { " · \($0)号电机" } ?? ""
                 let position: String
-                if let target = entry.target, let observed = entry.observed {
+                if let target = entry.details["target"], let observed = entry.details["observed"] {
                     position = "（目标 \(target)，反馈 \(observed)）"
                 } else {
                     position = ""

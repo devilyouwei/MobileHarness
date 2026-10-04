@@ -1,9 +1,29 @@
 import Foundation
 
+/// Immutable producer-supplied soft limits; sentence boundaries need no length policy.
+public struct TextSegmentationPolicy: Sendable {
+    public static let sentences = Self()
+    let hanziLimit: Int?
+    let otherLimit: Int?
+    private init() {
+        hanziLimit = nil
+        otherLimit = nil
+    }
+    public init(hanziLimit: Int, otherLimit: Int) throws {
+        guard (1...2000).contains(hanziLimit), (1...2000).contains(otherLimit) else {
+            throw GenerationError.limitExceeded
+        }
+        self.hanziLimit = hanziLimit
+        self.otherLimit = otherLimit
+    }
+}
+
 /// Preserves source text while waiting for one following character to disambiguate a boundary.
 /// Soft length boundaries preserve words; the pending buffer retains a hard 2,000-byte safety bound.
 struct SentenceFunctionBuffer {
     private var buffer = ""
+    private let policy: TextSegmentationPolicy
+    init(policy: TextSegmentationPolicy = .sentences) { self.policy = policy }
     private static let punctuation = Set<Character>(",，、;；:：.!?。！？؛،؟।॥\n\r")
     private static let sentenceEnds = Set<Character>(";；.!?。！？؛؟।॥\n\r")
     private static let closing = Set<Character>("\"'”’»›）)]}」』】》〉")
@@ -26,9 +46,9 @@ struct SentenceFunctionBuffer {
         while index < characters.count {
             let prefix = characters[start...index]
             containsHanzi = containsHanzi || Self.isCJK(characters[index])
-            let threshold = containsHanzi ? 60 : 120
+            let threshold = containsHanzi ? policy.hanziLimit : policy.otherLimit
             let lengthBoundary =
-                index - start + 1 >= threshold && index + 1 < characters.count
+                threshold.map { index - start + 1 >= $0 } == true && index + 1 < characters.count
                 && Self.canSplit(after: characters[index], before: characters[index + 1])
             guard Self.sentenceEnds.contains(characters[index]) || characters[index] == "\r\n" || lengthBoundary,
                 Self.hasContent(prefix)
@@ -59,7 +79,7 @@ struct SentenceFunctionBuffer {
             if Self.hasContent(buffer) {
                 output.append(buffer)
             } else if !output.isEmpty {
-                // Keep punctuation/whitespace attached to speech, never create an empty utterance.
+                // Keep punctuation/whitespace attached to text, never create an empty chunk.
                 output[output.count - 1] += buffer
             }
             buffer = ""

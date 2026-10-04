@@ -12,6 +12,7 @@ import Synchronization
 import Testing
 import ToolRuntime
 import Tools
+import Types
 
 private struct RecognitionFixture: SpeechRecognitionCapability {
     let text: String
@@ -103,6 +104,8 @@ private func preparedSpeech(
     try await manager.register(synth)
     try await synth.start()
     let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
         configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis"].map {
             try AgentConfigurations.load(named: $0)
         })
@@ -343,7 +346,7 @@ func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async 
     await #expect(throws: UITools.PresentationError.invalidText) {
         try await UITools.print(invocation: uiToolInvocation(invocation)) { value, _ in await probe.displayed(value) }
     }
-    #expect(throws: CommunicationError.invalidPayload) { _ = try SpeechSynthesisInput(text: text ?? "") }
+    #expect(throws: SpeechValidationError.invalidRequest) { _ = try SpeechSynthesisInput(text: text ?? "") }
     #expect(await probe.displayedText.isEmpty)
 }
 
@@ -422,10 +425,13 @@ private actor EndpointVADSession: VoiceActivitySession {
 }
 
 @Test(.timeLimit(.minutes(1))) func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
-    let policy = try CommunicationPolicy(configurations: [
-        AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
-        AgentConfigurations.load(named: "SpeechSynthesis"),
-    ])
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+        configurations: [
+            AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
+            AgentConfigurations.load(named: "SpeechSynthesis"),
+        ])
     let session = UUID()
     let manager = AgentManager()
     let assistant = ObservationRecorder(id: "assistant")
@@ -464,11 +470,17 @@ private actor EndpointVADSession: VoiceActivitySession {
     }
     let first = try AudioInput(samples: Data(repeating: 0, count: 1536 * 4), sequence: 0, timestamp: 0)
     let second = try AudioInput(samples: Data(repeating: 0, count: 12800 * 4), sequence: 1, timestamp: 0.096)
-    _ = try await input.publish(AgentInput(sessionID: session, payload: .audio(first)))
-    _ = try await input.publish(AgentInput(sessionID: session, payload: .audio(second)))
+    _ = try await input.publish(
+        AgentInput(
+            sessionID: session, payload: .audio(first),
+            metadata: InputMetadata(payload: .audio(first), source: "phone.microphone")))
+    _ = try await input.publish(
+        AgentInput(
+            sessionID: session, payload: .audio(second),
+            metadata: InputMetadata(payload: .audio(second), source: "phone.microphone")))
     for _ in 0..<10000 {
         if await assistant.inputs.contains(where: {
-            if case .observation(.transcript(_, final: true)) = $0.payload { return true }
+            if case .transcript(_, final: true)? = $0.payload.perception { return true }
             return false
         }) {
             break
@@ -476,12 +488,12 @@ private actor EndpointVADSession: VoiceActivitySession {
         try await Task.sleep(for: .milliseconds(1))
     }
     let finals = await assistant.inputs.filter {
-        if case .observation(.transcript(_, final: true)) = $0.payload { return true }
+        if case .transcript(_, final: true)? = $0.payload.perception { return true }
         return false
     }
     #expect(finals.count == 1)
     if let value = finals.first, case .observation(let event) = value.payload {
-        #expect(event == .transcript("你好", final: true))
+        #expect(event.perception == .transcript("你好", final: true))
         #expect(value.turn?.ordinal == 1)
     } else {
         Issue.record("Missing final observation")
@@ -495,7 +507,10 @@ private actor EndpointVADSession: VoiceActivitySession {
     #expect(displayed.filter { $0.isEmpty }.count == 1)
     await scheduler.shutdown()
     await #expect(throws: HarnessError.notRunning) {
-        try await speech.receive(AgentInput(sessionID: session, payload: .audio(first)))
+        try await speech.receive(
+            AgentInput(
+                sessionID: session, payload: .audio(first),
+                metadata: InputMetadata(payload: .audio(first), source: "phone.microphone")))
     }
     await manager.stopAll()
 }
@@ -555,10 +570,13 @@ private actor EndpointVADSession: VoiceActivitySession {
     try await manager.register(source, sessionID: session)
     try await assistant.start()
     await source.start()
-    let policy = try CommunicationPolicy(configurations: [
-        AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
-        AgentConfigurations.load(named: "SpeechSynthesis"),
-    ])
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+        configurations: [
+            AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
+            AgentConfigurations.load(named: "SpeechSynthesis"),
+        ])
     let input = InputGateway(manager: manager, policy: policy)
     let probe = VoiceProbe()
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
@@ -576,7 +594,7 @@ private actor EndpointVADSession: VoiceActivitySession {
         sessionID: session,
         payload: .audio(
             try AudioInput(samples: Data(repeating: 0, count: 4), sequence: 0, timestamp: 0)),
-        turn: ConversationTurn(ordinal: 1))
+        turn: AgentTurn(ordinal: 1))
     let report = try await port.publish(.speechPhase(.speaking), parent: parent)
     #expect(report.delivered == [.assistant])
     // Signal delivery alone cannot mutate the presentation handler's state.
@@ -605,9 +623,9 @@ private actor EndpointVADSession: VoiceActivitySession {
 
 @Test func conversationPresentationRejectsLateClosedAndRepeatedUpdates() throws {
     let session = UUID()
-    let first = ConversationTurn(ordinal: 1)
-    let second = ConversationTurn(ordinal: 2)
-    func envelope(_ turn: ConversationTurn, _ sequence: UInt64, _ source: AgentID) -> OutputEnvelope {
+    let first = AgentTurn(ordinal: 1)
+    let second = AgentTurn(ordinal: 2)
+    func envelope(_ turn: AgentTurn, _ sequence: UInt64, _ source: AgentID) -> OutputEnvelope {
         OutputEnvelope(
             source: source,
             input: AgentInput(sessionID: session, payload: .text("fixture"), turn: turn),
@@ -637,7 +655,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     #expect(!accepted10)
     let accepted11 = state.accept(envelope(first, 99, .speechPerception), update: .finishTranscript)
     #expect(!accepted11)
-    let accepted12 = state.accept(envelope(ConversationTurn(ordinal: 2), 100, .assistant), update: .beginReply)
+    let accepted12 = state.accept(envelope(AgentTurn(ordinal: 2), 100, .assistant), update: .beginReply)
     #expect(!accepted12)
     let accepted13 = state.accept(envelope(second, 6, .assistant), update: .beginReply)
     #expect(accepted13)

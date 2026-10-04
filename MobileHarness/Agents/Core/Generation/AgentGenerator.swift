@@ -6,12 +6,16 @@ public struct AgentGenerator: Sendable {
     public typealias TextMapping = @Sendable (String, String?) throws -> [GenerationEvent]
     private let mapTextCalls: TextMapping?
     private var parser = FunctionTokenParser()
-    private var sentences = SentenceFunctionBuffer()
+    private var sentences: SentenceFunctionBuffer
     private var textChannel: String?
     private var calls = 0
     private var closed = false
 
-    public init(capabilities: CapabilityRegistry, textMapping: TextMapping? = nil) {
+    public init(
+        capabilities: CapabilityRegistry, textMapping: TextMapping? = nil,
+        segmentation: TextSegmentationPolicy = .sentences
+    ) {
+        sentences = SentenceFunctionBuffer(policy: segmentation)
         self.capabilities = capabilities
         self.mapTextCalls = textMapping
     }

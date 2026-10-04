@@ -7,6 +7,7 @@ import ModelKit
 import OSLog
 import PlatformKit
 import Tools
+import Types
 
 /// Owns one vision Agent session: frames enter InputGateway, effects leave through OutputGateway.
 @MainActor
@@ -52,7 +53,7 @@ final class VisionSession {
                                 }),
                             sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation,
                             capturedAt: frame.capturedAt)
-                        let report = try await input.publish(AgentInput(sessionID: sessionID, payload: .image(image)))
+                        let report = try await input.publish(MediaInputAdapter.image(image, sessionID: sessionID))
                         guard report.rejected.isEmpty, report.delivered == [.visionPerception] else {
                             if await vision.status().lifecycle == .failed { return false }
                             continue

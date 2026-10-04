@@ -34,7 +34,9 @@ private func document() -> [String: Any] {
 }
 
 private func decode(_ document: [String: Any]) throws -> AgentConfiguration {
-    try AgentConfiguration(data: JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]))
+    try AgentConfiguration(
+        contracts: AgentContracts.communication,
+        data: JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]))
 }
 
 @Test(arguments: [
@@ -133,7 +135,9 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
                 channel: "Speech", parameters: ["text": "unconverted"])))
     for name in ["say", "print", "playAudio", "beginReplyTurn"] {
         #expect(throws: GenerationError.unknownCapability) { try registry.resolveAction(name, parameters: [:]) }
-        var generator = AgentGenerator(capabilities: registry, textMapping: AssistantAgent.mapText)
+        var generator = AgentGenerator(
+            capabilities: registry, textMapping: AssistantAgent.mapText,
+            segmentation: try AssistantAgent.textSegmentation)
         #expect(
             try generator.append("<\(name)/>") == [
                 .rejected(
@@ -151,9 +155,11 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
 
 @Test func configurationBoundsIdentityAndOldVersionRejection() throws {
     #expect(throws: AgentConfigurationError.invalidFormat) {
-        try AgentConfiguration(data: Data(repeating: 0, count: 65537))
+        try AgentConfiguration(contracts: AgentContracts.communication, data: Data(repeating: 0, count: 65537))
     }
-    #expect(throws: AgentConfigurationError.invalidFormat) { try AgentConfiguration(data: Data("invalid JSON".utf8)) }
+    #expect(throws: AgentConfigurationError.invalidFormat) {
+        try AgentConfiguration(contracts: AgentContracts.communication, data: Data("invalid JSON".utf8))
+    }
     var root = document()
     root["id"] = "other"
     let other = try decode(root)
@@ -196,7 +202,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
         #expect(!prompt.contains(text))
     }
     #expect(!prompt.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) })
-    var generator = AgentGenerator(capabilities: registry, textMapping: AssistantAgent.mapText)
+    var generator = AgentGenerator(
+        capabilities: registry, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
     let events = try generator.append("<wait>Hello.</wait><express emotion='smile'/>") + generator.finish()
     #expect(events.compactMap(\.actionCall).map(\.actionPath.function) == ["speak", "express"])
     #expect(events[0] == .scheduling(.beginWait))
@@ -286,7 +293,8 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
         #expect(throws: GenerationError.limitExceeded) { try invalid.append("Hi<wait></wait>") }
         #expect(throws: GenerationError.closed) { try invalid.finish() }
     }
-    var bounded = AgentGenerator(capabilities: model, textMapping: AssistantAgent.mapText)
+    var bounded = AgentGenerator(
+        capabilities: model, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
     for _ in 0..<40 {
         #expect(try bounded.append("Hello<express emotion='smile'/>").count == 3)
     }
@@ -310,4 +318,17 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     #expect(throws: GenerationError.limitExceeded) {
         try CapabilityRegistry(internalActions: Array(repeating: action, count: 129))
     }
+}
+
+@Test func agentCoreContextContainsNoAutomaticSpeechPolicy() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let generic = try CapabilityContextBuilder.build(config.capabilities)
+    #expect(generic.contains("SCHEDULING: CHANNEL, MODULE, WAIT"))
+    #expect(generic.contains("Action express:"))
+    #expect(!generic.contains("automatically converted to audio"))
+    #expect(!generic.contains("audio playback"))
+    #expect(!generic.contains("Speak-then-act"))
+    let assistant = try AssistantAgent.systemPrompt(capabilities: config.capabilities)
+    #expect(assistant.contains("automatically converted to audio"))
+    #expect(assistant.contains("Speak-then-act"))
 }

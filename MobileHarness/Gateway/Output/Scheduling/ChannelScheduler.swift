@@ -256,7 +256,7 @@ public actor ChannelScheduler {
         startEligibleChannels()
     }
     /// Seals the root group and joins all accepted work. Only one finish waiter is admitted.
-    public func finish(inputID: UUID, source: AgentID = .assistant) async throws {
+    public func finish(inputID: UUID, source: AgentID) async throws {
         let key = InputKey(source: source, inputID: inputID)
         guard let state = inputs[key] else {
             try Task.checkCancellation()
@@ -281,7 +281,7 @@ public actor ChannelScheduler {
         try outcome.get()
         try Task.checkCancellation()
     }
-    public func cancel(inputID: UUID, source: AgentID = .assistant) async {
+    public func cancel(inputID: UUID, source: AgentID) async {
         let key = InputKey(source: source, inputID: inputID)
         guard let completion = inputs[key]?.completion else { return }
         beginCancellation(key)

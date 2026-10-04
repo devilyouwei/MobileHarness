@@ -14,7 +14,7 @@ public struct AgentConfiguration: Sendable {
     public let agentID: AgentID
     public let capabilities: CapabilityRegistry
 
-    public init(data: Data) throws {
+    public init(contracts: CommunicationContracts = .standard, data: Data) throws {
         guard !data.isEmpty, data.count <= 65_536 else { throw AgentConfigurationError.invalidFormat }
         let raw: Any
         do { raw = try JSONSerialization.jsonObject(with: data) } catch {
@@ -41,7 +41,7 @@ public struct AgentConfiguration: Sendable {
             guard let entries = communicationObject[key] as? [Any] else { throw AgentConfigurationError.invalidFormat }
             for entry in entries { _ = try Self.dictionary(entry, keys: keys, field: "communication.\(key)") }
         }
-        try decoded.communication.validate()
+        try decoded.communication.validate(contracts: contracts)
         communication = decoded.communication
         guard let groups = root["actions"] as? [String: [Any]], let tools = root["tools"] as? [Any],
             groups.values.reduce(0, { $0 + $1.count }) + tools.count <= 128

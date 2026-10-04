@@ -12,6 +12,7 @@ import PlatformKit
 import StorageAudio
 import ToolRuntime
 import Tools
+import Types
 import UI
 
 @MainActor
@@ -302,7 +303,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                             timestamp += packet.duration
                             sequence += 1
                             let report = try await requests.publish(
-                                AgentInput(sessionID: generation, payload: .audio(audioInput)))
+                                MediaInputAdapter.audio(audioInput, sessionID: generation))
                             // Endpoint processing can close admission while the last capture packet is in flight.
                             guard self.voiceGeneration == generation else { return }
                             if !report.rejected.isEmpty {
@@ -433,7 +434,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     }
 
     func observeSpeech(_ input: AgentInput) {
-        guard input.sessionID == voiceGeneration, case .observation(let observation) = input.payload else { return }
+        guard input.sessionID == voiceGeneration, let observation = input.payload.perception else { return }
         switch observation {
         case .transcript(let text, let final):
             if final { record("你（语音）：\(text)") }

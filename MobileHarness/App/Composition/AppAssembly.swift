@@ -8,6 +8,7 @@ import ModelKitRuntime
 import Observation
 import PlatformKit
 import Storage
+import Types
 import UI
 
 /// The scene's composition root. Runtime services are lazy but never discovered by consumers.

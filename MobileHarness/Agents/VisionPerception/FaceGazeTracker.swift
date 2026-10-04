@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Types
 
 /// Bounded, identity-free attention policy. Coordinates are already upright; mirror only once.
 struct FaceGazeTracker: Sendable {

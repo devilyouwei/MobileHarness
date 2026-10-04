@@ -35,7 +35,7 @@ flowchart LR
 
 PCM 格式在一项请求内保持一致，帧 sequence 严格递增，流必须有 `finished` 且非空，总输出最多 8 MiB。模型或缓存错误写入对应句柄，不产生一条“成功”消息；请求方若需获知最终结果，应在消费该句柄时处理存储错误。当前不提供跨 Agent 的完成通知或持久化文件。
 
-✅ `speech.synthesize / 1 / observation` carries `SpeechSynthesisInput(audioID,text,locale)`. Nonblank text ≤2000 UTF-8 bytes; locale auto/zh-CN/en-US. The original Agent selects semantic segments. Model adapters retain language/length adaptation under the same audioID. `AgentMessage` generalizes the historical PerceptionObservation transport (source-compatible alias).
+✅ `speech.synthesize / 1 / observation` carries `SpeechSynthesisInput(audioID,text,locale)`. Nonblank text ≤2000 UTF-8 bytes; locale auto/zh-CN/en-US. The original Agent selects semantic segments. Model adapters retain language/length adaptation under the same audioID. `PerceptionMessage` defines typed business cases, carried by Core’s generic AgentMessage without a compatibility alias.
 
 ✅ `speech.cancel / 1 / observation` carries a UUID; ownership is checked against the directed sender, session and parent input. No subscriptions and no Assistant-specific source assumptions. Reception validates and reserves the handle before returning admission; it never awaits inference or capacity.
 
@@ -87,3 +87,5 @@ sequenceDiagram
 ❌ 取消是协作式的：底层推理若未及时响应，worker 退出和下一项合成仍可能延迟；这不是强制终止底层计算或保证精确到 60 秒的实时机制。测试不等于真机超时听感验收。
 
 ✅ SpeechSynthesis passes the trusted directed sender string into StorageAudio; audio storage does not import AgentCore. Ownership still includes the originating session and parent input.
+
+✅ SpeechSynthesisInput is imported from Types/Speech with unchanged text/locale contract and queue policy. Domain value validation is independent of AgentCore; message admission maps errors to the existing transport rejection.

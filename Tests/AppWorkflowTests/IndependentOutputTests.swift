@@ -1,4 +1,5 @@
 import AgentCore
+import Agents
 import AppWorkflows
 import Foundation
 import Testing

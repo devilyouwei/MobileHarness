@@ -4,7 +4,7 @@ Purpose: define typed Agent communication without owning transport tasks, messag
 
 - ✅ AgentMessaging binds publish/send to the sender's live incarnation through an OutputGateway closure.
 - ✅ CommunicationPolicy validates JSON v5 inputs, exact contract/source/topic subscriptions, publications and direct-send permissions.
-- ✅ DeliveryReport describes per-target admission; PerceptionInput defines typed media/observations.
+- ✅ DeliveryReport describes per-target admission; AgentMessaging.swift groups the generic AgentMessage, sender port and admission reports.
 - ❌ Dynamic subscriptions, request/reply, remote transport, persistence and automatic retry.
 
 InternalSignalBus and its queue/active-call registry, timers, session API, duplicate cache and snapshots have been removed. This directory replaces the former `AgentCore/Bus` directory (historical path); see [ADR 0048](../../../../docs/adr/0048-direct-signal-admission.md).
@@ -74,9 +74,9 @@ Remote or cross-process Agents would require an explicit transport adapter, not 
 See [external input delivery](../../../Gateway/Input/README.md#external-input-admission-and-delivery), [OutputGateway](../../../Gateway/Output/README.md) and the [communication framework](../../../README.md#communication-framework). Tests cover direct overlap, capacity recovery, receiver rejection, expired/foreign-session inputs and stale source ports; Agent tests cover their own buffering policies.
 
 
-✅ AgentMessage now carries typed speech.synthesize and speech.cancel directed requests in addition to perception facts; PerceptionObservation remains a source-compatible alias. Requests are discrete, never state-coalesced. Payload validation bounds text/locale; cache ownership uses source/session/parent input. ❌ General request/reply remains unsupported.
+✅ Generic AgentMessage holds immutable typed content and a checked encoded size. The application catalog registers expected content type, validation, maximum bytes, lifetime and whether publication starts new work. Unknown schemas reject admission; no domain case list or alias lives in Core.
 
-✅ Speech synthesis/cancel commands are newly generated work with a fresh 10-second admission deadline, preserving parent ID, root, hops, session and turn. They do not inherit the original input’s sensor-routing expiration; source identity/session validation and sender generation cancellation still apply. Forwarded perception observations continue to inherit the parent deadline. This prevents late generated segments from failing merely because the already-admitted input is older than 10 seconds.
+✅ Generated work starts its registered lifetime now; forwarded observations inherit the earlier parent deadline. Both retain source incarnation, session, root/parent IDs, hops and AgentTurn. This policy is declarative and does not require Gateway to recognize application contract strings.
 
 ✅ Source location: `MobileHarness/Agents/Core/Communication`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
 
@@ -87,3 +87,18 @@ See [external input delivery](../../../Gateway/Input/README.md#external-input-ad
 ✅ AgentMessaging publishResult/sendResult return ordinary routing failures in DeliveryReport.failure; explicit task cancellation propagates; a cancelled delivery alone is a failed receipt. Each port retains128 correlated delivery receipts, evicts oldest with an explicit counter, and performs no retry. Legacy throwing methods remain low-level validation APIs.
 
 ✅ DeliveryHistory retains a bounded outcome history; overflow evicts the oldest receipt and increments evictedCount. No accepted action is discarded.
+
+✅ CommunicationPolicy receives an immutable capacity-128 CommunicationContracts registry and a capacity-16 external-source allowlist from composition. Configuration parsing validates against the same registry. Duplicate/unknown schemas, missing observation validators and invalid size/lifetime bounds fail explicitly.
+❌ Generic request/reply, dynamic registration, remote serialization and durable delivery remain outstanding.
+
+```mermaid
+flowchart LR
+    Catalog[Business schema catalog] --> Registry[CommunicationContracts]
+    Registry --> Config[JSON configuration validation]
+    Registry --> Policy[CommunicationPolicy]
+    Content[Typed immutable domain value] --> Message[AgentMessage]
+    Message --> Gateway[OutputGateway / InputGateway]
+    Policy --> Gateway
+    Gateway --> Schema[Registered type / size / lifetime validation]
+    Schema --> Receiver[Agent-owned inbox]
+```

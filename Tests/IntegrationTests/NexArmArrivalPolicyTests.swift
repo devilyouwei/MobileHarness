@@ -1,6 +1,7 @@
 import ActionRuntime
 import Actions
 import AgentCore
+import Agents
 import Foundation
 import Gateway
 import PlatformKit
@@ -183,7 +184,7 @@ private enum MacroFixture {
         let envelope = OutputEnvelope(source: .assistant, input: input, output: .actionCall(call))
         try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))
     }
-    try await scheduler.finish(inputID: input.id)
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     await scheduler.finishResultDelivery()
     let results = await scheduler.resultSnapshot().compactMap(\.result)
     #expect(results.count == 2)

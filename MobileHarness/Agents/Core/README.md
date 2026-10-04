@@ -1,13 +1,13 @@
 # Agents/Core — Shared Agent Contracts
 
-Defines Agent identity, input/output, lifecycle, configuration, parsing and communication contracts. The goal is reusable infrastructure without business policy. It depends on Foundation and the Swift standard library, never UI, concrete Agents, model engines or device adapters.
+Defines Agent identity, input/output, lifecycle, configuration, parsing and communication contracts. The goal is reusable infrastructure without business policy. It depends only on immutable Types values, Foundation and the Swift standard library, never UI, concrete Agents, model engines or device adapters.
 
 ## Directory structure
 
 ```text
 Agents/Core/
 ├── Agent.swift, AgentDescriptor.swift, AgentID.swift  # Agent interface and identity
-├── AgentInput.swift, ImageInput.swift, InputKind.swift # Input and media transport
+├── AgentInput.swift, InputKind.swift                  # Generic input and interaction context
 ├── HarnessError.swift                               # Shared errors
 ├── Runtime/                                         # Registry, manager and lifecycle
 ├── Capability/                                      # JSON v5 validation and local permissions
@@ -29,8 +29,8 @@ flowchart TD
     Gateway --> AgentCore
     Actions --> AgentCore
     Tools --> AgentCore
-    StorageAudio -->|Agent identity and ownership| AgentCore
     AgentCore --> Foundation
+    AgentCore --> Types
 ```
 
 ## Internal structure and data flow
@@ -72,14 +72,14 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 | Open | Non-cooperative receivers can delay cancellation; transport is not a real-time safety system. |
 
 
-✅ Communication now includes generic AgentMessage with bounded synthesis requests and cancellation IDs; it contains no PCM cache, model or playback implementation. ❌ Persistent message delivery remains unsupported.
+✅ AgentMessage transports type-erased immutable Encodable/Sendable content with bounded encoding and validation. Concrete messages and schema policy belong to business Agents/Communication. ❌ Persistent or remote delivery remains unsupported.
 
 
 ✅ GenerationEvent preserves resolved Actions and typed wait boundaries. The shared lexical stack handles combined Channel/wait nesting; SchedulingDirective crosses the trusted output boundary without introducing runtime, UI or model dependencies. ❌ Execution policy remains in Gateway, not AgentCore.
 
 ✅ Runtime registries separate model alias resolution from code-owned InternalAction/InternalTool permission checks. Generator text mapping is a bounded Agent-supplied callback. See [capabilities](Capability/README.md). ❌ Full JSON Schema/native Tool transport remain deferred.
 
-✅ Physically owned by Agents/Core, compiled as the independent AgentCore target. The business Agents target excludes Core to prevent duplicate compilation and the Agents → StorageAudio → AgentCore dependency cycle. Core stays Foundation-only; importing Agents from Core is forbidden. ❌ Directory consolidation does not merge business policy into shared contracts.
+✅ Physically owned by Agents/Core, compiled as the independent AgentCore target. The business Agents target excludes Core to prevent duplicate compilation and the Agents → StorageAudio → AgentCore dependency cycle. Core depends only on Types values and Foundation; importing Agents from Core is forbidden. ❌ Directory consolidation does not merge business policy into shared contracts.
 
 ## Action runtime stage 2
 
@@ -90,4 +90,9 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 
 ✅ Visual skeleton presentation and detection statistics belong to Types/Vision, not AgentCore. Output contains generic invocation/runtime contracts only; no pose-specific presentation policy or preview conversion remains.
 
-✅ ImageInput retains optional native monotonic capture timing as input transport metadata; visual presentation statistics live separately in Types/Vision.
+✅ ImageInput/AudioInput are Types media values, referenced by generic InputPayload. AgentTurn identifies a workflow-defined interaction; Core does not assign speech semantics.
+
+✅ Concrete AgentID names belong to Agents/Communication/AgentContracts.swift. PoseObservation, SpeechPhase and SpeechSynthesisInput are Types values; no compatibility aliases remain in Core. CapabilityContextBuilder describes generic output syntax/scheduling only; Assistant owns text-to-audio guidance.
+✅ CommunicationContracts registers domain schema validators, size/freshness and new-work policy. Core contains only standard transport kinds; host device sources/TTL belong to App, and gray64 belongs to VisionPerception. ❌ Remote codecs and hot reload are not implemented.
+
+✅ Resource identities contain no camera constants; action reports contain no motor/target/observed fields. Device failures are opaque bounded identifiers. Shared text segmentation accepts a validated producer policy and defaults to sentence boundaries; Assistant owns the60/120-character soft limits. ❌ Business detail schemas are not validated by Core.

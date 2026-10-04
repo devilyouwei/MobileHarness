@@ -29,7 +29,7 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 
 
 
-✅ OutputEnvelope retains ConversationTurn and a source-monotonic output sequence. These are assigned by runtime/Agent implementation, never parsed from model parameters.
+✅ OutputEnvelope retains AgentTurn and a source-monotonic output sequence. These are assigned by runtime/Agent implementation, never parsed from model parameters.
 
 
 ✅ `AgentOutput.scheduling(SchedulingDirective)` and OutputKind.scheduling carry beginWait/endWait as typed runtime coordination. They inherit trusted source/session/input from the envelope, have no model-supplied group ID, and cannot invoke a device handler. Completion/error controls remain separate. Agent descriptors must explicitly permit scheduling output. ❌ General typed replacement of legacy control strings is still outstanding.
@@ -72,3 +72,18 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 
 
 ✅ Visual skeleton presentation and detection statistics belong to Types/Vision, not AgentCore. Output contains generic invocation/runtime contracts only; no pose-specific presentation policy or preview conversion remains.
+
+## Generic resource and result boundary
+
+✅ ResourceID contains no concrete device constants. App's CameraCoordinator owns camera.capture. AgentActionReport.Entry transports producer-defined details (at most16 keys,64 UTF-8 bytes per nonempty key,512 bytes per value) without interpreting device semantics. Construction rejects invalid programmer-supplied values by precondition; no fields are silently truncated or discarded. Report bounds remain256 entries and128 UTF-8 bytes per path.
+
+✅ Report codes and execution failure identifiers are bounded RawRepresentable values (1–64 UTF-8 bytes), not device enums. Core defines only framework failure/cancellation/timeout constants. Gateway copies producer codes/details without a device switch. App owns interpretation and localization, including unknown-code fallback. ❌ Remote validation/serialization is not implemented.
+
+```mermaid
+flowchart LR
+    Producer[Business producer: code and details] --> Runtime[ActionRuntime bounded report]
+    Runtime --> Gateway[Gateway: copy identifiers and details]
+    Gateway --> Core[AgentCore generic report]
+    Core --> Agent[Agent consumer]
+    Core --> App[App: business interpretation and presentation]
+```

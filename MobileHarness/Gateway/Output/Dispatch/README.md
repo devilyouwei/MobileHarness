@@ -27,7 +27,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ Completion-only tools are awaited directly and bypass Action lanes. No ToolResult is constructed/submitted on success; ordinary execution errors return correlated error ToolResponse values; cancellation of the calling task propagates. Data tools retain correlated result feedback. Cancellation is checked before execution and after the handler.
 
-✅ Returning ToolResult inputs preserve the originating ConversationTurn so continuation output cannot lose UI round association.
+✅ Returning ToolResult inputs preserve the originating AgentTurn so continuation output cannot lose UI round association.
 
 
 ✅ ActionDispatcher forwards typed SchedulingDirective alongside resolved ActionCall to the same scheduler. Admission does not wait for group execution. Channel capacities aggregate unfinished Actions across tasks, including dormant groups; per-task limits are 120 Actions and 32 waits. ❌ No Tool grouping or cross-task synchronization is introduced.
@@ -47,3 +47,5 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 Completion-only Tool errors remain execution outcomes and do not inject a new model-facing ToolResult; only returning Tools route data feedback.
 
 ✅ Tool feedback delivery errors preserve the original value/isError/callID and add a separate bounded deliveryFailure. True task cancellation propagates. ❌ Feedback delivery does not roll back completed effects.
+
+✅ BehaviorTranslation copies bounded error raw identifiers and complete report details; it no longer switches on device failure cases or maps motor/position fields. ❌ Gateway does not interpret business detail schemas.

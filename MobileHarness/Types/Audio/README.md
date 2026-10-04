@@ -14,3 +14,5 @@ flowchart LR
 ```
 
 ❌ Compressed media, file transport and audio mixing are outside these contracts.
+
+✅ AudioFrame.swift also groups AudioInput, the immutable bounded Float32 PCM input transport. It has no AgentCore dependency; malformed PCM reports AudioValidationError. Host source/deadline and model conversion belong to consumers.

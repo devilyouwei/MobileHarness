@@ -1,4 +1,4 @@
-# Vision — Shared presentation values
+# Vision — Shared visual values
 
 Purpose: own immutable visual values shared by independent consumers. Design goals: preserve the existing Codable payload without importing Agent, Tool, model or platform services.
 
@@ -15,3 +15,7 @@ flowchart LR
     App --> Values
     Values --> UI[UI camera state and projection]
 ```
+
+✅ PoseObservation is the unquantized shared COCO-17 observation used by VisionPerception and Photographer. Construction/validation throws VisionValidationError, with no AgentCore import. Observation-to-overlay projection remains in VisionPerception.
+
+✅ VisionValues.swift groups ImageInput/ImageAttachment, PoseObservation/PoseOverlay and validation errors. Generic attachments carry no fixed gray sample; RGB and native geometry/timing bounds remain. Sampling policy is implemented in VisionPerception, and native conversion in App.
