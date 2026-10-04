@@ -80,18 +80,42 @@
                     }
                 }
                 ForEach(state.items.filter { group.modelIDs.contains($0.id) }) { item in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(item.name)
-                        if item.id == "silero" {
-                            Text("下载后自动用于人声检测。")
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .center, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.name)
+                                if item.id == "silero" {
+                                    Text("下载后自动用于人声检测。")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Text(
+                                    "\(state.status(item)) · \(item.installed ? "" : "预计 ")\(ByteCountFormatter.string(fromByteCount: item.installed ? item.installedBytes : item.bytes, countStyle: .file))"
+                                )
                                 .font(.caption).foregroundStyle(.secondary)
+                                Text("版本 \(item.revision.prefix(12)) · \(item.license)").font(.caption2)
+                                    .foregroundStyle(
+                                        .secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .trailing, spacing: 0) {
+                                if state.isDownloading(item) {
+                                    Button(state.isCancelling(item.id) ? "正在取消…" : "取消下载") {
+                                        Task { await state.perform(item.id, operation: "cancel") }
+                                    }.frame(minHeight: 44).disabled(state.isCancelling(item.id))
+                                } else if !state.isBusy(item) {
+                                    if !item.installed {
+                                        Button(item.failure == nil ? "下载" : "继续下载") {
+                                            Task { await state.perform(item.id, operation: "download") }
+                                        }.frame(minHeight: 44).disabled(state.saving || !state.hasRestored)
+                                    }
+                                    if item.installed || item.failure != nil {
+                                        Button("删除", role: .destructive) { removal = item }.frame(minHeight: 44)
+                                    }
+                                }
+                            }.buttonStyle(.borderless)
+                                .font(.subheadline)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
-                        Text(
-                            "\(state.status(item)) · \(item.installed ? "" : "预计 ")\(ByteCountFormatter.string(fromByteCount: item.installed ? item.installedBytes : item.bytes, countStyle: .file))"
-                        )
-                        .font(.caption).foregroundStyle(.secondary)
-                        Text("版本 \(item.revision.prefix(12)) · \(item.license)").font(.caption2).foregroundStyle(
-                            .secondary)
                         if state.isBusy(item) {
                             if item.activity == .downloading && item.progress > 0 && !state.isCancelling(item.id) {
                                 HStack {
@@ -115,22 +139,6 @@
                         if !state.isBusy(item), let failure = item.failure {
                             Text(failure).font(.caption).foregroundStyle(.red)
                         }
-                        HStack {
-                            if state.isDownloading(item) {
-                                Button(state.isCancelling(item.id) ? "正在取消…" : "取消下载") {
-                                    Task { await state.perform(item.id, operation: "cancel") }
-                                }.disabled(state.isCancelling(item.id))
-                            } else if !state.isBusy(item) {
-                                if !item.installed {
-                                    Button(item.failure == nil ? "下载" : "继续下载") {
-                                        Task { await state.perform(item.id, operation: "download") }
-                                    }.disabled(state.saving || !state.hasRestored)
-                                }
-                                if item.installed || item.failure != nil {
-                                    Button("删除", role: .destructive) { removal = item }
-                                }
-                            }
-                        }.buttonStyle(.borderless)
                     }
                 }
             }
