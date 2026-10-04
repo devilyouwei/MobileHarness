@@ -1,20 +1,20 @@
 # Language generation
 
-Purpose: define ChatCapability and provide local Qwen3.5 and OpenAI-compatible cloud adapters. Design goals: capability-only consumers, bounded output and independent backend execution.
+Purpose: define ChatCapability and provide local Gemma 4 E2B and OpenAI-compatible cloud adapters. Design goals: capability-only consumers, bounded output and independent backend execution.
 
 - ✅ ChatCapability accepts caller-owned text conversation history and produces cancellable text, complete native Tool calls, optional token usage and completion events.
-- ✅ Qwen35 implements the capability using the optional MLX backend; App selects its local model directory.
+- ✅ Gemma4 implements the capability using the CoreAI backend; App selects its local model directory.
 - ❌ Image inputs and local native Tool Call events.
 
 Concrete adapters are separate Swift targets; the base SDK compiles only the capability contract here.
 
-✅ OpenAI-compatible cloud text chat is a separate `ModelKitOpenAI` target in OpenAI/, sharing the local capability/session contracts. ❌ Cloud modalities beyond text chat remain unimplemented.
+✅ OpenAI-compatible cloud text chat is a separate `ModelKitOpenAI` target in OpenAI/, sharing the shared capability/session contracts. ❌ Cloud modalities beyond text chat remain unimplemented.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ## Native cloud Tool calls
 
-✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Qwen remains text-only.
+✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
 
 ```mermaid
 flowchart LR
@@ -36,5 +36,5 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ## Generation token usage
 
-✅ ChatEvent.usage(ChatTokenUsage) reports nonnegative input/generated/total counts before the consumer's terminal finished event. Cloud counts come from provider usage; Qwen counts come from the actual template tokens and backend generation, including a consumed stop token. No AgentCore or Storage types enter ModelKit.
+✅ ChatEvent.usage(ChatTokenUsage) reports nonnegative input/generated/total counts before the consumer's terminal finished event. Cloud counts come from provider usage; Gemma 4 E2B counts come from the actual template tokens and backend generation, including a consumed stop token. No AgentCore or Storage types enter ModelKit.
 ❌ Providers may omit usage, and failed/cancelled generations may have no final counts; callers must not estimate or substitute zero.

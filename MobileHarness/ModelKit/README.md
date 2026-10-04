@@ -12,7 +12,7 @@ ModelKit/
 ├── Defaults/                 # ModelKitDefaults: provider assembly and default bindings
 ├── Management/               # ModelKitRuntime: ModelManager and registration contracts
 ├── Language/
-│   ├── LLM/                  # ChatCapability; separate Qwen35 and OpenAI adapters
+│   ├── LLM/                  # ChatCapability; separate Gemma4 and OpenAI adapters
 │   └── JEV/                  # JudgeCapability contract; no production provider
 ├── Speech/
 │   ├── ASR/                  # Recognition contract; Apple and Nemotron adapters
@@ -20,7 +20,7 @@ ModelKit/
 │   ├── VAD/                  # Voice activity contract, Silero and energy adapters
 │   └── Shared/Apple/         # Apple speech PCM helpers
 ├── Vision/                   # PoseCapability and separate YOLO adapter
-├── Backends/                 # Separate CoreAI, CoreML, MLX, FluidAudio and MossCoreML targets
+├── Backends/                 # Separate CoreAI, CoreML, FluidAudio and MossCoreML targets
 └── README.md                 # Capability boundary
 ```
 
@@ -60,13 +60,13 @@ Dependency arrows below point from a target to what it imports. Base `ModelKit` 
 ```mermaid
 flowchart TD
     Defaults[ModelKitDefaults] --> Runtime[ModelKitRuntime]
-    Defaults --> Adapters[Speech / Qwen35 / OpenAI / YOLO adapters]
+    Defaults --> Adapters[Speech / Gemma4 / OpenAI / YOLO adapters]
     Defaults --> Base[ModelKit contracts]
     Runtime --> Base
     Adapters --> Base
-    Adapters --> Backends[CoreAI / CoreML / MLX / FluidAudio / MossCoreML]
+    Adapters --> Backends[CoreAI / CoreML / FluidAudio / MossCoreML]
     Adapters --> System[Apple speech frameworks]
-    Backends --> Engines[Core ML / MLX / third-party engine SDKs]
+    Backends --> Engines[CoreAI / Core ML / third-party engine SDKs]
     Base --> Types[Types shared values]
 ```
 
@@ -110,7 +110,7 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 | --- | --- |
 | Speech recognition | ✅ Installed available Nemotron or modern Apple SpeechAnalyzer; Settings can force Apple |
 | Voice activity | ✅ Installed available Silero or adaptive energy activity, with per-session state |
-| Chat | ✅ Qwen3.5-2B 4-bit MLX or explicitly configured OpenAI-compatible cloud, text and native Tool calls |
+| Chat | ✅ Gemma 4 E2B QAT CoreAI or explicitly configured OpenAI-compatible cloud, text and native Tool calls |
 | Speech synthesis | ✅ Installed available MOSS Nano or Apple PCM TTS, shared by conversation/diagnostics; Kokoro is historical test-only |
 | Pose | ✅ YOLO26n-Pose INT8 with end-to-end output through PoseCapability |
 | Judgment | ✅ Protocol; ❌ production provider |
@@ -119,7 +119,7 @@ Detailed contracts: [Core](Core/README.md), [Management](Management/README.md), 
 - ✅ Shared provider identity, coalesced loading, explicit unload/shutdown, memory-warning handling and release-when-idle policy.
 - ❌ Timed eviction, measured cross-model memory/thermal budgets and local native Tool-call events.
 
-The physical App requires iOS 27. Speech defaults select enabled installed available local models or Apple ASR/TTS and energy VAD. Settings can force system speech while preserving downloaded artifacts. Simulator local chat reports unavailable; explicitly configured cloud chat is supported. Qwen/YOLO still require their own artifacts. No active-inference or network/cloud fallback is provided.
+The physical App requires iOS 27. Speech defaults select enabled installed available local models or Apple ASR/TTS and energy VAD. Settings can force system speech while preserving downloaded artifacts. Simulator local chat reports unavailable; explicitly configured cloud chat is supported. Gemma 4 E2B/YOLO still require their own artifacts. No active-inference or network/cloud fallback is provided.
 
 ## Adapter boundaries
 
@@ -127,7 +127,7 @@ ModelKitOpenAI exposes explicitly configured endpoint/key/model chat over bounde
 
 Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns no Agent permissions, device I/O or business state. Streams define byte estimates, admission and cleanup; unsupported capabilities fail explicitly. Non-cooperative backend calls can delay cancellation/shutdown; no generic forced interruption is provided.
 
-✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Qwen reports no native Tool support and rejects requests carrying tools. See [technical flow](Language/LLM/OpenAI/README.md).
+✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Gemma 4 E2B reports no native Tool support and rejects requests carrying tools. See [technical flow](Language/LLM/OpenAI/README.md).
 
 ## Local model resources — current contract
 

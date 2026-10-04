@@ -4,10 +4,10 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-profiles = ["nemotron", "qwen3.5-2b", "silero", "moss-tts-nano", "yolo26-pose"]
+profiles = ["nemotron", "gemma4-e2b", "silero", "moss-tts-nano", "yolo26-pose"]
 licenses = [
-    "Nemotron-OpenMDW-1.1", "CoreAIKit-BSD-3-Clause", "Qwen35-Apache-2.0",
-    "MLX-Swift-MIT", "MLX-Swift-LM-MIT", "Silero-MIT", "Hugging-Mac-MIT", "MOSS-TTS-Nano-Apache-2.0", "FluidAudio-Apache-2.0", "YOLOPose-AGPL-3.0",
+    "Nemotron-OpenMDW-1.1", "CoreAIKit-BSD-3-Clause", "Gemma4-Apache-2.0", "CoreAIModels-BSD-3-Clause",
+    "Silero-MIT", "Hugging-Mac-MIT", "MOSS-TTS-Nano-Apache-2.0", "FluidAudio-Apache-2.0", "YOLOPose-AGPL-3.0",
 ]
 for platform in ["iphoneos", "iphonesimulator"]:
     inputs = ["$(SRCROOT)/scripts/stage-voice-models.sh"]

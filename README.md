@@ -15,7 +15,7 @@ MobileHarness uses an iPhone as a host for stateful Agents, shared model capabil
 | Area | Implementation |
 | --- | --- |
 | Voice | Nemotron recognition, Silero VAD and MOSS-TTS-Nano synthesis with progressive captions. |
-| Chat | Local Qwen3.5-2B MLX or explicitly configured OpenAI-compatible cloud chat. |
+| Chat | Local Gemma 4 E2B CoreAI or explicitly configured OpenAI-compatible cloud chat. |
 | Camera | Foreground preview, lens switching and YOLO26n-Pose perception. |
 | Presentation | Recognition/reply captions, expressions/gaze, spectrum and pose overlay. |
 | Robot | Foreground NexArm discovery/connection, manual controls and permitted Agent-selected movement. |
@@ -42,11 +42,10 @@ General fast/slow orchestration, automatic compute escalation and unattended/bac
 ### Requirements
 
 - A Mac with **Xcode 27+**, its matching SDKs, and **Swift 6.4+** tooling.
-- The Xcode **Metal Toolchain** for MLX compilation.
 - **Python 3** for model provisioning and repository checks.
 - For the full experience, an **iOS 27+ physical device**, local model downloads and development signing.
 
-The app targets iOS 27+. Shared package targets have lower base deployment versions; that does not make the full app compatible with older iOS releases. XcodeGen and CocoaPods are not required.
+The app targets iOS 27+. The shared package has an iOS/macOS 26 dependency floor; CoreAI operations require OS 27; that does not make the full app compatible with older iOS releases. XcodeGen and CocoaPods are not required.
 
 ### 1. Get the project
 
@@ -59,7 +58,6 @@ Launch Xcode once to complete setup, install the iOS Simulator runtime, and sele
 
 ```sh
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-xcodebuild -downloadComponent MetalToolchain
 ```
 
 ### 2. Open in Xcode
@@ -68,7 +66,7 @@ xcodebuild -downloadComponent MetalToolchain
 open MobileHarness.xcodeproj
 ```
 
-For UI development, select **MobileHarnessSimulator** and run on an iOS simulator. This target bundles no model weights; local chat is unavailable; Core ML ASR requires downloaded resources, while explicitly configured cloud chat is supported. It is useful for interface work, not end-to-end voice or camera-model validation. Explicit Debug previews use simulated state.
+The current CoreAILM dependency cannot compile against the iOS simulator SDK because that SDK does not expose CoreAI. Use the physical-device MobileHarness scheme for the complete app; independent UI and shared package tests remain available on Mac. A separate simulator assembly is outstanding.
 
 For the full physical-device application, continue below.
 
@@ -82,14 +80,14 @@ Set your `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in `Config/Local.xcc
 
 Model weights are downloaded on the device through **Settings → 本地模型资源**. App builds bundle the pinned catalog and license notices only, so no model downloads are required before building. Choose the Hugging Face official source, the third-party HF-Mirror source, or paste a custom HTTPS download domain; production graph source revisions remain pinned. HF file resolution/metadata is handled by the SDK; only the independent YOLO ZIP has a bundled archive SHA-256. HF tasks survive page navigation but restart after process relaunch. GitHub-hosted YOLO uses its original download source.
 
-For offline development and opt-in Mac/model tests, the existing `scripts/download-*.py` wrappers still provision ignored local files, with `--endpoint` for Hugging Face downloads. See [model resources](MobileHarness/Resources/Models/README.md) for shared production declarations, the two separate Mac/comparison profiles, compatibility and notices.
+For offline development and opt-in Mac/model tests, the existing `scripts/download-*.py` wrappers still provision ignored local files, with `--endpoint` for Hugging Face downloads. See [model resources](MobileHarness/Resources/Models/README.md) for shared production declarations, the separate Gemma Mac test profile, compatibility and notices.
 
 ### 4. Run on an iPhone
 
 Select the **MobileHarness** scheme, choose your connected device, and build and run.
 
 - Grant camera permission for preview and pose perception; the camera runs independently of voice readiness.
-- Open Settings → 音频识别 / 语音合成 / 大模型 / 视觉识别 to manage Nemotron, Silero, MOSS, Qwen and YOLO respectively. Nemotron and MOSS are optional custom speech providers; Silero is automatically used when installed and available, otherwise Energy. Apple ASR/TTS work without those custom weights. Settings/history and camera preview remain accessible without these resources.
+- Open Settings → 音频识别 / 语音合成 / 大模型 / 视觉识别 to manage Nemotron, Silero, MOSS, Gemma 4 E2B and YOLO respectively. Nemotron and MOSS are optional custom speech providers; Silero is automatically used when installed and available, otherwise Energy. Apple ASR/TTS work without those custom weights. Settings/history and camera preview remain accessible without these resources.
 - Tap the central control to load/warm voice models and grant microphone permission.
 - Speak, then pause to finish your utterance. Recognition previews become a reply with speech and captions.
 - Tap again to stop recording and playback. Camera controls switch the lens or turn the preview off.
@@ -137,7 +135,7 @@ Do not commit or post credentials, signing settings, model weights, user recordi
 
 **A project license has not yet been selected.** This repository currently contains no root LICENSE granting an open-source license; the maintainer must choose one before an open-source release.
 
-MobileHarness builds on the work behind Apple frameworks, MLX, Qwen, Nemotron, Silero, MOSS-TTS-Nano, Kokoro and Ultralytics YOLO. Dependencies and model artifacts retain their own licenses and redistribution conditions. The configured YOLO26 pose artifact declares AGPL-3.0; model notices are documented with the [resource profiles](MobileHarness/Resources/Models/README.md).
+MobileHarness builds on the work behind Apple frameworks, CoreAI, Gemma 4 E2B, Nemotron, Silero, MOSS-TTS-Nano, Kokoro and Ultralytics YOLO. Dependencies and model artifacts retain their own licenses and redistribution conditions. The configured YOLO26 pose artifact declares AGPL-3.0; model notices are documented with the [resource profiles](MobileHarness/Resources/Models/README.md).
 
 Camera control Tools are registered as Camera.open, Camera.close and Camera.flip through the existing App-owned foreground camera lifecycle. Provider-native model Tool event transport remains unimplemented.
 
@@ -148,7 +146,7 @@ Camera control Tools are registered as Camera.open, Camera.close and Camera.flip
 ✅ Hub download regression coverage checks regular-file selection, safe remote metadata and optional actual-network progress through the production adapter. Downloads use selected per-file Hub APIs without a permanent SDK cache. ❌ Real iPhone download UI acceptance remains separate.
 
 
-✅ Speech can run without HF voice-model downloads through Apple ASR/TTS and energy detection. Settings can force this mode without deleting weights; local Qwen or configured cloud chat is still needed for conversation. Apple ASR may need a first-use system language-asset download.
+✅ Speech can run without HF voice-model downloads through Apple ASR/TTS and energy detection. Settings can force this mode without deleting weights; local Gemma 4 E2B or configured cloud chat is still needed for conversation. Apple ASR may need a first-use system language-asset download.
 
 
-✅ Model settings are grouped by use: 音频识别 (Nemotron+Silero), 语音合成 (MOSS), 大模型 (cloud service and Qwen), 视觉识别 (YOLO). Custom speech switches are independent and require only the respective ASR/TTS installation. Apple ASR uses native internal VAD; Silero is selected automatically when installed and available, otherwise Energy supplies silence scores; this is independent of the ASR switch.
+✅ Model settings are grouped by use: 音频识别 (Nemotron+Silero), 语音合成 (MOSS), 大模型 (cloud service and Gemma 4 E2B), 视觉识别 (YOLO). Custom speech switches are independent and require only the respective ASR/TTS installation. Apple ASR uses native internal VAD; Silero is selected automatically when installed and available, otherwise Energy supplies silence scores; this is independent of the ASR switch.

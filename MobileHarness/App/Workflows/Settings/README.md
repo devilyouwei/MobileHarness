@@ -38,3 +38,5 @@ flowchart LR
 ✅ Enable validation uses fresh installation snapshots before persistence: recognition needs Nemotron only, synthesis needs MOSS. Refresh/removal disables only a mode whose prerequisite vanished. Restore coalesces one migration/apply task (32 waiters; excess returns conflict). UI is not the sole guard. Shared download/storage protocols are unchanged.
 
 ✅ Restore persists network-permission normalization even when voice choices are unchanged. Source autosave keeps existing validation/revision checks and mutation admission; source edits do not change voice mode. Downloads consume the durable endpoint after UI admission validation.
+
+✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.

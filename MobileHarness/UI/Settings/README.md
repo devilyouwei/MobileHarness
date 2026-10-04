@@ -60,7 +60,7 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 
 ✅ JSON v5 uses Channel-grouped callable Actions; Assistant text interpretation uses Assistant.mapText rather than JSON aliases. Regression coverage checks internal permissions cannot be called through model markup and preserves wait event order. ❌ Live-model/device acceptance is separate from automated checks.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ✅ Source location: `MobileHarness/UI/Settings`; compiled by `UI`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
 
@@ -155,18 +155,18 @@ flowchart LR
 ✅ Failed model transfers offer 继续下载; active rows remain cancel-only. Completed files are reused by the backend, while detailed network codes are surfaced by the injected App adapter. UI owns no download task.
 
 
-✅ 音频识别 and 语音合成 have independent 使用自定义识别模型 / 使用自定义模型 switches; missing required installations bounce the switch off and show an installation alert. Recognition requires Nemotron only, synthesis requires MOSS. 大模型 keeps cloud configuration and adds Qwen download/removal; 视觉识别 retains YOLO. The shared ModelResourceSections component filters by business group and retains background progress, cancellation-only busy controls, source settings and safe deletion.
+✅ 音频识别 and 语音合成 have independent 使用自定义识别模型 / 使用自定义模型 switches; missing required installations bounce the switch off and show an installation alert. Recognition requires Nemotron only, synthesis requires MOSS. 大模型 keeps cloud configuration and adds Gemma 4 E2B download/removal; 视觉识别 retains YOLO. The shared ModelResourceSections component filters by business group and retains background progress, cancellation-only busy controls, source settings and safe deletion.
 
 ✅ Failed speech-preference saves restore both switches to the active durable policy. Prerequisite failures use an installation alert; other failures remain visible.
 
 
-✅ New installations default both custom speech switches off. Legacy preferDownloadedSpeech JSON migrates to the two flags; App validates actual installations before applying them. Download completion does not automatically enable a custom mode. Removing a required model automatically disables only its owning speech mode. Qwen local selection is guarded by installation in 大模型; cloud URL/Key/discovery/save remain unchanged.
+✅ New installations default both custom speech switches off. Legacy preferDownloadedSpeech JSON migrates to the two flags; App validates actual installations before applying them. Download completion does not automatically enable a custom mode. Removing a required model automatically disables only its owning speech mode. Gemma 4 E2B local selection is guarded by installation in 大模型; cloud URL/Key/discovery/save remain unchanged.
 
 ```mermaid
 flowchart LR
     Settings --> ASR[音频识别 / Nemotron + Silero]
     Settings --> TTS[语音合成 / MOSS]
-    Settings --> LLM[大模型 / cloud + Qwen]
+    Settings --> LLM[大模型 / cloud + Gemma 4 E2B]
     Settings --> Vision[视觉识别 / YOLO]
     ASR --> Resources[Shared model resource state and operations]
     TTS --> Resources
@@ -184,7 +184,7 @@ flowchart LR
 
 ✅ 下载源 appears within 自定义模型 / 本地大模型 with Hugging Face 官方, HF Mirror 中国镜像 and 自定义域名. YOLO has no source controls. No network toggle, save-source button or source footer remains. A single cancellable page task debounces endpoint edits by 600 ms; before download admission the state revalidates/persists the current endpoint using durable voice preferences. Failed saves prevent admission and retain the editable draft. Controls lock while saving; leaving the page cancels pending debounce without affecting background transfers. User guidance is brief and avoids implementation terminology.
 
-✅ Settings helper copy is limited to short user guidance: model prerequisites/system fallback, local Qwen requirement, blank-URL default, conversation archiving/local privacy and Bluetooth connection/control behavior. The idle save instruction, developer explanations of context windows/record internals and model-page total storage row are removed. Each model retains its own size/status/license and progress; errors and destructive confirmations remain visible. ❌ Physical-page copy/layout acceptance remains pending.
+✅ Settings helper copy is limited to short user guidance: model prerequisites/system fallback, local Gemma 4 E2B requirement, blank-URL default, conversation archiving/local privacy and Bluetooth connection/control behavior. The idle save instruction, developer explanations of context windows/record internals and model-page total storage row are removed. Each model retains its own size/status/license and progress; errors and destructive confirmations remain visible. ❌ Physical-page copy/layout acceptance remains pending.
 
 
 ✅ 设置首页按三个原生 List 板块组织：AI 模型（音频识别、语音合成、大模型、视觉识别）、外接设备（蓝牙外设）、用户（对话历史）。保留现有入口顺序、导航和无障碍标识。

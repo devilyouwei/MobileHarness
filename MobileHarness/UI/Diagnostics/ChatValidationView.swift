@@ -15,10 +15,10 @@
                     .task {
                         do {
                             result = try await validate()
-                            print("QWEN_VOICE_VALIDATION_OK \(result)")
+                            print("GEMMA_VOICE_VALIDATION_OK \(result)")
                         } catch {
                             result = "Validation failed: \(error)"
-                            print("QWEN_VOICE_VALIDATION_FAILED \(error)")
+                            print("GEMMA_VOICE_VALIDATION_FAILED \(error)")
                         }
                     }
             }

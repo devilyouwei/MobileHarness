@@ -4,14 +4,14 @@ Purpose: select and register the project's concrete model providers inside Model
 
 | Capability | Default |
 | --- | --- |
-| Chat | Qwen3.5-2B from Qwen35 |
+| Chat | Gemma 4 E2B QAT CoreAI from Gemma4 |
 | Recognition | Installed Nemotron → Apple SpeechAnalyzer / SpeechTranscriber |
 | Voice activity | Installed Silero → EnergyVoiceActivity |
 | Synthesis | Installed MOSS-TTS-Nano → Apple AVSpeechSynthesizer |
 
 Speech defaults are stable capability facades. Explicit ModelKitDefaults.mossNano returns the concrete local provider; the default synthesis facade selects it only when installed and available. Apple speech and energy VAD are registered lazily. Kokoro is not registered. Judgment has no provider and fails with missingDefault. Simulator local chat reports unavailable; Nemotron uses the same Core ML resource layout on Apple Silicon macOS and iOS; explicit cloud chat configuration is supported.
 
-ModelKitDefaults.manager(resources:) configures the MLX cache to 64 MiB and registers factories without loading weights. App supplies the sandbox installed resource root, obtains interfaces through manager.get(.chat), and forwards platform memory warnings. The Defaults target depends on management and adapters; ModelKitRuntime depends only on ModelKit. Models with large local weights opt into idle release on memory pressure.
+ModelKitDefaults.manager(resources:) registers factories without loading weights. App supplies the sandbox installed resource root, obtains interfaces through manager.get(.chat), and forwards platform memory warnings. The Defaults target depends on management and adapters; ModelKitRuntime depends only on ModelKit. Models with large local weights opt into idle release on memory pressure.
 
 ```mermaid
 flowchart LR
@@ -54,15 +54,15 @@ flowchart TD
 
 ✅ Default .pose now resolves exclusively to ModelID("yolo26n-pose") and the new official end-to-end artifact. Singleton and releaseWhenIdle ownership remain unchanged; no YOLOv8 registration/fallback remains.
 
-✅ `manager(resources:cloudChat:)` optionally selects OpenAI-compatible cloud chat, including on simulator, without loading Qwen or warming the remote service. Omission preserves local defaults. An explicit conflicting initial cloudChat throws `cloudConfigurationConflict`; ordinary manager(resources:) access uses the current configuration. Explicit updates use configureChat and preserve the resource root. App owns Keychain persistence and settings UI.
+✅ `manager(resources:cloudChat:)` optionally selects OpenAI-compatible cloud chat, including on simulator, without loading Gemma 4 E2B or warming the remote service. Omission preserves local defaults. An explicit conflicting initial cloudChat throws `cloudConfigurationConflict`; ordinary manager(resources:) access uses the current configuration. Explicit updates use configureChat and preserve the resource root. App owns Keychain persistence and settings UI.
 
-✅ configureChat(resources:configuration:) explicitly replaces the chat registration in the existing process manager. A nil configuration restores local Qwen. Ordinary manager(resources:) access now obtains the current process binding without resetting it. Explicit initial cloudChat still validates conflicts. App pauses its active voice session and resolves a fresh capability per operation. This supersedes the earlier restart-only limitation. ❌ Network/model availability is not verified by replacement itself.
+✅ configureChat(resources:configuration:) explicitly replaces the chat registration in the existing process manager. A nil configuration restores local Gemma 4 E2B. Ordinary manager(resources:) access now obtains the current process binding without resetting it. Explicit initial cloudChat still validates conflicts. App pauses its active voice session and resolves a fresh capability per operation. This supersedes the earlier restart-only limitation. ❌ Network/model availability is not verified by replacement itself.
 
 ✅ Explicit voice admission/diagnostics perform real in-memory synthesis warmup before conversation admission or measured speech. It exercises lazy kernels using synthetic Chinese text, drains PCM without playback and propagates failures. The first device run took 10.63 s to first PCM without warmup; explicit voice admission absorbs that compilation cost instead of extending StorageAudio timeouts. ❌ Warmup does not prove sustained runtime stability.
 
 ## Artifact-aware assembly
 
-✅ Local registrations associate with bundled artifact IDs; cloud chat has no Qwen download requirement. configureArtifacts receives App-supplied source catalog, storage and concrete downloader protocols through Defaults, validates associations and is idempotent for matching IDs/revisions/directories. App does not import ModelAssembly SPI. Defaults preserves one process manager and Swift-owned factories/bindings; JSON never registers executable providers. Factories use stable sandbox installed directory URLs. Deletion/reinstallation uses Management maintenance; YOLO selects its available format on each reload.
+✅ Local registrations associate with bundled artifact IDs; cloud chat has no Gemma 4 E2B download requirement. configureArtifacts receives App-supplied source catalog, storage and concrete downloader protocols through Defaults, validates associations and is idempotent for matching IDs/revisions/directories. App does not import ModelAssembly SPI. Defaults preserves one process manager and Swift-owned factories/bindings; JSON never registers executable providers. Factories use stable sandbox installed directory URLs. Deletion/reinstallation uses Management maintenance; YOLO selects its available format on each reload.
 
 ✅ App injects ModelKitHub as the concrete HF SDK adapter. ModelKitRuntime depends only on ModelKit, and neither Defaults nor Management imports Storage. Initialization does not warm models; explicit voice start or diagnostics performs warmup.
 

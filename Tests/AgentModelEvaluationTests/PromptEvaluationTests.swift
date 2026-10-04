@@ -2,32 +2,23 @@ import AgentCore
 import Agents
 import Foundation
 @_spi(ModelManagement) import ModelKit
-import ModelKitQwen35
+import ModelKitGemma4
 import Testing
 
 @Suite(.serialized)
 struct AgentModelEvaluationTests {
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_EVAL_QWEN35"] == "1"))
-    func evaluateQwenPromptVariants() async throws {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_EVAL_GEMMA4"] == "1"))
+    func evaluateGemmaPromptVariants() async throws {
+        guard #available(iOS 27, macOS 27, *) else { return }
         struct Fixture: Decodable {
             let scenario: String
             let messages: [[String: String]]
         }
-        let resources = try #require(Bundle.module.resourceURL)
-        let metalBundle = resources.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("mlx-swift_Cmlx.bundle")
-        let previousDirectory = FileManager.default.currentDirectoryPath
-        let metalResources = try #require(Bundle(url: metalBundle)?.resourceURL)
-        try #require(FileManager.default.changeCurrentDirectoryPath(metalResources.path))
-        defer { _ = FileManager.default.changeCurrentDirectoryPath(previousDirectory) }
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent(
-                "MobileHarness/Resources/Models")
-        let directory = ProcessInfo.processInfo.environment["HARNESS_QWEN35_SIZE"] == "4B" ? "Qwen35-4B" : "Qwen35"
+        let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["HARNESS_GEMMA4_ROOT"]))
         let modelContext = ModelContext()
-        let model = try Qwen35Chat(
+        let model = try Gemma4Chat(
             context: modelContext,
-            artifacts: root.appendingPathComponent(directory))
+            artifacts: root)
         let fixtures = try JSONDecoder().decode(
             [Fixture].self,
             from: Data(
@@ -66,8 +57,8 @@ struct AgentModelEvaluationTests {
                     "seconds": Date().timeIntervalSince(started), "system": system,
                 ])
                 try JSONSerialization.data(withJSONObject: results, options: [.prettyPrinted, .sortedKeys]).write(
-                    to: URL(fileURLWithPath: "/tmp/qwen35-prompt-variants.json"), options: .atomic)
-                print("QWEN_VARIANT \(variant)/\(fixture.scenario) \(error) \(answer)")
+                    to: URL(fileURLWithPath: "/tmp/gemma4-prompt-variants.json"), options: .atomic)
+                print("GEMMA_VARIANT \(variant)/\(fixture.scenario) \(error) \(answer)")
             }
         }
         try await modelContext.unload()

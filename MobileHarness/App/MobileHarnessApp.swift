@@ -124,7 +124,7 @@ struct MobileHarnessApp: App {
     private var isDiagnostic: Bool {
         let arguments = ProcessInfo.processInfo.arguments
         #if DEBUG
-            if arguments.contains("-qwen35-validation") { return true }
+            if arguments.contains("-gemma4-validation") { return true }
         #endif
         return arguments.contains("-moss-benchmark")
     }
@@ -154,7 +154,7 @@ struct MobileHarnessApp: App {
     @ViewBuilder
     private func content(_ container: AppContainer) -> some View {
         #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-qwen35-validation") {
+            if ProcessInfo.processInfo.arguments.contains("-gemma4-validation") {
                 container.makeChatValidationView()
             } else {
                 standardContent(container)

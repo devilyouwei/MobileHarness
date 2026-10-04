@@ -49,7 +49,7 @@ public enum ModelResourceGroup: String, Sendable {
         switch self {
         case .recognition: ["nemotron", "silero"]
         case .synthesis: ["moss-tts-nano"]
-        case .language: ["qwen35"]
+        case .language: ["gemma4-e2b"]
         case .vision: ["yolo26n-pose"]
         }
     }
@@ -61,7 +61,7 @@ public enum ModelResourceGroup: String, Sendable {
         switch self {
         case .recognition: "请先下载并安装 Nemotron 语音识别模型，再开启自定义识别模型。"
         case .synthesis: "请先下载并安装 MOSS 语音合成模型，再开启自定义模型。"
-        case .language: "请先下载并安装 Qwen 大模型，再切换到本地模型。"
+        case .language: "请先下载并安装 Gemma 4 E2B 大模型，再切换到本地模型。"
         case .vision: "请先下载并安装 YOLO 姿态模型。"
         }
     }

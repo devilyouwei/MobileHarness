@@ -36,7 +36,7 @@ for target in package['targets']:
         name = values[0]
         if kind in ('byName', 'target') and not name.startswith('ModelKit') and name != 'Types':
             errors.append(f"{target['name']} depends on external project target {name}")
-        if kind == 'product' and target['name'] not in {'ModelKitMLXLanguage', 'ModelKitFluidAudio', 'ModelKitHub'}:
+        if kind == 'product' and target['name'] not in {'ModelKitCoreAI', 'ModelKitFluidAudio', 'ModelKitHub'}:
             errors.append(f"Third-party dependency outside a backend: {target['name']} -> {name}")
         if name in FORBIDDEN:
             errors.append(f"Forbidden target dependency: {target['name']} -> {name}")

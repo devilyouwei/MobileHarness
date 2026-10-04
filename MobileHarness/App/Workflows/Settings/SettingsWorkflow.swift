@@ -30,7 +30,7 @@ public final class SettingsWorkflow: SettingsOperating {
         self.endChange = endChange
     }
     public var modelName: String {
-        guard let saved, saved.enabled else { return "Local Qwen3.5" }
+        guard let saved, saved.enabled else { return "Local Gemma 4 E2B" }
         return saved.model.isEmpty ? "Cloud default model" : saved.model
     }
     public func restore() async throws -> CloudSettingsDraft {

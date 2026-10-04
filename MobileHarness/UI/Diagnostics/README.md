@@ -16,7 +16,7 @@ Purpose: show explicitly selected model checks outside ordinary Agent conversati
 
 ✅ `-moss-autorun` runs without playback and writes a report. Adding `-moss-playback` uses the production AppleAudioIO playback path and reports speaker completion only after playback drains. Manual synthesis includes playback. Current evidence and reproduction are in [MOSS validation](../../../docs/Moss-Validation.md).
 
-✅ The existing Debug launch flag `-qwen35-validation` and `QWEN_VOICE_VALIDATION_*` log markers remain compatible with diagnostic scripts. The operation prepares ASR and the **currently configured chat binding**, then requests a short synthetic arithmetic reply. This is local Qwen by default or the explicitly configured cloud chat provider. It cancels the inference session when the operation exits; it does not explicitly unload chat weights. The page owns the task lifetime and ModelManager owns model residency. It records no microphone audio and executes no Agent Actions.
+✅ The existing Debug launch flag `-gemma4-validation` and `GEMMA_VOICE_VALIDATION_*` log markers remain compatible with diagnostic scripts. The operation prepares ASR and the **currently configured chat binding**, then requests a short synthetic arithmetic reply. This is local Gemma 4 E2B by default or the explicitly configured cloud chat provider. It cancels the inference session when the operation exits; it does not explicitly unload chat weights. The page owns the task lifetime and ModelManager owns model residency. It records no microphone audio and executes no Agent Actions.
 
 Conversation history is a normal [Settings](../Settings/README.md) feature, not a diagnostic inference page.
 

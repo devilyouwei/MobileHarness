@@ -162,7 +162,7 @@ import UI
     #expect(ModelResourceGroup.recognition.isInstalled(in: [nemotron]))
     #expect(!ModelResourceGroup.recognition.isInstalled(in: [silero]))
     #expect(ModelResourceGroup.synthesis.modelIDs == ["moss-tts-nano"])
-    #expect(ModelResourceGroup.language.modelIDs == ["qwen35"])
+    #expect(ModelResourceGroup.language.modelIDs == ["gemma4-e2b"])
     #expect(ModelResourceGroup.vision.modelIDs == ["yolo26n-pose"])
 }
 

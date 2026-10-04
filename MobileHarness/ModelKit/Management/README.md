@@ -68,7 +68,7 @@ No cancellation callback runs while holding a mutex. Resource load generations p
 
 Registration defaults to retain. releaseWhenIdle opts a model into handleMemoryPressure(): the manager examines at most 32 entries, gates one entry at a time, and atomically releases only a loaded resource with no leases, load or teardown in progress. Busy/loading/unconstructed resources are skipped without waiting, cancellation or deferred eviction. Existing capability handles reload on their next request; provider identity is retained. This is event-driven idle eviction, not a periodic timer or a guarantee of a particular number of freed bytes.
 
-ModelKitDefaults selects releaseWhenIdle for Nemotron, Qwen and MOSS synthesis. App’s memory-warning stream retains one pending event and coalesces repeated warnings; warnings carry no user data or device commands. Silero and system speech use retain. ModelManager does not depend on UIKit, MLX or OS notification APIs.
+ModelKitDefaults selects releaseWhenIdle for Nemotron, Gemma 4 E2B and MOSS synthesis. App’s memory-warning stream retains one pending event and coalesces repeated warnings; warnings carry no user data or device commands. Silero and system speech use retain. ModelManager does not depend on UIKit, MLX or OS notification APIs.
 
 ModelState is residency only. A provider without managed resources reports unmanaged. availability(id, for:) obtains a lightweight provider and checks its capability availability without loading weights; it can be unavailable even when residency is unmanaged. Availability is a snapshot and inference can still fail later.
 

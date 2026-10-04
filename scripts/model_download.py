@@ -22,12 +22,14 @@ def file_hash(path):
             digest.update(chunk)
     return digest.hexdigest()
 
-PRODUCTION = {"nemotron": "nemotron", "silero": "silero", "moss-tts-nano": "moss-tts-nano", "qwen3.5-2b": "qwen35", "yolo26-pose": "yolo26n-pose"}
+PRODUCTION = {"nemotron": "nemotron", "silero": "silero", "moss-tts-nano": "moss-tts-nano", "gemma4-e2b": "gemma4-e2b", "yolo26-pose": "yolo26n-pose"}
 
 
 def load_config(profile, platform=None):
-    if platform not in (None, "ios", "macos") or (platform == "macos" and profile != "nemotron"):
+    if platform not in (None, "ios", "macos") or (platform == "macos" and profile not in ("nemotron", "gemma4-e2b")):
         raise ValueError("Unsupported platform")
+    if platform == "macos" and profile == "gemma4-e2b":
+        return json.loads((MODELS / "gemma4-e2b-macos.download.json").read_text())
     if profile not in PRODUCTION:
         return json.loads((MODELS / (profile + ".download.json")).read_text())
     catalog = json.loads((MODELS / "model-catalog.json").read_text())

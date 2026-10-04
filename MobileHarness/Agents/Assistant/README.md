@@ -181,7 +181,7 @@ flowchart LR
 
 ✅ ConversationTitleGenerator generates titles from bounded excerpts as non-executable metadata. Its request is separate from Assistant conversation context and carries no Action instruction list. ❌ Storing raw responses does not guarantee that GPT-4.1 follows wait instructions or that Actions completed successfully; generation and execution status are distinct.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ## Action runtime stage 2
 
@@ -239,7 +239,7 @@ flowchart LR
 
 ## Native cloud Tool calls
 
-✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Qwen remains text-only.
+✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
 
 ```mermaid
 flowchart LR

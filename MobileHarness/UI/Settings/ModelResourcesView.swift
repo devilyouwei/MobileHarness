@@ -151,7 +151,7 @@
                         : group == .recognition || group == .synthesis
                             ? "删除后将使用 Apple 语音，再次启用需重新下载。"
                             : group == .language
-                                ? "删除后需要使用云端大模型，或重新下载 Qwen 才能进行本地对话。"
+                                ? "删除后需要使用云端大模型，或重新下载 Gemma 4 E2B 才能进行本地对话。"
                                 : "删除后需要重新下载 YOLO 才能使用本地姿态识别。")
             }
             .task(id: state.source.endpoint) {

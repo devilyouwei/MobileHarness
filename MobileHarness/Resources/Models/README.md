@@ -5,22 +5,22 @@ Purpose: keep the compact production source catalog and the local weights needed
 ## Configuration ownership
 
 - ✅ `model-catalog.json` schema v2 is the shared production source for App resource acquisition and developer download wrappers. It declares repositories/selection rules or a ZIP source, key required files, license/compatibility and advisory size. Per-file URLs/sizes/hashes are resolved at download time.
-- ✅ Only one separate development configuration remains: `qwen3.5-4b.download.json` (opt-in comparison/assessment variant). These do not redefine production resources.
+- ✅ Only one separate development configuration remains: `gemma4-e2b-macos.download.json` (matching uncompiled CoreAI decoder for opt-in Mac tests). These do not redefine production resources.
 - ✅ Redundant production download JSONs and the inactive Audio8 profile/wrapper are removed. Historical Audio8 validation remains in docs.
 
 | Local directory retained | Mac test use |
 | --- | --- |
 | Nemotron | Nemotron real streaming/cancellation and Silero comparison |
-| Qwen35 | Qwen generation/tokenizer/lifecycle and Agent prompt evaluation |
+| Gemma4 | Gemma 4 E2B generation/tokenizer/lifecycle and Agent prompt evaluation |
 | Silero | Real VAD streaming/reset tests |
 | MossTTSNano | Chinese/English synthesis and lifecycle |
 | YOLOPose | Opt-in real pose/lifecycle tests via YOLO_POSE_MODEL_ROOT |
 
-✅ Old unused `Kokoro` CoreAI weights and iPhone-only `Nemotron` h18p weights were removed locally (about 1.6 GiB). Other local model weights are retained for Mac validation. `Qwen35-4B` can be downloaded when requested but is not currently cached. These directories are ignored by Git and are never App build prerequisites.
+✅ Old unused `Kokoro` CoreAI weights and iPhone-only `Nemotron` h18p weights were removed locally (about 1.6 GiB). Other local model weights are retained for Mac validation. Gemma4 requires new CoreAI resources; old Qwen files are incompatible and are not loaded. These directories are ignored by Git and are never App build prerequisites.
 
 ## Developer acquisition workflow
 
-Use the existing wrappers: `download-qwen35.py` defaults to 2B (`--size 4b` selects its separate test profile); `download-nemotron.py --platform macos` selects the Mac test export (default/ios reads the production catalog). Silero/MOSS/YOLO wrappers read the same production catalog as App. `--endpoint` supports official HF, mirror and custom HTTPS domains; `--force` refreshes reused local files.
+Use the existing wrappers: `download-gemma4.py` uses the h18p iOS catalog (`--platform macos` selects the matching uncompiled decoder); `download-nemotron.py --platform macos` selects the Mac test export (default/ios reads the production catalog). Silero/MOSS/YOLO wrappers read the same production catalog as App. `--endpoint` supports official HF, mirror and custom HTTPS domains; `--force` refreshes reused local files.
 
 ```mermaid
 flowchart LR
@@ -47,3 +47,5 @@ flowchart LR
 
 
 ✅ Settings groups catalog entries by business use without changing catalog IDs, weight acquisition, receipts or directory layout. Recognition needs Nemotron only before custom activation; synthesis needs MOSS. Downloading never auto-enables a voice mode.
+
+✅ Gemma replaces the qwen35 catalog ID with gemma4-e2b and uses Gemma4 as a new directory. Existing device Qwen receipts/weights are not treated as Gemma installations. Obsolete ignored development Qwen35 weights were removed; device cleanup remains separate.

@@ -2,6 +2,15 @@
   "originHash" : "08edccb695efe7ad799332201b5751ab411c4260f83d6b1c63e4d6cabbfe11b1",
   "pins" : [
     {
+      "identity" : "coreai-models",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/john-rocky/coreai-models",
+      "state" : {
+        "revision" : "3dc4ceb5ec9d2e488b9c995d53a415b9e22fe7ba",
+        "version" : "0.2.8-zoo"
+      }
+    },
+    {
       "identity" : "eventsource",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mattt/EventSource.git",
@@ -16,24 +25,6 @@
       "location" : "https://github.com/FluidInference/FluidAudio",
       "state" : {
         "revision" : "20d4f0bd46d11d7f50a6eb4f7835cfdbd2b4ba14"
-      }
-    },
-    {
-      "identity" : "mlx-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift",
-      "state" : {
-        "revision" : "dc43e62d7055353c7f99fa071a4e71d29dfddc44",
-        "version" : "0.31.4"
-      }
-    },
-    {
-      "identity" : "mlx-swift-lm",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift-lm",
-      "state" : {
-        "revision" : "bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57",
-        "version" : "3.31.4"
       }
     },
     {
@@ -82,15 +73,6 @@
       }
     },
     {
-      "identity" : "swift-numerics",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
-      "state" : {
-        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
-        "version" : "1.1.1"
-      }
-    },
-    {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax.git",
@@ -106,6 +88,15 @@
       "state" : {
         "revision" : "4870d18b9f7637785891ab3e4c28f3ea489723d7",
         "version" : "1.1.0"
+      }
+    },
+    {
+      "identity" : "xgrammar",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mlc-ai/xgrammar",
+      "state" : {
+        "revision" : "4d145cc13d878c751ebeed36af1c013074be76bc",
+        "version" : "0.2.2"
       }
     }
   ],

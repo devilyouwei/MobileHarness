@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "HarnessKit",
-    platforms: [.iOS(.v18), .macOS(.v15)],
+    platforms: [.iOS("26.0"), .macOS("26.0")],
     products: [
         .library(
             name: "HarnessKit",
@@ -23,7 +23,7 @@ let package = Package(
         .library(name: "ModelKitNemotron", targets: ["ModelKitNemotron"]),
         .library(name: "ModelKitOpenAI", targets: ["ModelKitOpenAI"]),
         .library(name: "ModelKit", targets: ["ModelKit"]),
-        .library(name: "ModelKitQwen35", targets: ["ModelKitQwen35"]),
+        .library(name: "ModelKitGemma4", targets: ["ModelKitGemma4"]),
         .library(name: "ModelKitRuntime", targets: ["ModelKitRuntime"]),
         .library(name: "ModelKitAppleSpeech", targets: ["ModelKitAppleSpeech"]),
     ],
@@ -33,8 +33,7 @@ let package = Package(
         .package(
             url: "https://github.com/FluidInference/FluidAudio", revision: "20d4f0bd46d11d7f50a6eb4f7835cfdbd2b4ba14",
             traits: []),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm", exact: "3.31.4"),
-        .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.31.4"),
+        .package(url: "https://github.com/john-rocky/coreai-models", exact: "0.2.8-zoo"),
         .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.1.0"),
     ],
     targets: [
@@ -162,7 +161,7 @@ let package = Package(
             exclude: [
                 "README.md", "Language/README.md", "Language/JEV/README.md",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
-                "Language/LLM/Qwen35", "Language/LLM/OpenAI", "Language/LLM/README.md", "Backends",
+                "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md", "Backends",
                 "Core/README.md", "Management", "Defaults", "Speech/ASR/Apple", "Speech/TTS/Apple", "Speech/TTS/Kokoro",
                 "Speech/TTS/MossNano",
                 "Speech/Shared",
@@ -178,7 +177,7 @@ let package = Package(
             name: "ModelKitDefaults",
             dependencies: [
                 "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero",
-                "ModelKitMossNano", "ModelKitQwen35", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
+                "ModelKitMossNano", "ModelKitGemma4", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
                 "ModelKitEnergy",
             ],
             path: "MobileHarness/ModelKit/Defaults", exclude: ["README.md"]),
@@ -217,7 +216,11 @@ let package = Package(
                 "ModelKit", "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro", "Agents", "PlatformKit",
             ], exclude: ["README.md"]),
         .target(
-            name: "ModelKitCoreAI", path: "MobileHarness/ModelKit/Backends/CoreAI", exclude: ["README.md"]),
+            name: "ModelKitCoreAI",
+            dependencies: [
+                .product(name: "CoreAILM", package: "coreai-models"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ], path: "MobileHarness/ModelKit/Backends/CoreAI", exclude: ["README.md"]),
         .target(
             name: "ModelKitNemotron", dependencies: ["ModelKit", "ModelKitFluidAudio"],
             path: "MobileHarness/ModelKit/Speech/ASR/Nemotron", exclude: ["README.md"]),
@@ -253,22 +256,13 @@ let package = Package(
             ],
             exclude: ["README.md"]),
         .target(
-            name: "ModelKitMLXLanguage",
-            dependencies: [
-                .product(name: "MLX", package: "mlx-swift"),
-                .product(name: "MLXLLM", package: "mlx-swift-lm"),
-                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
-                .product(name: "Tokenizers", package: "swift-transformers"),
-                .product(name: "Hub", package: "swift-transformers"),
-            ], path: "MobileHarness/ModelKit/Backends/MLX", exclude: ["README.md"]),
-        .target(
-            name: "ModelKitQwen35", dependencies: ["ModelKit", "ModelKitMLXLanguage"],
-            path: "MobileHarness/ModelKit/Language/LLM/Qwen35", exclude: ["README.md"]),
+            name: "ModelKitGemma4", dependencies: ["ModelKit", "ModelKitCoreAI"],
+            path: "MobileHarness/ModelKit/Language/LLM/Gemma4", exclude: ["README.md"]),
         .testTarget(
-            name: "Qwen35Tests", dependencies: ["ModelKit", "ModelKitQwen35", "ModelKitMLXLanguage"],
-            exclude: ["README.md"], resources: [.copy("Fixtures")]),
+            name: "Gemma4Tests", dependencies: ["ModelKit", "ModelKitGemma4", "ModelKitCoreAI"],
+            exclude: ["README.md"]),
         .testTarget(
-            name: "AgentModelEvaluationTests", dependencies: ["AgentCore", "Agents", "ModelKit", "ModelKitQwen35"],
+            name: "AgentModelEvaluationTests", dependencies: ["AgentCore", "Agents", "ModelKit", "ModelKitGemma4"],
             exclude: ["README.md"], resources: [.copy("Scenarios")]),
         .testTarget(
             name: "ModelKitDefaultsTests", dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults"],

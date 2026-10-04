@@ -1,0 +1,8 @@
+Gemma 4 E2B CoreAI model notice
+
+Source: https://huggingface.co/mlboydaisuke/gemma-4-E2B-CoreAI
+Pinned revision: d669ab2b44c691e35e2b795f0535c0e1937b8390
+Upstream QAT checkpoint: google/gemma-4-E2B-it-qat-q4_0-unquantized
+License declared by the artifact publisher: Apache-2.0.
+The converted artifacts retain the upstream model license. No weights are bundled.
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0

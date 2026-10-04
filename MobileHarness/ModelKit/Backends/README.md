@@ -1,18 +1,17 @@
 # Inference and resource backends
 
-Purpose: isolate native graph execution, MLX language generation and concrete Hub acquisition. Design goals: backend-specific types stay behind adapters; no Agent, Gateway, Action, UI or device orchestration dependency.
+Purpose: isolate native graph execution, CoreAI language generation and concrete Hub acquisition. Design goals: backend-specific types stay behind adapters; no Agent, Gateway, Action, UI or device orchestration dependency.
 
 | Directory | Responsibility |
 | --- | --- |
 | HuggingFace | Independent ModelKitHub adapter for declarative artifact acquisition |
-| CoreAI | Optional native graph and tensor utilities; not the current Nemotron backend |
+| CoreAI | Native graph/tensor utilities and Gemma 4 pipelined language execution |
 | CoreML | Validated Core ML graph execution for Silero |
 | FluidAudio | Shared multilingual Nemotron Core ML graphs, optional Kokoro and local Mandarin frontend |
-| MLX | Local Qwen generation, tokenizer bridge and explicit allocator configuration |
 
 ```mermaid
 flowchart LR
-    Adapter[Model adapter] -->|Model files and typed backend inputs| Backend[CoreAI / CoreML / MLX]
+    Adapter[Model adapter] -->|Model files and typed backend inputs| Backend[CoreAI / CoreML]
     Backend -->|Platform or library calls| Engine[System framework / third-party engine]
     Engine -->|Results| Backend
     Backend -->|Tensors or text deltas| Adapter

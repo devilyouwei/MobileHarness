@@ -6,13 +6,6 @@ import Testing
 
 @Test func defaultAssemblyIsLazyAndSpeechHasManagedSystemFallback() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
-    // Standalone Swift Testing does not expose its XCTest bundle to MLX's bundle search.
-    let testResources = try #require(Bundle(for: TestBundleAnchor.self).resourceURL)
-    let metalBundle = testResources.appendingPathComponent("mlx-swift_Cmlx.bundle")
-    let metalResources = try #require(Bundle(url: metalBundle)?.resourceURL)
-    let previousDirectory = FileManager.default.currentDirectoryPath
-    try #require(FileManager.default.changeCurrentDirectoryPath(metalResources.path))
-    defer { _ = FileManager.default.changeCurrentDirectoryPath(previousDirectory) }
     let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let managers = try await withThrowingTaskGroup(of: ModelManager.self) { group in
         for _ in 0..<16 { group.addTask { try await ModelKitDefaults.manager(resources: missing) } }

@@ -67,7 +67,7 @@ class ModelArchiveTests(unittest.TestCase):
 class SourceCatalogTests(unittest.TestCase):
     def test_production_profiles_share_catalog_and_nemotron_is_cross_platform(self):
         from model_download import load_config
-        for name in ('nemotron', 'silero', 'moss-tts-nano', 'qwen3.5-2b', 'yolo26-pose'):
+        for name in ('nemotron', 'silero', 'moss-tts-nano', 'gemma4-e2b', 'yolo26-pose'):
             config = load_config(name)
             self.assertIn('declaration', config)
             self.assertNotIn('files', config)
@@ -76,7 +76,12 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertEqual(mac['directory'], 'Nemotron')
         self.assertEqual(mac['declaration']['stripPrefix'], 'multilingual/2240ms')
         self.assertEqual(mac['declaration']['allowPatterns'], ['multilingual/2240ms/**'])
-        self.assertEqual(load_config('qwen3.5-4b')['directory'], 'Qwen35-4B')
+        gemma = load_config('gemma4-e2b')
+        mac_gemma = load_config('gemma4-e2b', 'macos')
+        self.assertEqual(gemma['directory'], 'Gemma4')
+        self.assertEqual(gemma['declaration']['revision'], mac_gemma['declaration']['revision'])
+        self.assertIn('aotc_h18p', gemma['declaration']['allowPatterns'][0])
+        self.assertNotIn('aotc_h18p', mac_gemma['declaration']['allowPatterns'][0])
 
     def test_hub_selection_prefix_metadata_and_mirror(self):
         from model_download import resolve_hub

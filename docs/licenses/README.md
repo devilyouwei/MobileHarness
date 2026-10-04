@@ -2,7 +2,7 @@
 
 Purpose: preserve license notices for model artifacts and runtime dependencies. Design goals: retain the original legal text unchanged and distinguish current distribution from historical or comparison-only artifacts.
 
-✅ Qwen35-Apache-2.0.txt accompanies the pinned Qwen3.5 model. MLX-Swift-MIT.txt and MLX-Swift-LM-MIT.txt preserve the runtime/library notices; these are included in physical app resources.
+✅ Qwen35-Apache-2.0.txt accompanies the pinned Qwen3.5 model. MLX-Swift-MIT.txt and MLX-Swift-LM-MIT.txt preserve the runtime/library notices; these are retained for historical attribution and are no longer staged into app resources.
 ✅ Native CoreAI graph source notices remain for Nemotron and Kokoro, including CoreAIKit and CoreAIModels attribution.
 ❌ A license notice is not a model compatibility or quality guarantee. Development download profiles record model provenance.
 
@@ -14,3 +14,5 @@ Purpose: preserve license notices for model artifacts and runtime dependencies. 
 
 
 ✅ MOSS-TTS-Nano model notices are retained in MOSS-TTS-Nano-Apache-2.0.txt. Narrowly adapted FluidAudio source retains its Apache-2.0 attribution. ❌ No license claim is made for user-supplied voice recordings.
+
+✅ Gemma4-Apache-2.0.txt and CoreAIModels-BSD-3-Clause.txt accompany the new Gemma/CoreAILM integration; current file lists stage these notices. ❌ Notices do not establish model quality/device acceptance.

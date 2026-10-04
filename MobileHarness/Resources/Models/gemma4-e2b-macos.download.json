@@ -1,0 +1,19 @@
+{
+  "directory": "Gemma4",
+  "declaration": {
+    "kind": "huggingface",
+    "repoId": "mlboydaisuke/gemma-4-E2B-CoreAI",
+    "revision": "d669ab2b44c691e35e2b795f0535c0e1937b8390",
+    "allowPatterns": [
+      "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl/**",
+      "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.i8",
+      "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.scale.f32"
+    ]
+  },
+  "requiredFiles": [
+    "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl/metadata.json",
+    "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl/tokenizer/tokenizer.json",
+    "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.i8",
+    "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.scale.f32"
+  ]
+}

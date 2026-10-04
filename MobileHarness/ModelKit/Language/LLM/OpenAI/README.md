@@ -1,6 +1,6 @@
 # OpenAI-compatible cloud chat
 
-Purpose: implement third-party cloud text generation behind the same `ChatCapability`, `ChatRequest`, `ChatEvent` and cancellable `InferenceSession` used by local Qwen. Design goals: independent adapter target, no business dependencies, explicit configuration, complete reply buffering and managed lifecycle.
+Purpose: implement third-party cloud text generation behind the same `ChatCapability`, `ChatRequest`, `ChatEvent` and cancellable `InferenceSession` used by local Gemma 4 E2B. Design goals: independent adapter target, no business dependencies, explicit configuration, complete reply buffering and managed lifecycle.
 
 ✅ `ModelKitOpenAI` uses Foundation URLSession; no new third-party package. HTTPS Base URL includes the provider's API prefix (for example `https://provider.example/v1`); the adapter appends `chat/completions`. Key, model and timeout are supplied by the host. Uses Bearer authorization when the supplied key is nonempty and Chat Completions `stream`, `messages`, `temperature`, `max_tokens` fields. Providers must support these fields and SSE text deltas.
 
@@ -14,7 +14,7 @@ let manager = try await ModelKitDefaults.manager(resources: resources, cloudChat
 let chat = try await manager.get(.chat)
 ```
 
-Omit `cloudChat` to retain local Qwen. The resource root remains fixed for the process. Settings changes use `ModelKitDefaults.configureChat(resources:configuration:)` to replace only the chat binding without restarting; existing raw provider handles become terminal, so consumers resolve the current binding for each operation. Defaults owns registration; consumers receive only capabilities. No remote request occurs during registration/load. `availability` means configured, not authenticated or reachable. App settings UI and Keychain credential persistence belong to the host; never put keys in Agent JSON or tracked files.
+Omit `cloudChat` to retain local Gemma 4 E2B. The resource root remains fixed for the process. Settings changes use `ModelKitDefaults.configureChat(resources:configuration:)` to replace only the chat binding without restarting; existing raw provider handles become terminal, so consumers resolve the current binding for each operation. Defaults owns registration; consumers receive only capabilities. No remote request occurs during registration/load. `availability` means configured, not authenticated or reachable. App settings UI and Keychain credential persistence belong to the host; never put keys in Agent JSON or tracked files.
 
 ## Stream and lifecycle design
 
@@ -45,11 +45,11 @@ Protocol reference: [official OpenAI Chat API](https://developers.openai.com/api
 
 ✅ Empty credentials omit Authorization for both discovery and chat. Blank endpoint text resolves to https://api.openai.com/v1; HTTPS validation remains enforced. Discovery excludes known embedding, reranking, moderation, media, legacy completion and specialized non-chat families. Standard /models objects do not expose capabilities, so name-based filtering is heuristic: unknown third-party deployment names remain available. ❌ Discovery does not prove provider compatibility. See [official model objects](https://developers.openai.com/api/reference/resources/models).
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Qwen uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ## Native cloud Tool calls
 
-✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Qwen remains text-only.
+✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
 
 ```mermaid
 flowchart LR

@@ -45,7 +45,7 @@ flowchart TD
     Acquire --> Loader[Adapter loads sandbox files]
 ```
 
-The local configuration uses Nemotron ASR, Qwen3.5-2B chat, Silero VAD and YOLO26n-Pose; explicit cloud configuration selects the OpenAI-compatible chat provider. MOSS-TTS-Nano is default and diagnostic TTS (beta); Kokoro and Apple are not selected.  Qwen3.5-4B retains a comparison profile; Audio8 and Kokoro provisioning are removed. Production developer wrappers share model-catalog.json, including the same Nemotron multilingual/2240ms Core ML export for Mac and iOS.
+The local configuration uses Nemotron ASR, Gemma 4 E2B CoreAI chat, Silero VAD and YOLO26n-Pose; explicit cloud configuration selects the OpenAI-compatible chat provider. MOSS-TTS-Nano is default and diagnostic TTS (beta); Kokoro and Apple are not selected.  Gemma retains a matching macOS test profile; Audio8 and Kokoro provisioning are removed. Production developer wrappers share model-catalog.json, including the same Nemotron multilingual/2240ms Core ML export for Mac and iOS.
 
 Download scripts own bounded workers, temporary files and failures; [Models](Models/README.md) documents that workflow. YOLO reads its archive source/hash from the shared catalog; HF wrappers resolve selected remote metadata. Separate test profiles retain their own explicit sources. App/build settings choose packaged resources; ModelKit owns loading and execution.
 
@@ -59,6 +59,6 @@ Download scripts own bounded workers, temporary files and failures; [Models](Mod
 
 ## Local model resources — current contract
 
-✅ Device/simulator staging includes only model-catalog.json schema-v2 source declarations and license notices. HF repositories/selection rules replace per-file links/hashes; weights/config/tokenizers/graphs/voice assets are installed in the sandbox via Management and ModelKitHub. Production developer wrappers share this catalog; only Qwen4B uses a separate test profile. Local weights are not build prerequisites.
+✅ Device/simulator staging includes only model-catalog.json schema-v2 source declarations and license notices. HF repositories/selection rules replace per-file links/hashes; weights/config/tokenizers/graphs/voice assets are installed in the sandbox via Management and ModelKitHub. Production developer wrappers share this catalog; only Gemma macOS uses a separate test profile. Local weights are not build prerequisites.
 
 ❌ Full iPhone/network acceptance and HF durable background/partial resume remain pending. See [Management](../ModelKit/Management/README.md#local-model-resources--current-contract).

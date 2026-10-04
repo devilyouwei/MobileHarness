@@ -906,7 +906,7 @@
 
 
 
-        "A01300000000000000000002" = { "isa" = "XCSwiftPackageProductDependency"; "package" = "582681C2EAE02B3F3D399C0C"; "productName" = "ModelKitQwen35"; };
+        "A01300000000000000000002" = { "isa" = "XCSwiftPackageProductDependency"; "package" = "582681C2EAE02B3F3D399C0C"; "productName" = "ModelKitGemma4"; };
         "A01300000000000000000003" = { "isa" = "PBXBuildFile"; "productRef" = "A01300000000000000000002"; };
 		"B01400000000000000000001" = {
 			"productType" = "com.apple.product-type.application";

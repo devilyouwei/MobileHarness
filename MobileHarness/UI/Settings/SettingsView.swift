@@ -113,7 +113,7 @@
                     )
                     .accessibilityIdentifier("settings.cloud.enabled")
                 } footer: {
-                    Text("关闭后使用本地 Qwen，需先下载模型。")
+                    Text("关闭后使用本地 Gemma 4 E2B，需先下载模型。")
                 }
                 Section {
                     HStack {

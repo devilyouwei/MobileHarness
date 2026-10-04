@@ -1,38 +1,34 @@
 import Foundation
 import ModelKit
-import ModelKitMLXLanguage
+import ModelKitCoreAI
 import Synchronization
 
 /// An optional local chat provider. Consumers depend on ChatCapability, not this type.
-public actor Qwen35Chat: ChatCapability {
-    private let resource: ModelResource<MLXLanguageEngine>
+@available(iOS 27, macOS 27, *)
+public actor Gemma4Chat: ChatCapability {
+    private let resource: ModelResource<CoreAILanguageEngine>
     private let root: URL
     private let contextLimit: Int
-
-    /// Composition-only backend configuration. Apply before registering/loading chat.
-    public static func configureCache(limitBytes: Int) throws {
-        try MLXLanguageEngine.configureCache(limitBytes: limitBytes)
-    }
 
     public init(context: ModelContext, artifacts: URL) throws {
         root = artifacts
         contextLimit = 4096
         resource = try context.resource {
             try Self.requireHardware()
-            return try await MLXLanguageEngine(directory: artifacts)
+            return try await CoreAILanguageEngine(directory: artifacts)
         }
     }
 
     private static func requireHardware() throws {
         #if targetEnvironment(simulator) || !arch(arm64)
-            throw CapabilityError.unavailable("Qwen3.5 MLX requires physical Apple Silicon hardware")
+            throw CapabilityError.unavailable("Gemma 4 CoreAI requires physical Apple Silicon hardware")
         #endif
     }
 
     public var availability: CapabilityAvailability {
         do { try Self.requireHardware() } catch { return .unavailable(reason: String(describing: error)) }
         guard FileManager.default.fileExists(atPath: root.path) else {
-            return .unavailable(reason: "Qwen35 artifacts are not installed")
+            return .unavailable(reason: "Gemma4 artifacts are not installed")
         }
         return .available
     }
@@ -50,7 +46,7 @@ public actor Qwen35Chat: ChatCapability {
         do {
             let tokens = try await lease.model.tokenize(
                 request.messages.map {
-                    MLXLanguageTurn(role: $0.role.rawValue, content: $0.content)
+                    CoreAILanguageTurn(role: $0.role.rawValue, content: $0.content)
                 })
             let maximumTokens = request.maximumOutputTokens ?? (contextLimit - tokens.count)
             guard !tokens.isEmpty, maximumTokens > 0, maximumTokens <= contextLimit,
@@ -62,7 +58,7 @@ public actor Qwen35Chat: ChatCapability {
             try Task.checkCancellation()
             let control = GenerationControl()
             let pair = InferenceSession<ChatEvent>.make(
-                context: request.context, limits: try StreamLimits(capacity: nil, maximumEventBytes: 4096),
+                context: request.context, limits: try StreamLimits(capacity: 4096, maximumEventBytes: 4096),
                 estimatedBytes: { $0.estimatedBytes },
                 onTermination: { reason in
                     if case .finished = reason { return }
@@ -74,7 +70,7 @@ public actor Qwen35Chat: ChatCapability {
                 do {
                     let generation = try await lease.model.generate(
                         tokens: tokens, maximumTokens: maximumTokens, temperature: request.temperature,
-                        stopTokens: [248044, 248046]
+                        stopTokens: []
                     ) { delta in
                         try emitter.yield(.text(delta))
                     }
@@ -111,7 +107,7 @@ public actor Qwen35Chat: ChatCapability {
             request.messages.allSatisfy({ !$0.content.isEmpty })
         else {
             throw CapabilityError.invalidRequest(
-                "Qwen35 requires 1–64 nonempty messages ending in user, at most 64 KiB, and an output budget fitting the local context window"
+                "Gemma4 requires 1–64 nonempty messages ending in user, at most 64 KiB, and an output budget fitting the local context window"
             )
         }
         guard !request.messages.dropFirst().contains(where: { $0.role == .system }) else {

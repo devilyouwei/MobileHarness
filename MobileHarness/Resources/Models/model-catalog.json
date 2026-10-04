@@ -72,44 +72,39 @@
       ]
     },
     {
-      "id": "qwen35",
-      "name": "Qwen3.5 本地对话",
+      "id": "gemma4-e2b",
+      "name": "Gemma 4 E2B 本地对话",
       "capability": "chat",
-      "directory": "Qwen35",
+      "directory": "Gemma4",
       "minimumOS": 27,
       "requiresPhysicalDevice": true,
-      "deviceRequirement": null,
+      "deviceRequirement": "iPhone 17 Pro / Pro Max（h18p）",
       "license": "Apache-2.0",
-      "estimatedBytes": 1749080357,
+      "estimatedBytes": 4473389420,
       "source": {
         "kind": "huggingface",
-        "repoId": "mlx-community/Qwen3.5-2B-4bit",
-        "revision": "674aaa7240b91e8012fcad5d791b7dfe5ba90207",
+        "repoId": "mlboydaisuke/gemma-4-E2B-CoreAI",
+        "revision": "d669ab2b44c691e35e2b795f0535c0e1937b8390",
         "allowPatterns": [
-          "README.md",
-          "chat_template.jinja",
-          "config.json",
-          "model.safetensors",
-          "model.safetensors.index.json",
-          "preprocessor_config.json",
-          "processor_config.json",
-          "tokenizer.json",
-          "tokenizer_config.json",
-          "video_preprocessor_config.json",
-          "vocab.json"
+          "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/**",
+          "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.i8",
+          "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.scale.f32"
         ]
       },
       "requiredFiles": [
-        "chat_template.jinja",
-        "config.json",
-        "model.safetensors",
-        "model.safetensors.index.json",
-        "preprocessor_config.json",
-        "processor_config.json",
-        "tokenizer.json",
-        "tokenizer_config.json",
-        "video_preprocessor_config.json",
-        "vocab.json"
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/main-h18p.mlirb",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/main.hash",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/metadata.json",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/gemma4_e2b_qat_decode_int4lin_tbl.h18p.aimodelc/stats.json",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/metadata.json",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/tokenizer/tokenizer.json",
+        "gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl_aotc_h18p/tokenizer/tokenizer_config.json",
+        "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.i8",
+        "ios-frontend/gemma4_qat_gather_raw/embed_per_layer.scale.f32"
       ]
     },
     {
