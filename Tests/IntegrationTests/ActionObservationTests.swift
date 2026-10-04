@@ -186,3 +186,21 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     #expect(await scheduler.resultSnapshot().isEmpty)
     await scheduler.shutdown()
 }
+
+@Test func bluetoothProducerOwnsFailureToReportMapping() {
+    let cases: [(BluetoothWorkflowError, String, String)] = [
+        (.disconnected, "disconnected", "disconnected"),
+        (.busy, "busy", "unavailable"),
+        (.background, "background", "unavailable"),
+        (.posture, "invalidPose", "invalidArguments"),
+        (.unverified, "unconfirmed", "handlerFailed"),
+        (.controlNotReady, "controlNotReady", "unavailable"),
+        (.feedbackTimeout, "feedbackTimeout", "feedbackLost"),
+        (.completionTimeout, "completionTimeout", "targetNotReached"),
+        (.incomplete([1]), "completionTimeout", "targetNotReached"),
+    ]
+    for (error, identifier, reportCode) in cases {
+        #expect(error.actionExecutionFailure.rawValue == identifier)
+        #expect(ActionReport.code(for: error).rawValue == reportCode)
+    }
+}

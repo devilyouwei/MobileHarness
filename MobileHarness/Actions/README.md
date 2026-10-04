@@ -224,3 +224,5 @@ See [Runtime](Runtime/README.md) for registry/executor limits, [Results](../Gate
 ✅ NexArm owns tracking aim rest mapping, speed policy and controller admission; the completion-only Robot.aim Tool reaches this behavior through the App sender.
 
 ✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
+
+✅ Runtime now transports opaque producer failure/report codes; NexArm/Support owns device result names. Unused camera resource constants were deleted. See ADR0122. ❌ No physical completion or scheduling policy change is introduced.

@@ -67,10 +67,19 @@ import Tools
 
 @Test func actionFailureTranslationPreservesProducerIdentifiers() {
     let failures: [ActionFailure] = [
-        .operationFailed, .resourceUnavailable, .disconnected, .busy, .background, .invalidPose,
-        .unconfirmed, .controlNotReady, .feedbackTimeout, .completionTimeout, .invalidArguments,
+        .operationFailed, .resourceUnavailable, .invalidArguments,
+        .init(rawValue: "fixture.customFailure"), .init(rawValue: "feedbackTimeout"),
     ]
     for failure in failures {
         #expect(failure.observationFailure.rawValue == failure.rawValue)
     }
+}
+
+@Test func runtimeTransportsProducerReportCodeWithoutInterpretingFailureIdentity() {
+    struct FixtureError: ActionExecutionFailureProviding {
+        let actionExecutionFailure = ActionFailure(rawValue: "feedbackTimeout")
+        let actionReportCode = ActionReport.Entry.Code(rawValue: "fixture.customOutcome")
+    }
+    #expect(ActionReport.code(for: FixtureError()).rawValue == "fixture.customOutcome")
+    #expect(ActionReport.code(for: CancellationError()) == .cancelled)
 }

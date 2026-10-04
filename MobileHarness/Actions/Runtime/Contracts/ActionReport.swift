@@ -4,9 +4,19 @@ import Foundation
 public struct ActionReport: Equatable, Sendable {
     public struct Entry: Equatable, Sendable {
         public enum Status: String, Sendable { case succeeded, failed, cancelled, notStarted }
-        public enum Code: String, Sendable {
-            case targetNotReached, feedbackLost, disconnected, sendingFailed, timedOut
-            case invalidArguments, unavailable, handlerFailed, cancelled, resultCapacityExceeded
+        /// Bounded producer-owned code; Runtime interprets generic execution outcomes only.
+        public struct Code: RawRepresentable, Equatable, Hashable, Sendable {
+            public let rawValue: String
+            public init(rawValue: String) {
+                precondition(!rawValue.isEmpty && rawValue.utf8.count <= 64)
+                self.rawValue = rawValue
+            }
+            public static let timedOut = Self(rawValue: "timedOut")
+            public static let invalidArguments = Self(rawValue: "invalidArguments")
+            public static let unavailable = Self(rawValue: "unavailable")
+            public static let handlerFailed = Self(rawValue: "handlerFailed")
+            public static let cancelled = Self(rawValue: "cancelled")
+            public static let resultCapacityExceeded = Self(rawValue: "resultCapacityExceeded")
         }
         public let path: String
         public let status: Status
@@ -41,14 +51,7 @@ public struct ActionReport: Equatable, Sendable {
     }
     public static func code(for error: any Error) -> Entry.Code {
         if error is CancellationError { return .cancelled }
-        switch (error as? any ActionExecutionFailureProviding)?.actionExecutionFailure {
-        case .feedbackTimeout: return .feedbackLost
-        case .disconnected: return .disconnected
-        case .completionTimeout: return .targetNotReached
-        case .invalidArguments, .invalidPose: return .invalidArguments
-        case .busy, .controlNotReady, .resourceUnavailable, .background: return .unavailable
-        default: return .handlerFailed
-        }
+        return (error as? any ActionExecutionFailureProviding)?.actionReportCode ?? .handlerFailed
     }
     public init(entries: [Entry]) throws {
         guard entries.count <= 256 else { throw ValidationError.capacity }

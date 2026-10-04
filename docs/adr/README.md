@@ -164,3 +164,5 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 - [0120 — Agent-domain value ownership](0120-agent-domain-value-ownership.md): keep business speech/pose messages in Agents; Types retains cross-target transport/presentation.
 
 - [0121 — Remove shared Types](0121-remove-shared-types.md): input, Agent payload and UI value ownership.
+
+- [0122 — Runtime opaque domain failures](0122-runtime-opaque-domain-failures.md): producer-owned classification and generic resources.

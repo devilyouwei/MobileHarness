@@ -51,3 +51,5 @@ VisionPerception coalesces its bounded replaceable gaze/skeleton output before d
 ❌ Local native model Tool transport, live health reporting, additional network/storage/device domains and rendering acknowledgment are not implemented. Non-cooperative callbacks can delay callers; metadata does not imply forced interruption.
 
 ✅ Camera domain adds Camera.open/close/flip with a required CameraControlCapability; completion-only controls reuse the App camera owner and its lease. See [Camera](Camera/README.md). No direct platform dependency or Tool queue. ❌ Local native model Tool transport remains unsupported; cloud complete Tool calls are supported.
+
+✅ ToolRuntime resources are generic raw identifiers; the unused cameraCapture constant is removed. Concrete resource declarations remain with Tool domains and host lifetime owners. ❌ Runtime contains no built-in Tool catalog.

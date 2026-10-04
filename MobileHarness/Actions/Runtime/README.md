@@ -70,7 +70,7 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 | File | Responsibility |
 |---|---|
 | ../ActionMacro / ActionDefinition | Compile-time metadata factories and runtime contracts |
-| ActionRegistry | Validated registry and explicit domain catalog |
+| ActionRegistry | Bounded validation and lookup of injected definitions |
 | Contracts/ActionInvocation / ActionReportStore | Module-owned request/context and bounded report store |
 | ActionExecutor / ActionDeadline | Completion validation and cooperative deadlines |
 | ActionComposition | Validated trees, resource/budget union and outcome aggregation |
@@ -88,3 +88,7 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 ✅ Finite stored reports preserve subsequent handler failures as executionFailure; true task cancellation propagates to the scheduler for joined terminal recording. ❌ No forced termination of uncooperative handlers.
 
 ✅ ActionComposition preserves bounded producer-owned report details when flattening child paths, replacing dedicated motor/target/observed fields. ❌ Runtime does not interpret business detail keys.
+
+✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, BluetoothWorkflowError owns its failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
+
+❌ Runtime must not classify pose, foreground, control-readiness or device-feedback failures. Producers provide actionReportCode through ActionExecutionFailureProviding; the generic default handles invalid arguments/resource unavailability and otherwise reports handlerFailed. CancellationError remains cancellation.

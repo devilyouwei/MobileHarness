@@ -18,17 +18,17 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
             + report.entries.enumerated().compactMap { index, entry in
                 guard entry.status != .succeeded else { return nil }
                 let reason: String
-                switch entry.code.flatMap({ ActionReport.Entry.Code(rawValue: $0.rawValue) }) {
-                case .targetNotReached: reason = "稳定后仍未到位"
-                case .feedbackLost: reason = "未收到位置反馈"
-                case .disconnected: reason = "机械臂连接不可用"
-                case .sendingFailed: reason = "指令发送失败"
-                case .timedOut: reason = "执行超时"
-                case .invalidArguments: reason = "参数无效"
-                case .unavailable: reason = "当前不可执行"
-                case .cancelled: reason = entry.status == .notStarted ? "已取消，未执行" : "执行已取消"
-                case .resultCapacityExceeded: reason = "结果数量超出声明上限"
-                case .handlerFailed, nil:
+                switch entry.code?.rawValue {
+                case "targetNotReached": reason = "稳定后仍未到位"
+                case "feedbackLost": reason = "未收到位置反馈"
+                case "disconnected": reason = "机械臂连接不可用"
+                case "sendingFailed": reason = "指令发送失败"
+                case "timedOut": reason = "执行超时"
+                case "invalidArguments": reason = "参数无效"
+                case "unavailable": reason = "当前不可执行"
+                case "cancelled": reason = entry.status == .notStarted ? "已取消，未执行" : "执行已取消"
+                case "resultCapacityExceeded": reason = "结果数量超出声明上限"
+                default:
                     if report.entries.count == 1, let detail = execution.failureDescription, !detail.isEmpty {
                         reason = detail
                     } else {

@@ -78,3 +78,11 @@ extension NexArmActions {
     }
 
 }
+
+/// NexArm result vocabulary, transported opaquely by ActionRuntime.
+extension ActionReport.Entry.Code {
+    public static let targetNotReached = Self(rawValue: "targetNotReached")
+    public static let feedbackLost = Self(rawValue: "feedbackLost")
+    public static let disconnected = Self(rawValue: "disconnected")
+    public static let sendingFailed = Self(rawValue: "sendingFailed")
+}

@@ -5,7 +5,7 @@ Purpose: register and execute ToolRequests directly. Design goals: explicit feed
 | File | Responsibility |
 |---|---|
 | ../ToolMacro | Attached metadata declarations and generated factory interface |
-| Contracts/ToolDefinition | Domain definitions and explicit built-in catalog |
+| Contracts/ToolDefinition | Generic handler metadata; concrete catalogs remain in Tools |
 | ToolRegistry | Actor-owned bounded handlers and resource mappings |
 | Contracts/ToolInvocation | ToolRequest plus trusted output context |
 | ToolExecutor | Lookup, cancellation and result/completion semantics |
@@ -58,3 +58,7 @@ Gateway checks resource ownership through the same ResourceCoordinator used by A
 ✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.
 
 ✅ Completion handler ordinary exceptions now return correlated isError ToolResponse, matching returning Tools. Successful completion remains nil; cancellation propagates only when the calling task is cancelled.
+
+✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, BluetoothWorkflowError owns its failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
+
+❌ Runtime must not classify pose, foreground, control-readiness or device-feedback failures. Producers provide actionReportCode through ActionExecutionFailureProviding; the generic default handles invalid arguments/resource unavailability and otherwise reports handlerFailed. CancellationError remains cancellation.

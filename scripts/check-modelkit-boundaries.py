@@ -470,3 +470,11 @@ for source in KIT.rglob('*.swift'):
     if re.search(r'(?:reason:\s*|CapabilityError\.(?:unavailable|invalidRequest)\(\s*)"[^"\n]*[\u4e00-\u9fff]', content):
         raise SystemExit(f'Localized capability diagnostic in ModelKit: {source.relative_to(ROOT)}')
 print('ModelKit diagnostics remain independent of localized presentation.')
+
+# Execution Runtime must not regain concrete resources or device classification.
+for directory in ('Actions/Runtime', 'Tools/Runtime'):
+    for source in (ROOT / 'MobileHarness' / directory).rglob('*.swift'):
+        content = source.read_text()
+        if any(marker in content for marker in ('cameraCapture', '"camera.capture"', 'invalidPose', 'controlNotReady', 'feedbackTimeout', 'completionTimeout', 'feedbackLost', 'targetNotReached', 'sendingFailed')):
+            raise SystemExit(f'Domain vocabulary in execution Runtime: {source.relative_to(ROOT)}')
+print('Execution Runtime uses generic resources and producer-owned failure classification.')

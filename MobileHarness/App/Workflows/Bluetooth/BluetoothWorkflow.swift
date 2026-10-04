@@ -24,15 +24,27 @@ public enum BluetoothWorkflowError: LocalizedError, Sendable, Equatable, ActionE
     case disconnected, busy, background, posture, unverified, controlNotReady, feedbackTimeout, completionTimeout
     case incomplete([Int])
     public var actionExecutionFailure: ActionFailure {
+        let identifier: String
         switch self {
+        case .disconnected: identifier = "disconnected"
+        case .busy: identifier = "busy"
+        case .background: identifier = "background"
+        case .posture: identifier = "invalidPose"
+        case .unverified: identifier = "unconfirmed"
+        case .controlNotReady: identifier = "controlNotReady"
+        case .feedbackTimeout: identifier = "feedbackTimeout"
+        case .completionTimeout, .incomplete: identifier = "completionTimeout"
+        }
+        return ActionFailure(rawValue: identifier)
+    }
+    public var actionReportCode: ActionReport.Entry.Code {
+        switch self {
+        case .feedbackTimeout: .feedbackLost
         case .disconnected: .disconnected
-        case .busy: .busy
-        case .background: .background
-        case .posture: .invalidPose
-        case .unverified: .unconfirmed
-        case .controlNotReady: .controlNotReady
-        case .feedbackTimeout: .feedbackTimeout
-        case .completionTimeout, .incomplete: .completionTimeout
+        case .completionTimeout, .incomplete: .targetNotReached
+        case .posture: .invalidArguments
+        case .busy, .controlNotReady, .background: .unavailable
+        case .unverified: .handlerFailed
         }
     }
     public var errorDescription: String? {
