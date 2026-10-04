@@ -1437,3 +1437,91 @@ func bluetoothPositionTimeoutKeepsLinkConnectedWithoutGrantingControlOrSendingMo
     observer.cancel()
     await observer.value
 }
+
+@Test func bluetoothSharedBudgetBoundsMixedProducerBurstsAndDoesNotCatchUp() {
+    let start = ContinuousClock.now
+    var budget = NexArmBLETrafficBudget(started: start)
+    var accepted: [ContinuousClock.Instant] = []
+    // Six competing motor/query producers try every millisecond for one second.
+    for tick in 0..<1000 {
+        let now = start.advanced(by: .milliseconds(tick))
+        for _ in 0..<6 where budget.canSend(at: now, systemReady: true) {
+            accepted.append(now)
+            budget.sent(bytes: 14, at: now)
+        }
+    }
+    #expect(accepted.count == 34)
+    #expect(zip(accepted, accepted.dropFirst()).allSatisfy { $1 - $0 >= .milliseconds(30) })
+    let afterStall = start.advanced(by: .seconds(10))
+    let resumedAdmission = budget.canSend(at: afterStall, systemReady: true)
+    #expect(resumedAdmission)
+    budget.sent(bytes: 14, at: afterStall)
+    let burstAdmission = budget.canSend(at: afterStall, systemReady: true)
+    #expect(!burstAdmission)
+    #expect(budget.statistics.sentBytes == 35 * 14)
+}
+
+@Test func bluetoothSystemBackpressurePreservesBudgetForTheNextAcceptedWrite() {
+    let now = ContinuousClock.now
+    var budget = NexArmBLETrafficBudget(started: now)
+    for _ in 0..<100 {
+        let admission = budget.canSend(at: now, systemReady: false)
+        #expect(!admission)
+    }
+    #expect(budget.nextWrite == nil)
+    #expect(budget.statistics.sentPackets == 0)
+    budget.resumed()
+    let firstAdmission = budget.canSend(at: now, systemReady: true)
+    #expect(firstAdmission)
+    budget.sent(bytes: 14, at: now)
+    #expect(budget.statistics.systemDeferrals == 100)
+    #expect(budget.statistics.flowControlResumptions == 1)
+    let earlyAdmission = budget.canSend(at: now.advanced(by: .milliseconds(29)), systemReady: true)
+    let nextAdmission = budget.canSend(at: now.advanced(by: .milliseconds(30)), systemReady: true)
+    #expect(!earlyAdmission && nextAdmission)
+}
+
+@Test func bluetoothDiagnosticsDistinguishNotificationTrafficFromValidFeedback() {
+    let start = ContinuousClock.now
+    var budget = NexArmBLETrafficBudget(started: start)
+    budget.received(bytes: 30, feedbackSamples: 1, at: start)
+    // Incoming fragments/unrelated packets must not count as a fresh position sample.
+    budget.received(bytes: 6, feedbackSamples: 0, at: start.advanced(by: .milliseconds(1900)))
+    let stalled = budget.diagnostics(at: start.advanced(by: .seconds(2)))
+    #expect(stalled.notificationBytes == 36 && stalled.feedbackSamples == 1)
+    #expect(stalled.notificationGapMilliseconds == 100)
+    #expect(stalled.feedbackGapMilliseconds == 2000)
+    budget.received(bytes: 60, feedbackSamples: 2, at: start.advanced(by: .milliseconds(2100)))
+    let recovered = budget.diagnostics(at: start.advanced(by: .milliseconds(2100)))
+    #expect(recovered.feedbackSamples == 3 && recovered.feedbackGapMilliseconds == 0)
+    #expect(recovered.longestFeedbackGapMilliseconds == 2100)
+    #expect(NexArmBLETrafficBudget(started: start).statistics.sentPackets == 0)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(link.id)
+    await workflow.waitUntilIdle()
+    await link.throttleLive()
+    try await workflow.aim(base: 0.6, pitch: 0.5)
+    try await until { await link.liveCommands.count >= 20 }
+    await workflow.stopActions()
+    let commands = await link.liveCommands
+    #expect(Set(commands.map(\.id)) == Set(UInt8(1)...UInt8(4)))
+    #expect(commands.allSatisfy { $0.isLiveControl })
+    #expect(workflow.state.controlReady)
+    let count = commands.count
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(await link.liveCommands.count == count)
+    workflow.disconnect()
+    await workflow.waitUntilIdle()
+    observer.cancel()
+    await observer.value
+}

@@ -12,7 +12,7 @@ flowchart LR
 
 ❌ Physical safety still requires device-side support and sustained real-device acceptance.
 
-✅ Tracking aim uses the verified foreground NexArmActionController for the tracking start pose and holds motors 1–4 (base, shoulder lift, elbow, wrist pitch) on the live loop; the Tool boundary still declares motors 1–5. The four motors are sent in turn within one 30 ms tick. Return means transport acceptance, not arrival.
+✅ Tracking aim uses the verified foreground NexArmActionController for the tracking start pose and holds motors 1–4 (base, shoulder lift, elbow, wrist pitch) on the live loop; the Tool boundary still declares motors 1–5. The four motors are considered in turn within one 30 ms planning tick; PlatformKit admits at most one packet per shared 30 ms interval. Return means transport acceptance, not arrival.
 
 ✅ Connection verification shows separate position-read and action-mapping preparation stages. Query timeout errors include native command and received-notification byte count; this diagnostic does not claim a transport/firmware cause.
 
@@ -29,3 +29,5 @@ flowchart LR
 ❌ Runtime must not classify pose, foreground, control-readiness or device-feedback failures. Producers provide actionReportCode through ActionExecutionFailureProviding; the generic default handles invalid arguments/resource unavailability and otherwise reports handlerFailed. CancellationError remains cancellation.
 
 ✅ Connection failures distinguish position/protocol validation from preset IK mapping; position failures include the latest device-reported Cartesian values. Diagnostics preserve the original rejection and keep control disabled.
+
+✅ ADR0123: streaming owners keep latest intents and only commit admitted proposals under the shared PlatformKit BLE budget. Aim snapshots the round-robin start index before iterating so updating the next motor cannot skip/repeat motors in the same pass. Transport budgets and counters stay in PlatformKit; Workflow retains foreground lifetime, resource fences and explicit recovery. ❌ Physical multi-motor response under the initial ceiling remains to be measured.

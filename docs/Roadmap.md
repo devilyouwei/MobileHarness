@@ -146,3 +146,7 @@ Validation update (2026-10-04): Swift 6.4/full Xcode are available. The Types re
 ✅ [ADR0122](adr/0122-runtime-opaque-domain-failures.md): execution Runtime owns generic bounded resources and failure/report identifiers only; NexArm and Bluetooth producers own domain vocabulary and classification. Existing output identifiers remain unchanged. ❌ Physical robot acceptance remains outstanding.
 
 Validation (2026-10-04, ADR0122): producer mapping/opaque-code translation and presentation regression tests passed (5 tests); boundary checks, Python checks and Swift formatting passed; unsigned iOS device build passed. Full check.sh retains the same two pre-existing NexArm planner failures. build-ios.sh remains blocked by the simulator CoreAI module dependency.
+
+✅ [ADR0123](adr/0123-nexarm-ble-shared-pacing.md): shared BLE pacing, bounded transport diagnostics and fair aim iteration. ❌ Measure real BLE single/multi-motor stability, negotiated-MTU packing and bridge/firmware capacity before tuning the initial 30 ms write interval.
+
+Validation (2026-10-04, ADR0123): seven targeted BLE pacing/backpressure/fairness/cancellation tests passed; boundary checks, six Python checks and Swift formatting passed. Full check.sh retains the same two pre-existing aim planner failures (four assertions). build-ios.sh is unavailable under the selected Command Line Tools; full Xcode is not available in this environment. Physical BLE acceptance remains pending.

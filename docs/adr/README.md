@@ -166,3 +166,5 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 - [0121 — Remove shared Types](0121-remove-shared-types.md): input, Agent payload and UI value ownership.
 
 - [0122 — Runtime opaque domain failures](0122-runtime-opaque-domain-failures.md): producer-owned classification and generic resources.
+
+- [0123 — Shared NexArm BLE write pacing](0123-nexarm-ble-shared-pacing.md): connection-wide admission and transport diagnostics.

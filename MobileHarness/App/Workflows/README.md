@@ -258,3 +258,5 @@ flowchart LR
 
 
 ✅ Single-leaf handler failure details now preserve the captured domain error even when the completion also contains a generic report. No error catalog is duplicated in presentation.
+
+✅ ADR0123: BLE live/observed/query writes now share PlatformKit pacing with no streaming packet backlog. Aim iteration keeps a fixed start index per pass for fair motor admission. Existing latest-intent replacement, resource ownership and feedback-loss protection remain in force. ❌ Physical endurance and rate calibration remain pending.

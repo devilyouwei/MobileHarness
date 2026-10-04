@@ -26,10 +26,96 @@ public struct NexArmBluetoothDevice: Sendable, Equatable, Identifiable {
         self.rssi = rssi
     }
 }
+/// Connection-local transport facts. Counters saturate; no command history is retained.
+public struct NexArmBluetoothTraffic: Sendable, Equatable {
+    public internal(set) var sentPackets: UInt64 = 0
+    public internal(set) var sentBytes: UInt64 = 0
+    public internal(set) var pacingDeferrals: UInt64 = 0
+    public internal(set) var systemDeferrals: UInt64 = 0
+    public internal(set) var flowControlResumptions: UInt64 = 0
+    public internal(set) var notificationBytes: UInt64 = 0
+    public internal(set) var feedbackSamples: UInt64 = 0
+    public internal(set) var notificationGapMilliseconds = 0
+    public internal(set) var feedbackGapMilliseconds = 0
+    public internal(set) var longestNotificationGapMilliseconds = 0
+    public internal(set) var longestFeedbackGapMilliseconds = 0
+    public init() {}
+}
+
+/// One connection-wide budget for requests and both streaming modes; no queued packets.
+struct NexArmBLETrafficBudget {
+    static let minimumInterval: Duration = .milliseconds(30)
+    private(set) var nextWrite: ContinuousClock.Instant?
+    private(set) var statistics = NexArmBluetoothTraffic()
+    private var lastNotification: ContinuousClock.Instant?
+    private var lastFeedback: ContinuousClock.Instant?
+
+    init(started: ContinuousClock.Instant = .now) {
+        lastNotification = started
+        lastFeedback = started
+    }
+    func diagnostics(at now: ContinuousClock.Instant = .now) -> NexArmBluetoothTraffic {
+        var value = statistics
+        if let lastNotification { value.notificationGapMilliseconds = milliseconds(now - lastNotification) }
+        if let lastFeedback { value.feedbackGapMilliseconds = milliseconds(now - lastFeedback) }
+        value.longestNotificationGapMilliseconds = max(
+            value.longestNotificationGapMilliseconds, value.notificationGapMilliseconds)
+        value.longestFeedbackGapMilliseconds = max(value.longestFeedbackGapMilliseconds, value.feedbackGapMilliseconds)
+        return value
+    }
+    mutating func canSend(at now: ContinuousClock.Instant, systemReady: Bool) -> Bool {
+        if !systemReady {
+            increment(&statistics.systemDeferrals)
+            return false
+        }
+        if let nextWrite, now < nextWrite {
+            increment(&statistics.pacingDeferrals)
+            return false
+        }
+        return true
+    }
+    mutating func sent(bytes: Int, at now: ContinuousClock.Instant) {
+        increment(&statistics.sentPackets)
+        increment(&statistics.sentBytes, by: UInt64(bytes))
+        nextWrite = now.advanced(by: Self.minimumInterval)
+    }
+    mutating func received(bytes: Int, feedbackSamples: UInt64, at now: ContinuousClock.Instant) {
+        if bytes > 0 {
+            increment(&statistics.notificationBytes, by: UInt64(bytes))
+            if let lastNotification {
+                statistics.longestNotificationGapMilliseconds = max(
+                    statistics.longestNotificationGapMilliseconds, milliseconds(now - lastNotification))
+            }
+            lastNotification = now
+        }
+        if feedbackSamples > 0 {
+            increment(&statistics.feedbackSamples, by: feedbackSamples)
+            if let lastFeedback {
+                statistics.longestFeedbackGapMilliseconds = max(
+                    statistics.longestFeedbackGapMilliseconds, milliseconds(now - lastFeedback))
+            }
+            lastFeedback = now
+        }
+    }
+    mutating func resumed() { increment(&statistics.flowControlResumptions) }
+    private func milliseconds(_ duration: Duration) -> Int {
+        let value =
+            Double(duration.components.seconds) * 1000
+            + Double(duration.components.attoseconds) / 1e15
+        return Int(min(Double(Int.max / 2), max(0, value)))
+    }
+}
+
+private func increment(_ value: inout UInt64, by amount: UInt64 = 1) {
+    let result = value.addingReportingOverflow(amount)
+    value = result.overflow ? .max : result.partialValue
+}
+
 public struct NexArmBluetoothSnapshot: Sendable, Equatable {
     public var power: NexArmBluetoothPower = .unknown
     public var phase: NexArmBluetoothPhase = .disconnected
     public var scanning = false
+    public var traffic = NexArmBluetoothTraffic()
     public var feedbackHealthy = true
     public var devices: [NexArmBluetoothDevice] = []
     public var selected: NexArmBluetoothDevice?
@@ -142,6 +228,7 @@ struct NexArmBLEReply {
 private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerDelegate,
     @preconcurrency CBPeripheralDelegate
 {
+    private var trafficBudget = NexArmBLETrafficBudget()
     private var telemetry = NexArmTelemetryCache()
     private var observationID: UUID?
     private var feedbackWatchdog: NexArmFeedbackWatchdog?
@@ -165,8 +252,10 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withoutResponse) else {
             throw NexArmBluetoothError.packetTooLarge
         }
-        guard peripheral.canSendWriteWithoutResponse else { return false }
+        let now = ContinuousClock.now
+        guard trafficBudget.canSend(at: now, systemReady: peripheral.canSendWriteWithoutResponse) else { return false }
         peripheral.writeValue(Data(packet.bytes), for: tx, type: .withoutResponse)
+        trafficBudget.sent(bytes: packet.bytes.count, at: .now)
         return true
     }
     func latestObservation(after sequence: UInt64, session: UUID) throws -> NexArmTelemetry? {
@@ -198,8 +287,10 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     private var connectionTimer: Task<Void, Never>?
     private var request: CheckedContinuation<NexArmPacket, any Error>?
     private var requestID: UUID?
+    private var requestWasSent = false
     private var reply: NexArmBLEReply?
     private var requestTimer: Task<Void, Never>?
+    private var requestSender: Task<Void, Never>?
     private var queryTimeoutLatched = false
     private var liveControlID: UUID?
     private var retiredWriteAcknowledgment = false
@@ -211,14 +302,22 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         super.init()
         publish()
     }
-    private func publish() { updates.yield(snapshot) }  // Replace only presentation snapshots, never commands/results.
+    // Replace only presentation snapshots, never commands/results.
+    private func publish() {
+        snapshot.traffic = trafficBudget.diagnostics()
+        updates.yield(snapshot)
+    }
     private func manager() -> CBCentralManager {
         if let central { return central }
         let value = CBCentralManager(delegate: self, queue: .main)
         central = value
         return value
     }
-    func status() -> NexArmBluetoothSnapshot { snapshot }
+    func status() -> NexArmBluetoothSnapshot {
+        var value = snapshot
+        if snapshot.phase == .connected { value.traffic = trafficBudget.diagnostics() }
+        return value
+    }
     func scan() throws {
         try Task.checkCancellation()
         guard snapshot.phase == .disconnected else { throw NexArmError.busy }
@@ -314,11 +413,14 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         // Retire an old observation instead of allowing its timeout to close a live jog.
         // Its late data is ignored while manual control owns the channel.
         if let pending = request {
-            retiredWriteAcknowledgment = !(reply?.acknowledged ?? true)
+            retiredWriteAcknowledgment = requestWasSent && !(reply?.acknowledged ?? true)
             requestTimer?.cancel()
             requestTimer = nil
+            requestSender?.cancel()
+            requestSender = nil
             request = nil
             requestID = nil
+            requestWasSent = false
             reply = nil
             pending.resume(throwing: CancellationError())
         }
@@ -333,8 +435,10 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withoutResponse) else {
             throw NexArmBluetoothError.packetTooLarge
         }
-        guard peripheral.canSendWriteWithoutResponse else { return false }
+        let now = ContinuousClock.now
+        guard trafficBudget.canSend(at: now, systemReady: peripheral.canSendWriteWithoutResponse) else { return false }
         peripheral.writeValue(Data(packet.bytes), for: tx, type: .withoutResponse)
+        trafficBudget.sent(bytes: packet.bytes.count, at: .now)
         return true  // Local transport admission only; no device-completion claim.
     }
     func endLiveControl(_ session: UUID) {
@@ -378,6 +482,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         step = .writing
         let token = UUID()
         requestID = token
+        requestWasSent = false
         reply = NexArmBLEReply(
             id: replyID, command: replyCommand, count: replyCount,
             readOnlyQuery: packet.id == 255
@@ -395,7 +500,22 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
                     // No wire transaction IDs: close on timeout so late replies cannot satisfy another request.
                     self.fail(NexArmError.timeout)
                 }
-                peripheral.writeValue(Data(packet.bytes), for: tx, type: .withResponse)
+                // The request slot is already reserved, so the pacing wait cannot admit a second query.
+                requestSender = Task { [weak self] in
+                    guard let self else { return }
+                    if let deadline = self.trafficBudget.nextWrite, ContinuousClock.now < deadline {
+                        _ = self.trafficBudget.canSend(at: .now, systemReady: true)
+                        do { try await Task.sleep(until: deadline, clock: .continuous) } catch { return }
+                    }
+                    guard !Task.isCancelled, self.requestID == token,
+                        self.snapshot.phase == .connected, self.peripheral === peripheral,
+                        self.liveControlID == nil, self.observationID == nil
+                    else { return }
+                    self.requestWasSent = true
+                    peripheral.writeValue(Data(packet.bytes), for: tx, type: .withResponse)
+                    self.trafficBudget.sent(bytes: packet.bytes.count, at: .now)
+                    self.requestSender = nil
+                }
             }
         } onCancel: {
             Task { @MainActor [weak self] in
@@ -441,12 +561,15 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         connectionTimer = nil
         requestTimer?.cancel()
         requestTimer = nil
+        requestSender?.cancel()
+        requestSender = nil
         let connecting = connection
         connection = nil
         connectionID = nil
         let pending = request
         request = nil
         requestID = nil
+        requestWasSent = false
         reply = nil
         connecting?.resume(throwing: error)
         pending?.resume(throwing: error)
@@ -589,14 +712,21 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         connectionTimer = nil
         snapshot.phase = .connected
         queryTimeoutLatched = false
+        trafficBudget = NexArmBLETrafficBudget()
         snapshot.feedbackHealthy = true
         feedbackWatchdog = NexArmFeedbackWatchdog(started: .now)
         feedbackMonitor?.cancel()
         feedbackMonitor = Task { [weak self] in
+            var ticks = 0
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
                 guard let self, self.snapshot.phase == .connected else { return }
                 self.updateFeedbackHealth()
+                ticks += 1
+                if ticks == 50 {
+                    self.logTraffic()
+                    ticks = 0
+                }
             }
         }
         publish()
@@ -625,7 +755,12 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
             return
         }
         do {
-            try telemetry.receive(Array(data))
+            let previousSequence = telemetry.latest?.sequence ?? 0
+            let now = ContinuousClock.now
+            trafficBudget.received(bytes: data.count, feedbackSamples: 0, at: now)
+            try telemetry.receive(Array(data), at: now)
+            let samples = (telemetry.latest?.sequence ?? 0) &- previousSequence
+            trafficBudget.received(bytes: 0, feedbackSamples: samples, at: now)
             if let latest = telemetry.latest { feedbackWatchdog?.observe(at: latest.receivedAt) }
             updateFeedbackHealth()
             try reply?.receive(Array(data))
@@ -637,12 +772,24 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         let healthy = !queryTimeoutLatched && !feedbackWatchdog.isLost(at: .now)
         guard snapshot.feedbackHealthy != healthy else { return }
         snapshot.feedbackHealthy = healthy
+        logTraffic()
         publish()
+    }
+    private func logTraffic() {
+        let traffic = trafficBudget.diagnostics()
+        log.info(
+            "BLE traffic healthy=\(self.snapshot.feedbackHealthy, privacy: .public) sent=\(traffic.sentPackets, privacy: .public) bytes=\(traffic.sentBytes, privacy: .public) pacing=\(traffic.pacingDeferrals, privacy: .public) blocked=\(traffic.systemDeferrals, privacy: .public) ready=\(traffic.flowControlResumptions, privacy: .public) rxBytes=\(traffic.notificationBytes, privacy: .public) samples=\(traffic.feedbackSamples, privacy: .public) rxGapMs=\(traffic.notificationGapMilliseconds, privacy: .public) feedbackGapMs=\(traffic.feedbackGapMilliseconds, privacy: .public) maxFeedbackGapMs=\(traffic.longestFeedbackGapMilliseconds, privacy: .public)"
+        )
+    }
+    func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        guard self.peripheral === peripheral else { return }
+        trafficBudget.resumed()
     }
     private func finishReply() {
         guard let packet = reply?.completed, let request else { return }
         self.request = nil
         requestID = nil
+        requestWasSent = false
         reply = nil
         requestTimer?.cancel()
         requestTimer = nil

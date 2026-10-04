@@ -897,8 +897,9 @@ public final class BluetoothWorkflow: BluetoothControlling {
                             (3, goal.elbow, NexArmJogPlanner.aimReachSpeed),
                             (4, goal.pitch, NexArmJogPlanner.aimMaximumSpeed),
                         ]
+                        let startIndex = nextAimIndex
                         for offset in 0..<steps.count {
-                            let index = (nextAimIndex + offset) % steps.count
+                            let index = (startIndex + offset) % steps.count
                             let step = steps[index]
                             guard
                                 let proposed = try jogPlanner?.approach(

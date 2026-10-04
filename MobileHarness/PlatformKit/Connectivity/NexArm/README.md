@@ -30,3 +30,26 @@ Developer rules: add protocol operations here only when they are reusable device
 ✅ BLE reply timeouts retain expected command/payload length and total received notification bytes before pending state is cleared. Zero notifications and unmatched data can be distinguished. The SDK never replays a request; read-only response timeouts preserve the link with quarantined exchanges, while write/native transport failures disconnect. App owns localized labels.
 
 ✅ Read-only response timeout keeps the radio and notifications connected but quarantines exchanges until reconnect; feedback/control health stays false. This preserves connection truth without allowing a late response to satisfy a new request. Write/native transport failures still disconnect. No motion retry is introduced.
+
+## Shared BLE pacing and diagnostics — ADR0123
+
+✅ One connection-wide admission budget spaces actual writes by at least 30 ms (about 33 packets/s, burst capacity one). Observed writes, live writes and acknowledged requests share it; CoreBluetooth writeWithoutResponse readiness and packet-size checks still apply. This is a conservative initial transport ceiling, not a measured firmware limit. Reconnection resets the budget; observation/manual takeover does not refill it. Idle time never accumulates credits.
+
+✅ Streaming retains no packet queue: `false` means not sent, so the owner retains/recomputes its latest intent. A finite request reserves the existing capacity-one request slot before a cancellable pacing wait; a concurrent request fails busy. Takeover/disconnect cancels that unsent request task. Only a request actually written can leave an outstanding ATT acknowledgment. No command is silently dropped or automatically replayed. The existing five-second request deadline includes pacing; feedback silence remains two seconds.
+
+✅ `status().traffic` exposes fixed-size, connection-local saturating counters for admitted packets/bytes, pacing and system deferrals, readiness callbacks, raw notification bytes and valid feedback samples, plus current/maximum notification and feedback gaps. OSLog emits a summary every approximately five seconds and on feedback-health transitions. Raw notification traffic is counted before decoding, so unrelated/malformed data is distinct from valid pose receipts. No media or packet payload is retained in diagnostics.
+
+```mermaid
+flowchart LR
+    Live[Live owner: latest intent] --> Budget[Shared 30 ms write budget]
+    Observed[Observed finite action: retry unsent admission] --> Budget
+    Request[Single reserved request: cancellable wait] --> Budget
+    Budget --> Flow[CoreBluetooth readiness / size validation]
+    Flow --> Wire[Actual native write]
+    Wire --> Advance[Advance shared deadline]
+    RX[Notifications] --> Facts[Raw bytes / valid feedback / gaps]
+```
+
+❌ Physical BLE rate/MTU/firmware endurance calibration and device-side queue instrumentation remain pending. Native multi-motor packing is available but streaming does not assume a negotiated MTU can fit a combined packet. No claim of solved wireless interference or firmware starvation.
+
+This transport change does not add automatic reconnect after feedback loss while BLE remains connected. App still requires explicit control verification/reconnect for that case; physical disconnection retains its existing bounded recovery policy.

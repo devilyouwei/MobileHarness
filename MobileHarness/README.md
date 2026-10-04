@@ -740,3 +740,5 @@ FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-f
 ✅ Core residual boundary (ADR0118): concrete resource names belong to App; reports carry bounded producer-owned details/error identifiers; text soft limits belong to the consuming Agent. Existing file categories are reused, with no new forwarding files.
 
 ✅ [ADR0122](../docs/adr/0122-runtime-opaque-domain-failures.md): execution Runtime owns generic bounded resources and failure/report identifiers only; NexArm and Bluetooth producers own domain vocabulary and classification. Existing output identifiers remain unchanged. ❌ Physical robot acceptance remains outstanding.
+
+✅ [ADR0123](../docs/adr/0123-nexarm-ble-shared-pacing.md): PlatformKit spaces all BLE writes by at least 30 ms under one connection-wide budget; streaming admission returns false without queuing, and acknowledged requests reserve one cancellable slot. Actions retains proposal/finite-step semantics; App snapshots aim round-robin iteration and owns recovery. Fixed-size transport diagnostics distinguish notification traffic from valid feedback. ❌ Real-device rate/MTU calibration remains pending.

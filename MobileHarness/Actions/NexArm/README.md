@@ -203,3 +203,9 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 ✅ Tracking aim is an immediate target write, with capacity-one controller admission and motors1–5 ownership. A failed possible write requires explicit read-only recovery. Its target mapping is Support/NexArmJointCommand.swift; native encoding remains PlatformKit. ❌ Tracking arrival remains unmeasured.
 
 ✅ Incremental tracking retains its speed/motion state in the Action controller; gestures, reset, arrival checks and five-motor/gripper boundaries keep their existing contracts.
+
+## BLE admission under shared transport pacing
+
+✅ BLE proposal admission now shares the PlatformKit connection-wide 30 ms write budget (ADR0123). The existing Actions planner filters identical targets, caps elapsed integration at 60 ms and advances command state only after admission; finite execution retains its unsent step until admitted or its existing deadline/cancellation fails explicitly. Round-robin latest-intent streaming does not promise every motor receives a packet each planning tick. USB behavior is unchanged.
+
+❌ Streaming multi-motor packing with negotiated MTU validation and real-device calibration remain outstanding. Fixed presets, home selection and completion policy stay in Actions; neither Gateway nor UI owns BLE transport throttling.
