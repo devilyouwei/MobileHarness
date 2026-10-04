@@ -38,3 +38,5 @@ Implementation reference: [Apple AVCam](https://developer.apple.com/documentatio
 The Vision directory is a capability domain, distinct from Apple’s Vision framework. It owns camera I/O and frame adaptation; model preprocessing/inference belongs to ModelKit/Vision and its backends, frame-change admission and pose decisions belong to VisionPerception. future camera-motion policy is a [Photographer proposal](../../../docs/Photographer-Proposal.md). Camera files remain flat until multiple device implementations justify subdirectories.
 
 ✅ Responsibility audit: native preview binding remains here, while resizeAspectFill is selected by App/Adapters/CameraPreviewAdapter. Camera capture/frame conversion are device capabilities; overlay content, view layout and perception decisions are outside PlatformKit.
+
+✅ CameraFrame carries a ContinuousClock capture-callback instant alongside its unchanged media presentation timestamp. It measures callback-to-consumer latency without assuming media and host clocks share an epoch. ❌ Sensor exposure latency is not measured.

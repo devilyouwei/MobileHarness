@@ -11,7 +11,7 @@ Agents/
 ├── Assistant/                 # Chat, reply history and resolved speech Actions and UI Tools
 ├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
 ├── SpeechSynthesis/           # Directed serial synthesis into shared PCM handles
-├── VisionPerception/          # Frame filtering, pose inference and skeleton ToolCalls
+├── VisionPerception/          # Latest-frame image/pose/cost cadence, pose inference and skeleton ToolCalls
 ├── Photographer/              # Subscribed pose observations and optional arm aim
 └── README.md                  # Shared Agent and configuration rules
 ```
@@ -52,7 +52,7 @@ flowchart TB
         Speech[SpeechPerception: segmentation / recognition]
         Assistant[Assistant: context / generation / output parsing]
         Synth[SpeechSynthesis: directed serial synthesis]
-        Vision[VisionPerception: frame filtering / pose interpretation]
+        Vision[VisionPerception: latest-frame cadence / pose interpretation]
         Photographer[Photographer: shared-pose target selection]
     end
     Grants -.-> Speech
@@ -245,3 +245,5 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 ✅ Every production producer uses publishResult/sendResult: delivery failure affects only dependent work. App output consumers use OutputGateway.execute to retain execution failures rather than terminating another Agent. Startup configuration errors and explicit cancellation retain their existing validation/cleanup semantics.
 
 ✅ Output overflow rejects only the current unaccepted aim; Photographer remains running and queued accepted calls are retained.
+
+✅ Business Agents may depend explicitly on Types for immutable shared domain values. VisionPerception builds Types/Vision PoseOverlay; AgentCore retains generic runtime contracts. This does not allow UI/service imports or bypass OutputGateway.

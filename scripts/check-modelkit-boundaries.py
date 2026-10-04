@@ -103,7 +103,7 @@ for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools|CameraTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'Foundation'}
+agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'Types', 'Foundation'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     if 'Core' in source.relative_to(ROOT / 'MobileHarness/Agents').parts:
         continue
@@ -113,7 +113,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
 agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
 for dependency in agent_target.get('dependencies', []):
     name = next(iter(dependency.values()))[0]
-    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio'}:
+    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'Types'}:
         errors.append(f'Forbidden Agents dependency: {name}')
 # Storage core stays Foundation-only; media adapters may use the corresponding domain contracts.
 storage_target = next(t for t in package['targets'] if t['name'] == 'Storage')
@@ -155,9 +155,9 @@ ui = targets.get('UI', {})
 if ui.get('path') != 'MobileHarness/UI':
     errors.append('UI must compile MobileHarness/UI')
 ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])]
-if ui_dependencies != ['AgentCore', 'StorageChat']:
-    errors.append('UI may depend only on shared AgentCore/StorageChat value contracts')
-allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit', 'AgentCore', 'StorageChat'}
+if ui_dependencies != ['Types', 'StorageChat']:
+    errors.append('UI may depend only on shared Types/StorageChat value contracts')
+allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit', 'Types', 'StorageChat'}
 for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     content = source.read_text()
     for imported in re.findall(r'\bimport\s+(\w+)', content):
@@ -369,3 +369,7 @@ for platform in ('iphoneos', 'iphonesimulator'):
     if model_inputs != ['$(SRCROOT)/MobileHarness/Resources/Models/model-catalog.json']:
         raise SystemExit('App staging must not depend on model weights')
 print('Model resources: declarative catalog and metadata-only App staging passed.')
+
+# Feature-specific presentation contracts must not return to Agent infrastructure.
+if (ROOT / "MobileHarness/Agents/Core/Output/PoseOverlay.swift").exists():
+    raise SystemExit("PoseOverlay belongs to Types/Vision, not AgentCore")

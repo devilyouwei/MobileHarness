@@ -102,3 +102,23 @@ Validation (2026-10-03): 35 isolated shared tests passed (32 ModelKitRuntime, 2 
 ✅ [ADR 0112: Gemma CoreAI chat](adr/0112-gemma-coreai-chat.md) replaces local Qwen/MLX with Gemma 4 E2B QAT CoreAI. iOS uses pinned h18p AOT resources; old Qwen downloads are incompatible. Shared package dependencies require OS 26; CoreAI execution requires OS 27. ✅ Mac real inference, cancellation and reload passed. ❌ Sustained device acceptance remains pending.
 
 ❌ The iOS simulator SDK lacks CoreAI; the external CoreAILM target cannot build there. build-ios.sh currently stops on this limitation. Independent UI tests run on Mac; a separate simulator assembly remains outstanding.
+
+✅ Latest-capture inference uses pixel-independent capture-time cadence; controlled regression covers latest replacement even with insignificant grayscale change. ❌ Physical camera latency acceptance remains pending.
+
+✅ YOLO per-result timing/FPS/latest-frame replacement statistics and upper-left camera display are implemented. ❌ Adaptive pose/confidence/cost cadence is implemented; physical-phone sustained latency/thermal measurements remain pending.
+
+Validation: 14 explicitly filtered vision/UI tests, module boundary checks and changed-source formatting passed. Unsigned generic iOS device build passed; build-ios.sh remains blocked by the external CoreAIShared target lacking CoreAI in the simulator SDK. No robot motion tests were run. Physical UI/performance acceptance remains pending.
+
+✅ Removed fixed grayscale-percentage detection and camera threshold controls; latest-frame capture-time cadence provides the 100ms measurement baseline. ❌ Adaptive cadence is implemented (ADR0113); physical-phone energy/latency acceptance remains pending.
+
+Cadence baseline validation: 15 filtered vision/UI tests, module/resource boundaries, changed-source formatting, project plist and unsigned generic iOS device build passed. Full check.sh was not run because it includes the robot tests excluded by the user; the simulator CoreAI limitation remains as recorded above.
+
+✅ Adaptive pose cadence: 0...250ms bounds, 100ms initial interval, immediate motion/uncertainty acceleration, delayed stable relaxation, loss recovery and periodic empty-scene search, with measured inference-cost budgeting and optional interval UI statistics. ✅ Image motion and total-latency/freshness budgets are fused into cadence. ❌ Phone tuning, thermal/energy measurements and crowded-scene association acceptance remain pending.
+
+Adaptive validation: 21 filtered vision/UI tests, source formatting, module/resource boundaries and unsigned generic iOS device build passed. Full check.sh remains excluded by the user’s no-robot-test instruction; build-ios.sh has the previously recorded simulator CoreAI limitation. No robot tests or hardware actions were run. Physical camera layout/latency and parameter calibration remain pending.
+
+✅ Fused dynamic detection adds inferred-frame cumulative image motion, padded person-ROI plus global evidence, bounded contrast/brightness compensation, quiet-scene noise adaptation and compute-aware total-latency feedback. Default capture/result age budget is 750ms; stale results update timing only. ❌ Phone saturation/exposure, small-target motion sensitivity, power/thermal acceptance remain pending. Source-stall timeout cleanup is deferred by user decision; camera close already clears presentation.
+
+Fusion validation: 28 explicitly selected vision/UI tests, module/resource boundaries, changed-source formatting, project plist and unsigned generic iOS device build passed. Full check.sh was excluded by the user’s no-robot-test instruction; the known simulator CoreAI limitation remains. No robot tests or hardware actions were run. Physical small-target/exposure sensitivity, sustained latency/thermal behavior and UI acceptance remain pending.
+
+✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](adr/0114-vision-presentation-values.md).

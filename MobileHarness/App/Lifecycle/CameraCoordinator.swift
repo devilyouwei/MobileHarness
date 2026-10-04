@@ -9,6 +9,7 @@ import OSLog
 import PlatformKit
 import ToolRuntime
 import Tools
+import Types
 import UI
 
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
@@ -119,12 +120,6 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         }
     }
 
-    func setChangeThreshold(_ value: Double) {
-        guard value.isFinite, (0...1).contains(value), value != state.changeThreshold else { return }
-        state.changeThreshold = value
-        reconcile()
-    }
-
     func retry() {
         recoverRequested = true
         failed = false
@@ -186,11 +181,10 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
     private func startVision(frames: AsyncThrowingStream<CameraFrame, Error>) {
         let id = UUID()
         visionSession = id
-        let threshold = state.changeThreshold
         let mirrored = state.facing == .front
         visionTask = Task { [weak self] in
             do {
-                let configuration = try FrameChangeConfiguration(minimumChange: threshold, maximumRefreshInterval: 0.1)
+                let configuration = try FrameSamplingConfiguration()
                 let session = try await self?.makeSession()
                 try Task.checkCancellation()
                 guard let self, let session else { throw CancellationError() }
@@ -235,7 +229,14 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         guard state.skeleton.map({ overlay.sequence > $0.sequence }) ?? true else { throw ImageInputError.outOfOrder }
         state.skeleton = PoseOverlay(
             sequence: overlay.sequence, timestamp: overlay.timestamp, rotation: overlay.rotation,
-            people: overlay.people.map { $0.map { PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) } })
+            people: overlay.people.map { $0.map { PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) } },
+            statistics: overlay.statistics.map {
+                PoseOverlay.Statistics(
+                    queueMilliseconds: $0.queueMilliseconds, inferenceMilliseconds: $0.inferenceMilliseconds,
+                    totalMilliseconds: $0.totalMilliseconds, framesPerSecond: $0.framesPerSecond,
+                    replacements: $0.replacements, detectionIntervalMilliseconds: $0.detectionIntervalMilliseconds,
+                    imageMotion: $0.imageMotion)
+            })
     }
 
     private func recordCapture(_ state: ActivityEvent.State, id: UUID) {

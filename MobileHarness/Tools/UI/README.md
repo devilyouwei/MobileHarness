@@ -42,3 +42,9 @@ flowchart LR
 ✅ ToolPoseOverlay is the tool-owned decoded payload. App converts it to the UI overlay value. Conversation source/turn acceptance belongs to AppWorkflows, not Tools.
 
 ✅ ADR0098: Execution values and services are imported from independent ToolRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.
+
+✅ UI.showPose accepts optional finite nonnegative statistics and validates timing consistency before the host effect; existing payloads remain valid and the 3000-byte/six-person bound is unchanged.
+
+✅ Optional adaptive interval statistics remain in UI.showPose; validation accepts 0...1000ms finite values and legacy statistics without the field. No new callable entry or output queue is added.
+
+✅ UI.showPose retains its existing permission and 3000-byte bound while carrying optional normalized image-motion activity in statistics. Invalid activity is rejected before effects.

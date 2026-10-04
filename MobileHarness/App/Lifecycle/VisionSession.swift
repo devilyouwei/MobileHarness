@@ -12,17 +12,17 @@ import Tools
 @MainActor
 final class VisionSession {
     private let runtime: VisionRuntimeDependencies
-    private let makeAgent: (UUID, FrameChangeConfiguration, Bool) throws -> VisionPerceptionAgent
+    private let makeAgent: (UUID, FrameSamplingConfiguration, Bool) throws -> VisionPerceptionAgent
     init(
         runtime: VisionRuntimeDependencies,
-        makeAgent: @escaping (UUID, FrameChangeConfiguration, Bool) throws -> VisionPerceptionAgent
+        makeAgent: @escaping (UUID, FrameSamplingConfiguration, Bool) throws -> VisionPerceptionAgent
     ) {
         self.runtime = runtime
         self.makeAgent = makeAgent
     }
     func run(
         frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: UUID,
-        configuration: FrameChangeConfiguration, mirroredGaze: Bool,
+        configuration: FrameSamplingConfiguration, mirroredGaze: Bool,
         endpoint: any CameraOutputHandling
     ) async throws {
         let manager = runtime.manager
@@ -50,7 +50,8 @@ final class VisionSession {
                                 image: try frame.withPixelBuffer {
                                     try ImageFrame(pixelBuffer: $0, rotation: frame.rotation)
                                 }),
-                            sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation)
+                            sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation,
+                            capturedAt: frame.capturedAt)
                         let report = try await input.publish(AgentInput(sessionID: sessionID, payload: .image(image)))
                         guard report.rejected.isEmpty, report.delivered == [.visionPerception] else {
                             if await vision.status().lifecycle == .failed { return false }

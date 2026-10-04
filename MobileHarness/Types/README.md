@@ -4,6 +4,7 @@ Purpose: own shared immutable Sendable values used by independent SDKs. Design g
 
 | Directory | Implemented contracts |
 | --- | --- |
+| [Vision](Vision/README.md) | Skeleton presentation and detection statistics |
 | [Audio](Audio/README.md) | PCM formats/frames, microphone samples and validation errors |
 
 ```mermaid
@@ -20,4 +21,6 @@ flowchart LR
 
 ImageFrame and NativeImageBuffer currently belong to ModelKit/Core. Types owns no capture, inference, persistence, queues or lifecycle services.
 
-❌ Other shared value categories are not implemented. A category is added only with concrete values and consumers.
+✅ Vision owns PoseOverlay values shared by Agents, App and UI; no preview projection or execution policy.
+
+❌ Additional shared categories are not implemented. A category is added only with concrete values and consumers.

@@ -27,9 +27,7 @@ flowchart LR
 
 See [Generation](../Generation/README.md) for protocol definitions. Keep names, fields, implemented ✅ and outstanding ❌ behavior synchronized with code.
 
-✅ PoseOverlay is a Foundation-only compact action payload: sequence/time/rotation plus at most six COCO-17 skeletons, integer normalized coordinates and confidence. UI.showPose validates decoded values before presentation. Runtime agent.finished/agent.error controls now provide generic completion/cancellation alongside the legacy assistant names.
 
-✅ UI.showPose now uses ToolCall with the same bounded PoseOverlay data. Its App-registered Void handler produces no ToolResult; data-returning tool calls retain existing callID feedback. ToolCall itself does not authorize suppression of feedback.
 
 ✅ OutputEnvelope retains ConversationTurn and a source-monotonic output sequence. These are assigned by runtime/Agent implementation, never parsed from model parameters.
 
@@ -69,3 +67,8 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 ✅ ActionCall/ToolCall describe Agent intent; Gateway translates them to independent execution requests. AgentActionCompletion/AgentActionReport are delivery values, not execution interfaces. Action execution error protocols and argument readers now belong to Actions/Tools.
 
 ✅ rejectedCall carries a non-executable invocation rejection with Action/Tool output permission, bounded alias, typed reason and optional native Tool ID. Gateway records it alongside execution outcomes. ❌ It grants no execution or result-forging permission.
+
+
+
+
+✅ Visual skeleton presentation and detection statistics belong to Types/Vision, not AgentCore. Output contains generic invocation/runtime contracts only; no pose-specific presentation policy or preview conversion remains.

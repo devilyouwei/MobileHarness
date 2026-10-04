@@ -146,3 +146,7 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
 
 ✅ [ADR 0112: Gemma CoreAI chat](0112-gemma-coreai-chat.md) replaces local Qwen/MLX with Gemma 4 E2B QAT CoreAI. iOS uses pinned h18p AOT resources; old Qwen downloads are incompatible. Shared package dependencies require OS 26; CoreAI execution requires OS 27. ✅ Mac real inference, cancellation and reload passed. ❌ Sustained device acceptance remains pending.
+
+✅ [ADR 0113: Adaptive latest-frame pose detection](0113-adaptive-pose-cadence.md) documents Agent-owned image/pose/confidence/cost/freshness scheduling and existing Tool statistics. ❌ Physical-phone calibration remains pending.
+
+- [0114 — Visual presentation values outside AgentCore](0114-vision-presentation-values.md)

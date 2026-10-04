@@ -11,6 +11,8 @@ public struct CameraFrame: @unchecked Sendable {
     public func withPixelBuffer<T>(_ body: (CVPixelBuffer) throws -> T) rethrows -> T { try body(pixels) }
     public let sequence: UInt64
     public let timestamp: TimeInterval
+    /// Monotonic callback arrival, independent of the media presentation clock.
+    public let capturedAt: ContinuousClock.Instant
     public let rotation: Int
 }
 
@@ -59,6 +61,7 @@ public struct CameraFrame: @unchecked Sendable {
         func captureOutput(
             _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection
         ) {
+            let capturedAt = ContinuousClock.now
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
             let snapshot = state.withLock {
                 value -> (AsyncThrowingStream<CameraFrame, Error>.Continuation, UInt64, Int)? in
@@ -103,7 +106,7 @@ public struct CameraFrame: @unchecked Sendable {
             continuation.yield(
                 CameraFrame(
                     width: width, height: height, pixels: pixels, gray64: gray,
-                    sequence: sequence, timestamp: timestamp, rotation: rotation))
+                    sequence: sequence, timestamp: timestamp, capturedAt: capturedAt, rotation: rotation))
         }
     }
 #endif

@@ -53,7 +53,7 @@ let package = Package(
             name: "BehaviorAssembly", dependencies: ["Actions", "Tools", "ActionRuntime", "ToolRuntime"],
             path: "MobileHarness/App/Composition/Behaviors", exclude: ["README.md"]),
         .target(
-            name: "UI", dependencies: ["AgentCore", "StorageChat"], path: "MobileHarness/UI",
+            name: "UI", dependencies: ["Types", "StorageChat"], path: "MobileHarness/UI",
             exclude: [
                 "README.md", "Camera/README.md", "Components/README.md", "Conversation/README.md",
                 "Settings/README.md", "Diagnostics/README.md",
@@ -124,7 +124,7 @@ let package = Package(
                 "Speech/README.md", "Speech/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),
         .target(
-            name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageChat", "StorageAudio"],
+            name: "Agents", dependencies: ["AgentCore", "ModelKit", "StorageChat", "StorageAudio", "Types"],
             path: "MobileHarness/Agents",
             exclude: [
                 "Core", "SpeechSynthesis/README.md", "Assistant/README.md",
@@ -155,7 +155,8 @@ let package = Package(
                 "Robot/README.md", "Robot/Support/README.md",
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),
-        .target(name: "Types", path: "MobileHarness/Types", exclude: ["README.md", "Audio/README.md"]),
+        .target(
+            name: "Types", path: "MobileHarness/Types", exclude: ["README.md", "Audio/README.md", "Vision/README.md"]),
         .target(
             name: "ModelKit", dependencies: ["Types"], path: "MobileHarness/ModelKit",
             exclude: [

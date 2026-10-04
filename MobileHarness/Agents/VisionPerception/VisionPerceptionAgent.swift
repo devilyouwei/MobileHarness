@@ -1,6 +1,7 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Types
 
 /// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven gaze Tools.
 public actor VisionPerceptionAgent: Agent {
@@ -12,7 +13,7 @@ public actor VisionPerceptionAgent: Agent {
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private var port: AgentMessaging?
-    private var filter: FrameChangeFilter
+    private var cadence: FrameCadence
     private var gaze: FaceGazeTracker
     public private(set) var gazeReplacements = 0
     public private(set) var replacements = 0
@@ -35,10 +36,13 @@ public actor VisionPerceptionAgent: Agent {
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var processed = 0
+    private var fpsWindow: ContinuousClock.Instant?
+    private var fpsCompletions = 0
+    private var framesPerSecond: Double?
 
     public init(
         pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil,
-        sampling: FrameChangeConfiguration? = nil, mirroredGaze: Bool = false,
+        sampling: FrameSamplingConfiguration? = nil, mirroredGaze: Bool = false,
         resolveImage: @escaping @Sendable (ImageInput) throws -> ImageFrame = { input in
             guard case .rgb(let rgb) = input.content else { throw ImageInputError.invalidFrame }
             return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
@@ -51,7 +55,7 @@ public actor VisionPerceptionAgent: Agent {
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
-        self.filter = FrameChangeFilter(configuration: try sampling ?? FrameChangeConfiguration())
+        self.cadence = FrameCadence(configuration: try sampling ?? FrameSamplingConfiguration())
         self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
         self.pose = pose
         self.resolveImage = resolveImage
@@ -117,15 +121,21 @@ public actor VisionPerceptionAgent: Agent {
         else { throw ImageInputError.outOfOrder }
         lastSequence = image.sequence
         lastTimestamp = image.timestamp
-        guard try filter.accepts(image) else { return }
         if pending != nil { replacements += 1 }
-        pending = input  // Latest raw frame; display replacement has its own explicit state-only policy.
+        pending = input  // Every valid capture replaces the slot, regardless of motion or cadence.
         drain()
     }
     private func drain() {
-        guard lifecycle == .running, worker == nil, let input = pending else { return }
+        guard lifecycle == .running, worker == nil, pending != nil else { return }
+        worker = Task { await inferLatest() }
+    }
+    private func inferLatest() async {
+        guard lifecycle == .running, let input = pending else {
+            worker = nil
+            return
+        }
         pending = nil
-        worker = Task { await infer(input) }
+        await infer(input)
     }
     private func infer(_ input: AgentInput) async {
         defer {
@@ -138,20 +148,31 @@ public actor VisionPerceptionAgent: Agent {
                 expiredInputs += 1
                 return
             }
+            let staleBefore = cadence.staleInputs
+            guard try cadence.accepts(image, at: image.capturedAt == nil ? nil : .now) else {
+                expiredInputs += cadence.staleInputs - staleBefore
+                return
+            }
             let context = InferenceContext(requestID: input.id, conversationID: input.sessionID)
             let resolved = try resolveImage(image)
             guard resolved.width == image.width, resolved.height == image.height else {
                 throw ImageInputError.invalidFrame
             }
+            let startedAt = ContinuousClock.now
+            if fpsWindow == nil { fpsWindow = startedAt }
             let result = try await pose.estimatePose(
                 PoseRequest(
                     image: resolved, context: context))
+            let finishedAt = ContinuousClock.now
             try Task.checkCancellation()
             guard lifecycle == .running || lifecycle == .paused else { return }
             guard result.context == context else {
                 throw CapabilityError.invalidRequest("Pose result context mismatch")
             }
-            guard !input.metadata.expired else {
+            let inferenceDuration = Self.milliseconds(startedAt.duration(to: finishedAt)) / 1000
+            let totalLatency = image.capturedAt.map { Self.milliseconds($0.duration(to: finishedAt)) / 1000 }
+            guard !input.metadata.expired, totalLatency.map({ $0 < cadence.maximumObservationLatency }) ?? true else {
+                try cadence.observeTiming(inferenceDuration: inferenceDuration, totalLatency: totalLatency)
                 expiredInputs += 1
                 return
             }
@@ -165,7 +186,23 @@ public actor VisionPerceptionAgent: Agent {
             let observation = try PoseObservation(
                 width: image.width, height: image.height, sequence: image.sequence,
                 timestamp: image.timestamp, rotation: image.rotation, people: people)
-            try emitOverlay(observation, input: input)
+            try cadence.observe(observation, inferenceDuration: inferenceDuration, totalLatency: totalLatency)
+            fpsCompletions += 1
+            if let fpsWindow {
+                let elapsed = Self.milliseconds(fpsWindow.duration(to: finishedAt)) / 1000
+                if elapsed >= 1 {
+                    framesPerSecond = Double(fpsCompletions) / elapsed
+                    self.fpsWindow = finishedAt
+                    fpsCompletions = 0
+                }
+            }
+            let statistics = PoseOverlay.Statistics(
+                queueMilliseconds: image.capturedAt.map { Self.milliseconds($0.duration(to: startedAt)) },
+                inferenceMilliseconds: Self.milliseconds(startedAt.duration(to: finishedAt)),
+                totalMilliseconds: image.capturedAt.map { Self.milliseconds($0.duration(to: finishedAt)) },
+                framesPerSecond: framesPerSecond, replacements: replacements,
+                detectionIntervalMilliseconds: cadence.interval * 1000, imageMotion: cadence.imageActivity)
+            try emitOverlay(observation, input: input, statistics: statistics)
             let target = gaze.update(observation)
             let move = try Self.gaze.call(["x": String(target.x), "y": String(target.y)])
             try emit(.toolCall(move), input: input)
@@ -216,7 +253,13 @@ public actor VisionPerceptionAgent: Agent {
                 source: descriptor.id, input: input, output: .control("agent.error: pose processing failed")))
         continuation.finish()
     }
-    private func emitOverlay(_ image: PoseObservation, input: AgentInput) throws {
+    private static func milliseconds(_ duration: Duration) -> Double {
+        let components = duration.components
+        return max(0, Double(components.seconds) * 1000 + Double(components.attoseconds) / 1e15)
+    }
+    private func emitOverlay(
+        _ image: PoseObservation, input: AgentInput, statistics: PoseOverlay.Statistics
+    ) throws {
         let people = try image.people.prefix(6).map { person in
             guard person.count == 17 else { throw CommunicationError.invalidPayload }
             return try person.map { point in
@@ -234,7 +277,8 @@ public actor VisionPerceptionAgent: Agent {
             }
         }
         let overlay = PoseOverlay(
-            sequence: image.sequence, timestamp: image.timestamp, rotation: image.rotation, people: people)
+            sequence: image.sequence, timestamp: image.timestamp, rotation: image.rotation, people: people,
+            statistics: statistics)
         let data = try JSONEncoder().encode(overlay)
         guard data.count <= 3000, let json = String(data: data, encoding: .utf8) else {
             throw CommunicationError.invalidPayload

@@ -79,3 +79,5 @@ flowchart LR
 ✅ History parsing previews show ordered rejected model calls alongside valid calls and wait boundaries. ❌ Preview does not establish execution success.
 
 ✅ Download preference validation always permits cellular use while respecting OS permissions. The former UI network restriction is no longer configurable; model transport contracts remain unchanged.
+
+✅ CameraPreviewAdapter consumes Types/Vision and UI-owned sensor-point projection. Native preview conversion/crop/mirroring remain here.

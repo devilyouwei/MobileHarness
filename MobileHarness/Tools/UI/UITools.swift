@@ -105,7 +105,7 @@ public enum UITools {
         guard let payload = call.arguments["payload"], payload.utf8.count <= 3000,
             let overlay = try? JSONDecoder().decode(ToolPoseOverlay.self, from: Data(payload.utf8)),
             overlay.timestamp.isFinite, overlay.timestamp >= 0, (0...3).contains(overlay.rotation),
-            overlay.people.count <= 6,
+            overlay.people.count <= 6, overlay.statistics?.isValid ?? true,
             overlay.people.allSatisfy({ person in
                 person.count == 17
                     && person.allSatisfy {

@@ -8,38 +8,13 @@ import ModelKit
 import Testing
 import ToolRuntime
 import Tools
+import Types
+import UI
 
 private func image(_ value: UInt8, sequence: UInt64, rotation: Int = 1) throws -> ImageInput {
     try ImageInput(
         width: 4, height: 4, rgb: Data(repeating: value, count: 48),
         sequence: sequence, timestamp: Double(sequence), rotation: rotation)
-}
-
-@Test func grayscaleThresholdUsesPreviousExaminedFrame() throws {
-    var filter = FrameChangeFilter(configuration: try FrameChangeConfiguration())
-    #expect(try filter.accepts(image(0, sequence: 1)))
-    #expect(try !filter.accepts(image(0, sequence: 2)))
-    #expect(try !filter.accepts(image(7, sequence: 3)))  // 7/255 < 3%
-    #expect(try !filter.accepts(image(14, sequence: 4)))  // Baseline advanced to 7, not last admitted 0.
-    #expect(try filter.accepts(image(22, sequence: 5)))  // 8/255 > 3%
-    #expect(throws: ImageInputError.outOfOrder) { try filter.accepts(image(22, sequence: 5)) }
-    #expect(try filter.accepts(image(22, sequence: 6, rotation: 2)))
-    #expect(throws: ImageInputError.invalidFrame) { try FrameChangeConfiguration(minimumChange: .nan) }
-    #expect(throws: ImageInputError.invalidFrame) { try FrameChangeConfiguration(minimumChange: 1.1) }
-    var zero = FrameChangeFilter(configuration: try FrameChangeConfiguration(minimumChange: 0))
-    #expect(try zero.accepts(image(10, sequence: 1)))
-    #expect(try !zero.accepts(image(10, sequence: 2)))
-}
-
-@Test func grayscaleIntervalDoesNotAdvanceComparisonBaseline() throws {
-    var filter = FrameChangeFilter(configuration: try FrameChangeConfiguration(minimumInterval: 1))
-    let first = try ImageInput(width: 1, height: 1, rgb: Data([0, 0, 0]), sequence: 1, timestamp: 0, rotation: 0)
-    let skipped = try ImageInput(
-        width: 1, height: 1, rgb: Data([100, 100, 100]), sequence: 2, timestamp: 0.5, rotation: 0)
-    let next = try ImageInput(width: 1, height: 1, rgb: Data([100, 100, 100]), sequence: 3, timestamp: 1, rotation: 0)
-    #expect(try filter.accepts(first))
-    #expect(try !filter.accepts(skipped))
-    #expect(try filter.accepts(next))
 }
 
 /// Gate each inference explicitly so mailbox/cancellation tests do not depend on model speed.
@@ -78,7 +53,7 @@ private actor ControlledPose: PoseCapability {
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session, sampling: FrameChangeConfiguration(minimumChange: 0))
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(minimumInterval: 0))
     let observations = AsyncStream<PerceptionObservation>.makeStream(bufferingPolicy: .bufferingOldest(8))
     try await agent.bind(
         AgentMessaging { value, _, _ in
@@ -118,11 +93,36 @@ private actor ControlledPose: PoseCapability {
     await agent.stop()
 }
 
+@Test(.timeLimit(.minutes(1))) func visionInfersNewestCaptureRegardlessOfGrayscaleChange() async throws {
+    let model = ControlledPose()
+    let session = UUID()
+    let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
+    try await agent.start()
+    var started = model.started.makeAsyncIterator()
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(0, sequence: 1))))
+    #expect(await started.next() == 0)
+    // Frame 3 changes only 1/255 and must still replace the waiting frame.
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(100, sequence: 2))))
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(image(101, sequence: 3))))
+    await model.release()
+    #expect(await started.next() == 101)
+    #expect(await model.calls == [0, 101])
+    #expect(await model.maximumActive == 1)
+    let stopping = Task { await agent.stop() }
+    for _ in 0..<1000 {
+        if await agent.status().lifecycle == .stopped { break }
+        await Task.yield()
+    }
+    await model.release()
+    await stopping.value
+}
+
 @Test(.timeLimit(.minutes(1))) func visionPauseKeepsLatestAndStopSuppressesLateModelOutput() async throws {
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session, sampling: FrameChangeConfiguration(minimumChange: 0))
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(minimumInterval: 0))
     try await agent.bind(
         AgentMessaging { _, _, _ in
             Issue.record("Late output")
@@ -309,6 +309,8 @@ private struct CrowdPose: PoseCapability {
     }
     #expect((call.arguments["payload"]?.utf8.count ?? Int.max) <= 3000)
     try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+        #expect(overlay.statistics?.isValid == true)
+        #expect(overlay.statistics?.inferenceMilliseconds != nil)
         #expect(overlay.people.count == 6)
         #expect(overlay.people.allSatisfy { $0.count == 17 })
         #expect(overlay.people[0][0] == ToolPoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
@@ -390,24 +392,23 @@ private struct PoseImageAttachment: ImageAttachment { let image: ImageFrame }
     await agent.stop()
 }
 
-@Test func boundedRefreshAdmitsNewFramesForSlowOrStationaryScenes() throws {
-    var filter = FrameChangeFilter(configuration: try FrameChangeConfiguration(maximumRefreshInterval: 0.1))
+@Test func visionCadenceAdmitsStationaryFramesAndLimitsChangedFrames() throws {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     func frame(_ sequence: UInt64, _ time: Double, _ gray: UInt8) throws -> ImageInput {
         try ImageInput(
             width: 1, height: 1, rgb: Data(repeating: gray, count: 3),
             sequence: sequence, timestamp: time, rotation: 0)
     }
-    #expect(try filter.accepts(frame(1, 0, 0)))
-    #expect(try !filter.accepts(frame(2, 0.03, 1)))
-    #expect(try !filter.accepts(frame(3, 0.06, 2)))
-    #expect(try filter.accepts(frame(4, 0.11, 3)))
-    #expect(try !filter.accepts(frame(5, 0.14, 3)))
-    #expect(try filter.accepts(frame(6, 0.22, 3)))
-    #expect(throws: ImageInputError.outOfOrder) { try filter.accepts(frame(6, 0.22, 3)) }
-    #expect(throws: ImageInputError.invalidFrame) { try FrameChangeConfiguration(maximumRefreshInterval: .nan) }
-    #expect(throws: ImageInputError.invalidFrame) {
-        try FrameChangeConfiguration(minimumInterval: 0.2, maximumRefreshInterval: 0.1)
-    }
+    #expect(try cadence.accepts(frame(1, 0, 0)))
+    #expect(try !cadence.accepts(frame(2, 0.03, 255)))
+    #expect(try !cadence.accepts(frame(3, 0.06, 0)))
+    #expect(try cadence.accepts(frame(4, 0.11, 0)))
+    #expect(try !cadence.accepts(frame(5, 0.14, 255)))
+    #expect(try cadence.accepts(frame(6, 0.22, 0)))
+    #expect(throws: ImageInputError.outOfOrder) { try cadence.accepts(frame(6, 0.22, 0)) }
+    #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(minimumInterval: .nan) }
+    #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(minimumInterval: -0.1) }
+    #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(minimumInterval: 1.1) }
 }
 
 private actor BlockedPosePublication {
@@ -571,4 +572,353 @@ private struct FailingSecondPose: PoseCapability {
     #expect(await agent.publicationRejections == 2)
     #expect(await agent.status().lifecycle == .running)
     await agent.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) func visionStatisticsMeasureCaptureToResultThroughPoseTool() async throws {
+    let session = UUID()
+    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
+    try await agent.start()
+    let capturedAt = ContinuousClock.now.advanced(by: .milliseconds(-20))
+    let frame = try ImageInput(
+        width: 1, height: 1, rgb: Data([0, 0, 0]), sequence: 1, timestamp: 0, rotation: 0,
+        capturedAt: capturedAt)
+    try await agent.receive(AgentInput(sessionID: session, payload: .image(frame)))
+    var output = agent.outputs.makeAsyncIterator()
+    let envelope = try #require(await output.next())
+    guard case .toolCall(let call) = envelope.output else {
+        Issue.record("Missing pose Tool")
+        await agent.stop()
+        return
+    }
+    try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+        let statistics = try #require(overlay.statistics)
+        #expect(statistics.isValid)
+        #expect(try #require(statistics.queueMilliseconds) >= 20)
+        #expect(try #require(statistics.totalMilliseconds) >= 20)
+        #expect(statistics.framesPerSecond == nil)
+        let interval = try #require(statistics.detectionIntervalMilliseconds)
+        #expect((0...250).contains(interval))
+        #expect(statistics.replacements == 0)
+    }
+    await agent.stop()
+}
+
+@Test func poseStatisticsRemainOptionalAndRejectInvalidMeasurements() throws {
+    let legacy = Data(#"{"sequence":1,"timestamp":0,"rotation":0,"people":[]}"#.utf8)
+    #expect(try JSONDecoder().decode(PoseOverlay.self, from: legacy).statistics == nil)
+    #expect(try JSONDecoder().decode(ToolPoseOverlay.self, from: legacy).statistics == nil)
+    let valid = ToolPoseOverlay.Statistics(
+        queueMilliseconds: 10, inferenceMilliseconds: 20, totalMilliseconds: 30,
+        framesPerSecond: 10, replacements: 2)
+    #expect(valid.isValid)
+    let invalid = ToolPoseOverlay.Statistics(
+        queueMilliseconds: 10, inferenceMilliseconds: 20, totalMilliseconds: 15,
+        framesPerSecond: 10, replacements: 2)
+    #expect(!invalid.isValid)
+    #expect(
+        !ToolPoseOverlay.Statistics(
+            queueMilliseconds: nil, inferenceMilliseconds: .nan, totalMilliseconds: nil,
+            framesPerSecond: nil, replacements: 0
+        ).isValid)
+}
+
+private func cadencePose(
+    time: Double, offsets: [Float] = [0], confidence: Float = 0.9, rotation: Int = 0
+) throws -> PoseObservation {
+    try PoseObservation(
+        width: 640, height: 480, sequence: UInt64(time * 1000), timestamp: time, rotation: rotation,
+        people: offsets.map { offset in
+            (0..<17).map { index in
+                PoseObservation.Joint(
+                    x: 120 + Float(index % 4) * 20 + offset,
+                    y: 100 + Float(index / 4) * 30, confidence: confidence)
+            }
+        })
+}
+
+@Test func visionAdaptiveCadenceSlowsStablePoseThenAcceleratesMotionAndConfidenceLoss() throws {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
+    for step in 0...20 {
+        try cadence.observe(cadencePose(time: Double(step) * 0.1), inferenceDuration: 0.01)
+    }
+    #expect(cadence.interval > 0.2 && cadence.interval <= 0.25)
+    try cadence.observe(cadencePose(time: 2.1, offsets: [30]), inferenceDuration: 0.01)
+    #expect(cadence.interval == 0)
+    // Low-confidence keypoints cannot be treated as stationary reliable evidence.
+    try cadence.observe(cadencePose(time: 2.2, offsets: [30], confidence: 0.5), inferenceDuration: 0.01)
+    #expect(cadence.interval == 0)
+}
+
+@Test func visionAdaptiveCadenceAssociatesReorderedPeopleAndIgnoresSmallJitter() throws {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
+    for step in 0...20 {
+        let offsets: [Float] = step.isMultiple(of: 2) ? [0, 200] : [201, 1]
+        try cadence.observe(cadencePose(time: Double(step) * 0.1, offsets: offsets), inferenceDuration: 0.01)
+    }
+    #expect(cadence.interval > 0.2)
+    try cadence.observe(cadencePose(time: 2.1, offsets: [0, 200, 350]), inferenceDuration: 0.01)
+    #expect(cadence.interval == 0)
+}
+
+@Test func visionAdaptiveCadenceRecoversLostPeopleThenKeepsSearching() throws {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
+    try cadence.observe(cadencePose(time: 0), inferenceDuration: 0.01)
+    try cadence.observe(cadencePose(time: 0.1, offsets: []), inferenceDuration: 0.01)
+    #expect(cadence.interval == 0)
+    try cadence.observe(cadencePose(time: 0.4, offsets: []), inferenceDuration: 0.01)
+    #expect(cadence.interval == 0)
+    for step in 6...20 {
+        try cadence.observe(cadencePose(time: Double(step) * 0.1, offsets: []), inferenceDuration: 0.01)
+    }
+    #expect(cadence.interval > 0.15 && cadence.interval <= 0.2)
+    try cadence.observe(cadencePose(time: 2.1), inferenceDuration: 0.01)
+    #expect(cadence.interval == 0)
+}
+
+@Test func visionAdaptiveCadenceRespectsInferenceCostBoundsAndResetsGeometry() throws {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
+    try cadence.observe(cadencePose(time: 0), inferenceDuration: 0.4, totalLatency: 0.6)
+    #expect(cadence.interval == 0.25)
+    try cadence.observe(cadencePose(time: 0.1, offsets: [30]), inferenceDuration: 0.01)
+    #expect(cadence.interval == 0)
+    for step in 2...25 {
+        try cadence.observe(cadencePose(time: Double(step) * 0.1, offsets: [30]), inferenceDuration: 0.01)
+    }
+    #expect(cadence.interval > 0.2)
+    try cadence.observe(cadencePose(time: 2.6, offsets: [30], rotation: 1), inferenceDuration: 0.01)
+    #expect(cadence.interval < 0.1)
+    try cadence.observe(cadencePose(time: 2.7, offsets: [30], rotation: 1), inferenceDuration: 20)
+    #expect(cadence.interval == 0.25)
+    #expect(throws: ImageInputError.invalidFrame) {
+        try cadence.observe(cadencePose(time: 2.8), inferenceDuration: .nan)
+    }
+    #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(maximumInterval: 0.01) }
+    #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(initialInterval: .infinity) }
+}
+
+@Test func visionAdaptiveCadenceUsesMonotonicStartGapWithoutReplayingSkippedFrames() throws {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
+    let now = ContinuousClock.now
+    #expect(try cadence.accepts(image(0, sequence: 1), at: now))
+    // Media timestamps can advance while delivery bursts. Actual start gap still limits admission.
+    #expect(try !cadence.accepts(image(255, sequence: 2), at: now.advanced(by: .milliseconds(10))))
+    #expect(try cadence.accepts(image(0, sequence: 3), at: now.advanced(by: .milliseconds(110))))
+    #expect(throws: ImageInputError.outOfOrder) {
+        try cadence.accepts(image(255, sequence: 2), at: now.advanced(by: .milliseconds(220)))
+    }
+}
+
+@Test func visionAdaptiveUrgentCadenceAdmitsNextFreshFrameWithoutArtificialGap() throws {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
+    let now = ContinuousClock.now
+    let baseline = [UInt8](repeating: 100, count: 4096)
+    #expect(try cadence.accepts(motionFrame(baseline, sequence: 1, time: 0, capturedAt: now), at: now))
+    try cadence.observe(cadencePose(time: 0), inferenceDuration: 0.007, totalLatency: 0.009)
+    #expect(cadence.interval == 0)
+    #expect(
+        try cadence.accepts(
+            motionFrame(baseline, sequence: 2, time: 0.008, capturedAt: now.advanced(by: .milliseconds(8))),
+            at: now.advanced(by: .milliseconds(8))))
+    // Both consecutive fresh frames are admitted; the Agent's single worker owns non-overlap.
+    try cadence.observe(cadencePose(time: 0.008, offsets: [30]), inferenceDuration: 0.007)
+    #expect(cadence.interval == 0)
+    #expect(
+        try cadence.accepts(
+            motionFrame(baseline, sequence: 3, time: 0.016, capturedAt: now.advanced(by: .milliseconds(16))),
+            at: now.advanced(by: .milliseconds(16))))
+}
+
+@Test func poseAdaptiveIntervalStatisticsPreserveLegacyPayloadsAndBounds() throws {
+    let legacy = PoseOverlay(
+        sequence: 1, timestamp: 0, rotation: 0, people: [],
+        statistics: PoseOverlay.Statistics(
+            queueMilliseconds: 1, inferenceMilliseconds: 2, totalMilliseconds: 3,
+            framesPerSecond: 10, replacements: 0))
+    let decoded = try JSONDecoder().decode(ToolPoseOverlay.self, from: JSONEncoder().encode(legacy))
+    #expect(decoded.statistics?.detectionIntervalMilliseconds == nil)
+    #expect(decoded.statistics?.imageMotion == nil)
+    #expect(decoded.statistics?.isValid == true)
+    #expect(
+        !ToolPoseOverlay.Statistics(
+            queueMilliseconds: nil, inferenceMilliseconds: 1, totalMilliseconds: nil,
+            framesPerSecond: nil, replacements: 0, detectionIntervalMilliseconds: 1001
+        ).isValid)
+    let maximum = PoseOverlay(
+        sequence: UInt64.max, timestamp: 123456.789, rotation: 3,
+        people: Array(
+            repeating: Array(repeating: PoseOverlay.Joint(x: -10000, y: 20000, confidence: 1000), count: 17), count: 6),
+        statistics: PoseOverlay.Statistics(
+            queueMilliseconds: 100, inferenceMilliseconds: 150, totalMilliseconds: 250,
+            framesPerSecond: 6.666666666666667, replacements: Int.max, detectionIntervalMilliseconds: 250,
+            imageMotion: 1))
+    #expect(try JSONEncoder().encode(maximum).count <= 3000)
+}
+
+private struct MotionAttachment: ImageAttachment {}
+private func motionFrame(
+    _ pixels: [UInt8], sequence: UInt64, time: Double, capturedAt: ContinuousClock.Instant? = nil,
+    rotation: Int = 0
+) throws -> ImageInput {
+    try ImageInput(
+        width: 640, height: 480, gray64: Data(pixels), attachment: MotionAttachment(),
+        sequence: sequence, timestamp: time, rotation: rotation, capturedAt: capturedAt)
+}
+private func quietMotionCadence() throws -> FrameCadence {
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
+    for step in 0...20 {
+        try cadence.observe(cadencePose(time: Double(step) * 0.1), inferenceDuration: 0.01)
+    }
+    return cadence
+}
+private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int>) -> [UInt8] {
+    var pixels = [UInt8](repeating: 100, count: 4096)
+    for row in y {
+        for column in x { pixels[row * 64 + column] = value }
+    }
+    return pixels
+}
+
+@Test func visionImageMotionWeightsPersonRegionsAndDiscoversGlobalChanges() throws {
+    let baseline = [UInt8](repeating: 100, count: 4096)
+    var person = try quietMotionCadence()
+    #expect(try person.accepts(motionFrame(baseline, sequence: 1, time: 2)))
+    #expect(try person.accepts(motionFrame(motionPatch(120, x: 13...17, y: 16...20), sequence: 2, time: 2.1)))
+    #expect(person.interval < 0.1)
+    #expect(try #require(person.imageActivity) >= 0.5)
+
+    var background = try quietMotionCadence()
+    #expect(try background.accepts(motionFrame(baseline, sequence: 1, time: 2)))
+    #expect(try !background.accepts(motionFrame(motionPatch(120, x: 45...49, y: 40...44), sequence: 2, time: 2.1)))
+    #expect(background.interval > 0.2)
+    #expect(try background.accepts(motionFrame(motionPatch(160, x: 40...47, y: 40...47), sequence: 3, time: 2.15)))
+    #expect(background.interval < 0.1)
+}
+
+@Test func visionImageMotionAccumulatesAgainstInferenceReferenceInsteadOfSkippedFrames() throws {
+    var cadence = try quietMotionCadence()
+    #expect(try cadence.accepts(motionFrame([UInt8](repeating: 100, count: 4096), sequence: 1, time: 2)))
+    for (sequence, change) in [(2, 2), (3, 4), (4, 6)] {
+        let sample = motionPatch(UInt8(100 + change), x: 13...17, y: 16...20)
+        #expect(
+            try !cadence.accepts(motionFrame(sample, sequence: UInt64(sequence), time: 2 + Double(sequence - 1) * 0.03))
+        )
+    }
+    #expect(try cadence.accepts(motionFrame(motionPatch(110, x: 13...17, y: 16...20), sequence: 5, time: 2.15)))
+    #expect(try #require(cadence.imageActivity) >= 0.1)
+}
+
+@Test func visionImageMotionSuppressesExposureContrastNoiseAndGeometryMismatch() throws {
+    var cadence = try quietMotionCadence()
+    let baseline = (0..<4096).map { UInt8(30 + ($0 % 64) * 2) }
+    #expect(try cadence.accepts(motionFrame(baseline, sequence: 1, time: 2)))
+    let exposed = baseline.map { UInt8((Double($0) * 1.1 + 12).rounded()) }
+    #expect(try !cadence.accepts(motionFrame(exposed, sequence: 2, time: 2.1)))
+    #expect(try #require(cadence.imageActivity) < 0.1)
+    let noisy = baseline.enumerated().map { index, value in UInt8(Int(value) + (index.isMultiple(of: 2) ? 2 : -2)) }
+    #expect(try !cadence.accepts(motionFrame(noisy, sequence: 3, time: 2.15)))
+    #expect(try #require(cadence.imageActivity) < 0.1)
+    #expect(try cadence.accepts(motionFrame(exposed, sequence: 4, time: 2.2, rotation: 1)))
+    #expect(cadence.imageActivity == nil)
+}
+
+@Test func visionImageMotionCannotOverrideComputeOrFreshnessBudgets() throws {
+    var cadence = try quietMotionCadence()
+    try cadence.observeTiming(inferenceDuration: 0.4, totalLatency: 0.6)
+    let now = ContinuousClock.now
+    let baseline = [UInt8](repeating: 100, count: 4096)
+    #expect(try cadence.accepts(motionFrame(baseline, sequence: 1, time: 2, capturedAt: now), at: now))
+    let moving = motionPatch(180, x: 13...20, y: 16...26)
+    #expect(
+        try !cadence.accepts(
+            motionFrame(moving, sequence: 2, time: 2.1, capturedAt: now), at: now.advanced(by: .milliseconds(100))))
+    #expect(cadence.interval >= 0.2)
+    #expect(
+        try !cadence.accepts(
+            motionFrame(moving, sequence: 3, time: 2.9, capturedAt: now), at: now.advanced(by: .milliseconds(800))))
+    #expect(cadence.staleInputs == 1)
+    #expect(
+        try cadence.accepts(
+            motionFrame(moving, sequence: 4, time: 3, capturedAt: now.advanced(by: .seconds(1))),
+            at: now.advanced(by: .seconds(1))))
+}
+
+@Test func visionLatencyFeedbackDistinguishesUpstreamDelayFromInferencePressure() throws {
+    var delayed = try quietMotionCadence()
+    try delayed.observe(cadencePose(time: 2.1), inferenceDuration: 0.01, totalLatency: 0.6)
+    #expect(delayed.interval <= 0.1)
+    var compute = FrameCadence(configuration: try FrameSamplingConfiguration(maximumObservationLatency: 0.2))
+    try compute.observe(cadencePose(time: 0), inferenceDuration: 0.12, totalLatency: 0.18)
+    #expect(abs(compute.interval - 0.18) < 0.0001)
+    #expect(throws: ImageInputError.invalidFrame) {
+        try compute.observeTiming(inferenceDuration: 0.2, totalLatency: 0.1)
+    }
+    #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(maximumObservationLatency: .nan) }
+}
+
+@Test(.timeLimit(.minutes(1))) func visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers() async throws {
+    let model = ControlledPose()
+    let session = UUID()
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.03),
+        resolveImage: { _ in try ImageFrame(width: 640, height: 480, rgb: Data(repeating: 0, count: 640 * 480 * 3)) })
+    try await agent.bind(
+        AgentMessaging { _, parent, _ in
+            guard case .image(let frame) = parent.payload else { throw CommunicationError.invalidPayload }
+            #expect(frame.sequence == 2)
+            return DeliveryReport()
+        })
+    try await agent.start()
+    var started = model.started.makeAsyncIterator()
+    let pixels = [UInt8](repeating: 100, count: 4096)
+    try await agent.receive(
+        AgentInput(sessionID: session, payload: .image(motionFrame(pixels, sequence: 1, time: 0, capturedAt: .now))))
+    #expect(await started.next() == 0)
+    try await Task.sleep(for: .milliseconds(50))
+    await model.release()
+    for _ in 0..<10000 {
+        if await agent.expiredInputs == 1 { break }
+        await Task.yield()
+    }
+    #expect(await agent.expiredInputs == 1)
+    try await Task.sleep(for: .milliseconds(200))
+    try await agent.receive(
+        AgentInput(sessionID: session, payload: .image(motionFrame(pixels, sequence: 2, time: 1, capturedAt: .now))))
+    #expect(await started.next() == 0)
+    await model.release()
+    var outputs = agent.outputs.makeAsyncIterator()
+    let first = try #require(await outputs.next())
+    #expect(first.sequence == 2)
+    #expect(await model.maximumActive == 1)
+    await agent.stop()
+}
+
+@Test func poseImageMotionStatisticsRejectOutOfRangeAndNonfiniteActivity() throws {
+    for activity in [-0.1, 1.1, Double.nan, Double.infinity] {
+        let statistics = ToolPoseOverlay.Statistics(
+            queueMilliseconds: nil, inferenceMilliseconds: 1, totalMilliseconds: nil,
+            framesPerSecond: nil, replacements: 0, imageMotion: activity)
+        #expect(!statistics.isValid)
+    }
+    let overlay = PoseOverlay(
+        sequence: 1, timestamp: 0, rotation: 0, people: [],
+        statistics: PoseOverlay.Statistics(
+            queueMilliseconds: nil, inferenceMilliseconds: 1, totalMilliseconds: nil,
+            framesPerSecond: nil, replacements: 0, imageMotion: 0.5))
+    let decoded = try JSONDecoder().decode(ToolPoseOverlay.self, from: JSONEncoder().encode(overlay))
+    #expect(decoded.statistics?.imageMotion == 0.5)
+    #expect(decoded.statistics?.isValid == true)
+}
+
+@Test func poseSharedJointRejectsMalformedArraysWithoutAgentErrors() throws {
+    let decoder = JSONDecoder()
+    #expect(
+        try decoder.decode(PoseOverlay.Joint.self, from: Data("[1,2,3]".utf8))
+            == PoseOverlay.Joint(x: 1, y: 2, confidence: 3))
+    #expect(throws: DecodingError.self) {
+        try decoder.decode(PoseOverlay.Joint.self, from: Data("[1,2,3,4]".utf8))
+    }
+    #expect(throws: DecodingError.self) {
+        try decoder.decode(PoseOverlay.Joint.self, from: Data("[1,2]".utf8))
+    }
 }

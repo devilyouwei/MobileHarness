@@ -25,7 +25,6 @@ Arrows mean compile-time dependency on shared contracts; AgentCore does not impo
 flowchart TD
     App --> AgentCore
     AppWorkflows -->|Messages and parser traces| AgentCore
-    UI -->|PoseOverlay values only| AgentCore
     Agents --> AgentCore
     Gateway --> AgentCore
     Actions --> AgentCore
@@ -87,3 +86,8 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ✅ Shared output values now include ActionResult, ActivityEvent, ExecutionOwner and ResourceLease/ResourceControl; Runtime owns bounded receipt history and stop observation. AgentCore still has no dependency on Gateway, concrete Agents or device services. ❌ Persistent receipt delivery belongs to future work.
 
 ✅ DeliveryHistory provides bounded communication outcomes without dependencies on transport or business Agents.
+
+
+✅ Visual skeleton presentation and detection statistics belong to Types/Vision, not AgentCore. Output contains generic invocation/runtime contracts only; no pose-specific presentation policy or preview conversion remains.
+
+✅ ImageInput retains optional native monotonic capture timing as input transport metadata; visual presentation statistics live separately in Types/Vision.

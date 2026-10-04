@@ -105,7 +105,7 @@ flowchart TB
     App --> UI
     App --> PlatformKit
 
-    UI --> AgentCore
+    UI --> Types
     UI --> StorageChat
 
     Agents --> AgentCore
@@ -197,7 +197,8 @@ MobileHarness/
 │   ├── Robot/
 │   └── UI/
 ├── Types/
-│   └── Audio/                   # Shared immutable PCM/microphone values
+│   ├── Audio/                   # Shared immutable PCM/microphone values
+│   └── Vision/                  # Shared skeleton presentation/statistics values
 ├── Storage/
 │   ├── Audio/                   # StorageAudio: transient PCM ownership
 │   └── Chat/                    # StorageChat: conversation journal
@@ -239,9 +240,9 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `App/Workflows/Speech/` | AppSpeechPlayback | ActionRuntime, StorageAudio |
 | `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime, ToolRuntime |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
-| `UI/` | UI | AgentCore, StorageChat |
+| `UI/` | UI | Types, StorageChat |
 | `Agents/Core/` | AgentCore | None |
-| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio |
+| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, StorageChat, StorageAudio, Types |
 | `Gateway/` | Gateway | AgentCore, ActionRuntime, ToolRuntime |
 | `Actions/Runtime/` | ActionRuntime | None |
 | `Actions/` excluding `Runtime/` | Actions | ActionRuntime, PlatformKit, BehaviorDefinitions |
@@ -262,7 +263,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 ### Architectural boundaries
 
 - App owns concrete assembly, adaptation and application/session lifetime. Feature workflows expose typed operations and retain no global container access.
-- UI imports only AgentCore and StorageChat domain values. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
+- UI imports only Types and StorageChat domain values. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
 - AgentCore is independent of concrete Agents, UI, model engines and device adapters.
 - All external inputs, Tool results and Action/runtime feedback enter through InputGateway; all Agent messages and executable outputs leave through OutputGateway.
 - Actions owns business behavior, motion shaping, composition and completion policy. PlatformKit owns native I/O, protocol encoding, hardware limits and device feedback.
@@ -725,3 +726,15 @@ Assistant records rejected native Tools when possible; failure to write that out
 
 ✅ ModelKitGemma4 replaces ModelKitQwen35; Backends/CoreAI owns native graph and language execution. The MLX target and both MLX packages are removed. Gemma4 is the installed resource directory and gemma4-e2b the catalog ID. A pinned CoreAILM fork supplies the static-buffer pipeline; consumers retain ChatCapability. The shared package dependency floor is iOS/macOS 26; execution requires OS 27.
 ❌ Gemma real-model quality/memory and physical acceptance remain separate. See [ADR 0112](../docs/adr/0112-gemma-coreai-chat.md).
+
+VisionPerception retains every valid newest capture in its capacity-one slot. The worker consumes the newest slot at start, with expiry validation and adaptive cadence (initial 100ms, default bounds 0...250ms). Native clocked inputs also enforce the monotonic inter-start gap. Fixed grayscale percentage filtering and its UI controls are removed; model calls never overlap.
+
+YOLO diagnostics share the bounded UI.showPose payload: callback-to-model wait, capability-call time, callback-to-result latency, one-second-window successful FPS and replacement count. App converts Tool values to Types/Vision presentation values; UI displays these without runtime dependencies. Capture timing uses ContinuousClock, not assumptions about media timestamp epochs.
+
+VisionPerception owns bounded latest-image motion, pose-motion/confidence/loss feedback and inference/total-latency budgeting for adaptive cadence. At most six skeleton snapshots are retained; fast changes accelerate immediately, stable targets relax gradually, and empty scenes retain periodic search. App injects bounds; next-interval statistics travel with pose through UI.showPose. See [ADR 0113](../docs/adr/0113-adaptive-pose-cadence.md).
+
+FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-frame reference, one padded six-person ROI union, bounded exposure/noise compensation and continuous urgency. FrameCadence fuses those signals with pose reliability and compute/freshness budgets. No eligibility-filtered frame queue or PlatformKit/ModelKit/UI policy dependency is introduced; stale results cannot mutate presentation.
+
+✅ Urgent YOLO detection now permits a zero scheduling interval. The single inference worker processes only the newest pending capture after the active call completes. Normal inference duration adds no scheduling floor; compute-dominated freshness pressure can temporarily impose a bounded cost floor. Camera close already clears skeleton and its statistics; no source-stall timer is added.
+
+✅ PoseOverlay and its detection statistics are shared immutable values in Types/Vision. UI depends on Types and StorageChat only; preview joint rotation belongs to UI/Camera. VisionPerception imports Types explicitly, while UI.showPose keeps its independent Tool payload and existing Gateway/session mapping. AgentCore contains no PoseOverlay. See [ADR0114](../docs/adr/0114-vision-presentation-values.md).

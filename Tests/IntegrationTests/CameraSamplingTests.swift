@@ -1,5 +1,4 @@
 import AgentCore
-import Agents
 import Foundation
 import Testing
 
@@ -23,17 +22,16 @@ import Testing
 }
 
 private struct SampleAttachment: ImageAttachment {}
-@Test func sampledNativeInputUsesSameGatewayThreshold() throws {
-    var filter = FrameChangeFilter(configuration: try FrameChangeConfiguration())
-    func input(_ value: UInt8, _ sequence: UInt64) throws -> ImageInput {
-        try ImageInput(
-            width: 720, height: 1280, gray64: Data(repeating: value, count: 4096), attachment: SampleAttachment(),
-            sequence: sequence, timestamp: Double(sequence), rotation: 1)
+@Test func sampledNativeInputPreservesTransportAndValidatesSampleSize() throws {
+    let sample = Data(repeating: 7, count: 4096)
+    let input = try ImageInput(
+        width: 720, height: 1280, gray64: sample, attachment: SampleAttachment(),
+        sequence: 1, timestamp: 0, rotation: 1)
+    guard case .sampled(let gray, _) = input.content else {
+        Issue.record("Missing native attachment transport")
+        return
     }
-    #expect(try filter.accepts(input(0, 1)))
-    #expect(try !filter.accepts(input(7, 2)))
-    #expect(try filter.accepts(input(15, 3)))
-    #expect(try !filter.accepts(input(15, 4)))
+    #expect(gray == sample)
     #expect(throws: ImageInputError.self) {
         try ImageInput(
             width: 720, height: 1280, gray64: Data(), attachment: SampleAttachment(), sequence: 1, timestamp: 0,

@@ -1,7 +1,7 @@
-import AgentCore
 import CoreGraphics
 import Foundation
 import Observation
+import Types
 
 public enum CameraDirection: Sendable { case front, back }
 
@@ -17,7 +17,6 @@ public final class CameraState {
     public var gaze: CGSize = .zero
     public var visionMessage: String?
     public var trackingMessage: String?
-    public var changeThreshold = 0.03
     public init() {}
 }
 
@@ -26,6 +25,5 @@ public final class CameraState {
 public protocol CameraControlling: AnyObject {
     func toggle()
     func switchCamera()
-    func setChangeThreshold(_ value: Double)
     func retry()
 }

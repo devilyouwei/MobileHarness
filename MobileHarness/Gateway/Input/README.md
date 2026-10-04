@@ -74,7 +74,7 @@ Concurrent external submissions have no Gateway per-target FIFO guarantee. Inter
 
 Compare the [internal direct admission lifecycle](../../Agents/Core/Communication/README.md) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
 
-SpeechPerception owns LiveSpeechInput and VoiceActivitySegmenter. VisionPerception owns FrameChangeFilter. Source normalization means protocol validation and metadata here, not inference or perceptual transformations.
+SpeechPerception owns LiveSpeechInput and VoiceActivitySegmenter. VisionPerception owns latest-frame retention and FrameCadence; Gateway does not compare pixels or decide inference cadence. Source normalization means protocol validation and metadata here, not inference or perceptual transformations.
 
 ❌ Dynamic subscriptions, model-based routing suggestions, remote inputs and physical sensor adapters remain future work. Future model-assisted routing runs in an Agent and supplies a validated selection; no model will be added to Gateway.
 

@@ -56,24 +56,7 @@
                                 .disabled(!camera.isEnabled || camera.isBusy)
                                 .accessibilityLabel(camera.facing == .front ? "切换到后置摄像头" : "切换到前置摄像头")
                                 .accessibilityIdentifier("camera.switch")
-                                Menu {
-                                    Picker(
-                                        "灰度变化阈值",
-                                        selection: Binding(
-                                            get: { camera.changeThreshold }, set: controls.setChangeThreshold)
-                                    ) {
-                                        Text("1%").tag(0.01)
-                                        Text("3%（默认）").tag(0.03)
-                                        Text("5%").tag(0.05)
-                                        Text("10%").tag(0.10)
-                                    }
-                                } label: {
-                                    Text("\(Int(camera.changeThreshold * 100))%")
-                                        .font(.system(size: 15, weight: .medium).monospacedDigit())
-                                        .frame(width: 48, height: 48)
-                                }
-                                .accessibilityLabel("识别抽帧阈值")
-                                .accessibilityValue("\(Int(camera.changeThreshold * 100))%")
+
                             }
                             .font(.system(size: 18, weight: .medium))
                             .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
@@ -112,8 +95,35 @@
                 .padding(.top, 8)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: camera.isEnabled)
             }
+            .overlay(alignment: .topLeading) {
+                if camera.isVisible, let statistics = camera.skeleton?.statistics {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("YOLO · \(metric(statistics.framesPerSecond, suffix: "FPS"))")
+                            .fontWeight(.semibold)
+                        Text("间隔 \(metric(statistics.detectionIntervalMilliseconds, suffix: "ms"))")
+                        Text("画面运动 \(statistics.imageMotion.map { String(format: "%.2f", $0) } ?? "—")")
+                        Text("等待 \(metric(statistics.queueMilliseconds, suffix: "ms"))")
+                        Text("推理 \(metric(statistics.inferenceMilliseconds, suffix: "ms"))")
+                        Text("总延迟 \(metric(statistics.totalMilliseconds, suffix: "ms"))")
+                        Text("替换 \(statistics.replacements) 帧")
+                    }
+                    .font(.system(size: 11, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(8)
+                    .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.leading, 12)
+                    .padding(.top, 68)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("camera.poseStatistics")
+                }
+            }
             .preferredColorScheme(.dark)
 
+        }
+        private func metric(_ value: Double?, suffix: String) -> String {
+            guard let value else { return "— \(suffix)" }
+            return String(format: "%.1f %@", value, suffix)
         }
     }
 
