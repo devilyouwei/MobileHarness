@@ -48,7 +48,9 @@ struct MobileHarnessApp: App {
                     SettingsView(
                         settings: assembly.settings, bluetooth: assembly.bluetooth.state,
                         bluetoothControls: assembly.bluetooth, history: assembly.history.state,
-                        historyControls: assembly.history, modelResources: assembly.modelResources
+                        historyControls: assembly.history, modelResources: assembly.modelResources,
+                        audioDetection: container?.audioDetection.state,
+                        audioDetectionControls: container?.audioDetection
                     ) {
                         let applied = await assembly.settings.save()
                         if applied, container == nil {
@@ -84,6 +86,7 @@ struct MobileHarnessApp: App {
                     camera.setForeground(phase == .active && !showingSettings)
                     assembly.bluetooth.setForeground(phase == .active)
                     if phase == .background { container?.lifecycle.stopVoice(message: "已进入后台，轻触重新开始") }
+                    if phase != .active { container?.audioDetection.stop() }
                 }
             }
             .task(id: container.map { ObjectIdentifier($0) }) {

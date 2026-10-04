@@ -39,4 +39,6 @@ public struct ResourceControl: Sendable {
 /// Trusted execution context inherited by child tasks; never read from model parameters.
 public enum ResourceExecutionContext {
     @TaskLocal public static var held: Set<ResourceID> = []
+    /// Bound by Gateway, including intent Tools whose host worker outlives dispatch.
+    @TaskLocal public static var owner: ExecutionOwner?
 }

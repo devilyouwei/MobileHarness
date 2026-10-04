@@ -12,7 +12,8 @@ App/
 │   ├── AppAssembly.swift
 │   ├── AppContainer.swift
 │   └── ApplicationRuntime.swift
-├── Lifecycle/               # Voice and camera sessions, input/output pumps and cleanup
+├── Lifecycle/               # Voice, camera and audio-diagnostic sessions and cleanup
+│   ├── AudioDetectionSession.swift
 │   ├── VoiceSessionCoordinator.swift
 │   ├── CameraCoordinator.swift
 │   ├── VisionSession.swift
@@ -23,7 +24,7 @@ App/
 │   ├── Bluetooth/          # Connection/manual/action lifecycle and presentation
 │   ├── Speech/             # Stored-audio playback adaptation
 │   ├── Presentation/       # Conversation acceptance and execution observation
-│   └── Diagnostics/        # Explicit speech/chat diagnostics
+│   └── Diagnostics/        # Explicit audio/speech/chat diagnostic operations
 ├── Adapters/                # Typed effect endpoints, native preview and value conversion
 │   ├── RuntimePresentation.swift
 │   ├── CurrentChatCapability.swift
@@ -173,3 +174,9 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ ADR0119: App transports native camera frames and native-rate microphone samples with session/source/deadline metadata. Calling perception Agents own conversion into ModelKit inputs; composition no longer injects image conversion. SDK inputs/outputs are owned by ModelKit or PlatformKit, without Types dependencies. ❌ No physical-device acceptance is implied.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+
+## Settings audio detection
+
+✅ Settings → 音频识别 receives an App-owned AudioDetectionWorkflow/state and an isolated Lifecycle/AudioDetectionSession endpoint. The application scene cancels detection outside foreground; the recognition page also requests stop on departure. Detection uses actual capture facts and the existing sound.source broadcast, with no conversational or robot consumer.
+
+❌ Physical capture support, angle calibration and native interaction acceptance remain pending.

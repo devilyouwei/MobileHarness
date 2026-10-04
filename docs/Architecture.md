@@ -55,9 +55,9 @@ Cloud chat supports native function declarations from Agent JSON v5. Complete ca
 
 Photographer subscribes to VisionPerception pose observations and emits internal Robot.aim through OutputGateway. App binds the foreground BLE workflow; Actions owns aim mapping and admission, while PlatformKit supplies native command encoding. Transport acceptance does not establish physical arrival.
 
-Tracking Tool resource metadata now admits motors1–5 at OutputGateway before the App sender. Composition supplies Photographer construction; lifecycle owns activation and partial-failure cleanup. Failed possible writes require explicit Action-controller recovery without replay.
+Tracking Tool calls publish latest targets after OutputGateway authorization. The continuous App worker holds motors1–4 through the shared ResourceCoordinator for all native writes; the publication does not acquire a second conflicting fence (ADR0126). Composition supplies Photographer construction; lifecycle owns activation and cleanup. Control-admission conflicts are recorded separately from transport recovery.
 
-VisionPerception and Photographer share observations but have independent execution failure scopes. A rejected Robot.aim does not stop showPose. BLE connectivity and control verification are separate states; query timeout retains connectivity while quarantining control queries until reconnect.
+VisionPerception and Photographer share observations but have independent execution failure scopes. A rejected Robot.aim does not stop showPose. BLE connectivity and control verification are separate states; query timeout retains connectivity while quarantining control queries until App reconnects the link.
 
 ✅ Agent fault isolation: delivery failures are receipts; output execution failures are correlated results. Photographer suppresses commands while control is unavailable. Explicit stop/cancellation and invalid startup configuration remain lifecycle/assembly contracts.
 
@@ -142,3 +142,30 @@ SpeechPerception keeps utterance coordination in one Agent actor. VAD score adap
 ✅ BLE writes share one PlatformKit connection-wide pacing budget; Actions keeps trajectory/completion policy and App keeps latest-intent ownership/recovery. Fixed-size transport diagnostics distinguish raw notification traffic from valid feedback. The initial rate requires physical calibration; see [ADR0123](adr/0123-nexarm-ble-shared-pacing.md).
 
 SpeechPerception owns deterministic FOA sound direction alongside its existing VAD/ASR path. PlatformKit supplies spatial PCM only; App transports it; the Agent broadcasts typed sound.source observations through both Gateways. Optional subscribers cannot gate recognition. No Photographer behavior or UI is introduced. See [ADR0124](adr/0124-sound-source-perception.md).
+
+Microphone readiness requires a validated/enqueued PCM callback, not only a running native capture session. PlatformKit bounds first-frame startup and joins failed spatial capture before mono retry; running streams retain their layout. App enters listening after readiness and exits it on capture failure or unexpected completion. See ADR0124's startup correction.
+
+✅ [ADR0125](adr/0125-bluetooth-exception-recovery.md): BluetoothWorkflow unifies abnormal connected and disconnected sessions under bounded cleanup/reconnect. PlatformKit supplies facts, Actions owns behavior, and UI displays bounded diagnostic records; no old motion is replayed.
+
+✅ ADR0127: Settings device controls enter App through UI-owned typed operations, outside InputGateway/OutputGateway. They share Actions geometry/options with Agent behavior but use send-only manual takeover without Agent resource locks or arrival waits. App cancels/joins old software writers and suppresses tracking while manual control is active; Gateway session cleanup owns Agent work only. PlatformKit native pacing and exceptional connection recovery remain shared.
+
+## Settings audio detection (ADR0128)
+
+✅ AudioCaptureContext is a PlatformKit-owned native fact value, independent of generic Agent transport and UI. Actual MicrophoneFrame layout establishes capture mode; runtime FOA support and mono startup fallback are separate facts. AudioDetectionSession in App/Lifecycle assembles an isolated source-only SpeechPerception with its own session/manager/Gateways and no conversation, camera or robot consumer. Existing PCM bounds/rejection and latest sound publication remain unchanged.
+
+```mermaid
+flowchart LR
+    UI[Settings audio detection] --> Workflow[AppDiagnosticWorkflow: one operation and deadline monitor]
+    Workflow --> Endpoint[App Lifecycle: isolated session]
+    Endpoint --> Capture[PlatformKit: actual input and PCM]
+    Capture --> Adapter[MediaInputAdapter / InputGateway]
+    Adapter --> Speech[SpeechPerception: source-only mode]
+    Speech --> DSP[Existing SoundSourceEstimator]
+    DSP --> Broadcast[Bound port / OutputGateway]
+    Broadcast --> Observer[App diagnostic observer]
+    Observer --> Snapshot[UI display-only snapshot]
+```
+
+✅ The feature workflow depends on UI/ModelKit/PlatformKit only and invokes a whole endpoint protocol; it never constructs an Agent or Gateway. No new SDK/model dependency or AgentCore sound value is introduced. Start/stop has one operation, one monitor, no pending queue, and generation-fenced latest UI values. Stop joins hardware, Agent publication and output cleanup before replacement. Voice startup and diagnostics share explicit cleanup barriers. Direction expires at its 500 ms observation deadline; quiet/non-active states have no executable angle. Detection lasts 10 seconds after the first received frame; page departure and background cancel it.
+
+❌ Real device FOA axes, actual acoustic accuracy, camera coexistence and native navigation/background behavior remain acceptance items.

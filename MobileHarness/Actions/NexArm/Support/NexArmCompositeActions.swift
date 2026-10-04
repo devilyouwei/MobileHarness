@@ -35,7 +35,7 @@ public enum NexArmGesture: Sendable, CaseIterable {
         }
         return try cartesianPlaybackFrames(repetitions: 1)
     }
-    /// Shared geometry and completion policy for Settings and scheduled Actions.
+    /// Shared geometry and nominal choreography beats; callers select submission or feedback completion.
     func cartesianPlaybackFrames(repetitions: Int) throws -> [TestFrame] {
         guard motorID == nil, (1...3).contains(repetitions),
             (self != .tiltLeft && self != .tiltRight) || repetitions == 1

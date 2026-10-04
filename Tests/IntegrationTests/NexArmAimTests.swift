@@ -350,11 +350,11 @@ private actor AimLink: NexArmWritableLink {
     await agent.stop()
 }
 
-@Test func robotAimDeclaresEveryControlledMotorBeforeGatewayDispatch() async throws {
+@Test func robotAimPublishesIntentWithoutHoldingTheWorkersMotorFence() async throws {
     let module = RobotToolModule { _, _, _ in }
     let registry = try ToolRegistry(modules: [module])
     let resources = await registry.resources(for: "Robot.aim")
-    #expect(resources == Set((1...5).map { ToolResource(rawValue: "nexarm.motor.\($0)") }))
+    #expect(resources.isEmpty)
 }
 
 private actor ArmAvailability {

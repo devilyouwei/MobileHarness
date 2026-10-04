@@ -11,6 +11,8 @@ Purpose: present App configuration with accessible native SwiftUI controls. Desi
 | SettingsView.swift | Feature navigation and 大模型 cloud/local form; forward save and cancel only page-scoped model discovery on disappearance |
 | ModelResourcesState.swift | Shared source draft, independent speech choices, resource-group presentation, operation admission and installation alerts |
 | ModelResourcesView.swift | Recognition/synthesis/vision destinations and reusable filtered download/source sections for 大模型 |
+| AudioDetectionState.swift | Display-only detection values, direction/PCM freshness and injected whole-endpoint/control contracts |
+| AudioDetectionSection.swift | Compact recognition-page detection controls, capture/fallback results, level and current direction |
 | ConversationHistoryState.swift | History snapshot/status and ConversationHistoryControlling interface |
 | ConversationHistoryView.swift | Current/past lists, raw request/reply inspection, export and explicit mutation controls |
 
@@ -72,75 +74,31 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
 
-## Bluetooth devices
+## Bluetooth peripherals — current contract (ADR0125)
 
-✅ `BluetoothSettingsState` contains only UI values; `BluetoothControlling` is implemented by AppWorkflows. Settings → 蓝牙设备 uses native List sections for 我的设备 / 附近设备, searching/progress, explicit connect, verification, connected state, disconnect/cancel, and confirmed 忽略此设备. It displays permission/off/unsupported errors and offers a host-supplied system-settings action for permission denial. The page never imports CoreBluetooth or PlatformKit and never sends motor commands.
+Purpose: present device discovery, actual link/control readiness, explicit controls and bounded diagnostic history. Design goals: UI-owned values and typed intents only; the root workflow owns native effects, recovery and persistence.
 
-✅ Up to 32 discovered rows and one remembered device; rows use peripheral identifiers for stable identity. Only supported NexArm devices appear. Leaving the page stops discovery but preserves the root-owned connection and any joined lifecycle cleanup. Device names/state and completion/error feedback come from the workflow; no simulated success is displayed. The system radio cannot be toggled by this app, so its actual state is shown rather than an imitation toggle.
+✅ `BluetoothSettingsState` contains presentation values; App implements `BluetoothControlling`. Settings → 蓝牙外设 uses native List sections for 我的设备 / 附近设备. Discovery includes named BLE devices, bounded to 32 rows, with NexArm names first; compatibility is checked after selection. One remembered device uses a stable peripheral identifier. Radio power/permission/unsupported states are shown truthfully, with a host-supplied system-settings operation for permission denial.
 
-❌ iOS Settings pairing integration, audio accessories, automatic reconnection and background control are outside scope. UI rendering and physical-device acceptance are reported separately from workflow unit tests.
+✅ Remembered/current device rows remain navigable while disconnected. 当前状态 separates 蓝牙链路 from 控制 readiness and shows recovery stage/attempts. Actions require verified readiness and no active recovery. Automatic/explicit reconnect is read-only and never repeats a reset, indication or interrupted motion. A manual first connection may perform its optional indication; a missing AT32 version alone does not block the supported BLE protocol/pose checks. Manual disconnect/forget cancels and disables recovery; forget joins cleanup before removing the saved record.
 
-✅ Bluetooth connection and control readiness are distinct: a missing AT32 version shows “蓝牙已连接，控制待验证” with “重新验证”. Version queries are read-only; the first successful verification then runs the connection indication described below. Disconnect and forget remain available. A green control indicator requires validated firmware and pose. ❌ Real iPhone control acceptance remains pending.
+✅ Below 当前状态, 异常与恢复记录 shows bounded App-supplied events with time, original cause, attempt/elapsed time and expandable native/traffic/feedback summaries. 重新连接 starts a fresh recovery budget; 取消恢复 / 断开 stops it; 清空记录 changes only cached events. Cache is process-local, at most four devices with 32 newest events each. UI imports no PlatformKit/Actions service and owns no recovery task.
 
-✅ Connection explains whole-arm reset and the ID5 feedback gesture, shows “正在复位 / 提示…” while it runs, and enables control only after feedback completion. Cancel/disconnect remains available. Missing firmware does not animate or claim success. ❌ Physical-device presentation/motion acceptance pending.
+✅ Details show measured end-effector coordinates, sample time and six 上次位置 values. Entry/refresh/pull-to-refresh call the injected read-only operation, whose App admission rejects overlapping recovery/motion. `BluetoothArmAction` exposes typed presets including 点头/摇头 and separate 整臂归位. Settings and conversation share Actions recipes, while Settings uses send-only submission outside Gateway/resource locks. Buttons/sliders stay enabled while verified control is available, including active motion, jog, reset or refresh; only unavailable control/recovery disables them. This prevents a drag from disabling itself and invoking spring-return release (ADR0127). Failures remain visible; local send admission is not physical arrival.
 
-## Current NexArm compatibility presentation
-
-✅ After successful protocol/pose and connection-indication checks, the known missing-AT32 profile can show ready while device info truthfully displays “ESP32 1.0.2 · AT32 版本暂不可读”. The notice explains the compatibility checks. The connection footer describes whole-arm reset and ID5 about ±8° then center; the old pending-only behavior applies to earlier revisions. ❌ Actual iPhone reset/ID5 acceptance remains pending.
-
-## Current Bluetooth UX
-
-✅ User confirmed real iPhone conversation control. Connection status now follows service/pose and ID5 feedback validation, independently of firmware-version strings; AT32 version and its missing-read warning are removed. Nearby shows discovered BLE devices without name/service exclusion, sorts NexArm names first and explains that compatibility is checked after selection. Devices may be renamed. The old firmware retry button is removed.
-
-✅ The footer explains foreground automatic reconnection, no repeat gesture/reset during recovery, and manual disconnect disabling recovery. Explicit connection retains the reset/ID5 gesture. ❌ Physical verification of broad scanning and lock/unlock recovery remains pending; not all Bluetooth Classic devices are BLE-discoverable.
-
-## Bluetooth peripheral details (current)
-
-✅ Settings → 蓝牙外设 removes developer-facing protocol/version/gesture explanations. The radio footer contains only foreground auto-reconnect behavior. Connected rows navigate to device details showing measured end-effector coordinates, six encoder positions and sample time; refresh on entry, explicit refresh/pull-to-refresh and completed operations update feedback. Presets expose all seven supported directional choices, plus a separate confirmed reset. Six sliders commit once on release and display measured positions separately from the draft target.
-
-✅ UI receives presentation values and typed operations only. Movement is App-root-owned and survives navigation; sliders/actions disable during motion or refresh and disconnected details cannot control another device. Each release is limited to ±91 encoder counts (~8°), clipped to 1536...2560. Out-of-range motors stay visible but require repositioning before manual adjustment.
-
-❌ Live iPhone layout, all-six-motor mechanical limits and physical acceptance remain pending. Values are sampled feedback, not a continuous telemetry stream. This section supersedes earlier statements that device details/manual controls are unavailable.
-
-## Peripheral list cleanup (current)
-
-✅ Nearby discovery omits missing/placeholder names. Connection stops scanning and clears the discovery list; explicit searching starts a fresh list. Forget clears saved/selected identity, telemetry and stale feedback. Successful connections clear old errors. A failed connection gesture no longer requires reconnecting a healthy link; actual transport loss receives one automatic read-only reconnect attempt.
-
-❌ App-level 忽略 does not remove iOS system pairing. Physical list/recovery acceptance is still separate from simulated workflow tests.
-
-## Spring-return motor controls (current)
-
-✅ All six controls render regardless of available telemetry or current posture. Touch/drag sends a normalized direction/speed intent immediately; displacement from center sets speed. Release, gesture cancellation, disabled connection and leaving details return the thumb to center and stop further intent. Last observed encoder values remain explicitly labeled 上次位置. There is no per-release target/8° limit or home prerequisite.
-
-✅ Preset Play retains completion-based execution. Reset stays available during a preset or jog, immediately requests priority takeover, and reports instruction submission rather than fabricated arrival. No confirmation sheet delays this explicit reset control. ❌ Actual physical stop timing, touch feel and sustained radio throughput require device acceptance.
-
-## Settings test control (current)
-
-✅ Settings Play uses native CMD8 writeWithoutResponse without telemetry/ATT completion waits. Fixed ready400ms → body800ms per frame → home600ms, maximum8 frames. These are cancellable playback deadlines, not arrival gates. One latest test slot replaces all unsent old frames; no command backlog. New Play/reset/jog can take over within the30ms worker cadence (subject to native transport admission). Buttons remain enabled while connected. Native congestion retains only the latest request, fails visibly after2s, and never replays skipped old frames. Page exit/background/disconnect discard unsent test frames. UI says sent, never physically completed. Conversation/channel performGesture retains its existing feedback-based contract.
+✅ Six spring-return sliders send normalized direction/speed immediately while dragging. Release, gesture cancellation, disable and page exit clear motor intent. UI displays last sampled motor positions separately from slider speed, without a per-release target or home prerequisite. Page exit stops scans/page-owned motor intent; connection/recovery survives navigation. Native settings effects remain root-owned.
 
 ```mermaid
 flowchart LR
-    Click[Settings click] --> Replace[Replace unsent test plan]
-    Replace --> Live[Native writeWithoutResponse]
-    Live --> Clock[Cancellable frame deadline]
-    Clock --> Live
-    Next[New click / reset / jog] --> Replace
-    Channel[Conversation channel] --> Feedback[Existing completion-based controller]
+    UI[Settings typed intents] --> Workflow[App BluetoothWorkflow]
+    Workflow --> Actions[Shared Actions recipe / manual submission]
+    Actions --> BLE[PlatformKit native transport]
+    BLE --> Workflow
+    Workflow --> Values[UI state and bounded incidents]
+    Values --> UI
 ```
 
-❌ Wireless delivery and physical arrival are not established by local send admission. Optional NEXARM_SETTINGS_TEST validates the shared frame plan on USB, separate from default tests.
-
-## Head gestures
-
-✅ BluetoothArmAction exposes 点头 and 摇头 as typed settings intents; the existing list discovers them through CaseIterable. UI owns no motor implementation. ❌ Physical arrival is not inferred from a Settings send.
-
-## NexArm feedback execution — 2026-10-01
-
-✅ Settings labels the explicit motors1–5 reset as 整臂归位. UI consumes workflow status and connection-instability messages; it owns no executor, device lock or feedback policy.
-
-❌ Sustained real-device acceptance remains pending.
-
-✅ Physical BLE connection and control readiness are presented separately. Connected devices with failed verification show 已连接，控制未就绪; actions remain disabled.
+❌ Native iPhone diagnostic layout, sustained BLE/firmware recovery and physical motor acceptance remain pending. System pairing removal, Bluetooth Classic accessories, background physical control and durable diagnostic history are not implemented.
 
 ## Local model resources — current contract
 
@@ -193,3 +151,9 @@ flowchart LR
 
 ✅ 本地模型列表采用左侧紧凑信息、右侧操作按钮布局：名称、安装状态/大小、版本/许可的间距为 4；下载、继续下载、取消、删除保留原有可用状态和删除确认。进度与错误在下方按需显示，不为闲置状态预留额外行。
 ❌ 真机不同字号的视觉验收仍待完成。
+
+## Audio detection
+
+✅ AudioDetectionState.swift owns display-only capture/direction snapshots, freshness and injected AudioDetectionControlling/AudioDetectionRunning protocols. AudioDetectionSection.swift adds a compact recognition-page section: start/stop, microphone permission/input, runtime spatial support, actual four-channel/mono mode, concise fallback reason, actual PCM level and active azimuth/elevation. The section is injected through SettingsView/ModelResourcesView; UI imports no Agent, device or workflow service. Page departure/background requests cancellation. Valid direction expires at the observation deadline; quiet/unavailable statuses contain no angles. Completed/stopped sessions clear angles.
+
+❌ Native layout/accessibility and real capture-field coordinates require device acceptance. No distance, robot coordinate, source identity or ASR-quality result is presented.

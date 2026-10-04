@@ -69,16 +69,27 @@ flowchart LR
 
 ✅ AppleAudioIO.startCapture(preferSpatial:) asynchronously chooses an audio-only SpatialAudioCapture backend on a built-in route supporting firstOrderAmbisonics, otherwise the existing mono AVAudioEngine. Spatial capture uses AVCaptureAudioDataOutput with HOA_ACN_SN3D|4 and verifies actual layout, native PCM format and capture PTS. No video input or second concurrent microphone engine is opened. Four channels are converted to interleaved Float32 without localization or activity classification. MicrophoneFrame carries native layout, PTS and monotonic capturedAt; mono initializer defaults remain available. Metering uses omnidirectional W, and the generic resampler rejects multichannel input until its caller extracts mono.
 
-✅ Spatial callbacks are serial and bridge to a64-packet bufferingOldest stream. Native callbacks are limited to8192 sample frames and split into at most4000 frames/16000 scalar samples per transport packet. Overflow fails explicitly. AVFoundation may drop sufficiently late callbacks; PTS continuity checks detect gaps beyond two samples and fail with overflow. Unexpected layouts/formats, interruptions and runtime errors fail the active capture rather than silently downgrading. Unsupported graph/mode before startup returns mono fallback. stopCapture/stop are async and join spatial callbacks before replacement; cancellation fences an in-flight startup.
+✅ Spatial callbacks are serial and bridge to a 64-packet bufferingOldest stream. Native callbacks are limited to 8192 sample frames and split into at most 4000 frames/16000 scalar samples per transport packet. Overflow fails explicitly. AVFoundation may drop sufficiently late callbacks; PTS continuity checks detect gaps beyond two samples and fail with overflow. Unexpected layouts/formats, interruptions and runtime errors fail an admitted capture rather than silently downgrading. Unsupported graph/mode or a failed first-frame startup returns mono fallback after spatial shutdown. stopCapture/stop are async and join spatial callbacks before replacement; cancellation fences an in-flight startup.
+
+✅ AudioCaptureReadiness separates native session startup from actual PCM delivery. Both backends wait for their first validated/enqueued frame, with one waiter, one terminal result and one cancellable 3-second startup timer; silence is valid PCM and does not block startup. Stop/cancellation resolves the waiter immediately. No stream is returned to App before this gate completes. FOA lets AVCaptureSession configure its microphone path; the prior default-mode AVAudioSession configuration alone did not establish FOA readiness. Failed FOA startup is logged, closed and retried as the existing mono engine before admitting any layout; mono failure propagates to App. Running streams never change layout in place.
 
 ```mermaid
 flowchart LR
     Capability[Built-in route / runtime FOA support] --> Select[AppleAudioIO]
     Select --> FOA[SpatialAudioCapture: serial AVCaptureSession]
-    Select --> Mono[Existing AVAudioEngine mono fallback]
-    FOA --> Frames[64 bounded native PCM packets]
-    Mono --> Frames
+    FOA --> Check[First validated PCM / 3-second startup gate]
+    Check -->|Ready| Frames[64 bounded native PCM packets]
+    Check -->|Startup failure: stop and join| Mono[Existing AVAudioEngine mono fallback]
+    Select --> Mono
+    Mono --> MonoCheck[First validated mono PCM / startup gate]
+    MonoCheck --> Frames
     Frames --> App[App input adapter]
 ```
 
 ❌ Physical device support, actual channel axes, late-drop tolerance, camera/playback coexistence and external-route behavior require device acceptance. No angle estimate belongs to PlatformKit.
+
+## Capture selection facts
+
+✅ AudioCaptureContext exposes native input category, runtime FOA capability and pre-admission fallback reason (unsupported/current input/startup timeout/startup failure). Capability support is distinct from the actual frame layout; MicrophoneFrame remains the authoritative received format. Context is refreshed per capture attempt, including mono startup failure. The public captureTimeout error reports a failed first-PCM readiness deadline without exposing the internal readiness helper. No localized strings or direction algorithm live in the SDK.
+
+❌ Physical route/capability and FOA startup coexistence acceptance remains pending.

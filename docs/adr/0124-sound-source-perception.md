@@ -4,7 +4,9 @@ Status: accepted
 
 ## Decision
 
-SpeechPerception estimates one dominant direction for any obvious sound during existing listening admission. No VAD gate, sound identity, distance, UI, Photographer subscription or robot command is introduced. PlatformKit captures first-order ACN/SN3D on supported built-in routes using public audio-only AVCaptureSession APIs; mono routes retain ASR and report direction unavailable. Actual native layout is validated; failure after startup never silently changes backend.
+SpeechPerception estimates one dominant direction for any obvious sound during existing listening admission. No VAD gate, sound identity, distance, UI, Photographer subscription or robot command is introduced. PlatformKit captures first-order ACN/SN3D on supported built-in routes using public audio-only AVCaptureSession APIs; mono routes retain ASR and report direction unavailable. Actual native layout is validated; failure after admitting the first PCM frame never silently changes backend.
+
+Startup correction: native isRunning is insufficient evidence of capture readiness. FOA enables AVCaptureSession microphone configuration and waits for its first validated/enqueued PCM callback before returning a stream. Unsupported or failed FOA startup (including a 3-second no-frame timeout) stops and joins the spatial graph before mono retry; no intermediate FOA frame crosses App/Gateway. Mono also verifies first PCM delivery. One readiness waiter/result/timer bounds each attempt, and cancellation never triggers fallback. App presents listening only after readiness and marks capture failure or unexpected stream completion as failed.
 
 AgentCore owns generic channel-aware AudioInput only. Native audio preserves sampling rate and capture time. App adapts SDK layout to transport and keeps microphone spectrum based on omnidirectional W. SpeechPerception extracts W for its existing 16 kHz resampler/VAD/ASR and feeds W/Y/Z/X to a pure scalar-statistics estimator. PlatformKit contains no angle/activity policy; ModelKit gains no capability or model provider.
 

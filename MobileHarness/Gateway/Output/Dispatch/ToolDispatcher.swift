@@ -9,17 +9,19 @@ struct ToolDispatcher: Sendable {
 
     func dispatch(_ call: ToolCall, envelope: OutputEnvelope, owner: ExecutionOwner) async throws -> ToolResponse? {
         let required = Set(await registry.resources(for: call.toolPath).map { ResourceID(rawValue: $0.rawValue) })
+        let execute: @Sendable () async throws -> ToolResponse? = {
+            try await ResourceExecutionContext.$owner.withValue(owner) {
+                try await ToolExecutor(registry: registry).execute(
+                    call.executionRequest, context: envelope.toolContext)
+            }
+        }
         let result: ToolResponse?
         if !required.isEmpty {
             guard let resources else { throw ResourceError.unknownResource }
             let lease = await resources.lease(for: owner, resources: required)
-            result = try await resources.run(resources: required, owner: owner, lease: lease) {
-                try await ToolExecutor(registry: registry).execute(
-                    call.executionRequest, context: envelope.toolContext)
-            }
+            result = try await resources.run(resources: required, owner: owner, lease: lease, operation: execute)
         } else {
-            result = try await ToolExecutor(registry: registry).execute(
-                call.executionRequest, context: envelope.toolContext)
+            result = try await execute()
         }
         guard let result else { return nil }
         try Task.checkCancellation()

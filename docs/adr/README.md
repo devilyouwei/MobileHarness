@@ -1,5 +1,7 @@
 # Architecture decisions
 
+✅ ADR0124's startup correction defines first-PCM readiness, bounded pre-admission fallback and accurate capture-failure presentation. ❌ Physical acoustic acceptance remains pending.
+
 ADRs retain the context, decision and consequences at their recorded date. Read each record's status and supersession notes; an accepted historical decision does not make its original API, model or limits current.
 
 Current dependencies and flows belong to the [technical design](../../MobileHarness/README.md); module READMEs own current contracts. [Roadmap](../Roadmap.md) owns pending work and [validation](../README.md#experiments-tests-and-acceptance) owns experimental evidence.
@@ -170,3 +172,11 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 - [0123 — Shared NexArm BLE write pacing](0123-nexarm-ble-shared-pacing.md): connection-wide admission and transport diagnostics.
 
 - [0124 — FOA sound-source perception and optional broadcasting](0124-sound-source-perception.md)
+
+- [0125 — Bounded Bluetooth exception recovery and diagnostics](0125-bluetooth-exception-recovery.md): App recovery policy, joined cleanup and per-device memory cache.
+
+✅ [ADR0126](0126-aim-worker-resource-ownership.md): latest aim intents and continuous worker resource lifetime; explicit admission diagnostics.
+
+- [0127 — Settings manual robot takeover](0127-settings-manual-robot-takeover.md): reuse Action recipes with send-only playback, immediate replacement and no Agent resource lock.
+
+- [0128 — Settings audio detection](0128-settings-audio-detection.md): isolated diagnostic capture, source-only SpeechPerception, native capture facts and joined cleanup.

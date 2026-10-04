@@ -2,6 +2,16 @@
 
 Purpose: preserve dated test, UI and packaging observations that were previously embedded in module READMEs. These are records of what was checked at the time, not current implementation contracts or substitutes for physical-device acceptance.
 
+## 2026-10-04 — Microphone startup readiness correction
+
+Following the reported silent-listening regression after FOA capture was introduced, spatial startup now enables native microphone configuration and waits for actual validated PCM delivery. Both capture backends have one startup waiter/result and a cancellable 3-second first-frame timer. Failed spatial startup is closed and joined before mono retry; cancellation never retries. App clears listening on capture failure or unexpected stream completion and rejects late voice-state Tools after capture admission closes.
+
+✅ All 24 selected audio-readiness, speech-perception, sound-source and PCM-resampling tests passed, including six new readiness tests. Module boundaries, all six Python checks, full Swift formatting and project/privacy/entitlements plist validation passed. The unsigned generic iOS device build passed again after the final lifecycle guard.
+
+Full check.sh completed with 415 IntegrationTests and retained the two existing NexArm planner failures (four assertions) plus the vision recovery timeout (two issues). All readiness/sound-source tests passed in that run. The simulator build script failed at the existing CoreAIShared dependency because the simulator SDK cannot resolve CoreAI.
+
+❌ This correction was not installed or tested on a physical microphone. Restored acoustic capture, FOA channel mapping, camera/playback coexistence and sustained operation still require device acceptance. No signing settings, weights or user media were changed.
+
 ## 2026-09-26 — Camera background
 
 The repository check and four iOS simulator builds passed; an unsigned physical-target Debug build completed. A simulator launch showed camera controls during model preparation and the permission prompt. The simulator had no physical camera or voice-model resources. Live video, front/back switching, camera/voice coexistence and ready-conversation visuals were not accepted on an iPhone.
@@ -44,3 +54,37 @@ Validation (2026-09-28): root scripts/check.sh passed, followed by all nine Open
 On branch refactor/module-dependency-boundaries, repository checks passed with 297 IntegrationTests, 13 AppWorkflowTests and the other enabled suites after the shared Types migration. All four simulator build schemes passed with full Xcode selected. Optional real-model and physical-motion tests were not enabled.
 
 The signed Debug application containing commits through ed778b7 built successfully and installed on the connected iPhone 17 Pro as version 0.1.0, bundle version 2026100204. An independent installed-app query confirmed the version. The application was not automatically launched; installation is not voice/model/device-behavior acceptance. Subsequent README/documentation commits do not change that installed code.
+
+## 2026-10-04 — Bluetooth exception recovery installation
+
+The current working tree based on 55edf61, including ADR0125 Bluetooth cleanup/recovery and the per-device diagnostic page, built successfully for the paired iPhone 17 Pro using Xcode 27.0 (27A266a). `DEVELOPER_DIR` selected full Xcode without changing the system Command Line Tools selection. The signed Debug app passed strict signature verification and all five packaged Agent configuration checks.
+
+Device installation succeeded for `dev.mobileharness.app`, version 0.1.0 / bundle version 1; a separate installed-app query confirmed the result. The app was not automatically launched and no physical Bluetooth, robot-motion or visual-layout validation was performed. No local signing configuration, device identifiers, weights or media were added to Git.
+
+The required simulator build script was also retried under full Xcode. It failed at the existing CoreAIShared dependency because the iOS simulator SDK cannot resolve `CoreAI`; the signed physical-device build and installation succeeded independently.
+
+## 2026-10-04 — Tracking resource ownership fix
+
+ADR0126 corrects overlapping Robot.aim Tool and continuous-worker motor fences, preserves trusted Agent/session ownership through the worker, and records resource-admission failures in Bluetooth device diagnostics. Selected BLE/aim/resource tests passed, including real OutputGateway updates, competing-write exclusion and originating-session cancellation/join. Full repository checks retained two existing aim-planner failures and one vision timeout that passed in isolated rerun; boundary, format and plist checks passed.
+
+A signed Debug iPhone build completed under Xcode 27.0 in an independent ignored build directory after the shared build database was busy. Signature verification and all five packaged Agent configuration checks passed. The revised app installed successfully on the paired iPhone 17 Pro; a separate installed-app query confirmed dev.mobileharness.app 0.1.0 / bundle version 1. The app was not automatically launched or used to move the robot. The simulator script retained the known missing CoreAI module failure. Unrelated concurrent audio/signing configuration changes were not edited by this fix.
+
+## 2026-10-05 — Settings manual robot takeover
+
+- ADR0127 restores Settings preset/reset/jog replacement without Gateway resource admission or physical-arrival waiting. Actions supplies one shared prepared recipe/options and bounded send-only choreography; controls remain enabled while verified control is available. Manual intent revision fences a preset waiting for old cleanup; pending native queries are retired before owner cancellation. Agent cleanup does not cancel manual work.
+- Final selected simulated BLE regression run: 61 tests passed, including resource occupation/no telemetry, identical Agent/manual recipe packets, reset/jog takeover, independent session cleanup, pending refresh retirement and slider replacement during held aim cleanup. No physical robot motion or native touch trial was performed.
+- `scripts/check.sh`: boundary/catalog checks, six provisioning tests and strict repository formatting passed. The IntegrationTests run executed 419 tests and reported ten issues: four assertions in the two previously failing aim planner tests, four deadline-policy assertions in the communication test and two issues in the previously intermittent vision time-limit test. Communication (two parameter cases) and vision both passed isolated reruns. Targeted BLE tests passed in the full run as well. Final boundary, changed-file formatting, diff whitespace and project/privacy/entitlements plist checks passed.
+- Final iOS device-target build compiled the changed Actions/UI/AppBluetoothWorkflow targets, but overall App assembly failed at AppContainer.swift: AudioDetectionSession was referenced by concurrent audio-detection work without its new source being registered in the Xcode project. No local signing changes or device installation were made for this correction.
+- `scripts/build-ios.sh` was run with full Xcode. Its first simulator scheme failed because the simulator SDK cannot resolve CoreAI in CoreAIShared; the remaining loop schemes did not run.
+
+### Audio detection validation — 2026-10-05
+
+✅ Final targeted audio/detection regression: 32 tests passed (UI freshness 3, workflow lifetime 3, speech/source/capture/resampler integration 25, capability resampler 1). Whole-repository strict Swift formatting, architecture boundary checks, Python tests (6), diff whitespace and plist metadata validation passed. The final unsigned MobileHarness generic iOS device build passed, including the App-owned diagnostic endpoint and native Settings section.
+
+❌ `./scripts/check.sh` completes the test run with two existing NexArm planner test failures (four assertions): aimFollowApproachesTheLatestCountWithoutJumpingThere and aimFollowBrakesBeforeReversing. No audio/detection test failure occurred. `./scripts/build-ios.sh` fails in its first MobileHarnessSimulator scheme because the external CoreAIShared dependency cannot resolve the CoreAI module; the remaining three schemes are not attempted by this script. Physical capture, UI interaction, routes, coexistence and acoustic coordinates are not validated by these builds/fixtures. Original Technical_Design.docx is unchanged.
+
+## 2026-10-05 — Latest working-tree iPhone installation
+
+- Signed Debug device build succeeded from all current tracked/non-ignored source changes, including ADR0127 Settings manual takeover and ADR0128 audio detection. The audio-detection source registration that blocked the earlier App build is now present. A 368-file compile/configuration input digest remained identical before/after building and after installation.
+- Strict/deep code-signature verification and all five bundled Agent configurations passed. Native device installation succeeded, and an independent installed-app query confirmed Mobile Harness / dev.mobileharness.app version 0.1.0 on the paired physical iPhone 17 Pro. Installation did not launch the application or send robot commands.
+- Latest check.sh passed boundaries, model metadata/provisioning and formatting. IntegrationTests executed 420 tests with the existing two aim-planner failures (four assertions) and the intermittent vision time-limit failure (two issues). AppWorkflowTests executed 25 tests with one permission-retry timeout. Vision and audio permission-retry both passed isolated reruns. Simulator validation remains limited by the previously recorded unavailable CoreAI module. Physical robot/touch/audio acceptance remains pending.

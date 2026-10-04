@@ -41,3 +41,5 @@ See [result delivery](../Results/README.md) and [lifecycle tests](../../../../Te
 ✅ Production now registers nexarm.motor.1…6. ResourceExecutionContext passes the held set to composed children; workflow gates avoid reentrant acquisition. Motor cleanup is software cancellation/join only, not an independently verified hardware stop.
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
+
+✅ ADR0126: run binds trusted owner and held resources together. App workers spawned by intent Tools retain the actual Agent/session owner, so session cancellation or Agent removal cancels/joins their registered use. Repeated intent publications do not acquire the ongoing worker fence; actual competing writers still reject busy.

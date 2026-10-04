@@ -560,8 +560,8 @@ flowchart LR
     Gateway --> AgentFence[Shared resource guard]
     AgentFence --> Runtime[ActionRuntime]
     Runtime --> Actions
-    Settings[Bluetooth workflow user operation] --> SettingsFence[Same resource authority]
-    SettingsFence --> Actions[Actions NexArm]
+    Settings[Bluetooth workflow user operation] --> Manual[Cancel prior writer / manual submission]
+    Manual --> Actions[Shared Actions NexArm recipes]
     Actions --> Platform[PlatformKit connection / native commands]
     Platform -->|telemetry and acknowledgment| Actions
     Actions -->|Agent-path completion / failure| Runtime
@@ -570,7 +570,7 @@ flowchart LR
     Results --> Input[InputGateway / originating Agent]
 ```
 
-Agent-selected and Settings-initiated movement use the same Actions implementation and shared resource authority. Actions owns gesture composition, limits within business policy, home/reset selection and completion rules. PlatformKit owns discovery, connection, protocol encoding, native hardware limits and structured feedback. A transport write is not automatically an Action success; each Action documents the acknowledgment that completes its effect.
+Agent-selected and Settings-initiated movement reuse the same Actions recipes and encoders. Settings enters App directly, cancels old writers and uses send-only submission without Gateway resource admission or arrival waiting (ADR0127). Agent-selected execution retains OutputGateway authorization, resource arbitration and its declared completion policy. Actions owns gesture composition, limits within business policy, home/reset selection and completion rules. PlatformKit owns discovery, connection, protocol encoding, native hardware limits and structured feedback. A transport write is not automatically an Action success; each Action documents the acknowledgment that completes its effect.
 
 Bluetooth discovery/connection is an App workflow because preferred-device ordering, explicit user intent and presentation belong to the application. Physical safety requires device-side protection and cannot rely on iOS background execution.
 
@@ -682,9 +682,9 @@ Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The c
 
 Photographer consumes validated `vision.pose` through InputGateway and emits internal `Robot.aim` through OutputGateway. Its JSON v5 contains the subscription and empty model-callable catalogs; fixed internal permission and target-selection policy stay in Agent code. The output buffer holds eight calls and fails explicitly on overflow.
 
-RobotTools owns argument validation and macro metadata for motors1–5. Gateway authorizes and locks the resources; App supplies NexArmBehaviorAdapter and a composition-owned Photographer factory. VisionSession owns registration, output pumps and cleanup, including partial registration failure. Action-side aim policy maps the rest/angles and chooses speed; PlatformKit encodes native commands. Return means transport acceptance, not arrival. A possible failed write latches uncertainty until explicit read-only recovery. ❌ Physical tracking acceptance remains pending.
+RobotTools validates intent arguments; Gateway authorizes the source/session and Tool permission. The continuous App worker holds motors1–4 through the shared ResourceCoordinator (ADR0126); App supplies NexArmBehaviorAdapter and a composition-owned Photographer factory. VisionSession owns registration, output pumps and cleanup, including partial registration failure. Action-side aim policy maps the rest/angles and chooses speed; PlatformKit encodes native commands. Return means the latest target was accepted by a started worker, not packet delivery or arrival. Actual feedback/send faults enter bounded read-only connection recovery without old-target replay. ❌ Physical tracking acceptance remains pending.
 
-✅ Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until explicit reconnect. Final App resource validation requires all five Agent JSON files.
+✅ Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until App reconnects the link. Final App resource validation requires all five Agent JSON files.
 
 ✅ Agent fault isolation: ordinary messaging and behavior execution failures are outcomes, never a reason to terminate sibling Agents. Photographer owns offline command suppression; Gateway retains bounded output/Action diagnostics. Startup configuration validation and explicit cancellation remain strict.
 
@@ -745,4 +745,14 @@ FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-f
 
 ### Sound source direction data flow
 
-PlatformKit preserves native mono or ACN/SN3D FOA PCM and hardware capture time. App passes channel layout and PCM through the generic AudioInput; SpeechPerception alone calculates dominant acoustic direction and extracts W for 16 kHz ASR. sound.source/1 is a 500 ms latest-state observation through OutputGateway→InputGateway. It uses captured sound-field coordinates and contains no motor/camera command. Mono remains available for ASR; direction is unavailable there. Capture/reply lifecycle is unchanged, and Photographer does not subscribe. See [ADR0124](../docs/adr/0124-sound-source-perception.md). Physical precision and coordinate calibration remain outstanding.
+PlatformKit preserves native mono or ACN/SN3D FOA PCM and hardware capture time. App passes channel layout and PCM through the generic AudioInput; SpeechPerception alone calculates dominant acoustic direction and extracts W for 16 kHz ASR. sound.source/1 is a 500 ms latest-state observation through OutputGateway→InputGateway. It uses captured sound-field coordinates and contains no motor/camera command. Mono remains available for ASR; direction is unavailable there. Reply admission is unchanged, and Photographer does not subscribe. See [ADR0124](../docs/adr/0124-sound-source-perception.md). Physical precision and coordinate calibration remain outstanding.
+
+✅ Native capture startup is committed by first validated PCM delivery. FOA uses AVCaptureSession microphone configuration; unsupported or failed startup closes the spatial graph before mono retry, with a 3-second first-frame bound for each backend. No running stream silently changes channel layout. The host shows listening after readiness and clears that phase/spectrum on capture failure. ❌ Physical restart/coexistence acceptance remains required.
+
+✅ [ADR0125](../docs/adr/0125-bluetooth-exception-recovery.md): App owns joined cleanup and three bounded reconnect attempts for BLE loss, feedback silence, send stalls and query isolation; PlatformKit supplies versioned facts, Actions retains physical policy, and UI displays a four-device/32-event-per-device memory cache below 当前状态. Verified recovery never replays old motion. ❌ Physical BLE/native UI acceptance remains pending.
+
+### Settings audio detection
+
+✅ [ADR0128](../docs/adr/0128-settings-audio-detection.md): 音频识别 includes an explicit 10-second microphone/spatial diagnostic. PlatformKit exposes native input/capability/fallback facts; App Lifecycle owns an isolated capture and source-only SpeechPerception session through both Gateways; AppDiagnosticWorkflow owns admission, freshness/deadline monitoring and joined cleanup; UI owns simple result presentation. Actual received layout distinguishes four-channel capture from mono fallback. No model warmup, conversation, Photographer consumer or robot action is added.
+
+❌ Physical FOA support, coordinates, camera coexistence and navigation/background interactions still require device acceptance.

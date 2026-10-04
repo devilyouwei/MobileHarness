@@ -208,7 +208,9 @@ public actor ResourceCoordinator {
         let id = UUID()
         let task = Task {
             try Task.checkCancellation()
-            return try await ResourceExecutionContext.$held.withValue(resources) { try await operation() }
+            return try await ResourceExecutionContext.$owner.withValue(owner) {
+                try await ResourceExecutionContext.$held.withValue(resources) { try await operation() }
+            }
         }
         uses[id] = Use(resources: resources, owner: owner, cancel: { task.cancel() }, join: { _ = await task.result })
         defer { uses[id] = nil }

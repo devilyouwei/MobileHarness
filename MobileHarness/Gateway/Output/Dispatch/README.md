@@ -49,3 +49,5 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 ✅ Tool feedback delivery errors preserve the original value/isError/callID and add a separate bounded deliveryFailure. True task cancellation propagates. ❌ Feedback delivery does not roll back completed effects.
 
 ✅ BehaviorTranslation copies bounded error raw identifiers and complete report details; it no longer switches on device failure cases or maps motor/position fields. ❌ Gateway does not interpret business detail schemas.
+
+✅ ADR0126: ToolDispatcher binds trusted ExecutionOwner even for intent Tools without transient hardware resources. An injected host worker may inherit that context while retaining its own shared resource guard; source/session permissions remain enforced at dispatch.

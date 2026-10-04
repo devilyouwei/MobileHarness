@@ -10,12 +10,16 @@
         let history: ConversationHistoryState
         let historyControls: any ConversationHistoryControlling
         let modelResources: ModelResourcesState?
+        let audioDetection: AudioDetectionState?
+        let audioDetectionControls: (any AudioDetectionControlling)?
         let save: () async -> Bool
 
         public init(
             settings: SettingsState, bluetooth: BluetoothSettingsState, bluetoothControls: any BluetoothControlling,
             history: ConversationHistoryState,
             historyControls: any ConversationHistoryControlling, modelResources: ModelResourcesState? = nil,
+            audioDetection: AudioDetectionState? = nil,
+            audioDetectionControls: (any AudioDetectionControlling)? = nil,
             save: @escaping () async -> Bool
         ) {
             self.settings = settings
@@ -24,6 +28,8 @@
             self.history = history
             self.historyControls = historyControls
             self.modelResources = modelResources
+            self.audioDetection = audioDetection
+            self.audioDetectionControls = audioDetectionControls
             self.save = save
         }
 
@@ -32,7 +38,9 @@
                 Section("AI 模型") {
                     if let modelResources {
                         NavigationLink {
-                            ModelResourcesView(state: modelResources, group: .recognition)
+                            ModelResourcesView(
+                                state: modelResources, group: .recognition, audioDetection: audioDetection,
+                                audioDetectionControls: audioDetectionControls)
                         } label: {
                             Label("音频识别", systemImage: "waveform")
                         }

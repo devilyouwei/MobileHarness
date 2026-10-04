@@ -52,4 +52,4 @@ flowchart LR
 
 ❌ Physical BLE rate/MTU/firmware endurance calibration and device-side queue instrumentation remain pending. Native multi-motor packing is available but streaming does not assume a negotiated MTU can fit a combined packet. No claim of solved wireless interference or firmware starvation.
 
-This transport change does not add automatic reconnect after feedback loss while BLE remains connected. App still requires explicit control verification/reconnect for that case; physical disconnection retains its existing bounded recovery policy.
+✅ Snapshots expose query quarantine and monotonically versioned native facts. App (ADR0125) now closes/reconnects abnormal connected sessions through its bounded recovery policy; PlatformKit still does not decide retries, Action replay or UI state. Reconnect clears query quarantine, telemetry/session decoder state and the flow budget only after a new native connection is established.

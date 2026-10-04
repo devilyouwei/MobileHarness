@@ -1,6 +1,6 @@
 # Speech Perception
 
-Purpose: convert bounded microphone PCM into shared speech observations. Owns VAD, segmentation, streaming ASR, transcript merging and dominant sound direction; never owns microphone hardware or UI implementation; it selects recognition-caption behavior through code-owned internal Tools.
+Purpose: convert bounded microphone PCM into shared speech and sound-source observations. Owns VAD, segmentation, streaming ASR, transcript merging and dominant sound direction; never owns microphone hardware or UI implementation; it selects recognition-caption behavior through code-owned internal Tools.
 
 ```mermaid
 flowchart LR
@@ -159,3 +159,9 @@ flowchart LR
 ✅ Pending sound state has capacity 1 with latest replacement and a single publisher task. Raw audio remains 128 packets/64,000 scalar samples with explicit rejection, including all four channels. Freshness is 500 ms from analysis-window end, with the parent deadline capped before publication; queued stale states are skipped. Sender identity/topic/session come from the bound port. No subscribers is an ordinary result; receiver rejection does not stop either perception branch. Stop/failure cancels and joins the publisher, and pause clears its pending state.
 
 ❌ Physical angle calibration, microphone route behavior, real acoustic precision, reverberant/multiple simultaneous sound sources, camera coexistence and sustained power/latency acceptance remain pending. This is one dominant acoustic direction, not separated sound-source tracking. Photographer has no subscription or turning behavior yet.
+
+## Host-selected diagnostic mode
+
+✅ `Mode.soundSourceOnly` shares the same bounded input worker, estimator, latest-state publisher and sound.source Gateway contract. It does not open VAD/ASR sessions, extract/resample W for a model, emit speech observations or grant transcript/voice-state Tools. The default `speechAndSoundSource` retains conversational behavior. Mode is a host lifecycle choice, not a model-callable Tool or duplicated JSON registry. Mono still publishes direction unavailable.
+
+❌ This diagnostic mode measures dominant direction only; it does not test ASR accuracy or establish physical axis calibration.

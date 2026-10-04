@@ -5,6 +5,9 @@ import PlatformKit
 
 /// Streaming perception only. Device capture and playback remain composition-owned.
 public actor SpeechPerceptionAgent: Agent {
+    /// Host-selected diagnostic scope; model capabilities/permissions remain in the versioned configuration.
+    public enum Mode: Sendable { case speechAndSoundSource, soundSourceOnly }
+    private let mode: Mode
     private static let transcript = InternalTool(path: "UI.setTranscript", required: ["text"])
     private static let voiceState = InternalTool(path: "UI.setVoiceState", required: ["state"])
     private static let finishTranscript = InternalTool(path: "UI.finishTranscript")
@@ -43,7 +46,7 @@ public actor SpeechPerceptionAgent: Agent {
 
     public init(
         recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
-        sessionID: UUID, configuration: AgentConfiguration? = nil
+        sessionID: UUID, configuration: AgentConfiguration? = nil, mode: Mode = .speechAndSoundSource
     ) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "SpeechPerception")
         guard configuration.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }
@@ -51,11 +54,13 @@ public actor SpeechPerceptionAgent: Agent {
         self.recognition = recognition
         self.vad = vad
         self.sessionID = sessionID
+        self.mode = mode
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Speech Perception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.toolCall, .control],
-            capabilities: try Self.runtimeCapabilities(configuration.capabilities))
+            outputs: mode == .speechAndSoundSource ? [.toolCall, .control] : [.control],
+            capabilities: try mode == .speechAndSoundSource
+                ? Self.runtimeCapabilities(configuration.capabilities) : configuration.capabilities)
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(32))
         outputs = stream.stream
         continuation = stream.continuation
@@ -70,6 +75,11 @@ public actor SpeechPerceptionAgent: Agent {
     }
     public func start() async throws {
         guard lifecycle == .registered, port != nil else { throw HarnessError.invalidTransition }
+        if mode == .soundSourceOnly {
+            try Task.checkCancellation()
+            lifecycle = .running
+            return
+        }
         let session = try await vad.detectVoiceActivity(
             format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32))
         guard lifecycle == .registered, !Task.isCancelled else {
@@ -227,7 +237,7 @@ public actor SpeechPerceptionAgent: Agent {
     }
     private func processAudio(_ acceptedInput: AgentInput) async throws {
         let input = acceptedInput
-        guard case .audio(let audio) = input.payload, let segmenter, let recognitionTurn, let port else {
+        guard case .audio(let audio) = input.payload, let port else {
             throw HarnessError.unsupportedInput
         }
         queuedSamples -= audio.sampleCount
@@ -236,6 +246,7 @@ public actor SpeechPerceptionAgent: Agent {
             stride(from: 0, to: bytes.count, by: 4).map { bytes.loadUnaligned(fromByteOffset: $0, as: Float.self) }
         }
         try Task.checkCancellation()
+        if mode == .soundSourceOnly { activeInput = input }
         if soundLayout != audio.layout || soundRate != audio.sampleRate {
             soundEstimator.reset()
             await resampler.reset()
@@ -261,6 +272,11 @@ public actor SpeechPerceptionAgent: Agent {
                 }
             }
         }
+        if mode == .soundSourceOnly {
+            processed += 1
+            return
+        }
+        guard let segmenter, let recognitionTurn else { throw HarnessError.invalidTransition }
         let mono = audio.layout == .mono ? samples : stride(from: 0, to: samples.count, by: 4).map { samples[$0] }
         var timestamp = audio.timestamp
         for offset in stride(from: 0, to: mono.count, by: 8192) {

@@ -1,6 +1,6 @@
 # NexArm Action support
 
-Purpose: implement the NexArm action domain below its stateless callable entry points. Design goals: one shared Settings/Channel executor, explicit motor scope, bounded work and complete child outcomes.
+Purpose: implement the NexArm action domain below its stateless callable entry points. Design goals: shared Settings/Channel recipes with explicit submission versus feedback-completion boundaries, validated motor scope, bounded work and complete Channel child outcomes.
 
 ✅ This directory owns gesture metadata, simple/complex recipes, IK plan preparation, the Action controller, completion policy/results, reset wrappers and manual jog shaping. It imports the foundational PlatformKit SDK through injected links; concrete connection lifetime belongs to App. Public helpers do not grant model permission.
 
@@ -33,3 +33,13 @@ flowchart LR
 ✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, BluetoothWorkflowError owns its failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
 
 ❌ Runtime must not classify pose, foreground, control-readiness or device-feedback failures. Producers provide actionReportCode through ActionExecutionFailureProviding; the generic default handles invalid arguments/resource unavailability and otherwise reports handlerFailed. CancellationError remains cancellation.
+
+✅ ADR0127: `NexArmActionController.manualPlan` builds the same prepared geometry/options used by Channel gestures/reset without I/O or lock admission. `NexArmMotionPlan.submit` owns bounded cancellable choreography and send admission, while the existing controller owns feedback arrival. App supplies one live session and cancels prior writers; no second geometry catalog or packet encoder is introduced.
+
+```mermaid
+flowchart LR
+    Recipe[Shared prepared motion recipe] --> Manual[Send-only submission / nominal beats]
+    Recipe --> Channel[Feedback completion / motor outcomes]
+    Manual --> SDK[PlatformKit native admission]
+    Channel --> SDK
+```

@@ -2,14 +2,9 @@ import Foundation
 import ToolRuntime
 
 public enum RobotTools {
-    /// Returns once `send` accepts the logical angles. Does not wait for the arm to settle.
-    @Tool(
-        path: "Robot.aim", title: "aim",
-        resources: [
-            ToolResource(rawValue: "nexarm.motor.1"), ToolResource(rawValue: "nexarm.motor.2"),
-            ToolResource(rawValue: "nexarm.motor.3"), ToolResource(rawValue: "nexarm.motor.4"),
-            ToolResource(rawValue: "nexarm.motor.5"),
-        ])
+    /// Publishes a latest target to the host-owned, resource-guarded worker.
+    /// The publication itself holds no motor fence; it must remain available during tracking.
+    @Tool(path: "Robot.aim", title: "aim")
     public static func aim(
         invocation: ToolInvocation,
         using send: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void

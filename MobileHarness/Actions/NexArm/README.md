@@ -4,13 +4,13 @@
 
 Each motor operation records its own outcome. Compositions collect outcomes and continue after child failures. Channel continues after an Action succeeds, partially fails or fails. Feedback loss and an unreachable target are ordinary leaf errors; neither implicitly cancels the composition. Explicit user/session cancellation stops remaining work.
 
-Actions owns gesture definitions, reset/home selection, motion shaping, completion policy and result collection. [PlatformKit](../../PlatformKit/Connectivity/NexArm/README.md) owns connections, protocol/native command encoding, hardware limits and telemetry. App owns connection lifetime, resource bindings and presentation. Settings and conversation use the same Action controller.
+Actions owns gesture definitions, reset/home selection, motion shaping, completion policy and result collection. [PlatformKit](../../PlatformKit/Connectivity/NexArm/README.md) owns connections, protocol/native command encoding, hardware limits and telemetry. App owns connection lifetime, resource bindings and presentation. Settings and conversation reuse the same connection-prepared Action recipes and native command encoding. Channel execution observes physical feedback; Settings uses bounded send-only playback and manual jog without Gateway resource admission (ADR0127).
 
 ```mermaid
 flowchart LR
     Channel[OutputGateway / Channel] --> Entry[NexArmActions]
     Entry --> App[App binding / resource fence]
-    Settings[Settings] --> App
+    Settings[Settings via App manual takeover] --> Domain
     App --> Domain[Actions: plans and controller]
     Domain --> SDK[PlatformKit: packets and link]
     SDK <--> Device[Arm]
@@ -34,7 +34,7 @@ Only NexArm/Support may import PlatformKit within Actions; PlatformKit owns its 
 | [Support/NexArmCompositeActions.swift](Support/NexArmCompositeActions.swift) | Gesture geometry, home selection and IK plans |
 | [Support/NexArmActionController.swift](Support/NexArmActionController.swift) | Shared execution and feedback observation |
 | [Support/NexArmMotorExecution.swift](Support/NexArmMotorExecution.swift) | Completion policy, motor results, reset wrapper and errors |
-| [Support/NexArmMotionPlan.swift](Support/NexArmMotionPlan.swift) | Bounded groups, motor scope and stability tracking |
+| [Support/NexArmMotionPlan.swift](Support/NexArmMotionPlan.swift) | Shared bounded recipes, send-only choreography and feedback stability tracking |
 | [Support/NexArmMotorProfiles.swift](Support/NexArmMotorProfiles.swift) | Central per-motor tolerances and empirical timing envelope |
 | [Support/NexArmRegistration.swift](Support/NexArmRegistration.swift) | Parameter-dependent resources and pre-admission budget |
 | [Support/NexArmJogPlanner.swift](Support/NexArmJogPlanner.swift) | Manual jog input, trajectory shaping and release policy |
@@ -126,7 +126,7 @@ Transport refusal before acceptance can be retried within a one-second admission
 
 Current presets use a bounded `NexArmMotionPlan`, not a generic composition node for every waypoint. A plan contains at most 20 groups, each with up to 6 distinct addressed motors. Simultaneous groups send one synchronized packet and check each motor independently; they must not become five sequential motor moves.
 
-`ActionDefinition.resolvingResources` computes motor resources from call parameters; entry handlers validate the full argument set. Plan validation requires the lock set to equal the union of addressed motors. The parent holds that union throughout execution, including delays; children inherit the fence instead of reacquiring it. Settings uses the same coordinator. Manual streaming reserves all six motors because its input can change during the session.
+`ActionDefinition.resolvingResources` computes motor resources from call parameters; entry handlers validate the full argument set. Plan validation requires the lock set to equal the union of addressed motors. The parent holds that union throughout execution, including delays; children inherit the fence instead of reacquiring it. These resource fences apply to Agent-selected execution. Settings presets/reset/jog bypass the coordinator and cancel/join old writers through App manual takeover; motor-scope metadata still validates addressed packets (ADR0127).
 
 | Operation or illustrative composition | Resource union |
 |---|---|
@@ -209,3 +209,11 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 ✅ BLE proposal admission now shares the PlatformKit connection-wide 30 ms write budget (ADR0123). The existing Actions planner filters identical targets, caps elapsed integration at 60 ms and advances command state only after admission; finite execution retains its unsent step until admitted or its existing deadline/cancellation fails explicitly. Round-robin latest-intent streaming does not promise every motor receives a packet each planning tick. USB behavior is unchanged.
 
 ❌ Streaming multi-motor packing with negotiated MTU validation and real-device calibration remain outstanding. Fixed presets, home selection and completion policy stay in Actions; neither Gateway nor UI owns BLE transport throttling.
+
+## Manual submission — ADR0127
+
+✅ `manualPlan` reuses the prepared `NexArmArmPlan.motion/home` recipes and the same `configured` native speed/acceleration as Channel execution. It performs no I/O, resource acquisition, stationary recovery or feedback-completion wait. `NexArmMotionPlan.Step` retains nominal frame milliseconds. `submit` sends each frame through an App-supplied admission capability, waiting only cancellable inter-frame choreography beats; the last admitted frame returns immediately. Identical recipe/encoder implementation serves both paths, including single-motor head gestures and motors1–5 reset.
+
+✅ Plans remain bounded to 20 frames, each 1…10,000 ms. A blocked frame retries at 30 ms with a two-second admission deadline; cancellation stops unsent frames, including the ending home. Local admission is never described as physical arrival. PlatformKit still imposes the actual connection-wide packet interval and system backpressure.
+
+❌ Physical gesture pacing, manual takeover stop timing and sustained firmware acceptance remain pending.

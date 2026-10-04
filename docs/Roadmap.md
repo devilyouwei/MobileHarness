@@ -156,3 +156,23 @@ Validation (2026-10-04, ADR0123): seven targeted BLE pacing/backpressure/fairnes
 Validation (2026-10-04, ADR0124): 20 targeted speech/sound-source/vision recovery tests passed, including all synthetic direction and publication lifecycle tests. Boundary checks, six Python checks and Swift formatting passed; unsigned generic iOS device build passed. Full check.sh ran 397 integration tests and reported the two existing NexArm planner failures (four assertions) plus one vision recovery timeout (two issues); that vision test passed on the isolated rerun. build-ios.sh remains blocked by CoreAIShared's missing simulator CoreAI module. No physical microphone, coordinate/precision, camera/playback coexistence, route-change or sustained-run acceptance has been performed.
 
 Final verification: changed sound-source Swift files, boundary checks and project/privacy/entitlements plist validation pass. A later whole-repository formatting rerun reports errors in concurrently modified BluetoothWorkflow.swift and BluetoothSettingsState.swift, outside this change; those edits are preserved.
+
+✅ FOA startup regression correction: native microphone configuration and first validated PCM delivery gate now precede listening. Failed spatial startup is joined before mono retry; capture failure/stream completion clears listening and rejects late voice-state Tools. Six readiness concurrency/cancellation tests and existing speech/sound-source/PCM regressions passed (24 targeted tests); unsigned iOS device build passed. See [validation history](Validation-History.md#2026-10-04--microphone-startup-readiness-correction). ❌ Physical confirmation of restored recording and capture coexistence remains pending.
+
+✅ [ADR0125](adr/0125-bluetooth-exception-recovery.md): unified Bluetooth exception recovery, cancellation/cleanup fences and per-device diagnostic cache are implemented. ❌ Physical firmware/radio recovery and iOS diagnostic page acceptance remain pending; process-local cache does not survive relaunch.
+
+✅ ADR0126 fixes tracking's overlapping Tool/worker resource fences and records control-admission failures. ❌ Supervised iPhone tracking/endurance acceptance remains pending.
+
+✅ [ADR0127](adr/0127-settings-manual-robot-takeover.md): Settings presets/reset/jog restore immediate replacement without Gateway resource locks or physical-arrival waiting, sharing Actions recipes/options and native pacing. ❌ Native slider gesture and physical robot takeover/endurance acceptance remain pending.
+
+## Settings audio detection — ADR0128
+
+✅ Recognition settings now has a compact explicit detection section with native permission/input, spatial capability, actual received four-channel/mono mode, startup fallback reason, PCM level and fresh source direction. Diagnostics reuse source-only SpeechPerception and both Gateways without VAD/ASR warmup, conversational consumers or robot effects. One operation and one monitor stop after 10 seconds of captured audio; page departure/background cancel and voice switching joins cleanup.
+
+❌ Device acceptance: permission denial/retry, built-in/headset route, supported versus actual FOA/fallback reason, real front/back/left/right axes, camera coexistence, stop/restart, navigation/background and continuous latency. Synthetic tests do not establish angular precision.
+
+### Audio detection validation — 2026-10-05
+
+✅ Final targeted audio/detection regression: 32 tests passed (UI freshness 3, workflow lifetime 3, speech/source/capture/resampler integration 25, capability resampler 1). Whole-repository strict Swift formatting, architecture boundary checks, Python tests (6), diff whitespace and plist metadata validation passed. The final unsigned MobileHarness generic iOS device build passed, including the App-owned diagnostic endpoint and native Settings section.
+
+❌ `./scripts/check.sh` completes the test run with two existing NexArm planner test failures (four assertions): aimFollowApproachesTheLatestCountWithoutJumpingThere and aimFollowBrakesBeforeReversing. No audio/detection test failure occurred. `./scripts/build-ios.sh` fails in its first MobileHarnessSimulator scheme because the external CoreAIShared dependency cannot resolve the CoreAI module; the remaining three schemes are not attempted by this script. Physical capture, UI interaction, routes, coexistence and acoustic coordinates are not validated by these builds/fixtures. Original Technical_Design.docx is unchanged.

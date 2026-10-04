@@ -208,6 +208,19 @@ public actor NexArmActionController {
         return (sample.joints, sample.pose)
     }
 
+    /// Builds the shared recipe from connection-prepared mapping; performs no I/O or lock admission.
+    /// A nil gesture selects whole-arm home. App owns cancellation and the live sending session.
+    public func manualPlan(gesture: NexArmGesture?, speed: Int = 1400, acceleration: Int = 30) throws
+        -> NexArmMotionPlan
+    {
+        try Task.checkCancellation()
+        guard let armPlan, cachedJoints.count == 6 else { throw NexArmError.invalidMotion }
+        let plan =
+            try gesture.map { try armPlan.motion($0, repetitions: 1, from: cachedJoints) }
+            ?? NexArmMotionPlan(lockedMotors: Set(1...5), frames: [armPlan.home(from: cachedJoints)])
+        return try plan.configured(speed: speed, acceleration: acceleration)
+    }
+
     /// Explicit whole-arm reset, the only reset operation that owns all motors1–5.
     public func resetPosition(speed: Int = 1400, acceleration: Int = 30) async throws {
         try Task.checkCancellation()
@@ -223,7 +236,7 @@ public actor NexArmActionController {
                 speed: speed, acceleration: acceleration))
     }
 
-    /// One motor-scoped executor for Settings, Channel, composite gestures and reset.
+    /// Feedback-based Channel execution shares its recipe with manualPlan, not its arrival policy.
     public func performGesture(_ gesture: NexArmGesture, repetitions: Int, speed: Int = 1400, acceleration: Int = 30)
         async throws
     {

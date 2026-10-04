@@ -29,6 +29,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     private var expressionWaitID: UUID?
     private func updatePhase() { state.voicePhase = playbackActive ? .speaking : presentationPhase }
     private var changingSettings = false
+    var beforeVoiceStart: @MainActor () async -> Void = {}
     private var startupTask: Task<Void, Never>?
     private var voiceGeneration: UUID? { didSet { state.isVoiceActive = voiceGeneration != nil } }
     private let audio: AppleAudioIO
@@ -195,6 +196,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
 
     func startVoice() async {
         guard state.isReady, !changingSettings, voiceGeneration == nil else { return }
+        await beforeVoiceStart()
+        guard state.isReady, !changingSettings, voiceGeneration == nil, !Task.isCancelled else { return }
         let generation = UUID()
         voiceGeneration = generation
         presentationPhase = .loading
@@ -310,6 +313,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                             throw CommunicationError.unavailableTarget
                         }
                     }
+                    guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
+                    await self.stopPerception(message: "录音已结束，请重新开始聆听")
                 } catch is CancellationError {} catch {
                     guard let self, self.voiceGeneration == generation else { return }
                     await self.stopPerception(message: "录音中断：\(String(describing: error))")
@@ -350,6 +355,12 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         await cleanupTask?.value
     }
 
+    func stopVoiceAndWait() async {
+        // A pending voice start may be joining diagnostic cleanup; only stop an admitted voice session.
+        if voiceGeneration != nil { stopVoice() }
+        await cleanupTask?.value
+    }
+
     func endSettingsChange() { changingSettings = false }
 
     func toggleVoice() {
@@ -362,11 +373,16 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     }
 
     private func stopPerception(message: String) async {
-        await audio.stopCapture()
+        let generation = voiceGeneration
         captureTask?.cancel()
         captureTask = nil
+        await audio.stopCapture()
+        guard voiceGeneration == generation else { return }
         let failedAgent = speech
         Task { await failedAgent?.stop() }
+        presentationPhase = .failed
+        handlingTurn = false
+        state.microphoneSpectrum = AudioSpectrum.silence
         state.voiceStatus = message
         record(message)
     }
@@ -387,7 +403,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         state.playbackSpectrum = AudioSpectrum.silence
         state.microphoneSpectrum = AudioSpectrum.silence
         startupTask?.cancel()
-        let previousStartup = startupTask
+        // Before voice admission this task only joins diagnostics; joining it here would form a cleanup cycle.
+        let previousStartup = oldGeneration == nil ? nil : startupTask
         startupTask = nil
         let previousCleanup = cleanupTask
         let previousCapture = captureTask
@@ -528,6 +545,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     func presentVoiceState(_ voiceState: UITools.VoiceState, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+        // In-flight perception Tools cannot restore listening after capture admission has closed.
+        guard captureTask != nil else { throw CancellationError() }
         if conversationPresentation.isCurrent(invocation.context), conversationPresentation.transcriptClosed,
             voiceState != .listening
         {

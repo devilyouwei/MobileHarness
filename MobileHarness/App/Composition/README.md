@@ -40,7 +40,7 @@ flowchart TD
 
 ## Action runtime stage 2
 
-✅ AppAssembly owns one AppleCamera instance shared with CameraCoordinator and ApplicationRuntime. Runtime assembles camera.capture ResourceDefinition, a single ResourceCoordinator, scheduler feedback delivery to InputGateway, and OutputGateway sharing that authority. Only runtime.camera may acquire capture leases. ❌ Audio and robot resource mappings are not yet registered.
+✅ AppAssembly owns one AppleCamera instance shared with CameraCoordinator and ApplicationRuntime. Runtime assembles camera.capture ResourceDefinition, a single ResourceCoordinator, scheduler feedback delivery to InputGateway, and OutputGateway sharing that authority. Only runtime.camera may acquire capture leases. Six NexArm motor resources are registered for guarded host/Action workers; audio resource mapping remains outstanding.
 
 ## Domain-owned behavior assembly
 
@@ -112,3 +112,13 @@ flowchart TD
 ✅ ADR0119: App transports native camera frames and native-rate microphone samples with session/source/deadline metadata. Calling perception Agents own conversion into ModelKit inputs; composition no longer injects image conversion. SDK inputs/outputs are owned by ModelKit or PlatformKit, without Types dependencies. ❌ No physical-device acceptance is implied.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+
+✅ ADR0126: ApplicationRuntime maps Gateway resource-busy/unavailable failures into App-owned Bluetooth control errors at the injected Agent resource boundary. Robot.aim publishes targets without a second Tool fence; the continuous App worker retains the shared motor guard with the trusted task-local owner/lease, preserving originating-session cleanup. No policy or localized presentation is added to PlatformKit/Gateway.
+
+✅ ADR0127: Settings presets/reset/jog bypass the injected Agent motor guard. Resource cleanup is bound to `stopAgentActions`, preserving independent manual ownership; Photographer availability uses `trackingAvailable` to avoid new aim commands during manual takeover. Actions recipes and PlatformKit pacing remain shared. ❌ Physical-device acceptance remains pending.
+
+## Audio detection assembly
+
+✅ AppContainer composes AudioDetectionWorkflow with the whole AudioDetectionSession endpoint and stable capability handles. Diagnostics select direction-only perception without model warmup. Weak pre-start barriers join voice/diagnostic shutdown before replacing microphone ownership. The application host injects UI state/controls and cancels diagnostics when the scene leaves active.
+
+❌ Physical capture and navigation/background interaction acceptance remains pending.

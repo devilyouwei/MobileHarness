@@ -64,14 +64,25 @@ final class ApplicationRuntime {
                         allowedOwners: motor == 6 ? [.assistant] : [.assistant, .photographer]
                     ) {
                         // Cancel and join software ownership; this is not a hardware stop acknowledgment.
-                        await bluetooth.stopActions()
+                        await bluetooth.stopAgentActions()
                     }
                 })
         self.resources = resources
         bluetooth.withMotorResources = { motors, operation in
-            try await resources.run(
-                resources: Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") }),
-                owner: nil, lease: nil, operation: operation)
+            do {
+                let requested = Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") })
+                let owner = ResourceExecutionContext.owner
+                let lease =
+                    if let owner { await resources.lease(for: owner, resources: requested) } else {
+                        nil as ResourceLease?
+                    }
+                try await resources.run(
+                    resources: requested, owner: owner, lease: lease, operation: operation)
+            } catch ResourceError.busy {
+                throw BluetoothWorkflowError.resourceBusy
+            } catch let error as ResourceError {
+                throw BluetoothWorkflowError.resourceUnavailable(String(describing: error))
+            }
         }
         let robot = NexArmBehaviorAdapter(bluetooth: bluetooth)
         let behaviors = try BehaviorAssembly(
@@ -118,7 +129,7 @@ final class ApplicationRuntime {
         .init(
             makePhotographer: { [bluetooth] in
                 try PhotographerAgent(
-                    sessionID: $0, controlsArm: true, controlAvailable: { await bluetooth.state.controlReady })
+                    sessionID: $0, controlsArm: true, controlAvailable: { await bluetooth.trackingAvailable })
             },
             manager: manager, input: input, output: output, actions: actions, presentation: presentation)
     }

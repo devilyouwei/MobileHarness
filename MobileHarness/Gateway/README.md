@@ -108,3 +108,5 @@ Each active task phase runs FIFO per Channel and shares process-wide Action-modu
 ❌ General request/reply, dynamic subscriptions, Channel locks, priority/preemption and durable feedback are not implemented. Channel metadata does not grant physical ownership; declared resource leases/fences are the separate authority. Cleanup depends on cooperative handlers and each device capability's stop acknowledgment.
 
 ✅ An Agent output failure remains scoped to its source/input; it does not stop downstream or sibling Agents. Tools and admission/barrier failures are available from executionResults.
+
+✅ ADR0126: authorized intent calls carry trusted owner context to host workers. Gateway remains device-independent; registered long-lived resource uses join session/Agent cleanup while actual overlapping writes still fail explicitly.

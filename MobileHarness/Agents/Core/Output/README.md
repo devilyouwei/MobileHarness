@@ -87,3 +87,5 @@ flowchart LR
     Core --> Agent[Agent consumer]
     Core --> App[App: business interpretation and presentation]
 ```
+
+✅ ADR0126: ResourceExecutionContext also carries the Gateway-bound ExecutionOwner independently of the held-resource set. This shared value imports no concrete runtime/device service; intent-triggered host workers inherit trusted Agent/session identity rather than reconstructing it from arguments.

@@ -15,6 +15,7 @@ final class AppContainer {
     let conversation: ConversationState
     let actionActivity: ActionActivityState
     private let diagnostic: SpeechDiagnosticWorkflow
+    let audioDetection: AudioDetectionWorkflow
 
     func makeMossValidationView() -> MossValidationView {
         MossValidationView(
@@ -71,6 +72,13 @@ final class AppContainer {
                 try await models.warmup(.synthesis)
             }, voiceActivity: vad, chat: chat)
         self.lifecycle = lifecycle
+        let audioDetection = AudioDetectionWorkflow(
+            state: AudioDetectionState(),
+            endpoint: AudioDetectionSession(
+                recognition: recognition, vad: vad,
+                beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() }))
+        self.audioDetection = audioDetection
+        lifecycle.beforeVoiceStart = { [weak audioDetection] in await audioDetection?.stopAndWait() }
         conversation = state
         let warnings = memoryWarningStream()
         memoryWarnings = Task {

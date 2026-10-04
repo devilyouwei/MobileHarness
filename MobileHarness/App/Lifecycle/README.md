@@ -5,8 +5,11 @@ Purpose: coordinate voice and camera runtime scopes. Design goals: preserve admi
 | File | Responsibility |
 | --- | --- |
 | VoiceSessionCoordinator.swift | Voice Agents, capture/output tasks, session/turn checks, actual playback, the voice-scope PCM cache and cleanup; receives VoiceRuntimeDependencies, capabilities, audio service and ConversationState |
+| AudioDetectionSession.swift | Isolated microphone/source-only Agent session, Gateway pumps, native-fact/UI projection and joined shutdown |
 | CameraCoordinator.swift | Permission/foreground/user intent, native camera start/stop and one vision task; receives AppleCamera, CameraState and a vision-session factory |
 | VisionSession.swift | One VisionPerception Agent incarnation, frame admission and output consumption through Gateways; receives VisionRuntimeDependencies and an injected Agent factory |
+
+✅ VoiceSessionCoordinator enters listening only after AppleAudioIO confirms actual PCM delivery. A failed capture or unexpectedly ended stream clears the microphone spectrum and enters the failed presentation phase, retaining the existing independent Assistant/Synthesis scope. Closing capture admission also rejects in-flight voice-state Tools so they cannot restore listening after failure. Generation checks after asynchronous capture shutdown prevent old failures from changing a replacement session. ❌ Physical microphone restart and spatial/camera/playback coexistence still require device acceptance.
 
 CameraCoordinator has one worker and one latest desired state; newer user intent replaces pending intent. Native frames retain their existing bounded latest-frame stream. VisionSession uses App/Adapters for image conversion, awaits Tool completion and joins each admitted Action before consuming another replaceable output. These files own running scopes, not page layout or dependency registration.
 
@@ -109,3 +112,11 @@ flowchart LR
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
 
 ✅ VoiceSessionCoordinator requests spatial-capable microphone capture, transports native layout/PTS/monotonic capture time through InputGateway and uses W only for existing spectrum telemetry. Existing reply admission suppresses all sound/ASR inputs. Voice cleanup awaits async microphone shutdown; SpeechDiagnosticWorkflow also joins audio cleanup. ❌ No sound direction is consumed or presented by App; route/coexistence acceptance remains physical-device work.
+
+## Isolated audio detection session
+
+✅ AudioDetectionSession.swift owns the entire diagnostic capture/perception endpoint: a fresh AppleAudioIO, session ID, AgentManager and both Gateways, with only SpeechPerception registered in soundSourceOnly mode. All PCM goes through MediaInputAdapter/InputGateway and direction through the bound publishResult port/OutputGateway observer. App maps SDK facts and observations into UI values; it contains no direction DSP. Native meter snapshots are latest replaceable values, at most 10 Hz; raw PCM admission retains explicit rejection. Route changes and interruptions stop the attempt for explicit retry, rather than silently updating layout/input. No Assistant, Photographer, conversation recording, playback or robot execution is registered.
+
+✅ Composition supplies mutual voice/diagnostic cleanup barriers. Starting diagnostics stops and joins admitted voice work; starting voice cancels and joins diagnostics before microphone setup. A pending voice start is not recursively joined by diagnostic pre-start cleanup. Shutdown closes UI updates, cancels/joins output handling and Agent publication, stops hardware and removes the isolated registration before replacement.
+
+❌ Physical transitions, microphone permission/route behavior and camera coexistence remain device acceptance items.

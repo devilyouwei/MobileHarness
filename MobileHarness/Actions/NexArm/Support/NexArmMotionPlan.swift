@@ -7,6 +7,7 @@ public struct NexArmMotionPlan: Sendable {
     public struct Step: Sendable {
         public let packet: NexArmPacket
         public let targets: [Int: Int]
+        public let milliseconds: Int
     }
     public let lockedMotors: Set<Int>
     public let steps: [Step]
@@ -19,7 +20,8 @@ public struct NexArmMotionPlan: Sendable {
             guard let targets = frame.packet.motorTargets,
                 Set(targets.keys).isSubset(of: lockedMotors)
             else { throw NexArmError.invalidMotion }
-            return Step(packet: frame.packet, targets: targets)
+            guard (1...10_000).contains(frame.milliseconds) else { throw NexArmError.invalidMotion }
+            return Step(packet: frame.packet, targets: targets, milliseconds: frame.milliseconds)
         }
         guard Set(steps.flatMap { $0.targets.keys }) == lockedMotors else { throw NexArmError.invalidMotion }
     }
@@ -44,9 +46,27 @@ public struct NexArmMotionPlan: Sendable {
                 }
                 packet = try NexArmPacket(id: step.packet.id, command: step.packet.command, payload: payload)
             }
-            return NexArmGesture.TestFrame(packet: packet, milliseconds: 1000)
+            return NexArmGesture.TestFrame(packet: packet, milliseconds: step.milliseconds)
         }
         return try Self(lockedMotors: lockedMotors, frames: frames)
+    }
+
+    /// Manual playback reuses the same finite recipe without resource or arrival admission.
+    /// Inter-frame beats describe choreography only; return confirms local submission of the last frame.
+    public func submit(using send: @Sendable (NexArmPacket) async throws -> Bool) async throws {
+        for (index, step) in steps.enumerated() {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            while true {
+                try Task.checkCancellation()
+                guard ContinuousClock.now < deadline else { throw NexArmError.timeout }
+                if try await send(step.packet) { break }
+                try await Task.sleep(for: .milliseconds(30))
+            }
+            try Task.checkCancellation()
+            if index < steps.count - 1 {
+                try await Task.sleep(for: .milliseconds(step.milliseconds))
+            }
+        }
     }
 
 }

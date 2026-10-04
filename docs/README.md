@@ -1,5 +1,7 @@
 # Project documentation
 
+✅ [ADR0124](adr/0124-sound-source-perception.md) records bounded microphone first-frame startup, pre-admission mono fallback and capture-failure presentation. ❌ Physical acoustic and coexistence acceptance remains separate from builds and synthetic tests.
+
 ## Requirements and public explanations
 
 | Document | Purpose |
@@ -90,3 +92,15 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [ADR 0112: Gemma CoreAI chat](adr/0112-gemma-coreai-chat.md) replaces local Qwen/MLX with Gemma 4 E2B QAT CoreAI. iOS uses pinned h18p AOT resources; old Qwen downloads are incompatible. Shared package dependencies require OS 26; CoreAI execution requires OS 27. ✅ Mac real inference, cancellation and reload passed. ❌ Sustained device acceptance remains pending.
 
 ✅ [BLE pacing decision](adr/0123-nexarm-ble-shared-pacing.md) records transport admission, diagnostics and physical validation limits.
+
+✅ [Bluetooth exception recovery](adr/0125-bluetooth-exception-recovery.md) records retry/cleanup/cancellation contracts and diagnostic cache bounds.
+
+✅ [2026-10-04 installation evidence](Validation-History.md#2026-10-04--bluetooth-exception-recovery-installation): ADR0125 recovery and diagnostic UI compiled, passed signature/resource checks and installed on iPhone 17 Pro. ❌ Installation does not establish physical Bluetooth/robot or visual-layout acceptance.
+
+✅ [ADR0126](adr/0126-aim-worker-resource-ownership.md): fixes overlapping tracking Tool/worker fences and records resource conflicts separately from BLE recovery.
+
+✅ [Tracking resource fix validation](Validation-History.md#2026-10-04--tracking-resource-ownership-fix): Gateway/worker/session regression tests and signed iPhone installation passed; physical tracking remains pending.
+
+✅ [ADR0127](adr/0127-settings-manual-robot-takeover.md) documents Settings manual takeover and separate submission/completion boundaries with shared Action recipes. Native touch and physical acceptance remain pending.
+
+✅ [ADR0128](adr/0128-settings-audio-detection.md) records Settings audio detection ownership, source-only perception, actual capture/fallback reporting and cleanup/freshness limits. ❌ Device capture and acoustic calibration remain pending.

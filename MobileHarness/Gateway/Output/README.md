@@ -82,3 +82,5 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Invocation lookup, argument and resource availability errors reject only that Action and remain output failures; structural scheduling and producer identity errors still close the input. Independent operation cancellation is an outcome, while cancellation of the executing task propagates. ❌ No automatic retries.
 
 ✅ Published message freshness and generated-work policy come from the registered CommunicationContract. Gateway contains no speech/vision string cases. Generic messages carry typed domain values without queueing or replay; existing parent/source/session/AgentTurn correlation remains.
+
+✅ ADR0126: intent Tool dispatch propagates trusted execution ownership separately from transient resource admission. Host continuous workers register their complete native-writing lifetime with the shared resource authority and close with the originating session.

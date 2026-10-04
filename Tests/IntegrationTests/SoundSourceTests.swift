@@ -142,6 +142,12 @@ private struct NoSoundASR: SpeechRecognitionCapability {
         throw CapabilityError.unavailable("Non-speech test must not open ASR")
     }
 }
+private struct ForbiddenSoundVAD: VoiceActivityCapability {
+    var availability: CapabilityAvailability { .unavailable(reason: "No diagnostic model") }
+    func detectVoiceActivity(format: AudioFormat) throws -> any VoiceActivitySession {
+        throw CapabilityError.unavailable("Direction-only detection must not open VAD")
+    }
+}
 private actor SoundPublications {
     private(set) var values: [SoundSourceObservation] = []
     func append(_ value: SoundSourceObservation) { values.append(value) }
@@ -164,6 +170,45 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
         try await Task.sleep(for: .milliseconds(1))
     }
     Issue.record("Timed out waiting for sound perception")
+}
+
+@Test func soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants() async throws {
+    let configuration = try AgentConfigurations.load(named: "SpeechPerception")
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["phone.microphone"],
+        configurations: [configuration])
+    let manager = AgentManager()
+    let session = UUID()
+    let values = SoundPublications()
+    let speech = try SpeechPerceptionAgent(
+        recognition: NoSoundASR(), vad: ForbiddenSoundVAD(), sessionID: session,
+        configuration: configuration, mode: .soundSourceOnly)
+    #expect(speech.descriptor.capabilities.internalTools.isEmpty)
+    #expect(speech.descriptor.capabilities.internalActions.isEmpty)
+    try await manager.register(speech, sessionID: session)
+    let input = InputGateway(manager: manager, policy: policy)
+    let output = OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
+        observedContracts: ["sound.source"],
+        observeEvent: { input in
+            if case .soundSource(let value)? = input.payload.perception { await values.append(value) }
+        }, sink: { _ in Issue.record("Diagnostic must not emit presentation output") })
+    try await speech.bind(output.messaging(for: .speechPerception))
+    try await speech.start()
+    _ = try await input.publish(
+        soundInput(Array(repeating: 0, count: 1600), session: session, sequence: 0, timestamp: 0, layout: .mono))
+    try await waitForSound { await values.values.count == 1 }
+    #expect(await values.values.first?.state == .unavailable)
+    _ = try await input.publish(
+        soundInput(soundPCM(direction: (0, 1, 0), count: 1600), session: session, sequence: 1, timestamp: 0.1))
+    try await waitForSound { await values.values.count == 2 }
+    #expect(await values.values.last?.direction?.y == 1)
+    #expect(await speech.status().lifecycle == .running)
+    await speech.stop()
+    var outputCount = 0
+    for await _ in speech.outputs { outputCount += 1 }
+    #expect(outputCount == 0)
+    await output.shutdown()
 }
 
 @Test func soundSourceNonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR() async throws {

@@ -399,6 +399,17 @@ sound_estimator = ROOT / 'MobileHarness/Agents/SpeechPerception/SoundSourceEstim
 if not sound_estimator.exists() or set(re.findall(r'^import (\w+)', sound_estimator.read_text(), re.MULTILINE)) - {'Foundation'}:
     errors.append('SoundSourceEstimator must remain pure Foundation-only Agent policy')
 
+# Settings diagnostics delegates whole session work to Lifecycle; never duplicate capture or DSP here.
+audio_workflow = ROOT / 'MobileHarness/App/Workflows/Diagnostics/AudioDetectionWorkflow.swift'
+if audio_workflow.exists() and re.search(
+    r'\b(?:SpeechPerceptionAgent|SoundSourceEstimator|StreamingMonoPCMResampler|AppleAudioIO|InputGateway|OutputGateway)\s*\(',
+    audio_workflow.read_text(),
+):
+    errors.append('AudioDetectionWorkflow must use an injected whole endpoint, not construct capture/Agent/DSP services')
+audio_context = ROOT / 'MobileHarness/PlatformKit/Audio/AudioCaptureContext.swift'
+if audio_context.exists() and re.findall(r'^import (\w+)', audio_context.read_text(), re.MULTILINE):
+    errors.append('AudioCaptureContext must remain an independent native SDK fact value')
+
 if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')

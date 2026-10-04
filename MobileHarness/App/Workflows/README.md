@@ -58,64 +58,38 @@ flowchart LR
     Speech[InputGateway → Assistant → OutputGateway] --> Action[Actions NexArm.shakeBase]
     Action --> Binding[Composition callback]
     Binding --> Workflow
-    Workflow --> Controller[PlatformKit bounded NexArmActionController]
+    Workflow --> Controller[Actions NexArmActionController]
     Controller --> BLE
     Controller --> Result[Action completion → InputGateway]
 ```
 
-Connection waits for App-injected voice/session quiescence before arming a new controller, so queued work from an earlier connection cannot move a replacement. FFE0/FFE1/FFE2 discovery is followed by version and pose queries; only observed ESP32/AT32 1.0.2 is accepted. Readiness is checked again after persistence. Controller admission additionally enforces existing posture and movement bounds. Action and settings share the same root instance.
+Connection waits for App-injected voice/session quiescence before arming a new Actions controller. The current `nexArmBLEProtocol` policy verifies fresh protocol/pose and bounded Actions-owned mapping; the supported profile does not require AT32 version availability. Manual first connection retains its optional indication. Readiness requires persistence, fresh feedback and current generation/native-link checks. Actions and Settings share this root instance.
 
-Leaving settings only stops scans. Disconnect/background closes admission immediately, cancels connection/motion, joins the current bounded controller leg, then closes BLE. No next leg or automatic resume/reconnect is issued. A missing CoreBluetooth disconnection acknowledgment stays visible as disconnecting. Physical movement already accepted may finish even if iOS suspends; safety never relies on background execution or a false physical-stop ACK. Uncertain completion faults the current controller until explicit reconnection after inspection. Forget joins disconnection before removing the record.
+Leaving Settings stops discovery and page-owned motor intent; connection/recovery lifetime belongs to App. Disconnect/background immediately fences control, cancels work, closes native admission and joins old tasks. Background suspends eligible recovery until foreground; manual disconnect/forget disables the saved reconnect preference. A missing native disconnection acknowledgment stops recovery before any new connection. Already accepted physical motion may finish; host cleanup is not physical-stop proof.
 
-✅ Tests cover actual Assistant/parser/Gateway/Action dispatch through this workflow with a declared simulated BLE fixture, navigation persistence, remembered-device restoration/forget, wrong firmware, background during connection/motion, uncertain writes and the old-session barrier. ❌ Hardware suspension, disconnect timing and physical-stop/watchdog acceptance remain separate.
+✅ Simulation tests cover Assistant/Gateway/Action dispatch, navigation, restoration/forget, incompatible devices, background cancellation, failed writes, query/feedback loss, retries and old-session fencing. Current behavior and exact bounds are owned by [Bluetooth/README.md](Bluetooth/README.md).
 
-✅ Bluetooth disconnect/background cleanup no longer invokes the global voice/settings barrier. It closes robot admission and joins only robot work; explicit reconnection still joins prior voice/session work before arming a new controller. This prevents a disconnected Bluetooth owner from stopping unrelated microphone use during permission/lifecycle transitions. ❌ iPhone camera/audio recovery remains a separate acceptance check.
-
-✅ BLE readiness uses the same NexArmActionController that later executes Actions. It verifies actual firmware once per live connection with bounded read-only handling of missing AT32 information; missing version and unsupported version have distinct errors. Disconnection discards that controller. ❌ Full iPhone physical acceptance remains pending.
-
-✅ Missing AT32 version retains the live BLE connection with control admission closed. An explicit capacity-one verification retry reuses that controller; version, pose, persistence, the requested first connection indication and generation/native-state checks must pass before readiness. Version queries remain read-only. Rejected Actions never replay. Disconnect/background cancels verification and clears readiness. ❌ Persistent device-side version read failure and full iPhone motion acceptance remain unresolved.
-
-✅ After version/pose/persistence validation, explicit connection performs one reset + ID5 indication through the same controller, in a separate visible indicating phase. The retained motion task shares disconnect/background joining with Actions; control readiness is published only after indication and a fresh generation/native-link check. Missing firmware keeps the connection without motion; a later successful explicit verification triggers the first indication. No repeated indication on page navigation or ready-state retry. ❌ Physical iPhone acceptance pending.
-
-## Current NexArm BLE admission
-
-✅ App explicitly selects `nexArm102BLE` compatibility policy for the known version-query defect, following physical USB/BLE comparison and user-observed motion. Exact ESP32 1.0.2 + missing AT32 can proceed only after bounded stationary pose checks and the complete reset/ID5 indication. The state continues to show “AT32 版本暂不可读”; it never fabricates 1.0.2. Actual nonzero unsupported firmware remains rejected. This supersedes the earlier missing-version-always-blocked policy. Indication is now ID5 ±8° then center, once per connection. ❌ iPhone physical acceptance remains pending.
+✅ Bluetooth cleanup joins only robot work and does not invoke the global voice/settings barrier. Opening a replacement connection still performs the injected quiescence operation. ❌ Hardware suspension/disconnect/watchdog and iPhone camera/audio recovery remain separate acceptance work.
 
 ## Current foreground recovery contract
 
-✅ User confirmed the iPhone LLM → Action → real-arm path. Firmware-version display/admission has been removed from normal BLE connections: validate the pose protocol and the requested manual connection gesture, then mark `controlValidated`. App never calls the failing version query or displays an AT32 warning.
+✅ [Bluetooth](Bluetooth/README.md) owns the ADR0125 recovery state machine for physical disconnection, feedback loss, blocked sends and query quarantine. One worker fences/clears old control intent, closes and joins old owners, confirms native disconnect and performs at most three read-only recovery attempts with 1/2/4-second backoff. Manual disconnect/forget/background can cancel it; restored devices and radio power recovery share this path. Page lifetime does not own recovery, and old physical commands are never replayed.
 
-✅ Remember the verified peripheral UUID/name plus a backward-compatible optional auto-reconnect preference. One bounded recovery attempt per foreground activation (including cold start) joins background cleanup, initializes the radio if needed, retrieves that UUID, verifies services and stationary telemetry, and restores control. Recovery is independent of Settings page lifetime and sends no reset, gesture or earlier Action. There is no retry timer or physical-command backlog. Manual connect still joins old voice/session work and performs the gesture. Manual disconnect, forget and uncertain motion disable recovery; manual disconnect during an already-running background cleanup persists that intent. Storage failures stay visible.
-
-```mermaid
-stateDiagram-v2
-    [*] --> Disconnected
-    Disconnected --> Verifying: explicit device selection
-    Verifying --> Indicating: services + stationary pose valid
-    Indicating --> Ready: reset + ID5 feedback complete
-    Ready --> Cleanup: background / lock
-    Cleanup --> Disconnected: cancel future legs and join committed leg
-    Disconnected --> Recovering: active + saved auto-reconnect
-    Recovering --> Ready: read-only service / pose validation
-    Recovering --> Disconnected: failed attempt; wait for next activation
-    Ready --> Disconnected: manual disconnect disables recovery
-```
-
-❌ No guaranteed background connection/control, automatic retry after physical uncertainty, queued-motion replay or OS-level headset pairing integration. Updated real-device lock/unlock acceptance remains pending.
+❌ Physical-device endurance and emergency-stop proof remain outside host recovery.
 
 ## NexArm entertainment skills (2026-09-30)
 
-✅ BluetoothWorkflow shares one runMotion lifecycle for base sweeps and all entertainment presets: foreground/connection validation, capacity-one admission, execution status, cancellation join, fault latching and reconnect policy. No page-owned motion work or separate gesture queue. ❌ Newly added gesture sequences await iPhone physical acceptance.
+✅ Agent-selected base sweeps and entertainment presets share one runMotion lifecycle: foreground/connection validation, capacity-one admission, execution status, cancellation join, fault latching and reconnect policy. No page-owned motion work or separate gesture queue. ❌ Newly added gesture sequences await iPhone physical acceptance.
 
 ## Peripheral detail operations
 
-✅ BluetoothControlling exposes measured refresh, typed preset/reset requests and individual motor adjustments. Manual requests use a capacity-one retained task with explicit busy rejection, sharing runMotion and the same controller with conversation Actions. Read refresh reserves the connection-operation slot; it cannot interleave with motion. Commands survive page navigation, while disconnect/background fences admission and joins committed work. Successful connect/motion refreshes measured UI values; disconnect clears them. No command queue or replay is added.
+✅ BluetoothControlling exposes measured refresh, typed preset/reset requests and individual motor adjustments. Manual requests use a capacity-one latest slot with explicit replacement, shared Actions recipes and send-only submission outside Gateway locks. Conversation Actions retain runMotion and feedback completion. Read refresh reserves the connection-operation slot; it cannot interleave with motion. Commands survive page navigation, while disconnect/background fences admission and joins committed work. Successful connect/motion refreshes measured UI values; disconnect clears them. No command queue or replay is added.
 
 ```mermaid
 flowchart LR
     Details[Peripheral details: typed UI intent] --> Manual[Root workflow manual slot]
     Actions[Conversation via Gateways and Actions] --> Motion[Shared motion admission]
-    Manual --> Motion
+    Manual --> Recipe[Shared Actions recipe / send-only submission]
     Motion --> Controller[NexArm controller]
     Controller --> Feedback[Measured pose and six encoder values]
     Feedback --> State[UI values and sample timestamp]
@@ -123,33 +97,13 @@ flowchart LR
 
 Manual operations are explicit host device controls, like connection/reset, not Agent outputs; conversation inputs and Agent outputs retain their Gateway route. ❌ Real-device slider/reset acceptance remains pending. See ADR 0073.
 
-## Unconfirmed motion recovery (current)
+## Peripheral cleanup and exceptional recovery
 
-✅ An unconfirmed Action/manual movement releases the busy state but retains the connected controller and reconnect preference. It reports “动作未确认完成，可刷新状态或继续操作”. Refresh or the next explicit operation invokes read-only recovery; no old Action or remaining gesture legs are replayed. Actual transport disconnect still follows native link state. This supersedes the earlier workflow policy of discarding the controller and requiring reconnection after every uncertain completion.
+✅ ADR0125 supersedes the one-attempt/manual-only feedback recovery policy. Native sending failure, feedback loss, query quarantine and actual disconnect request one bounded cleanup/reconnect path. Ordinary off-target/completion failures remain local Action outcomes. A failed optional initial indication can retain its verified link; automatic recovery does not repeat it.
 
-❌ An arm still moving or unreadable cannot accept another motor write; the request returns an error and remains retryable on the same connection. Physical acceptance remains separate.
+✅ Forget clears native/saved selection after joined cleanup and disables automatic reconnect. Interrupted Actions terminate and preserve diagnostics; only new input after verified readiness may issue another command. Latest-intent replacement and PlatformKit pacing remain separate from connection recovery.
 
-## Complete peripheral cleanup and transport recovery
-
-✅ Connecting clears visible discovery immediately; only a fresh explicit scan can repopulate rows after connect/forget/disconnect. The selected retry target remains available even after a failed connection clears discovery. Forget joins cleanup, clears native discovery/selection/failure, saves an empty device record with reconnect disabled, and clears UI identity, telemetry, motion text and errors. Failed cleanup/persistence stays visible. Delayed snapshots cannot repopulate a retired scan.
-
-✅ Connection protocol validation and the feedback gesture are separate. A motion-level indication failure retains the live verified connection and controller; the next explicit operation/read recovers stationary telemetry without repeating reset. If the verified connection is actually lost (including request timeout), one foreground read-only reconnect attempt joins previous work. Failure does not loop; no reset, gesture or pending command is replayed. Manual disconnect/forget/background fence this recovery. Successful connection clears old errors. This supersedes the earlier once-per-foreground-only recovery and gesture-required-for-readiness policies.
-
-```mermaid
-flowchart TD
-    Scan[Named discoveries only] --> Select[Select peripheral]
-    Select --> Clear[Stop scan and clear discoveries]
-    Clear --> Verify[Read-only protocol validation]
-    Verify --> Indicate[Optional connection gesture]
-    Indicate --> Ready[Live connection: no old error]
-    Indicate -->|Motion unconfirmed, transport live| Recover[Retain owner; read-only recovery before next command]
-    Ready -->|Transport lost| Retry[One reconnect, no motion replay]
-    Retry --> Ready
-    Retry -->|Failed| Failed[Visible failure; no retry loop]
-    Ready --> Forget[Join disconnect and clear native + saved + UI state]
-```
-
-❌ New physical BLE timeout/recovery and forget acceptance remain pending. App-owned cleanup is distinct from system pairing/unpairing.
+❌ Hardware and native UI acceptance remain pending; [Bluetooth's current contract](Bluetooth/README.md) owns the complete algorithm and bounds.
 
 ## Continuous manual control and reset priority
 
@@ -165,27 +119,27 @@ flowchart TD
 
 ✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
 
-## Settings test control (current)
+## Settings device control (current)
 
-✅ Settings Play uses native CMD8 writeWithoutResponse without telemetry/ATT completion waits. Fixed ready400ms → body800ms per frame → home600ms, maximum8 frames. These are cancellable playback deadlines, not arrival gates. One latest test slot replaces all unsent old frames; no command backlog. New Play/reset/jog can take over within the30ms worker cadence (subject to native transport admission). Buttons remain enabled while connected. Native congestion retains only the latest request, fails visibly after2s, and never replays skipped old frames. Page exit/background/disconnect discard unsent test frames. UI says sent, never physically completed. Conversation/channel performGesture retains its existing feedback-based contract.
+✅ ADR0127 restores Settings manual takeover: presets/reset replace one latest request, cancel and join the previous software writer, then submit the shared Actions recipe without resource admission or physical-feedback completion. Sliders use the same latest-intent jog planner without Agent locks. Buttons/sliders require verified readiness and no active recovery, but remain available during motion/jog/reset/refresh. Native sending/feedback failure still enters ADR0125 cleanup/reconnect without old request replay.
 
 ```mermaid
 flowchart LR
-    Click[Settings click] --> Replace[Replace unsent test plan]
-    Replace --> Live[Native writeWithoutResponse]
-    Live --> Clock[Cancellable frame deadline]
-    Clock --> Live
-    Next[New click / reset / jog] --> Replace
-    Channel[Conversation channel] --> Feedback[Existing completion-based controller]
+    Click[Settings typed request] --> Slot[One latest pending request]
+    Slot --> Join[Cancel and join previous owner]
+    Join --> Recipe[Shared Actions recipe]
+    Recipe --> Manual[Send-only Settings submission]
+    Channel[Conversation via OutputGateway] --> Complete[Feedback completion]
+    Recipe --> Complete
+    Manual --> BLE[PlatformKit paced native transport]
+    Complete --> BLE
 ```
 
-❌ Wireless delivery and physical arrival are not established by local send admission. Optional NEXARM_SETTINGS_TEST validates the shared frame plan on USB, separate from default tests.
-
-✅ Channel completion now reports distinct no-feedback and total-deadline failures. Completion uses the controller's last confirmed observation without a redundant status query. A failed await does not automatically replay motion; settings immediate tests keep their separate live path. ❌ Host timeout does not imply physical stop.
+✅ Channel completion reports distinct no-feedback and total-deadline failures. Motor inputs use the separate latest-intent live loop; disconnect/background clears both intent types. ❌ Local admission or host timeout does not imply physical arrival/stop; hardware acceptance remains pending.
 
 ## Unified Action presentation
 
-✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, projects AgentCore execution observations into UI-owned display values, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. ActionActivityPresentation maps finite/state/activity semantics and bounded report details into UI display fields. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Settings test commands remain outside channel execution history and retain send-only acknowledgments.
+✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, projects AgentCore execution observations into UI-owned display values, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. ActionActivityPresentation maps finite/state/activity semantics and bounded report details into UI display fields. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Direct Settings controls remain outside channel execution history and show submission/failure, never physical completion.
 
 ```mermaid
 flowchart LR
@@ -216,27 +170,27 @@ flowchart LR
 
 ## Arm-only NexArm dispatch
 
-✅ Connection verification prepares the bounded PlatformKit IK table before enabling control. Settings tests and reset compile geometry with the same `NexArmArmPlan` used by Channel Actions; only motors1–5 are written. Command estimates update addressed arm joints after admission and preserve motor6, including interrupted tests and return home. Disconnect/reconnect discards the table. Explicit manual motor6 control remains independent.
+✅ Connection verification prepares the bounded Actions-owned IK table before enabling control. Settings tests and reset compile geometry with the same `NexArmArmPlan` used by Channel Actions; only motors1–5 are written. Command estimates update addressed arm joints after admission and preserve motor6, including interrupted tests and return home. Disconnect/reconnect discards the table. Explicit manual motor6 control remains independent.
 
 ❌ BLE endurance remains separate from supervised USB acceptance. See [ADR0090](../../../docs/adr/0090-nexarm-arm-only-motion-packets.md); never restore CMD54 or send geometry intents as raw CMD8.
 
 ## NexArm feedback execution — 2026-10-01
 
-✅ BluetoothWorkflow routes Settings and conversation through the same feedback executor. Settings pending capacity is one with explicit replacement; cancellation joins the previous owner before replacement. Idle/active feedback loss disables control and surfaces connection instability; restored feedback never replays motion. `resetArm` resets1–5 only.
+✅ Conversation uses feedback execution; ADR0127 Settings uses the shared recipe with send-only submission. Settings pending capacity is one with explicit replacement; cancellation joins the previous software owner before replacement, without waiting for physical completion. Idle/active feedback loss disables control and surfaces connection instability; restored feedback never replays motion. `resetArm` resets1–5 only.
 
 ❌ Sustained real-device acceptance remains pending.
 
 ## Atomic composition — ADR0092
 
-✅ BluetoothWorkflow exposes the last structured motor report and configurable single-motor execution. Settings and manual streaming use injected resource fences; already-owned Channel calls inherit the fence. UI error messages remain separate from collected child outcomes.
+✅ BluetoothWorkflow exposes the last structured motor report and configurable single-motor execution. Agent-selected motion/aim uses injected resource fences; already-owned Channel calls inherit the fence. Settings presets/reset/jog bypass those fences through manual takeover. UI error messages remain separate from collected child outcomes.
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
-✅ ADR0093: BluetoothWorkflow imports Actions and owns one Actions.NexArmActionController per connection. Settings and conversation invoke the same domain gesture/execution implementation; PlatformKit owns transport only. No duplicated gesture geometry or completion algorithm in Workflow.
+✅ ADR0093: BluetoothWorkflow imports Actions and owns one Actions.NexArmActionController per connection. Settings and conversation share domain gesture geometry/options with separate submission and feedback-completion policies; PlatformKit owns transport only. Workflow duplicates neither geometry nor either completion algorithm.
 
 ✅ BluetoothPresentation owns NexArm display-name fallback/filtering, preferred device ordering and localized failure text. PlatformKit now returns typed NexArmBluetoothFailure values with step/native diagnostic data. BluetoothWorkflow maps those values to UI while preserving connection recovery and Settings behavior. Manual jog planning comes from Actions/NexArm/Support.
 
-✅ NexArm motor movement timeout maps to `timedOut`, separately from stable `targetNotReached`; reports preserve both. Default arrival tolerances and deadline calculations remain in Actions/NexArm, shared by Settings and Channel.
+✅ NexArm motor movement timeout maps to `timedOut`, separately from stable `targetNotReached`; reports preserve both. Default arrival tolerances and deadline calculations remain in Actions/NexArm for feedback-completed Channel behavior; Settings uses only bounded local submission.
 
 ✅ NexArm presentation handles only currently produced motion-failure cases; obsolete pose/query failure branches were removed with the retired diagnostic APIs.
 
@@ -260,3 +214,7 @@ flowchart LR
 ✅ Single-leaf handler failure details now preserve the captured domain error even when the completion also contains a generic report. No error catalog is duplicated in presentation.
 
 ✅ ADR0123: BLE live/observed/query writes now share PlatformKit pacing with no streaming packet backlog. Aim iteration keeps a fixed start index per pass for fair motor admission. Existing latest-intent replacement, resource ownership and feedback-loss protection remain in force. ❌ Physical endurance and rate calibration remain pending.
+
+✅ ADR0126 gives continuous aim/jog workers the complete motor resource lifetime; latest-target Tools do not compete with their worker's fence. Startup is acknowledged after resource/session admission, old guards release before replacement workers start, and admission failures enter Bluetooth's bounded incident cache without a radio reconnect.
+
+✅ Diagnostics additionally owns AudioDetectionWorkflow: one active endpoint operation, one deadline/freshness monitor and no pending queue. App injects the complete capture/Agent session; the independent feature target gains no Agents/Gateway dependency. Detection finishes after 10 seconds of received PCM, joins cleanup before restart and fences stale callbacks.

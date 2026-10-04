@@ -112,6 +112,8 @@ private func increment(_ value: inout UInt64, by amount: UInt64 = 1) {
 }
 
 public struct NexArmBluetoothSnapshot: Sendable, Equatable {
+    public var revision: UInt64 = 0
+    public var queriesQuarantined = false
     public var power: NexArmBluetoothPower = .unknown
     public var phase: NexArmBluetoothPhase = .disconnected
     public var scanning = false
@@ -304,6 +306,8 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     }
     // Replace only presentation snapshots, never commands/results.
     private func publish() {
+        snapshot.revision &+= 1
+        snapshot.queriesQuarantined = queryTimeoutLatched
         snapshot.traffic = trafficBudget.diagnostics()
         updates.yield(snapshot)
     }

@@ -11,40 +11,52 @@
         private let callbackQueue = DispatchQueue(label: "dev.mobileharness.audio.spatial")
         private var receiver: SpatialAudioReceiver?
         private var observation: SpatialAudioObservation?
+        private(set) var supportsSpatialCapture: Bool?
 
         /// Nil means the built-in route cannot supply FOA, before any hardware is started.
-        func start() throws -> AsyncThrowingStream<MicrophoneFrame, Error>? {
+        func start() async throws -> AsyncThrowingStream<MicrophoneFrame, Error>? {
             guard let device = AVCaptureDevice.default(for: .audio) else { return nil }
             let input = try AVCaptureDeviceInput(device: device)
-            guard input.isMultichannelAudioModeSupported(.firstOrderAmbisonics) else { return nil }
-            session.automaticallyConfiguresApplicationAudioSession = false
+            supportsSpatialCapture = input.isMultichannelAudioModeSupported(.firstOrderAmbisonics)
+            guard supportsSpatialCapture == true else { return nil }
+            // FOA needs capture-specific microphone configuration, unlike the mono engine backend.
+            session.automaticallyConfiguresApplicationAudioSession = true
             session.beginConfiguration()
             let output = AVCaptureAudioDataOutput()
             guard session.canAddInput(input), session.canAddOutput(output) else {
                 session.commitConfiguration()
-                return nil
+                throw AudioIOError.invalidFormat
             }
             input.multichannelAudioMode = .firstOrderAmbisonics
             output.spatialAudioChannelLayoutTag = kAudioChannelLayoutTag_HOA_ACN_SN3D | 4
             session.addInput(input)
             session.addOutput(output)
             let pair = AsyncThrowingStream<MicrophoneFrame, Error>.makeStream(bufferingPolicy: .bufferingOldest(64))
-            let receiver = SpatialAudioReceiver(continuation: pair.continuation)
+            let readiness = AudioCaptureReadiness()
+            let receiver = SpatialAudioReceiver(continuation: pair.continuation, readiness: readiness)
             self.receiver = receiver
             output.setSampleBufferDelegate(receiver, queue: callbackQueue)
-            observation = SpatialAudioObservation(session: session, continuation: pair.continuation)
+            observation = SpatialAudioObservation(
+                session: session, continuation: pair.continuation, readiness: readiness)
             session.commitConfiguration()
             session.startRunning()
-            guard session.isRunning else {
+            guard session.isRunning, !session.isInterrupted else {
                 pair.continuation.finish(throwing: AudioIOError.invalidFormat)
                 stop()
                 throw AudioIOError.invalidFormat
+            }
+            do {
+                try await readiness.wait()
+            } catch {
+                stop()
+                throw error
             }
             return pair.stream
         }
         func stop() {
             session.stopRunning()
             callbackQueue.sync {}  // Join callbacks before allowing a replacement capture backend.
+            receiver?.readiness.resolve(.failure(CancellationError()))
             receiver?.continuation.finish()
             receiver = nil
             observation = nil
@@ -53,14 +65,23 @@
 
     private final class SpatialAudioObservation: @unchecked Sendable {
         private let tokens: [NSObjectProtocol]
-        init(session: AVCaptureSession, continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation) {
+        init(
+            session: AVCaptureSession, continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation,
+            readiness: AudioCaptureReadiness
+        ) {
             tokens = [
                 NotificationCenter.default.addObserver(
                     forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil
-                ) { _ in continuation.finish(throwing: AudioIOError.invalidFormat) },
+                ) { _ in
+                    readiness.resolve(.failure(AudioIOError.invalidFormat))
+                    continuation.finish(throwing: AudioIOError.invalidFormat)
+                },
                 NotificationCenter.default.addObserver(
                     forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil
-                ) { _ in continuation.finish(throwing: AudioIOError.invalidFormat) },
+                ) { _ in
+                    readiness.resolve(.failure(AudioIOError.invalidFormat))
+                    continuation.finish(throwing: AudioIOError.invalidFormat)
+                },
             ]
         }
         deinit { for token in tokens { NotificationCenter.default.removeObserver(token) } }
@@ -69,10 +90,15 @@
     /// Immutable bridge plus mutex-protected sequence. Never touches App/MainActor state.
     private final class SpatialAudioReceiver: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate, Sendable {
         let continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation
+        let readiness: AudioCaptureReadiness
         private let sequence = Mutex<UInt64>(0)
         private let timeline = Mutex<(end: Double?, rate: Double?)>((nil, nil))
-        init(continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation) {
+        init(
+            continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation,
+            readiness: AudioCaptureReadiness
+        ) {
             self.continuation = continuation
+            self.readiness = readiness
         }
         func captureOutput(
             _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection
@@ -159,10 +185,16 @@
                         samples: samples, sampleRate: Int(asbd.mSampleRate), sequence: number,
                         layout: .firstOrderAmbisonicsACNSN3D, timestamp: timestamp + delta,
                         capturedAt: capturedAt.advanced(by: .seconds(delta)))
-                    if case .dropped = continuation.yield(frame) { throw AudioIOError.overflow }
+                    switch continuation.yield(frame) {
+                    case .enqueued: readiness.resolve(.success(()))
+                    case .dropped: throw AudioIOError.overflow
+                    case .terminated: return
+                    @unknown default: throw AudioIOError.invalidFormat
+                    }
                 }
                 withExtendedLifetime(block) {}
             } catch {
+                readiness.resolve(.failure(error))
                 continuation.finish(throwing: error)
             }
         }

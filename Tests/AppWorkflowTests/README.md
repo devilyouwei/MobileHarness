@@ -50,3 +50,5 @@ Purpose: test cross-module history operations using the real journal and a contr
 ✅ Workflow fixtures import built-in application identities from Agents rather than AgentCore. Production feature workflows keep their own source-selection policy without depending on concrete Agents.
 
 ✅ Presentation regression tests use opaque provider codes/details while preserving motor failure display and unknown-code fallback. ❌ These tests perform no device effects.
+
+✅ AudioDetectionWorkflowTests exercises automatic completion, one-operation admission, joined cleanup before restart, late-callback fencing and permission failure/retry using an injected endpoint without a microphone or models. ❌ It does not validate physical capture.

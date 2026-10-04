@@ -1,9 +1,10 @@
 #if os(iOS)
     import AVFAudio
     import Foundation
+    import OSLog
     import Synchronization
 
-    public enum AudioIOError: Error { case microphoneDenied, invalidFormat, overflow, playbackTimeout }
+    public enum AudioIOError: Error { case microphoneDenied, invalidFormat, overflow, captureTimeout, playbackTimeout }
 
     private final class PlaybackTelemetry: Sendable {
         let value = Mutex((samples: [Float](), sampleRate: 24_000))
@@ -25,7 +26,10 @@
         private let playbackEngine = AVAudioEngine()
         private let player = AVAudioPlayerNode()
         private var captureToken: UUID?
+        public private(set) var captureContext = AudioCaptureContext()
+        private var captureReadiness: AudioCaptureReadiness?
         private var spatialCapture: SpatialAudioCapture?
+        private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         private var capture: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation?
         private var hasTap = false
         private var playbackFormat: AVAudioFormat?
@@ -75,19 +79,44 @@
             let audio = AVAudioSession.sharedInstance()
             try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try audio.setActive(true)
+            let input = captureInput(audio)
+            var spatialSupport: AudioCaptureContext.SpatialSupport = .unknown
+            var fallback: AudioCaptureContext.Fallback?
+            captureContext = AudioCaptureContext(input: input)
             if preferSpatial, audio.currentRoute.inputs.contains(where: { $0.portType == .builtInMic }) {
                 let backend = SpatialAudioCapture()
                 spatialCapture = backend
-                if let frames = try await backend.start() {
-                    guard captureToken == token, !Task.isCancelled else {
-                        await backend.stop()
+                do {
+                    if let frames = try await backend.start() {
+                        guard captureToken == token, !Task.isCancelled else {
+                            await backend.stop()
+                            throw CancellationError()
+                        }
+                        captureContext = AudioCaptureContext(input: captureInput(audio), spatialSupport: .supported)
+                        return frames
+                    }
+                    spatialSupport = await backend.supportsSpatialCapture == false ? .unsupported : .unknown
+                    fallback = spatialSupport == .unsupported ? .unsupported : .startupFailed
+                } catch {
+                    await backend.stop()
+                    guard captureToken == token, !Task.isCancelled, !(error is CancellationError) else {
                         throw CancellationError()
                     }
-                    return frames
+                    spatialSupport = await backend.supportsSpatialCapture == true ? .supported : .unknown
+                    fallback = error as? AudioCaptureReadinessError == .timedOut ? .startupTimeout : .startupFailed
+                    log.warning("Spatial capture startup failed; retrying mono: \(String(describing: error))")
                 }
                 guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
                 spatialCapture = nil
+                // Release the failed spatial graph before reconfiguring and starting the mono engine.
+                try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+                try audio.setActive(true)
+            } else if preferSpatial {
+                spatialSupport = .inputUnavailable
+                fallback = .inputUnavailable
             }
+            captureContext = AudioCaptureContext(
+                input: captureInput(audio), spatialSupport: spatialSupport, fallback: fallback)
             let node = captureEngine.inputNode
             let format = node.outputFormat(forBus: 0)
             guard format.channelCount > 0, format.sampleRate >= 8000 else { throw AudioIOError.invalidFormat }
@@ -95,9 +124,12 @@
             capture = pair.continuation
             let counter = Mutex<UInt64>(0)
             let continuation = pair.continuation
+            let readiness = AudioCaptureReadiness()
+            captureReadiness = readiness
             node.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, when in
                 guard let source = buffer.floatChannelData?[0], buffer.frameLength > 0, buffer.frameLength <= 8192
                 else {
+                    readiness.resolve(.failure(AudioIOError.invalidFormat))
                     continuation.finish(throwing: AudioIOError.invalidFormat)
                     return
                 }
@@ -112,17 +144,40 @@
                     timestamp: when.isHostTimeValid
                         ? AVAudioTime.seconds(forHostTime: when.hostTime) : ProcessInfo.processInfo.systemUptime,
                     capturedAt: .now)
-                if case .dropped = continuation.yield(frame) { continuation.finish(throwing: AudioIOError.overflow) }
+                switch continuation.yield(frame) {
+                case .enqueued: readiness.resolve(.success(()))
+                case .dropped:
+                    readiness.resolve(.failure(AudioIOError.overflow))
+                    continuation.finish(throwing: AudioIOError.overflow)
+                case .terminated: return
+                @unknown default:
+                    readiness.resolve(.failure(AudioIOError.invalidFormat))
+                    continuation.finish(throwing: AudioIOError.invalidFormat)
+                }
             }
             hasTap = true
             do {
                 captureEngine.prepare()
                 try captureEngine.start()
+                try await readiness.wait()
+                guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
+                captureContext = AudioCaptureContext(
+                    input: captureInput(audio), spatialSupport: spatialSupport, fallback: fallback)
             } catch {
-                await stop()
+                if captureToken == token { await stop() }
+                if error as? AudioCaptureReadinessError == .timedOut { throw AudioIOError.captureTimeout }
                 throw error
             }
             return pair.stream
+        }
+
+        private func captureInput(_ audio: AVAudioSession) -> AudioCaptureContext.Input {
+            guard let input = audio.currentRoute.inputs.first else { return .unknown }
+            switch input.portType {
+            case .builtInMic: return .builtInMicrophone
+            case .headsetMic, .bluetoothHFP: return .headset
+            default: return .external
+            }
         }
 
         /// At most three PCM buffers scheduled; wait for hardware capacity, not each individual packet.
@@ -230,6 +285,8 @@
         }
         public func stopCapture() async {
             captureToken = nil
+            captureReadiness?.resolve(.failure(CancellationError()))
+            captureReadiness = nil
             let backend = spatialCapture
             spatialCapture = nil
             await backend?.stop()

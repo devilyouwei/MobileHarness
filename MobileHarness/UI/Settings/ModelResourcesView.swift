@@ -4,15 +4,25 @@
     @MainActor public struct ModelResourcesView: View {
         @Bindable private var state: ModelResourcesState
         private let group: ModelResourceGroup
-        public init(state: ModelResourcesState, group: ModelResourceGroup) {
+        private let audioDetection: AudioDetectionState?
+        private let audioDetectionControls: (any AudioDetectionControlling)?
+        public init(
+            state: ModelResourcesState, group: ModelResourceGroup, audioDetection: AudioDetectionState? = nil,
+            audioDetectionControls: (any AudioDetectionControlling)? = nil
+        ) {
             self.state = state
             self.group = group
+            self.audioDetection = audioDetection
+            self.audioDetectionControls = audioDetectionControls
         }
         private var customEnabled: Bool {
             group == .recognition ? state.source.useCustomRecognition : state.source.useCustomSynthesis
         }
         public var body: some View {
             Form {
+                if group == .recognition, let audioDetection, let audioDetectionControls {
+                    AudioDetectionSection(state: audioDetection, controls: audioDetectionControls)
+                }
                 if group == .recognition || group == .synthesis {
                     Section {
                         Toggle(
