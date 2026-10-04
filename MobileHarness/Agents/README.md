@@ -39,6 +39,14 @@ flowchart LR
     Output --> Input
 ```
 
+## Current compilation and ownership
+
+✅ Root Package.swift compiles Core once as the independent AgentCore target with no project dependencies; the Agents target excludes Core. All five business Agent directories, Communication and AgentConfigurations currently compile together in one Agents target. Its dependencies are AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio. Each actor owns its processing state; the shared target does not enforce per-Agent import isolation.
+
+✅ Model-callable registrations are loaded from each JSON v5 resource. Code owns fixed internal permissions and behavior, capability protocols are injected, and communication/execution requests cross Gateways. AgentCore supplies generic contracts/parsers/registries rather than business messages or native services.
+
+❌ Per-Agent targets and separate speech/vision communication targets are not implemented. StorageChat currently assembles Assistant context in begin(), and SpeechSynthesis currently uses StorageAudio synthesis errors; their planned relocation is recorded in [Storage](../Storage/README.md#planned-business-decoupling).
+
 ## Internal structure and data flow
 
 Agents combine injected processing capabilities with explicit messages and executable calls. Solid arrows show capability use or runtime flow, not imports. Dashed arrows show validated configuration. Model/storage interfaces are used directly; communication and skill calls cross Gateway. The external subgraph is a boundary, not Agent-owned implementation.

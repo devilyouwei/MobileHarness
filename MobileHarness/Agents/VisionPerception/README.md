@@ -198,15 +198,15 @@ ImageInput {
     capturedAt: ContinuousClock.Instant? // 原生采集回调的单调时钟，用于延迟与新鲜度
     rotation: Int           // 传感器图像到正向图像的顺时针 90° 次数，0...3
     content: .rgb(Data)
-          或 .sampled(gray64: Data, attachment: any ImageAttachment)
+          或 .attachment(any ImageAttachment) // 摄像头路径为 SampledImageAttachment，source 为 CameraImageAttachment
 }
 ```
 
-RGB 路径为正向、未镜像 RGB8，宽高各 1...640，字节数必须为 width × height × 3。当前摄像头走 attachment 路径：CameraImageAttachment 持有原生 CameraFrame；宽高各 1...4096、总像素不超过 4194304。Gateway 不解析原生附件或执行模型预处理；VisionPerception 验证原生附件后构造模型输入。默认 image 接纳期限 1 秒，过期帧不进入推理/输出；帧率节奏由 Agent 内部控制；gray64 由 PlatformKit 在采集回调中生成，Agent 内的 FrameMotionAnalyzer 使用它作为运动证据，只影响检测时机，不改变最新帧的保存和选取规则。
+RGB 路径为正向、未镜像 RGB8，宽高各 1...640，字节数必须为 width × height × 3。当前摄像头走 attachment 路径：SampledImageAttachment 包装既有 gray64 和 CameraImageAttachment，后者持有原生 CameraFrame；宽高各 1...4096、总像素不超过 4194304。Gateway 不解析原生附件或执行模型预处理；VisionPerception 验证原生附件后构造模型输入。默认 image 接纳期限 1 秒，过期帧不进入推理/输出；帧率节奏由 Agent 内部控制；gray64 由 PlatformKit 在采集回调中生成，Agent 内的 FrameMotionAnalyzer 使用它作为运动证据，只影响检测时机，不改变最新帧的保存和选取规则。
 
 ```mermaid
 flowchart LR
-    Camera[PlatformKit camera] --> App[VisionSession: gray64 + attachment]
+    Camera[PlatformKit camera] --> App[VisionSession: wrap retained frame and existing gray64]
     App -->|media.image| IG[InputGateway]
     IG --> Filter[VisionPerception: latest slot then cadence]
     Filter --> Latest[One active + newest pending frame]

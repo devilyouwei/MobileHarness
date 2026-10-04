@@ -19,7 +19,7 @@ flowchart LR
 
 ## Domain value ownership
 
-✅ SpeechValues.swift owns SpeechPhase, SpeechSynthesisInput and SpeechValidationError; PoseObservation.swift owns the COCO-17 observation/Joint and VisionValidationError. These values are shared by business Agents inside one target, with the same Codable shape and validation limits. They have Foundation-only imports and are not re-exported from Types or Core.
+✅ SpeechValues.swift owns SpeechPhase, SpeechSynthesisInput and SpeechValidationError; PoseObservation.swift owns the COCO-17 observation/Joint and VisionValidationError. These values are shared by business Agents inside one target, with the same Codable shape and validation limits. The domain value files import Foundation only. AgentContracts.swift imports AgentCore for generic envelopes and schema registration; business values are not declared or re-exported by Core.
 
 ```mermaid
 flowchart LR
@@ -34,4 +34,10 @@ flowchart LR
     Pose --> Message
 ```
 
-✅ Image transport geometry errors remain ImageInputError.invalidFrame in Types; Agent/cadence input ordering rejects CommunicationError.outOfOrder and session mismatch rejects CommunicationError.scopeClosed. ❌ No compatibility aliases, new queues or serialization migration is introduced.
+✅ Image transport geometry errors remain ImageInputError.invalidFrame in AgentCore/Input; Agent/cadence input ordering rejects CommunicationError.outOfOrder and session mismatch rejects CommunicationError.scopeClosed. ❌ No compatibility aliases, new queues or serialization migration is introduced.
+
+## Current compilation boundary
+
+✅ This directory compiles into the single Agents target with the five business Agents. PerceptionMessage is currently one Codable union for transcript, speech phase, pose, synthesis and cancellation; AgentContracts registers the whole catalog. AgentCore is a separate Foundation-only target and contains no concrete schema names or application Agent identities.
+
+❌ Communication domains and individual business Agents are not separate compilation targets. This document does not claim per-Agent import isolation; independent target/domain splitting is not implemented.

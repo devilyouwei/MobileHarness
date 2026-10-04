@@ -275,3 +275,9 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ✅ Assistant extracts PerceptionMessage from the generic message envelope after schema validation. Prompt policy and text admission helpers are grouped in AssistantAgent.swift; no separate prompt-only file is retained.
 
 ✅ Assistant owns validated textSegmentation (Hanzi60 / other120 Characters) and supplies it to generation; App history preview supplies the same policy. Core defaults no longer imply speech latency policy. ❌ No timer flushing or first-chunk policy.
+
+## Current storage boundary
+
+✅ Assistant supplies the system prompt and user text to StorageChat.ConversationHistoryStore.begin(). The store currently selects up to ten completed turns, assembles the full request and persists it; Assistant maps the returned ConversationMessage values into ModelKit.ChatMessage. This is the current implementation, not completed business/storage separation.
+
+❌ Context selection and request assembly will move into Assistant or its owning business layer as part of the [Storage decoupling plan](../../Storage/README.md#planned-business-decoupling). No context or persisted-format change is implemented by this documentation update.

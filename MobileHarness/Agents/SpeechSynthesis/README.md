@@ -91,3 +91,9 @@ sequenceDiagram
 ✅ SpeechSynthesisInput is owned by Agents/Communication/SpeechValues.swift with unchanged text/locale contract and queue policy. Domain value validation is independent of AgentCore; message admission maps errors to the existing transport rejection.
 
 ✅ Synthesis owns the ModelKit.AudioFrame → StorageAudio.SpeechPCMFrame conversion, preserving bytes, format, sequence and timestamp after existing format/order validation. Storage owns its PCM types; it does not import ModelKit or Types. ❌ No playback/device preparation belongs to synthesis.
+
+## Current error ownership
+
+✅ SpeechSynthesis currently reports producer deadline and invalid model output with StorageAudio.SpeechAudioError.synthesisTimedOut/invalidAudio, and passes failures into the shared audio store. StorageAudio owns that error type today.
+
+❌ Moving synthesis business errors out of StorageAudio and localizing storage failures in consumer presentation is deferred to the [Storage decoupling plan](../../Storage/README.md#planned-business-decoupling). This document describes the existing implementation, not a completed migration.

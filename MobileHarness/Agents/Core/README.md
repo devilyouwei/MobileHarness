@@ -25,11 +25,10 @@ Arrows mean compile-time dependency on shared contracts; AgentCore does not impo
 ```mermaid
 flowchart TD
     App --> AgentCore
-    AppWorkflows -->|Messages and parser traces| AgentCore
+    AppPresentationWorkflow -->|Messages and parser traces| AgentCore
+    AppBluetoothWorkflow -->|Invocation context| AgentCore
     Agents --> AgentCore
     Gateway --> AgentCore
-    Actions --> AgentCore
-    Tools --> AgentCore
     AgentCore --> Foundation
 ```
 
@@ -93,8 +92,8 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ✅ ImageInput/AudioInput are AgentCore/Input transport values, referenced by generic InputPayload. AgentTurn identifies a workflow-defined interaction; Core does not assign speech semantics.
 
 ✅ Concrete AgentID names belong to Agents/Communication/AgentContracts.swift. PoseObservation, SpeechPhase and SpeechSynthesisInput are Agents/Communication values; no compatibility aliases remain in Core. CapabilityContextBuilder describes generic output syntax/scheduling only; Assistant owns text-to-audio guidance.
-✅ CommunicationContracts registers domain schema validators, size/freshness and new-work policy. Core contains only standard transport kinds; host device sources/TTL belong to App, and gray64 belongs to VisionPerception. ❌ Remote codecs and hot reload are not implemented.
+✅ CommunicationContracts registers domain schema validators, size/freshness and new-work policy. Core contains only standard transport kinds; host device sources/TTL belong to App, PlatformKit generates native camera gray64 samples, and VisionPerception owns SampledImageAttachment plus motion/cadence interpretation. ❌ Remote codecs and hot reload are not implemented.
 
-✅ Resource identities contain no camera constants; action reports contain no motor/target/observed fields. Device failures are opaque bounded identifiers. Shared text segmentation accepts a validated producer policy and defaults to sentence boundaries; Assistant owns the60/120-character soft limits. ❌ Business detail schemas are not validated by Core.
+✅ Resource identities contain no camera constants; action reports contain no motor/target/observed fields. Device failures are opaque bounded identifiers. Shared text segmentation accepts a validated producer policy and defaults to sentence boundaries; Assistant owns the 60/120-character soft limits. ❌ Business detail schemas are not validated by Core.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
