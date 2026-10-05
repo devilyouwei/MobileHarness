@@ -2,6 +2,8 @@
 
 ✅ ADR0124's startup correction defines first-PCM readiness, bounded pre-admission fallback and accurate capture-failure presentation. ❌ Physical acoustic acceptance remains pending.
 
+✅ ADR0124's native extraction correction uses CoreMedia's queried list size within a four-buffer bound and preserves retained PCM storage through synchronous reads. ❌ Physical axes/accuracy remain separate from capture acceptance.
+
 ADRs retain the context, decision and consequences at their recorded date. Read each record's status and supersession notes; an accepted historical decision does not make its original API, model or limits current.
 
 Current dependencies and flows belong to the [technical design](../../MobileHarness/README.md); module READMEs own current contracts. [Roadmap](../Roadmap.md) owns pending work and [validation](../README.md#experiments-tests-and-acceptance) owns experimental evidence.

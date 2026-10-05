@@ -2,7 +2,7 @@
 
 ✅ [ADR0124](adr/0124-sound-source-perception.md) records bounded microphone first-frame startup, pre-admission mono fallback and capture-failure presentation. ❌ Physical acoustic and coexistence acceptance remains separate from builds and synthetic tests.
 
-❌ [Open iPhone 17 Pro spatial-capture issue](Validation-History.md#2026-10-05--open-issue-supported-iphone-foa-capture-falls-back-to-mono): runtime capability reports supported, but startup falls back to mono. The diagnostic screenshot establishes the observed state; native failure stage and root cause remain unresolved.
+✅ [iPhone 17 Pro spatial-capture investigation](Validation-History.md#2026-10-05--open-issue-supported-iphone-foa-capture-falls-back-to-mono): device logs confirm native 48 kHz/four-channel Float32 ACN/SN3D delivery; failure was AudioBufferList extraction. Build `2026100505` queries the actual list size within a fixed four-buffer bound, passed native regressions/full checks and was installed/launched. The user confirmed direction angles and uncertain/quiet states during Settings detection. ❌ Physical axes/precision and coexistence acceptance remain pending.
 
 ## Requirements and public explanations
 

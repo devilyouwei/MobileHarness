@@ -104,7 +104,8 @@
                     }
                     spatialSupport = await backend.supportsSpatialCapture == true ? .supported : .unknown
                     fallback = error as? AudioCaptureReadinessError == .timedOut ? .startupTimeout : .startupFailed
-                    log.warning("Spatial capture startup failed; retrying mono: \(String(describing: error))")
+                    log.warning(
+                        "Spatial capture startup failed; retrying mono: \(String(describing: error), privacy: .public)")
                 }
                 guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
                 spatialCapture = nil

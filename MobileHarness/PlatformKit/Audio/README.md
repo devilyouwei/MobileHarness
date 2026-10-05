@@ -71,13 +71,16 @@ flowchart LR
 
 ✅ Spatial callbacks are serial and bridge to a 64-packet bufferingOldest stream. Native callbacks are limited to 8192 sample frames and split into at most 4000 frames/16000 scalar samples per transport packet. Overflow fails explicitly. AVFoundation may drop sufficiently late callbacks; PTS continuity checks detect gaps beyond two samples and fail with overflow. Unexpected layouts/formats, interruptions and runtime errors fail an admitted capture rather than silently downgrading. Unsupported graph/mode or a failed first-frame startup returns mono fallback after spatial shutdown. stopCapture/stop are async and join spatial callbacks before replacement; cancellation fences an in-flight startup.
 
+✅ AudioSampleBufferReader queries CoreMedia's required AudioBufferList size before extraction and passes that exact size, bounded to storage for four buffers. Interleaved FOA contains four channels in one buffer; planar FOA contains four buffers. Channel count is not buffer count. The retained CMBlockBuffer stays alive throughout the synchronous reader closure, including thrown-error cleanup. Native query/extraction OSStatus is preserved; oversized lists fail before invoking the reader. SpatialAudioReceiver retains its strict layout/PCM/continuity checks and performs no hardware/backend substitution inside the callback.
+
 ✅ AudioCaptureReadiness separates native session startup from actual PCM delivery. Both backends wait for their first validated/enqueued frame, with one waiter, one terminal result and one cancellable 3-second startup timer; silence is valid PCM and does not block startup. Stop/cancellation resolves the waiter immediately. No stream is returned to App before this gate completes. FOA lets AVCaptureSession configure its microphone path; the prior default-mode AVAudioSession configuration alone did not establish FOA readiness. Failed FOA startup is logged, closed and retried as the existing mono engine before admitting any layout; mono failure propagates to App. Running streams never change layout in place.
 
 ```mermaid
 flowchart LR
     Capability[Built-in route / runtime FOA support] --> Select[AppleAudioIO]
     Select --> FOA[SpatialAudioCapture: serial AVCaptureSession]
-    FOA --> Check[First validated PCM / 3-second startup gate]
+    FOA --> Buffers[Query native buffer-list size / at most four buffers]
+    Buffers --> Check[First validated PCM / 3-second startup gate]
     Check -->|Ready| Frames[64 bounded native PCM packets]
     Check -->|Startup failure: stop and join| Mono[Existing AVAudioEngine mono fallback]
     Select --> Mono
@@ -86,10 +89,12 @@ flowchart LR
     Frames --> App[App input adapter]
 ```
 
-❌ Physical device support, actual channel axes, late-drop tolerance, camera/playback coexistence and external-route behavior require device acceptance. No angle estimate belongs to PlatformKit.
+❌ Additional devices, actual channel axes, late-drop tolerance, camera/playback coexistence and external-route behavior require device acceptance. No angle estimate belongs to PlatformKit. Recorded iPhone 17 Pro capture/observation evidence belongs in [validation history](../../../docs/Validation-History.md#2026-10-05--open-issue-supported-iphone-foa-capture-falls-back-to-mono).
 
 ## Capture selection facts
 
 ✅ AudioCaptureContext exposes native input category, runtime FOA capability and pre-admission fallback reason (unsupported/current input/startup timeout/startup failure). Capability support is distinct from the actual frame layout; MicrophoneFrame remains the authoritative received format. Context is refreshed per capture attempt, including mono startup failure. The public captureTimeout error reports a failed first-PCM readiness deadline without exposing the internal readiness helper. No localized strings or direction algorithm live in the SDK.
 
 ❌ Physical route/capability and FOA startup coexistence acceptance remains pending.
+
+✅ Spatial startup diagnostics log graph rejection, session running/interrupted state, native runtime-error domain/code and interruption reason. Each receiver logs first-frame ASBD/layout metadata once and the first PCM rejection stage once, using mutex-protected flags. Logs contain format/error metadata, never samples, recordings or transcripts. This distinguishes supported hardware from native-session and received-format failures without pausing the capture callback in a debugger.
