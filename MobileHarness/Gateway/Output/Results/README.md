@@ -67,3 +67,7 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 | Cancellation of the executing task | Propagated cancellation; execute does not append a new output outcome | Owner performs shutdown/join; admitted Action records retain terminal cleanup |
 
 Output failure/delivery descriptions are bounded to512 characters. Tool data and durable native-call history remain separate contracts. Execution result retention is256 outputs with counted oldest eviction; Action history uses its existing scheduler bounds. ❌ No durable diagnostic replay or forced handler interruption.
+
+✅ ADR0132: OutputExecutionResult.failureCode identifies dispatch/delivery errors independently of ToolResponse.failureCode. Delivery rejection cannot overwrite the handler outcome.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.

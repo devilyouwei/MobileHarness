@@ -78,9 +78,17 @@ public struct ActionComposition: Sendable {
                 details: $0.details)
         }
         if let code = report.executionFailure {
-            entries.append(.init(path: "\(path).execution", status: .failed, code: code))
+            entries.append(
+                .init(
+                    path: "\(path).execution", status: .failed, code: code,
+                    details: failureDetails(report.failureDescription)))
         }
         return entries
+    }
+    private static func failureDetails(_ description: String?) -> [String: String] {
+        guard var description else { return [:] }
+        while description.utf8.count > 512 { description.removeLast() }
+        return ["failureDescription": description]
     }
     public func run() async throws -> ActionReport {
         try ActionReport(entries: await Self.run(root, path: "root"))
@@ -141,7 +149,8 @@ public struct ActionComposition: Sendable {
                 return [
                     .init(
                         path: leaf, status: error is CancellationError ? .cancelled : .failed,
-                        code: ActionReport.code(for: error))
+                        code: ActionReport.code(for: error),
+                        details: failureDetails(ActionReport.description(for: error)))
                 ]
             }
         }

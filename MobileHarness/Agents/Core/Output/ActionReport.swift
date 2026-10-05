@@ -35,14 +35,17 @@ public struct AgentActionReport: Equatable, Sendable {
     public let entries: [Entry]
     /// Execution-level failure is separate from bounded child results; no child is discarded.
     public let executionFailure: Entry.Code?
-    private init(validatedEntries: [Entry], executionFailure: Entry.Code? = nil) {
+    public let failureDescription: String?
+    private init(validatedEntries: [Entry], executionFailure: Entry.Code? = nil, failureDescription: String? = nil) {
         entries = validatedEntries
         self.executionFailure = executionFailure
+        self.failureDescription = failureDescription.map { String($0.prefix(512)) }
     }
-    public init(delivering entries: [Entry], executionFailure: Entry.Code?) {
+    public init(delivering entries: [Entry], executionFailure: Entry.Code?, failureDescription: String? = nil) {
         precondition(entries.count <= 256 && entries.allSatisfy { !$0.path.isEmpty && $0.path.utf8.count <= 128 })
         self.entries = entries
         self.executionFailure = executionFailure
+        self.failureDescription = failureDescription.map { String($0.prefix(512)) }
     }
     public static func executionFailed(_ code: Entry.Code) -> Self {
         Self(validatedEntries: [], executionFailure: code)
@@ -56,10 +59,13 @@ public struct AgentActionReport: Equatable, Sendable {
             throw ValidationError.invalidPath
         }
         self.executionFailure = nil
+        self.failureDescription =
+            entries.first { $0.status == .failed && $0.details["failureDescription"] != nil }?.details[
+                "failureDescription"]
         self.entries = entries
     }
-    public func withExecutionFailure(_ code: Entry.Code) -> Self {
-        Self(validatedEntries: entries, executionFailure: code)
+    public func withExecutionFailure(_ code: Entry.Code, description: String? = nil) -> Self {
+        Self(validatedEntries: entries, executionFailure: code, failureDescription: description ?? failureDescription)
     }
     public var hasFailures: Bool { executionFailure != nil || entries.contains { $0.status == .failed } }
     public var isCancelled: Bool {

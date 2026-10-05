@@ -4,7 +4,8 @@ import PlatformKit
 
 /// Presets own gesture geometry; callers select bounded repetition and native motion options.
 public enum NexArmGesture: Sendable, CaseIterable {
-    /// Nominal fixture/reference home; actual execution uses connection-local device IK.
+    /// Ordinary arm reset home for passive links; device IK resolves Cartesian geometry on other paths.
+    /// The sixth reference is not sent by whole-arm reset or presets. This is not measured feedback.
     public static let referenceHomeJoints = [2048, 2087, 1198, 1238, 2048, 2048]
     case baseSway, nod, shakeHead, wave, tiltLeft, tiltRight, lookAround, celebrate, dance
 
@@ -39,9 +40,9 @@ public enum NexArmGesture: Sendable, CaseIterable {
     func cartesianPlaybackFrames(repetitions: Int) throws -> [TestFrame] {
         guard motorID == nil, (1...3).contains(repetitions),
             (self != .tiltLeft && self != .tiltRight) || repetitions == 1
-        else { throw NexArmError.invalidMotion }
+        else { throw NexArmExecutionError.invalidArguments }
         let poses = [Self.home] + (0..<repetitions).flatMap { _ in frames } + [Self.home]
-        guard poses.count <= 20, poses.allSatisfy(Self.validPose) else { throw NexArmError.invalidMotion }
+        guard poses.count <= 20, poses.allSatisfy(Self.validPose) else { throw NexArmExecutionError.invalidArguments }
         return try poses.enumerated().map { index, pose in
             let duration = index == 0 ? 400 : (index == poses.count - 1 ? 600 : 800)
             let values = [pose[3], pose[0], pose[1], pose[2], pose[4], pose[5], duration]
@@ -129,10 +130,10 @@ public struct NexArmArmPlan: Sendable {
         let requested = Self.words(frame.packet.payload)
         let values = Self.words(reply.payload)
         guard Array(values.prefix(5)) == [requested[1], requested[2], requested[3], requested[0], requested[4]]
-        else { throw NexArmError.invalidMotion }
+        else { throw NexArmExecutionError.invalidArguments }
         let joints = Array(values[6..<11])
         guard zip(joints, NexArmJogPlanner.limits).allSatisfy({ $1.contains($0) }) else {
-            throw NexArmError.invalidMotion
+            throw NexArmExecutionError.invalidArguments
         }
         guard targets[key(frame)] != nil || targets.count < 64 else { throw NexArmError.overflow }
         targets[key(frame)] = joints
@@ -141,7 +142,7 @@ public struct NexArmArmPlan: Sendable {
     public var homeJoints: [Int] {
         get throws {
             let frame = try NexArmGesture.homeFrame(milliseconds: 1000)
-            guard let arm = targets[key(frame)] else { throw NexArmError.invalidMotion }
+            guard let arm = targets[key(frame)] else { throw NexArmExecutionError.invalidArguments }
             return arm + [0]  // Claw is neither commanded nor used by an arm plan.
         }
     }
@@ -162,7 +163,7 @@ public struct NexArmArmPlan: Sendable {
 
     public func compile(_ frames: [NexArmGesture.TestFrame], from joints: [Int]) throws -> [NexArmGesture.TestFrame] {
         guard joints.count == 6, joints.allSatisfy({ (0...4095).contains($0) }), frames.count <= 20 else {
-            throw NexArmError.invalidMotion
+            throw NexArmExecutionError.invalidArguments
         }
         return try frames.map { frame in
             if frame.packet.command == 3, let index = Int(exactly: frame.packet.id), (4...5).contains(index),
@@ -172,7 +173,7 @@ public struct NexArmArmPlan: Sendable {
             }
             guard let target = targets[key(frame)], frame.packet.command == 8, frame.packet.payload.count == 14,
                 (400...2000).contains(frame.milliseconds)
-            else { throw NexArmError.invalidMotion }
+            else { throw NexArmExecutionError.invalidArguments }
             let atoms = try (0..<5).map { index in
                 try NexArmMotorCommands.move(motor: index + 1, target: target[index], options: NexArmMotorOptions())
             }
@@ -183,9 +184,9 @@ public struct NexArmArmPlan: Sendable {
 
     /// Command estimate for manual takeover, never reported as measured feedback; preserves motor6.
     public static func applying(_ packet: NexArmPacket, to previous: [Int]) throws -> [Int] {
-        guard previous.count == 6 else { throw NexArmError.invalidMotion }
+        guard previous.count == 6 else { throw NexArmExecutionError.invalidArguments }
         var result = previous
-        guard let targets = packet.motorTargets else { throw NexArmError.invalidMotion }
+        guard let targets = packet.motorTargets else { throw NexArmExecutionError.invalidArguments }
         for (motor, target) in targets { result[motor - 1] = target }
         return result
     }

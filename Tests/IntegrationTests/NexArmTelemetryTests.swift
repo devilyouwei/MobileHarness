@@ -224,7 +224,9 @@ func nexArmChannelUsesFreshMotorFeedbackWithoutNominalWait(_ gesture: NexArmGest
 @Test func nexArmFeedbackLossAbortsWithoutQueryFallback() async throws {
     let link = ObservableArmFixture(.queryOnly)
     let controller = NexArmActionController(link: link)
-    await #expect(throws: NexArmError.feedbackLost) { try await controller.performGesture(.tiltRight, repetitions: 1) }
+    await #expect(throws: NexArmExecutionError.feedbackTimeout) {
+        try await controller.performGesture(.tiltRight, repetitions: 1)
+    }
     #expect(await link.queries == 0)
     #expect(await controller.motionFailure == .feedbackTimeout)
     #expect(await link.writes < 3)
@@ -237,7 +239,9 @@ func nexArmChannelUsesFreshMotorFeedbackWithoutNominalWait(_ gesture: NexArmGest
     let link = ObservableArmFixture(.silent)
     let controller = NexArmActionController(link: link)
     let began = ContinuousClock.now
-    await #expect(throws: NexArmError.feedbackLost) { try await controller.performGesture(.wave, repetitions: 1) }
+    await #expect(throws: NexArmExecutionError.feedbackTimeout) {
+        try await controller.performGesture(.wave, repetitions: 1)
+    }
     #expect(ContinuousClock.now - began < .seconds(8))
     #expect(await controller.motionFailure == .feedbackTimeout)
     let sentBeforeLoss = await link.writes
@@ -333,13 +337,13 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
     // next child admission after preparation and cannot prove zero committed writes.
     await link.blockAdmission()
     let controller = NexArmActionController(link: link)
-    await #expect(throws: NexArmActionError.uncertainMotion) {
+    await #expect(throws: NexArmExecutionError.admissionTimeout) {
         try await controller.performGesture(.dance, repetitions: 1)
     }
     #expect(await link.writes == 0)
     #expect(await link.queries == 0)
     #expect(await link.session == nil)
-    #expect(await controller.motionFailure == .sending)
+    #expect(await controller.motionFailure == .admission)
 }
 
 @Test func nexArmChannelKeepsNextActionQueuedUntilFreshFinalHome() async throws {
@@ -371,7 +375,7 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
 @Test func nexArmCachedHomeDuringPlaybackCannotConfirmFinalCompletion() async throws {
     let link = ObservableArmFixture(.silent)
     let controller = NexArmActionController(link: link)
-    await #expect(throws: NexArmError.feedbackLost) {
+    await #expect(throws: NexArmExecutionError.feedbackTimeout) {
         try await controller.performGesture(.tiltLeft, repetitions: 1)
     }
     #expect(await link.writes < 3)
@@ -425,7 +429,7 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
 
 @Test func nexArmPlanRejectsWritesOutsideDeclaredMotorLocks() throws {
     let frames = try NexArmGesture.nod.settingsTestFrames()
-    #expect(throws: NexArmError.invalidMotion) { try NexArmMotionPlan(lockedMotors: [5], frames: frames) }
+    #expect(throws: NexArmExecutionError.invalidArguments) { try NexArmMotionPlan(lockedMotors: [5], frames: frames) }
     let plan = try NexArmMotionPlan(lockedMotors: [4], frames: frames)
     #expect(plan.steps.allSatisfy { Set($0.targets.keys) == [4] })
 }

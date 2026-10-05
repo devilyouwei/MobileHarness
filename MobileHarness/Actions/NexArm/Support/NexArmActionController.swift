@@ -3,6 +3,7 @@ import Foundation
 import PlatformKit
 
 public enum NexArmCompatibilityPolicy: Sendable {
+    case passiveBLE
     case strictFirmware
     /// Validated NexArm pose protocol; firmware version is not part of the BLE handshake.
     case nexArmBLEProtocol
@@ -14,6 +15,7 @@ public enum NexArmCompatibility: Sendable, Equatable {
 
 public enum NexArmMotionFailure: Sendable, Equatable {
     case sending
+    case admission, feedback
     case feedbackTimeout
     case completionTimeout
 }
@@ -24,13 +26,15 @@ public actor NexArmActionController {
     private var busy = false
     public private(set) var lockedMotors: Set<Int> = []
     public private(set) var unreachedSegments: [Int] = []
-    public private(set) var motorResults: [NexArmMotorResult] = []
+    public private(set) var motorResultRevision: UInt64 = 0
+    public private(set) var motorResults: [NexArmMotorResult] = [] {
+        didSet { motorResultRevision &+= 1 }
+    }
     private var faulted = false
     private let compatibilityPolicy: NexArmCompatibilityPolicy
     private var compatibility: NexArmCompatibility?
     private var armPlan: NexArmArmPlan?
     private var motorHomes: [Int: Int] = [:]
-    private var connectionIndicationUsed = false
     private var lastAimPositions: [Int]?
     public private(set) var cachedJoints: [Int] = []
     private var cachedPose: [Int] = []
@@ -42,11 +46,17 @@ public actor NexArmActionController {
         self.compatibilityPolicy = compatibilityPolicy
     }
 
+    /// Cache native unsolicited feedback; no query, compatibility probe or movement is issued.
+    public func receivePassiveFeedback(_ packet: NexArmPacket) throws -> (joints: [Int], pose: [Int]) {
+        let sample = try decodePosition(packet)
+        return (sample.joints, sample.pose)
+    }
+
     /// One controller belongs to one live connection; discard it on disconnect.
     @discardableResult
     public func verifyCompatibility() async throws -> NexArmCompatibility {
         try Task.checkCancellation()
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         guard !faulted else { throw NexArmActionError.uncertainMotion }
         busy = true
         defer { busy = false }
@@ -57,6 +67,10 @@ public actor NexArmActionController {
         motionFailure = nil
         try Task.checkCancellation()
         if let compatibility { return compatibility }
+        if compatibilityPolicy == .passiveBLE {
+            compatibility = .poseProtocol
+            return .poseProtocol
+        }
         if compatibilityPolicy == .nexArmBLEProtocol {
             // This validates the pose protocol, not any firmware version.
             let first = try await position()
@@ -66,7 +80,7 @@ public actor NexArmActionController {
                 guard hypot(Double(sample.pose[0]), Double(sample.pose[1])) <= 450,
                     (50...600).contains(sample.pose[2]), abs(sample.pose[3]) <= 1800,
                     abs(sample.pose[4]) <= 180, abs(sample.pose[5]) <= 180
-                else { throw NexArmError.invalidMotion }
+                else { throw NexArmExecutionError.invalidArguments }
             }
             guard zip(first.joints.prefix(5), second.joints.prefix(5)).allSatisfy({ abs($0 - $1) <= 2 }) else {
                 throw NexArmActionError.moving
@@ -83,19 +97,19 @@ public actor NexArmActionController {
             }
             // The ESP32 returns zeros when its internal AT32 version read fails.
             // Only this read-only result can be queried again; never retry a motion or failed transport.
-            guard version.payload == [1, 0, 2, 0, 0, 0] else { throw NexArmError.unsupportedFirmware }
+            guard version.payload == [1, 0, 2, 0, 0, 0] else { throw NexArmExecutionError.unsupportedFirmware }
             if attempt < 3 { try await Task.sleep(for: .milliseconds(200)) }
         }
-        throw NexArmError.firmwareUnavailable
+        throw NexArmExecutionError.firmwareUnavailable
     }
 
     /// Completion-only tracking write; accepted transport does not establish arrival.
     public func aim(base: Double, pitch: Double) async throws {
         try Task.checkCancellation()
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         guard !faulted else { throw NexArmActionError.uncertainMotion }
-        guard compatibility != nil else { throw NexArmError.firmwareUnavailable }
-        guard let writer = link as? any NexArmWritableLink else { throw NexArmError.invalidMotion }
+        guard compatibility != nil else { throw NexArmExecutionError.firmwareUnavailable }
+        guard let writer = link as? any NexArmWritableLink else { throw NexArmExecutionError.invalidArguments }
         let positions = try NexArmJointCommand.positions(base: base, pitch: pitch)
         let previous =
             lastAimPositions ?? (cachedJoints.count >= 5 ? Array(cachedJoints.prefix(5)) : NexArmJointCommand.armHome)
@@ -123,53 +137,32 @@ public actor NexArmActionController {
 
     /// Prepare a bounded, connection-local IK table before any motion/live session.
     public func prepareArmControl() async throws -> NexArmArmPlan {
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         busy = true
         defer { busy = false }
         _ = try await requireCompatibility()
         return try await preparedArmPlan()
     }
 
-    private func preparedArmPlan() async throws -> NexArmArmPlan {
-        if let armPlan { return armPlan }
-        var plan = NexArmArmPlan()
-        for gesture in NexArmGesture.allCases {
-            for frame in try gesture.settingsTestFrames() where frame.packet.command == 8 {
-                try Task.checkCancellation()
-                if plan.contains(frame) { continue }
-                let reply = try await link.exchange(
-                    NexArmPacket(command: 7, payload: frame.packet.payload),
-                    replyID: 255, replyCommand: 7, replyCount: 24)
-                try plan.insert(frame, reply: reply)
-            }
+    private func preparedArmPlan(for frames: [NexArmGesture.TestFrame]? = nil) async throws -> NexArmArmPlan {
+        var plan = armPlan ?? NexArmArmPlan()
+        let requested = try frames ?? NexArmGesture.allCases.flatMap { try $0.settingsTestFrames() }
+        for frame in requested + [try NexArmGesture.homeFrame(milliseconds: 1000)] where frame.packet.command == 8 {
+            try Task.checkCancellation()
+            if plan.contains(frame) { continue }
+            let reply = try await link.exchange(
+                NexArmPacket(command: 7, payload: frame.packet.payload),
+                replyID: 255, replyCommand: 7, replyCount: 24)
+            try plan.insert(frame, reply: reply)
         }
         armPlan = plan
         return plan
     }
 
-    /// Connection feedback only owns motor5; never resets the rest of the arm.
-    public func indicateConnection() async throws {
-        try Task.checkCancellation()
-        guard !busy else { throw NexArmError.busy }
-        guard !connectionIndicationUsed else { throw NexArmActionError.alreadyUsed }
-        busy = true
-        defer { busy = false }
-        motorResults = []
-        _ = try await requireCompatibility()
-        let plan = try await preparedArmPlan()
-        let home = try plan.homeJoints[4]
-        let frames = try [0, -91, 91, 0].map { offset in
-            NexArmGesture.TestFrame(
-                packet: try NexArmSimpleActions.packet(id: 5, target: home + offset), milliseconds: 1500)
-        }
-        connectionIndicationUsed = true
-        try await execute(NexArmMotionPlan(lockedMotors: [5], frames: frames))
-    }
-
     /// Latest measured encoder values and Cartesian pose, never inferred from commands.
     public func readState() async throws -> (joints: [Int], pose: [Int]) {
         try Task.checkCancellation()
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         guard !faulted else { throw NexArmActionError.uncertainMotion }
         busy = true
         defer { busy = false }
@@ -181,7 +174,7 @@ public actor NexArmActionController {
     public func recoverState() async throws -> (joints: [Int], pose: [Int]) {
         lastAimPositions = nil
         try Task.checkCancellation()
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         busy = true
         defer { busy = false }
         var sample = try await position()
@@ -191,12 +184,12 @@ public actor NexArmActionController {
                     && (50...600).contains(pose[2]) && abs(pose[3]) <= 1800
                     && abs(pose[4]) <= 180 && abs(pose[5]) <= 180
             }
-            guard validPose(sample.pose) else { throw NexArmError.invalidMotion }
+            guard validPose(sample.pose) else { throw NexArmExecutionError.invalidArguments }
             let baseline = sample.joints
             for _ in 0..<2 {
                 try await Task.sleep(for: .milliseconds(150))
                 let next = try await position()
-                guard validPose(next.pose) else { throw NexArmError.invalidMotion }
+                guard validPose(next.pose) else { throw NexArmExecutionError.invalidArguments }
                 guard zip(baseline.prefix(5), next.joints.prefix(5)).allSatisfy({ abs($0 - $1) <= 2 }) else {
                     throw NexArmActionError.moving
                 }
@@ -208,28 +201,56 @@ public actor NexArmActionController {
         return (sample.joints, sample.pose)
     }
 
-    /// Builds the shared recipe from connection-prepared mapping; performs no I/O or lock admission.
+    /// Builds the shared recipe without a resource fence. Resolve only missing Cartesian targets;
+    /// passive simple/reset plans issue no queries.
     /// A nil gesture selects whole-arm home. App owns cancellation and the live sending session.
-    public func manualPlan(gesture: NexArmGesture?, speed: Int = 1400, acceleration: Int = 30) throws
+    public func manualPlan(gesture: NexArmGesture?, repetitions: Int = 1, speed: Int = 1400, acceleration: Int = 30)
+        async throws
         -> NexArmMotionPlan
     {
         try Task.checkCancellation()
-        guard let armPlan, cachedJoints.count == 6 else { throw NexArmError.invalidMotion }
+        guard (1...3).contains(repetitions) else { throw NexArmExecutionError.invalidArguments }
+        if compatibilityPolicy == .passiveBLE, gesture == nil || gesture?.motorID != nil {
+            // Ordinary reset home is independent of the elevated Photographer tracking rest.
+            let configured = NexArmGesture.referenceHomeJoints
+            let home = gesture == nil ? configured : (cachedJoints.count == 6 ? cachedJoints : configured)
+            let frames: [NexArmGesture.TestFrame]
+            let motors: Set<Int>
+            if let gesture {
+                frames = try NexArmSimpleActions.frames(gesture, home: home, repetitions: repetitions)
+                motors = gesture.lockedMotors
+            } else {
+                let atoms = try (1...5).map {
+                    try NexArmSimpleActions.packet(id: $0, target: home[$0 - 1])
+                }
+                frames = [.init(packet: try NexArmMotorCommands.simultaneous(atoms), milliseconds: 1000)]
+                motors = Set(1...5)
+            }
+            return try NexArmMotionPlan(lockedMotors: motors, frames: frames).configured(
+                speed: speed, acceleration: acceleration)
+        }
+        let frames = try gesture.map { try $0.settingsTestFrames() } ?? [NexArmGesture.homeFrame(milliseconds: 1000)]
+        let armPlan = try await preparedArmPlan(for: frames)
+        let startingJoints = cachedJoints.count == 6 ? cachedJoints : NexArmGesture.referenceHomeJoints
         let plan =
-            try gesture.map { try armPlan.motion($0, repetitions: 1, from: cachedJoints) }
-            ?? NexArmMotionPlan(lockedMotors: Set(1...5), frames: [armPlan.home(from: cachedJoints)])
+            try gesture.map { try armPlan.motion($0, repetitions: repetitions, from: startingJoints) }
+            ?? NexArmMotionPlan(lockedMotors: Set(1...5), frames: [armPlan.home(from: startingJoints)])
         return try plan.configured(speed: speed, acceleration: acceleration)
     }
 
     /// Explicit whole-arm reset, the only reset operation that owns all motors1–5.
     public func resetPosition(speed: Int = 1400, acceleration: Int = 30) async throws {
         try Task.checkCancellation()
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         busy = true
         defer { busy = false }
         motorResults = []
         _ = try await requireCompatibility()
-        let plan = try await preparedArmPlan()
+        if compatibilityPolicy == .passiveBLE {
+            try await execute(manualPlan(gesture: nil, speed: speed, acceleration: acceleration))
+            return
+        }
+        let plan = try await preparedArmPlan(for: [NexArmGesture.homeFrame(milliseconds: 1000)])
         if cachedJoints.count != 6 { _ = try await position() }
         try await execute(
             NexArmMotionPlan(lockedMotors: Set(1...5), frames: [plan.home(from: cachedJoints)]).configured(
@@ -243,13 +264,18 @@ public actor NexArmActionController {
         try Task.checkCancellation()
         guard (1...3).contains(repetitions),
             (gesture != .tiltLeft && gesture != .tiltRight) || repetitions == 1
-        else { throw NexArmError.invalidMotion }
-        guard !busy else { throw NexArmError.busy }
+        else { throw NexArmExecutionError.invalidArguments }
+        guard !busy else { throw NexArmExecutionError.busy }
         busy = true
         defer { busy = false }
         motorResults = []
         _ = try await requireCompatibility()
-        let plan = try await preparedArmPlan()
+        if compatibilityPolicy == .passiveBLE {
+            try await execute(
+                manualPlan(gesture: gesture, repetitions: repetitions, speed: speed, acceleration: acceleration))
+            return
+        }
+        let plan = try await preparedArmPlan(for: gesture.settingsTestFrames())
         if cachedJoints.count != 6 { _ = try await position() }
         try await execute(
             plan.motion(gesture, repetitions: repetitions, from: cachedJoints).configured(
@@ -259,12 +285,12 @@ public actor NexArmActionController {
     /// Software reset target only; does not write calibration or firmware registers.
     public func configureMotorHome(id: Int, target: Int) throws {
         guard !busy, (1...6).contains(id), NexArmJogPlanner.limits[id - 1].contains(target) else {
-            throw NexArmError.invalidMotion
+            throw NexArmExecutionError.invalidArguments
         }
         motorHomes[id] = target
     }
     public func performPlan(_ plan: NexArmMotionPlan, completion: NexArmMotorCompletion) async throws {
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         busy = true
         defer { busy = false }
         motorResults = []
@@ -275,7 +301,7 @@ public actor NexArmActionController {
         id: Int, target: Int, options: NexArmMotorOptions,
         completion: NexArmMotorCompletion
     ) async throws {
-        guard !busy else { throw NexArmError.busy }
+        guard !busy else { throw NexArmExecutionError.busy }
         busy = true
         defer { busy = false }
         motorResults = []
@@ -293,9 +319,13 @@ public actor NexArmActionController {
         if let configured = motorHomes[id] {
             target = configured
         } else {
-            guard (1...5).contains(id) else { throw NexArmError.invalidMotion }
-            let prepared = try await prepareArmControl()
-            target = try prepared.homeJoints[id - 1]
+            guard (1...5).contains(id) else { throw NexArmExecutionError.invalidArguments }
+            if compatibilityPolicy == .passiveBLE {
+                target = NexArmGesture.referenceHomeJoints[id - 1]
+            } else {
+                let prepared = try await prepareArmControl()
+                target = try prepared.homeJoints[id - 1]
+            }
         }
         let packet = try NexArmMotorReset.reset(motor: id, home: [id: target], options: options)
         try await performPlan(
@@ -304,8 +334,8 @@ public actor NexArmActionController {
     }
     private func execute(_ plan: NexArmMotionPlan, policy suppliedPolicy: NexArmMotorCompletion? = nil) async throws {
         lastAimPositions = nil
-        guard let observable = link as? any NexArmObservableLink else { throw NexArmError.invalidMotion }
-        guard lockedMotors.isDisjoint(with: plan.lockedMotors) else { throw NexArmError.busy }
+        guard let observable = link as? any NexArmObservableLink else { throw NexArmExecutionError.invalidArguments }
+        guard lockedMotors.isDisjoint(with: plan.lockedMotors) else { throw NexArmExecutionError.busy }
         lockedMotors = plan.lockedMotors
         defer { lockedMotors = [] }
         motorResults = []
@@ -319,9 +349,20 @@ public actor NexArmActionController {
         var lastFeedback = ContinuousClock.now
         var receivedFeedback = false
         var connectionFailure: NexArmMotorResult.Failure?
+        var executionError: (any Error)?
         var cancelled = false
         do { session = try await observable.beginObservation() } catch {
-            connectionFailure = error as? NexArmError == .feedbackLost ? .feedbackLost : .disconnected
+            executionError = error
+            if error is CancellationError {
+                connectionFailure = .cancelled
+                cancelled = true
+            } else if error as? NexArmExecutionError == .feedbackTimeout {
+                connectionFailure = .feedbackLost
+            } else if error as? NexArmError == .disconnected {
+                connectionFailure = .disconnected
+            } else {
+                connectionFailure = .admissionFailed
+            }
         }
         for (index, step) in plan.steps.enumerated() {
             var pending = step.targets
@@ -341,6 +382,7 @@ public actor NexArmActionController {
             }
             guard let session else { continue }
             var committed = false
+            var stage: NexArmMotorResult.Failure = .feedbackFailed
             do {
                 let admissionDeadline = ContinuousClock.now.advanced(by: .seconds(1))
                 var sentAt = ContinuousClock.now
@@ -353,16 +395,19 @@ public actor NexArmActionController {
                         receivedFeedback = true
                     }
                     guard ContinuousClock.now - lastFeedback < .milliseconds(policy.feedbackMilliseconds) else {
-                        throw NexArmError.feedbackLost
+                        throw NexArmExecutionError.feedbackTimeout
                     }
-                    guard ContinuousClock.now < admissionDeadline else { throw NexArmError.timeout }
+                    guard ContinuousClock.now < admissionDeadline else { throw NexArmExecutionError.admissionTimeout }
                     sentAt = .now
+                    stage = .sendingFailed
                     if try await observable.sendObserved(step.packet, session: session) {
                         committed = true
                         break
                     }
+                    stage = .feedbackFailed
                     try await Task.sleep(for: .milliseconds(20))
                 }
+                stage = .feedbackFailed
                 var trackers: [Int: NexArmSegmentTracker] = [:]
                 for (motor, target) in step.targets {
                     let options = try step.options(for: motor)
@@ -391,7 +436,7 @@ public actor NexArmActionController {
                         }
                     }
                     guard ContinuousClock.now - lastFeedback < .milliseconds(policy.feedbackMilliseconds) else {
-                        throw NexArmError.feedbackLost
+                        throw NexArmExecutionError.feedbackTimeout
                     }
                     for motor in pending.keys.sorted() {
                         switch trackers[motor]?.outcome(at: .now) {
@@ -410,18 +455,19 @@ public actor NexArmActionController {
                     if !pending.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
                 }
             } catch {
+                if executionError == nil { executionError = error }
                 let failure: NexArmMotorResult.Failure
                 if error is CancellationError {
                     failure = .cancelled
                     cancelled = true
-                } else if error as? NexArmError == .feedbackLost {
+                } else if error as? NexArmExecutionError == .feedbackTimeout {
                     failure = .feedbackLost
                     connectionFailure = failure
                 } else if error as? NexArmError == .disconnected {
                     failure = .disconnected
                     connectionFailure = failure
                 } else {
-                    failure = .sendingFailed
+                    failure = error as? NexArmExecutionError == .admissionTimeout ? .admissionFailed : stage
                 }
                 motorResults += pending.keys.sorted().map { result($0, failure, started: committed) }
             }
@@ -433,20 +479,24 @@ public actor NexArmActionController {
         if let failure = motorResults.first(where: { $0.failure != nil })?.failure {
             faulted = true
             lastFailure = failure.rawValue
-            if failure == .feedbackLost || failure == .disconnected {
-                motionFailure = .feedbackTimeout
-                throw NexArmError.feedbackLost
+            switch failure {
+            case .feedbackLost: motionFailure = .feedbackTimeout
+            case .sendingFailed, .disconnected: motionFailure = .sending
+            case .admissionFailed: motionFailure = .admission
+            case .feedbackFailed: motionFailure = .feedback
+            default: motionFailure = .completionTimeout
             }
-            if failure == .sendingFailed {
-                motionFailure = .sending
-                throw NexArmActionError.uncertainMotion
-            }
-            motionFailure = .completionTimeout
-            if failure == .timedOut {
+            if let executionError { throw executionError }
+            switch failure {
+            case .timedOut:
                 throw NexArmActionError.motionTimedOut(
                     Array(Set(motorResults.filter { $0.failure == .timedOut }.map(\.step))).sorted())
+            case .targetNotReached:
+                throw NexArmActionError.targetsNotReached(unreachedSegments)
+            default:
+                // Native/observation errors were retained above; never synthesize a different device error.
+                throw NexArmActionError.uncertainMotion
             }
-            throw NexArmActionError.targetsNotReached(unreachedSegments)
         }
     }
 

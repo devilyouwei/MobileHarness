@@ -13,6 +13,7 @@ public actor PhotographerAgent: Agent {
     private var lifecycle: AgentLifecycle = .registered
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
+    private var lastPoseReceivedAt: ContinuousClock.Instant?
     private var lastAim: (base: Double, pitch: Double, time: TimeInterval)?
     private var filteredBase = 0.0
     private var filteredPitch = 0.0
@@ -50,6 +51,8 @@ public actor PhotographerAgent: Agent {
     public func pause() throws {
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
+        lastPoseReceivedAt = nil
+        resetTracking()
     }
     public func resume() throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
@@ -57,10 +60,18 @@ public actor PhotographerAgent: Agent {
     }
     public func stop() async {
         lifecycle = .stopped
+        lastPoseReceivedAt = nil
+        resetTracking()
         continuation.finish()
     }
     public func status() -> AgentStatus {
         AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)
+    }
+
+    /// Read-only host signal for a usable tracking pose; sensor timestamps cannot extend freshness.
+    public func hasFreshPose(maximumAge: Duration = .seconds(1)) -> Bool {
+        guard lifecycle == .running, maximumAge > .zero, let lastPoseReceivedAt else { return false }
+        return ContinuousClock.now - lastPoseReceivedAt < maximumAge
     }
 
     public func receive(_ input: AgentInput) async throws {
@@ -72,6 +83,12 @@ public actor PhotographerAgent: Agent {
             lastTimestamp.map({ pose.timestamp >= $0 }) ?? true
         else { throw CommunicationError.outOfOrder }
         guard !input.metadata.expired else { throw CommunicationError.expired }
+        if let lastPoseReceivedAt, ContinuousClock.now - lastPoseReceivedAt >= .seconds(1) {
+            resetTracking()
+        }
+        if let person = pose.people.first, aimPoint(person, width: pose.width, height: pose.height) != nil {
+            lastPoseReceivedAt = .now
+        }
         lastSequence = pose.sequence
         lastTimestamp = pose.timestamp
         processed += 1
@@ -79,11 +96,7 @@ public actor PhotographerAgent: Agent {
         let available = await controlAvailable()
         guard lifecycle == .running, lastSequence == pose.sequence else { return }
         guard available else {
-            lastAim = nil
-            filteredBase = 0
-            filteredPitch = 0
-            commandedBase = 0
-            commandedPitch = 0
+            resetTracking()
             return
         }
         guard let aim = nextAim(pose) else { return }
@@ -92,6 +105,14 @@ public actor PhotographerAgent: Agent {
         commandedBase = aim.base
         commandedPitch = aim.pitch
         lastAim = (aim.base, aim.pitch, pose.timestamp)
+    }
+
+    private func resetTracking() {
+        lastAim = nil
+        filteredBase = 0
+        filteredPitch = 0
+        commandedBase = 0
+        commandedPitch = 0
     }
 
     /// First published person. Nose at confidence ≥ 0.3 inside the image, otherwise the midpoint of such joints.

@@ -1,10 +1,12 @@
 # NexArm Actions
 
+✅ ADR0135: tracking approaches converge to the exact final encoder target within the existing 2-count/8-count-per-second settling region. The final write must be admitted before `accept` commits planner state; then the worker can become idle. This removes fractional-tail streaming without widening physical arrival tolerances or claiming a Tool's target publication means arrival. See [serial acceptance](../../../docs/NexArm_Physical_Acceptance.md) for scoped physical evidence.
+
 ## Contract and ownership
 
 Each motor operation records its own outcome. Compositions collect outcomes and continue after child failures. Channel continues after an Action succeeds, partially fails or fails. Feedback loss and an unreachable target are ordinary leaf errors; neither implicitly cancels the composition. Explicit user/session cancellation stops remaining work.
 
-Actions owns gesture definitions, reset/home selection, motion shaping, completion policy and result collection. [PlatformKit](../../PlatformKit/Connectivity/NexArm/README.md) owns connections, protocol/native command encoding, hardware limits and telemetry. App owns connection lifetime, resource bindings and presentation. Settings and conversation reuse the same connection-prepared Action recipes and native command encoding. Channel execution observes physical feedback; Settings uses bounded send-only playback and manual jog without Gateway resource admission (ADR0127).
+Actions owns gesture definitions, reset/home selection, motion shaping, completion policy and result collection. [PlatformKit](../../PlatformKit/Connectivity/NexArm/README.md) owns connections, protocol/native command encoding, hardware limits and telemetry. App owns connection lifetime, resource bindings and presentation. Settings and conversation reuse the same prepared Action recipes and native command encoding. Channel execution observes physical feedback; Settings uses cancellable background segment-feedback execution and manual jog without Gateway resource admission (ADR0127).
 
 ```mermaid
 flowchart LR
@@ -34,7 +36,7 @@ Only NexArm/Support may import PlatformKit within Actions; PlatformKit owns its 
 | [Support/NexArmCompositeActions.swift](Support/NexArmCompositeActions.swift) | Gesture geometry, home selection and IK plans |
 | [Support/NexArmActionController.swift](Support/NexArmActionController.swift) | Shared execution and feedback observation |
 | [Support/NexArmMotorExecution.swift](Support/NexArmMotorExecution.swift) | Completion policy, motor results, reset wrapper and errors |
-| [Support/NexArmMotionPlan.swift](Support/NexArmMotionPlan.swift) | Shared bounded recipes, send-only choreography and feedback stability tracking |
+| [Support/NexArmMotionPlan.swift](Support/NexArmMotionPlan.swift) | Shared bounded recipes, feedback tracking and feedback stability tracking |
 | [Support/NexArmMotorProfiles.swift](Support/NexArmMotorProfiles.swift) | Central per-motor tolerances and empirical timing envelope |
 | [Support/NexArmRegistration.swift](Support/NexArmRegistration.swift) | Parameter-dependent resources and pre-admission budget |
 | [Support/NexArmJogPlanner.swift](Support/NexArmJogPlanner.swift) | Manual jog input, trajectory shaping and release policy |
@@ -57,9 +59,11 @@ All entries are finite. Unknown parameters fail validation. Optional `speed` def
 | `tiltWrist` | `direction`: left/right | 1–5 |
 | `lookAround`, `celebrate`, `dance` | `cycles`: 1–3 | 1–5 |
 
-Nod and shake-head prepare, sweep and return only their own motor. Complex presets prepare and return motors 1–5. Performances and whole-arm reset neither command nor check the gripper. Explicit motor 6 operations are supported; its reset requires a configured home and currently reports `invalidMotion` when missing. No home is guessed or written into firmware calibration. `amplitude` and `pause` are not current callable parameters.
+Nod and shake-head prepare, sweep and return only their own motor. Complex presets prepare and return motors 1–5. Performances and whole-arm reset neither command nor check the gripper. Explicit motor 6 operations are supported; its reset requires a configured home and reports `NexArmExecutionError.invalidArguments` when missing. No home is guessed or written into firmware calibration. `amplitude` and `pause` are not current callable parameters.
 
-Connection preparation uses read-only device IK to resolve the domain's home pose, XYZ=[200,0,200]mm with zero pitch/roll, and caches at most 64 geometries. Reference encoder values are not measured feedback. Finite moves send native CMD3 targets; simultaneous groups use CMD131 addressed writes. Firmware performs the movement. Complex geometry is compiled into motor targets rather than whole-device Cartesian commands that also control the gripper.
+Ordinary passive-link whole-arm reset and unconfigured single-motor reset use the legacy home `[2048, 2087, 1198, 1238, 2048]` from `NexArmGesture.referenceHomeJoints` (ADR0137). Settings and Agent reset share this recipe without IK queries; neither current feedback nor cached Cartesian IK changes the reset target. Explicit single-motor software homes still take precedence. Photographer tracking rest remains `[2047, 2087, 1984, 2045, 2048]` in `NexArmJointCommand.armHome` and is not an ordinary reset target. The sixth reference value is never commanded by whole-arm reset. Strict/pose-protocol execution retains device-resolved home for XYZ `[200,0,200]`; constants are not measured feedback or firmware calibration.
+
+Explicit preset preparation uses read-only device IK to resolve the domain's home pose, XYZ=[200,0,200]mm with zero pitch/roll, and caches at most 64 geometries. Reference encoder values are not measured feedback. Finite moves send native CMD3 targets; simultaneous groups use CMD131 addressed writes. Firmware performs the movement. Complex geometry is compiled into motor targets rather than whole-device Cartesian commands that also control the gripper.
 
 Manual jog is separate: 30ms planning steps, 4% dead zone, squared input response, speed/acceleration/jerk ceilings of 600/1800/12000 encoder units and 60ms finite look-ahead. Only accepted proposals advance state; identical targets are not resent. Release retains the last finite target and discards future velocity, without automatic reset.
 
@@ -67,24 +71,7 @@ Manual jog is separate: 30ms planning steps, 4% dead zone, squared input respons
 
 Each motor observes only its own target. The first fresh post-send sample inside its arrival tolerance succeeds immediately, including passage through the target while moving. This contract does not promise a stationary hold. Old cached samples cannot complete a new move.
 
-Outside the arrival region, fresh samples must remain within a 2-count anchor range for the off-target window before `targetNotReached`. Movement resets that interval. Missing samples never extend stability. Feedback silence for 2000ms produces `feedbackLost`; continuing motion past its calculated deadline produces `timedOut`. These are peer leaf failures and do not cancel subsequent children.
-
-```mermaid
-flowchart TD
-    A[Validate and send target once] --> B[Observe fresh motor feedback]
-    B --> C{Inside arrival tolerance?}
-    C -->|yes| OK[Success immediately]
-    C -->|no| D{Fresh stable span exceeded?}
-    D -->|yes| E[targetNotReached]
-    D -->|no| F{Feedback gap or motion deadline exceeded?}
-    F -->|no| B
-    F -->|gap| G[feedbackLost]
-    F -->|deadline| H[timedOut]
-    OK --> N[Record result and continue]
-    E --> N
-    G --> N
-    H --> N
-```
+Outside the arrival region, fresh samples must remain within a 2-count anchor range for the off-target window before `targetNotReached`. Movement resets that interval. Missing samples never extend stability. Feedback silence for 2000ms produces `feedbackLost`; continuing motion past its calculated deadline produces `timedOut`. Target/timeout failures allow later segments to execute. Feedback loss ends pending motors and records remaining segments without sending; it does not cancel the surrounding composition or trigger Bluetooth recovery.
 
 ### Motor profiles and measurement limits
 
@@ -118,8 +105,6 @@ This is a conservative empirical envelope, not a claimed physical acceleration c
 
 `@Action` attaches resource and timeout resolver functions to each entry. Registration before device admission conservatively reserves maximum legal travel per group, plus1s admission per group and5s setup/cleanup. Queue waiting is excluded. The actual plan can estimate from known positions: sequential budgets sum, parallel budgets take the maximum; generic compositions multiply repeats and add explicit delays. Estimates never introduce sleeps. Generic Action/composition deadlines cancel and **join** their handler before releasing resources. Whole-Action timeout is reported separately from the preserved child results. An uncooperative handler cannot be forcibly terminated safely.
 
-Transport refusal before acceptance can be retried within a one-second admission budget; accepted motion is never replayed. A target failure allows the next target to overwrite it. Feedback loss/disconnection ends the affected pending leaves and latches connection failure for the remaining plan: later steps are recorded without blind writes, repeated feedback deadlines, reconnects or query fallback. Preparation and explicit read-only diagnostics may still query.
-
 ## Composition and resource ownership
 
 [ActionComposition](../Runtime/ActionComposition.swift) supports `sequence`, `parallel`, `repeated` and `delay`. Sequential children continue after ordinary failure. Parallel children retain separate outcomes and must use disjoint resources. Intentional rhythm belongs in `delay`, not in atomic completion.
@@ -151,6 +136,60 @@ flowchart TD
     Report --> Release[Publish ActionResult and release execution slot]
     Release --> Next[Channel continues later Actions]
 ```
+
+## Execution errors and handling
+
+Action errors describe invocation/completion, not Bluetooth health. The controller retains per-motor outcomes and the original producer error; App converts them to an invocation-owned `ActionReport`. Native faults independently follow the [SDK error flow](../../PlatformKit/Connectivity/NexArm/README.md#bluetooth-errors-and-recovery). A disconnect can affect both flows; an Action failure never initiates native recovery.
+
+```mermaid
+flowchart TD
+    Call[OutputGateway / Channel] --> Adapter[App behavior adapter]
+    Adapter --> Admission{Foreground, ready, idle and resources available?}
+    Admission -->|no| Reject[NexArmExecutionError]
+    Admission -->|yes| Observe[Controller: begin observation]
+    Observe --> Send[Send segment: retry only before acceptance, up to 1s]
+    Send --> Feedback[Observe fresh per-motor feedback]
+    Feedback --> Outcome{Outcome}
+    Outcome -->|arrived| Record[Record motor result]
+    Outcome -->|off-target stable / motion deadline| Record
+    Outcome -->|feedback lost / disconnected| Latch[Fail pending motors; mark remaining segments without writes]
+    Outcome -->|other execution error| Stage[Record admission / sending / feedback failure]
+    Record --> More{More segments?}
+    Stage --> More
+    More -->|yes| Send
+    More -->|no| Report[App: ActionReport plus original error]
+    Latch --> Report
+    Observe -->|admission error| Report
+    Feedback -->|explicit cancellation| Cancel[Retain results; mark unstarted work]
+    Cancel --> Report
+    Reject --> Terminal[Runtime terminal result]
+    Report --> Terminal
+    Terminal --> Next[Release slot; ordinary failure allows later Channel work]
+```
+
+| Motor result / terminal error | Trigger | Handling |
+|---|---|---|
+| `targetNotReached` / `targetsNotReached(steps)` | Fresh samples stay outside target tolerance within a 2-count anchor range for the off-target window (default 600ms, enlarged by motor budget) | Record failed motor; continue later segments; aggregate failed steps |
+| `timedOut` / `motionTimedOut(steps)` | Motor deadline expires without arrival | Record failure; continue later segments; never replay accepted motion |
+| `feedbackLost` / `feedbackTimeout` | Position feedback gap exceeds the completion threshold (default 2000ms) | Fail pending motors; latch failure for remaining segments; no reconnect or query fallback |
+| `disconnected` | SDK observation/send returns `NexArmError.disconnected` | Same plan-local latch; retain original error; SDK/App handle connection separately |
+| `admissionFailed` | Observation admission fails, or unsent segment exceeds its 1s admission budget | Observation failure prevents all plan writes; segment admission timeout records that segment and permits later attempts |
+| `sendingFailed` | Send stage throws another error | Record pending motors and original error; native recovery remains SDK/App-owned |
+| `feedbackFailed` | Feedback retrieval/decoding or post-send processing throws another error | Record stage failure and original error; continue later segments unless cancelled/disconnected |
+| `cancelled` / `CancellationError` | Explicit caller/task cancellation | Stop future writes; retain completed results; unstarted entries become `notStarted` |
+
+| Invocation/business error | Trigger | Handling |
+|---|---|---|
+| `invalidArguments`; gesture `invalidRepetitions`, `invalidCycles`, `invalidDirection` | Invalid parameters, plan, completion settings or missing motor home | Reject invocation; gesture entry errors expose `ActionFailure.invalidArguments` |
+| `busy`, `resourceBusy`, `resourceUnavailable(reason)` | Occupied controller/App execution slot, overlapping motors or unavailable resource fence | Reject invocation; retry after ownership is released; no device fault |
+| `background`, `disconnected`, `controlNotReady` | App admission lacks foreground, connection or control readiness | Reject invocation; no synthetic Bluetooth diagnostic |
+| `unsupportedFirmware`, `firmwareUnavailable` | Explicit preparation lacks required firmware information/support | Fail preparation; passive BLE connection does not run this probe |
+| `moving` | Preparation/read-only recovery observes changing position | Recovery remains incomplete; no compensating motion |
+| `uncertainMotion` | A possible write cannot be confirmed, or a guarded operation follows faulted state | Guarded operations require explicit read-only `recoverState()`; never replay/rollback a command |
+
+Types: [NexArmMotorExecution.swift](Support/NexArmMotorExecution.swift), [gesture errors](Support/NexArmTypes.swift). Flow: [Controller.execute](Support/NexArmActionController.swift), [App runMotion/report](../../App/Workflows/Bluetooth/BluetoothWorkflow.swift), [behavior adapter](../../App/Adapters/NexArmBehaviorAdapter.swift).
+
+`NexArmExecutionError` supplies top-level `ActionFailure`; `NexArmActionError` does not implement that provider. Use report entries for motor-specific classification. `admissionTimeout` maps to top-level report code `timedOut`, while its motor entry is `admissionFailed`. Settings manual execution ends the current playback on failure and accepts later intent; it does not publish execution errors as device diagnostics.
 
 ## Results and Channel behavior
 
@@ -188,9 +227,9 @@ Cancellation stops future writes and joins cooperative tasks while retaining pri
 
 ## Status
 
-✅ Motor-scoped move/reset, shared completion, bounded gesture plans, result aggregation, generic composition, parameter-based resources and Channel failure continuation are implemented and covered by automated tests. Settings and conversation share the controller. Connection indication remains an Action-side helper. Retired query-driven wrist/base diagnostics live only in `Tests/IntegrationTests/NexArmLegacyDiagnosticController.swift`; production has one feedback-driven motion executor.
+✅ Motor-scoped move/reset, shared completion, bounded gesture plans, result aggregation, generic composition, parameter-based resources and Channel failure continuation are implemented and covered by automated tests. Settings and conversation share the controller. Connection indication is removed; connection completion sends no business motion. Retired query-driven wrist/base diagnostics live only in `Tests/IntegrationTests/NexArmLegacyDiagnosticController.swift`; production has one feedback-driven motion executor.
 
-❌ The API and composition gaps noted above remain open. Physical emergency stopping and persistent result delivery are also unimplemented; automated tests do not establish physical motion quality.
+❌ A nonthrowing `ActionOutcome` API, physical emergency stopping and persistent result delivery remain unimplemented; automated tests do not establish physical motion quality.
 
 Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros.md), [ADR0091](../../../docs/adr/0091-nexarm-motor-scoped-feedback.md), [ADR0092](../../../docs/adr/0092-atomic-actions-and-composed-results.md), [ADR0093](../../../docs/adr/0093-nexarm-platform-action-boundary.md). This document describes current code, not superseded implementations or unimplemented proposal interfaces.
 
@@ -200,7 +239,7 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 
 ✅ Support/NexArmJointCommand maps tracking radians to five motor targets on the 2026-10-03 rest `[2047, 2087, 1984, 2045, 2048]`: shoulder lift extends with wrist pitch above 0.25 rad down to `reachLiftMinimum`, and the elbow levels the forearm (`forearmLevelSum` 4071) with a 40 count lead only while extending (`NexArmForearmLeveler`). `NexArmJogPlanner.approach` moves one of those counts with the manual-jog jerk limit, caps aim speed at 200 counts/s (100 for lift and elbow), and holds position for one step before reversing. Production tracking streams that step on the live Bluetooth loop and does not wait for arrival. ❌ Physical tracking acceptance with the phone mounted remains pending.
 
-✅ Tracking aim is an immediate target write, with capacity-one controller admission and motors1–5 ownership. A failed possible write requires explicit read-only recovery. Its target mapping is Support/NexArmJointCommand.swift; native encoding remains PlatformKit. ❌ Tracking arrival remains unmeasured.
+✅ Tracking target publication returns before physical arrival; App streams accepted planner proposals under motors1–5 ownership. Direct controller aim has capacity-one admission and requires read-only recovery after an uncertain write. Mapping belongs to Support/NexArmJointCommand.swift; native encoding remains PlatformKit.
 
 ✅ Incremental tracking retains its speed/motion state in the Action controller; gestures, reset, arrival checks and five-motor/gripper boundaries keep their existing contracts.
 
@@ -210,10 +249,18 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 
 ❌ Streaming multi-motor packing with negotiated MTU validation and real-device calibration remain outstanding. Fixed presets, home selection and completion policy stay in Actions; neither Gateway nor UI owns BLE transport throttling.
 
-## Manual submission — ADR0127
+## Manual background execution — ADR0128
 
-✅ `manualPlan` reuses the prepared `NexArmArmPlan.motion/home` recipes and the same `configured` native speed/acceleration as Channel execution. It performs no I/O, resource acquisition, stationary recovery or feedback-completion wait. `NexArmMotionPlan.Step` retains nominal frame milliseconds. `submit` sends each frame through an App-supplied admission capability, waiting only cancellable inter-frame choreography beats; the last admitted frame returns immediately. Identical recipe/encoder implementation serves both paths, including single-motor head gestures and motors1–5 reset.
+✅ `manualPlan` builds the shared recipe without resource admission; passive BLE simple gestures use configured/measured joint references, while reset uses the configured/reference home without queries. Cartesian presets resolve only their missing requested poses plus home. App submits immediately to one cancellable background child; `performPlan` uses the same feedback-driven per-motor completion executor as Channel. Every segment, including final home, receives fresh feedback. Frame duration metadata never introduces a sleep. New preset/reset/jog cancels and joins software cleanup without waiting for the old target to arrive. Settings bypasses Gateway resources while retaining readiness, native limits, pacing and feedback failure policy.
 
-✅ Plans remain bounded to 20 frames, each 1…10,000 ms. A blocked frame retries at 30 ms with a two-second admission deadline; cancellation stops unsent frames, including the ending home. Local admission is never described as physical arrival. PlatformKit still imposes the actual connection-wide packet interval and system backpressure.
+❌ Physical motion rhythm and takeover acceptance remain pending; cancellation cannot retract an accepted target.
 
-❌ Physical gesture pacing, manual takeover stop timing and sustained firmware acceptance remain pending.
+## Passive BLE connection — ADR0130
+
+✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+
+❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+
+✅ Execution errors, invocation-owned reports and native Bluetooth faults follow the independent flows above (ADR0129–ADR0132). Passive nod/shake-head and resets need no IK table; Cartesian presets resolve only requested frames plus home and cache repeated poses. Explicit `prepareArmControl` retains full-catalog diagnostics (ADR0133).
+
+❌ Sustained physical-device motion/IK/takeover acceptance and durable execution history remain pending.

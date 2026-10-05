@@ -2,34 +2,49 @@ import ActionRuntime
 import Actions
 import AppWorkflows
 import Foundation
-import PlatformKit
 import ToolRuntime
-import Tools
 
 /// Host adaptation only; gesture/execution business policy remains in Actions.
 @MainActor
 struct NexArmBehaviorAdapter {
     let bluetooth: BluetoothWorkflow
+    let activity: ActionActivityWorkflow
     func aim(_ base: Double, _ pitch: Double, _ invocation: ToolInvocation) async throws {
-        do { try await bluetooth.aim(base: base, pitch: pitch) } catch BluetoothWorkflowError.disconnected,
-            BluetoothWorkflowError.controlNotReady,
-            BluetoothWorkflowError.background
-        {
-            throw RobotTools.AimError.notConnected
+        do {
+            try await bluetooth.aim(
+                base: base, pitch: pitch,
+                origin: .init(
+                    source: invocation.context.source, sessionID: invocation.context.sessionID,
+                    inputID: invocation.context.inputID, callID: invocation.call.id)
+            ) { [activity] failure in
+                await activity.recordFailure(
+                    title: "Robot.aim", source: failure.origin?.source ?? "持续控制", message: failure.message,
+                    failureCode: failure.code,
+                    context: .init(
+                        workerID: failure.workerID, sessionID: failure.origin?.sessionID,
+                        inputID: failure.origin?.inputID, callID: failure.origin?.callID))
+            }
+        } catch let error as NexArmExecutionError {
+            throw ToolExecutionFailure(
+                code: .init(rawValue: error.actionExecutionFailure.rawValue),
+                message: ActionReport.description(for: error))
         }
     }
     func gesture(_ request: NexArmActions.GestureRequest, _ invocation: ActionInvocation) async throws {
         let composition = try ActionComposition(
             .action("gesture", [], maximumResults: 100) {
+                let reports = ActionReportStore()
                 do {
                     switch request.gesture {
                     case .reset:
-                        try await bluetooth.resetArm(speed: request.speed, acceleration: request.acceleration)
+                        try await bluetooth.resetArm(
+                            speed: request.speed, acceleration: request.acceleration,
+                            recordReport: { try await reports.record($0) })
                     case .moveMotor, .resetMotor:
-                        guard let motor = request.motor else { throw NexArmError.invalidMotion }
+                        guard let motor = request.motor else { throw NexArmExecutionError.invalidArguments }
                         try await bluetooth.moveMotor(
                             id: motor, target: request.target, speed: request.speed,
-                            acceleration: request.acceleration)
+                            acceleration: request.acceleration, recordReport: { try await reports.record($0) })
                     default:
                         let gesture: NexArmGesture
                         switch request.gesture {
@@ -41,24 +56,26 @@ struct NexArmBehaviorAdapter {
                         case .lookAround: gesture = .lookAround
                         case .celebrate: gesture = .celebrate
                         case .dance: gesture = .dance
-                        default: throw NexArmError.invalidMotion
+                        default: throw NexArmExecutionError.invalidArguments
                         }
                         try await bluetooth.performGesture(
                             gesture, repetitions: request.repetitions,
-                            speed: request.speed, acceleration: request.acceleration)
+                            speed: request.speed, acceleration: request.acceleration,
+                            recordReport: { try await reports.record($0) })
                     }
                 } catch {
-                    if let report = await bluetooth.lastActionReport {
-                        return .report(report)
+                    if let report = await reports.snapshot() {
+                        return .report(report.recordingFailure(error))
                     }
                     throw error
                 }
-                if let report = await bluetooth.lastActionReport { return .report(report) }
+                if let report = await reports.snapshot() { return .report(report) }
                 return .completed
             })
         try await invocation.results.record(composition.run())
     }
     func shakeBase(_ cycles: Int, _ invocation: ActionInvocation) async throws {
+        let reports = ActionReportStore()
         do {
             let args = ActionArguments(invocation.call.parameters)
             let speed =
@@ -68,15 +85,16 @@ struct NexArmBehaviorAdapter {
                 try invocation.call.parameters["acceleration"] == nil
                 ? 30 : args.requiredInt("acceleration", range: 1...254)
             try await bluetooth.performGesture(
-                .baseSway, repetitions: cycles, speed: speed, acceleration: acceleration)
+                .baseSway, repetitions: cycles, speed: speed, acceleration: acceleration,
+                recordReport: { try await reports.record($0) })
         } catch {
-            if let report = await bluetooth.lastActionReport {
-                try await invocation.results.record(report)
+            if let report = await reports.snapshot() {
+                try await invocation.results.record(report.recordingFailure(error))
                 if error is CancellationError { throw error }
                 return
             }
             throw error
         }
-        if let report = await bluetooth.lastActionReport { try await invocation.results.record(report) }
+        if let report = await reports.snapshot() { try await invocation.results.record(report) }
     }
 }

@@ -162,7 +162,7 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ [ADR0125](adr/0125-bluetooth-exception-recovery.md): unified Bluetooth exception recovery, cancellation/cleanup fences and per-device diagnostic cache are implemented. ❌ Physical firmware/radio recovery and iOS diagnostic page acceptance remain pending; process-local cache does not survive relaunch.
 
-✅ ADR0126 fixes tracking's overlapping Tool/worker resource fences and records control-admission failures. ❌ Supervised iPhone tracking/endurance acceptance remains pending.
+✅ ADR0126 fixes tracking's overlapping Tool/worker resource fences and returns control-admission failures through Tool results and the independent home execution observer (ADR0131). ❌ Supervised iPhone tracking/endurance acceptance remains pending.
 
 ✅ [ADR0127](adr/0127-settings-manual-robot-takeover.md): Settings presets/reset/jog restore immediate replacement without Gateway resource locks or physical-arrival waiting, sharing Actions recipes/options and native pacing. ❌ Native slider gesture and physical robot takeover/endurance acceptance remain pending.
 
@@ -179,3 +179,31 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ✅ Final targeted audio/detection regression: 32 tests passed (UI freshness 3, workflow lifetime 3, speech/source/capture/resampler integration 25, capability resampler 1). Whole-repository strict Swift formatting, architecture boundary checks, Python tests (6), diff whitespace and plist metadata validation passed. The final unsigned MobileHarness generic iOS device build passed, including the App-owned diagnostic endpoint and native Settings section.
 
 ❌ `./scripts/check.sh` completes the test run with two existing NexArm planner test failures (four assertions): aimFollowApproachesTheLatestCountWithoutJumpingThere and aimFollowBrakesBeforeReversing. No audio/detection test failure occurred. `./scripts/build-ios.sh` fails in its first MobileHarnessSimulator scheme because the external CoreAIShared dependency cannot resolve the CoreAI module; the remaining three schemes are not attempted by this script. Physical capture, UI interaction, routes, coexistence and acoustic coordinates are not validated by these builds/fixtures. Original Technical_Design.docx is unchanged.
+
+✅ Settings NexArm presets/reset now advance on fresh segment feedback in a replaceable background task, without fixed 1.5 s waits (ADR0128). ❌ Physical-device rhythm, feedback-loss and immediate preset/jog/reset takeover acceptance remain pending.
+
+✅ [ADR0129](adr/0129-bluetooth-session-isolation.md): Bluetooth recovery removes global voice cleanup and scheduler coupling. Native session invalidation produces device failures, recorded by existing Action/Tool policies; accepted Channel work is preserved and executes normally. ❌ Physical voice/BLE coexistence acceptance remains pending.
+
+## Passive BLE connection — ADR0130
+
+✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+
+❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+
+✅ ADR0129/0130 simulation migration is complete: native recovery preserves accepted work, passive refresh does not query, and feedback silence is diagnostic only. ❌ Whole-suite and physical acceptance remain separate; current failures are recorded in Validation-History.
+
+
+## Independent Bluetooth diagnostics — ADR0131
+
+✅ ADR0133 (`docs/adr/0133-motion-admission-and-terminal-reports.md`): Actions prepares only requested Cartesian poses; passive simple/reset commands require no IK queries. PlatformKit selects supported native write capability with shared pacing and a capacity-one acknowledged-control window, publishes current interrupted-reply failures, and App reports restored connectivity without claiming motion validation. Runtime/Gateway preserve terminal failure entries and descriptions. ❌ Physical repeated-control, characteristic/firmware and UI acceptance remain pending.
+
+✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+
+✅ [ADR0135](adr/0135-nexarm-aim-final-count.md) implements exact final-count tracking convergence after native admission; scoped supervised USB acceptance is recorded in [physical results](NexArm_Physical_Acceptance.md). ❌ Real BLE recovery/endurance, native Settings gestures and tracking under phone load remain separate acceptance work.
+
+✅ [ADR0137](adr/0137-nexarm-ordinary-home.md) restores ordinary reset motor3/4 targets1198/1238 with query-free shared Settings/Agent execution, separately from tracking preparation. ❌ The restored posture has not been revalidated on hardware; earlier tracking-rest reset trials remain revision-scoped evidence.
+
+✅ [ADR0139](adr/0139-tracking-freshness-and-assistant-preemption.md): Photographer usable-pose freshness expires after one second; camera/session shutdown and stale input release the tracking motor use. Authorized Assistant NexArm actions preempt Photographer through host-configured joined writer takeover, keeping subsequent Channel Actions. ❌ Physical camera-off/source-stall/takeover timing and hardware stop acceptance remain pending.
+
+
+✅ [ADR0141](adr/0141-resource-control-ownership.md): public unlocked/locked(owner) replaces persistent faulted/recover. One occupancy authority includes transient writers, and revocable execution permits protect App effects. Cleanup timeout fails only its request; retained late cleanup automatically unlocks. Cancellation-independent acknowledgment remains. ❌ Physical camera-close/takeover timing and native uncooperative-I/O isolation acceptance remain pending.

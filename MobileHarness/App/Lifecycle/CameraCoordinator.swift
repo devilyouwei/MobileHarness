@@ -23,7 +23,6 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
     private var leaseRenewal: Task<Void, Never>?
     private var eventSequence: UInt64 = 0
     private(set) var captureEvent: ActivityEvent?
-    private var recoverRequested = false
     let preview: CameraPreviewSource
     let state: CameraState
     private var gazeSequence: UInt64?
@@ -121,7 +120,6 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
     }
 
     func retry() {
-        recoverRequested = true
         failed = false
         state.message = nil
         reconcile()
@@ -170,7 +168,6 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         state.gaze = .zero
         gazeSequence = nil
         state.visionMessage = nil
-        state.trackingMessage = nil
         visionSession = nil
         visionTask?.cancel()
         guard worker == nil else { return }
@@ -206,11 +203,6 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         state.visionMessage = message
         if message != nil { state.skeleton = nil }
     }
-    func trackingStatus(_ message: String?, sessionID: UUID) {
-        guard visionSession == sessionID, foreground, state.isEnabled else { return }
-        state.trackingMessage = message
-    }
-
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard visionSession == invocation.context.sessionID, foreground, state.isEnabled, state.isVisible else {
@@ -249,12 +241,6 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
     private func startCapture(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error> {
         let runtime = try makeRuntime()
         resourceRuntime = runtime
-        if recoverRequested {
-            recoverRequested = false
-            if await runtime.resources.snapshot()[CameraCoordinator.captureResource] == .faulted {
-                try await runtime.resources.recover([CameraCoordinator.captureResource])
-            }
-        }
         let lease = try await runtime.resources.acquire(
             resources: [CameraCoordinator.captureResource], owner: captureOwner, duration: .seconds(60)
         ) {
@@ -307,12 +293,13 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
             return true
         } catch ResourceError.staleLease {
             let current = await runtime.resources.snapshot()[CameraCoordinator.captureResource]
-            if current == .available
-                || {
-                    if case .leased = current { return true }
-                    return false
-                }()
-            {
+            let replacement: ResourceLease?
+            if case .locked(let owner?) = current {
+                replacement = await runtime.resources.lease(for: owner, resources: [CameraCoordinator.captureResource])
+            } else {
+                replacement = nil
+            }
+            if current == .unlocked || replacement != nil {
                 recordCapture(.revoked, id: lease.id)
                 return true
             }

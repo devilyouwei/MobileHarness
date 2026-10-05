@@ -40,9 +40,13 @@ public actor InputGateway {
         case .actionResult(let result):
             guard result.owner.sessionID == input.sessionID, result.owner.agent.rawValue.utf8.count <= 64,
                 result.path.module.utf8.count <= 64, result.path.function.utf8.count <= 64,
-                (result.status == .succeeded) == (result.completion != nil),
+                result.status != .succeeded || result.completion != nil,
                 (result.status == .succeeded) == (result.failure == nil)
             else { throw CommunicationError.invalidPayload }
+            if result.status != .succeeded, let completion = result.completion {
+                // Failed/cancelled reports retain partial effects; success-only completion kinds are invalid.
+                guard case .report = completion else { throw CommunicationError.invalidPayload }
+            }
         case .activityEvent(let event):
             guard event.owner.sessionID == input.sessionID, event.owner.agent.rawValue.utf8.count <= 64,
                 event.sequence > 0

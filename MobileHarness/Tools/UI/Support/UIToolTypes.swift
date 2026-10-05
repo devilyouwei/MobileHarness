@@ -8,12 +8,19 @@ extension UITools {
         public let x: Double
         public let y: Double
     }
-    public enum GazeError: Error, Equatable, Sendable { case invalidTarget }
+    public enum GazeError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
+        case invalidTarget
+        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
+    }
 
-    public enum PoseError: Error, Equatable, Sendable { case invalidPayload }
+    public enum PoseError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
+        case invalidPayload
+        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
+    }
 
-    public enum PresentationError: Error, Equatable, Sendable {
+    public enum PresentationError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
         case invalidText
         case invalidCall
+        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
     }
 }

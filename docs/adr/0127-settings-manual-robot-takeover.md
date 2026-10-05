@@ -1,6 +1,6 @@
 # ADR0127: Settings manual robot takeover
 
-Status: Accepted. Supersedes ADR0126 manual resource fencing and the shared Settings/Channel completion policy.
+Status: Superseded in its send-only completion decision by ADR0128; manual takeover and resource bypass remain accepted. Its recipe-preparation description is superseded by ADR0133: simple/reset passive plans are query-free, while Cartesian plans resolve requested missing poses in the background child. Supersedes ADR0126 manual resource fencing and the shared Settings/Channel completion policy.
 
 ## Problem
 

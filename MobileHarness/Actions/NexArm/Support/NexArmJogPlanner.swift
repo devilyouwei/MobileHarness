@@ -40,7 +40,7 @@ public struct NexArmJogPlanner: Sendable {
     public func proposal(id: Int, deflection: Double, elapsed: Double = period) throws -> Proposal? {
         guard (1...6).contains(id), deflection.isFinite, (-1...1).contains(deflection),
             elapsed.isFinite, elapsed > 0
-        else { throw NexArmError.invalidMotion }
+        else { throw NexArmExecutionError.invalidArguments }
         guard abs(deflection) > 0.04 else { return nil }
         let dt = min(elapsed, 0.06)  // Never catch up an accumulated transport stall.
         let index = id - 1
@@ -94,7 +94,7 @@ public struct NexArmJogPlanner: Sendable {
         guard (1...5).contains(id), Self.limits[id - 1].contains(target), elapsed.isFinite, elapsed > 0,
             speedLimit.isFinite, speedLimit > 0, speedLimit <= Self.maximumSpeed
         else {
-            throw NexArmError.invalidMotion
+            throw NexArmExecutionError.invalidArguments
         }
         let dt = min(elapsed, 0.06)
         let index = id - 1
@@ -130,8 +130,11 @@ public struct NexArmJogPlanner: Sendable {
             old.velocity + (old.acceleration + acceleration) * 0.5 * dt, -speedLimit, speedLimit)
         let lower = Double(Self.limits[index].lowerBound)
         let upper = Double(Self.limits[index].upperBound)
-        let position = clamp(old.position + (old.velocity + velocity) * 0.5 * dt, lower, upper)
+        var position = clamp(old.position + (old.velocity + velocity) * 0.5 * dt, lower, upper)
         if abs(Double(target) - position) <= 2, abs(velocity) < 8 {
+            // Commit the final count only after native admission; otherwise a fractional
+            // position just short of the target can keep the worker alive indefinitely.
+            position = Double(target)
             velocity = 0
             acceleration = 0
         }

@@ -34,7 +34,7 @@ flowchart LR
 
 ## Action runtime stage 2
 
-✅ CameraCoordinator acquires a 60-second camera.capture lease, renews every 10 seconds and fences camera start. Stop/lens/background transitions release the lease through centralized stop acknowledgment. Faults remain blocked until explicit retry/recovery; stale local cleanup cannot stop a newer owner. Latest capture ActivityEvent is host telemetry, not a recording Action or model turn. ❌ No generic activity event stream or real-device takeover acceptance.
+✅ CameraCoordinator acquires a 60-second camera.capture lease, renews every 10 seconds and fences camera start. Stop/lens/background transitions release the lease through centralized stop acknowledgment. Capture failure requires normal camera retry; resource ownership has no persistent fault/recover state. Cleanup timeout fails its request and retains unfinished work until actual completion automatically unlocks; stale local cleanup cannot stop a newer owner. Latest capture ActivityEvent is host telemetry, not a recording Action or model turn. See [resource ownership](../../Gateway/Output/Resources/README.md). ❌ No generic activity event stream or real-device takeover acceptance.
 
 ## Domain-owned behavior assembly
 
@@ -64,7 +64,7 @@ flowchart LR
 
 ✅ Photographer construction is injected from composition. VisionSession tracks successful registration and cleans up its own Agents after partial activation failure; it never removes a pre-existing Photographer after registration rejection.
 
-✅ VisionSession treats tracking outputs as an independent subscriber. Each failed Tool is reported through session-scoped tracking status and does not stop frames, VisionPerception or showPose. Subscriber completion does not end the camera task group; cancellation still joins both producers. ❌ Physical tracking acceptance remains pending.
+✅ VisionSession treats tracking outputs as an independent subscriber. Each failed Tool is retained by the independent OutputGateway failure observer for the home scheduling issue list and does not stop frames, VisionPerception or showPose. Subscriber completion does not end the camera task group; cancellation still joins both producers. ❌ Physical tracking acceptance remains pending.
 
 ✅ Voice and vision consumers use nonfatal Gateway execution outcomes. SpeechPerception failure stops only its capture worker and own actor, preserving Assistant/SpeechSynthesis lifetime; session/user cancellation retains full cleanup.
 
@@ -120,3 +120,8 @@ flowchart LR
 ✅ Composition supplies mutual voice/diagnostic cleanup barriers. Starting diagnostics stops and joins admitted voice work; starting voice cancels and joins diagnostics before microphone setup. A pending voice start is not recursively joined by diagnostic pre-start cleanup. Shutdown closes UI updates, cancels/joins output handling and Agent publication, stops hardware and removes the isolated registration before replacement.
 
 ❌ Physical transitions, microphone permission/route behavior and camera coexistence remain device acceptance items.
+
+✅ ADR0131: VisionSession continues processing after ordinary tracking output failure; OutputGateway records those failures for the home scheduling issue list. CameraCoordinator exposes no tracking error banner endpoint. BLE recovery does not stop voice/session scheduling. ❌ Physical coexistence acceptance remains pending.
+
+
+✅ ADR0141 removes CameraCoordinator's faulted/recover flag and branch. Retry performs normal lease acquisition against current occupancy; late completed cleanup unlocks automatically. Cancelled lifecycle removal and closure during an existing handoff still await bounded coordinator-owned acknowledgment. Camera capture leases retain deadlines, renewals and stale-lease checks. ❌ Software closure does not establish physical device stop.

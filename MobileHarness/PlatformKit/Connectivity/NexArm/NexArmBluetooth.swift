@@ -2,6 +2,35 @@ import CoreBluetooth
 import Foundation
 import OSLog
 
+/// Capability selection is native transport policy, independent of the operation's business purpose.
+enum NexArmBLEWriteMode: Sendable, Equatable {
+    case acknowledged, unacknowledged
+    static func select(withResponse: Bool, withoutResponse: Bool, preferred: Self) throws -> Self {
+        switch preferred {
+        case .acknowledged:
+            if withResponse { return .acknowledged }
+            if withoutResponse { return .unacknowledged }
+        case .unacknowledged:
+            if withoutResponse { return .unacknowledged }
+            if withResponse { return .acknowledged }
+        }
+        throw NexArmBluetoothError.incompatibleService
+    }
+    var nativeType: CBCharacteristicWriteType { self == .acknowledged ? .withResponse : .withoutResponse }
+}
+
+/// One GATT control acknowledgment may be outstanding. New packets remain caller-owned, never queued here.
+struct NexArmBLEControlWriteWindow {
+    private(set) var token: UUID?
+    mutating func reserve() -> UUID? {
+        guard token == nil else { return nil }
+        let value = UUID()
+        token = value
+        return value
+    }
+    mutating func complete() { token = nil }
+}
+
 public enum NexArmBluetoothPower: Sendable, Equatable {
     case unknown, resetting, unsupported, unauthorized, poweredOff, poweredOn
 }
@@ -49,6 +78,7 @@ struct NexArmBLETrafficBudget {
     private(set) var statistics = NexArmBluetoothTraffic()
     private var lastNotification: ContinuousClock.Instant?
     private var lastFeedback: ContinuousClock.Instant?
+    private var blockedSince: ContinuousClock.Instant?
 
     init(started: ContinuousClock.Instant = .now) {
         lastNotification = started
@@ -66,8 +96,10 @@ struct NexArmBLETrafficBudget {
     mutating func canSend(at now: ContinuousClock.Instant, systemReady: Bool) -> Bool {
         if !systemReady {
             increment(&statistics.systemDeferrals)
+            blockedSince = blockedSince ?? now
             return false
         }
+        blockedSince = nil
         if let nextWrite, now < nextWrite {
             increment(&statistics.pacingDeferrals)
             return false
@@ -97,7 +129,14 @@ struct NexArmBLETrafficBudget {
             lastFeedback = now
         }
     }
-    mutating func resumed() { increment(&statistics.flowControlResumptions) }
+    mutating func cancelBlockedWrite() { blockedSince = nil }
+    func isSendBlocked(at now: ContinuousClock.Instant = .now) -> Bool {
+        blockedSince.map { now - $0 >= .seconds(2) } ?? false
+    }
+    mutating func resumed() {
+        blockedSince = nil
+        increment(&statistics.flowControlResumptions)
+    }
     private func milliseconds(_ duration: Duration) -> Int {
         let value =
             Double(duration.components.seconds) * 1000
@@ -113,11 +152,14 @@ private func increment(_ value: inout UInt64, by amount: UInt64 = 1) {
 
 public struct NexArmBluetoothSnapshot: Sendable, Equatable {
     public var revision: UInt64 = 0
+    public var connectionID = UUID()
     public var queriesQuarantined = false
     public var power: NexArmBluetoothPower = .unknown
     public var phase: NexArmBluetoothPhase = .disconnected
     public var scanning = false
     public var traffic = NexArmBluetoothTraffic()
+    public var feedbackReceivedAt: ContinuousClock.Instant?
+    public var feedbackPacket: NexArmPacket?
     public var feedbackHealthy = true
     public var devices: [NexArmBluetoothDevice] = []
     public var selected: NexArmBluetoothDevice?
@@ -185,15 +227,23 @@ public enum NexArmBluetoothStep: String, Sendable, Equatable {
     case connecting, services, characteristics, notifications, writing, response
 }
 public enum NexArmBluetoothFailure: Sendable, Equatable {
+    public enum ProtocolViolation: Sendable, Equatable { case invalidPacket, receiveOverflow }
+    case protocolViolation(ProtocolViolation)
     case timeout(NexArmBluetoothStep)
     case responseTimeout(command: UInt8, expectedBytes: Int, receivedBytes: Int)
     case incompatibleService(NexArmBluetoothStep)
     case native(step: NexArmBluetoothStep, domain: String, code: Int)
     case disconnectUnconfirmed
+    case requestInterrupted(command: UInt8)
+    case sendBlocked
 
     public init(step: NexArmBluetoothStep, error: any Error) {
         if error as? NexArmError == .timeout {
             self = .timeout(step)
+        } else if error as? NexArmError == .invalidPacket {
+            self = .protocolViolation(.invalidPacket)
+        } else if error as? NexArmError == .overflow {
+            self = .protocolViolation(.receiveOverflow)
         } else if error as? NexArmBluetoothError == .incompatibleService {
             self = .incompatibleService(step)
         } else {
@@ -232,42 +282,40 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
 {
     private var trafficBudget = NexArmBLETrafficBudget()
     private var telemetry = NexArmTelemetryCache()
+    private var controlWriteWindow = NexArmBLEControlWriteWindow()
+    private var controlWriteTimer: Task<Void, Never>?
     private var observationID: UUID?
     private var feedbackWatchdog: NexArmFeedbackWatchdog?
     private var feedbackMonitor: Task<Void, Never>?
     func beginObservation() throws -> UUID {
         guard snapshot.phase == .connected, let tx, rx?.isNotifying == true else { throw NexArmError.disconnected }
-        guard snapshot.feedbackHealthy else { throw NexArmError.feedbackLost }
         guard liveControlID == nil, request == nil, observationID == nil else { throw NexArmError.busy }
-        guard tx.properties.contains(.writeWithoutResponse) else { throw NexArmBluetoothError.incompatibleService }
+        _ = try writeMode(tx, preferred: .unacknowledged)
         let token = UUID()
         observationID = token
         return token
     }
     func sendObserved(_ packet: NexArmPacket, session: UUID) throws -> Bool {
         try Task.checkCancellation()
-        guard observationID == session, liveControlID == nil else { throw CancellationError() }
-        guard snapshot.feedbackHealthy else { throw NexArmError.feedbackLost }
+        guard observationID == session, liveControlID == nil else { throw NexArmError.disconnected }
         guard snapshot.phase == .connected, let peripheral, let tx else { throw NexArmError.disconnected }
         guard packet.isObservedControl
         else { throw NexArmError.invalidPacket }
-        guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withoutResponse) else {
-            throw NexArmBluetoothError.packetTooLarge
-        }
-        let now = ContinuousClock.now
-        guard trafficBudget.canSend(at: now, systemReady: peripheral.canSendWriteWithoutResponse) else { return false }
-        peripheral.writeValue(Data(packet.bytes), for: tx, type: .withoutResponse)
-        trafficBudget.sent(bytes: packet.bytes.count, at: .now)
-        return true
+        return try writeControl(packet, peripheral: peripheral, characteristic: tx)
     }
     func latestObservation(after sequence: UInt64, session: UUID) throws -> NexArmTelemetry? {
-        guard observationID == session, liveControlID == nil else { throw CancellationError() }
-        guard snapshot.feedbackHealthy else { throw NexArmError.feedbackLost }
+        try Task.checkCancellation()
+        guard observationID == session, liveControlID == nil else { throw NexArmError.disconnected }
         guard snapshot.phase == .connected else { throw NexArmError.disconnected }
         guard let latest = telemetry.latest, latest.sequence > sequence else { return nil }
         return latest
     }
-    func endObservation(_ session: UUID) { if observationID == session { observationID = nil } }
+    func endObservation(_ session: UUID) {
+        if observationID == session {
+            observationID = nil
+            trafficBudget.cancelBlockedWrite()
+        }
+    }
     private static let service = CBUUID(string: "FFE0")
     private static let transmit = CBUUID(string: "FFE1")
     private static let receive = CBUUID(string: "FFE2")
@@ -316,6 +364,48 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         let value = CBCentralManager(delegate: self, queue: .main)
         central = value
         return value
+    }
+    private func writeMode(_ characteristic: CBCharacteristic, preferred: NexArmBLEWriteMode) throws
+        -> NexArmBLEWriteMode
+    {
+        try .select(
+            withResponse: characteristic.properties.contains(.write),
+            withoutResponse: characteristic.properties.contains(.writeWithoutResponse), preferred: preferred)
+    }
+    private func writeControl(_ packet: NexArmPacket, peripheral: CBPeripheral, characteristic: CBCharacteristic) throws
+        -> Bool
+    {
+        let mode = try writeMode(characteristic, preferred: .unacknowledged)
+        guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: mode.nativeType) else {
+            throw NexArmBluetoothError.packetTooLarge
+        }
+        guard controlWriteWindow.token == nil else { return false }
+        if mode == .acknowledged {
+            guard !retiredWriteAcknowledgment else { return false }
+        }
+        guard try admitWrite(peripheral, systemReady: mode == .acknowledged || peripheral.canSendWriteWithoutResponse)
+        else {
+            return false
+        }
+        if mode == .acknowledged {
+            guard let token = controlWriteWindow.reserve() else { return false }
+            controlWriteTimer = Task { [weak self] in
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                guard let self, self.controlWriteWindow.token == token else { return }
+                self.fail(NexArmError.timeout, overriding: .timeout(.writing))
+            }
+        }
+        peripheral.writeValue(Data(packet.bytes), for: characteristic, type: mode.nativeType)
+        trafficBudget.sent(bytes: packet.bytes.count, at: .now)
+        return true  // Native admission; physical completion still requires feedback.
+    }
+    private func admitWrite(_ peripheral: CBPeripheral, systemReady: Bool) throws -> Bool {
+        let accepted = trafficBudget.canSend(at: .now, systemReady: systemReady)
+        if trafficBudget.isSendBlocked() {
+            fail(NexArmError.timeout, overriding: .sendBlocked)
+            throw NexArmError.timeout
+        }
+        return accepted
     }
     func status() -> NexArmBluetoothSnapshot {
         var value = snapshot
@@ -389,6 +479,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         snapshot.failure = nil
         let token = UUID()
         connectionID = token
+        snapshot.connectionID = token
         publish()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -409,9 +500,8 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         try Task.checkCancellation()
     }
     func beginLiveControl() throws -> UUID {
-        observationID = nil
         guard snapshot.phase == .connected, let tx else { throw NexArmError.disconnected }
-        guard tx.properties.contains(.writeWithoutResponse) else { throw NexArmBluetoothError.incompatibleService }
+        _ = try writeMode(tx, preferred: .unacknowledged)
         let token = UUID()
         liveControlID = token
         // Retire an old observation instead of allowing its timeout to close a live jog.
@@ -426,28 +516,22 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
             requestID = nil
             requestWasSent = false
             reply = nil
-            pending.resume(throwing: CancellationError())
+            pending.resume(throwing: NexArmError.sessionReplaced)
         }
         return token
     }
     func sendLive(_ packet: NexArmPacket, session: UUID) throws -> Bool {
         try Task.checkCancellation()
-        guard liveControlID == session else { throw CancellationError() }
+        guard liveControlID == session else { throw NexArmError.disconnected }
         guard snapshot.phase == .connected, let peripheral, let tx else { throw NexArmError.disconnected }
-        guard snapshot.feedbackHealthy else { throw NexArmError.feedbackLost }
         guard packet.isLiveControl else { throw NexArmError.invalidPacket }
-        guard packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withoutResponse) else {
-            throw NexArmBluetoothError.packetTooLarge
-        }
-        let now = ContinuousClock.now
-        guard trafficBudget.canSend(at: now, systemReady: peripheral.canSendWriteWithoutResponse) else { return false }
-        peripheral.writeValue(Data(packet.bytes), for: tx, type: .withoutResponse)
-        trafficBudget.sent(bytes: packet.bytes.count, at: .now)
-        return true  // Local transport admission only; no device-completion claim.
+        // Local transport admission only; no device-completion claim.
+        return try writeControl(packet, peripheral: peripheral, characteristic: tx)
     }
     func endLiveControl(_ session: UUID) {
         if liveControlID == session {
             liveControlID = nil
+            trafficBudget.cancelBlockedWrite()
             liveDrainUntil = .now.advanced(by: .milliseconds(150))
         }
     }
@@ -466,20 +550,21 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         acknowledgmentOnly: Bool
     ) async throws -> NexArmPacket {
         try Task.checkCancellation()
-        guard liveControlID == nil, observationID == nil else { throw CancellationError() }
+        guard liveControlID == nil, observationID == nil else { throw NexArmError.busy }
         if let liveDrainUntil, ContinuousClock.now < liveDrainUntil {
             try await Task.sleep(until: liveDrainUntil, clock: .continuous)
         }
         try Task.checkCancellation()
-        guard liveControlID == nil, observationID == nil else { throw CancellationError() }
+        guard liveControlID == nil, observationID == nil else { throw NexArmError.busy }
         guard !retiredWriteAcknowledgment else { throw NexArmError.busy }
         guard snapshot.phase == .connected, let peripheral, let tx, rx?.isNotifying == true else {
             throw NexArmError.disconnected
         }
-        guard request == nil else { throw NexArmError.busy }
+        guard request == nil, controlWriteWindow.token == nil else { throw NexArmError.busy }
         guard !queryTimeoutLatched else { throw NexArmError.timeout }
+        let mode = try writeMode(tx, preferred: .acknowledged)
         guard (0...253).contains(replyCount),
-            packet.bytes.count <= peripheral.maximumWriteValueLength(for: .withResponse)
+            packet.bytes.count <= peripheral.maximumWriteValueLength(for: mode.nativeType)
         else {
             throw NexArmBluetoothError.packetTooLarge
         }
@@ -501,36 +586,55 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
                 requestTimer = Task { [weak self] in
                     do { try await Task.sleep(for: .seconds(5)) } catch { return }
                     guard let self, self.requestID == token else { return }
-                    // No wire transaction IDs: close on timeout so late replies cannot satisfy another request.
+                    // No wire transaction IDs: quarantine a read timeout or close a failed write before another request.
                     self.fail(NexArmError.timeout)
                 }
                 // The request slot is already reserved, so the pacing wait cannot admit a second query.
                 requestSender = Task { [weak self] in
                     guard let self else { return }
-                    if let deadline = self.trafficBudget.nextWrite, ContinuousClock.now < deadline {
-                        _ = self.trafficBudget.canSend(at: .now, systemReady: true)
-                        do { try await Task.sleep(until: deadline, clock: .continuous) } catch { return }
+                    do {
+                        while true {
+                            try Task.checkCancellation()
+                            guard self.requestID == token, self.snapshot.phase == .connected,
+                                self.peripheral === peripheral, self.liveControlID == nil, self.observationID == nil
+                            else { return }
+                            if try self.admitWrite(
+                                peripheral, systemReady: mode == .acknowledged || peripheral.canSendWriteWithoutResponse
+                            ) {
+                                break
+                            }
+                            try await Task.sleep(for: .milliseconds(20))
+                        }
+                    } catch {
+                        guard self.requestID == token, !(error is CancellationError) else { return }
+                        self.fail(error)
+                        return
                     }
-                    guard !Task.isCancelled, self.requestID == token,
-                        self.snapshot.phase == .connected, self.peripheral === peripheral,
-                        self.liveControlID == nil, self.observationID == nil
-                    else { return }
                     self.requestWasSent = true
-                    peripheral.writeValue(Data(packet.bytes), for: tx, type: .withResponse)
+                    if mode == .unacknowledged {
+                        self.reply?.acknowledged = true
+                        self.step = .response
+                    }
+                    peripheral.writeValue(Data(packet.bytes), for: tx, type: mode.nativeType)
                     self.trafficBudget.sent(bytes: packet.bytes.count, at: .now)
                     self.requestSender = nil
+                    self.finishReply()
                 }
             }
         } onCancel: {
             Task { @MainActor [weak self] in
                 guard let self, self.requestID == token else { return }
-                self.fail(CancellationError())
+                if self.requestWasSent {
+                    self.fail(CancellationError(), overriding: .requestInterrupted(command: packet.command))
+                } else {
+                    self.failPending(CancellationError())
+                }
             }
         }
     }
     func disconnect() async {
         stopScan()
-        failPending(CancellationError())
+        failPending(NexArmError.disconnected)
         guard let peripheral else { return }
         if let disconnectTask {
             await disconnectTask.value
@@ -556,8 +660,14 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         disconnectTask = nil
     }
     private func failPending(_ error: any Error) {
+        controlWriteTimer?.cancel()
+        controlWriteTimer = nil
+        controlWriteWindow.complete()
+        trafficBudget.cancelBlockedWrite()
         observationID = nil
         telemetry = NexArmTelemetryCache()
+        snapshot.feedbackPacket = nil
+        snapshot.feedbackReceivedAt = nil
         liveControlID = nil
         retiredWriteAcknowledgment = false
         liveDrainUntil = nil
@@ -578,10 +688,10 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         connecting?.resume(throwing: error)
         pending?.resume(throwing: error)
     }
-    private func fail(_ error: any Error) {
+    private func fail(_ error: any Error, overriding: NexArmBluetoothFailure? = nil) {
         // Capture the pending query before failPending clears it. Never replay a timed-out request.
         let keepConnection =
-            error as? NexArmError == .timeout && step == .response
+            overriding == nil && error as? NexArmError == .timeout && step == .response
             && reply?.readOnlyQuery == true
         let failure: NexArmBluetoothFailure?
         if error as? NexArmError == .timeout, step == .response, let reply, !reply.acknowledgmentOnly {
@@ -590,8 +700,9 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         } else {
             failure = error is CancellationError ? nil : NexArmBluetoothFailure(step: step, error: error)
         }
+        let captured = overriding ?? failure
         failPending(error)
-        snapshot.failure = failure
+        snapshot.failure = captured
         if let failure = snapshot.failure { log.error("\(String(describing: failure), privacy: .public)") }
         if keepConnection {
             // No wire request IDs: quarantine queries until reconnect rather than allowing a late reply
@@ -692,7 +803,10 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     }
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard self.peripheral === peripheral, connection != nil else { return }
-        tx = service.characteristics?.first { $0.uuid == Self.transmit && $0.properties.contains(.write) }
+        tx = service.characteristics?.first {
+            $0.uuid == Self.transmit
+                && ($0.properties.contains(.write) || $0.properties.contains(.writeWithoutResponse))
+        }
         rx = service.characteristics?.first { $0.uuid == Self.receive && $0.properties.contains(.notify) }
         guard error == nil, tx != nil, let rx else {
             fail(error ?? NexArmBluetoothError.incompatibleService)
@@ -725,6 +839,10 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
                 guard let self, self.snapshot.phase == .connected else { return }
+                if self.trafficBudget.isSendBlocked() {
+                    self.fail(NexArmError.timeout, overriding: .sendBlocked)
+                    return
+                }
                 self.updateFeedbackHealth()
                 ticks += 1
                 if ticks == 50 {
@@ -741,6 +859,17 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         if retiredWriteAcknowledgment {
             retiredWriteAcknowledgment = false
             if let error { fail(error) }
+            return
+        }
+        if controlWriteWindow.token != nil {
+            controlWriteTimer?.cancel()
+            controlWriteTimer = nil
+            controlWriteWindow.complete()
+            if let error {
+                fail(
+                    error,
+                    overriding: NexArmBluetoothFailure(step: .writing, error: error))
+            }
             return
         }
         guard request != nil else { return }
@@ -766,7 +895,12 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
             let samples = (telemetry.latest?.sequence ?? 0) &- previousSequence
             trafficBudget.received(bytes: 0, feedbackSamples: samples, at: now)
             if let latest = telemetry.latest { feedbackWatchdog?.observe(at: latest.receivedAt) }
+            if samples > 0 {
+                snapshot.feedbackPacket = telemetry.latest?.packet
+                snapshot.feedbackReceivedAt = telemetry.latest?.receivedAt
+            }
             updateFeedbackHealth()
+            if samples > 0 { publish() }
             try reply?.receive(Array(data))
             finishReply()
         } catch { fail(error) }

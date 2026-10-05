@@ -53,7 +53,7 @@ extension ActionReport {
             delivering: entries.map {
                 .init(
                     path: $0.path, status: $0.status.agentValue, code: $0.code?.agentValue, details: $0.details)
-            }, executionFailure: executionFailure?.agentValue)
+            }, executionFailure: executionFailure?.agentValue, failureDescription: failureDescription)
     }
 }
 extension ActionFailure {

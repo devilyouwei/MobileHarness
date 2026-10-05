@@ -1,5 +1,7 @@
 # NexArm Action support
 
+✅ ADR0135: `NexArmJogPlanner.approach` finishes the last 1–2 counts once the existing near-target/low-speed condition holds. The final exact-count proposal remains pending until native admission and `accept`; a deferred write cannot advance the target. Reaching the planner target ends streaming, not physical arrival. All speed, scope and feedback-result boundaries remain separately owned.
+
 Purpose: implement the NexArm action domain below its stateless callable entry points. Design goals: shared Settings/Channel recipes with explicit submission versus feedback-completion boundaries, validated motor scope, bounded work and complete Channel child outcomes.
 
 ✅ This directory owns gesture metadata, simple/complex recipes, IK plan preparation, the Action controller, completion policy/results, reset wrappers and manual jog shaping. It imports the foundational PlatformKit SDK through injected links; concrete connection lifetime belongs to App. Public helpers do not grant model permission.
@@ -26,20 +28,41 @@ flowchart LR
 
 ✅ NexArmJointCommand owns tracking rest/angle and speed policy; aim shares controller admission and motor ownership. Native encoding remains in PlatformKit. ❌ Tracking arrival is not measured.
 
-✅ Tracking writes reject faulted controllers. Any failed/cancelled write that may have committed latches uncertainty; explicit recoverState verifies stationary feedback and never replays a command.
+✅ The direct single-packet aim diagnostic rejects uncertain controllers until explicit read-only recoverState; it never replays a write. Production App BLE streaming uses the jog planner and native connection sessions instead; finite/manual execution failure does not leave a persistent admission latch.
 
-✅ Tracking rest and reach: `NexArmJointCommand.armHome` is `[2047, 2087, 1984, 2045, 2048]`; `reachLift` maps wrist pitch to shoulder lift, and `NexArmForearmLeveler` adds the measured 40 count elbow lead only while extending. ✅ Production tracking steps through `NexArmJogPlanner.approach`. Speed follows the remaining count and stays at 200 counts/s (100 for lift and elbow). A direction change holds the current count for one step before reversing. The five-axis packet builder still sizes its test speed from the previous target. Faulted writes still require explicit read-only recovery and are never replayed. Native encoding remains in PlatformKit.
+✅ ADR0137: Ordinary passive-link reset uses `NexArmGesture.referenceHomeJoints` for motors1–5 (`[2048,2087,1198,1238,2048]`), independently of tracking/current feedback/prepared IK. Manual and Agent reset share this target without queries; explicit single-motor software homes remain honored. ❌ Restored phone posture has not been physically revalidated.
 
-✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, BluetoothWorkflowError owns its failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
+✅ Tracking rest and reach: `NexArmJointCommand.armHome` is `[2047, 2087, 1984, 2045, 2048]`; `reachLift` maps wrist pitch to shoulder lift, and `NexArmForearmLeveler` adds the measured 40 count elbow lead only while extending. ✅ Production tracking steps through `NexArmJogPlanner.approach`. Speed follows the remaining count and stays at 200 counts/s (100 for lift and elbow). A direction change holds the current count for one step before reversing. The five-axis packet builder still sizes its test speed from the previous target. The diagnostic single-packet path retains explicit read-only recovery; App streaming does not use that path. Native encoding remains in PlatformKit.
+
+✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, Actions-owned NexArmExecutionError owns its execution failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
 
 ❌ Runtime must not classify pose, foreground, control-readiness or device-feedback failures. Producers provide actionReportCode through ActionExecutionFailureProviding; the generic default handles invalid arguments/resource unavailability and otherwise reports handlerFailed. CancellationError remains cancellation.
 
-✅ ADR0127: `NexArmActionController.manualPlan` builds the same prepared geometry/options used by Channel gestures/reset without I/O or lock admission. `NexArmMotionPlan.submit` owns bounded cancellable choreography and send admission, while the existing controller owns feedback arrival. App supplies one live session and cancels prior writers; no second geometry catalog or packet encoder is introduced.
+✅ Manual requests build the same prepared recipe through `manualPlan` and run `performPlan` on App's cancellable child task. The shared executor uses fresh feedback for every segment, including the final home; there is no nominal-frame sleep. Caller submission remains immediate, and replacement joins software cleanup without requiring physical arrival. No duplicate motion executor or packet encoder is introduced.
 
 ```mermaid
 flowchart LR
-    Recipe[Shared prepared motion recipe] --> Manual[Send-only submission / nominal beats]
-    Recipe --> Channel[Feedback completion / motor outcomes]
-    Manual --> SDK[PlatformKit native admission]
-    Channel --> SDK
+    Recipe[Shared prepared recipe] --> Worker[Cancellable App worker]
+    Worker --> Executor[Actions segment feedback executor]
+    Executor <--> SDK[PlatformKit native commands and feedback]
 ```
+
+## Passive BLE connection — ADR0130
+
+✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+
+❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+
+✅ ADR0129: observation-session invalidation reports disconnected motor outcomes and throws a device error. Only explicit caller cancellation creates cancelled outcomes; reconnect policy never selects or cancels Action tasks.
+
+✅ ADR0131: NexArmExecutionError owns invocation/admission failures here, separate from SDK Bluetooth diagnostics. The motion executor retains per-motor outcomes while propagating the original caught dependency error. ❌ Physical motion/firmware acceptance remains pending.
+
+✅ Motor report revision distinguishes execution outcomes from a pre-execution rejection; the App never attaches a preceding call's motor results to a new validation failure. ❌ Physical validation remains pending.
+
+✅ Retired connection-indication motion/API is removed. Missing Action feedback throws NexArmExecutionError.feedbackTimeout; PlatformKit contains no unused feedbackLost error. Observation admission distinguishes cancellation, actual disconnection and generic dependency failure rather than reporting every rejection as disconnected. ❌ Physical motion acceptance remains pending.
+
+✅ ADR0132: Actions now owns invalidArguments, busy, firmware policy and admissionTimeout errors. Motor outcomes distinguish observation admission, native sending and feedback processing; the original dependency Error remains separate. Platform SDK hardware-encoding errors remain SDK-owned.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.
+
+✅ ADR0133: Passive BLE nod/shake-head, whole-arm reset and per-motor reset no longer require an IK table, including after partial Cartesian preparation. Cartesian presets incrementally resolve only the requested frames plus home before sending; repeated poses reuse the connection-local cache. Explicit diagnostic `prepareArmControl` retains full-catalog preparation. Manual and Channel requests reuse the same Actions recipes and feedback executor. ❌ Physical motion/IK firmware acceptance remains pending.

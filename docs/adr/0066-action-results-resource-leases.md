@@ -2,6 +2,8 @@
 
 Status: accepted, implementation stage 2 (2026-09-29). Supersedes the future-work portions of ADR 0065 concerning terminal feedback and resource arbitration; original design documents remain unchanged.
 
+Current resource ownership contract: [ADR0141](0141-resource-control-ownership.md) supersedes the persistent faulted/explicit-recovery policy below. Caller-independent acknowledgment, configured preemption and existing execution/result isolation remain current.
+
 ## Context and decision
 
 An Action admission receipt cannot describe execution completion. A state-setting or activity-start call may return while its effect remains active, so Channel/module exclusion alone cannot protect a physical resource. Tool and host paths must share the same resource authority.

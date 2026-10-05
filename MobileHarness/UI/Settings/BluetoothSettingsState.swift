@@ -3,9 +3,10 @@ import Observation
 
 public enum BluetoothAvailability: Sendable { case unknown, available, poweredOff, denied, unsupported }
 public enum BluetoothConnectionPhase: Sendable {
-    case idle, connecting, verifying, indicating, connected, disconnecting, failed
+    case idle, connecting, connected, disconnecting, failed
 }
-public struct BluetoothDeviceRow: Identifiable, Sendable, Equatable {
+public enum BluetoothDeviceRowIntent: Sendable { case connect, openDetail, unavailable }
+public struct BluetoothDeviceRow: Identifiable, Sendable, Hashable {
     public let id: UUID
     public let name: String
     public init(id: UUID, name: String) {
@@ -16,7 +17,6 @@ public struct BluetoothDeviceRow: Identifiable, Sendable, Equatable {
 @MainActor
 public protocol BluetoothControlling: AnyObject {
     func reconnect(_ id: UUID)
-    func clearIncidents(_ id: UUID)
     func refreshDevice() async
     func tryAction(_ action: BluetoothArmAction)
     func setMotorVelocity(id: Int, value: Double)
@@ -51,14 +51,13 @@ public enum BluetoothArmAction: String, CaseIterable, Identifiable, Sendable {
 }
 
 public enum BluetoothRecoveryStage: Sendable {
-    case idle, cleaning, waiting, connecting, verifying, waitingForBluetooth, suspended, failed
+    case idle, cleaning, waiting, connecting, waitingForBluetooth, suspended, failed
     public var title: String {
         switch self {
         case .idle: "无恢复任务"
         case .cleaning: "正在清理旧连接"
         case .waiting: "等待重新连接"
         case .connecting: "正在重新连接"
-        case .verifying: "正在验证控制"
         case .waitingForBluetooth: "等待蓝牙恢复"
         case .suspended: "恢复已暂停，返回前台后继续"
         case .failed: "恢复未完成，需要处理"
@@ -66,38 +65,9 @@ public enum BluetoothRecoveryStage: Sendable {
     }
     public var busy: Bool {
         switch self {
-        case .cleaning, .waiting, .connecting, .verifying: true
+        case .cleaning, .waiting, .connecting: true
         default: false
         }
-    }
-}
-
-/// Bounded display-only diagnostic values; no device SDK types enter UI.
-public struct BluetoothIncident: Identifiable, Sendable {
-    public let id: UUID
-    public let episodeID: UUID
-    public let deviceID: UUID
-    public let time: Date
-    public let cause: String
-    public let stage: String
-    public let message: String
-    public let attempt: Int
-    public let elapsedSeconds: Double
-    public let details: [String]
-    public init(
-        id: UUID = UUID(), episodeID: UUID, deviceID: UUID, time: Date = Date(), cause: String,
-        stage: String, message: String, attempt: Int, elapsedSeconds: Double, details: [String]
-    ) {
-        self.id = id
-        self.episodeID = episodeID
-        self.deviceID = deviceID
-        self.time = time
-        self.cause = String(cause.prefix(128))
-        self.stage = String(stage.prefix(128))
-        self.message = String(message.prefix(512))
-        self.attempt = attempt
-        self.elapsedSeconds = elapsedSeconds
-        self.details = details.prefix(10).map { String($0.prefix(256)) }
     }
 }
 
@@ -106,7 +76,6 @@ public struct BluetoothIncident: Identifiable, Sendable {
 public final class BluetoothSettingsState {
     public var availability: BluetoothAvailability = .unknown
     public var phase: BluetoothConnectionPhase = .idle
-    public var transportStatus = "未连接"
     public var scanning = false
     public var remembered: BluetoothDeviceRow?
     public var nearby: [BluetoothDeviceRow] = []
@@ -114,53 +83,73 @@ public final class BluetoothSettingsState {
     public var recoveryStage: BluetoothRecoveryStage = .idle
     public var recoveryDeviceID: UUID?
     public var recoveryAttempt = 0
-    public var incidents: [BluetoothIncident] = []
-    public func incidents(for id: UUID) -> [BluetoothIncident] { incidents.filter { $0.deviceID == id } }
-    public var controlValidated = false
+    /// Latest native communication issue, independently adapted by App.
+    public var transportIssue: String?
+    /// Connected or remembered devices belong to My Devices; a new pending selection stays nearby.
+    public var myDevice: BluetoothDeviceRow? {
+        if phase == .connected, let selected { return selected }
+        if let remembered { return selected?.id == remembered.id ? selected : remembered }
+        return nil
+    }
+    public var otherDevices: [BluetoothDeviceRow] {
+        var rows = nearby.filter { $0.id != myDevice?.id }
+        if let selected, selected.id != myDevice?.id, !rows.contains(where: { $0.id == selected.id }) {
+            rows.insert(selected, at: 0)
+        }
+        return rows
+    }
+    public func rowIntent(for id: UUID) -> BluetoothDeviceRowIntent {
+        if isConnected(id) { return .openDetail }
+        return canConnect ? .connect : .unavailable
+    }
+    public func isConnected(_ id: UUID) -> Bool { selected?.id == id && phase == .connected }
+    public func hasConnectionIssue(_ id: UUID) -> Bool { isConnected(id) && transportIssue != nil }
+    public func canControl(_ id: UUID) -> Bool { isConnected(id) && canControl }
+    public func currentMessage(for id: UUID) -> String? {
+        let currentID = selected?.id ?? (recoveryStage == .idle ? nil : recoveryDeviceID) ?? remembered?.id
+        guard currentID == id else { return nil }
+        if isConnected(id) { return transportIssue }
+        if recoveryStage != .idle { return error ?? notice }
+        return phase == .failed ? error : nil
+    }
     public var error: String?
     public var notice: String?
-    public var motionStatus: String?
-    public var executing = false
-    public var refreshing = false
     public var jogging = false
-    public var testing = false
-    public var resetting = false
     public var joints: [Int] = []
     public var pose: [Int] = []
     public var sampledAt: Date?
     /// Manual controls remain available for takeover while a previous operation is active.
-    public var canControl: Bool { controlReady }
+    public var canControl: Bool { phase == .connected && !recoveryStage.busy }
 
     public init() {}
-    public var controlReady: Bool { phase == .connected && controlValidated && !recoveryStage.busy }
+    public var controlReady: Bool { phase == .connected && !recoveryStage.busy }
     public var connectionBusy: Bool {
-        recoveryStage.busy || phase == .connecting || phase == .verifying || phase == .indicating
-            || phase == .disconnecting
+        recoveryStage.busy || phase == .connecting || phase == .disconnecting
     }
-    public var canScan: Bool {
+    public var canConnect: Bool {
         !connectionBusy && phase != .connected && (availability == .available || availability == .unknown)
     }
-    public var summary: String {
-        switch phase {
-        case .connected: controlReady ? (selected?.name ?? "已连接") : "已连接，控制待验证"
-        case .connecting: "正在连接…"
-        case .verifying: "正在检查设备…"
-        case .indicating: "正在执行连接提示…"
-        case .disconnecting: "正在断开…"
-        case .failed: "连接不可用"
-        case .idle: availability == .poweredOff ? "蓝牙已关闭" : "未连接"
-        }
+    public var canScan: Bool {
+        canConnect
     }
+    /// Latest connection/communication status never consumes Action/Tool execution outcomes.
+    public var summary: String { connectionTitle }
     public func status(for id: UUID) -> String {
-        guard selected?.id == id else { return "未连接" }
+        (selected?.id ?? (recoveryStage == .idle ? nil : recoveryDeviceID)) == id ? connectionTitle : "未连接"
+    }
+    private var connectionTitle: String {
         switch phase {
-        case .connected: return controlReady ? (executing ? "动作执行中" : "已连接") : "已连接，控制未就绪"
-        case .connecting: return "正在连接…"
-        case .verifying: return "正在检查…"
-        case .indicating: return "正在复位 / 提示…"
-        case .disconnecting: return "正在断开…"
-        case .failed: return "需要重新连接"
-        case .idle: return "未连接"
+        case .connected: transportIssue == nil ? "已连接" : "已连接，异常"
+        case .connecting: recoveryStage == .connecting ? "正在重连…" : "正在连接…"
+        case .disconnecting: "正在断开…"
+        case .failed: "未连接"
+        case .idle:
+            switch recoveryStage {
+            case .cleaning, .waiting, .connecting: "正在重连…"
+            case .waitingForBluetooth: "等待蓝牙开启"
+            case .failed: "未连接"
+            case .idle, .suspended: "未连接"
+            }
         }
     }
 }

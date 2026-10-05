@@ -36,9 +36,19 @@ public struct ResourceControl: Sendable {
     }
 }
 
+/// Revocable validation capability bound to one actual resource execution, not an Agent alone.
+public struct ResourceExecutionPermit: Sendable {
+    public let validate: @Sendable (Set<ResourceID>) async throws -> Void
+
+    public init(validate: @escaping @Sendable (Set<ResourceID>) async throws -> Void) {
+        self.validate = validate
+    }
+}
+
 /// Trusted execution context inherited by child tasks; never read from model parameters.
 public enum ResourceExecutionContext {
     @TaskLocal public static var held: Set<ResourceID> = []
+    @TaskLocal public static var permit: ResourceExecutionPermit?
     /// Bound by Gateway, including intent Tools whose host worker outlives dispatch.
     @TaskLocal public static var owner: ExecutionOwner?
 }

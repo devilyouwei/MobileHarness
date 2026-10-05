@@ -433,5 +433,86 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
         return
     }
     #expect(report.executionFailure == .timedOut)
+    #expect(report.failureDescription == "Action execution timed out")
     #expect(ActionExecutor.defaultTimeout == .seconds(30))
+}
+
+@Test func actionDeadlinePreservesChildCauseWithoutBorrowingItsRootMessage() async throws {
+    let definition = ActionDefinition(
+        path: contractPath.executionIdentifier, displayName: "Timeout cause fixture",
+        kind: .finite, completion: "Joined cleanup",
+        estimatingDuration: { _ in try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(20)) },
+        handler: { invocation in
+            try await invocation.results.record(
+                ActionReport(entries: [
+                    .init(
+                        path: "first", status: .failed, code: .handlerFailed,
+                        details: ["failureDescription": "Earlier child failure"])
+                ]))
+            do { try await Task.sleep(for: .seconds(60)) } catch {
+                throw ActionReportedError(
+                    try ActionReport(entries: [
+                        .init(
+                            path: "cleanup", status: .cancelled, code: .cancelled,
+                            details: ["failureDescription": "Cleanup cancellation"])
+                    ]))
+            }
+        })
+    let executor = ActionExecutor(registry: try ActionRegistry(definitions: [definition]))
+    guard case .report(let report) = try await executor.execute(contractInvocation()) else {
+        Issue.record("Expected timeout report")
+        return
+    }
+    #expect(report.executionFailure == .timedOut)
+    #expect(report.failureDescription == "Action execution timed out")
+    #expect(report.entries.first?.details["failureDescription"] == "Earlier child failure")
+    #expect(report.entries.first?.code == .handlerFailed)
+}
+
+@Test func schedulerPreservesTerminalChildFailureInsteadOfEarlierSuccessfulReport() async throws {
+    let definition = ActionDefinition(
+        path: contractPath.executionIdentifier, displayName: "Terminal fixture", kind: .finite,
+        completion: "Terminal report",
+        completing: { invocation in
+            try await invocation.results.record(ActionReport(entries: [.init(path: "motor", status: .succeeded)]))
+            return .report(
+                try ActionReport(entries: [
+                    .init(
+                        path: "motor", status: .failed, code: .handlerFailed,
+                        details: ["failureDescription": "Native write was not executed"])
+                ]))
+        })
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [definition]))
+    let invocation = contractInvocation()
+    try await scheduler.enqueue(invocation: invocation)
+    try await scheduler.finish(inputID: invocation.context.inputID, source: AgentID(rawValue: "assistant"))
+    let record = try #require(await scheduler.executionSnapshot().records.first)
+    #expect(record.phase == .failed)
+    #expect(record.failureDescription == "Native write was not executed")
+    guard case .report(let report)? = record.completion else {
+        Issue.record("Expected terminal report")
+        return
+    }
+    #expect(report.entries.first?.status == .failed)
+}
+
+@Test func schedulerPreservesOriginalTerminalErrorDescriptionAfterStoredChildReport() async throws {
+    struct WriteFailure: LocalizedError { var errorDescription: String? { "Native fixture write failed" } }
+    let definition = contractDefinition { invocation in
+        try await invocation.results.record(ActionReport(entries: [.init(path: "first", status: .succeeded)]))
+        throw WriteFailure()
+    }
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [definition]))
+    let invocation = contractInvocation()
+    try await scheduler.enqueue(invocation: invocation)
+    try await scheduler.finish(inputID: invocation.context.inputID, source: AgentID(rawValue: "assistant"))
+    let record = try #require(await scheduler.executionSnapshot().records.first)
+    #expect(record.phase == .failed)
+    #expect(record.failureDescription == "Native fixture write failed")
+    guard case .report(let report)? = record.completion else {
+        Issue.record("Expected terminal report")
+        return
+    }
+    #expect(report.executionFailure == .handlerFailed)
+    #expect(report.failureDescription == "Native fixture write failed")
 }

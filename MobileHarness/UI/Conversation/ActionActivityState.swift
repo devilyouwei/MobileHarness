@@ -40,6 +40,42 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
     }
 }
 
+/// Display-only execution issue; no device state or SDK fault classification.
+public struct ExecutionIssue: Identifiable, Sendable, Equatable {
+    public struct Context: Sendable, Equatable {
+        public let workerID: UUID
+        public let sessionID: UUID?
+        public let inputID: UUID?
+        public let callID: UUID?
+        public init(workerID: UUID, sessionID: UUID? = nil, inputID: UUID? = nil, callID: UUID? = nil) {
+            self.workerID = workerID
+            self.sessionID = sessionID
+            self.inputID = inputID
+            self.callID = callID
+        }
+    }
+    public let context: Context?
+    public let failureCode: String?
+    public let id: UUID
+    public let title: String
+    public let source: String
+    public let message: String
+    public let time: Date
+    public init(
+        id: UUID = UUID(), title: String, source: String, message: String, time: Date = Date(),
+        failureCode: String? = nil, context: Context? = nil
+    ) {
+        self.id = id
+        self.title = String(title.prefix(128))
+        self.source = String(source.prefix(64))
+        self.message = String(message.prefix(512))
+        precondition(failureCode.map { !$0.isEmpty && $0.utf8.count <= 64 } ?? true)
+        self.failureCode = failureCode
+        self.context = context
+        self.time = time
+    }
+}
+
 /// Display aggregation by exact channel name; not a cross-task execution lane.
 public struct ActionChannelSummary: Identifiable {
     public let item: ActionActivityItem
@@ -55,6 +91,27 @@ public final class ActionActivityState {
     public private(set) var revision: UInt64?
     public private(set) var evictedCount: UInt64 = 0
     public var observationUnavailable = false
+    public private(set) var outputIssues: [ExecutionIssue] = []
+    public private(set) var backgroundIssues: [ExecutionIssue] = []
+    private var outputEvictions: UInt64 = 0
+    private var backgroundEvictions: UInt64 = 0
+    public var issueEvictions: UInt64 { outputEvictions + backgroundEvictions }
+    private var issueRevision: UInt64?
+    public func replaceIssues(revision: UInt64, records: [ExecutionIssue], evictedCount: UInt64) {
+        guard issueRevision == nil || revision > issueRevision! else { return }
+        issueRevision = revision
+        outputIssues = Array(records.suffix(100))
+        outputEvictions = evictedCount
+    }
+    public func recordIssue(_ issue: ExecutionIssue) {
+        if backgroundIssues.count == 100 {
+            backgroundIssues.removeFirst()
+            backgroundEvictions &+= 1
+        }
+        backgroundIssues.append(issue)
+    }
+    public var hasRecords: Bool { !items.isEmpty || !outputIssues.isEmpty || !backgroundIssues.isEmpty }
+
     private var dismissed: Set<UUID> = []
 
     public init() {}

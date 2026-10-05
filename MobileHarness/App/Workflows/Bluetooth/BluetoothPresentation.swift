@@ -18,6 +18,14 @@ public enum BluetoothPresentation {
         else { return nil }
         return name
     }
+    /// Latest native state only; no execution result or history is accepted.
+    static func currentIssue(_ snapshot: NexArmBluetoothSnapshot) -> String? {
+        if let fault = snapshot.failure { return String(failure(fault).prefix(512)) }
+        if snapshot.phase == .connected && !snapshot.feedbackHealthy {
+            return "暂未收到新的机械臂位置反馈"
+        }
+        return nil
+    }
     public static func failure(_ value: NexArmBluetoothFailure) -> String {
         func title(_ step: NexArmBluetoothStep) -> String {
             switch step {
@@ -34,7 +42,6 @@ public enum BluetoothPresentation {
             let query: String
             switch command {
             case 11: query = "读取机械臂位置"
-            case 7: query = "准备机械臂动作"
             case 1: query = "读取固件版本"
             default: query = "设备查询"
             }
@@ -43,6 +50,11 @@ public enum BluetoothPresentation {
         case .timeout(let step): return "\(title(step))超时"
         case .incompatibleService(let step): return "\(title(step))失败：蓝牙服务不兼容"
         case .native(let step, let domain, let code): return "\(title(step))失败（\(domain) \(code)）"
+        case .protocolViolation(.invalidPacket): return "蓝牙回包格式无效"
+        case .protocolViolation(.receiveOverflow): return "蓝牙接收数据超过缓冲上限"
+        case .requestInterrupted(let command):
+            return "在途设备查询等待已终止（\(String(format: "0x%02X", command))），为隔离迟到回包已关闭旧连接"
+        case .sendBlocked: return "蓝牙原生发送持续阻塞"
         case .disconnectUnconfirmed: return "蓝牙断开尚未确认，请关闭系统蓝牙后重试"
         }
     }

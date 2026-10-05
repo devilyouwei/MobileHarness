@@ -1,6 +1,6 @@
 # ADR0126: Continuous aim worker owns motor resources
 
-Status: Accepted. Supersedes ADR0102's transient five-motor Robot.aim fence.
+Status: Accepted. Supersedes ADR0102's transient five-motor Robot.aim fence. ADR0139 supersedes unconditional Agent conflict rejection with host-configured Assistant-over-Photographer takeover and monotonic tracking input expiry; shared worker ownership and session cleanup remain current.
 
 ## Problem
 
@@ -10,7 +10,7 @@ Robot.aim returns after storing a latest target while App starts a long-lived wo
 
 Robot.aim remains an authorized OutputGateway Tool, but publishes an intent with no transient motor fence. The App continuous worker is the sole native writer and holds motors1–4 through the shared injected ResourceCoordinator for its full lifetime. Finite Agent Actions keep their declared fences. ADR0127 supersedes the manual-control fence: Settings bypasses Agent resource admission and explicitly cancels/joins the old writer before manual submission. Agent callers cannot bypass the aim worker guard. Gateway binds trusted ExecutionOwner independently of a transient fence; the host worker inherits that Agent/incarnation/session and registers its use with that owner, so session cancellation/Agent removal cancels and joins it. Settings playback/jog belongs to independent App manual ownership (ADR0127). The first intent waits for a bounded one-element startup acknowledgment after resource/session admission. Subsequent intents replace its one latest target; no command backlog or physical-arrival promise is added.
 
-The Agent aim worker releases its resource guard before declaring idle or starting another worker. Settings jog is outside the resource guard under ADR0127. Failed/closing owners cannot accept a target they would silently discard. Cleanup cancels/joins the worker and fences stale publication. App maps resource errors to localized control-admission errors and caches bounded incidents; healthy BLE readiness stays intact and resource conflict does not initiate reconnect. New successful admission clears the old presentation error. Gateway/PlatformKit gain no device/presentation policy.
+The Agent aim worker releases its resource guard before declaring idle or starting another worker. Settings jog is outside the resource guard under ADR0127. Failed/closing owners cannot accept a target they would silently discard. Cleanup cancels/joins the worker and fences stale publication. App maps resource errors to Actions-owned admission failures and returns the original Tool result; the independent home execution observer retains them (ADR0131). They never create device incidents or alter native BLE readiness/recovery. No persistent Bluetooth presentation error is set or cleared by admission. Gateway/PlatformKit gain no device/presentation policy.
 
 ```mermaid
 flowchart LR

@@ -6,12 +6,21 @@ public protocol CameraControlCapability: Sendable {
     func flip(invocation: ToolInvocation) async throws
 }
 
-public enum CameraControlError: Error, Equatable, Sendable {
+public enum CameraControlError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
     case notForeground
     case busy
     case disabled
     case permissionDenied
     case unavailable
+    public var toolFailureCode: ToolResponse.FailureCode {
+        switch self {
+        case .permissionDenied: .permissionDenied
+        case .notForeground: .init(rawValue: "background")
+        case .busy: .init(rawValue: "busy")
+        case .disabled: .init(rawValue: "disabled")
+        case .unavailable: .init(rawValue: "unavailable")
+        }
+    }
 }
 
 public struct CameraToolModule: ToolModule {

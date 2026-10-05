@@ -51,3 +51,9 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 ✅ BehaviorTranslation copies bounded error raw identifiers and complete report details; it no longer switches on device failure cases or maps motor/position fields. ❌ Gateway does not interpret business detail schemas.
 
 ✅ ADR0126: ToolDispatcher binds trusted ExecutionOwner even for intent Tools without transient hardware resources. An injected host worker may inherit that context while retaining its own shared resource guard; source/session permissions remain enforced at dispatch.
+
+✅ ADR0131: report translation preserves bounded failureDescription alongside producer codes/details, without SDK error interpretation. ❌ Durable/remote result encoding remains pending.
+
+✅ ADR0132: ToolDispatcher copies producer failure codes into Core ToolResult and preserves them when attaching a separate deliveryFailure. It never infers Bluetooth health or recovery.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.

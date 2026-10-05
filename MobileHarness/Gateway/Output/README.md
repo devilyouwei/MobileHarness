@@ -84,3 +84,29 @@ The configured observer consumes only current speech state and has no unbounded 
 ✅ Published message freshness and generated-work policy come from the registered CommunicationContract. Gateway contains no speech/vision string cases. Generic messages carry typed domain values without queueing or replay; existing parent/source/session/AgentTurn correlation remains.
 
 ✅ ADR0126: intent Tool dispatch propagates trusted execution ownership separately from transient resource admission. Host continuous workers register their complete native-writing lifetime with the shared resource authority and close with the originating session.
+
+✅ ADR0129: device failures use ordinary Action/Tool execution outcomes. Recovery has no scheduler suspension or queue-removal hook; accepted Actions keep normal Channel ordering. Failed detailed reports remain valid runtime feedback. Explicit session stop and lease-revocation cancellation retain their existing scopes.
+
+✅ ADR0131: OutputGateway observes ordinary Tool, invocation and delivery failures using generic OutputFailureSnapshot, independently of scheduled Action snapshots and Agent result routing. Ring100 evicts oldest with an explicit count;8 observers each receive newest-one complete snapshots, excess registration throws. Shutdown finishes observers. No device diagnostic/reconnect dependency is added. ❌ Durable observation remains pending.
+
+```mermaid
+flowchart LR
+    Execute[execute: validated dispatch] --> Result[OutputExecutionResult / ToolResponse]
+    Result --> Agent[Existing result delivery]
+    Result -->|ordinary error| History[100 bounded OutputFailureRecords]
+    History --> Stream[8 observers / newest-one complete snapshot]
+    Stream --> App[Home execution presentation]
+    Schedule[ChannelScheduler] --> ActionStream[Independent Action execution snapshots]
+    ActionStream --> App
+```
+
+The observation path neither injects a new Agent result nor invokes device recovery. Scheduled Action terminal failures remain in their existing snapshot rather than being duplicated as output-admission failures.
+
+✅ ADR0132: Output handler, dispatch and delivery codes are observed independently. Tool handler codes survive feedback delivery; permission/resource dispatch rejection receives a framework code without SDK classification.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.
+
+✅ ADR0139: configured resource takeover is distinct from global priority scheduling. Shared writer groups stop/join permitted victims before execution; the same takeover owner may enqueue later bounded Channel work while cleanup is pending. No resource event cancels Agent sessions or Bluetooth recovery.
+
+
+✅ ADR0140/ADR0141: ResourceCoordinator owns cancellation-independent bounded cleanup. Public resource state is unlocked/locked(owner), including transient use. Cleanup timeout fails only its requester; retained work automatically unlocks when it finishes. Stop errors after joined cleanup release occupancy. Execution permits invalidate stale inherited context. ❌ Physical stop acknowledgment remains outside this software contract.

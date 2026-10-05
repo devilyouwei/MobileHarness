@@ -13,3 +13,5 @@ flowchart LR
 ```
 
 ❌ No fallback camera, permission bypass, native Tool transport or device readiness claim.
+
+✅ ADR0132: Domain validation/availability errors provide bounded ToolRuntime producer codes; generic execution and home observation preserve them without importing platform errors. ❌ Physical acceptance remains pending.

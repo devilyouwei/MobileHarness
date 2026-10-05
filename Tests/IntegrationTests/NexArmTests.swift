@@ -110,14 +110,14 @@ private actor NexArmFixture: NexArmWritableLink {
     try await controller.nudgeWrist(delta: 1)
     #expect(await controller.lastMotion?.start == 2110)
     #expect(await controller.lastMotion?.observed == 2121)
-    await #expect(throws: NexArmActionError.alreadyUsed) { try await controller.nudgeWrist(delta: 1) }
+    await #expect(throws: NexArmLegacyDiagnosticError.alreadyUsed) { try await controller.nudgeWrist(delta: 1) }
     #expect(await link.writes == 1)
 }
 
 @Test func nexArmLegacyMotionRefusesUnknownFirmwareAndMovingDevice() async throws {
     let wrong = NexArmFixture()
     await wrong.configure(wrong: true)
-    await #expect(throws: NexArmError.unsupportedFirmware) {
+    await #expect(throws: NexArmExecutionError.unsupportedFirmware) {
         try await NexArmLegacyDiagnosticController(link: wrong).nudgeWrist(delta: 1)
     }
     #expect(await wrong.writes == 0)
@@ -231,7 +231,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
 
 @Test func nexArmLegacyBaseRejectsPreflightAndLatchesUncertainWrite() async throws {
     let wrong = NexArmBaseFixture(wrongFirmware: true)
-    await #expect(throws: NexArmError.unsupportedFirmware) {
+    await #expect(throws: NexArmExecutionError.unsupportedFirmware) {
         try await NexArmLegacyDiagnosticController(link: wrong).shakeBase(cycles: 1)
     }
     #expect(await wrong.writes == 0)
@@ -266,7 +266,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
     #expect(await controller.lastBaseSweep == nil)
 }
 
-private struct NexArmAssistantUIModule: ActionModule {
+struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionDefinition] {
         ["express", "setExpression", "beginReplyTurn", "print"].map {
             ActionDefinition(
@@ -419,7 +419,7 @@ private actor NexArmFirmwareFixture: NexArmLink {
     try await controller.verifyCompatibility()
     #expect(await link.reads == 4)  // Reuse verified identity for this live connection only.
     let exhausted = NexArmFirmwareFixture(missingReplies: 10)
-    await #expect(throws: NexArmError.firmwareUnavailable) {
+    await #expect(throws: NexArmExecutionError.firmwareUnavailable) {
         try await NexArmActionController(link: exhausted).verifyCompatibility()
     }
     #expect(await exhausted.reads == 4)
@@ -666,7 +666,7 @@ func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) as
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     let task = Task { try await controller.performGesture(.dance, repetitions: 3) }
     await fixture.waitForFirstWrite()
-    await #expect(throws: NexArmError.busy) { try await controller.performGesture(.wave, repetitions: 1) }
+    await #expect(throws: NexArmExecutionError.busy) { try await controller.performGesture(.wave, repetitions: 1) }
     task.cancel()
     await fixture.releaseWrite()
     await #expect(throws: CancellationError.self) { try await task.value }
@@ -695,9 +695,15 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     let fixture = GestureArmFixture()
     await fixture.configure(wrist: 4000)
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
-    await #expect(throws: NexArmError.invalidMotion) { try await controller.performGesture(.dance, repetitions: 1) }
-    await #expect(throws: NexArmError.invalidMotion) { try await controller.performGesture(.wave, repetitions: 4) }
-    await #expect(throws: NexArmError.invalidMotion) { try await controller.performGesture(.tiltLeft, repetitions: 2) }
+    await #expect(throws: NexArmExecutionError.invalidArguments) {
+        try await controller.performGesture(.dance, repetitions: 1)
+    }
+    await #expect(throws: NexArmExecutionError.invalidArguments) {
+        try await controller.performGesture(.wave, repetitions: 4)
+    }
+    await #expect(throws: NexArmExecutionError.invalidArguments) {
+        try await controller.performGesture(.tiltLeft, repetitions: 2)
+    }
     #expect(await fixture.commands.isEmpty == true)
 }
 
@@ -1101,7 +1107,7 @@ func headFeedbackAdvancesWithoutCartesianOrNominalWait(_ gesture: NexArmGesture)
                 injected[34] = 6
                 let bad = try NexArmPacket(id: 254, command: 131, payload: injected)
                 // Explicit gripper atoms are supported, but cannot enter an arm-only performance plan.
-                #expect(throws: NexArmError.invalidMotion) {
+                #expect(throws: NexArmExecutionError.invalidArguments) {
                     try NexArmMotionPlan(lockedMotors: Set(1...5), frames: [.init(packet: bad, milliseconds: 1000)])
                 }
             } else {
@@ -1119,7 +1125,7 @@ func headFeedbackAdvancesWithoutCartesianOrNominalWait(_ gesture: NexArmGesture)
     #expect(
         try plan.compile(NexArmGesture.dance.settingsTestFrames(), from: measured).map(\.packet)
             == plan.compile(NexArmGesture.dance.settingsTestFrames(), from: otherClaw).map(\.packet))
-    #expect(throws: NexArmError.invalidMotion) {
+    #expect(throws: NexArmExecutionError.invalidArguments) {
         try NexArmArmPlan().compile(NexArmGesture.dance.settingsTestFrames(), from: measured)
     }
 }
@@ -1133,7 +1139,7 @@ func headFeedbackAdvancesWithoutCartesianOrNominalWait(_ gesture: NexArmGesture)
         bytes[index] = 255
         bytes[index + 1] = 127
         var plan = NexArmArmPlan()
-        #expect(throws: NexArmError.invalidMotion) {
+        #expect(throws: NexArmExecutionError.invalidArguments) {
             try plan.insert(frame, reply: NexArmPacket(command: 7, payload: bytes))
         }
     }

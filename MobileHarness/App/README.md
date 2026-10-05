@@ -180,3 +180,11 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ Settings → 音频识别 receives an App-owned AudioDetectionWorkflow/state and an isolated Lifecycle/AudioDetectionSession endpoint. The application scene cancels detection outside foreground; the recognition page also requests stop on departure. Detection uses actual capture facts and the existing sound.source broadcast, with no conversational or robot consumer.
 
 ❌ Physical capture support, angle calibration and native interaction acceptance remain pending.
+
+✅ ADR0128: Settings preset/reset submission returns immediately; a cancellable background worker uses the shared Actions segment-feedback executor. Replacement joins software cleanup without waiting for arrival. ❌ Physical takeover/rhythm acceptance remains pending.
+
+✅ ADR0129: Bluetooth recovery has no voice lifecycle or scheduler callback. It closes native I/O and resets connection-local work; existing Agent Actions/Tools report failures and queued work follows normal execution policy.
+
+✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+
+✅ ADR0139: Composition configures Assistant-over-Photographer resource takeover across the NexArm writer; BluetoothWorkflow ends tracking on stale usable-pose input. Normal Action results, vision sessions, Settings takeover and native recovery retain independent scopes.

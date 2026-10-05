@@ -1,9 +1,9 @@
 # ADR 0071 — Foreground iPhone NexArm BLE
 
-> Current status (2026-09-30): user confirmed iPhone LLM conversation control. Broad BLE discovery and foreground recovery are implemented; acceptance of these latest UX changes remains pending.
+> Historical decision. Native BLE transport remains implemented; active connection verification/indication, global voice cleanup, recovery-driven Action cancellation and shared diagnostics below are superseded by ADR0129, ADR0130 and ADR0131. The following records the original contract, not current runtime policy.
 
 
-Date: 2026-09-29. Status: implemented; final iPhone physical acceptance separate.
+Date: 2026-09-29. Status: runtime policy superseded; native transport retained. Current physical acceptance remains separate.
 
 ## Context
 

@@ -22,3 +22,20 @@ flowchart LR
 ✅ ActionActivityPresentation interprets opaque report codes through ActionRuntime and producer-owned detail keys locally. Unknown codes retain general failure presentation and captured handler description; Core/Gateway contain no motor-field presentation. ❌ No schema inference for unknown providers.
 
 ✅ ADR0122: presentation maps producer-owned report raw identifiers to existing UI text and handles unknown codes with the generic failure description. No concrete Actions dependency is added. ❌ Execution Runtime does not own these localized mappings.
+
+✅ ADR0131: ActionActivityWorkflow independently consumes scheduled execution and Output failure snapshots for the home scheduling issue list. It maps only generic values and retains100 bounded late worker errors with eviction counts. Tool failures do not fabricate Action rows or alter completed Tool results. ❌ Native visual acceptance remains pending.
+
+```mermaid
+flowchart LR
+    Action[ActionExecutionSnapshot] --> Root[Root-owned ActionActivityWorkflow]
+    Output[OutputFailureSnapshot] --> Root
+    Worker[Late execution worker failure] --> Root
+    Root --> Values[UI-owned bounded execution values]
+    Values --> Home[Home scheduling issue sheet]
+```
+
+Native Bluetooth diagnostics have a different subscriber/cache in AppBluetoothWorkflow and cannot enter this projection. Page dismissal does not stop either root subscription.
+
+✅ ADR0132: Home issue presentation preserves generic failure codes and optional App worker/source call provenance. Motor admission/read errors have stage-specific labels; device diagnostics remain absent.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.

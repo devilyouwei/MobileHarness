@@ -31,7 +31,7 @@ actor NexArmLegacyDiagnosticController {
         try Task.checkCancellation()
         guard !busy else { throw NexArmError.busy }
         guard !faulted else { throw NexArmActionError.uncertainMotion }
-        guard !used else { throw NexArmActionError.alreadyUsed }
+        guard !used else { throw NexArmLegacyDiagnosticError.alreadyUsed }
         guard (-2...2).contains(delta), delta != 0 else { throw NexArmError.invalidMotion }
         busy = true
         defer { busy = false }
@@ -197,3 +197,6 @@ actor NexArmLegacyDiagnosticController {
         return (joints[4], joints, roll, pose)
     }
 }
+
+/// One-shot diagnostic ownership, not a production Action error.
+enum NexArmLegacyDiagnosticError: Error, Equatable { case alreadyUsed }

@@ -61,7 +61,9 @@ final class ApplicationRuntime {
                 + (1...6).map { motor in
                     ResourceDefinition(
                         id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
-                        allowedOwners: motor == 6 ? [.assistant] : [.assistant, .photographer]
+                        allowedOwners: motor == 6 ? [.assistant] : [.assistant, .photographer],
+                        executionGroup: ResourceID(rawValue: "nexarm.writer"),
+                        preempts: [.assistant: [.photographer]]
                     ) {
                         // Cancel and join software ownership; this is not a hardware stop acknowledgment.
                         await bluetooth.stopAgentActions()
@@ -79,12 +81,13 @@ final class ApplicationRuntime {
                 try await resources.run(
                     resources: requested, owner: owner, lease: lease, operation: operation)
             } catch ResourceError.busy {
-                throw BluetoothWorkflowError.resourceBusy
+                throw NexArmExecutionError.resourceBusy
             } catch let error as ResourceError {
-                throw BluetoothWorkflowError.resourceUnavailable(String(describing: error))
+                throw NexArmExecutionError.resourceUnavailable(String(describing: error))
             }
         }
-        let robot = NexArmBehaviorAdapter(bluetooth: bluetooth)
+        let activity = ActionActivityWorkflow(state: ActionActivityState())
+        let robot = NexArmBehaviorAdapter(bluetooth: bluetooth, activity: activity)
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation, camera: presentation,
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
@@ -108,13 +111,15 @@ final class ApplicationRuntime {
         self.input = input
         self.presentation = presentation
         self.actions = actions
-        actionActivity = ActionActivityWorkflow(state: ActionActivityState())
+        actionActivity = activity
         actionActivity.start { try await actions.observeExecutions() }
-        output = OutputGateway(
+        let gateway = OutputGateway(
             manager: manager, requests: input, tools: behaviors.tools, actions: actions, policy: policy,
             actionFeedback: .terminal,
             observedContracts: ["speech.partial", "speech.final", "speech.phase"],
             observeEvent: { try await presentation.observe($0) }, sink: { await presentation.output($0) })
+        output = gateway
+        activity.startFailures { try await gateway.observeFailures() }
     }
     var voiceDependencies: VoiceRuntimeDependencies {
         VoiceRuntimeDependencies(
@@ -128,8 +133,12 @@ final class ApplicationRuntime {
     var visionDependencies: VisionRuntimeDependencies {
         .init(
             makePhotographer: { [bluetooth] in
-                try PhotographerAgent(
+                let photographer = try PhotographerAgent(
                     sessionID: $0, controlsArm: true, controlAvailable: { await bluetooth.trackingAvailable })
+                bluetooth.trackingInputAvailable = { [weak photographer] in
+                    await photographer?.hasFreshPose() ?? false
+                }
+                return photographer
             },
             manager: manager, input: input, output: output, actions: actions, presentation: presentation)
     }

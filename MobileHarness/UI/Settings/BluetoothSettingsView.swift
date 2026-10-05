@@ -6,6 +6,7 @@
         @Bindable var state: BluetoothSettingsState
         private let controls: any BluetoothControlling
         @State private var forgetting = false
+        @State private var deviceForDetail: BluetoothDeviceRow?
         public init(state: BluetoothSettingsState, controls: any BluetoothControlling) {
             self.state = state
             self.controls = controls
@@ -15,11 +16,22 @@
                 availabilitySection
                 myDevicesSection
                 nearbySection
-                messageSection
+            }
+            .buttonStyle(.borderless)
+            .navigationDestination(item: $deviceForDetail) { device in
+                BluetoothArmDetailView(state: state, controls: controls, device: device)
             }
             .navigationTitle("蓝牙外设")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                if state.connectionBusy, state.phase != .disconnecting {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("取消", action: controls.disconnect)
+                            .accessibilityIdentifier("settings.bluetooth.cancelConnection")
+                    }
+                }
+            }
             .preferredColorScheme(.dark)
             .task { controls.openPage() }
             .onDisappear { controls.closePage() }
@@ -41,12 +53,11 @@
             }
         }
         @ViewBuilder private var myDevicesSection: some View {
-            if let device = state.selected ?? state.remembered {
+            if let device = state.myDevice {
                 Section("我的设备") {
                     deviceRow(device)
-                    if state.selected?.id == device.id && (state.phase != .idle || state.recoveryStage != .idle) {
-                        Button(state.connectionBusy ? "取消连接 / 断开" : "断开连接", action: controls.disconnect)
-                            .disabled(state.phase == .disconnecting && !state.recoveryStage.busy)
+                    if state.isConnected(device.id) {
+                        Button("断开连接", action: controls.disconnect)
                             .accessibilityIdentifier("settings.bluetooth.disconnect")
                     }
                     Button("忽略此设备", role: .destructive) { forgetting = true }
@@ -57,7 +68,7 @@
         @ViewBuilder private var nearbySection: some View {
             if state.phase != .connected {
                 Section {
-                    ForEach(state.nearby.filter { $0.id != (state.selected ?? state.remembered)?.id }) { device in
+                    ForEach(state.otherDevices) { device in
                         deviceRow(device)
                     }
                     Button {
@@ -71,17 +82,12 @@
                     }
                     .disabled(!state.canScan)
                     .accessibilityIdentifier("settings.bluetooth.scan")
-                    if state.nearby.isEmpty && !state.scanning {
+                    if state.otherDevices.isEmpty && !state.scanning {
                         Text("暂未发现设备").foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("附近设备")
                 }
-            }
-        }
-        @ViewBuilder private var messageSection: some View {
-            if let error = state.error {
-                Section { Text(error).foregroundStyle(.red).accessibilityIdentifier("settings.bluetooth.error") }
             }
         }
         private var availabilityText: String {
@@ -93,34 +99,37 @@
             case .unsupported: "当前设备不支持"
             }
         }
-        @ViewBuilder private func deviceRow(_ device: BluetoothDeviceRow) -> some View {
-            if state.selected?.id == device.id || state.remembered?.id == device.id
-                || !state.incidents(for: device.id).isEmpty
-            {
-                NavigationLink {
-                    BluetoothArmDetailView(state: state, controls: controls, device: device)
-                } label: {
-                    rowLabel(device)
+        private func deviceRow(_ device: BluetoothDeviceRow) -> some View {
+            Button {
+                switch state.rowIntent(for: device.id) {
+                case .connect: controls.connect(device.id)
+                case .openDetail: deviceForDetail = device
+                case .unavailable: break
                 }
-                .accessibilityIdentifier("settings.bluetooth.device.\(device.id.uuidString)")
-            } else {
-                Button {
-                    controls.connect(device.id)
-                } label: {
-                    rowLabel(device)
-                }
-                .disabled(state.connectionBusy || state.phase == .connected || state.executing)
-                .accessibilityIdentifier("settings.bluetooth.device.\(device.id.uuidString)")
+            } label: {
+                rowLabel(device)
             }
+            .disabled(state.rowIntent(for: device.id) == .unavailable)
+            .accessibilityIdentifier("settings.bluetooth.device.\(device.id.uuidString)")
         }
         private func rowLabel(_ device: BluetoothDeviceRow) -> some View {
             HStack(spacing: 12) {
-                Image(systemName: "sensor.tag.radiowaves.forward.fill").foregroundStyle(.blue)
-                Text(device.name).foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(device.name)
+                        .foregroundStyle(state.rowIntent(for: device.id) == .unavailable ? Color.secondary : .primary)
+                    if let message = state.currentMessage(for: device.id) {
+                        Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                }
                 Spacer()
                 if state.selected?.id == device.id && state.connectionBusy { ProgressView() }
-                Text(state.status(for: device.id)).font(.subheadline).foregroundStyle(.secondary)
+                Text(state.status(for: device.id)).font(.subheadline)
+                    .foregroundStyle(state.hasConnectionIssue(device.id) ? Color.yellow : .secondary)
+                if state.isConnected(device.id) {
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                }
             }
+            .contentShape(Rectangle())
         }
     }
 
@@ -129,28 +138,14 @@
         @Bindable var state: BluetoothSettingsState
         let controls: any BluetoothControlling
         let device: BluetoothDeviceRow
-        private var connected: Bool { state.selected?.id == device.id && state.phase == .connected }
-        private var canControl: Bool { state.selected?.id == device.id && state.canControl }
+        private var connected: Bool { state.isConnected(device.id) }
+        private var canControl: Bool { state.canControl(device.id) }
         var body: some View {
             List {
                 Section("当前状态") {
-                    LabeledContent("连接", value: state.status(for: device.id))
-                    LabeledContent("蓝牙链路", value: state.selected?.id == device.id ? state.transportStatus : "未连接")
-                    LabeledContent("控制", value: state.selected?.id == device.id && state.controlReady ? "已就绪" : "未就绪")
-                    if connected {
-                        LabeledContent(
-                            "机械臂",
-                            value: state.testing
-                                ? "测试指令发送中" : state.jogging ? "手动控制中" : (state.executing ? "动作执行中" : "待机"))
-                        if state.pose.count == 6 {
-                            LabeledContent(
-                                "末端位置", value: "X \(state.pose[0]) · Y \(state.pose[1]) · Z \(state.pose[2]) mm")
-                        }
-                        if let sampledAt = state.sampledAt {
-                            LabeledContent("位置更新于") { Text(sampledAt, style: .time) }
-                        }
-                        Button("刷新状态 / 验证控制") { Task { await controls.refreshDevice() } }
-                            .disabled(state.executing || state.refreshing || state.connectionBusy)
+                    LabeledContent("连接") {
+                        Text(state.status(for: device.id))
+                            .foregroundStyle(state.hasConnectionIssue(device.id) ? Color.yellow : .secondary)
                     }
                     if state.recoveryDeviceID == device.id, state.recoveryStage != .idle {
                         LabeledContent("恢复", value: state.recoveryStage.title)
@@ -165,33 +160,25 @@
                         Button("取消恢复 / 断开", action: controls.disconnect)
                             .accessibilityIdentifier("settings.bluetooth.cancelRecovery")
                     }
-                    if let status = state.motionStatus, connected { Text(status).foregroundStyle(.secondary) }
-                    if let error = state.error, state.selected?.id == device.id {
-                        Text(error).foregroundStyle(.red)
+                }
+                if let message = state.currentMessage(for: device.id) {
+                    Section {
+                        Text(message).font(.subheadline).foregroundStyle(.red)
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("settings.bluetooth.currentError")
                     }
                 }
-                Section("异常与恢复记录") {
-                    let records = state.incidents(for: device.id)
-                    if records.isEmpty { Text("暂无记录").foregroundStyle(.secondary) }
-                    ForEach(records) { entry in
-                        DisclosureGroup {
-                            Text(entry.message)
-                            LabeledContent("原因", value: entry.cause)
-                            LabeledContent("恢复尝试", value: "\(entry.attempt)/3 次")
-                            LabeledContent("本轮用时", value: "\(Int(entry.elapsedSeconds)) 秒")
-                            ForEach(entry.details.indices, id: \.self) { index in
-                                Text(entry.details[index]).font(.caption).foregroundStyle(.secondary)
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(entry.stage)
-                                Text(entry.time, style: .time).font(.caption).foregroundStyle(.secondary)
-                            }
+                if connected {
+                    Section("设备反馈") {
+                        if state.pose.count == 6 {
+                            LabeledContent(
+                                "末端位置", value: "X \(state.pose[0]) · Y \(state.pose[1]) · Z \(state.pose[2]) mm")
                         }
-                    }
-                    if !records.isEmpty {
-                        Button("清空记录") { controls.clearIncidents(device.id) }
-                            .accessibilityIdentifier("settings.bluetooth.clearIncidents")
+                        if let sampledAt = state.sampledAt {
+                            LabeledContent("位置更新于") { Text(sampledAt, style: .time) }
+                        }
+                        Button("刷新位置") { Task { await controls.refreshDevice() } }
+                            .disabled(state.connectionBusy)
                     }
                 }
                 Section("动作") {
@@ -200,7 +187,7 @@
                             controls.tryAction(action)
                         } label: {
                             HStack {
-                                Text(action.title).foregroundStyle(.primary)
+                                Text(action.title)
                                 Spacer()
                                 Image(systemName: "play.circle.fill")
                             }
@@ -219,7 +206,9 @@
                     ForEach(1...6, id: \.self) { id in
                         BluetoothMotorSlider(
                             id: id, position: state.joints.count == 6 ? state.joints[id - 1] : nil,
-                            enabled: canControl, controls: controls)
+                            enabled: canControl, controls: controls
+                        )
+                        .disabled(!canControl)
                     }
                 } header: {
                     Text("电机控制")
@@ -227,6 +216,7 @@
                     Text("滑动控制方向和速度，松手停止并保持当前位置。")
                 }
             }
+            .buttonStyle(.borderless)
             .navigationTitle(device.name)
             .navigationBarTitleDisplayMode(.inline)
             .task { if connected { await controls.refreshDevice() } }
@@ -288,6 +278,7 @@
                     Image(systemName: "plus")
                 }.font(.caption).foregroundStyle(.secondary)
             }
+            .opacity(enabled ? 1 : 0.45)
             .onChange(of: touching) { _, active in if !active { release() } }
             .onChange(of: enabled) { _, active in if !active { release() } }
             .onDisappear { release() }

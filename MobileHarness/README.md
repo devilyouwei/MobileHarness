@@ -570,7 +570,7 @@ flowchart LR
     Results --> Input[InputGateway / originating Agent]
 ```
 
-Agent-selected and Settings-initiated movement reuse the same Actions recipes and encoders. Settings enters App directly, cancels old writers and uses send-only submission without Gateway resource admission or arrival waiting (ADR0127). Agent-selected execution retains OutputGateway authorization, resource arbitration and its declared completion policy. Actions owns gesture composition, limits within business policy, home/reset selection and completion rules. PlatformKit owns discovery, connection, protocol encoding, native hardware limits and structured feedback. A transport write is not automatically an Action success; each Action documents the acknowledgment that completes its effect.
+Agent-selected and Settings-initiated movement reuse the same Actions recipes and encoders. Settings enters App directly, cancels old writers and uses background segment-feedback execution without Gateway resource admission (ADR0128). Agent-selected execution retains OutputGateway authorization, resource arbitration and its declared completion policy. Actions owns gesture composition, limits within business policy, home/reset selection and completion rules. PlatformKit owns discovery, connection, protocol encoding, native hardware limits and structured feedback. A transport write is not automatically an Action success; each Action documents the acknowledgment that completes its effect.
 
 Bluetooth discovery/connection is an App workflow because preferred-device ordering, explicit user intent and presentation belong to the application. Physical safety requires device-side protection and cannot rely on iOS background execution.
 
@@ -682,7 +682,7 @@ Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The c
 
 Photographer consumes validated `vision.pose` through InputGateway and emits internal `Robot.aim` through OutputGateway. Its JSON v5 contains the subscription and empty model-callable catalogs; fixed internal permission and target-selection policy stay in Agent code. The output buffer holds eight calls and fails explicitly on overflow.
 
-RobotTools validates intent arguments; Gateway authorizes the source/session and Tool permission. The continuous App worker holds motors1–4 through the shared ResourceCoordinator (ADR0126); App supplies NexArmBehaviorAdapter and a composition-owned Photographer factory. VisionSession owns registration, output pumps and cleanup, including partial registration failure. Action-side aim policy maps the rest/angles and chooses speed; PlatformKit encodes native commands. Return means the latest target was accepted by a started worker, not packet delivery or arrival. Actual feedback/send faults enter bounded read-only connection recovery without old-target replay. ❌ Physical tracking acceptance remains pending.
+RobotTools validates intent arguments; Gateway authorizes source/session and Tool permission. The App worker holds motors1–4 through ResourceCoordinator (ADR0126), with monotonic usable-pose freshness from Photographer; one second without fresh input joins/releases the writer. App groups all six motors under nexarm.writer and explicitly allows Assistant to preempt Photographer after joined cleanup (ADR0139), including disjoint motor5/6 actions. Queued same-owner Actions survive the takeover gate; no scheduler/session cancellation or radio recovery occurs. VisionSession camera closure removes its owned work; old targets never replay. Actions owns mapping/motion, PlatformKit native encoding; return is target admission, not physical arrival. ❌ Physical tracking/takeover acceptance remains pending.
 
 ✅ Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until App reconnects the link. Final App resource validation requires all five Agent JSON files.
 
@@ -749,10 +749,32 @@ PlatformKit preserves native mono or ACN/SN3D FOA PCM and hardware capture time.
 
 ✅ Native capture startup is committed by first validated PCM delivery. FOA uses AVCaptureSession microphone configuration; unsupported or failed startup closes the spatial graph before mono retry, with a 3-second first-frame bound for each backend. No running stream silently changes channel layout. The host shows listening after readiness and clears that phase/spectrum on capture failure. ❌ Physical restart/coexistence acceptance remains required.
 
-✅ [ADR0125](../docs/adr/0125-bluetooth-exception-recovery.md): App owns joined cleanup and three bounded reconnect attempts for BLE loss, feedback silence, send stalls and query isolation; PlatformKit supplies versioned facts, Actions retains physical policy, and UI displays a four-device/32-event-per-device memory cache below 当前状态. Verified recovery never replays old motion. ❌ Physical BLE/native UI acceptance remains pending.
-
 ### Settings audio detection
 
 ✅ [ADR0128](../docs/adr/0128-settings-audio-detection.md): 音频识别 includes an explicit 10-second microphone/spatial diagnostic. PlatformKit exposes native input/capability/fallback facts; App Lifecycle owns an isolated capture and source-only SpeechPerception session through both Gateways; AppDiagnosticWorkflow owns admission, freshness/deadline monitoring and joined cleanup; UI owns simple result presentation. Actual received layout distinguishes four-channel capture from mono fallback. No model warmup, conversation, Photographer consumer or robot action is added.
 
 ❌ Physical FOA support, coordinates, camera coexistence and navigation/background interactions still require device acceptance.
+
+✅ [ADR0129](../docs/adr/0129-bluetooth-session-isolation.md): transport recovery and Agent scheduling are independent. Bluetooth closes native I/O sessions, resets connection-local state and reconnects; it never cancels/removes accepted Actions or suspends scheduler admission. Current operations fail through Action/Tool results; queued work executes normally against the state available at execution. No global voice cleanup or automatic replay of failed native commands. ❌ Physical coexistence acceptance remains pending.
+
+## Passive BLE connection — ADR0130
+
+✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+
+❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+
+
+### Independent Bluetooth diagnostics — ADR0131
+
+✅ ADR0129 separates recovery lifecycle from Agent scheduling/session cancellation; existing Action/Tool results and normal Channel progression remain implemented.
+
+✅ ADR0133 (`docs/adr/0133-motion-admission-and-terminal-reports.md`): Actions prepares only requested Cartesian poses; passive simple/reset commands require no IK queries. PlatformKit selects supported native write capability with shared pacing and a capacity-one acknowledged-control window, publishes current interrupted-reply failures, and App reports restored connectivity without claiming motion validation. Runtime/Gateway preserve terminal failure entries and descriptions. ❌ Physical repeated-control, characteristic/firmware and UI acceptance remain pending.
+
+✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+
+✅ [ADR0135](../docs/adr/0135-nexarm-aim-final-count.md): Actions tracking converges the last two counts at low speed, committing only after native admission; this never establishes physical arrival. Opt-in root Integration tests use a bounded serial connection façade for the production Settings workflow and real Agent/Gateway Action/Tool chains. BLE-specific native callbacks, SwiftUI touches and real model/vision decisions remain outside that test seam.
+
+✅ [ADR0137](../docs/adr/0137-nexarm-ordinary-home.md): ordinary passive-link reset uses the legacy five-arm-axis reference; tracking rest remains separate. Actions owns target selection, shared Settings/Agent execution and configured motor-home precedence; PlatformKit remains a native SDK. ❌ Restored phone posture acceptance remains pending.
+
+
+✅ [ADR0141](../docs/adr/0141-resource-control-ownership.md): ResourceCoordinator owns control rather than device health, with unlocked/locked(owner) snapshots from one holding index. Transient writers and persistent leases share ownership semantics; internal handoff is bounded. Stop errors after joined work unlock; timeout fails that request and actual late completion automatically unlocks, without replay. Revocable execution permits prevent stale held-context bypass at App entries. Cancelled cleanup still waits independently of its caller. Camera no longer calls recover. Action/Tool outcomes, Channel queues and Bluetooth recovery remain separate. ❌ Physical stop/takeover and uncooperative-native-I/O acceptance remain pending.

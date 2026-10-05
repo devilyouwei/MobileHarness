@@ -172,7 +172,7 @@ struct MobileHarnessApp: App {
             container.makeMossValidationView()
         } else {
             ConversationView(
-                state: container.conversation, robot: assembly.bluetooth.state, activity: container.actionActivity,
+                state: container.conversation, activity: container.actionActivity,
                 toggleVoice: container.lifecycle.toggleVoice)
         }
     }

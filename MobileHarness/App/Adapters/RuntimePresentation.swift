@@ -26,7 +26,6 @@ protocol CameraOutputHandling: AnyObject, Sendable {
     func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws
     func present(_ overlay: ToolPoseOverlay, sessionID: UUID) throws
     func visionStatus(_ message: String?, sessionID: UUID)
-    func trackingStatus(_ message: String?, sessionID: UUID)
 }
 
 /// A whole role binds atomically. Closures in the handler registry never own session resources.

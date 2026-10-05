@@ -51,7 +51,7 @@ flowchart LR
 
 ✅ NexArmBehaviorAdapter binds the completion-only Robot.aim sender and converts connection/foreground availability errors to Tool errors. It neither selects targets nor constructs Agents.
 
-✅ CameraOutputHandling exposes session-scoped trackingStatus independently of skeleton/gaze delivery. Tracking failure never clears the accepted pose.
+✅ CameraOutputHandling carries camera/pose display values only. OutputGateway failure observation supplies home scheduling issues; tracking execution failures never become camera banners or clear the accepted pose (ADR0131).
 
 ✅ visionStatus scopes vision-only failure presentation separately from tracking and camera lifecycle.
 
@@ -89,3 +89,13 @@ flowchart LR
 ✅ HistoryAgentAdapter injects Assistant textSegmentation into GenerationTrace so preview and live parsing use identical business chunk limits. ❌ Preview does not execute generated calls.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+
+✅ ADR0129: NexArm failures preserve motor outcomes and attach the execution exception before returning a report. An exception after successful child results cannot become Action success. Adapters do not cancel Channel work or bind Bluetooth recovery to Agent lifetime.
+
+✅ ADR0131: NexArmBehaviorAdapter preserves caught failure descriptions in Action reports. Late continuous-control execution failures feed only ActionActivityWorkflow, including errors caught after transport recovery fences the old generation; startup Tool failures retain ordinary results. CameraOutputHandling no longer carries trackingStatus. No execution failure is written to Bluetooth history. ❌ Device acceptance remains pending.
+
+✅ NexArm bindings allocate a private ActionReportStore per invocation and receive motor outcomes through the call-specific recordReport sink. They preserve composition paths and original thrown errors; no shared last-result lookup or Bluetooth diagnostic interpretation remains. ❌ Physical execution acceptance remains pending.
+
+✅ ADR0132: NexArmBehaviorAdapter preserves Actions availability reasons as ToolRuntime producer codes/messages, and supplies the initiating Tool provenance to the App-owned worker. No completed Tool result is rewritten by a later worker error.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.

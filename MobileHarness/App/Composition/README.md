@@ -1,6 +1,6 @@
 # App Composition
 
-> Current status (2026-09-29): the user identified desktop simulator screen sharing as the cause of missing iPhone camera/microphone input. BLE settings and conversation binding are restored; receipt-admission and robot-only disconnect fixes remain. iPhone BLE acceptance without screen sharing is still pending; no causal claim is made about the earlier BLE failure.
+> Historical observation (2026-09-29): the user identified desktop simulator screen sharing as the cause of missing iPhone camera/microphone input; no causal claim is made about the earlier BLE failure. Current Bluetooth recovery is device-scoped (ADR0129); physical BLE/voice coexistence acceptance remains pending.
 
 
 Purpose: construct the application graph and bind concrete services. Design goals: one explicit root, narrow injected dependencies, no hidden runtime lookup or duplicate model registrations.
@@ -54,7 +54,7 @@ flowchart TD
 
 ✅ BehaviorAssembly requires a typed `shakeBase` binding. The iPhone root binds BluetoothWorkflow; the Mac diagnostic binds USB. Both fail explicitly when unavailable.
 
-✅ AppAssembly owns one BluetoothWorkflow and NexArmBluetooth for settings and conversation. Its quiesce callback joins VoiceSessionCoordinator cleanup before changing the device; ApplicationRuntime binds shakeBase to that same workflow and requests terminal ActionResults through InputGateway. ❌ No page-owned connection or unavailable success stub remains.
+✅ AppAssembly owns one BluetoothWorkflow and NexArmBluetooth for Settings and conversation. Connection/recovery has no voice lifecycle or scheduler admission callback (ADR0129). ApplicationRuntime binds NexArm handlers to that workflow; device exceptions and reports use the existing Action/Tool execution/result path through InputGateway. ❌ Physical coexistence remains pending.
 
 ## NexArm entertainment skills (2026-09-30)
 
@@ -113,7 +113,7 @@ flowchart TD
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
 
-✅ ADR0126: ApplicationRuntime maps Gateway resource-busy/unavailable failures into App-owned Bluetooth control errors at the injected Agent resource boundary. Robot.aim publishes targets without a second Tool fence; the continuous App worker retains the shared motor guard with the trusted task-local owner/lease, preserving originating-session cleanup. No policy or localized presentation is added to PlatformKit/Gateway.
+✅ ADR0126 / ADR0139: ApplicationRuntime maps resource-busy/unavailable errors into Actions-owned execution failures at the injected Agent resource boundary, independently of native Bluetooth status/recovery. Robot.aim publishes without a second Tool fence; its continuous worker retains trusted owner/session cleanup. App configures Assistant-over-Photographer shared-writer takeover; Gateway implements generic arbitration only and PlatformKit contains no business priority or localized presentation.
 
 ✅ ADR0127: Settings presets/reset/jog bypass the injected Agent motor guard. Resource cleanup is bound to `stopAgentActions`, preserving independent manual ownership; Photographer availability uses `trackingAvailable` to avoid new aim commands during manual takeover. Actions recipes and PlatformKit pacing remain shared. ❌ Physical-device acceptance remains pending.
 
@@ -122,3 +122,13 @@ flowchart TD
 ✅ AppContainer composes AudioDetectionWorkflow with the whole AudioDetectionSession endpoint and stable capability handles. Diagnostics select direction-only perception without model warmup. Weak pre-start barriers join voice/diagnostic shutdown before replacing microphone ownership. The application host injects UI state/controls and cancels diagnostics when the scene leaves active.
 
 ❌ Physical capture and navigation/background interaction acceptance remains pending.
+
+✅ ADR0129: composition does not bind Bluetooth recovery to Channel cancellation, queue removal or resource suspension. Accepted Actions retain normal execution and feedback policy; device availability is checked by the handler when it executes. Model-setting changes retain their separate voice cleanup barrier.
+
+✅ ADR0131: composition starts one root-owned Output failure observer beside the Action observer and injects that execution presentation endpoint into NexArmBehaviorAdapter. Bluetooth recovery and native diagnostics remain independent; neither observer depends on page lifetime. ❌ Physical coexistence acceptance remains pending.
+
+## Tracking freshness and takeover — ADR0139
+
+✅ All six NexArm resources share nexarm.writer executionGroup. Host policy explicitly permits Assistant to preempt Photographer; reverse, equal-owner and unknown-owner conflicts reject. Cleanup uses stopAgentActions and preserves Settings ownership. The Photographer factory binds a weak read-only hasFreshPose query into BluetoothWorkflow, avoiding a retained Agent cycle; default production freshness is one second. Generic Gateway contains no concrete identities/device policy.
+
+❌ Physical interruption and camera/Bluetooth coexistence acceptance remain pending.

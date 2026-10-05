@@ -47,7 +47,7 @@ Assistant 每次生成前读取相关资源快照，以数据形式加入上下�
 
 ## Lock 与持久化
 
-lock 可作为 resource 的只读属性，权威来源仍是现有 ResourceCoordinator，不在 Store 建立第二套锁控制。本次不修改锁控制、兜底或恢复机制，相关问题另开 issue。
+lock 可作为 resource 的只读属性，权威来源是 ResourceCoordinator 的 unlocked/locked(owner)（见 [ADR0141](adr/0141-resource-control-ownership.md)）；设备健康与执行异常分别拥有，不推导锁状态。Store 不建立第二套锁控制，本状态缓存计划不重复实现交接、释放或异常处理。
 
 跨页面和会话共享内存状态；进程重启后重新获取事实。未来若需要落盘，复用 Storage 现有机制，物理设备状态不能因读取旧记录而被视为已确认。
 

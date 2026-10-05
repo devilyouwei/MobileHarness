@@ -13,7 +13,13 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
     }
     public var issueDescriptions: [String] {
         guard let report else { return [] }
-        let executionIssues = report.executionFailure.map { [$0 == .timedOut ? "动作执行超时，已结束并保留各步骤结果" : "动作执行失败"] } ?? []
+        let executionIssues =
+            report.executionFailure.map {
+                [
+                    report.failureDescription ?? execution.failureDescription
+                        ?? ($0 == .timedOut ? "动作执行超时，已结束并保留各步骤结果" : "动作执行失败")
+                ]
+            } ?? []
         return executionIssues
             + report.entries.enumerated().compactMap { index, entry in
                 guard entry.status != .succeeded else { return nil }
@@ -23,6 +29,8 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
                 case "feedbackLost": reason = "未收到位置反馈"
                 case "disconnected": reason = "机械臂连接不可用"
                 case "sendingFailed": reason = "指令发送失败"
+                case "admissionFailed": reason = "执行通道准入失败"
+                case "feedbackFailed": reason = "位置反馈处理失败"
                 case "timedOut": reason = "执行超时"
                 case "invalidArguments": reason = "参数无效"
                 case "unavailable": reason = "当前不可执行"
@@ -35,6 +43,7 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
                         reason = "执行失败"
                     }
                 }
+                let capturedReason = entry.details["failureDescription"] ?? reason
                 let motor = entry.details["motor"].map { " · \($0)号电机" } ?? ""
                 let position: String
                 if let target = entry.details["target"], let observed = entry.details["observed"] {
@@ -42,7 +51,7 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
                 } else {
                     position = ""
                 }
-                return "第\(index + 1)项\(motor)：\(reason)\(position)"
+                return "第\(index + 1)项\(motor)：\(capturedReason)\(position)"
             }
     }
     public var status: String {

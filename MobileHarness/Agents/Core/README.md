@@ -97,3 +97,8 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ✅ Resource identities contain no camera constants; action reports contain no motor/target/observed fields. Device failures are opaque bounded identifiers. Shared text segmentation accepts a validated producer policy and defaults to sentence boundaries; Assistant owns the 60/120-character soft limits. ❌ Business detail schemas are not validated by Core.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+
+✅ ADR0131: Core Output values include independent generic output failure observations and bounded report descriptions. They import no device/App/Gateway/UI services and cannot trigger recovery. ❌ Durable output diagnostics remain pending.
+
+
+✅ ADR0141 adds generic ResourceExecutionPermit to trusted Output context. It carries a revocable validation closure only; actual ownership remains Gateway-owned, concrete effect checks App-owned. ❌ No device health, scheduler or platform dependency is introduced.

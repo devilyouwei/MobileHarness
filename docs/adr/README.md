@@ -180,3 +180,38 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 - [0127 — Settings manual robot takeover](0127-settings-manual-robot-takeover.md): reuse Action recipes with send-only playback, immediate replacement and no Agent resource lock.
 
 - [0128 — Settings audio detection](0128-settings-audio-detection.md): isolated diagnostic capture, source-only SpeechPerception, native capture facts and joined cleanup.
+
+✅ ADR0128: Settings preset/reset submission returns immediately; a cancellable background worker uses the shared Actions segment-feedback executor. Replacement joins software cleanup without waiting for arrival. ❌ Physical takeover/rhythm acceptance remains pending.
+
+✅ [ADR0129](0129-bluetooth-session-isolation.md): independent Bluetooth recovery and Agent scheduling; device failures retain normal Action/Tool results and accepted queues.
+
+## Passive BLE connection — ADR0130
+
+✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+
+❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+
+- ✅ [ADR0131 — Independent execution/native ownership](0131-independent-bluetooth-diagnostics.md): execution and recovery isolation remains current; its exception-history scheme is superseded by ADR0134.
+- ✅ [ADR0132 — Execution error semantics](0132-execution-error-semantics.md): producer codes, root causes and worker provenance remain current; device event writers are superseded by ADR0134.
+
+- ✅ [ADR0133 — Motion admission and terminal reports](0133-motion-admission-and-terminal-reports.md): demand-driven Actions preparation, capability-aware bounded BLE admission, independent native interruption facts and preserved terminal execution reports. ❌ Real-device acceptance remains pending.
+
+✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+
+- ✅ [ADR0134 — Bluetooth current state and navigation](0134-bluetooth-current-state-and-navigation.md): removes SDK/App/UI incident history, displays latest native state and disables disconnected controls; its automatic connection/navigation policy is superseded by ADR0136. Execution and recovery remain independent. ❌ Physical acceptance remains pending.
+
+- ✅ [ADR0135 — NexArm final tracking count](0135-nexarm-aim-final-count.md): the last near-target count remains pending until native admission, then planned motion converges without a fractional tail. Physical arrival and Tool publication remain distinct; supervised serial fixtures exercise Settings and Agent boundaries.
+
+- ✅ [ADR0136 — Explicit Bluetooth connection and native navigation](0136-bluetooth-explicit-navigation.md): historical separate connection buttons/dimmed links superseded by ADR0138; stable one-level native back navigation and a combined yellow warning with the current red native error. ❌ Physical swipe/layout acceptance remains pending.
+
+- ✅ [ADR0137 — Ordinary NexArm home](0137-nexarm-ordinary-home.md): restores legacy query-free ordinary reset, keeps tracking rest separate, preserves gripper exclusion and explicit single-motor software homes. ❌ Restored physical posture acceptance remains pending.
+
+- ✅ [ADR0138 — Compact Bluetooth device rows](0138-compact-bluetooth-device-list.md): row-tap connection, later connected-tap detail, connected-only Disconnect, saved-device Forget, correct grouping and persisted default reconnection. ❌ Phone layout/gesture acceptance remains pending.
+
+- ✅ [ADR0139 — Tracking freshness and Assistant preemption](0139-tracking-freshness-and-assistant-preemption.md): one-second usable-pose expiry and host-configured joined writer takeover, preserving queued Actions. ❌ Physical interruption/timing acceptance remains pending.
+
+
+- ✅ [ADR0140 — Cancellation-safe resource cleanup](0140-cancellation-safe-resource-cleanup.md): coordinator-owned bounded stop/join acknowledgment survives caller cancellation; confirmed cleanup does not become faulted or grant a cancelled requester a lease. ❌ Physical stop verification remains pending.
+
+
+- ✅ [ADR0141 — Resource control ownership](0141-resource-control-ownership.md): unlocked/locked(owner), one actual holding authority, revocable execution permits and automatic late cleanup release; no faulted/recover latch. ❌ Physical stop/native isolation acceptance remains pending.

@@ -226,3 +226,7 @@ See [Runtime](Runtime/README.md) for registry/executor limits, [Results](../Gate
 ✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
 
 ✅ Runtime now transports opaque producer failure/report codes; NexArm/Support owns device result names. Unused camera resource constants were deleted. See ADR0122. ❌ No physical completion or scheduling policy change is introduced.
+
+✅ ADR0128: Settings preset/reset submission returns immediately; a cancellable background worker uses the shared Actions segment-feedback executor. Replacement joins software cleanup without waiting for arrival. ❌ Physical takeover/rhythm acceptance remains pending.
+
+✅ ADR0131: business exceptions and report messages remain Actions-owned, independent of native Bluetooth diagnostic vocabulary and recovery. Settings reuses NexArm recipes without Gateway resources and ignores manual execution failure presentation. ❌ Device acceptance remains pending.

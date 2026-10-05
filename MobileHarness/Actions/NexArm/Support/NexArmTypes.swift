@@ -84,5 +84,7 @@ extension ActionReport.Entry.Code {
     public static let targetNotReached = Self(rawValue: "targetNotReached")
     public static let feedbackLost = Self(rawValue: "feedbackLost")
     public static let disconnected = Self(rawValue: "disconnected")
+    public static let admissionFailed = Self(rawValue: "admissionFailed")
+    public static let feedbackFailed = Self(rawValue: "feedbackFailed")
     public static let sendingFailed = Self(rawValue: "sendingFailed")
 }

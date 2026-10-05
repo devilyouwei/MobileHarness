@@ -22,7 +22,8 @@ public struct ToolExecutor: Sendable {
     public func execute(_ call: ToolRequest, context: ToolExecutionContext) async throws -> ToolResponse? {
         try Task.checkCancellation()
         guard let handler = await registry.handler(for: call.toolPath) else {
-            return ToolResponse(callID: call.id, value: "Unknown tool: \(call.toolPath)", isError: true)
+            return ToolResponse(
+                callID: call.id, value: "Unknown tool: \(call.toolPath)", isError: true, failureCode: .unknownTool)
         }
         let timeout = await registry.timeout(for: call.toolPath) ?? self.timeout
         return try await withThrowingTaskGroup(of: Outcome.self) { group in
@@ -53,13 +54,21 @@ public struct ToolExecutor: Sendable {
                 switch result {
                 case .success(let response): return response
                 case .failure(let error):
-                    return ToolResponse(callID: call.id, value: String(describing: error), isError: true)
+                    return ToolResponse(
+                        callID: call.id,
+                        value: String(
+                            ((error as? any LocalizedError)?.errorDescription ?? String(describing: error)).prefix(512)),
+                        isError: true,
+                        failureCode: error is CancellationError
+                            ? .cancelled
+                            : (error as? any ToolExecutionFailureProviding)?.toolFailureCode ?? .handlerFailed)
                 }
             case .timedOut:
                 // Structured concurrency retains ownership until the cancelled handler joins.
                 while (try? await group.next()) != nil {}
                 try Task.checkCancellation()
-                return ToolResponse(callID: call.id, value: "Tool execution timed out", isError: true)
+                return ToolResponse(
+                    callID: call.id, value: "Tool execution timed out", isError: true, failureCode: .timedOut)
             }
         }
     }

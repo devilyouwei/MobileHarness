@@ -137,7 +137,7 @@ private actor Recorder {
     func act() { actions += 1 }
 }
 
-@Test func toolRoundTripPreservesSessionAndCallID() async throws {
+@Test(arguments: [false, true]) func toolRoundTripPreservesSessionAndCallID(_ fails: Bool) async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
@@ -145,7 +145,10 @@ private actor Recorder {
     try await manager.start(.assistant)
     let requests = InputGateway(manager: manager)
     let tools = ToolRegistry()
-    try await tools.register("runtimeInfo") { _ in "runtime healthy" }
+    try await tools.register("runtimeInfo") { _ in
+        if fails { throw ToolExecutionFailure(code: .init(rawValue: "busy"), message: "Fixture busy") }
+        return "runtime healthy"
+    }
     let recorder = Recorder()
     let actions = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
@@ -168,12 +171,16 @@ private actor Recorder {
     #expect(first.inputID == input.id)
     let directResult = try #require(try await ToolExecutor(registry: tools).execute(call, envelope: first))
     #expect(directResult.callID == call.id)
-    try await responses.dispatch(first)
+    let delivered = try #require(try await responses.dispatch(first))
+    #expect(delivered.isError == fails)
+    #expect(delivered.failureCode?.rawValue == (fails ? "busy" : nil))
+    #expect(delivered.deliveryFailure == nil)
     let reply = try #require(await iterator.next())
     #expect(reply.sessionID == session)
     #expect(
         await speechRequests.restored(reply.output)
-            == .actionCall(expectedActionCall(name: "say", parameters: ["text": "runtime healthy"])))
+            == .actionCall(
+                expectedActionCall(name: "say", parameters: ["text": fails ? "Fixture busy" : "runtime healthy"])))
     try await responses.dispatch(reply)
     #expect(await recorder.outputs.count == 2)
     await agent.stop()
@@ -258,6 +265,7 @@ private actor Recorder {
     let cancelled = try #require(
         try await ToolExecutor(registry: registry).execute(ToolCall(toolPath: "cancel"), envelope: envelope))
     #expect(cancelled.isError)
+    #expect(cancelled.failureCode == .cancelled)
 }
 
 @Test func gatewayForwardsWaitBoundariesAndRejectsUnbalancedCompletion() async throws {
@@ -330,11 +338,21 @@ private actor Recorder {
     try await registry.registerCompletion("UI.beginReplyTurn") { _, _ in }
     let gateway = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: registry, sink: { _ in })
+    let failures = try await gateway.observeFailures()
+    var failureIterator = failures.makeAsyncIterator()
+    #expect(await failureIterator.next()?.records.isEmpty == true)
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
     let failedCall = try InternalTool(path: "UI.print", required: ["text"]).call(["text": "hello"])
     let first = try await gateway.execute(
         OutputEnvelope(source: .assistant, input: input, output: .toolCall(failedCall)))
     #expect(first.isError)
+    let failureSnapshot = try #require(await failureIterator.next())
+    #expect(failureSnapshot.records.count == 1)
+    #expect(failureSnapshot.records.first?.title == "UI.print")
+    #expect(failureSnapshot.records.first?.message == first.tool?.value)
+    #expect(first.tool?.failureCode == .handlerFailed)
+    #expect(failureSnapshot.records.first?.failureCode == "handlerFailed")
+
     let nextCall = try InternalTool(path: "UI.beginReplyTurn").call([:])
     let second = try await gateway.execute(
         OutputEnvelope(source: .assistant, input: input, output: .toolCall(nextCall)))
@@ -356,6 +374,20 @@ private actor Recorder {
         OutputEnvelope(source: .assistant, input: input, output: .toolCall(nextCall)))
     #expect(!continued.isError)
     #expect(await gateway.executionResults().outputs.count == 8)
+    // Coalesced observations retain all bounded failures, independent of Tool-result delivery.
+    for _ in 0..<100 {
+        _ = try await gateway.execute(OutputEnvelope(source: .assistant, input: input, output: .toolCall(failedCall)))
+    }
+    let latest = try #require(await failureIterator.next())
+    #expect(latest.records.count == 100)
+    #expect(latest.evictedCount == 6)
+    #expect(await gateway.executionResults().actions.records.isEmpty)
+    var subscriptions = [failures]
+    for _ in 0..<7 { subscriptions.append(try await gateway.observeFailures()) }
+    await #expect(throws: OutputGateway.ObservationError.capacityExceeded) { _ = try await gateway.observeFailures() }
+    await gateway.shutdown()
+    withExtendedLifetime(subscriptions) {}
+
 }
 
 @Test func toolDeadlineJoinsCleanupAndExplicitCancellationPropagates() async throws {
@@ -374,6 +406,7 @@ private actor Recorder {
             call, context: context))
     #expect(result.isError)
     #expect(result.value.contains("timed out"))
+    #expect(result.failureCode == .timedOut)
     #expect(await cleanup.actions == 1)
     let task = Task { try await ToolExecutor(registry: registry).execute(call, context: context) }
     task.cancel()
@@ -401,6 +434,8 @@ private actor Recorder {
     #expect(result.tool?.value == "completed value")
     #expect(result.tool?.isError == false)
     #expect(result.failure != nil)
+    #expect(result.failureCode == .deliveryFailed)
+    #expect(result.tool?.failureCode == nil)
     await agent.stop()
 }
 
@@ -429,4 +464,46 @@ private struct ToolTimeoutModule: ToolModule {
             ])
         ])
     }
+}
+
+@Test func toolFailureCapturesProducerDescriptionWithoutDeviceClassification() async throws {
+    struct FixtureFailure: LocalizedError { var errorDescription: String? { String(repeating: "业务资源异常", count: 200) } }
+    let registry = ToolRegistry()
+    try await registry.registerCompletion("Fixture.failure") { _, _ in throw FixtureFailure() }
+    let result = try #require(
+        try await ToolExecutor(registry: registry).execute(
+            ToolRequest(toolPath: "Fixture.failure"),
+            context: ToolExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
+    #expect(result.isError)
+    #expect(result.value.count == 512)
+    #expect(result.value.hasPrefix("业务资源异常"))
+}
+
+@Test func toolProducerCodesPreserveAdmissionAndArgumentSemantics() async throws {
+    let registry = ToolRegistry()
+    try await registry.registerCompletion("Fixture.argument") { _, _ in
+        _ = try ToolArguments([:]).requiredInt("count", range: 1...3)
+    }
+    try await registry.registerCompletion("Fixture.background") { _, _ in
+        throw ToolExecutionFailure(code: .init(rawValue: "background"), message: "App must be foreground")
+    }
+    let context = ToolExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID())
+    for (path, code) in [
+        ("Fixture.argument", "invalidArguments"), ("Fixture.background", "background"),
+        ("Fixture.unknown", "unknownTool"),
+    ] {
+        let call = ToolRequest(toolPath: path)
+        let response = try #require(try await ToolExecutor(registry: registry).execute(call, context: context))
+        #expect(response.callID == call.id)
+        #expect(response.isError && response.failureCode?.rawValue == code)
+        #expect(response.deliveryFailure == nil)
+    }
+    let response = try #require(
+        try await ToolExecutor(registry: registry).execute(
+            ToolRequest(toolPath: "Fixture.background"), context: context))
+    #expect(response.value == "App must be foreground")
+    let delivered = ToolResult(
+        callID: response.callID, value: response.value, isError: response.isError,
+        failureCode: response.failureCode?.rawValue)
+    #expect(delivered.failureCode == "background")
 }

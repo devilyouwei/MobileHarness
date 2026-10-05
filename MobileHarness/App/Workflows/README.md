@@ -45,7 +45,7 @@ History output remains raw stored data. Preview uses the existing Agent configur
 
 ## BluetoothWorkflow
 
-✅ App-root-owned MainActor workflow maps PlatformKit snapshots into UI values, loads/saves one remembered device with a 4096-byte Storage document, and performs explicit scan/connect/verify/disconnect/forget operations. Restoration coalesces; one connection operation, one motion and one joined cleanup slot, no physical command queue. Scan/stop intent coalesces into one worker; newest presentation snapshots replace older ones. Persistence errors are visible and cannot produce a ready connection.
+✅ App-root-owned MainActor workflow maps PlatformKit snapshots into UI values, loads/saves one remembered device with a 4096-byte Storage document, and performs explicit scan/connect/passive refresh/disconnect/forget operations. Restoration coalesces; one connection operation, one motion and one joined cleanup slot, no physical command queue. Scan/stop intent coalesces into one worker; newest presentation snapshots replace older ones. Persistence errors are visible and cannot produce a ready connection.
 
 ```mermaid
 flowchart LR
@@ -63,17 +63,17 @@ flowchart LR
     Controller --> Result[Action completion → InputGateway]
 ```
 
-Connection waits for App-injected voice/session quiescence before arming a new Actions controller. The current `nexArmBLEProtocol` policy verifies fresh protocol/pose and bounded Actions-owned mapping; the supported profile does not require AT32 version availability. Manual first connection retains its optional indication. Readiness requires persistence, fresh feedback and current generation/native-link checks. Actions and Settings share this root instance.
+Connection uses native BLE subscription completion and passive feedback (ADR0130). It has no voice/session cleanup or scheduler callback. Actions and Settings share the root connection/controller; explicit gestures prepare their own Actions-owned plans when needed. Missing feedback is diagnostic rather than a reconnect trigger.
 
-Leaving Settings stops discovery and page-owned motor intent; connection/recovery lifetime belongs to App. Disconnect/background immediately fences control, cancels work, closes native admission and joins old tasks. Background suspends eligible recovery until foreground; manual disconnect/forget disables the saved reconnect preference. A missing native disconnection acknowledgment stops recovery before any new connection. Already accepted physical motion may finish; host cleanup is not physical-stop proof.
+Leaving Settings stops discovery and page-owned motor intent; connection/recovery lifetime belongs to App. Disconnect immediately fences native I/O, clears transport/manual intents and joins native/manual workers. Finite Agent operations fail naturally through their results. Explicit application background policy still cancels the foreground motion task. Background suspends eligible recovery until foreground; manual disconnect/forget disables the saved reconnect preference. A missing native disconnection acknowledgment stops recovery before any new connection. Already accepted physical motion may finish; host cleanup is not physical-stop proof.
 
 ✅ Simulation tests cover Assistant/Gateway/Action dispatch, navigation, restoration/forget, incompatible devices, background cancellation, failed writes, query/feedback loss, retries and old-session fencing. Current behavior and exact bounds are owned by [Bluetooth/README.md](Bluetooth/README.md).
 
-✅ Bluetooth cleanup joins only robot work and does not invoke the global voice/settings barrier. Opening a replacement connection still performs the injected quiescence operation. ❌ Hardware suspension/disconnect/watchdog and iPhone camera/audio recovery remain separate acceptance work.
+✅ Bluetooth recovery is independent of voice/session lifetime and Channel scheduling. It does not cancel accepted Agent Actions or wait for business result publication; ordinary failures retain motor reports and subsequent queued Actions execute normally. ❌ Hardware suspension/disconnect/watchdog and iPhone camera/audio recovery remain separate acceptance work.
 
 ## Current foreground recovery contract
 
-✅ [Bluetooth](Bluetooth/README.md) owns the ADR0125 recovery state machine for physical disconnection, feedback loss, blocked sends and query quarantine. One worker fences/clears old control intent, closes and joins old owners, confirms native disconnect and performs at most three read-only recovery attempts with 1/2/4-second backoff. Manual disconnect/forget/background can cancel it; restored devices and radio power recovery share this path. Page lifetime does not own recovery, and old physical commands are never replayed.
+✅ [Bluetooth](Bluetooth/README.md) owns the ADR0125 recovery state machine for physical disconnection, blocked sends and query quarantine. Passive feedback silence is diagnostic (ADR0130). One worker fences/clears transport-local intent, closes and joins native/manual workers, confirms native disconnect and performs at most three connection attempts with 1/2/4-second backoff. Manual disconnect/forget/background can cancel it; restored devices and radio power recovery share this path. Page lifetime does not own recovery, and old physical commands are never replayed.
 
 ❌ Physical-device endurance and emergency-stop proof remain outside host recovery.
 
@@ -83,13 +83,13 @@ Leaving Settings stops discovery and page-owned motor intent; connection/recover
 
 ## Peripheral detail operations
 
-✅ BluetoothControlling exposes measured refresh, typed preset/reset requests and individual motor adjustments. Manual requests use a capacity-one latest slot with explicit replacement, shared Actions recipes and send-only submission outside Gateway locks. Conversation Actions retain runMotion and feedback completion. Read refresh reserves the connection-operation slot; it cannot interleave with motion. Commands survive page navigation, while disconnect/background fences admission and joins committed work. Successful connect/motion refreshes measured UI values; disconnect clears them. No command queue or replay is added.
+✅ BluetoothControlling exposes measured refresh, typed preset/reset requests and individual motor adjustments. Manual requests use a capacity-one latest slot with explicit replacement, shared Actions recipes and background segment-feedback execution outside Gateway locks. Conversation Actions retain runMotion and feedback completion. Read refresh reserves the connection-operation slot; it cannot interleave with motion. Commands survive page navigation, while disconnect/background fences admission and joins committed work. Successful connect/motion refreshes measured UI values; disconnect clears them. No command queue or replay is added.
 
 ```mermaid
 flowchart LR
     Details[Peripheral details: typed UI intent] --> Manual[Root workflow manual slot]
     Actions[Conversation via Gateways and Actions] --> Motion[Shared motion admission]
-    Manual --> Recipe[Shared Actions recipe / send-only submission]
+    Manual --> Recipe[Shared Actions recipe / background segment-feedback execution]
     Motion --> Controller[NexArm controller]
     Controller --> Feedback[Measured pose and six encoder values]
     Feedback --> State[UI values and sample timestamp]
@@ -99,9 +99,9 @@ Manual operations are explicit host device controls, like connection/reset, not 
 
 ## Peripheral cleanup and exceptional recovery
 
-✅ ADR0125 supersedes the one-attempt/manual-only feedback recovery policy. Native sending failure, feedback loss, query quarantine and actual disconnect request one bounded cleanup/reconnect path. Ordinary off-target/completion failures remain local Action outcomes. A failed optional initial indication can retain its verified link; automatic recovery does not repeat it.
+✅ ADR0125 recovery is refined by ADR0129/0130: native sending failure, query quarantine and actual disconnect request bounded transport cleanup/reconnect without scheduler coupling. Passive feedback silence does not trigger reconnect; finite feedback/arrival failures remain Action outcomes. Connection sends no indication motion.
 
-✅ Forget clears native/saved selection after joined cleanup and disables automatic reconnect. Interrupted Actions terminate and preserve diagnostics; only new input after verified readiness may issue another command. Latest-intent replacement and PlatformKit pacing remain separate from connection recovery.
+✅ Forget clears native/saved selection after joined cleanup and disables automatic reconnect. Interrupted Actions terminate and preserve diagnostics; only new input after native connectivity may issue another command. Latest-intent replacement and PlatformKit pacing remain separate from connection recovery.
 
 ❌ Hardware and native UI acceptance remain pending; [Bluetooth's current contract](Bluetooth/README.md) owns the complete algorithm and bounds.
 
@@ -113,15 +113,15 @@ Manual operations are explicit host device controls, like connection/reset, not 
 
 ✅ Jog starts from latest measured/commanded targets, without requesting fresh telemetry. After explicit reset the planner uses the vendor's nominal home targets as estimates, never reported measurements. Only sampled values populate UI positions. Presets still recover and verify telemetry when subsequently invoked. ❌ A final accepted finite target can finish after release; iOS suspension/link close are not an emergency-stop guarantee.
 
-✅ Preset failure details now distinguish command delivery, missing position feedback and joints short of target. The manual-action wrapper preserves those details instead of overwriting them with a generic message. Reset remains a priority fire-and-observe-later command; no reset completion ACK is required. ❌ Physical replacement-preset acceptance remains pending.
+✅ Preset failure details now distinguish command delivery, missing position feedback and joints short of target. The manual-action wrapper preserves those details instead of overwriting them with a generic message. Reset is a priority background request; its worker observes motor arrival and can be replaced before completion. ❌ Physical replacement-preset acceptance remains pending.
 
 ✅ Phone UI and conversational shakeBase now bind the same fixed `.baseSway` performance (±30°,800ms body legs); neither calls the retained ±2° USB diagnostic. All presets use physical pose completion and remain interruptible by live reset. ❌ Physical acceptance remains pending.
 
-✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
+✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its feedback-driven motion. Segment outcomes remain collected; ordinary target failures do not implicitly cancel later segments. Subsequent user requests can replace the invocation. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
 
 ## Settings device control (current)
 
-✅ ADR0127 restores Settings manual takeover: presets/reset replace one latest request, cancel and join the previous software writer, then submit the shared Actions recipe without resource admission or physical-feedback completion. Sliders use the same latest-intent jog planner without Agent locks. Buttons/sliders require verified readiness and no active recovery, but remain available during motion/jog/reset/refresh. Native sending/feedback failure still enters ADR0125 cleanup/reconnect without old request replay.
+✅ ADR0127 restores Settings manual takeover: presets/reset replace one latest request, cancel and join the previous software writer, then submit the shared Actions recipe without resource admission; its background child observes completion for each segment. Sliders use the same latest-intent jog planner without Agent locks. Buttons/sliders require native connectivity and no active recovery, but remain available during motion/jog/reset/refresh. Native sending/feedback failure still enters ADR0125 cleanup/reconnect without old request replay.
 
 ```mermaid
 flowchart LR
@@ -139,7 +139,7 @@ flowchart LR
 
 ## Unified Action presentation
 
-✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, projects AgentCore execution observations into UI-owned display values, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. ActionActivityPresentation maps finite/state/activity semantics and bounded report details into UI display fields. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Direct Settings controls remain outside channel execution history and show submission/failure, never physical completion.
+✅ `ActionActivityWorkflow` owns one root-lifetime subscription injected by composition, projects AgentCore execution observations into UI-owned display values, and never imports Gateway. It consumes full versioned snapshots; UI ignores stale revisions. Display names are presentation metadata; failure text is the captured thrown error description, not a duplicate error catalog. ActionActivityPresentation maps finite/state/activity semantics and bounded report details into UI display fields. BluetoothWorkflow exposes bounded failure reasons through the shared protocol. Direct Settings controls remain outside Channel execution history; submission is immediate and manual execution failures are ignored rather than published as Bluetooth state or home issues.
 
 ```mermaid
 flowchart LR
@@ -176,13 +176,13 @@ flowchart LR
 
 ## NexArm feedback execution — 2026-10-01
 
-✅ Conversation uses feedback execution; ADR0127 Settings uses the shared recipe with send-only submission. Settings pending capacity is one with explicit replacement; cancellation joins the previous software owner before replacement, without waiting for physical completion. Idle/active feedback loss disables control and surfaces connection instability; restored feedback never replays motion. `resetArm` resets1–5 only.
+✅ Conversation uses feedback execution; ADR0128 Settings uses the shared recipe with background segment-feedback execution. Settings pending capacity is one with explicit replacement; cancellation joins the previous software owner before replacement, without waiting for physical completion. Idle/active feedback loss surfaces diagnostics while manual controls remain enabled; restored feedback never replays motion. `resetArm` resets1–5 only.
 
 ❌ Sustained real-device acceptance remains pending.
 
 ## Atomic composition — ADR0092
 
-✅ BluetoothWorkflow exposes the last structured motor report and configurable single-motor execution. Agent-selected motion/aim uses injected resource fences; already-owned Channel calls inherit the fence. Settings presets/reset/jog bypass those fences through manual takeover. UI error messages remain separate from collected child outcomes.
+✅ BluetoothWorkflow uses invocation-private structured motor reports and configurable single-motor execution. Agent motion/aim uses injected resource fences; already-owned Channel calls inherit the fence. Settings presets/reset/jog bypass those fences through manual takeover. Native current state remains separate from collected Action outcomes.
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
@@ -215,6 +215,21 @@ flowchart LR
 
 ✅ ADR0123: BLE live/observed/query writes now share PlatformKit pacing with no streaming packet backlog. Aim iteration keeps a fixed start index per pass for fair motor admission. Existing latest-intent replacement, resource ownership and feedback-loss protection remain in force. ❌ Physical endurance and rate calibration remain pending.
 
-✅ ADR0126 gives continuous aim/jog workers the complete motor resource lifetime; latest-target Tools do not compete with their worker's fence. Startup is acknowledged after resource/session admission, old guards release before replacement workers start, and admission failures enter Bluetooth's bounded incident cache without a radio reconnect.
-
 ✅ Diagnostics additionally owns AudioDetectionWorkflow: one active endpoint operation, one deadline/freshness monitor and no pending queue. App injects the complete capture/Agent session; the independent feature target gains no Agents/Gateway dependency. Detection finishes after 10 seconds of received PCM, joins cleanup before restart and fences stale callbacks.
+
+## Passive BLE connection — ADR0130
+
+✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+
+❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+
+✅ ADR0129: Bluetooth owns transport/manual worker cleanup and recovery independently of Agent scheduling. It neither removes accepted Actions nor suspends resource admission; existing results report device failures.
+
+✅ Passive aim startup shares the same Actions-owned configured reference as manual jog when no measurement has arrived; this seeds the planner only and never fabricates UI telemetry. Existing resource/session admission remains mandatory.
+
+✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+
+✅ ADR0139: tracking checks the injected Photographer pose freshness and joins/releases its motor use after a one-second gap. Assistant uses configured shared-writer takeover; old targets are cleared and later accepted Channel Actions are retained. No Bluetooth recovery or whole-Agent stop is involved.
+
+
+✅ ADR0141: AppBluetoothWorkflow validates execution permits at Agent motion/continuous-write entries, independently of Settings manual takeover and native connection recovery. ❌ Resource ownership does not establish physical device health or arrival.

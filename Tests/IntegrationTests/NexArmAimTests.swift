@@ -160,6 +160,29 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     await agent.stop()
 }
 
+@Test func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    try await agent.start()
+    #expect(await !agent.hasFreshPose())
+    // A future sensor timestamp cannot prolong physical input freshness.
+    try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 1e12), session: session))
+    #expect(await agent.hasFreshPose(maximumAge: .milliseconds(200)))
+    try await Task.sleep(for: .milliseconds(250))
+    #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
+    try await agent.receive(
+        observation(try pose(noseX: 50, noseY: 50, sequence: 2, timestamp: 1e12, people: 0), session: session))
+    #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
+    try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 3, timestamp: 1e12), session: session))
+    #expect(await agent.hasFreshPose())
+    try await agent.pause()
+    #expect(await !agent.hasFreshPose())
+    await agent.stop()
+    #expect(await !agent.hasFreshPose())
+    var outputs = agent.outputs.makeAsyncIterator()
+    #expect(await outputs.next() == nil)
+}
+
 @Test func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
@@ -284,7 +307,7 @@ private actor AimLink: NexArmWritableLink {
 @Test func controllerAimWritesFiveAxesAfterVerification() async throws {
     let link = AimLink()
     let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
-    await #expect(throws: NexArmError.firmwareUnavailable) {
+    await #expect(throws: NexArmExecutionError.firmwareUnavailable) {
         try await controller.aim(base: 0, pitch: 0)
     }
     #expect(await link.writes.isEmpty)

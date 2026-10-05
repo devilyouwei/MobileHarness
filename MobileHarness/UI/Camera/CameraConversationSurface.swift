@@ -72,8 +72,7 @@
                     .buttonStyle(.plain)
                     .background(.black.opacity(0.4), in: Capsule())
                     .overlay(Capsule().strokeBorder(.white.opacity(0.18)))
-                    if let message = camera.message ?? camera.visionMessage ?? camera.trackingMessage, camera.isEnabled
-                    {
+                    if let message = camera.message ?? camera.visionMessage, camera.isEnabled {
                         VStack(alignment: .trailing, spacing: 8) {
                             Text(message).font(.footnote)
                                 .multilineTextAlignment(.trailing)

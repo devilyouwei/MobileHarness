@@ -35,10 +35,10 @@ flowchart TD
     Lookup --> Deadline[Bounded cooperative deadline]
     Deadline -->|expiry| Cleanup[Cancel and join handler]
     Cleanup --> Error
-    Lookup -->|unknown| Error[Error ToolResponse]
+    Lookup -->|unknown| Error[Error ToolResponse: code and message]
     Lookup --> Returning[Returning handler]
     Lookup --> Completion[Completion handler]
-    Returning -->|String or ordinary error| Result[Correlated ToolResponse]
+    Returning -->|String or ordinary error| Result[Correlated ToolResponse: producer code and message]
     Completion -->|success| Done[Return nil]
     Completion -->|failure| Result
     Result --> Input[Dispatcher routes through InputGateway]
@@ -59,6 +59,12 @@ Gateway checks resource ownership through the same ResourceCoordinator used by A
 
 ✅ Completion handler ordinary exceptions now return correlated isError ToolResponse, matching returning Tools. Successful completion remains nil; cancellation propagates only when the calling task is cancelled.
 
-✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, BluetoothWorkflowError owns its failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
+✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, Actions-owned NexArmExecutionError owns its execution failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
 
 ❌ Runtime must not classify pose, foreground, control-readiness or device-feedback failures. Producers provide actionReportCode through ActionExecutionFailureProviding; the generic default handles invalid arguments/resource unavailability and otherwise reports handlerFailed. CancellationError remains cancellation.
+
+✅ ADR0131: ordinary dependency failures retain the producer's LocalizedError description when available, otherwise its original string description. Completion/returning policies and result routing remain unchanged; no native diagnostic classification or reconnect hook is added. ❌ Durable error history remains pending.
+
+✅ ADR0132: ToolResponse carries bounded producer-owned FailureCode through ToolExecutionFailureProviding. Lookup, handler cancellation and deadline expiry use distinct generic codes. Domain/dependency error enums and recovery decisions remain outside Runtime.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.

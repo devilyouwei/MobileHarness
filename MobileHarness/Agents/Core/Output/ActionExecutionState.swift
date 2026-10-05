@@ -66,3 +66,35 @@ public struct ActionExecutionSnapshot: Sendable {
         self.evictedCount = evictedCount
     }
 }
+
+/// Output failure observation, distinct from scheduled Action execution and Agent-facing results.
+public struct OutputFailureRecord: Identifiable, Sendable, Equatable {
+    public let id: UUID
+    public let source: AgentID
+    public let title: String
+    public let message: String
+    public let failureCode: String?
+    public let time: Date
+    public init(
+        id: UUID = UUID(), source: AgentID, title: String, message: String, time: Date = Date(),
+        failureCode: String? = nil
+    ) {
+        self.id = id
+        self.source = source
+        self.title = String(title.prefix(128))
+        self.message = String(message.prefix(512))
+        precondition(failureCode.map { !$0.isEmpty && $0.utf8.count <= 64 } ?? true)
+        self.failureCode = failureCode
+        self.time = time
+    }
+}
+public struct OutputFailureSnapshot: Sendable {
+    public let revision: UInt64
+    public let records: [OutputFailureRecord]
+    public let evictedCount: UInt64
+    public init(revision: UInt64, records: [OutputFailureRecord], evictedCount: UInt64) {
+        self.revision = revision
+        self.records = records
+        self.evictedCount = evictedCount
+    }
+}

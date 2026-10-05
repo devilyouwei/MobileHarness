@@ -1,4 +1,8 @@
-# NexArm physical USB acceptance — 2026-09-30
+# NexArm supervised USB acceptance
+
+The dated sections retain historical measurements and the APIs/policies used at that time. Current App/Agent serial trials are recorded in the 2026-10-05 section below; current contracts belong to module READMEs and ADRs. Older trial descriptions are not the current implementation specification.
+
+## Historical controller acceptance — 2026-09-30
 
 This is real hardware evidence, not a simulator result. Port `/dev/cu.usbserial-110`, serial1Mbps, strict firmware compatibility verified by the shared controller. The user explicitly authorized Mac serial action debugging. USB and iPhone BLE run the same `NexArmController.performGesture` code with different `NexArmWritableLink` implementations.
 
@@ -192,3 +196,60 @@ Logs: `/tmp/nexarm-armonly-home.log`, `/tmp/nexarm-armonly-celebrate.log`, `/tmp
 ✅ Settings compiled playback also passed left/right tilt over USB (5.088s), with final XYZ[199,−1,197]mm, pitch−1.1°, roll0°, claw−6° (`/tmp/nexarm-armonly-settings.log`). `scripts/check.sh` passed, including273 IntegrationTests; `scripts/build-ios.sh` passed all four schemes. Signed iPhone build2026100102 succeeded; installation verification is recorded below when complete.
 
 Installation: signed artifact Info.plist reports `0.1.0 (2026100102)`. The first wireless installation failed with a remote-device connection error. Retry succeeded: `/tmp/nexarm-armonly-install-retry.json` reports `outcome=success`, bundle `dev.mobileharness.app`, installed container `E1896609-2B97-4593-A2FB-B221013E7100`, database sequence2088. Before installation, the phone reported build2026100101. After installation, both normal and exact-bundle/all-app listing calls returned successful but empty app arrays, so **independent device version readback is unavailable**, not verified. The CLI exposes no supported app-bundle file read domain here; no app data or signing settings were altered to work around that. The new app was not automatically launched.
+
+## 2026-10-05 — Settings, Assistant and Photographer over serial before ADR0137
+
+These results precede [ADR0137](adr/0137-nexarm-ordinary-home.md): the recorded reset incorrectly reused the tracking rest (motor3=1984, motor4=2045). Preserve these measurements as evidence for that revision; they do not validate the restored ordinary home (motor3=1198, motor4=1238). The current opt-in trials distinguish ordinary reset from explicit tracking setup.
+
+The user authorized physical serial Action/Tool tests, confirmed phone control was stopped and the workspace was clear, then restarted the arm/reconnected USB after the initial read-only position check failed. The port was `/dev/cu.usbserial-110`, configured by `PlatformKit.NexArmSerial` at 1 Mbps. A valid version reply reported ESP32/AT32 1.0.2. The initial version/position checks were inconsistent: a later version query succeeded, while raw serial showed the firmware receiving CMD11 without a binary position reply. After the user restart, position queries and unsolicited position receipts recovered. No motion was sent before position preflight passed. This observation does not identify the phone's BLE failure cause or prove radio congestion.
+
+### Test seam and measurement boundaries
+
+`NexArmSerialAcceptanceTests` invokes the production `BluetoothWorkflow`, Actions controller/recipes/planners, domain Action/Tool modules and real Assistant/Photographer/Gateways. A bounded test-only serial façade supplies the workflow's currently BLE-specific connection interface. No position, IK response or motion success is synthesized. It uses the SDK admission budget, one latest telemetry/snapshot/target, one native observation reader and fenced virtual operation owners. A sequence recheck after the serial await prevents concurrent readers from publishing the same native receipt twice. Queries and motion submissions are paced; no device command queue or replay is introduced.
+
+Assistant uses fixed model text and explicit test composition bindings, with non-device presentation fixtures. Photographer receives six injected, validated pose observations through InputGateway at 250 ms intervals. Its actual algorithm emits progressively accumulated `Robot.aim` targets; OutputGateway's production `execute` path records completion outcomes. App's private application assembly/behavior adapter, real chat providers, camera/YOLO inference, CoreBluetooth and native SwiftUI gestures are not exercised by this seam.
+
+### Final physical results
+
+Each hardware test ran alone, with other hardware gates disabled, after the final serial/session/reader fixes. Counters below count actual logged motion writes and unique observed position receipts, not acknowledgments or estimated movement.
+
+| Trial | Actual checks | Motion packets / receipts | Final result |
+| --- | --- | --- | --- |
+| Read-only preflight | firmware, two stationary position reads; closed observation read/send return `disconnected` before another write | no motion | passed, 0.508 s |
+| Settings + Assistant motor trial | motor5 +80 counts/return through real Assistant scheduler; manual nod/shake-head; motor5 slider release/hold; invalid target and offline execution | 28 / 64 | passed, 12.878 s |
+| Photographer + manual takeover | explicit tracking-rest Action; six real Agent Tool outputs; measured base movement; manual sending under an Agent lease; slider replaces active shake-head, no subsequent old preset writes | 94 / 27 | passed, 5.434 s |
+| Full Settings + Assistant preset trial | all nine gestures once through each route, plus whole-arm reset through each route | 98 / 409 | passed, 81.692 s |
+
+The nine gestures were nod, shake-head, base sway, wave, left/right tilt, look-around, celebrate and dance. A final trace audit matched all98 finite native targets to a real receipt within their per-motor arrival region before the next command (including the last command). Manual preset verification requires the expected number of actual motion writes and measured final targets; manual errors remain intentionally unpublished. Agent preset trials additionally require terminal `succeeded` records from the real scheduler. Physical completion uses the existing per-motor arrival regions, not zero encoder error. For example, final reset's motor3 observation was 1951 against target1984, inside the current 56-count region; this is not a claim of exact endpoint accuracy.
+
+The final motor5 slider trial wrote 14 commands in its 450 ms interval, moved from2054 to2129 and held within four counts after release. The Photographer trial accepted six Tool outputs, issued81 tracking motion packets, and moved base2046→1929; wrist roll/claw stayed within the separately checked region. A Tool publication remains distinct from arrival: the test checks actual positions and absence of late worker failure separately. Tracking's final fractional-tail fix (ADR0135) preserves a pending last-count proposal until native admission, then permits the worker to end. The existing convergence/reversal tests and a20-case deferred-admission regression passed; the reversal fixture now uses motor4's own start.
+
+Invalid target5000 produced a failed Action with its captured validation reason; offline movement produced a failed Action with a disconnected reason. Neither sent a native motion, became a successful completion or became a Settings transport issue. Disconnected Settings control admission rejected both preset and slider intents. Serial close/session loss now returns native `disconnected`, while explicit caller Task cancellation remains separate.
+
+### Reproduction and remaining acceptance
+
+Run only under supervision, one physical test per process, with `NEXARM_PORT` set and exactly one gate set to `1`: `NEXARM_SERIAL_PREFLIGHT`, `NEXARM_SERIAL_ACCEPTANCE`, `NEXARM_SERIAL_TRACKING_ACCEPTANCE`, or `NEXARM_SERIAL_PRESETS_ACCEPTANCE`. The matching function names and bounds are in Tests/IntegrationTests/README.md. Default checks disable these gates. Final logs were `/tmp/mobileharness-serial-final-preflight-planner.log`, `/tmp/mobileharness-serial-final-settings-agent.log`, `/tmp/mobileharness-serial-final-tracking.log`, and `/tmp/mobileharness-serial-final-presets.log`.
+
+No torque, calibration, firmware, gripper motion or automatic failure return-home was used. These results do not establish emergency stopping, every individual slider under load, wrist/reach tracking accuracy, native phone touch behavior, weak-signal BLE, actual radio detach/recovery, device starvation endurance or the previously reported phone reconnect loop. Phone/load configuration was not separately recorded; do not generalize these samples to another load. The initial missing serial feedback required the user's device restart; no application-only recovery conclusion is drawn from that event.
+
+## 2026-10-05 — Photographer aim rate and small-target jitter diagnostic
+
+The user reported jitter during phone Photographer tracking, authorized serial testing, and confirmed phone control was stopped and the workspace clear. Read-only preflight on `/dev/cu.usbserial-110` passed (firmware102; two stable position samples). No production control parameter was changed.
+
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer NEXARM_SERIAL_TRACKING_ACCEPTANCE=1 NEXARM_SERIAL_AIM_STRESS=1 NEXARM_PORT=/dev/cu.usbserial-110 swift test --filter nexArmSerialSettingsTakeoverAndPhotographerToolAcceptance`. The existing tracking preparation and six Photographer calls precede three explicit Tool fixtures through OutputGateway; centered observations pass InputGateway to preserve real freshness. The bounded serial façade retains the production 30ms budget. Stress mode skips manual takeover.
+
+| Phase | Tool calls | Actual motion writes | Elapsed | User observation |
+| --- | --- | --- | --- | --- |
+| Base sweep −0.08…0.08 rad, nominal 5Hz | 30 | 147 | 6.149s | Jitter during continuous target movement |
+| Same base 0.08 rad / pitch 0, nominal 50Hz | 300 | 129 | 7.007s | Fixed target stable |
+| Base 0.08 ±0.01 rad / pitch 0, nominal 5Hz | 30 | 100 | 6.113s | Jitter during alternating target movement |
+
+The whole test passed in 28.227s; all Tool calls were admitted without a recorded worker failure and the serial connection closed. The achieved repeated-target publication rate was about 42.8Hz including dispatch overhead. Earlier real Photographer calls produced 84 writes. Phase write counts include settling carried over from the preceding phase.
+
+Code inspection: Photographer throttles target publication to 0.2s on observation timestamps and applies a 4% image dead zone. The App worker advances the Actions jog planner at 30ms, with a connection-wide minimum write interval of 30ms. The planner suppresses identical consecutive encoded goals but converges to the exact encoder target; its 2-count/8-count-per-second settling region is not measured physical arrival tolerance. Single-count increments remain legal. Alternation generated 63 base packets over a 2097…2100 target range, with 28 immediate sign changes between consecutive target differences. This is command evidence, not a vibration measurement.
+
+Repeated identical Tool calls still produced writes: after a worker settles and exits for 300ms, a later same-goal call starts a new worker seeded from cached measured joints. In the fixed-target phase, elbow commands repeatedly advanced from about1931 toward1984 while feedback stayed around1929; 92 elbow writes and 24 wrist writes occurred. This is a separate restart/reconvergence behavior to investigate. User-observed stability in this phase means command frequency alone did not explain the visible jitter in this trial.
+
+❌ The likely contribution of tiny incremental commands, low servo speeds and frequent reversals needs controlled tuning trials; no cause is established for YOLO noise, phone camera delay, BLE, load or firmware control loops. This test isolates explicit base Tool targets, not actual camera perception, wrist pitch tracking or shoulder extension. Roughly5Hz position telemetry cannot establish absence of high-frequency physical vibration. No torque, PID, calibration, firmware or gripper change, and no failure return-home/replay, was used. Logs: `/tmp/mobileharness-aim-preflight.log` and `/tmp/mobileharness-aim-stress.log`.
+
+Validation for this diagnostic: the opt-in physical test and changed-source formatting passed. `scripts/check.sh` passed boundary/provisioning/format checks but failed the existing `bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion` test (eight `result == nil` expectation failures and subsequent timeout; IntegrationTests reported 464 tests / 10 issues). This unrelated simulated test was not modified in this diagnostic. `scripts/build-ios.sh` was run with full Xcode and stopped at the external CoreAIShared simulator target because the simulator SDK cannot resolve CoreAI; no successful full simulator build is claimed. Logs: `/tmp/mobileharness-aim-check.log`, `/tmp/mobileharness-aim-ios.log`.

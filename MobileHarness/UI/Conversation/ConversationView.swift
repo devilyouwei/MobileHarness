@@ -4,15 +4,13 @@
     @MainActor
     public struct ConversationView: View {
         @Bindable var state: ConversationState
-        @Bindable var robot: BluetoothSettingsState
         @Bindable var activity: ActionActivityState
         private let toggleVoice: () -> Void
         public init(
-            state: ConversationState, robot: BluetoothSettingsState, activity: ActionActivityState,
+            state: ConversationState, activity: ActionActivityState,
             toggleVoice: @escaping () -> Void
         ) {
             self.state = state
-            self.robot = robot
             self.activity = activity
             self.toggleVoice = toggleVoice
         }
@@ -98,14 +96,8 @@
                     .opacity(state.voicePhase == .speaking ? 1 : 0)
                     VStack {
                         Spacer(minLength: 0)
-                        if !activity.items.isEmpty || activity.observationUnavailable {
+                        if activity.hasRecords || activity.observationUnavailable {
                             ActionActivityView(state: activity)
-                        } else if robot.phase == .connected {
-                            Label(
-                                robot.controlReady ? "\(robot.selected?.name ?? "机械臂") 已连接" : "机械臂已连接，控制待验证",
-                                systemImage: "sensor.tag.radiowaves.forward.fill"
-                            )
-                            .font(.caption).foregroundStyle(.white.opacity(0.7))
                         }
                     }
                     .frame(width: geometry.size.width - 40)

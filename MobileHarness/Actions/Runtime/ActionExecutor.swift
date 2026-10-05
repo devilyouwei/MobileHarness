@@ -25,8 +25,9 @@ public struct ActionExecutor: Sendable {
             throw error
         }
         let completion: ActionCompletion
-        if case .report(let report) = returned, report.executionFailure != nil {
-            return returned
+        if case .report(let report) = returned {
+            if report.executionFailure != nil { return returned }
+            completion = returned
         } else if let report = await invocation.results.snapshot(), definition.kind == .finite {
             completion = .report(report)
         } else {

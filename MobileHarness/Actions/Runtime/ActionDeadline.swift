@@ -36,7 +36,9 @@ enum ActionDeadline {
                 }
                 try Task.checkCancellation()
                 let stored = await snapshot()
-                return .report((stored ?? returned ?? .executionFailed(.timedOut)).withExecutionFailure(.timedOut))
+                return .report(
+                    (stored ?? returned ?? .executionFailed(.timedOut)).withExecutionFailure(
+                        .timedOut, description: "Action execution timed out"))
             }
         }
     }

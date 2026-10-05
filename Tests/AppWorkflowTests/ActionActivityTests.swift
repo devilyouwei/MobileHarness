@@ -187,3 +187,22 @@ extension ActionActivityState {
         execution: activityRecord(phase: .failed, completion: .report(report)))
     #expect(item.issueDescriptions == ["第1项：执行失败"])
 }
+
+@Test @MainActor func executionFailureObservationIsIndependentAndBounded() async throws {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    workflow.startFailures { pair.stream }
+    let issue = OutputFailureRecord(source: .assistant, title: "Fixture.tool", message: "Resource rejected")
+    pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 2))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while state.outputIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
+    #expect(state.outputIssues.first?.message == "Resource rejected")
+    #expect(state.items.isEmpty && state.hasRecords)
+    for _ in 0..<105 { workflow.recordFailure(title: "Worker", source: "Fixture", message: "Business failure") }
+    #expect(state.backgroundIssues.count == 100)
+    #expect(state.issueEvictions == 7)
+    state.replaceIssues(revision: 0, records: [], evictedCount: 0)
+    #expect(state.outputIssues.count == 1)
+    pair.continuation.finish()
+}

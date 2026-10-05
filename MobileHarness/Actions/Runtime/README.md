@@ -89,6 +89,25 @@ ChannelScheduler owns `ActionDiagnostics`, a circular ring of256 records by defa
 
 ✅ ActionComposition preserves bounded producer-owned report details when flattening child paths, replacing dedicated motor/target/observed fields. ❌ Runtime does not interpret business detail keys.
 
-✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, BluetoothWorkflowError owns its failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
+✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, Actions-owned NexArmExecutionError owns its execution failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
 
 ❌ Runtime must not classify pose, foreground, control-readiness or device-feedback failures. Producers provide actionReportCode through ActionExecutionFailureProviding; the generic default handles invalid arguments/resource unavailability and otherwise reports handlerFailed. CancellationError remains cancellation.
+
+✅ ADR0131: compositions preserve captured producer failure descriptions through bounded generic leaf details and aggregate reports; arbitrary Error capture remains independent of SDK classification. Cancellation and deadlines retain their existing execution policies. ❌ Durable result delivery remains pending.
+
+```mermaid
+flowchart LR
+    Error[Producer Error] --> Capture[Generic code and bounded description]
+    Child[Existing child report] --> Capture
+    Capture --> Flatten[Composition leaf details / aggregate description]
+    Flatten --> Report[ActionReport]
+    Report --> Gateway[Generic result and observation translation]
+```
+
+Failure text uses a producer LocalizedError description when supplied, otherwise its original string description. The Runtime does not map device error enums or generate device incident records.
+
+✅ ADR0132: A winning Action deadline supplies its own timedOut root description while retaining saved child causes; cancelled cleanup never becomes the timeout explanation.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.
+
+✅ ADR0133: An explicitly returned terminal report takes precedence over the invocation's earlier stored report. Void completions and throws still consume stored child outcomes; thrown failure and winning deadline retain their original root descriptions. Runtime never turns native admission into physical success. ❌ Uncooperative-handler termination remains unavailable.

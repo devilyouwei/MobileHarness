@@ -22,7 +22,7 @@ App owns these state instances and injects workflows. UI imports Storage for rec
 ✅ A standalone settings page is available from the home top-right controls even when voice startup fails. Key uses SecureField and privacySensitive. Saving is owned by App state and completes across navigation.
 ❌ Live provider and physical-device interaction acceptance require user configuration. No credentials are embedded; the visible default endpoint/model comes from the configured adapter defaults.
 
-✅ Settings is now a pushed standalone page with a first-level feature list and second-level 大模型 form. Back navigates to settings/home. The enabled switch selects cloud/local on Save while preserving credentials. Native PasteButton controls beside URL/Key read text only on explicit tap. No sheet or automatic clipboard read remains.
+✅ Settings is now a pushed standalone page with a first-level feature list and second-level 大模型 form. Back navigates to settings/home. The enabled switch selects cloud/local on Save while preserving credentials. Native PasteButton controls beside URL/Key read text only on explicit tap. The 大模型 form uses push navigation; it has no sheet or automatic clipboard read.
 
 ✅ Native NavigationStack back items replace custom dismiss buttons, restoring interactive leading-edge swipe at both settings levels. Native back navigation stays present during saves; App-owned save work continues if the user navigates back. Cancelled swipes remain on the current page. ❌ Physical-device gesture acceptance pending.
 
@@ -74,31 +74,30 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
 
-## Bluetooth peripherals — current contract (ADR0125)
+## Bluetooth — current state and explicit navigation (ADR0134 / ADR0138)
 
-Purpose: present device discovery, actual link/control readiness, explicit controls and bounded diagnostic history. Design goals: UI-owned values and typed intents only; the root workflow owns native effects, recovery and persistence.
+✅ Device lists show the latest native connection/communication status and current reason only: 未连接、已连接、已连接，异常 and connecting/reconnecting/disconnecting/radio-wait transitions. Failed connection remains 未连接 with the latest reason. Each device occupies one tappable row. An unconnected name submits connection; native success stays on the list and a later connected-name tap opens detail. There are no per-device Connect rows or decorative device icons; only connected rows show a detail chevron and a Disconnect row below. Busy/unavailable connection admission dims and disables row taps, while a toolbar Cancel action remains available during connection/recovery. My Devices contains the connected or remembered device, with Forget available even while disconnected. A new unsuccessful selection stays in nearby rows without replacing the remembered entry. Current reasons are scoped to the attempted device. App owns connection effects; UI owns one local tap-selected destination.
 
-✅ `BluetoothSettingsState` contains presentation values; App implements `BluetoothControlling`. Settings → 蓝牙外设 uses native List sections for 我的设备 / 附近设备. Discovery includes named BLE devices, bounded to 32 rows, with NexArm names first; compatibility is checked after selection. One remembered device uses a stable peripheral identifier. Radio power/permission/unsupported states are shown truthfully, with a host-supplied system-settings operation for permission denial.
+✅ An open detail page survives disconnection. 当前状态 shows 未连接 when disconnected, current recovery phase/attempt/retry controls, and the latest connection reason only. A connected detail shows one 连接 row: 已连接, or yellow 已连接，异常. The latest native reason is shown in full red text immediately below 当前状态; healthy snapshots clear an earlier issue. There is no separate 通信 row. Connection progress remains visible during recovery. There is no exception modal, historical event list/count, clear operation or device diagnostic cache. Action/Tool outcomes stay in home scheduling issues and cannot alter Bluetooth state.
 
-✅ Remembered/current device rows remain navigable while disconnected. 当前状态 separates 蓝牙链路 from 控制 readiness and shows recovery stage/attempts. Actions require verified readiness and no active recovery. Automatic/explicit reconnect is read-only and never repeats a reset, indication or interrupted motion. A manual first connection may perform its optional indication; a missing AT32 version alone does not block the supported BLE protocol/pose checks. Manual disconnect/forget cancels and disables recovery; forget joins cleanup before removing the saved record.
+✅ Actions, whole-arm reset and six motor sliders are disabled/gray after disconnection or native cleanup. Slider disable/release/page exit clears input and springs to center. While connected, motion/refresh/feedback gaps do not impose Agent resource locks or block manual takeover. Settings submits immediately to App's replaceable worker, shares Actions recipes and ignores manual execution errors; it does not wait for completion.
 
-✅ Below 当前状态, 异常与恢复记录 shows bounded App-supplied events with time, original cause, attempt/elapsed time and expandable native/traffic/feedback summaries. 重新连接 starts a fresh recovery budget; 取消恢复 / 断开 stops it; 清空记录 changes only cached events. Cache is process-local, at most four devices with 32 newest events each. UI imports no PlatformKit/Actions service and owns no recovery task.
-
-✅ Details show measured end-effector coordinates, sample time and six 上次位置 values. Entry/refresh/pull-to-refresh call the injected read-only operation, whose App admission rejects overlapping recovery/motion. `BluetoothArmAction` exposes typed presets including 点头/摇头 and separate 整臂归位. Settings and conversation share Actions recipes, while Settings uses send-only submission outside Gateway/resource locks. Buttons/sliders stay enabled while verified control is available, including active motion, jog, reset or refresh; only unavailable control/recovery disables them. This prevents a drag from disabling itself and invoking spring-return release (ADR0127). Failures remain visible; local send admission is not physical arrival.
-
-✅ Six spring-return sliders send normalized direction/speed immediately while dragging. Release, gesture cancellation, disable and page exit clear motor intent. UI displays last sampled motor positions separately from slider speed, without a per-release target or home prerequisite. Page exit stops scans/page-owned motor intent; connection/recovery survives navigation. Native settings effects remain root-owned.
+✅ Measured end-effector/joint values and sample time remain separate from connection state. Entry/refresh/pull-to-refresh reads cached passive samples, not native queries or connection probes. Connection/recovery survives page navigation; page exit ends only discovery/page motor intent. System power/permission/unsupported state is truthful. Disconnect/forget disables auto-reconnect, and forget joins cleanup before removing persistence.
 
 ```mermaid
 flowchart LR
-    UI[Settings typed intents] --> Workflow[App BluetoothWorkflow]
-    Workflow --> Actions[Shared Actions recipe / manual submission]
-    Actions --> BLE[PlatformKit native transport]
-    BLE --> Workflow
-    Workflow --> Values[UI state and bounded incidents]
-    Values --> UI
+    Tap[Device-name tap] --> Intent{Connected?}
+    Intent -->|no / admitted| Connect[App connect]
+    Connect --> Latest[Latest native snapshot]
+    Latest --> State[Current UI values / remain on list]
+    Intent -->|yes| Detail[UI-local destination / native detail push]
+    Detail --> Manual[Immediate manual intent / shared Actions]
+    State --> Disabled[Connection lost: disabled action and motor controls]
 ```
 
-❌ Native iPhone diagnostic layout, sustained BLE/firmware recovery and physical motor acceptance remain pending. System pairing removal, Bluetooth Classic accessories, background physical control and durable diagnostic history are not implemented.
+✅ Detail → device list → Settings uses the existing single NavigationStack and one UI-local tap-owned destination. Only a connected-name tap assigns it; page appearance and connection snapshots never reset a destination or initiate navigation; removing the former list onAppear reset prevents a second pop during an interactive return. Cancelled gestures leave navigation to SwiftUI.
+
+❌ Physical iPhone navigation/touch, sustained BLE/firmware recovery and motor acceptance remain pending. No historical Bluetooth cache, durable diagnostics, system pairing removal, Bluetooth Classic or background physical control.
 
 ## Local model resources — current contract
 
@@ -157,3 +156,11 @@ flowchart LR
 ✅ AudioDetectionState.swift owns display-only capture/direction snapshots, freshness and injected AudioDetectionControlling/AudioDetectionRunning protocols. AudioDetectionSection.swift adds a compact recognition-page section: start/stop, microphone permission/input, runtime spatial support, actual four-channel/mono mode, concise fallback reason, actual PCM level and active azimuth/elevation. The section is injected through SettingsView/ModelResourcesView; UI imports no Agent, device or workflow service. Page departure/background requests cancellation. Valid direction expires at the observation deadline; quiet/unavailable statuses contain no angles. Completed/stopped sessions clear angles.
 
 ❌ Native layout/accessibility and real capture-field coordinates require device acceptance. No distance, robot coordinate, source identity or ASR-quality result is presented.
+
+## Passive BLE connection — ADR0130
+
+✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+
+❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+
+✅ ADR0133: Bluetooth lists use explicit borderless button behavior to isolate operation taps within native List rows. Recovery-success copy distinguishes restored connectivity from unverified movement. No Action failure or resource policy is added to Settings. ❌ Device touch/layout verification remains pending.

@@ -55,7 +55,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         presentation: endpoint, playback: endpoint, pose: endpoint, camera: endpoint,
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
-        aim: { _, _, _ in throw RobotTools.AimError.notConnected })
+        aim: { _, _, _ in throw ToolExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable") })
     try BehaviorCoverage.validate(
         actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [

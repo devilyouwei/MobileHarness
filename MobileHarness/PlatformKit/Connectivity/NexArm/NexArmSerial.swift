@@ -20,7 +20,7 @@
         public func endObservation(_ session: UUID) { if observationID == session { observationID = nil } }
         public func sendObserved(_ packet: NexArmPacket, session: UUID) throws -> Bool {
             try Task.checkCancellation()
-            guard observationID == session else { throw CancellationError() }
+            guard observationID == session else { throw NexArmError.disconnected }
             guard fd >= 0 else { throw NexArmError.disconnected }
             guard packet.isObservedControl
             else { throw NexArmError.invalidPacket }
@@ -28,7 +28,8 @@
             return true
         }
         public func latestObservation(after sequence: UInt64, session: UUID) throws -> NexArmTelemetry? {
-            guard observationID == session else { throw CancellationError() }
+            try Task.checkCancellation()
+            guard observationID == session else { throw NexArmError.disconnected }
             guard fd >= 0 else { throw NexArmError.disconnected }
             var consumed = 0
             while true {

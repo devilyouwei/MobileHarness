@@ -193,7 +193,7 @@ public actor ChannelScheduler {
         let required = try definition.requiredResources(for: invocation.call)
         if !required.isEmpty {
             guard let resources else { throw ResourceError.unknownResource }
-            try await resources.validate(
+            try await resources.validateAdmission(
                 resources: required, owner: invocation.owner, lease: invocation.lease)
         }
         // Recheck state after the resource actor hop, before reserving capacity.
@@ -376,9 +376,9 @@ public actor ChannelScheduler {
                     case .failure(let error):
                         outcome = .success(.report(report.recordingFailure(error)))
                     case .success(.report(let terminal)):
-                        outcome = .success(
-                            .report(
-                                terminal.executionFailure.map { report.withExecutionFailure($0) } ?? report))
+                        // The executor already merged stored children with the terminal error/deadline.
+                        // Re-reading the older store must not erase terminal entries or its captured cause.
+                        outcome = .success(.report(terminal))
                     case .success:
                         outcome = .success(.report(report))
                     }
@@ -408,7 +408,7 @@ public actor ChannelScheduler {
                     "\($0.path): \($0.code?.rawValue ?? "handlerFailed")"
                 } ?? []
             if let failure = report?.executionFailure { issues.append("execution: \(failure.rawValue)") }
-            let description = issues.joined(separator: "; ")
+            let description = report?.failureDescription ?? issues.joined(separator: "; ")
             executionTransition(
                 job.id, to: phase, completion: completion,
                 failure: status == .succeeded ? nil : .operationFailed,
@@ -429,7 +429,7 @@ public actor ChannelScheduler {
                     ? nil
                     : ((error as? any ActionExecutionFailureProviding)?.actionExecutionFailure.observationFailure
                         ?? (error is ResourceError ? .resourceUnavailable : .operationFailed)),
-                failureDescription: error is CancellationError ? nil : error.localizedDescription)
+                failureDescription: error is CancellationError ? nil : ActionReport.description(for: error))
             resultLedger.complete(
                 job.invocation, status: error is CancellationError ? .cancelled : .failed,
                 effect: started ? .unknown : .notStarted, completion: .report(report),

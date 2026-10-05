@@ -16,7 +16,7 @@ flowchart LR
 
 ✅ The first person in the published array is the target. That array keeps VisionPerception's copy order. The current pose decoder sorts by detection score before the score is removed, but this Agent does not re-rank. The nose is the aim point when its confidence is at least 0.3 and it lies inside the image. Otherwise the point is the midpoint of joints that pass the same test. No such joint means no aim. `base` turns only the base and `pitch` tips only the wrist. Each command adds a limited step from the last command: a 4% dead zone, smoothing, and a capped rate so a person at the edge is followed without a full-frame snap. The first aim outside the dead zone is immediate. Later aims wait 0.2 seconds on the observation timestamp. A centered person, or an empty observation, emits nothing and does not return to center. Pause admits the observation and does not aim.
 
-✅ App composition supplies the Agent factory; VisionSession registers this Agent with `controlsArm` true and dispatches each `Robot.aim` through OutputGateway. Gateway admits the declared five-motor resources; NexArmBehaviorAdapter binds the verified foreground Bluetooth workflow. Missing/unready/background connection failure is visible as an independent tracking warning; vision continues. ❌ Wi-Fi stays closed, and physical tracking acceptance remains pending.
+✅ App composition supplies the Agent factory; VisionSession registers it with controlsArm true and dispatches Robot.aim through OutputGateway. Intent dispatch has no transient motor fence; App's worker holds motors1–4 through ResourceCoordinator (ADR0126). NexArmBehaviorAdapter binds the foreground Bluetooth workflow. Missing/unready/background failure is an independent tracking warning; vision continues. ❌ Wi-Fi and physical tracking acceptance remain pending.
 
 ## 输入、订阅与输出契约
 
@@ -40,3 +40,22 @@ flowchart LR
 ✅ PoseObservation is owned by Agents/Communication; association and robot-selection business policy remain here. Concrete AgentID constants are compiled in the business Agents target.
 
 ✅ Photographer extracts the business PerceptionMessage.pose from generic AgentMessage. Shared pose validation still precedes indexing; no robot behavior changes are made.
+
+## Tracking freshness and takeover — ADR0139
+
+✅ hasFreshPose is a read-only host query. Validated, nonexpired, ordered observations with a usable first-person aim point update ContinuousClock reception time, including centered targets that emit no Tool. Empty/no-visible-target observations do not renew freshness; future sensor timestamps cannot prolong it. Production expires after one second. Pause/stop deny freshness and clear accumulation. Fresh input after a one-second gap resets previous filters/targets before selecting a new step.
+
+✅ Composition binds this query to the App tracking writer. Source silence exits/join-cleans the writer and releases motor use without a new Tool, whole-Agent cancellation or Bluetooth recovery. Camera shutdown independently removes the vision session and closes its resources. Assistant's authorized NexArm executions can preempt Photographer through host-configured ResourceCoordinator policy; Photographer cannot preempt Assistant. Later tracking requires fresh usable input and ordinary control availability.
+
+```mermaid
+flowchart LR
+    Pose[InputGateway admitted usable pose] --> Time[Agent monotonic freshness]
+    Time --> Query[App query / one-second expiry]
+    Query -->|stale or stopped| Join[Exit writer / end live session / join]
+    Join --> Release[Release motor use / clear old target]
+    Assistant[Authorized Assistant Action] --> Policy[Configured resource takeover]
+    Policy --> Join
+    Release --> Action[Assistant execution or later fresh tracking]
+```
+
+❌ Physical takeover timing/stop acceptance remains pending.

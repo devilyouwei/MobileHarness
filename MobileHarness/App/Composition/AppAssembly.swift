@@ -93,10 +93,6 @@ final class AppAssembly {
         operations: settingsWorkflow, initial: SettingsProviderAdapter.initial)
     @ObservationIgnored lazy var bluetooth = BluetoothWorkflow(
         state: BluetoothSettingsState(), link: NexArmBluetooth(),
-        quiesce: { [weak self] in
-            await self?.container?.lifecycle.beginSettingsChange()
-            self?.container?.lifecycle.endSettingsChange()
-        },
         makeStore: {
             let root = try FileManager.default.url(
                 for: .applicationSupportDirectory, in: .userDomainMask,

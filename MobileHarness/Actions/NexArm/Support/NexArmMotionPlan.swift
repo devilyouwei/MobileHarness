@@ -13,20 +13,22 @@ public struct NexArmMotionPlan: Sendable {
     public let steps: [Step]
     public init(lockedMotors: Set<Int>, frames: [NexArmGesture.TestFrame]) throws {
         guard !lockedMotors.isEmpty, lockedMotors.isSubset(of: Set(1...6)), (1...20).contains(frames.count) else {
-            throw NexArmError.invalidMotion
+            throw NexArmExecutionError.invalidArguments
         }
         self.lockedMotors = lockedMotors
         steps = try frames.map { frame in
             guard let targets = frame.packet.motorTargets,
                 Set(targets.keys).isSubset(of: lockedMotors)
-            else { throw NexArmError.invalidMotion }
-            guard (1...10_000).contains(frame.milliseconds) else { throw NexArmError.invalidMotion }
+            else { throw NexArmExecutionError.invalidArguments }
+            guard (1...10_000).contains(frame.milliseconds) else { throw NexArmExecutionError.invalidArguments }
             return Step(packet: frame.packet, targets: targets, milliseconds: frame.milliseconds)
         }
-        guard Set(steps.flatMap { $0.targets.keys }) == lockedMotors else { throw NexArmError.invalidMotion }
+        guard Set(steps.flatMap { $0.targets.keys }) == lockedMotors else {
+            throw NexArmExecutionError.invalidArguments
+        }
     }
     public init(groups: [[NexArmPacket]]) throws {
-        guard (1...20).contains(groups.count) else { throw NexArmError.invalidMotion }
+        guard (1...20).contains(groups.count) else { throw NexArmExecutionError.invalidArguments }
         let packets = try groups.map { try NexArmMotorCommands.simultaneous($0) }
         let motors = Set(packets.flatMap { $0.motorTargets?.keys.map { $0 } ?? [] })
         try self.init(lockedMotors: motors, frames: packets.map { .init(packet: $0, milliseconds: 1000) })
@@ -49,24 +51,6 @@ public struct NexArmMotionPlan: Sendable {
             return NexArmGesture.TestFrame(packet: packet, milliseconds: step.milliseconds)
         }
         return try Self(lockedMotors: lockedMotors, frames: frames)
-    }
-
-    /// Manual playback reuses the same finite recipe without resource or arrival admission.
-    /// Inter-frame beats describe choreography only; return confirms local submission of the last frame.
-    public func submit(using send: @Sendable (NexArmPacket) async throws -> Bool) async throws {
-        for (index, step) in steps.enumerated() {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-            while true {
-                try Task.checkCancellation()
-                guard ContinuousClock.now < deadline else { throw NexArmError.timeout }
-                if try await send(step.packet) { break }
-                try await Task.sleep(for: .milliseconds(30))
-            }
-            try Task.checkCancellation()
-            if index < steps.count - 1 {
-                try await Task.sleep(for: .milliseconds(step.milliseconds))
-            }
-        }
     }
 
 }

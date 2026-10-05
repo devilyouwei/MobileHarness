@@ -8,6 +8,7 @@ public enum NexArmJointCommand {
     /// Nominal duration used only to choose a legal motor speed. It is not a measured travel time.
     public static let aimMilliseconds = 200
     /// Tracking rest and highest camera position, read over Bluetooth on 2026-10-03 (X299 Z327 mm, end pitch -1.9°).
+    /// Tracking only; ordinary reset uses NexArmGesture.referenceHomeJoints.
     /// The gripper encoder (1630) is excluded: the suction cup occupies it.
     public static let armHome: [Int] = [2047, 2087, 1984, 2045, 2048]
     /// Measured 2026-10-03: with the wrist fixed, shoulder_lift + elbow_flex of 4067…4071 holds the forearm level.

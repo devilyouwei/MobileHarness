@@ -267,3 +267,7 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
 
 ✅ SpeechPerception additionally estimates the single dominant direction of any obvious sound in its listening interval and publishes sound.source. Its deterministic estimator is separate from ASR/VAD, and Communication owns the immutable observation. ❌ Source identity, multiple-source separation and Photographer audio-driven movement are unimplemented.
+
+✅ ADR0131: generic Core observations transport producer execution descriptions without Bluetooth classification; business Agent result/session policies are unchanged. ❌ Physical device failure acceptance remains pending.
+
+✅ ADR0139: Photographer exposes monotonic usable-pose freshness as a read-only host signal; source silence releases the App writer after one second. Assistant priority over Photographer is host resource policy, not Agent-to-Agent cancellation or a model-callable permission.

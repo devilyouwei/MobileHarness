@@ -39,15 +39,20 @@ public struct ActionReport: Equatable, Sendable {
     public let entries: [Entry]
     /// Execution-level failure is separate from bounded child results; no child is discarded.
     public let executionFailure: Entry.Code?
-    private init(validatedEntries: [Entry], executionFailure: Entry.Code? = nil) {
+    public let failureDescription: String?
+    private init(validatedEntries: [Entry], executionFailure: Entry.Code? = nil, failureDescription: String? = nil) {
         entries = validatedEntries
         self.executionFailure = executionFailure
+        self.failureDescription = failureDescription.map { String($0.prefix(512)) }
     }
     public static func executionFailed(_ code: Entry.Code) -> Self {
         Self(validatedEntries: [], executionFailure: code)
     }
     public static func failure(_ code: Entry.Code) -> Self {
         Self(validatedEntries: [.init(path: "root", status: code == .cancelled ? .cancelled : .failed, code: code)])
+    }
+    public static func description(for error: any Error) -> String {
+        String(((error as? any LocalizedError)?.errorDescription ?? String(describing: error)).prefix(512))
     }
     public static func code(for error: any Error) -> Entry.Code {
         if error is CancellationError { return .cancelled }
@@ -59,10 +64,13 @@ public struct ActionReport: Equatable, Sendable {
             throw ValidationError.invalidPath
         }
         self.executionFailure = nil
+        self.failureDescription =
+            entries.first { $0.status == .failed && $0.details["failureDescription"] != nil }?.details[
+                "failureDescription"]
         self.entries = entries
     }
-    public func withExecutionFailure(_ code: Entry.Code) -> Self {
-        Self(validatedEntries: entries, executionFailure: code)
+    public func withExecutionFailure(_ code: Entry.Code, description: String? = nil) -> Self {
+        Self(validatedEntries: entries, executionFailure: code, failureDescription: description ?? failureDescription)
     }
     /// Retain child outcomes while attaching an exception that happened after they were recorded.
     public func recordingFailure(_ error: any Error) -> Self {
@@ -71,7 +79,7 @@ public struct ActionReport: Equatable, Sendable {
             reported?.executionFailure
             ?? (reported?.isCancelled == true ? .cancelled : reported?.entries.first { $0.status == .failed }?.code)
             ?? Self.code(for: error)
-        return withExecutionFailure(code)
+        return withExecutionFailure(code, description: reported?.failureDescription ?? Self.description(for: error))
     }
     public var hasFailures: Bool { executionFailure != nil || entries.contains { $0.status == .failed } }
     public var isCancelled: Bool {

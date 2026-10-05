@@ -1,5 +1,7 @@
 # Project tests
 
+✅ Opt-in `IntegrationTests/NexArmSerialAcceptanceTests.swift` exercises physical USB writes/feedback through the production Settings workflow and Agent Action/Tool boundaries. Four independent gates remain disabled in normal checks; the test-only connection façade does not establish BLE or SwiftUI touch acceptance. See [IntegrationTests](IntegrationTests/README.md#supervised-serial-appagent-acceptance) for bounds, fixtures and supervision requirements. ❌ Sustained wireless/load/native UI acceptance remains separate.
+
 Purpose: verify contracts and application integration in separate test targets. Design goals: one source tree and explicit test dependencies.
 
 ❌ Test success alone does not establish physical-device acceptance.
@@ -64,3 +66,21 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ Settings policy tests cover independent flags, full-prerequisite enable admission, legacy migration, deletion reconciliation and concurrent restoration. Real Apple combined ASR/VAD test remains opt-in.
 
 ✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.
+
+✅ ADR0128: Settings preset/reset submission returns immediately; a cancellable background worker uses the shared Actions segment-feedback executor. Replacement joins software cleanup without waiting for arrival. ❌ Physical takeover/rhythm acceptance remains pending.
+
+✅ ADR0129: simulated recovery tests verify Assistant/speech continuation, ordinary disconnected reports and accepted queued Actions executing once after reconnect. Physical coexistence remains outstanding.
+
+❌ Final ADR0129 audit: selected recovery/queue regressions pass, but the full suite remains failing. Legacy BLE connection-indication, active-refresh and feedback-silence recovery assumptions/fixture classification require migration to ADR0130; manual-segment, aim-planner, vision timing and audio retry failures remain recorded in Validation-History. No whole-suite or physical acceptance is claimed.
+
+✅ Bluetooth UI-state and held-operation regressions distinguish connection labels from device Action diagnostics and verify native reconnection without waiting for prior business completion.
+
+✅ Connected Bluetooth feedback-error regression verifies malformed passive packets and explicit refresh failures enter the per-device cache, unchanged packets do not log again on unrelated native snapshots, and clearing records preserves connection/control without reconnecting. These simulated checks do not validate native sheet rendering.
+
+✅ ADR0131 adds independent execution/native diagnostic regression coverage without moving physical hardware. Full verification outcome is recorded in docs/Validation-History.md; ❌ physical endurance remains pending.
+
+✅ ADR0132: Independent producer codes, timeout root/child causes, App worker provenance and native-only recovery evidence have regression coverage. ❌ Physical acceptance and persistent error history remain pending.
+
+✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+
+✅ Optional `NEXARM_SERIAL_AIM_STRESS=1` extends the tracking acceptance gate with three supervised six-second Robot.aim fixtures: 5Hz bounded base sweep (−0.08…0.08 rad), 50Hz identical target, then 5Hz ±0.01 rad target alternation. Centered poses pass InputGateway to maintain real Photographer freshness; explicit internal Tool envelopes pass OutputGateway into the production worker. SDK 30ms pacing and 512-write bound remain active. Stress mode skips the unrelated manual takeover trial. ❌ Encoder samples do not determine visible/high-frequency vibration; user observation and BLE acceptance remain separate.

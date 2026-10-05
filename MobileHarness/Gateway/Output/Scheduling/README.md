@@ -45,118 +45,27 @@ finish seals root input and joins all accepted work; unclosed wait scopes fail w
 
 Handler completion means the implementation's actual completion (including drained speech playback), not inference completion, XML closure or admission. Persistent presentation effects may remain after their handler returns. Already executed effects cannot be rolled back. A wait adds no timeout; individual Action hardware and model execution deadlines still apply. Speech synthesis runs outside Action scheduling: each executing job has a 60-second deadline, but queued/ready audio has no wall-clock expiry and remains owned by its reply until consumed or explicitly cleaned up. Production PCM reads have no independent starvation timer. Tools remain outside XML wait groups.
 
-❌ Priority, preemption, global cross-task barriers, rollback, arbitrary resource dependency graphs and hardware takeover are not implemented. Device acceptance is separate from deterministic handler tests. See ADR 0059 for the migration from shared lanes.
+✅ Configured resource preemption is implemented by ResourceCoordinator, independently of Channel order. ❌ Global priority/fairness scheduling, global cross-task barriers, rollback, arbitrary resource dependency graphs and hardware takeover are not implemented. Device acceptance is separate from deterministic handler tests. See ADR 0059 for the migration from shared lanes.
 
-## Channel Lock Design
+## Channel ordering and resource ownership
 
-This is a future device-ownership proposal, not wait synchronization. Task-local phase lanes cannot serve as a process-wide ownership registry; enforcement will require a separate bounded resource-domain registry spanning all tasks.
+✅ ChannelScheduler owns bounded task/phase FIFO ordering and module exclusion. Process-wide hardware ownership belongs to [Resources/ResourceCoordinator](../Resources/README.md), with the current contract in [ADR0141](../../../../docs/adr/0141-resource-control-ownership.md). A Channel name does not grant a resource lease or represent device health.
 
-A lock gives one authorized Agent exclusive control of one or more channels. **Acquisition interrupts existing control:** block new calls, cancel queued work, stop running work, then grant ownership.
-
-- ✅ `Channel.swift` defines owner identity and `unlocked` / `locked` metadata. Every channel is currently immutable `unlocked`.
-- ❌ Acquire, enforcement, renewal, release, notifications and device control are not implemented.
-- ❌ A wait-for-current-action handoff mode is outside the initial scope. Immediate takeover is the only planned acquisition mode.
-
-### Who decides?
-
-- Agent B sends observations and optional advice to Agent A.
-- Agent A decides whether to request control.
-- The runtime checks permission and performs the takeover; a signal never transfers ownership.
-
-See the general [signal-to-takeover flow](../../../Agents/Core/Communication/README.md). Input delivery continues while a channel is locked.
-
-### Acquire: interrupt, then grant
-
-```mermaid
-flowchart TD
-    Request[Agent requests a channel group] --> Validate{Authorized, live and group available?}
-    Validate -->|no| Reject[Return explicit failure]
-    Validate -->|yes| Gate[Reserve and gate the whole group]
-    Gate --> Queue[Cancel conflicting queued work]
-    Queue --> Run[Cancel running work and await cleanup]
-    Run --> Ready{Old control has stopped?}
-    Ready -->|yes| Grant[Grant one owner lease]
-    Ready -->|failure or timeout| Fault[Keep control gated and report failure]
-    Grant --> Action[Owner submits its next Action]
-```
-
-1. Validate the complete group, trusted identity, permissions and finite deadline. Conflicting ownership or an active transition fails immediately; no lock-wait queue or implicit stealing.
-2. Reserve the whole group atomically before awaiting cleanup. No new work starts in the group, including the applicant's work, during transition.
-3. Cancel conflicting queued and running work with an explicit `channelControlRevoked` outcome. To preserve Action sequence integrity, fail each affected Agent/input and cancel its remaining Actions across channels. Other inputs remain unaffected.
-4. Await handler cleanup. For persistent device commands, the adapter must also confirm that old control has stopped; a returned Swift function alone is insufficient.
-5. Grant all channels together or none. If cleanup is uncertain, keep the domain gated for supervisor recovery. Do not report a successful lock.
-
-**Stopping old control is not the same as selecting a new device state.** Lock acquisition does not automatically issue `hold`. The owner sends the appropriate Action after acquisition and waits for its acknowledgement before claiming that state. Resource-specific cancellation may itself require a safe stop.
-
-### Ownership and enforcement
-
-| Rule | Design |
-| --- | --- |
-| Owner identity | AgentID + runtime instanceID + sessionID + leaseID + monotonic deadline |
-| Group | Nonempty registered channel set; one owner and lease for the entire group |
-| Authority | App policy defines allowed owners, channel/resource groups and finite lease durations |
-| Entry points | Runtime control through OutputGateway; outcomes through InputGateway, independent of full Action queues |
-| Action checks | Validate ownership at admission and immediately before execution |
-| Non-owner calls | Explicit `channelLocked` failure; no buffering, silent drops, retries or replay |
-| Owner calls | Still subject to capability validation, FIFO and resource exclusion |
-| Credentials | Trusted runtime context; never model-supplied XML parameters |
-| Failure scope | Reject/fail affected input work without crashing the source Agent |
-
-A channel name is a scheduling scope. Exclusive **device** control additionally requires:
-
-- App-defined ActionPath → resource-domain mapping, covering every allowed Channel, regardless of its name or task.
-- The same ownership fence for side-effecting Tools, or exclusion of those Tools from that device.
-- Adapter cancellation and generation checks so revoked commands or late callbacks cannot restore old control.
-- Complete route coverage before enabling a physical-control lock. Module mutual exclusion alone is insufficient.
-
-Current Agent JSON v5 has no lock permissions. Configuration and trusted invocation context need coordinated changes before enabling this API.
-
-### Release and owner loss
+✅ Action admission calls validateAdmission; actual execution calls ResourceCoordinator.run with trusted owner/lease context. Declared writer groups and App-configured preemption govern takeover. Successful takeover joins the old writer before starting the requester. Later accepted Actions remain under normal Channel policy; takeover does not cancel their whole input or introduce a resource waiting queue. Explicit lease revocation retains its declared callback policy.
 
 ```mermaid
 flowchart LR
-    Trigger[Release / expiry / owner stop / session close] --> Gate[Invalidate lease and block owner work]
-    Gate --> Clean[Cancel queued work and stop active control]
-    Clean --> Result{Cleanup confirmed?}
-    Result -->|yes| Open[Reopen group under resource policy]
-    Result -->|no| Fault[Keep gated for recovery]
+    Call[Resolved Action / trusted owner] --> Admission[Bounded Channel admission]
+    Admission --> FIFO[Active phase / lane head / module exclusion]
+    FIFO --> Resource[ResourceCoordinator.run]
+    Resource -->|free or joined configured takeover| Execute[ActionExecutor / execution permit]
+    Resource -->|busy or cleanup deadline| Failure[Action execution result]
+    Execute --> End[Join handler / release transient holding and module]
 ```
 
-- Renewal must match the live lease and arrive before expiry; stale renew/release cannot affect a new owner.
-- Repeated acquire is not renewal. Group expansion is outside initial scope.
-- Unlock never replays cancelled Actions or automatically resumes another Agent. Resumption uses fresh state and new authorized calls.
-- Ownership events may help producers pause Action generation; correctness depends on enforcement, not notification delivery.
-- Emergency stop and device watchdogs remain independent of Agent ownership and iOS execution.
+The earlier Channel-lock takeover proposal is superseded by resource ownership. Its channel acquire API, persistent fault gate and whole-input cancellation plan are not the current implementation. Channel.swift still contains immutable, always-unlocked ChannelLockState metadata; no runtime Channel lease is acquired or enforced. The authoritative lock snapshot comes from ResourceCoordinator, never that metadata.
 
-### Minimal runtime API sketch
-
-Illustrative only; these methods are **not implemented**. The port is bound to trusted owner/session context.
-
-```swift
-// Through OutputGateway; immediate takeover is the sole acquisition mode.
-func acquire(channels: Set<String>, duration: Duration) async throws -> ChannelLease
-func renew(_ lease: ChannelLease, duration: Duration) async throws -> ChannelLease
-func release(_ lease: ChannelLease) async throws
-```
-
-- Acquire completes only after old control has stopped. The caller then submits ordinary ActionCalls with runtime-bound lease context.
-- Lease durations are finite and clamped by App policy; cancelled or expired acquisition cannot grant ownership later.
-- Transition states (`acquiring`, `releasing`, `faulted`) will need runtime representation in addition to the existing ownership metadata.
-
-### Bounds and required checks
-
-- The proposed ownership registry must bound live leases, groups and transition records independently of ephemeral task lanes. The current `maximumChannels` value (16 live names with unfinished Actions) is not an implemented ownership limit. Empty owned or faulted resource domains must retain their gate until explicit cleanup.
-- Use bounded deadline bookkeeping; no waiting-lock queue. Release/cancel must remain serviceable when business and Action queues are full.
-- Revalidate identity, deadline and transition generation after every external await.
-
-Before enabling locks, test:
-
-- ❌ Atomic group acquisition, permission rejection and competing requests.
-- ❌ Queue cancellation, joined running work and affected-input isolation.
-- ❌ Admission/start races, stale credentials and late device callbacks.
-- ❌ Alternative-channel and Tool-route enforcement.
-- ❌ Timeout, failed cleanup, owner loss, release and no stale replay.
-- ❌ Capacity limits, full-queue control access and unchanged unlocked scheduling.
+❌ Channel-level ownership APIs and global fairness are not implemented. Physical stop and takeover acceptance remain separate from software acknowledgment.
 
 ## Action contract stage 1
 
@@ -224,3 +133,47 @@ flowchart LR
 ✅ Stored child reports no longer replace subsequent exceptions or cancellation; the execution-level issue is retained before releasing the lane. ❌ No effect rollback.
 
 ✅ ChannelScheduler.finish/cancel(inputID:source:) require explicit source identity, removing an implicit Assistant default. Input keys and cancellation fences remain unchanged; production Gateway callers already supply the source.
+
+## Device failures — ADR0129
+
+✅ Device recovery does not call this scheduler or change admission, queues, wait groups or running tasks. An ordinary handler failure publishes its correlated report/result, releases its lane after handler cleanup and advances accepted work under the existing execution policy. A queued Action can fail while offline or succeed after reconnect; it is never removed merely because the device connection changed. Explicit session cancellation and lease revocation retain their existing cancellation policy.
+
+```mermaid
+flowchart LR
+    Queue[Accepted Channel work] --> Handler[Normal handler execution]
+    Handler --> Device[Device operation]
+    Device --> Failure[Communication failure]
+    Failure --> Result[ActionResult and retained report]
+    Result --> Next[Release lane / execute next accepted Action]
+```
+
+❌ Physical device recovery and emergency stop are outside scheduler ownership.
+
+✅ ADR0131: terminal report observation prefers its captured producer failureDescription over synthesized code text, preserving original reasons through composition. Channel continuation/cancellation and resource policies are unchanged; no native recovery triggers are introduced. ❌ Physical failure acceptance remains pending.
+
+✅ ADR0133: Scheduler preserves the executor's terminal report, including failed children and captured error description, rather than replacing it with an earlier stored report. Throws without terminal reports still preserve stored children and add the original failure. Failed reports produce failed ledger/observation records and normal lane continuation; transport recovery is independent.
+
+```mermaid
+flowchart LR
+    Store[Invocation stored children] --> Executor[ActionExecutor: resolve terminal completion]
+    Returned[Explicit terminal report / throw / deadline] --> Executor
+    Executor --> Terminal[Preserved terminal report and reason]
+    Terminal --> Ledger[Execution ledger / result]
+    Ledger --> Next[Normal Channel continuation]
+```
+
+❌ This fixture validation does not prove physical motor execution.
+
+## Resource takeover admission — ADR0139
+
+✅ Admission uses validateAdmission, separately from strict run execution validation. Later Actions from the same trusted owner performing a takeover may enter the existing bounded Channel during old-writer cleanup; they cannot execute during the gate and are not removed or replayed. ResourceCoordinator applies host-configured takeover when a job executes. Scheduler contains no concrete Agent/device priority rules.
+
+```mermaid
+flowchart LR
+    Call[Authorized Action] --> Admission[Resource validateAdmission / bounded Channel]
+    Admission --> Execute[Strict ResourceCoordinator.run]
+    Execute --> Join[Configured takeover / stop and join old use]
+    Join --> Handler[Normal Action handler and terminal result]
+```
+
+❌ Global priority/fairness scheduling remains outstanding.

@@ -110,3 +110,12 @@ Each active task phase runs FIFO per Channel and shares process-wide Action-modu
 ✅ An Agent output failure remains scoped to its source/input; it does not stop downstream or sibling Agents. Tools and admission/barrier failures are available from executionResults.
 
 ✅ ADR0126: authorized intent calls carry trusted owner context to host workers. Gateway remains device-independent; registered long-lived resource uses join session/Agent cleanup while actual overlapping writes still fail explicitly.
+
+✅ ADR0129: Bluetooth recovery does not control Gateway queues or Agent lifetime. Device handlers fail through the existing ActionResult/ToolResponse path; later accepted Actions execute under normal Channel policy. InputGateway accepts bounded report-bearing failures without accepting success-only completions on a failed result.
+
+✅ ADR0131: generic bounded Output failure observation complements Action execution snapshots for home presentation; no Bluetooth history or retry policy belongs in Gateway. ❌ Durable observation remains pending.
+
+✅ ADR0139 adds host-configured execution-group exclusion and owner preemption to ResourceCoordinator. Takeover gates, stops and joins old uses without removing Channel work; concrete Assistant/Photographer policy stays in App. ❌ Global priority/fairness scheduling remains outstanding.
+
+
+✅ ADR0140/ADR0141: cancelled lifecycle cleanup still awaits acknowledgment. ResourceCoordinator exposes unlocked/locked(owner) from one occupancy authority, retires completed writers even after errors, and automatically unlocks late completed cleanup after timeout. Revocable permits reject stale execution context. Queues, Action/Tool outcomes and transport recovery remain independent. ❌ Physical stop verification remains outstanding.

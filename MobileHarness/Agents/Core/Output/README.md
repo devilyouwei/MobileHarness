@@ -89,3 +89,12 @@ flowchart LR
 ```
 
 ✅ ADR0126: ResourceExecutionContext also carries the Gateway-bound ExecutionOwner independently of the held-resource set. This shared value imports no concrete runtime/device service; intent-triggered host workers inherit trusted Agent/session identity rather than reconstructing it from arguments.
+
+✅ ADR0131: OutputFailureRecord/OutputFailureSnapshot are generic bounded source/title/message/time observation values, distinct from Agent-facing ToolResult and scheduled Action records. AgentActionReport carries producer failureDescription without SDK enums or device context. ❌ Durable failure history remains pending.
+
+✅ ADR0132: ToolResult and OutputFailureRecord transport optional bounded opaque failure-code strings. Core interprets no domain errors and imports no ToolRuntime/SDK classification.
+
+❌ Sustained physical-device acceptance and durable error history remain pending.
+
+
+✅ ADR0141: ResourceExecutionPermit is a generic Sendable validation capability bound to one actual execution. ResourceExecutionContext carries it beside owner/held IDs; App effects validate inherited authority rather than trusting IDs alone. Core contains no coordinator/device implementation or priority policy. ❌ Permits do not prove device availability or physical stop.

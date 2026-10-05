@@ -316,6 +316,46 @@ for folder, (target, allowed) in workflow_boundaries.items():
         imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
         if imports - allowed - {'Foundation', 'Synchronization', 'Security', 'AVFAudio', 'UIKit'}:
             errors.append(f'Unexpected workflow import: {source.relative_to(ROOT)}')
+# Discovery/connection presentation must not consume device Action diagnostics.
+bluetooth_view = (ROOT / 'MobileHarness/UI/Settings/BluetoothSettingsView.swift').read_text()
+discovery_view = bluetooth_view.split('private struct BluetoothArmDetailView', 1)[0]
+if re.search(r'\bstate\.(?:error|notice|incidents|motionStatus|executing|controlReady|controlValidated)\b', discovery_view):
+    errors.append('Bluetooth discovery/connection UI consumes Action diagnostics or execution state')
+# Device recovery must not acquire voice/session or scheduler cleanup.
+bluetooth_sources = (ROOT / 'MobileHarness/App/Workflows/Bluetooth').glob('*.swift')
+for source in bluetooth_sources:
+    if re.search(r'\b(?:quiesce|stopVoice|beginSettingsChange|synchronizeAgentControl|ChannelScheduler)\b', source.read_text()):
+        errors.append(f'Bluetooth recovery depends on session/scheduler policy: {source.relative_to(ROOT)}')
+bluetooth_workflow = (ROOT / 'MobileHarness/App/Workflows/Bluetooth/BluetoothWorkflow.swift').read_text()
+disconnect_body = bluetooth_workflow.split('private func disconnect(', 1)[1].split('public func forget(', 1)[0]
+if 'motion?.cancel()' in disconnect_body or 'movement.value' in disconnect_body:
+    errors.append('Native disconnect must not cancel or join finite Agent Actions')
+runtime = (ROOT / 'MobileHarness/App/Composition/ApplicationRuntime.swift').read_text()
+if 'synchronizeAgentControl' in runtime or 'initiallyUnavailableResources' in runtime:
+    errors.append('Bluetooth recovery must not bind scheduler admission or queue cleanup')
+# Resource takeover is generic execution policy; concrete tracking priority stays in composition.
+resource_coordinator = (ROOT / 'MobileHarness/Gateway/Output/Resources/ResourceCoordinator.swift').read_text()
+if re.search(r'\.(?:assistant|photographer)\b|nexarm\.', resource_coordinator):
+    errors.append('ResourceCoordinator contains concrete Agent/device takeover policy')
+if re.search(r'\bfaulted\b|func recover\(', resource_coordinator):
+    errors.append('Resource ownership must not retain device-health fault/recover states')
+if 'case unlocked' not in resource_coordinator or 'case locked(ExecutionOwner?)' not in resource_coordinator:
+    errors.append('Resource snapshots must expose unlocked/locked ownership')
+if 'ResourceExecutionPermit' not in resource_coordinator or 'validateUse' not in resource_coordinator:
+    errors.append('Resource execution must bind revocable per-use validation')
+if 'validateAgentWriter' not in bluetooth_workflow or 'ResourceExecutionContext.permit' not in bluetooth_workflow:
+    errors.append('Agent motor effects must validate inherited resource execution authority')
+camera_ownership = (ROOT / 'MobileHarness/App/Lifecycle/CameraCoordinator.swift').read_text()
+if '.faulted' in camera_ownership or 'resources.recover' in camera_ownership or 'recoverRequested' in camera_ownership:
+    errors.append('Camera retry must acquire actual ownership without resource-fault recovery')
+if 'preempts: [.assistant: [.photographer]]' not in runtime or 'executionGroup:' not in runtime:
+    errors.append('Composition must configure Assistant-over-Photographer shared-writer takeover')
+if 'trackingInputAvailable' not in runtime or '[weak photographer]' not in runtime or 'hasFreshPose()' not in runtime:
+    errors.append('Tracking freshness must be bound to the current Photographer without retaining its lifetime')
+assembly = (ROOT / 'MobileHarness/App/Composition/AppAssembly.swift').read_text()
+bluetooth_binding = assembly.split('lazy var bluetooth = BluetoothWorkflow(', 1)[1].split('lazy var camera', 1)[0]
+if re.search(r'\b(?:lifecycle|quiesce|stopVoice|beginSettingsChange)\b', bluetooth_binding):
+    errors.append('Bluetooth composition must not bind whole voice/session cleanup')
 for source in (ROOT / 'MobileHarness/App/Lifecycle').glob('*.swift'):
     if 'ApplicationRuntime' in source.read_text():
         errors.append(f'Lifecycle depends on whole application runtime: {source.relative_to(ROOT)}')
@@ -493,3 +533,75 @@ for directory in ('Actions/Runtime', 'Tools/Runtime'):
         if any(marker in content for marker in ('cameraCapture', '"camera.capture"', 'invalidPose', 'controlNotReady', 'feedbackTimeout', 'completionTimeout', 'feedbackLost', 'targetNotReached', 'sendingFailed')):
             raise SystemExit(f'Domain vocabulary in execution Runtime: {source.relative_to(ROOT)}')
 print('Execution Runtime uses generic resources and producer-owned failure classification.')
+
+# Manual submission is asynchronous App ownership, not an alternate timer-based Action executor.
+manual_workflow = (ROOT / 'MobileHarness/App/Workflows/Bluetooth/BluetoothWorkflow.swift').read_text()
+manual_section = manual_workflow.split('public func tryAction', 1)[1].split('private func joinCancelledControl', 1)[0]
+if 'controller.performPlan' not in manual_section or 'plan.submit' in manual_section or 'link.sendLive' in manual_section:
+    raise SystemExit('Settings presets must reuse Actions segment-feedback execution.')
+plan_source = (ROOT / 'MobileHarness/Actions/NexArm/Support/NexArmMotionPlan.swift').read_text()
+if 'Task.sleep' in plan_source:
+    raise SystemExit('Motion recipes must not implement nominal-frame playback sleeps.')
+print('Settings presets reuse Actions segment feedback under cancellable App ownership.')
+
+connect_source = manual_workflow.split('public func connect', 1)[1].split('public func disconnect', 1)[0]
+if any(probe in connect_source for probe in ('verifyCompatibility(', 'prepareArmControl(', 'indicateConnection(', 'readState(')):
+    raise SystemExit('App BLE connection must use passive feedback without active probes.')
+print('App BLE connection uses native subscription and passive feedback.')
+
+# Native diagnostics and execution results have independent owners and effects.
+execution_section = manual_workflow.split('public func tryAction', 1)[1]
+if any(marker in execution_section for marker in ('recordIncident(', 'appendIncident(', 'recordConnectionEvent(', 'recordLifecycleEvent(', 'recordRecoveryEvent(', 'requestRecovery(', 'state.error =', 'state.transportIssue =', 'state.notice =', 'handleControlFailure', 'stalledSince')):
+    raise SystemExit('Execution/manual control must not write Bluetooth diagnostics or initiate recovery.')
+recovery_source = (ROOT / 'MobileHarness/App/Workflows/Bluetooth/BluetoothRecovery.swift').read_text()
+if re.search(r'\b(?:import Actions|NexArmActionError|NexArmExecutionError|case resources)\b', recovery_source):
+    raise SystemExit('Bluetooth recovery must not depend on Action failures/resources.')
+if 'BluetoothSettingsState' in (ROOT / 'MobileHarness/UI/Conversation/ConversationView.swift').read_text():
+    raise SystemExit('Home conversation must not observe Bluetooth state.')
+for filename in ('App/Adapters/RuntimePresentation.swift', 'App/Lifecycle/CameraCoordinator.swift', 'UI/Camera/CameraState.swift'):
+    source = (ROOT / 'MobileHarness' / filename).read_text()
+    if 'trackingMessage' in source or 'trackingStatus' in source:
+        raise SystemExit('Tracking execution failures belong only in home scheduling issues.')
+native_source = (ROOT / 'MobileHarness/PlatformKit/Connectivity/NexArm/NexArmBluetooth.swift').read_text()
+if not all(marker in native_source for marker in ('public var failure:', 'feedbackHealthy', 'isSendBlocked', 'cancelBlockedWrite')):
+    raise SystemExit('SDK must own latest native status and blocked-write detection.')
+if re.search(r'\b(?:ActionReport|ActionFailure|NexArmExecutionError|ToolResponse|ResourceID|AgentID)\b', native_source):
+    raise SystemExit('Bluetooth SDK diagnostics must not know execution context.')
+print('Bluetooth current status and execution results remain independent.')
+
+# Keep invocation outcomes and recovery context scoped to their actual owner.
+adapter_source = (ROOT / 'MobileHarness/App/Adapters/NexArmBehaviorAdapter.swift').read_text()
+if 'lastActionReport' in manual_workflow or 'lastActionReport' in adapter_source:
+    raise SystemExit('Motor reports must return to invocation-scoped sinks, not a shared last-result field.')
+settings_source = (ROOT / 'MobileHarness/UI/Settings/BluetoothSettingsState.swift').read_text()
+if re.search(r'public var (?:motionStatus|executing|testing|resetting|refreshing|controlValidated)\b', settings_source):
+    raise SystemExit('Retired Bluetooth execution/verification presentation state must not return.')
+controller_source = (ROOT / 'MobileHarness/Actions/NexArm/Support/NexArmActionController.swift').read_text()
+if 'indicateConnection' in controller_source or 'connectionIndicationUsed' in controller_source:
+    raise SystemExit('Retired connection-indication motion must not return.')
+protocol_source = (ROOT / 'MobileHarness/PlatformKit/Connectivity/NexArm/NexArmProtocol.swift').read_text()
+if 'feedbackLost' in protocol_source:
+    raise SystemExit('Action completion feedback timeout must remain outside native protocol errors.')
+print('Invocation report ownership, independent native categories and retired implementation checks pass.')
+
+# Error semantics must stay in their owning layer after admission and replacement.
+if 'unsupportedFirmware' in protocol_source or 'firmwareUnavailable' in protocol_source:
+    raise SystemExit('Firmware policy errors belong to Actions, not the native protocol SDK.')
+if 'guard liveControlID == nil, observationID == nil else { throw CancellationError() }' in native_source:
+    raise SystemExit('Channel admission must not impersonate task cancellation.')
+settings_view = (ROOT / 'MobileHarness/UI/Settings/BluetoothSettingsView.swift').read_text()
+for source in (manual_workflow, native_source, settings_source, settings_view):
+    if any(marker in source for marker in ('BluetoothIncident', 'NexArmBluetoothDiagnostics', 'clearIncidents', 'consumeNativeIncidents', 'appendIncident', 'recordRecoveryEvent', 'incidentDevices')):
+        raise SystemExit('Retired Bluetooth incident history must not return; retain current state only.')
+if 'state.rowIntent(for: device.id)' not in settings_view or 'case .connect: controls.connect(device.id)' not in settings_view or 'case .openDetail: deviceForDetail = device' not in settings_view:
+    raise SystemExit('Bluetooth row taps must connect disconnected devices and open only connected details.')
+if 'navigationDestination(item: $deviceForDetail)' not in settings_view or 'connectionButton(' in settings_view:
+    raise SystemExit('Bluetooth details require one tap-owned local destination, without duplicate connect rows.')
+if any(marker in settings_source + settings_view for marker in ('detailDevice', 'pendingDetailDevice', 'resolveDeviceNavigation', 'selectDevice(', '.onAppear', '.onChange(of: state.phase)')):
+    raise SystemExit('Bluetooth connection snapshots and page appearance must not mutate navigation or auto-open details.')
+if 'LabeledContent("通信"' in settings_view:
+    raise SystemExit('Bluetooth communication issues belong to the combined connection status and current error.')
+tool_contract = (ROOT / 'MobileHarness/Tools/Runtime/Contracts/ToolResponse.swift').read_text()
+if 'FailureCode' not in tool_contract or 'ToolExecutionFailureProviding' not in tool_contract:
+    raise SystemExit('Tools require independent bounded producer failure codes.')
+print('Latest Bluetooth status and independent Tool failure codes pass.')

@@ -20,7 +20,7 @@ enum NexArmRegistration {
     static func budget(_ call: ActionRequest) throws -> ActionExecutionBudget {
         func value(_ name: String, fallback: Int, range: ClosedRange<Int>) throws -> Int {
             guard let raw = call.parameters[name] else { return fallback }
-            guard let value = Int(raw), range.contains(value) else { throw NexArmError.invalidMotion }
+            guard let value = Int(raw), range.contains(value) else { throw NexArmExecutionError.invalidArguments }
             return value
         }
         let options = try NexArmMotorOptions(

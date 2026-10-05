@@ -6,6 +6,48 @@ import ToolRuntime
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
     public typealias Sink = @Sendable (OutputEnvelope) async -> Void
+    private var failures: [OutputFailureRecord] = []
+    private var failureRevision: UInt64 = 0
+    private var evictedFailures: UInt64 = 0
+    private var failureObservers: [UUID: AsyncStream<OutputFailureSnapshot>.Continuation] = [:]
+    private var closed = false
+    public enum ObservationError: Error { case capacityExceeded }
+    public func observeFailures() throws -> AsyncStream<OutputFailureSnapshot> {
+        guard failureObservers.count < 8 else { throw ObservationError.capacityExceeded }
+        let id = UUID()
+        let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        pair.continuation.yield(failureSnapshot())
+        if closed {
+            pair.continuation.finish()
+        } else {
+            failureObservers[id] = pair.continuation
+            pair.continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeFailureObserver(id) }
+            }
+        }
+        return pair.stream
+    }
+    private func removeFailureObserver(_ id: UUID) { failureObservers.removeValue(forKey: id) }
+    private func failureSnapshot() -> OutputFailureSnapshot {
+        .init(revision: failureRevision, records: failures, evictedCount: evictedFailures)
+    }
+    private func recordFailure(_ envelope: OutputEnvelope, message: String, code: ToolResponse.FailureCode?) {
+        let title: String
+        switch envelope.output {
+        case .toolCall(let call): title = call.toolPath
+        case .actionCall(let call): title = call.actionPath.description
+        case .rejectedCall(let rejection): title = rejection.alias
+        default: title = "Output"
+        }
+        if failures.count == 100 {
+            failures.removeFirst()
+            evictedFailures &+= 1
+        }
+        failures.append(.init(source: envelope.source, title: title, message: message, failureCode: code?.rawValue))
+        failureRevision &+= 1
+        let snapshot = failureSnapshot()
+        for observer in failureObservers.values { observer.yield(snapshot) }
+    }
     private var outputResults: [OutputExecutionResult] = []
     private var evictedOutputs: UInt64 = 0
     private let requests: InputGateway
@@ -171,6 +213,9 @@ public actor OutputGateway {
         await cancelled
     }
     public func shutdown() async {
+        closed = true
+        for observer in failureObservers.values { observer.finish() }
+        failureObservers.removeAll()
         async let cancelled: Void = actions.shutdown()
         await resources?.shutdown()
         await cancelled
@@ -181,22 +226,46 @@ public actor OutputGateway {
     @discardableResult
     public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         let failure: String?
+        var code: ToolResponse.FailureCode?
         var tool: ToolResponse?
         do {
             tool = try await dispatch(envelope)
             failure = tool?.deliveryFailure
+            code = failure == nil ? nil : .deliveryFailed
         } catch {
             try Task.checkCancellation()
-            failure = String(String(describing: error).prefix(512))
+            if let producer = error as? any ToolExecutionFailureProviding {
+                code = producer.toolFailureCode
+            } else if let producer = error as? any ActionExecutionFailureProviding {
+                code = .init(rawValue: producer.actionExecutionFailure.rawValue)
+            } else if let resource = error as? ResourceError {
+                code = resource == .unauthorized ? .permissionDenied : .resourceUnavailable
+            } else if error as? CommunicationError == .unauthorized {
+                code = .permissionDenied
+            } else if let harness = error as? HarnessError,
+                [HarnessError.forbiddenOutput, .forbiddenFunction, .forbiddenTool].contains(harness)
+            {
+                code = .permissionDenied
+            } else {
+                code = .handlerFailed
+            }
+            failure = String(
+                ((error as? any LocalizedError)?.errorDescription ?? String(describing: error)).prefix(512))
         }
         let result = OutputExecutionResult(
             source: envelope.source, inputID: envelope.inputID,
-            sequence: envelope.sequence, tool: tool, failure: failure)
+            sequence: envelope.sequence, tool: tool, failure: failure, failureCode: code)
         if outputResults.count == 256 {
             outputResults.removeFirst()
             evictedOutputs += 1
         }
         outputResults.append(result)
+        if result.isError {
+            let reasons = [tool?.isError == true ? tool?.value : nil, failure].compactMap { $0 }
+            recordFailure(
+                envelope, message: reasons.isEmpty ? "Execution failed" : reasons.joined(separator: "\n"),
+                code: code ?? tool?.failureCode)
+        }
         return result
     }
     public func executionResults(source: AgentID? = nil, inputID: UUID? = nil) async -> OutputExecutionSnapshot {
@@ -228,7 +297,8 @@ public actor OutputGateway {
         if case .rejectedCall(let rejection) = envelope.output, rejection.kind == .tool {
             return ToolResponse(
                 callID: rejection.callID ?? UUID(),
-                value: "\(rejection.reason): \(rejection.alias)", isError: true)
+                value: "\(rejection.reason): \(rejection.alias)", isError: true,
+                failureCode: rejection.reason == .invalidParameters ? .invalidArguments : .unknownTool)
         }
         switch try ExecutionRouter.route(envelope.output) {
         case .action(let token):

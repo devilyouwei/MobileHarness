@@ -10,7 +10,7 @@
 
         public var body: some View {
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                let channels = state.summaries(at: context.date)
+                let channels = state.summaries(at: context.date).filter { !$0.item.isFailure }
                 VStack(alignment: .trailing, spacing: 12) {
                     if !channels.isEmpty || state.observationUnavailable {
                         VStack(alignment: .leading, spacing: 8) {
@@ -56,7 +56,7 @@
                         .modifier(ActionPanelGlass())
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    if !state.items.isEmpty {
+                    if state.hasRecords {
                         Button {
                             showingHistory = true
                         } label: {
@@ -82,14 +82,44 @@
                                 ForEach(active) { item in historyRow(item) }
                             }
                         }
+                        Section("调度异常") {
+                            ForEach(state.items.filter(\.isFailure).reversed()) { item in historyRow(item) }
+                            ForEach((state.outputIssues + state.backgroundIssues).sorted { $0.time > $1.time }) {
+                                issue in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(issue.title).font(.body.weight(.medium))
+                                    Text(issue.source).font(.caption).foregroundStyle(.secondary)
+                                    Text(issue.message).font(.subheadline).textSelection(.enabled)
+                                    Text(issue.time, style: .time).font(.caption).foregroundStyle(.secondary)
+                                    if issue.failureCode != nil || issue.context != nil {
+                                        DisclosureGroup("执行信息") {
+                                            if let code = issue.failureCode { Text("错误代码：\(code)") }
+                                            if let context = issue.context {
+                                                Text("持续任务：\(context.workerID)")
+                                                if let call = context.callID { Text("来源调用：\(call)") }
+                                                if let input = context.inputID { Text("来源输入：\(input)") }
+                                                if let session = context.sessionID { Text("来源会话：\(session)") }
+                                            }
+                                        }.font(.caption).textSelection(.enabled)
+                                    }
+                                }
+                            }
+                            if state.items.allSatisfy({ !$0.isFailure }) && state.outputIssues.isEmpty
+                                && state.backgroundIssues.isEmpty
+                            {
+                                Text("暂无调度异常").foregroundStyle(.secondary)
+                            }
+                        }
                         Section("最近结果") {
-                            ForEach(state.items.filter { !$0.isActive }.reversed()) { item in historyRow(item) }
-                            if state.items.allSatisfy(\.isActive) {
+                            ForEach(state.items.filter { !$0.isActive && !$0.isFailure }.reversed()) { item in
+                                historyRow(item)
+                            }
+                            if state.items.allSatisfy({ $0.isActive || $0.isFailure }) {
                                 Text("还没有已结束的动作").foregroundStyle(.secondary)
                             }
                         }
-                        if state.evictedCount > 0 {
-                            Text("仅保留最近 100 条结束记录，较早记录已移除。")
+                        if state.evictedCount > 0 || state.issueEvictions > 0 {
+                            Text("每类历史最多保留 100 条，已移除 \(state.evictedCount + state.issueEvictions) 条较早记录。")
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
@@ -154,10 +184,9 @@
         public struct ActionActivityVisualPreview: View {
             @State private var state = ActionActivityState()
             @State private var conversation = ConversationState()
-            @State private var robot = BluetoothSettingsState()
             public init() {}
             public var body: some View {
-                ConversationView(state: conversation, robot: robot, activity: state, toggleVoice: {})
+                ConversationView(state: conversation, activity: state, toggleVoice: {})
                     .overlay(alignment: .top) {
                         Text("演示数据 · 不连接设备").font(.caption).padding(12)
                     }

@@ -34,7 +34,9 @@ struct ToolDispatcher: Sendable {
                 AgentInput(
                     sessionID: envelope.sessionID,
                     payload: .toolResult(
-                        ToolResult(callID: result.callID, value: result.value, isError: result.isError)),
+                        ToolResult(
+                            callID: result.callID, value: result.value, isError: result.isError,
+                            failureCode: result.failureCode?.rawValue)),
                     turn: envelope.turn),
                 to: envelope.source)
             failure = report.rejected.isEmpty ? nil : "Result delivery rejected: \(report.rejected)"
@@ -43,6 +45,7 @@ struct ToolDispatcher: Sendable {
             failure = String(describing: error)
         }
         return ToolResponse(
-            callID: result.callID, value: result.value, isError: result.isError, deliveryFailure: failure)
+            callID: result.callID, value: result.value, isError: result.isError, deliveryFailure: failure,
+            failureCode: result.failureCode)
     }
 }

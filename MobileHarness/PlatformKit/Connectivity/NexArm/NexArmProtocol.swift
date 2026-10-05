@@ -1,10 +1,9 @@
 import Foundation
 
 public enum NexArmError: Error, Equatable, Sendable {
-    case invalidPacket, overflow, timeout, busy, disconnected
-    case feedbackLost
+    case invalidPacket, overflow, timeout, busy, disconnected, sessionReplaced
     case io(Int32)
-    case unsupportedFirmware, firmwareUnavailable, invalidMotion
+    case invalidMotion
 }
 
 public struct NexArmPacket: Equatable, Sendable {

@@ -75,22 +75,12 @@ final class VisionSession {
                     try await IndependentOutputWorkflow.consume(
                         photographer.outputs,
                         dispatch: { envelope in
-                            let result = try await responses.execute(envelope)
-                            await endpoint.trackingStatus(
-                                result.isError ? "跟踪指令未执行，姿态识别继续运行" : nil, sessionID: sessionID)
+                            _ = try await responses.execute(envelope)
                         },
                         rejected: { _, error in
-                            let message =
-                                error as? RobotTools.AimError == .notConnected
-                                ? "机械臂未连接或控制未就绪，姿态识别继续运行"
-                                : "跟踪指令未执行，姿态识别继续运行"
-                            await endpoint.trackingStatus(message, sessionID: sessionID)
                             Logger(subsystem: "dev.mobileharness", category: "Tracking")
                                 .error("Tracking call rejected: \(String(describing: error), privacy: .private)")
                         })
-                    if await photographer.status().lifecycle == .failed {
-                        await endpoint.trackingStatus("跟踪输出已停止，姿态识别继续运行", sessionID: sessionID)
-                    }
                     // Completion of this independent subscriber must not terminate frame processing.
                     return false
                 }

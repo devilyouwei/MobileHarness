@@ -2,10 +2,11 @@ import Foundation
 
 /// Transport decoding only. Domain meaning, permissions and defaults belong to each behavior.
 public struct ToolArguments: Sendable {
-    public enum ValidationError: Error, Equatable, Sendable {
+    public enum ValidationError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
         case invalidKeys
         case missing(String)
         case invalidValue(String)
+        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
     }
 
     private let values: [String: String]

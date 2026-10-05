@@ -31,3 +31,9 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ Settings state tests use UI and Foundation directly; no unused AgentCore import remains. ❌ Native UI automation is separate.
 
 ✅ AudioDetectionStateTests verifies direction expiry independently of PCM freshness, missing-audio metering, retained unavailable/quiet status and cleared executable angles. ❌ Native rendering and real angle precision remain separate.
+
+✅ BluetoothConnectionStateTests verifies execution messages/manual activity cannot alter native status. Row intent distinguishes connect/open/unavailable; grouping retains remembered devices through unsuccessful new selections and current reasons stay scoped to their attempted device. Disconnected controls remain disabled. ❌ SwiftUI device rendering and return gestures remain separate acceptance.
+
+✅ Bluetooth connection label fixtures use native connection/recovery and active manual state; retired execution/verification fields are removed. ❌ Native rendering remains separate.
+
+✅ ADR0134 / ADR0138: Bluetooth state tests cover row intent transitions (connect / open detail / unavailable), connected-versus-remembered grouping, unsuccessful selection retention while discovery clears, attempted-device reason isolation, unavailable radio/recovery admission, current native warning replacement and disconnected motor/action admission. Shared/pending destination state stays removed; one view-local destination is assigned only by a connected-name tap. No diagnostic history protocol/value remains. ❌ Native single-level/cancelled swipes and compact-row layout require phone acceptance.

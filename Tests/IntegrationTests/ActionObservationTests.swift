@@ -141,7 +141,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
         registry: try ActionRegistry(definitions: [
             ActionDefinition(path: path, displayName: "测试动作", kind: .finite, completion: "Failure fixture.") {
                 _ async throws -> Void in
-                throw BluetoothWorkflowError.feedbackTimeout
+                throw NexArmExecutionError.feedbackTimeout
             }
         ]))
     var streams: [AsyncStream<ActionExecutionSnapshot>] = []
@@ -153,7 +153,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let result = try #require(await scheduler.executionSnapshot().records.first)
     #expect(result.phase == .failed)
     #expect(result.failure?.rawValue == "feedbackTimeout")
-    #expect(result.failureDescription == BluetoothWorkflowError.feedbackTimeout.localizedDescription)
+    #expect(result.failureDescription == NexArmExecutionError.feedbackTimeout.localizedDescription)
     await scheduler.shutdown()
     var iterator = streams[0].makeAsyncIterator()
     let final = await iterator.next()
@@ -187,20 +187,51 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     await scheduler.shutdown()
 }
 
-@Test func bluetoothProducerOwnsFailureToReportMapping() {
-    let cases: [(BluetoothWorkflowError, String, String)] = [
+@Test func actionsOwnExecutionFailureMappingWithoutBluetoothDiagnostics() {
+    let cases: [(NexArmExecutionError, String, String)] = [
         (.disconnected, "disconnected", "disconnected"),
         (.busy, "busy", "unavailable"),
         (.background, "background", "unavailable"),
-        (.posture, "invalidPose", "invalidArguments"),
-        (.unverified, "unconfirmed", "handlerFailed"),
         (.controlNotReady, "controlNotReady", "unavailable"),
         (.feedbackTimeout, "feedbackTimeout", "feedbackLost"),
-        (.completionTimeout, "completionTimeout", "targetNotReached"),
-        (.incomplete([1]), "completionTimeout", "targetNotReached"),
+        (.resourceBusy, "resourceUnavailable", "unavailable"),
+        (.resourceUnavailable("Fixture"), "resourceUnavailable", "unavailable"),
     ]
     for (error, identifier, reportCode) in cases {
         #expect(error.actionExecutionFailure.rawValue == identifier)
         #expect(ActionReport.code(for: error).rawValue == reportCode)
     }
+}
+
+@Test func composedFailurePreservesProducerMessageThroughSchedulerDelivery() async throws {
+    enum FixtureFailure: LocalizedError {
+        case failed
+        var errorDescription: String? { "Fixture transport cause" }
+    }
+    let composition = try ActionComposition(
+        .action("leaf", [], maximumResults: 2) {
+            .report(
+                try ActionReport(entries: [.init(path: "motor", status: .failed, code: .handlerFailed)])
+                    .recordingFailure(FixtureFailure.failed))
+        })
+    let path = ActionPath(module: "Fixture", function: "failure")
+    let scheduler = ChannelScheduler(
+        registry: try ActionRegistry(definitions: [
+            ActionDefinition(
+                path: path, displayName: "Fixture", kind: .finite, completion: "Preserved error",
+                completing: { _ in .report(try await composition.run()) })
+        ]))
+    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
+    _ = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Fixture"))
+    try await scheduler.finish(inputID: input.id, source: .assistant)
+    let record = try #require(await scheduler.executionSnapshot().records.first)
+    #expect(record.phase == .failed)
+    #expect(record.failureDescription == "Fixture transport cause")
+    guard case .report(let report) = record.completion else {
+        Issue.record("Expected preserved report")
+        return
+    }
+    #expect(report.failureDescription == "Fixture transport cause")
+    #expect(report.entries.count == 2)
+    await scheduler.shutdown()
 }
