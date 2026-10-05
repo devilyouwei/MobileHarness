@@ -2,6 +2,8 @@
 
 Status: Accepted. Supersedes App's one-attempt/manual-only feedback recovery contract; ADR0123 transport pacing remains in force.
 
+Current scene/retry contract: [ADR0142](0142-bluetooth-scene-lifetime-and-retry-episodes.md) supersedes the stable-connection budget refill and unconditional background disconnect described below. Connection success clears attempts immediately; eligible foreground return starts a new episode while healthy links are retained during joined control suspension.
+
 ## Decision and ownership
 
 AppBluetoothWorkflow owns one recovery state machine and one bounded process-local diagnostic cache. PlatformKit supplies native power/phase, monotonic snapshot revisions, query quarantine and traffic facts; Actions owns physical behavior/completion, and UI receives presentation values only. BluetoothRecovery.swift owns retry classification, 1/2/4-second backoff, three-attempt cap, cooperative two-minute active-worker deadlines.

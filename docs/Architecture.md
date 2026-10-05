@@ -43,7 +43,7 @@ Conversation records persist locally across voice sessions and restarts. New Con
 
 The default pipeline uses local recognition, synthesis, pose and chat models. Explicit cloud configuration selects an OpenAI-compatible chat capability and sends its chat context to that provider; other perception/output remains local. Model configuration and resource acquisition share a process-wide manager.
 
-Foreground camera perception and NexArm BLE control are implemented. Robot behavior/completion policy belongs to Actions; connection and native command/feedback belong to PlatformKit. Settings and Agent-selected movement share the same Action implementation. Autonomous camera motion belongs to the separate [Photographer proposal](Photographer-Proposal.md).
+Foreground camera perception and NexArm BLE control are implemented. Healthy BLE connections are retained during background control suspension; App joins old effects and checks the current native link on return. Eligible foreground return starts a fresh bounded retry episode, and connection success clears attempts. Inactive does not disconnect; manual disconnect/forget remains authoritative. No background Bluetooth execution or state restoration is configured. Robot behavior/completion policy belongs to Actions; connection and native command/feedback belong to PlatformKit. Settings and Agent-selected movement share the same Action implementation. Autonomous camera motion belongs to the separate [Photographer proposal](Photographer-Proposal.md).
 
 ## Design and evidence entry points
 

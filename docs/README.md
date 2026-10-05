@@ -60,6 +60,8 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 
 ❌ Undelivered proposals and unrecorded acceptance are not current implementation claims.
 
+✅ [ADR0142](adr/0142-bluetooth-scene-lifetime-and-retry-episodes.md) records healthy background connection retention and independent foreground retry episodes. Validation history confirms iPhone installation and fresh launch of build 2026100601. ❌ Physical suspension/late-callback acceptance remains pending.
+
 ✅ [ADR0100](adr/0100-camera-control-tools.md) records foreground Camera Tool ownership, completion and lease policy; native Tool transport and physical camera acceptance remain pending.
 
 ✅ [ADR0103](adr/0103-agent-failure-isolation.md) defines Agent isolation, bounded delivery/execution outcomes and Photographer offline suppression. ❌ Physical fault acceptance remains pending.

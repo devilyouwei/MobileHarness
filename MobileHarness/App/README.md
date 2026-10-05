@@ -140,7 +140,7 @@ Detailed contracts: [Composition](Composition/README.md), [Lifecycle](Lifecycle/
 
 ## Host observation and previews
 
-The root observes Bluetooth state independently of the settings page and forwards foreground changes. One workflow supplies connection controls/status and robot Action callbacks. Discovery/connection requests drive BLE permission checks; no Bluetooth background mode is configured.
+The root observes Bluetooth state independently of the settings page and forwards actual background transitions; inactive leaves Bluetooth lifetime unchanged. One workflow supplies connection controls/status and robot Action callbacks. Background stops/joins control effects and retains healthy native connectivity; foreground verifies current connectivity after cleanup and gives eligible reconnection a fresh bounded episode. Discovery/connection requests drive BLE permission checks; no Bluetooth background mode or state restoration is configured. See [Bluetooth lifetime](Workflows/Bluetooth/README.md).
 
 ActionActivityState is root-owned and injected into the conversation screen alongside conversation and connection state. App projects Channel execution snapshots; UI owns wording/layout and Settings owns manual-operation presentation.
 

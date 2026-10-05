@@ -65,7 +65,7 @@ struct MobileHarnessApp: App {
             }
             .task {
                 if !isVisualPreview && !isDiagnostic {
-                    assembly.bluetooth.setForeground(scenePhase == .active)
+                    assembly.bluetooth.setForeground(scenePhase != .background)
                     await assembly.bluetooth.run()
                 }
             }
@@ -84,7 +84,7 @@ struct MobileHarnessApp: App {
             .onChange(of: scenePhase) { _, phase in
                 if !isVisualPreview && !isDiagnostic {
                     camera.setForeground(phase == .active && !showingSettings)
-                    assembly.bluetooth.setForeground(phase == .active)
+                    assembly.bluetooth.setForeground(phase != .background)
                     if phase == .background { container?.lifecycle.stopVoice(message: "已进入后台，轻触重新开始") }
                     if phase != .active { container?.audioDetection.stop() }
                 }

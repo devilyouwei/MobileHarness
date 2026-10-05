@@ -6,7 +6,6 @@ import Storage
 struct BluetoothRecoveryPolicy {
     static let maximumAttempts = 3
     static let episodeTimeout: Duration = .seconds(120)
-    static let stableInterval: Duration = .seconds(30)
     static func delay(attempt: Int) -> Duration { .seconds(1 << (attempt - 1)) }
 
     static func canRetry(_ error: any Error, snapshot: NexArmBluetoothSnapshot) -> Bool {

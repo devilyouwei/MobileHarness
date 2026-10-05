@@ -74,7 +74,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
     /// Composition binds the current Photographer's monotonic pose freshness, independently of the radio.
     public var trackingInputAvailable: @Sendable () async -> Bool = { true }
     public var trackingAvailable: Bool {
-        state.controlReady && settingsWorker == nil && pendingArmAction == nil && !state.jogging
+        foreground && suspension == nil && state.controlReady && settingsWorker == nil && pendingArmAction == nil
+            && !state.jogging
             && motion == nil && operation == nil && cleanup == nil
     }
     private var motionID: UUID?
@@ -89,12 +90,12 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private var reconnectEnabled = false
     private var manualDisconnectPending = false
     private var recovery: Task<Void, Never>?
+    private var suspension: Task<Void, Never>?
     private var recoveryID = UUID()
     private var recoveryPending = false
     private var recoveryNeedsUser = false
     private var recoveryAttempts = 0
     private var recoveryStarted: ContinuousClock.Instant?
-    private var readySince: ContinuousClock.Instant?
     private var recoveryCause = BluetoothRecoveryCause.resume
     private var connectionError: (any Error)?
     private var latestLinkSnapshot = NexArmBluetoothSnapshot() {
@@ -316,7 +317,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 guard foreground, token == generation else { throw CancellationError() }
                 state.phase = .connected
                 state.notice = "已连接，正在监听机械臂反馈"
-                readySince = .now
+                resetRecoveryBudget()
             } catch {
                 guard token == generation else { return }
                 let failed = await link.status()
@@ -354,7 +355,6 @@ public final class BluetoothWorkflow: BluetoothControlling {
         settingsWorker?.cancel()
         liveTask?.cancel()
         controlRevision = UUID()
-        readySince = nil
         if !preserveReconnect {
             recoveryPending = false
             reconnectEnabled = false
@@ -425,16 +425,53 @@ public final class BluetoothWorkflow: BluetoothControlling {
         disconnect()
     }
     public func setForeground(_ active: Bool) {
-        let changed = foreground != active
+        guard foreground != active else { return }
         foreground = active
         if !active {
-            // Application background policy is explicit cancellation, separate from link recovery.
+            // Stop software effects independently of healthy native connection ownership.
             motion?.cancel()
-            disconnect(preserveReconnect: true)
-        } else if changed {
-            // Paused/unavailable time does not consume the active recovery time window or refill attempts.
-            recoveryStarted = nil
+            if controller != nil, state.phase == .connected, operation == nil, cleanup == nil {
+                suspendControl()
+            } else {
+                disconnect(preserveReconnect: true)
+            }
+        } else {
+            resetRecoveryBudget()
             scheduleReconnect()
+        }
+    }
+    private func suspendControl() {
+        // A foreground verification waiter is not a failed native connection. Cancel it
+        // without tearing down the healthy link when another background event arrives.
+        recoveryID = UUID()
+        recovery?.cancel()
+        recovery = nil
+        recoveryPending = false
+        state.recoveryStage = .idle
+        stopScan()
+        discoveryVisible = false
+        stopMotorControl()
+        settingsWorker?.cancel()
+        liveTask?.cancel()
+        controlRevision = UUID()
+        guard suspension == nil else { return }
+        let token = generation
+        let movement = motion
+        let streaming = liveTask
+        let settings = settingsWorker
+        suspension = Task {
+            defer { suspension = nil }
+            if let movement { _ = await movement.result }
+            await streaming?.value
+            await settings?.value
+            // The invocation owning motion must also retire its result/report scope.
+            while motion != nil { await Task.yield() }
+            guard token == generation else { return }
+            liveTask = nil
+            state.jogging = false
+            followingAim = false
+            jogPlanner = nil
+            forearmLeveler = NexArmForearmLeveler()
         }
     }
     private func scheduleReconnect() {
@@ -444,11 +481,21 @@ public final class BluetoothWorkflow: BluetoothControlling {
             do { try await restore() } catch {
                 state.error = "设备记录读取失败：\(Self.message(error))"
             }
+            await suspension?.value
             await cleanup?.value
             guard identity == recoveryID, !Task.isCancelled else { return }
+            let native = await link.status()
+            guard identity == recoveryID, !Task.isCancelled else { return }
+            latestLinkSnapshot = native
             recovery = nil
-            guard foreground, reconnectEnabled, controller == nil else { return }
-            requestRecovery(.resume, snapshot: await link.status())
+            guard foreground, reconnectEnabled else { return }
+            if controller != nil, state.phase == .connected, native.phase == .connected,
+                native.power == .poweredOn, !native.queriesQuarantined
+            {
+                state.recoveryStage = .idle
+                return
+            }
+            requestRecovery(.resume, snapshot: native)
         }
     }
 
@@ -466,8 +513,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private func resetRecoveryBudget() {
         recoveryAttempts = 0
         recoveryNeedsUser = false
+        recoveryPending = false
         recoveryStarted = nil
-        readySince = nil
         state.recoveryAttempt = 0
     }
     public func reconnect(_ id: UUID) {
@@ -489,11 +536,11 @@ public final class BluetoothWorkflow: BluetoothControlling {
             let device = state.selected ?? state.remembered
         else { return }
         latestLinkSnapshot = snapshot
-        if recovery != nil { return }
-        if let readySince, ContinuousClock.now - readySince >= BluetoothRecoveryPolicy.stableInterval {
-            resetRecoveryBudget()
+        guard foreground else {
+            recoveryPending = true
+            return
         }
-        readySince = nil
+        if recovery != nil { return }
         recoveryStarted = recoveryStarted ?? .now
         recoveryCause = cause
         recoveryPending = false
@@ -561,14 +608,15 @@ public final class BluetoothWorkflow: BluetoothControlling {
                     finishRecoveryFailure(BluetoothRecoveryError.episodeTimeout)
                     return
                 }
-                recoveryAttempts += 1
-                state.recoveryAttempt = recoveryAttempts
+                let attempt = recoveryAttempts + 1
                 state.recoveryStage = .waiting
-                state.notice = "等待重新连接，第 \(recoveryAttempts)/3 次"
-                do { try await Task.sleep(for: BluetoothRecoveryPolicy.delay(attempt: recoveryAttempts)) } catch {
+                state.notice = "等待重新连接，第 \(attempt)/3 次"
+                do { try await Task.sleep(for: BluetoothRecoveryPolicy.delay(attempt: attempt)) } catch {
                     return
                 }
                 guard identity == recoveryID, !Task.isCancelled, foreground, reconnectEnabled else { return }
+                recoveryAttempts = attempt
+                state.recoveryAttempt = attempt
                 state.recoveryStage = .connecting
                 connect(device.id, automatically: true)
                 await operation?.value
@@ -576,6 +624,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 native = await link.status()
                 latestLinkSnapshot = native
                 if controller != nil, state.phase == .connected, native.phase == .connected {
+                    resetRecoveryBudget()
                     state.recoveryStage = .idle
                     state.error = nil
                     state.notice = "蓝牙连接已恢复；动作发送与执行尚未验证，中断动作未重放"
@@ -617,11 +666,12 @@ public final class BluetoothWorkflow: BluetoothControlling {
             await operation?.value
             await cleanup?.value
             await recovery?.value
+            await suspension?.value
             await liveTask?.value
             await settingsWorker?.value
             await Task.yield()
         } while discovery != nil || operation != nil || cleanup != nil || recovery != nil
-            || liveTask != nil || settingsWorker != nil
+            || suspension != nil || liveTask != nil || settingsWorker != nil
     }
     public func openSystemSettings() {
         #if os(iOS)
@@ -657,7 +707,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         }
     }
     public func tryAction(_ action: BluetoothArmAction) {
-        guard foreground, state.canControl else {
+        guard foreground, suspension == nil, state.canControl else {
             return
         }
         manualRevision = UUID()
@@ -746,7 +796,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             motorInputs[id - 1] = 0
             return
         }
-        guard foreground, state.canControl else {
+        guard foreground, suspension == nil, state.canControl else {
             return
         }
         cancelTestSequence()
@@ -914,7 +964,9 @@ public final class BluetoothWorkflow: BluetoothControlling {
     ) async throws {
         try Task.checkCancellation()
         guard foreground else { throw NexArmExecutionError.background }
-        guard motion == nil, operation == nil, cleanup == nil, settingsWorker == nil, pendingArmAction == nil else {
+        guard suspension == nil, motion == nil, operation == nil, cleanup == nil, settingsWorker == nil,
+            pendingArmAction == nil
+        else {
             throw NexArmExecutionError.busy
         }
         guard motorInputs.allSatisfy({ abs($0) <= 0.04 }) else { throw NexArmExecutionError.busy }
@@ -1108,7 +1160,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
         }
         try Task.checkCancellation()
         guard foreground else { throw NexArmExecutionError.background }
-        guard operation == nil, cleanup == nil, motion == nil, liveTask == nil, settingsWorker == nil,
+        guard suspension == nil, operation == nil, cleanup == nil, motion == nil, liveTask == nil,
+            settingsWorker == nil,
             pendingArmAction == nil
         else {
             throw NexArmExecutionError.busy

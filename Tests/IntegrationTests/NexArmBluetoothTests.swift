@@ -579,12 +579,13 @@ func bluetoothBackgroundJoinsCommittedLegAndDoesNotResumeMotion() async throws {
     await workflow.waitUntilIdle()
     await #expect(throws: CancellationError.self) { try await movement.value }
     #expect(await link.writes == 1)
-    #expect(workflow.state.phase == .idle)
+    #expect(workflow.state.phase == .connected)
     workflow.setForeground(true)
     await workflow.waitUntilIdle()
     #expect(await link.writes == 1)
     #expect(workflow.state.phase == .connected)
     #expect(await link.feedbackCommands.isEmpty)
+    #expect(await link.connects == 1)
     observer.cancel()
     await observer.value
 }
@@ -786,20 +787,20 @@ func bluetoothRenamedDeviceResumesWithoutSettingsOrMovementAndManualDisconnectPe
     #expect(await link.versionReads == 0)
     let commands = await link.feedbackCommands
     workflow.setForeground(false)
-    // Return before background cleanup has completed; reconnect joins it.
+    // Return before control cleanup completes; reuse waits for the existing owner to retire.
     workflow.setForeground(true)
     await workflow.waitUntilIdle()
     #expect(workflow.state.controlReady)
-    #expect(await link.connects == 2)
+    #expect(await link.connects == 1)
     #expect(await link.feedbackCommands == commands)
     #expect(await link.writes == 0)
-    #expect(workflow.state.notice == "蓝牙连接已恢复；动作发送与执行尚未验证，中断动作未重放")
+    #expect(workflow.state.recoveryAttempt == 0)
     workflow.disconnect()
     await workflow.waitUntilIdle()
     workflow.setForeground(false)
     workflow.setForeground(true)
     await workflow.waitUntilIdle()
-    #expect(await link.connects == 2)
+    #expect(await link.connects == 1)
     #expect(!workflow.state.controlReady)
     let saved = try await LocalDocumentStore<BluetoothDeviceRecord>(url: file).load()
     #expect(saved?.value.automaticallyReconnect == false)
@@ -1769,7 +1770,7 @@ func bluetoothRecoveryStopsAfterThreeFailuresAndManualReconnectStartsAFreshEpiso
     workflow.reconnect(link.id)
     await workflow.waitUntilIdle()
     #expect(await link.connects == 5)
-    #expect(workflow.state.controlReady && workflow.state.recoveryAttempt == 1)
+    #expect(workflow.state.controlReady && workflow.state.recoveryAttempt == 0)
     #expect(workflow.state.transportIssue == nil)
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -1871,7 +1872,7 @@ func bluetoothOldSnapshotsCannotReviveOrFloodARecovery() async throws {
 }
 
 @Test(.timeLimit(.minutes(1))) @MainActor
-func bluetoothRepeatedBriefSuccessDoesNotRefillTheRecoveryBudget() async throws {
+func bluetoothEveryRecoverySuccessResetsItsEpisodeBudget() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
@@ -1881,21 +1882,144 @@ func bluetoothRepeatedBriefSuccessDoesNotRefillTheRecoveryBudget() async throws 
     try await until { !workflow.state.nearby.isEmpty }
     workflow.connect(link.id)
     await workflow.waitUntilIdle()
-    for count in 2...4 {
+    for count in 2...6 {
         await link.loseConnection()
         try await until { await link.connects == count && workflow.state.controlReady }
         await workflow.waitUntilIdle()
+        #expect(workflow.state.recoveryAttempt == 0)
+        #expect(workflow.state.recoveryStage == .idle)
     }
-    await link.loseConnection()
-    try await until { workflow.state.recoveryStage == .failed }
+    workflow.disconnect()
     await workflow.waitUntilIdle()
-    #expect(await link.connects == 4)
-    #expect(workflow.state.recoveryAttempt == 3)
-    workflow.setForeground(false)
+    observer.cancel()
+    await observer.value
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(link.id)
     await workflow.waitUntilIdle()
+    for count in [4, 7] {
+        await link.failConnections(3)
+        if count == 4 { await link.loseConnection() } else { workflow.setForeground(true) }
+        try await until { workflow.state.recoveryStage == .failed }
+        await workflow.waitUntilIdle()
+        #expect(await link.connects == count)
+        #expect(workflow.state.recoveryAttempt == 3)
+        workflow.setForeground(true)
+        await workflow.waitUntilIdle()
+        #expect(await link.connects == count)
+        workflow.setForeground(false)
+        await workflow.waitUntilIdle()
+    }
     workflow.setForeground(true)
     await workflow.waitUntilIdle()
-    #expect(await link.connects == 4)  // Foreground changes cannot bypass exhaustion.
+    #expect(await link.connects == 8)
+    #expect(workflow.state.controlReady && workflow.state.recoveryAttempt == 0)
+    workflow.disconnect()
+    await workflow.waitUntilIdle()
+    observer.cancel()
+    await observer.value
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func bluetoothRepeatedBackgroundPreservesHealthyLinkAndNeverResumesOldJog() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(link.id)
+    await workflow.waitUntilIdle()
+    workflow.setMotorVelocity(id: 1, value: 0.8)
+    try await until(context: "initial jog before repeated background") { await !link.liveCommands.isEmpty }
+    for _ in 0..<5 {
+        workflow.setForeground(false)
+        workflow.setForeground(true)
+        workflow.setForeground(false)
+        workflow.setForeground(true)
+        await workflow.waitUntilIdle()
+        #expect(workflow.state.controlReady && !workflow.state.jogging)
+        #expect(workflow.state.recoveryAttempt == 0)
+        #expect(await link.connects == 1)
+        #expect(await link.disconnects == 0)
+    }
+    let commands = await link.liveCommands.count
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(await link.liveCommands.count == commands)
+    workflow.setMotorVelocity(id: 1, value: -0.8)
+    try await until(context: "fresh jog after repeated background") { await link.liveCommands.count > commands }
+    workflow.disconnect()
+    await workflow.waitUntilIdle()
+    observer.cancel()
+    await observer.value
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func bluetoothForegroundJoinsSuspendedWriterBeforeAdmittingNewControl() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(link.id)
+    await workflow.waitUntilIdle()
+    await link.blockLiveEnd()
+    workflow.setMotorVelocity(id: 1, value: 0.8)
+    try await until { await !link.liveCommands.isEmpty }
+    workflow.setForeground(false)
+    try await until { await link.waitingForLiveEnd }
+    workflow.setForeground(true)
+    let commands = await link.liveCommands.count
+    workflow.tryAction(.nod)
+    workflow.setMotorVelocity(id: 2, value: 1)
+    await #expect(throws: NexArmExecutionError.busy) { try await workflow.resetArm() }
+    #expect(!workflow.trackingAvailable)
+    #expect(await link.liveCommands.count == commands)
+    #expect(await link.observedCommands.isEmpty)
+    #expect(await link.connects == 1)
+    await link.releaseLiveEnd()
+    await workflow.waitUntilIdle()
+    #expect(workflow.trackingAvailable)
+    #expect(await link.disconnects == 0)
+    workflow.disconnect()
+    await workflow.waitUntilIdle()
+    observer.cancel()
+    await observer.value
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func bluetoothLossWhileBackgroundedWaitsForForegroundThenReconnects() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(link.id)
+    await workflow.waitUntilIdle()
+    workflow.setForeground(false)
+    await workflow.waitUntilIdle()
+    await link.loseConnection()
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(await link.connects == 1)
+    #expect(workflow.state.recoveryAttempt == 0)
+    workflow.setForeground(true)
+    await workflow.waitUntilIdle()
+    #expect(await link.connects == 2)
+    #expect(workflow.state.controlReady && workflow.state.recoveryAttempt == 0)
     workflow.disconnect()
     await workflow.waitUntilIdle()
     observer.cancel()
@@ -1921,10 +2045,11 @@ func bluetoothBackgroundCancelsRecoveryAndForegroundResumesWithoutOldAim() async
     await workflow.waitUntilIdle()
     #expect(workflow.state.recoveryStage == .suspended)
     #expect(await link.connects == 1)
+    #expect(workflow.state.recoveryAttempt == 0)
     let oldCommandCount = await link.liveCommands.count
     workflow.setForeground(true)
     await workflow.waitUntilIdle()
-    #expect(workflow.state.controlReady && workflow.state.recoveryAttempt == 2)
+    #expect(workflow.state.controlReady && workflow.state.recoveryAttempt == 0)
     #expect(await link.connects == 2)
     #expect(await link.liveCommands.count == oldCommandCount)
     try await workflow.aim(base: -0.8, pitch: -0.5)

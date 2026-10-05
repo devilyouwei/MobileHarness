@@ -2,6 +2,22 @@
 
 Purpose: preserve dated test, UI and packaging observations that were previously embedded in module READMEs. These are records of what was checked at the time, not current implementation contracts or substitutes for physical-device acceptance.
 
+## 2026-10-06 — Bluetooth scene/retry fixes installed on iPhone, build 2026100601
+
+Latest source, including ADR0142 healthy background connection retention and fresh foreground retry episodes, compiled for the paired iPhone 17 Pro using existing signing configuration. Strict signature verification and all five packaged Agent configurations passed. Installation succeeded; an independent installed-app query confirmed dev.mobileharness.app version 0.1.0, build 2026100601, replacing the observed installed build 2026100505. Fresh process launch with terminate-existing succeeded.
+
+Evidence: `/tmp/mobileharness-background-reconnect-signed-build.log`, `/tmp/mobileharness-background-reconnect-install.json`, `/tmp/mobileharness-background-reconnect-installed-apps.json` and `/tmp/mobileharness-background-reconnect-launch.json`. Native launch confirmation does not establish sustained runtime, Bluetooth background connection survival or mechanical motion acceptance. No physical robot test commands were issued; signing settings, user media and model resources were not changed.
+
+## 2026-10-06 — Bluetooth background retention and foreground retry episodes (ADR0142)
+
+BluetoothWorkflow now joins background control suspension while retaining healthy native connectivity. App no longer treats inactive as background. Foreground reads current native status after cleanup before reusing or reconnecting; each eligible return starts a fresh bounded episode and successful connection immediately clears attempts. Cancelled backoff consumes no connection attempt. Manual disconnect/forget still disables automatic recovery, native closure remains mandatory for unhealthy sessions and old motion is never replayed.
+
+- Final `./scripts/check.sh` passed: boundary guards, six Python tests, strict Swift formatting, all root test targets and metadata lint. IntegrationTests passed473 tests in61.411 seconds; AppWorkflowTests passed26 (`/tmp/mobileharness-background-reconnect-check.log`). Regressions include more than three brief successful recoveries, repeated exhausted episodes followed by foreground retry, repeated rapid background/foreground events with one native connection, fresh jog after suspension, retained writer cleanup blocking new effects, deferred background native loss and cancelled backoff.
+- An initial direct Swift test invocation failed because the Command Line Tools did not locate TestingMacros without the plugin path supplied by check.sh. Initial focused runs also exposed an incorrect new test assertion using the finite-write counter for live jogs; the corrected assertion checks actual liveCommands. Those intermediate failures are not final validation evidence.
+- Full-Xcode unsigned generic iOS device build succeeded and all five packaged Agent configurations verified (`/tmp/mobileharness-background-reconnect-device.log`). Required `./scripts/build-ios.sh` exited65 in MobileHarnessSimulator because CoreAIShared cannot resolve simulator CoreAI for arm64/x86_64; later schemes were not reached (`/tmp/mobileharness-background-reconnect-ios.log`). Diff whitespace checks passed.
+
+All motion/recovery fixtures are simulated; no phone installation or physical robot commands were performed. Actual inactive/background/lock-screen connection survival, queued native callback delivery and in-flight native query isolation remain unverified. No Bluetooth background mode, state restoration, signing configuration, dependency, model weight or user media was added. Original Technical_Design.docx remains unchanged.
+
 ## 2026-10-05 — Resource ownership fixes installed on iPhone, build 2026100503
 
 Latest source, including ADR0140 cancellation-safe cleanup and ADR0141 unlocked/locked ownership, compiled for the paired iPhone 17 Pro with the existing signing configuration. Strict signature verification and all five packaged Agent configurations passed. Installation succeeded; an independent installed-app query confirmed dev.mobileharness.app version 0.1.0, build 2026100503.

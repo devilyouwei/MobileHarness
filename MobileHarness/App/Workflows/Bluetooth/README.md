@@ -20,13 +20,13 @@ flowchart LR
     UI -->|later connected-name tap| Detail[UI-local destination / native detail push]
 ```
 
-## Recovery — ADR0125 / ADR0129
+## Recovery and scene lifetime — ADR0125 / ADR0129 / ADR0142
 
 ✅ Physical loss, native transport/protocol failure, sustained two-second send blockage and quarantined queries enter the existing bounded recovery worker. Recovery closes and confirms the old native session, clears connection-local manual/live intents/controller/planner/telemetry, and reconnects without replaying old commands. A current native fault and current recovery phase/attempt are retained; historical stages are not stored. Recovery success confirms connectivity only, not physical motion.
 
 ✅ Recovery never cancels finite Agent Actions, removes Channel queues, changes Agent/session admission or stops Assistant/speech. Old native I/O returns its dependency error and follows the existing Action/Tool terminal-result policy. Generation/session fences reject stale writes and UI mutations. Explicit user/session cancellation and resource revocation retain separate execution policy.
 
-✅ One worker, three attempts, 1/2/4-second backoff and a cooperative two-minute active deadline. Cleanup joins native closure; unconfirmed disconnect prevents a second connection. Thirty seconds of stable native connectivity allows a fresh budget. Radio-off/reset waits on native events; denied/unsupported stops. Background pauses native recovery/control; foreground resumes eligible devices. Manual disconnect/forget disables reconnection; manual retry starts a fresh budget. Unknown/configuration/storage/service-policy errors are not blindly retried.
+✅ One recovery worker, three actual connection attempts per episode, 1/2/4-second backoff and a cooperative two-minute active deadline. Waiting cancellation consumes no attempt. Successful connection immediately clears attempts/exhaustion; every actual background-to-foreground transition starts a fresh eligible budget, including after previous exhaustion. Repeated same-phase notifications do not refill it. Radio-off/reset waits on native events without consuming attempts; denied/unsupported stops. Cleanup joins native closure; unconfirmed disconnect prevents a second connection. Manual disconnect/forget persists disabled reconnection. Unknown/configuration/storage/service-policy errors are not blindly retried. No connection-flapping counter shares this retry budget.
 
 ```mermaid
 stateDiagram-v2
@@ -39,9 +39,17 @@ stateDiagram-v2
     Waiting --> WaitingForBluetooth: radio unavailable
     WaitingForBluetooth --> Cleaning: radio restored
     Waiting --> Failed: budget exhausted
-    Connected --> Suspended: background
-    Suspended --> Cleaning: foreground / reconnect enabled
+    Connected --> PausedControl: background / retain healthy native link
+    PausedControl --> Connected: foreground / join old effects / verify same link
+    PausedControl --> Cleaning: foreground / link lost / fresh budget
+    Waiting --> SuspendedRecovery: background / cancel pending setup
+    SuspendedRecovery --> Cleaning: foreground / fresh eligible budget
+    Failed --> Cleaning: foreground / new eligible episode
 ```
+
+✅ App forwards actual background status; transient inactive does not disconnect or renew retry budgets. Background cancels/joins finite motion, Settings playback/jog and tracking, clears latest motor/aim intents and stops discovery, while retaining a healthy controller/native connection. One control-suspension Task gates new effects until old writers/report owners retire, even after a rapid foreground return. Pending connection/recovery still closes normally; background native loss is deferred until foreground. Foreground joins suspension/native cleanup and reads current SDK status before reusing or reconnecting. A genuine in-flight query cancellation can close/quarantine the native link under its existing isolation contract. No old command resumes.
+
+❌ No bluetooth-central background execution mode, state restoration, guarantee of continuous connection, background Action execution or perpetual recovery is introduced. OS-suspended events may arrive only on foreground return; physical scene/native-I/O acceptance remains outstanding.
 
 ## Shared Actions and manual takeover
 

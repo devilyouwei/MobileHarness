@@ -18,6 +18,7 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 - Record sustained iPhone Chinese/English conversation, listening quality, synthesis quality, first-audio latency, interruptions/route changes, memory and thermal behavior using [Voice](Voice.md) and [MOSS validation](Moss-Validation.md).
 - Validate real cloud providers, switching and failure recovery separately from offline adapter tests.
 - Extend supervised robot evidence to relevant BLE cadence, repeated operation, hardware/load configurations and recovery cases. Existing trial results are scoped to their recorded environment in [physical acceptance](NexArm_Physical_Acceptance.md) and [measurements](measurements/README.md).
+- Validate retained BLE connectivity through inactive/background/lock-screen transitions, late native callbacks, foreground recovery after retry exhaustion and in-flight query isolation. Current ADR0142 is implemented with synthetic tests; physical lifecycle acceptance, background Bluetooth event execution and state restoration remain outstanding.
 - Validate current streaming/wait/cancellation behavior under real model output and device playback/presentation.
 
 ## Future implementation directions

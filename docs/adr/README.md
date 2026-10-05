@@ -12,6 +12,8 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 
 ❌ Superseded records are historical evidence rather than current implementation requirements.
 
+✅ [ADR0142 — Bluetooth scene lifetime and retry episodes](0142-bluetooth-scene-lifetime-and-retry-episodes.md): retain healthy background connectivity, join control suspension, reset attempts on success and grant a fresh eligible foreground episode. ❌ Physical lifecycle acceptance remains pending.
+
 | ID | Decision |
 | --- | --- |
 | 0001 | [ADR 0001 原生模块化 Runtime](0001-native-modular-runtime.md) |

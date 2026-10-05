@@ -65,7 +65,7 @@ flowchart LR
 
 Connection uses native BLE subscription completion and passive feedback (ADR0130). It has no voice/session cleanup or scheduler callback. Actions and Settings share the root connection/controller; explicit gestures prepare their own Actions-owned plans when needed. Missing feedback is diagnostic rather than a reconnect trigger.
 
-Leaving Settings stops discovery and page-owned motor intent; connection/recovery lifetime belongs to App. Disconnect immediately fences native I/O, clears transport/manual intents and joins native/manual workers. Finite Agent operations fail naturally through their results. Explicit application background policy still cancels the foreground motion task. Background suspends eligible recovery until foreground; manual disconnect/forget disables the saved reconnect preference. A missing native disconnection acknowledgment stops recovery before any new connection. Already accepted physical motion may finish; host cleanup is not physical-stop proof.
+Leaving Settings stops discovery and page-owned motor intent; connection/recovery lifetime belongs to App. Disconnect immediately fences native I/O, clears transport/manual intents and joins native/manual workers. Finite Agent operations fail naturally through their results. Explicit application background policy still cancels the foreground motion task. Background joins control suspension while retaining a healthy native link, or cancels pending setup/recovery. Foreground checks current native status after cleanup before reuse/reconnect and starts a fresh eligible retry episode; success clears attempts immediately. Manual disconnect/forget disables the saved reconnect preference. A missing native disconnection acknowledgment stops recovery before any new connection. Already accepted physical motion may finish; host cleanup is not physical-stop proof.
 
 ✅ Simulation tests cover Assistant/Gateway/Action dispatch, navigation, restoration/forget, incompatible devices, background cancellation, failed writes, query/feedback loss, retries and old-session fencing. Current behavior and exact bounds are owned by [Bluetooth/README.md](Bluetooth/README.md).
 
@@ -73,7 +73,7 @@ Leaving Settings stops discovery and page-owned motor intent; connection/recover
 
 ## Current foreground recovery contract
 
-✅ [Bluetooth](Bluetooth/README.md) owns the ADR0125 recovery state machine for physical disconnection, blocked sends and query quarantine. Passive feedback silence is diagnostic (ADR0130). One worker fences/clears transport-local intent, closes and joins native/manual workers, confirms native disconnect and performs at most three connection attempts with 1/2/4-second backoff. Manual disconnect/forget/background can cancel it; restored devices and radio power recovery share this path. Page lifetime does not own recovery, and old physical commands are never replayed.
+✅ [Bluetooth](Bluetooth/README.md) owns the ADR0125 recovery state machine for physical disconnection, blocked sends and query quarantine. Passive feedback silence is diagnostic (ADR0130). One worker fences/clears transport-local intent, closes and joins native/manual workers, confirms native disconnect and performs at most three actual connection attempts per episode with 1/2/4-second backoff. Success clears the episode immediately; every eligible actual foreground return grants a new episode, while transient inactive changes do not. Manual disconnect/forget/background can cancel it; restored devices and radio power recovery share this path. Page lifetime does not own recovery, and old physical commands are never replayed.
 
 ❌ Physical-device endurance and emergency-stop proof remain outside host recovery.
 
@@ -233,3 +233,5 @@ flowchart LR
 
 
 ✅ ADR0141: AppBluetoothWorkflow validates execution permits at Agent motion/continuous-write entries, independently of Settings manual takeover and native connection recovery. ❌ Resource ownership does not establish physical device health or arrival.
+
+❌ Background Bluetooth execution/state restoration and physical scene-lifetime acceptance remain outside the current [Bluetooth](Bluetooth/README.md) implementation.
