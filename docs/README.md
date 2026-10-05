@@ -13,6 +13,7 @@
 | [Architecture](Architecture.md) | Public explanation of the current system and ownership boundaries. |
 | [Platform boundaries](Platform-Boundaries.md) | Foreground/device capabilities and physical-control constraints. |
 | [Roadmap](Roadmap.md) | Current delivery priorities, unimplemented directions and acceptance work. |
+| [Agent-driven app](Agent-Driven-App.md) | ❌ Proposed Agent business backend, shared UI/conversation capabilities and staged migration. |
 | [Photographer proposal](Photographer-Proposal.md) | Proposed camera composition/motion behavior; not an implemented Agent. |
 | [Resource 状态计划](Resource-State-Plan.md) | ❌ 当前 UI/App/设备状态的快速存取与 Agent 上下文接入计划；lock 兜底另行处理。 |
 
