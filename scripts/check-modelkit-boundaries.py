@@ -146,6 +146,16 @@ for source in (ROOT / 'MobileHarness/Storage/Audio').rglob('*.swift'):
     for imported in re.findall(r'\bimport\s+(?:(?:class|struct|enum|protocol|func|var|let|typealias)\s+)?(\w+)', source.read_text()):
         if imported not in {'Foundation', 'Storage'}:
             errors.append(f'Forbidden StorageAudio import {imported}: {source.relative_to(ROOT)}')
+# Storage retains data; business context, producer policy and wording belong to consumers.
+for source in (ROOT / 'MobileHarness/Storage').rglob('*.swift'):
+    text = source.read_text()
+    if re.search(r'\b(?:LocalizedError|errorDescription|synthesisTimedOut)\b', text):
+        errors.append(f'Storage contains presentation or synthesis policy: {source.relative_to(ROOT)}')
+    if any(word in text for word in ('新对话', '待生成标题')):
+        errors.append(f'Storage contains localized title fallback: {source.relative_to(ROOT)}')
+chat_source = (ROOT / 'MobileHarness/Storage/Chat/ConversationHistory.swift').read_text()
+if re.search(r'\.suffix\(10\)|public var title:', chat_source):
+    errors.append('StorageChat must not select model context or presentation titles')
 # Speech signal observation is runtime admission/logging, never a UI-command side channel.
 coordinator = (ROOT / 'MobileHarness/App/Lifecycle/VoiceSessionCoordinator.swift').read_text()
 observer = coordinator.split('func observeSpeech(', 1)[1].split('private func resumeListening(', 1)[0]

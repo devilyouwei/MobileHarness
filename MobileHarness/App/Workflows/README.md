@@ -156,7 +156,7 @@ flowchart LR
 
 ## Action and Tool presentation boundary
 
-✅ ActionActivityWorkflow forwards every scheduled Action without module/source filtering; UI displays its captured failureDescription directly. Unknown errors use Swift localizedDescription; domain LocalizedError owns readable wording. Conversation history dry-run output labels Tool events explicitly. ❌ No duplicate error-message table is maintained.
+✅ ActionActivityWorkflow forwards every scheduled Action without module/source filtering; UI displays its captured failureDescription directly. Unknown errors use Swift localizedDescription; App adapts neutral speech storage/producer failures after playback cleanup, while other domain LocalizedError values retain their wording. Conversation history dry-run output labels Tool events explicitly. ❌ No duplicate error-message table is maintained.
 
 ## Head gestures
 

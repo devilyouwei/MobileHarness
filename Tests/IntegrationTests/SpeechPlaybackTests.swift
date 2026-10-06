@@ -376,7 +376,7 @@ private actor ReplyCompletionGate {
     try await agent.start()
     let job = try await admit("wait", agent: agent)
     let audio = try await store.checkout(job.0, owner: job.1)
-    await #expect(throws: SpeechAudioError.synthesisTimedOut) { _ = try await audio.next() }
+    await #expect(throws: SpeechSynthesisError.timedOut) { _ = try await audio.next() }
     await agent.stop()
     await store.shutdown()
 }

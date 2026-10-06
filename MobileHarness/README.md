@@ -575,7 +575,7 @@ sequenceDiagram
     end
 ```
 
-Admission of the synthesis request does not mean synthesis completed. SpeechSynthesis owns a serial bounded FIFO and a per-job execution deadline; it does not inspect Action Channels. Playback can consume frames while synthesis continues. StorageAudio validates ownership and provides a single-use, reply-owned handle with no pending/ready expiry timer. Reply completion or session cleanup retires unused handles. Successful `Speech.speak` completion means platform playback drained and the lease was released.
+Admission of the synthesis request does not mean synthesis completed. SpeechSynthesis owns a serial bounded FIFO and a per-job execution deadline; it does not inspect Action Channels. Playback can consume frames while synthesis continues. StorageAudio validates ownership and provides a single-use, reply-owned handle with no pending/ready expiry timer. Reply completion or session cleanup retires unused handles. Successful `Speech.speak` completion means platform playback drained and the lease was released. SpeechSynthesisError carries producer timeout/invalid-output failures through StorageAudio unchanged; neutral PCM/cache errors remain storage-owned. App maps known failures to user wording after playback cleanup.
 
 ### Camera perception and UI projection
 
@@ -681,7 +681,7 @@ flowchart TB
 
 The facade holds no mutable feature state. Each feature target owns its effects and depends only on the values/services needed by that feature. UI owns editable presentation state; workflows own persistence, validation and asynchronous operation boundaries. Credentials use the Keychain through App-supplied operations, while non-secret settings and conversation records use local document storage.
 
-Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant and the History workflow share the same injected journal service.
+Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
 
 <a id="391-platformkit-versus-modelkit"></a>
 

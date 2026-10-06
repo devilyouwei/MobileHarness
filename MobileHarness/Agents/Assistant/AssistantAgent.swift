@@ -225,9 +225,13 @@ public actor AssistantAgent: Agent {
         var recorded = false
         generationFinishReason = nil
         do {
+            let history = try await conversations.readCurrent()
+            let requestMessages = try ConversationContextBuilder.request(
+                system: Self.systemPrompt(capabilities: descriptor.capabilities), user: text,
+                conversation: history.current)
             let record = try await conversations.begin(
                 id: input.id, user: text,
-                system: Self.systemPrompt(capabilities: descriptor.capabilities),
+                request: requestMessages, expecting: history.token,
                 model: try await modelName())
             recorded = true
             try Task.checkCancellation()

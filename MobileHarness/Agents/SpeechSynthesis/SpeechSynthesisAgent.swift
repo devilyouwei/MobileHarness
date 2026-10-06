@@ -106,7 +106,7 @@ public actor SpeechSynthesisAgent: Agent {
         }
         let deadline = Task {
             do { try await Task.sleep(for: executionTimeout) } catch { return }
-            await store.fail(request.audioID, error: SpeechAudioError.synthesisTimedOut)
+            await store.fail(request.audioID, error: SpeechSynthesisError.timedOut)
         }
         defer { deadline.cancel() }
         do {
@@ -116,7 +116,7 @@ public actor SpeechSynthesisAgent: Agent {
             let session = try await synthesis.synthesize(
                 SpeechSynthesisRequest(text: request.text, locale: request.locale, context: context))
             defer { session.cancel() }
-            guard session.context == context else { throw SpeechAudioError.invalidAudio }
+            guard session.context == context else { throw SpeechSynthesisError.invalidOutput }
             var finished = false
             var bytes = 0
             var format: AudioFormat?
@@ -124,14 +124,14 @@ public actor SpeechSynthesisAgent: Agent {
             try await withTaskCancellationHandler {
                 for try await event in session.events {
                     try Task.checkCancellation()
-                    guard !finished else { throw SpeechAudioError.invalidAudio }
+                    guard !finished else { throw SpeechSynthesisError.invalidOutput }
                     switch event {
                     case .audio(let frame):
                         guard frame.format.channels == 1, frame.format.encoding == .float32,
                             format == nil || format == frame.format,
                             sequence.map({ frame.sequence > $0 }) ?? true,
                             frame.data.count <= 8_388_608 - bytes
-                        else { throw SpeechAudioError.invalidAudio }
+                        else { throw SpeechSynthesisError.invalidOutput }
                         format = frame.format
                         sequence = frame.sequence
                         bytes += frame.data.count
@@ -148,7 +148,7 @@ public actor SpeechSynthesisAgent: Agent {
             } onCancel: {
                 session.cancel()
             }
-            guard finished, bytes > 0 else { throw SpeechAudioError.invalidAudio }
+            guard finished, bytes > 0 else { throw SpeechSynthesisError.invalidOutput }
             await store.complete(request.audioID)
         } catch { await store.fail(request.audioID, error: error) }
     }

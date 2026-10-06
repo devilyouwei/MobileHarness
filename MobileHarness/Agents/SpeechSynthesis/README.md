@@ -45,7 +45,7 @@ PCM 格式在一项请求内保持一致，帧 sequence 严格递增，流必须
 
 ❌ File output, retry, priority, replay and hardware performance acceptance remain outside this implementation.
 
-✅ Synthesis and cache failures use the shared SpeechAudioError type; scheduled consumption belongs to SpeechPlayback.
+✅ Producer failures use SpeechSynthesisError; cache/PCM failures use StorageAudio.SpeechAudioError. Scheduled consumption belongs to SpeechPlayback.
 
 ✅ Pending and completed-unclaimed audio uses reply-owned lifetime without queue/ready TTL. App clears remaining source/input handles after reply completion/cancellation, and session handles on interruption. A reply is one originating source/input within a voice session, not the entire multi-turn session. Consumed frames leave the cache immediately and each played handle is released after hardware drain; only unconsumed audio remains until owner cleanup. The synthesis execution deadline is not a cache expiry or a total playback-wait deadline. ❌ Long-sequence physical-device acceptance remains pending.
 
@@ -55,7 +55,7 @@ PCM 格式在一项请求内保持一致，帧 sequence 严格递增，流必须
 
 ✅ 超时由 `SpeechSynthesisAgent.produce` 内的独立 Task 实现：请求从 FIFO 出队并开始执行时启动，默认 `executionTimeout = 60 秒`。收到 PCM 不会重置计时；合成正常完成或失败退出时，由 `defer` 取消计时任务。排队时间不计入此期限，已经合成成功的音频也不会因为后续等待播放而触发合成超时。
 
-到期后调用 `store.fail(audioID, error: SpeechAudioError.synthesisTimedOut)`。Agent 不直接调用播放 Action，也不发送一条超时 Agent 消息；合成与播放通过同一 audioID 对应的共享缓存传递失败状态。
+到期后调用 `store.fail(audioID, error: SpeechSynthesisError.timedOut)`。Agent 不直接调用播放 Action，也不发送一条超时 Agent 消息；合成与播放通过同一 audioID 对应的共享缓存传递失败状态。
 
 ```mermaid
 sequenceDiagram
@@ -94,6 +94,6 @@ sequenceDiagram
 
 ## Current error ownership
 
-✅ SpeechSynthesis currently reports producer deadline and invalid model output with StorageAudio.SpeechAudioError.synthesisTimedOut/invalidAudio, and passes failures into the shared audio store. StorageAudio owns that error type today.
+✅ SpeechSynthesisError owns timedOut and invalidOutput. Context identity, mono Float32/stable format, sequence, EOS, nonempty output and synthesis byte policy remain Agent-owned; StorageAudio validates its PCM contract separately. Producer errors pass through the store to playback unchanged. App owns localized messages.
 
-❌ Moving synthesis business errors out of StorageAudio and localizing storage failures in consumer presentation is deferred to the [Storage decoupling plan](../../Storage/README.md#planned-business-decoupling). This document describes the existing implementation, not a completed migration.
+❌ Automatic producer retry and real-device performance acceptance remain outstanding.

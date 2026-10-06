@@ -164,3 +164,5 @@ flowchart LR
 ❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
 
 ✅ ADR0133: Bluetooth lists use explicit borderless button behavior to isolate operation taps within native List rows. Recovery-success copy distinguishes restored connectivity from unverified movement. No Action failure or resource policy is added to Settings. ❌ Device touch/layout verification remains pending.
+
+✅ ConversationHistoryPresentation centralizes current/archived title rules and localized defaults; record schemas remain in StorageChat. ❌ History operations still use the existing workflow pending Agent migration.

@@ -17,6 +17,7 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 | ID | Decision |
 | --- | --- |
 | 0001 | [ADR 0001 原生模块化 Runtime](0001-native-modular-runtime.md) |
+| 0143 | [Storage and consumer policy boundaries](0143-storage-consumer-policy-boundaries.md) |
 | 0002 | [ADR 0002 模型能力与后端解耦](0002-model-capabilities.md) |
 | 0003 | [ADR 0003 能力 SDK 与应用组装的编译边界](0003-capability-sdk-boundary.md) |
 | 0004 | [ADR 0004 系统语音网关闭环](0004-system-voice-loop.md) |

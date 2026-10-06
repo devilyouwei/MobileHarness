@@ -28,7 +28,7 @@ flowchart LR
     App -.->|Capability injection and lifecycle| Agents
     Input[InputGateway] -->|AgentInput and ToolResult| Agents
     Agents -->|Read context and persist turns| Storage[StorageChat ConversationHistoryStore]
-    Storage -->|Last ten completed rounds| Agents
+    Storage -->|Raw records + admission token| Agents
     Agents -->|Register and write synthesized PCM| Audio[StorageAudio SpeechAudioStore]
     Audio -->|Scoped audioID checkout| Playback[AppSpeechPlayback endpoint]
     Agents -->|Device values / PCM conversion| PlatformKit
@@ -45,7 +45,7 @@ flowchart LR
 
 ✅ Model-callable registrations are loaded from each JSON v5 resource. Code owns fixed internal permissions and behavior, capability protocols are injected, and communication/execution requests cross Gateways. AgentCore supplies generic contracts/parsers/registries rather than business messages or native services.
 
-❌ Per-Agent targets and separate speech/vision communication targets are not implemented. StorageChat currently assembles Assistant context in begin(), and SpeechSynthesis currently uses StorageAudio synthesis errors; their planned relocation is recorded in [Storage](../Storage/README.md#planned-business-decoupling).
+❌ Per-Agent targets and separate speech/vision communication targets are not implemented. Assistant owns request context selection and SpeechSynthesis owns producer errors; Storage retains records and neutral media/cache contracts.
 
 ## Internal structure and data flow
 

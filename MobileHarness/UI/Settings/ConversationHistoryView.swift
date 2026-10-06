@@ -91,7 +91,7 @@
 
         private func row(_ conversation: StoredConversation) -> some View {
             VStack(alignment: .leading, spacing: 6) {
-                Text(verbatim: conversation.title).lineLimit(2)
+                Text(verbatim: ConversationHistoryPresentation.title(conversation)).lineLimit(2)
                 Text(
                     "\(conversation.turns.count) 轮 · \(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))"
                 )
@@ -119,7 +119,7 @@
                     }
                 }
             }
-            .navigationTitle(String(conversation.title.prefix(40)))
+            .navigationTitle(String(ConversationHistoryPresentation.title(conversation).prefix(40)))
             .toolbar { ShareLink("导出", item: export) }
         }
         private var export: String {

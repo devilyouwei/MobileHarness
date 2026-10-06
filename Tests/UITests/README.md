@@ -37,3 +37,5 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ Bluetooth connection label fixtures use native connection/recovery and active manual state; retired execution/verification fields are removed. ❌ Native rendering remains separate.
 
 ✅ ADR0134 / ADR0138: Bluetooth state tests cover row intent transitions (connect / open detail / unavailable), connected-versus-remembered grouping, unsuccessful selection retention while discovery clears, attempted-device reason isolation, unavailable radio/recovery admission, current native warning replacement and disconnected motor/action admission. Shared/pending destination state stays removed; one view-local destination is assigned only by a connected-name tap. No diagnostic history protocol/value remains. ❌ Native single-level/cancelled swipes and compact-row layout require phone acceptance.
+
+✅ ConversationHistoryPresentationTests verifies empty/current/archived title wording and preservation of raw user text. ❌ Native page and animation acceptance remains separate.

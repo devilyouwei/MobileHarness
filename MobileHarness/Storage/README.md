@@ -123,13 +123,12 @@ flowchart LR
 
 ❌ No concrete external service lookup or implicit model/device/business dependency is permitted.
 
-## Planned business decoupling
+## Consumer policy boundary
 
-Storage is a foundational storage capability. Storage owns data retention, bounds, ownership, atomic persistence and retrieval; callers own business decisions and UI presentation. The following migration is planned, not implemented in this change:
+✅ Assistant owns completed-turn selection, its ten-round limit and system/user/assistant request assembly. StorageChat reads current records with an opaque process-local token and persists the caller's exact request only when that token remains current. Successful mutations and unsaved terminal recovery invalidate tokens; stale admission fails explicitly without retry.
 
-- ❌ Move ConversationHistoryStore.begin's completed-turn selection, ten-turn context limit and system/user/assistant request assembly into Assistant or its owning business layer. Storage should persist the exact request supplied by the caller and expose stored records for retrieval.
-- ❌ Move StoredConversation.title selection and localized fallback titles into UI or the owning business workflow. Storage should retain raw user text, summaryTitle and archive metadata only.
-- ❌ Move SpeechAudioError's localized messages into consumer presentation; move synthesisTimedOut and synthesis validation policy into SpeechSynthesis. Storage retains storage errors and conveys caller-supplied producer failures through standard Error contracts.
-- ❌ Audit remaining storage-side workflow policy before splitting business adapters out of Storage. Preserve persisted schema compatibility, atomic revision checks, explicit capacities and ownership/cleanup semantics during migration.
+✅ UI owns conversation title selection and localized fallback wording. Storage retains original user text, summaryTitle and archive metadata. SpeechSynthesis owns producer timeout and model-output validation; StorageAudio owns PCM validity and lease/cache errors and passes caller-supplied failures unchanged. App adapts known speech errors into user-facing messages after playback cleanup.
 
-✅ Storage core remains Foundation-only; StorageChat and StorageAudio currently depend only on Storage. This dependency independence does not imply the above semantic decoupling is complete. No Storage runtime or payload format changes are made in this step.
+✅ Persisted schemas, atomic revisions, bounded writers and reply/session audio ownership remain unchanged. See [ADR0143](../../docs/adr/0143-storage-consumer-policy-boundaries.md).
+
+❌ Broader workflow migration, unified UI intent and conversation-driven task continuation remain planned in [Agent-driven app](../../docs/Agent-Driven-App.md). No implicit business/service dependency is permitted in Storage.

@@ -318,3 +318,11 @@ The App also now enables automatic reconnect before persisting successful explic
 - Generic unsigned iOS device build succeeded, and five packaged Agent configurations passed validation. Required build-ios.sh exited65 in the first simulator scheme because CoreAIShared could not resolve CoreAI; later simulator schemes did not run. Diff whitespace checks passed.
 
 No installation or new physical motion/layout/gesture verification was performed. The previously installed build0.1.0(2026100501) predates this compact-list policy and ADR0137 ordinary-home correction. Apple’s official name-tap connection and information/forget interaction was used as a reference; the project’s later connected-name detail tap follows the user’s requested adaptation.
+
+## 2026-10-06 — Agent-driven app: Storage boundary stage
+
+Branch: codex/agent-driven-app. Scope: Assistant-owned request context, token-fenced exact journal admission, UI-owned titles and producer-owned speech failures; no new Agent or device workflow.
+
+✅ Swift 6.4 strict formatting, architecture boundaries, six Python checks, diff whitespace and project/privacy/entitlements plist validation passed. The final targeted run passed 32 tests across history/context/admission, speech errors, title presentation and history workflows, including the audio detection retry regression. The unsigned generic iOS device build passed with Xcode 27, including SpeechFailurePresentation and VoiceSessionCoordinator.
+
+❌ Full scripts/check.sh returned failure: all 476 integration tests passed, but AppWorkflowTests.audioDetectionKeepsFailedPermissionResultAndAllowsRetry timed out in the full run. Its isolated final rerun passed; whole-suite success is not claimed. scripts/build-ios.sh failed at the first simulator scheme because external CoreAIShared cannot resolve CoreAI; its remaining three schemes were not attempted. No real-model inference, physical device interaction, audio latency or UI gesture acceptance was performed. Original Technical_Design.docx remains unchanged.

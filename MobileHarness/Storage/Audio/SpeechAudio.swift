@@ -1,22 +1,8 @@
 import Foundation
 import Storage
 
-public enum SpeechAudioError: Error, Equatable, Sendable, LocalizedError {
-    case capacityExceeded, missingAudio, timedOut, invalidAudio, duplicate, closed, expired, forbidden,
-        synthesisTimedOut
-    public var errorDescription: String? {
-        switch self {
-        case .capacityExceeded: "语音缓冲已满，请重试"
-        case .missingAudio: "语音任务已失效"
-        case .synthesisTimedOut: "语音合成执行超时"
-        case .timedOut: "等待语音超时，请重试"
-        case .invalidAudio: "语音合成返回了无效音频"
-        case .duplicate: "语音任务重复"
-        case .expired: "语音缓存已过期"
-        case .forbidden: "语音不属于当前请求"
-        case .closed: "语音服务已关闭"
-        }
-    }
+public enum SpeechAudioError: Error, Equatable, Sendable {
+    case capacityExceeded, missingAudio, timedOut, invalidAudio, duplicate, closed, expired, forbidden
 }
 
 extension SpeechAudioError {

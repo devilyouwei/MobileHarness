@@ -11,3 +11,5 @@ flowchart LR
 ```
 
 ❌ No replay or audio mixing is introduced.
+
+✅ Playback propagates neutral storage and caller-supplied producer failures after existing cleanup; host adaptation supplies user wording. ❌ No synthesis policy is implemented here.

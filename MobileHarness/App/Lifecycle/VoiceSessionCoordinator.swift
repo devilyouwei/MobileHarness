@@ -466,11 +466,14 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     }
     func play(audioID: UUID, invocation: ActionInvocation) async throws {
         guard let speechPlayback else { throw CommunicationError.scopeClosed }
-        try await speechPlayback.play(audioID: audioID, invocation: invocation) { [weak self] stream, invocation in
-            guard let self else { throw CancellationError() }
-            try await self.play(stream, envelope: invocation.context)
-        }
+        do {
+            try await speechPlayback.play(audioID: audioID, invocation: invocation) { [weak self] stream, invocation in
+                guard let self else { throw CancellationError() }
+                try await self.play(stream, envelope: invocation.context)
+            }
+        } catch { throw SpeechFailurePresentation.adapting(error) }
     }
+
     private func play(_ stream: SpeechAudio, envelope: ActionExecutionContext) async throws {
         let generation = envelope.sessionID
         guard conversationPresentation.isCurrent(envelope), accepts(session: generation) else {

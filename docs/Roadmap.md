@@ -26,6 +26,7 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 | Direction | Boundary before implementation |
 | --- | --- |
 | [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions/Tools 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
+| [Agent-driven app](Agent-Driven-App.md) | Storage cleanup is implemented; shared Tools, structured UI intent, Agent-owned workflows and model result continuation remain pending. |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
 | Local native Tool events and result-driven request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |
@@ -141,7 +142,7 @@ SpeechPerception cleanup validation: helper boundary checks, changed Swift forma
 
 ✅ [ADR0121](adr/0121-remove-shared-types.md): Types is deleted; AgentCore has zero project dependencies, UI depends only on StorageChat, and explicit Agent → Tool → App → UI adaptation preserves the pose wire format. ❌ Physical-device acceptance remains outstanding.
 
-✅ ModelKit diagnostic cleanup: availability/errors provide typed capability outcomes and neutral diagnostic text; consumer layers own localized messages and recovery guidance. Native camera gray64 sampling remains in PlatformKit, with motion/cadence decisions in VisionPerception. ❌ Storage business/context/presentation decoupling is planned in [Storage](../MobileHarness/Storage/README.md#planned-business-decoupling); current imports are independent but semantic cleanup remains outstanding.
+✅ ModelKit diagnostic cleanup: availability/errors provide typed capability outcomes and neutral diagnostic text; consumer layers own localized messages and recovery guidance. Native camera gray64 sampling remains in PlatformKit, with motion/cadence decisions in VisionPerception. ✅ Storage context/title/producer-error separation is implemented in [ADR0143](adr/0143-storage-consumer-policy-boundaries.md). ❌ Broader Agent-driven app migration remains planned.
 
 Validation update (2026-10-04): Swift 6.4/full Xcode are available. The Types removal boundary checks and targeted media/UI tests passed; the unsigned iOS device build passed. Full check.sh still reports two pre-existing NexArm planner test failures. build-ios.sh stops on simulator CoreAI module availability. Earlier dated CLT/MLX validation entries describe historical conditions. Fresh validation for the diagnostic/documentation cleanup: boundary checks (including localized-diagnostic rejection), six Python checks and Swift formatting passed; unsigned iOS device build passed. Full tests still fail only the same two NexArm planner tests; the simulator build remains blocked by CoreAIShared resolving CoreAI.
 

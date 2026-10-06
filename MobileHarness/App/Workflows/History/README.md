@@ -11,3 +11,5 @@ flowchart LR
 ```
 
 ❌ Real title/model acceptance remains separate; no background retry or durable execution is added.
+
+✅ History uses unchanged record/metadata operations; UI owns display-title selection and Assistant owns context. ❌ Moving this workflow into a ConversationMemory Agent remains planned.

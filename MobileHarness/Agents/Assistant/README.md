@@ -15,8 +15,10 @@ Purpose: send user input to ChatCapability, maintain bounded history and interpr
 ```mermaid
 flowchart TD
     Input[AgentInput] --> Queue[Bounded inbox and single worker]
-    Queue -->|Persist input and request context| History[Storage ConversationHistoryStore]
-    History -->|Last ten completed rounds| Model[ChatCapability]
+    Queue -->|Read records + token| History[Storage ConversationHistoryStore]
+    History --> Builder[Assistant ConversationContextBuilder]
+    Builder -->|Exact request + token| History
+    Builder --> Model[ChatCapability]
     Queue --> Model
     Model -->|Persist raw fragments before parsing| History
     Model --> Parser[AgentGenerator]
@@ -276,8 +278,8 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ✅ Assistant owns validated textSegmentation (Hanzi60 / other120 Characters) and supplies it to generation; App history preview supplies the same policy. Core defaults no longer imply speech latency policy. ❌ No timer flushing or first-chunk policy.
 
-## Current storage boundary
+## Context ownership
 
-✅ Assistant supplies the system prompt and user text to StorageChat.ConversationHistoryStore.begin(). The store currently selects up to ten completed turns, assembles the full request and persists it; Assistant maps the returned ConversationMessage values into ModelKit.ChatMessage. This is the current implementation, not completed business/storage separation.
+✅ ConversationContextBuilder selects the last ten completed rounds and preserves exact raw text. Assistant reads records with a token, builds the request, persists it with fenced admission and sends that stored request to ChatCapability. Archived/failed/cancelled/interrupted rounds are excluded. Conflicts and persistence errors terminate this input without calling the model or retrying.
 
-❌ Context selection and request assembly will move into Assistant or its owning business layer as part of the [Storage decoupling plan](../../Storage/README.md#planned-business-decoupling). No context or persisted-format change is implemented by this documentation update.
+❌ Retrieval-based context and automatic conflict retry are not implemented.

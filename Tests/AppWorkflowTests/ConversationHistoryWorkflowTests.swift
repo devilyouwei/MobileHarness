@@ -27,7 +27,10 @@ private actor ControlledTitle: ChatCapability {
 private func completedConversation() async throws -> ConversationHistoryStore {
     let store = ConversationHistoryStore()
     let id = UUID()
-    _ = try await store.begin(id: id, user: "原始用户输入", system: "test-system", model: "test-model")
+    let read = try await store.readCurrent()
+    _ = try await store.begin(
+        id: id, user: "原始用户输入", request: [.init(role: .user, content: "原始用户输入")],
+        expecting: read.token, model: "test-model")
     try await store.append("<wait>原始模型输出</wait>", to: id)
     try await store.finish(id, state: .completed, reason: "stop")
     return store

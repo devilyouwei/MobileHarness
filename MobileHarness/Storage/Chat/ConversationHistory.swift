@@ -2,7 +2,7 @@ import Foundation
 import Storage
 
 public enum ConversationHistoryError: Error, Equatable, Sendable {
-    case busy, capacityExceeded, invalidRecord, missingTurn, emptyConversation
+    case busy, capacityExceeded, invalidRecord, missingTurn, emptyConversation, conflict
 }
 
 public struct ConversationMessage: Codable, Sendable, Equatable {
@@ -71,10 +71,6 @@ public struct StoredConversation: Codable, Sendable, Identifiable {
     public var summaryTitle: String?
     public var titleError: String?
     public var turns: [ConversationRecord] = []
-    public var title: String {
-        if archivedAt != nil { return summaryTitle ?? "待生成标题" }
-        return turns.last?.user ?? "新对话"
-    }
     public init() {
         id = UUID()
         createdAt = Date()
@@ -92,6 +88,16 @@ public struct ConversationArchive: Codable, Sendable {
     }
 }
 
+/// Process-local read fence; tokens cannot be constructed outside StorageChat.
+public struct ConversationReadToken: Sendable, Equatable {
+    fileprivate let value: UUID
+}
+
+public struct ConversationReadSnapshot: Sendable {
+    public let current: StoredConversation
+    public let token: ConversationReadToken
+}
+
 /// One process-wide journal. A nil document is an explicit in-memory mode for isolated tests.
 /// Writes are serialized across document awaits; at most 16 callers may wait, overflow fails busy.
 public actor ConversationHistoryStore {
@@ -99,6 +105,7 @@ public actor ConversationHistoryStore {
     private let document: LocalDocumentStore<ConversationArchive>?
     private var value = ConversationArchive()
     private var revision: UUID?
+    private var readToken = ConversationReadToken(value: UUID())
     private var loaded = false
     private var writing = false
     private var writers: [CheckedContinuation<Void, Never>] = []
@@ -126,6 +133,7 @@ public actor ConversationHistoryStore {
             revision = saved.revision
             // An unfinished journal record after process restart is evidence of interruption.
             for index in value.current.turns.indices where value.current.turns[index].state == .generating {
+                readToken = ConversationReadToken(value: UUID())
                 value.current.turns[index].state = .interrupted
                 value.current.turns[index].error =
                     "App stopped before generation completed; retained output may be partial."
@@ -143,6 +151,7 @@ public actor ConversationHistoryStore {
             revision = saved.revision
         }
         value = next
+        readToken = ConversationReadToken(value: UUID())
     }
 
     public func snapshot() async throws -> ConversationArchive {
@@ -152,29 +161,35 @@ public actor ConversationHistoryStore {
         return value
     }
 
-    /// Persists input and the exact request before inference; prior context contains at most ten completed turns.
+    /// Reads records and a fence atomically, without selecting model context.
+    public func readCurrent() async throws -> ConversationReadSnapshot {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        return ConversationReadSnapshot(current: value.current, token: readToken)
+    }
+
+    /// Persists the caller's exact request, rejecting intervening mutations.
     public func begin(
-        id: UUID, user: String, system: String, model: String,
-        maximumOutputTokens: Int? = nil, temperature: Double = 0.7
+        id: UUID, user: String, request: [ConversationMessage], expecting token: ConversationReadToken,
+        model: String, maximumOutputTokens: Int? = nil, temperature: Double = 0.7
     ) async throws -> ConversationRecord {
         try await acquireWrite()
         defer { releaseWrite() }
         try await load()
+        guard token == readToken else { throw ConversationHistoryError.conflict }
         guard !value.current.turns.contains(where: { $0.state == .generating }) else {
             throw ConversationHistoryError.busy
         }
         guard value.current.turns.count < 256 else { throw ConversationHistoryError.capacityExceeded }
-        guard user.utf8.count <= 4096, system.utf8.count <= 32768, model.utf8.count <= 512,
+        guard user.utf8.count <= 4096, model.utf8.count <= 512,
+            request.count <= 514,
+            request.allSatisfy({ $0.content.utf8.count <= ($0.role == .system ? 32768 : 262144) }),
+            temperature.isFinite, maximumOutputTokens.map({ $0 > 0 }) ?? true,
             !value.current.turns.contains(where: { $0.id == id })
         else { throw ConversationHistoryError.invalidRecord }
-        let history = value.current.turns.filter { $0.state == .completed }.suffix(10)
-        var messages = [ConversationMessage(role: .system, content: system)]
-        for turn in history {
-            messages += [.init(role: .user, content: turn.user), .init(role: .assistant, content: turn.raw)]
-        }
-        messages.append(.init(role: .user, content: user))
         let record = ConversationRecord(
-            id: id, date: Date(), user: user, request: messages, model: model,
+            id: id, date: Date(), user: user, request: request, model: model,
             maximumOutputTokens: maximumOutputTokens, temperature: temperature)
         var next = value
         next.current.turns.append(record)
@@ -289,6 +304,7 @@ public actor ConversationHistoryStore {
         } catch {
             // The producer has ended even if disk protection/capacity prevented its terminal write.
             // Keep the raw prefix and make the unsaved terminal state explicit; a later write retries it.
+            readToken = ConversationReadToken(value: UUID())
             value.current.turns[index].state = .interrupted
             value.current.turns[index].error = "Terminal status could not be saved: \(error)"
             throw error

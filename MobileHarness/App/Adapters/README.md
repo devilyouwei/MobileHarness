@@ -99,3 +99,5 @@ flowchart LR
 ✅ ADR0132: NexArmBehaviorAdapter preserves Actions availability reasons as ToolRuntime producer codes/messages, and supplies the initiating Tool provenance to the App-owned worker. No completed Tool result is rewritten by a later worker error.
 
 ❌ Sustained physical-device acceptance and durable error history remain pending.
+
+✅ SpeechFailurePresentation maps neutral SpeechSynthesis/StorageAudio errors to localized playback failures and retains their underlying error; cancellation and unknown failures are unchanged. ❌ It performs no business decision, retry or audio cleanup.

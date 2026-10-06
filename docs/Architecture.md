@@ -39,7 +39,7 @@ UI pages do not own model/device sessions. Long-lived work belongs to App lifecy
 
 ## Conversation, settings and devices
 
-Conversation records persist locally across voice sessions and restarts. New Conversation archives the current record before title generation; browsing history cannot replay behavior. Settings persist locally, credentials use the device Keychain, and App supplies provider/title/preview operations to narrow feature workflows.
+Conversation records persist locally across voice sessions and restarts. Assistant owns ten-round context selection and exact request assembly; Storage admits that request against an opaque read token. UI owns display-title defaults. SpeechSynthesis owns producer errors; StorageAudio validates PCM and retains audio, while App supplies localized failure wording after cleanup. New Conversation archives the current record before title generation; browsing history cannot replay behavior. Settings persist locally, credentials use the device Keychain, and App supplies provider/title/preview operations to narrow feature workflows.
 
 The default pipeline uses local recognition, synthesis, pose and chat models. Explicit cloud configuration selects an OpenAI-compatible chat capability and sends its chat context to that provider; other perception/output remains local. Model configuration and resource acquisition share a process-wide manager.
 
@@ -135,7 +135,7 @@ SpeechPerception keeps utterance coordination in one Agent actor. VAD score adap
 
 ✅ [ADR0121](adr/0121-remove-shared-types.md): Types is deleted; AgentCore has zero project dependencies, UI depends only on StorageChat, and explicit Agent → Tool → App → UI adaptation preserves the pose wire format. ❌ Physical-device acceptance remains outstanding.
 
-✅ ModelKit diagnostic cleanup: availability/errors provide typed capability outcomes and neutral diagnostic text; consumer layers own localized messages and recovery guidance. Native camera gray64 sampling remains in PlatformKit, with motion/cadence decisions in VisionPerception. ❌ Storage business/context/presentation decoupling is planned in [Storage](../MobileHarness/Storage/README.md#planned-business-decoupling); current imports are independent but semantic cleanup remains outstanding.
+✅ ModelKit diagnostic cleanup: availability/errors provide typed capability outcomes and neutral diagnostic text; consumer layers own localized messages and recovery guidance. Native camera gray64 sampling remains in PlatformKit, with motion/cadence decisions in VisionPerception. ✅ Storage context/title/producer-error ownership is separated in [ADR0143](adr/0143-storage-consumer-policy-boundaries.md). ❌ Broader Agent-driven workflows remain planned.
 
 ✅ [ADR0122](adr/0122-runtime-opaque-domain-failures.md): execution Runtime owns generic bounded resources and failure/report identifiers only; NexArm and Bluetooth producers own domain vocabulary and classification. Existing output identifiers remain unchanged. ❌ Physical robot acceptance remains outstanding.
 

@@ -9,7 +9,7 @@ Compile-time dependencies are `Storage` (bounded streams and leases). There is n
 ## Design goals
 
 - Preserve the existing audioID, ownership, cancellation and playback timing contract while moving shared storage under `Storage/`.
-- Keep speech-specific media types and error messages out of the general Storage target.
+- Keep speech-specific media types out of the general Storage target.
 - Reuse Storage's bounded memory stream and single-checkout handle store rather than duplicating queue and expiry logic.
 
 ```mermaid
@@ -29,7 +29,7 @@ flowchart LR
 
 ✅ Ownership is opaque source string + session + originating input, converted to a `speech.pcm` Storage scope. One checkout per UUID. Queued and completed-unclaimed audio have no time-based expiry. Their lifetime belongs to the originating reply (source Agent + input ID) within the voice session. App retires remaining handles only after the reply completion/cancellation barrier; interruption cancels the whole voice session. Each read removes its frame from Storage; the player may still retain that frame until hardware consumption. The audioID is released after the whole segment drains, not retained for replay until reply end. Empty reads have no independent deadline by default: they wait for PCM, completion, producer failure or cancellation. SpeechSynthesisAgent retains its 60-second deadline from worker execution start; queue time is excluded, and there is no total deadline measured from playback checkout. An explicit waitTimeout remains available to callers that need a read deadline.
 
-✅ Playback completion, reply/session cleanup, cancellation and error release PCM immediately; synthesis completion alone retains unplayed PCM. At most 128 terminal records retain errors for 30 seconds. The adapter translates general Storage failures to the existing `SpeechAudioError` cases, so Agent and Action behavior remains stable.
+✅ Playback completion, reply/session cleanup, cancellation and error release PCM immediately; synthesis completion alone retains unplayed PCM. At most 128 terminal records retain errors for 30 seconds. The adapter translates generic Storage failures into storage-only `SpeechAudioError` cases; producer failures pass through unchanged.
 
 ❌ Persistence, repeated playback and multi-consumer handles are unsupported. Physical-device latency and memory acceptance remain outstanding; model intermediate waveforms and player buffers are outside this cache.
 
@@ -46,3 +46,9 @@ flowchart LR
 ✅ PCM values are owned by StorageAudio in SpeechPCM.swift, independently of Types and ModelKit. ❌ Persistent audio and multi-reader replay remain unsupported.
 
 ✅ SpeechPCM.swift owns SpeechPCMFormat/SpeechPCMFrame with 8–192 kHz, 1–8 channels, Int16/Float32 and validated 1 MiB frame bounds. SpeechSynthesis explicitly converts ModelKit values at write admission; playback consumers adapt stored values to PlatformKit. ❌ No model/device dependency or shared SDK typealias.
+
+## Failure ownership
+
+✅ SpeechAudioError is a neutral storage error without localized messages or synthesis timeout policy. invalidAudio describes PCM format/frame validity only. SpeechSynthesis supplies its own producer errors; App supplies user wording at the playback boundary after cleanup. Frame and aggregate limits, lease fencing and cancellation remain unchanged.
+
+❌ StorageAudio does not classify model output events or decide producer deadlines.

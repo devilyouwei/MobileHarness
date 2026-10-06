@@ -14,6 +14,7 @@
 | [Platform boundaries](Platform-Boundaries.md) | Foreground/device capabilities and physical-control constraints. |
 | [Roadmap](Roadmap.md) | Current delivery priorities, unimplemented directions and acceptance work. |
 | [Agent-driven app](Agent-Driven-App.md) | ❌ Proposed Agent business backend, shared UI/conversation capabilities and staged migration. |
+| [Storage consumer policy](adr/0143-storage-consumer-policy-boundaries.md) | ✅ First Agent-driven migration stage: context, title and producer-error ownership. |
 | [Photographer proposal](Photographer-Proposal.md) | Proposed camera composition/motion behavior; not an implemented Agent. |
 | [Resource 状态计划](Resource-State-Plan.md) | ❌ 当前 UI/App/设备状态的快速存取与 Agent 上下文接入计划；lock 兜底另行处理。 |
 
@@ -148,3 +149,5 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [ADR0141](adr/0141-resource-control-ownership.md) separates control ownership from device health/execution failure, with public unlocked/locked snapshots and automatic release after late cleanup. ❌ Physical stop and forced native-I/O isolation remain separate acceptance work.
 
 ✅ NexArm physical acceptance records the supervised 2026-10-05 aim-rate diagnostic, actual packet counts and user-observed motion/hold jitter distinction. ❌ Tracking tuning and physical root-cause attribution remain pending.
+
+✅ [Agent-driven Storage stage validation](Validation-History.md#2026-10-06--agent-driven-app-storage-boundary-stage): targeted regressions and unsigned iOS device build passed. ❌ One full-run workflow timeout and simulator CoreAI availability remain explicit validation limits.

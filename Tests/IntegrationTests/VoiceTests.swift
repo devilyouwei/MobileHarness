@@ -176,7 +176,7 @@ private func preparedSpeech(
     let input = AgentInput(sessionID: UUID(), payload: .text("你好"))
     let (synth, store, playback, invocation) = try await preparedSpeech(
         text: "回复", input: input, probe: probe, producesAudio: false)
-    await #expect(throws: SpeechAudioError.invalidAudio) {
+    await #expect(throws: SpeechSynthesisError.invalidOutput) {
         try await playback.play(invocation) { audio, _ in
             while let frame = try await audio.next() { await probe.played(frame) }
         }
