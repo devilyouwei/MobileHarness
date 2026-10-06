@@ -13,7 +13,6 @@
 | [Architecture](Architecture.md) | Public explanation of the current system and ownership boundaries. |
 | [Platform boundaries](Platform-Boundaries.md) | Foreground/device capabilities and physical-control constraints. |
 | [Roadmap](Roadmap.md) | Current delivery priorities, unimplemented directions and acceptance work. |
-| [Agent-driven app](../MobileHarness/Agent-Driven-App.md) | ✅ Active architecture organized by responsibilities, Signal contracts, execution/feedback, six scenarios and implementation/migration status. |
 | [History mutation continuation](adr/0147-history-delete-result-continuation.md) | ✅ Confirmed deletion, correlated feedback and cancellation cleanup; model continuation pending. |
 | [Model resource UI boundary](adr/0146-model-resource-interaction-ownership.md) | ✅ Resource interaction ownership moved to feature workflow; Agent routing pending. |
 | [History refresh intent](adr/0145-history-refresh-agent-intent.md) | ✅ Deterministic memory Agent and scoped presentation; mutations remain pending. |
@@ -26,7 +25,7 @@
 
 | Location | Owns |
 | --- | --- |
-| [MobileHarness/README.md](../MobileHarness/README.md) | Overall architecture, directory/target dependencies and complete cross-module technical flows. |
+| [MobileHarness/README.md](../MobileHarness/README.md) | Single overall technical design: Agent-driven architecture, module ownership, directory/target dependencies, Signal and execution contracts, and complete cross-module flows. |
 | `MobileHarness/<module>/README.md` | Current module responsibilities, interfaces, algorithms, limits and lifecycle/failure contracts. |
 | Nested module READMEs | Domain-specific values, callable entries, adapters and processing policies. |
 
@@ -166,7 +165,7 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 
 ✅ [Signal origin and returning Tool feedback](adr/0149-signal-origin-and-tool-feedback.md) records typed admission and stale-owner/causal fencing. ❌ Action/activity roots and legacy typed controls remain pending.
 
-✅ Unified executable capabilities are implemented under the [active Agent-driven architecture](../MobileHarness/Agent-Driven-App.md#unified-executable-capabilities--adopted-design). The decisions below record the migration stages; their original transitional contracts are historical.
+✅ Unified executable capabilities are implemented under the [active Agent-driven architecture](../MobileHarness/README.md#canonical-functions-and-protocol-bindings). The decisions below record the migration stages; their original transitional contracts are historical.
 
 - [ADR0150](adr/0150-unified-execution-lifetime.md): shared deadlines, cancellation and joined cleanup.
 - [ADR0151](adr/0151-consolidated-capability-sources.md): capability sources consolidated under Actions; temporary compatibility targets subsequently retired.

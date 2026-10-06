@@ -73,6 +73,6 @@ A composed function retains leaf outcomes rather than hiding partial failure in 
 
 ❌ Additional application capabilities, complete feature Signal routing and physical acceptance remain separate work. `System.Runtime.runtimeInfo` returns fixed information, not live diagnostics.
 
-See [Contracts](Contracts/README.md), [Agent-driven architecture](../Agent-Driven-App.md) and [host profiles](../App/Composition/Behaviors/README.md).
+See [Contracts](Contracts/README.md), [Agent-driven architecture](../README.md) and [host profiles](../App/Composition/Behaviors/README.md).
 
 ✅ Every function preserves its business completion policy independently of call protocol. On invocation failure, preserve bounded child outcomes and producer causes; Gateway normalizes and dispatches the common result without stopping unrelated work. Explicit cancellation still joins cleanup.

@@ -35,4 +35,4 @@ Edge/cloud collaboration means explicitly selecting remote processing where prov
 
 [Architecture](Architecture.md) describes current collaboration. The [technical design](../MobileHarness/README.md#part-iii--key-techniques) defines cross-module flows and module READMEs define the algorithms.
 
-The active [Signal contract](../MobileHarness/Agent-Driven-App.md#unified-signal-contract) defines the shared envelope, payload ownership, admission and feedback rules, with current implementation gaps explicitly marked.
+The active [Signal contract](../MobileHarness/README.md#unified-signal-contract) defines the shared envelope, payload ownership, admission and feedback rules, with current implementation gaps explicitly marked.

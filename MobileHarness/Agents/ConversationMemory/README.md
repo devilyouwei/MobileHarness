@@ -1,6 +1,6 @@
 # ConversationMemory Agent
 
-Purpose: interpret explicit history intent without voice or model inference. Design goals: bounded deterministic coordination, correlated runtime results and Gateway-only effects. This implements the [history mutation contract](../../Agent-Driven-App.md#deterministic-history-mutation-contract).
+Purpose: interpret explicit history intent without voice or model inference. Design goals: bounded deterministic coordination, correlated runtime results and Gateway-only effects. This implements the [history mutation contract](../../README.md#deterministic-history-mutation-contract).
 
 | Direction | Implemented contract |
 | --- | --- |

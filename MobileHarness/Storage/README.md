@@ -91,4 +91,4 @@ Core never imports a domain or concrete business service. App owns settings/cred
 
 ❌ Persistent image/video/audio domains, semantic memory/retrieval/forgetting, reclaimable disk caches, cross-namespace budgets and cross-device/process synchronization are not implemented. MemoryLeaseStore is a cache primitive, not a semantic memory Agent. File-protection and locked-device acceptance remain separate.
 
-See [Chat](Chat/README.md), [Audio](Audio/README.md), [Model management](../ModelKit/Management/README.md) and [Agent-driven architecture](../Agent-Driven-App.md).
+See [Chat](Chat/README.md), [Audio](Audio/README.md), [Model management](../ModelKit/Management/README.md) and [Agent-driven architecture](../README.md).

@@ -160,4 +160,4 @@ Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns
 
 ✅ Independent ModelKit contracts, ModelKitRuntime management, ModelKitDefaults assembly and separate adapters/backends. Agent-specific preprocessing of transport values stays with callers; model-specific tensor/tokenizer work stays with adapters. Models have no business-call registration, Channel scheduling or Signal routing responsibility.
 
-❌ Model continuation belongs to Agents; measured cross-model budgets, unsupported capability providers and physical/model acceptance remain separate. See [Agent-driven architecture](../Agent-Driven-App.md) for business/capability boundaries.
+❌ Model continuation belongs to Agents; measured cross-model budgets, unsupported capability providers and physical/model acceptance remain separate. See [Agent-driven architecture](../README.md) for business/capability boundaries.

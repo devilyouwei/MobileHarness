@@ -106,4 +106,4 @@ Native download background handling is separate from voice/device lifetime. App 
 
 ❌ Remaining settings, archive/title, resource and device business routes still need Agent/typed-Signal migration. Independent multi-window namespaces, background supervision and forced interruption of non-cooperative handlers are not implemented. Device/model acceptance is separate from build results.
 
-See [Agent-driven architecture](../Agent-Driven-App.md), [Behavior assembly](Composition/Behaviors/README.md) and the owning lifecycle/workflow READMEs for detailed limits and platform policies.
+See [Agent-driven architecture](../README.md), [Behavior assembly](Composition/Behaviors/README.md) and the owning lifecycle/workflow READMEs for detailed limits and platform policies.

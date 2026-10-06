@@ -14,39 +14,65 @@ Module READMEs own implementation details, algorithms and local limits. Requirem
 - [Part II — Module Responsibilities](#part-ii--module-responsibilities)
 - [Part III — Cross-module Technical Design](#part-iii--cross-module-technical-design)
 
+Key contracts: [Signals](#unified-signal-contract), [callable functions and protocol bindings](#canonical-functions-and-protocol-bindings), [feedback causality](#execution-feedback-causality), [six interaction scenarios](#signal-and-effect-scenarios), and [implementation coverage](#implementation-coverage).
+
 ## Part I — Overall Architecture
 
 ### System architecture
 
-The system is divided into four groups. App is the composition root and lifetime owner; the other code modules remain independently testable and depend only toward lower-level contracts.
+Build an application whose business processing is driven by Agents. Agents own data-processing strategies, business decisions and task coordination. Human interaction, physical-world observations, system events, Agent messages and execution feedback enter as Signals through InputGateway. External inputs pass through App adapters; Agent communication and execution feedback follow their validated Gateway paths.
 
-| Group | Modules | System role |
-| --- | --- | --- |
-| Host and interaction | App, UI | Assemble the process, own application/session lifetime and present state. |
-| Cognition and coordination | Agents, AgentCore, Gateway | Interpret signals, retain cognitive state and validate communication/execution. |
-| Behavior implementation and execution | Actions; Gateway execution SDKs | Define protocol-neutral functions; register and execute permitted calls through Gateway. |
-| Foundations | ModelKit, PlatformKit, Storage, Resources | Supply processing, device I/O, retained data and packaged artifacts. |
+Direct interaction and LLM-selected behavior use the same Agent-owned business flows, shared capabilities and actual execution results. An Agent may handle explicit intent deterministically or use a model to decide its next step. It drives operations and presentation through OutputGateway and registered Actions/Tools, then uses returning Signals to continue, complete or cancel work.
+
+UI, ModelKit, PlatformKit and Storage provide foundational presentation, inference, native I/O and persistence capabilities. App hosts and assembles the system, adapts external inputs and owns application lifecycle. UI renders Agent-driven state, captures human intent and retains local presentation state. The design supports direct interaction and conversation over the same permissions and execution contracts; current coverage is listed separately.
 
 ```mermaid
-flowchart LR
-    World[Users / environment] --> Signals[Microphone / camera / user intent]
-    Signals --> Input[InputGateway]
-    Input --> Agents[Stateful Agents]
-    Agents <--> Models[ModelKit capabilities]
-    Agents --> Output[OutputGateway]
-    Output --> Actions[Scheduled Actions]
-    Output --> Tools[Direct Tools]
-    Actions --> Effects[Speaker / UI / robot]
-    Tools --> Effects
-    Output -.->|ToolResult / ActionResult / ActivityEvent| Input
-    Effects --> World
-    App[App composition and lifetime] -.-> Input
-    App -.-> Agents
-    App -.-> Output
-    App -.-> Effects
+flowchart TB
+    subgraph Host["APP HOST · Entry and lifecycle"]
+        App["App<br/>Composition · Input adaptation · Lifecycle"]
+    end
+
+    subgraph Business["BUSINESS · Decisions and behavior"]
+        direction LR
+        Agents["Agents<br/>Intent · Cognition · Task policy"]
+        Gateway["Gateway<br/>Admission · Routing · Execution"]
+        Actions["Actions<br/>Callable business functions"]
+    end
+
+    subgraph Foundations["FOUNDATIONS · Independent capabilities"]
+        direction LR
+        UI["UI<br/>Presentation · Interaction"]
+        ModelKit["ModelKit<br/>Inference"]
+        PlatformKit["PlatformKit<br/>Device and OS I/O"]
+        Storage["Storage<br/>Records · Persistence"]
+    end
+
+    App -->|Adapt external input| Gateway
+    App -.->|Construct Agents| Agents
+    App -.->|Bind capabilities| Actions
+
+    Agents <-->|Signals / Messages / Resolved calls| Gateway
+    Gateway -->|Execute authorized calls| Actions
+    Agents -->|Model processing| ModelKit
+    Agents -->|Context and records| Storage
+    Actions -->|Presentation effects| UI
+    Actions -->|Device effects| PlatformKit
+    Actions -->|Data operations| Storage
+
+    style Host fill:#eaf1ff,stroke:#6487c7,stroke-width:2px,color:#24416b
+    style Business fill:#fff5e6,stroke:#d39b46,stroke-width:2px,color:#705021
+    style Foundations fill:#eaf6ef,stroke:#6a9f80,stroke-width:2px,color:#2f5c41
+    classDef host fill:#ffffff,stroke:#6487c7,color:#24416b
+    classDef business fill:#ffffff,stroke:#d39b46,color:#705021
+    classDef foundation fill:#ffffff,stroke:#6a9f80,color:#2f5c41
+    class App host
+    class Agents,Gateway,Actions business
+    class UI,ModelKit,PlatformKit,Storage foundation
 ```
 
-App assembles concrete implementations but is not a service locator. Long-lived owners receive role-specific dependencies. UI receives observable state and typed operations. Agents receive model/storage capabilities and bound Gateway ports. Actions and Tools receive only the capabilities required by their registered handlers.
+Read top to bottom: App Host → business modules → foundational capabilities. Nodes represent first-level modules under MobileHarness; Resources is packaging input and is shown in the source map rather than the runtime layers. Solid arrows show input, business communication or capability use; dashed arrows show host assembly. These are module relationships, not Swift import dependencies. App also supplies foundation instances and forwards UI/native input through its adapters; the detailed flows below show those paths.
+
+Gateway contains InputGateway, OutputGateway and shared execution. ActionCall and ToolCall are call protocols over the same Actions functions, not separate top-level modules. UI captures intent and presents state; ModelKit, PlatformKit and Storage supply processing, native I/O and persistence.
 
 ### Coordination ownership
 
@@ -60,7 +86,7 @@ Semantic fusion belongs to Agents. Gateway carries identities, contracts and des
 
 ### Composition and mediation boundaries
 
-App composes the running system; Agents generate task behavior; Actions and Tools execute it; Gateway mediates Agent communication and execution. ModelKit and PlatformKit are foundational capability SDKs that may be injected into Agents, Actions or Tools when a concrete implementation requires them. The diagram expresses this allowed capability model; the compilation graph in the next section records the dependencies used by the current implementation.
+App composes the running system; Agents generate task behavior; Actions implements callable behavior; Gateway mediates Agent communication and execution. ModelKit and PlatformKit are foundational capability SDKs that may be injected into Agents or callable functions when a concrete implementation requires them. The diagram expresses this allowed capability model; the compilation graph in the next section records the dependencies used by the current implementation.
 
 ```mermaid
 flowchart TB
@@ -86,9 +112,9 @@ flowchart TB
 ```
 
 - **App assembles and owns lifetime.** It constructs Agents, Gateways, behavior registries, workflows and shared services, then injects role-specific interfaces. It does not become a global container that modules query at runtime.
-- **Agents generate behavior.** They interpret input, use injected foundational capabilities and emit resolved Agent messages, `ActionCall`, `ToolCall` and scheduling controls through OutputGateway. The current Agents target uses ModelKit and StorageAudio/StorageChat; the architecture also permits a scoped PlatformKit capability when an Agent has a concrete need.
+- **Agents generate behavior.** They interpret input, use injected foundational capabilities and emit resolved Agent messages, `ActionCall`, `ToolCall` and scheduling controls through OutputGateway. The Agents target uses ModelKit, PlatformKit and StorageAudio/StorageChat; the architecture also permits a scoped PlatformKit capability when an Agent has a concrete need.
 - **Actions implement behavior.** Canonical functions use injected capabilities and are registered for scheduled ActionCall or native ToolCall through Gateway. Current Actions uses PlatformKit and App-bound endpoints. Adding a dependency requires a concrete implementation need and must preserve execution SDK independence.
-- **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, generated Action/Tool calls, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit, PlatformKit or Storage capability calls, nor App/UI feature-workflow operations.
+- **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, generated Action/Tool calls, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit, PlatformKit or Storage capability calls, or the host-owned feature operations listed under implementation coverage.
 - **Observable Agent-selected effects remain explicit.** An Agent may use foundational capabilities internally, but device commands, presentation changes and other complete business effects selected by the Agent are emitted as permitted Actions or Tools. App lifecycle code may use PlatformKit directly for host-owned capture, preview and connection workflows.
 
 ### Compilation dependencies
@@ -152,7 +178,7 @@ flowchart TB
     Adapters --> ModelKit
 ```
 
-The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `FunctionContracts`, `Storage` and `AgentCore` have no project dependencies. Tools/ToolRuntime compatibility targets are removed; FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
+The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `FunctionContracts`, `Storage` and `AgentCore` have no project dependencies. FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -183,7 +209,7 @@ MobileHarness/
 │   │   ├── Generation/          # Function Token, Channel/wait and Tool parsers
 │   │   ├── Output/              # Resolved calls and trusted envelopes
 │   │   └── Communication/       # Typed messages and routing contracts
-│   ├── ConversationMemory/      # Structured history refresh
+│   ├── ConversationMemory/      # Typed history refresh, deletion and cancellation
 │   ├── Assistant/
 │   ├── SpeechPerception/
 │   ├── SpeechSynthesis/
@@ -272,7 +298,7 @@ Describe implemented behavior separately from migration targets using ✅/❌. U
 ### Architectural boundaries
 
 - App owns concrete assembly, adaptation and application/session lifetime. Feature workflows expose typed operations and retain no global container access.
-- UI imports only StorageChat domain values and owns presentation values. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
+- UI owns presentation values. The current compilation target imports StorageChat domain values; eliminating this cross-foundation dependency remains outstanding under the repository independence principle. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
 - AgentCore is independent of concrete Agents, UI, model engines and device adapters.
 - All external inputs, Tool results and Action/runtime feedback enter through InputGateway; all Agent messages and executable outputs leave through OutputGateway.
 - Actions owns business behavior, motion shaping, composition and completion policy. PlatformKit owns native I/O, protocol encoding, hardware limits and device feedback.
@@ -280,9 +306,9 @@ Describe implemented behavior separately from migration targets using ✅/❌. U
 - ModelKit is a capability SDK. Provider registration/default selection belongs to ModelKitDefaults; process-wide model ownership belongs to ModelKitRuntime.
 - AgentCore/Input owns generic input transport; UI owns presentation values. Storage owns lifetime and retention, not inference or business policy.
 
-✅ The current source graph implements the independent runtime, workflow, UI, AgentCore, ModelKit, PlatformKit, Storage boundaries shown above.
+✅ AgentCore, FunctionContracts, base ModelKit, PlatformKit and Storage are independent targets. Execution, call adaptation and feature workflows have the compilation boundaries shown above.
 
-❌ Unimplemented architecture extensions and physical acceptance work are tracked in the [Roadmap](../docs/Roadmap.md).
+❌ UI independence and remaining Agent-driven business routes are listed under [implementation coverage](#implementation-coverage); delivery priorities and acceptance work live in the [Roadmap](../docs/Roadmap.md).
 
 ## Part II — Module Responsibilities
 
@@ -308,7 +334,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **App.** [Composition](App/Composition/README.md) builds the graph and validates registrations. [Lifecycle](App/Lifecycle/README.md) owns long-running voice/camera work and cleanup. [Workflows](App/Workflows/README.md) is a state-free facade over independent Settings, History, Bluetooth, Speech, Presentation and Diagnostics targets. [Adapters](App/Adapters/README.md) translate module contracts to host capabilities.
 
-**Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation and response policy; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
+**Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation and response policy; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs; Photographer owns tracking policy; ConversationMemory owns deterministic history intent and result-driven deletion. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
 
 **Behavior.** Actions owns protocol-neutral callable functions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall follows its binding's direct or scheduled policy. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
@@ -345,19 +371,51 @@ Composition resolves configuration and registration errors before producers star
 
 Voice and camera have independent App-owned sessions. A stop closes producer admission, cancels and joins capture/perception, sends explicit Agent cancellation, retires owned media and Actions, and only then releases resources. Page navigation does not define runtime lifetime. Session IDs, Agent incarnations, turns and monotonic sequences fence stale input, feedback and presentation.
 
-### Signal and media representation
+### Unified Signal Contract
 
-Signal is the conceptual input abstraction; `AgentInput` is its implemented envelope. It separates payload from trusted source, contract/version, session, turn, sequence, capture time, incarnation, causal root/parent and admission deadline. Media streams are successive typed inputs rather than a second transport protocol. JSON v6 configures Agent capabilities and communication permissions; it is not the audio or image format.
+A **Signal** is immutable information admitted to an Agent: human intent, a captured physical observation, another Agent's message, or execution feedback. Signal is the architectural concept; **`AgentInput` is its canonical in-process envelope**. Keep one envelope rather than introducing a parallel `Signal` type. Payloads retain domain-specific types and validation.
 
-| Payload | Meaning |
+An Agent's registered Action/Tool call is an execution request in `OutputEnvelope`, not an input Signal. Its returning feedback becomes a Signal. Model inference returns and private intermediate computations remain local capability results unless explicitly communicated to another Agent. UI drafts, scrolling and expansion remain local presentation state.
+
+#### External and internal origin
+
+Origin and payload meaning are independent dimensions. All origins share the `AgentInput` envelope; intent, observation and feedback remain domain semantics rather than inheritance branches.
+
+| Origin | Examples | Authority |
+| --- | --- | --- |
+| External | Human interaction, native capture/device facts, OS lifecycle and permission changes, future remote inputs | App adapters bind source identity and adapt validated native inputs. |
+| Internal / Agent | Published observations, directed commands and declared domain replies | Identity-bound AgentMessaging binds a live Agent source through both Gateways. |
+| Internal / Runtime | Actual execution feedback, task progress/cancellation and future declared runtime timer triggers | The owning execution/runtime producer binds operation identity and feedback authority. |
+
+“External” means outside the Agent system, even when UI or a native SDK runs in the same process. A hardware notification is an external fact; the executor's correlated interpretation of an operation outcome is internal feedback. Both can exist, with distinct contracts and deduplication rules. Model inference returns stay local unless explicitly communicated.
+
+The design uses composition of common envelope, typed origin and domain payload rather than a class hierarchy. Origin must be bound by the producing adapter or runtime, not asserted by payload content. Neither payload kind nor a missing incarnation identifies origin, and an internal label grants no permission. Current typed-origin coverage and remaining host-control paths are listed under [implementation coverage](#implementation-coverage).
+
+#### Envelope and payload
+
+| Contract element | Canonical structure / rule |
 | --- | --- |
-| Text / runtime event | User text or an explicit runtime control input. |
-| Audio / image | Bounded PCM or an App-owned native-image attachment. |
-| Perception observation | Typed transcript, speech phase or pose without the original media. |
-| ToolResult | A returned Tool value correlated to its originating call and session. |
-| ActionResult / ActivityEvent | Terminal execution feedback or a later activity observation with trusted ownership. |
+| Identity and scope | `AgentInput.id`, `sessionID`, optional `AgentTurn`; distinguish delivery identity, session and interaction. |
+| Schema | `InputMetadata.contract` and `version` identify payload semantics; `topic` currently equals contract. Agent configuration JSON v6 is a separate format version. |
+| Producer | `source` and optional `incarnation`; App input adapters assign external sources, and the runtime binds Agent identity. Model text cannot assign trusted identity or permissions. |
+| Time and order | `capturedAt` uses process uptime; `sequence` is producer-scoped; `deadline` uses `ContinuousClock`. These are process-local values, not wall-clock timestamps or a remote wire format. |
+| Causality | `rootID`, optional `parentID`, `hops`; forwarded messages preserve their root and identify their parent. Execution feedback also preserves its call/execution correlation and owning session. |
+| Content | `InputPayload` selects typed text, event, audio, image, Agent message, Tool result, Action result or activity feedback. A kind declaration alone does not implement a payload or adapter. |
+| Domain message | `AgentMessage` carries immutable `Encodable & Sendable` content. Domain-owned schemas validate concrete type, fields, units, encoded size and freshness through `CommunicationContracts`. |
 
-App adapters bridge PlatformKit frames into AgentCore values/attachments without adding ModelKit or PlatformKit dependencies to AgentCore. Payload bounds and attachment lifetimes remain in the InputGateway and AgentCore communication contracts.
+#### Payload meaning
+
+Origin describes who produced a Signal; the following categories describe what it means. They do not introduce a second transport enum:
+
+| Category | Producers and examples | Current representation |
+| --- | --- | --- |
+| Intent / command | Human clicks, text requests, Agent-generated synthesis or cancellation | `.text`, `.event`, or registered `.observation(AgentMessage)` with command semantics |
+| Observation | Microphone/camera capture, perceived transcript, pose or sound direction; future device discovery facts | `.audio`, `.image`, registered `.observation(AgentMessage)` |
+| Execution feedback | Actual Tool/Action outcomes and activity lifecycle updates | `.toolResult`, `.actionResult`, `.activityEvent` |
+
+The existing name `observation` is a generic domain-message carrier and currently includes commands. `CommunicationContract.startsNewWork` distinguishes generated work from forwarded observations. New business intents must use domain-owned typed contracts registered through this mechanism; do not expand string-encoded `runtime.event` commands. History refresh, delete and cancel use typed `history.intent/1`; legacy history strings reject. Remaining host control strings are outstanding typed-contract work. Payload types belong to their domain, generic envelope/routing types to AgentCore, and native SDK values are converted by App adapters.
+
+App adapters bridge PlatformKit frames into AgentCore values and native-image attachments without adding model or device dependencies to AgentCore. Media are successive bounded inputs; attachment lifetime belongs to the capture/session owner.
 
 <a id="32-internal-agent-communication"></a>
 <a id="communication-framework"></a>
@@ -392,19 +450,49 @@ Gateways perform bounded structured admission and metadata validation; their cro
 | `speechPerception` | `speech.final`, `speech.phase` | Assistant subscription |
 | `speechPerception` | `speech.partial`, `speech.final`, `speech.phase` | Registered runtime observer for admission/lifecycle coordination, without UI mutation |
 | `visionPerception` | `vision.pose` | Declared business subscribers; gaze and skeleton presentation use independent Tools |
+| `user` / trusted host runtime source | `history.intent/1` | ConversationMemory: typed refresh/delete/cancel |
 | `runtime` | `tool.result`, `action.result`, `activity.event`, `runtime.event` (`assistant.cancel`) | Original or explicitly selected Agent/session |
 
 Assistant sends directed `speech.synthesize` and `speech.cancel` messages to SpeechSynthesis. A publication with no Agent recipient fails unless a registered runtime observer accepts that contract. Agent messaging, Tool return and runtime Action feedback all re-enter through validated InputGateway paths, while retaining their distinct permissions and completion semantics.
 
 ### Communication and execution contract ownership
 
-Domain ownership: Agents/Communication owns PoseObservation, SpeechPhase and SpeechSynthesisInput, Agents owns built-in identity constants, and Assistant owns automatic speech prompt policy. AgentCore has zero project dependencies; scheduler source identity is explicit. The communication contract provides generic message/schema registration. The business catalog owns domain expiry; App owns device-source/media expiry; VisionPerception owns sampling.
+Domain ownership: Agents/Communication owns PoseObservation, SpeechPhase, SpeechSynthesisInput and ConversationMemoryIntent, Agents owns built-in identity constants, and Assistant owns automatic speech prompt policy. AgentCore has zero project dependencies; scheduler source identity is explicit. The communication contract provides generic message/schema registration. The business catalog owns domain expiry; App owns device-source/media expiry; VisionPerception owns sampling.
 
 Core communication has one generic typed-message container and one immutable schema registry. Application schemas/identities are grouped in Agents/Communication/AgentContracts.swift, Agent-domain speech/pose values in Agents/Communication and image inputs in Agents/Core/Input/ImageInput.swift and presentation values in UI/Camera/PoseOverlay.swift, and native source/deadline conversion in App/Adapters/MediaInputAdapter.swift. AgentTurn is a generic interaction identity.
 
 Neutral contract boundary: concrete resource names belong to App; reports carry bounded producer-owned details/error identifiers; text soft limits belong to the consuming Agent.
 
 Execution Runtime owns generic bounded resources and failure/report identifiers only; NexArm and Bluetooth producers own domain vocabulary and classification.
+
+### Routing, Authorization and Feedback
+
+#### Routing and authorization
+
+External Signals enter through App → InputGateway. Agent messages use AgentMessaging → OutputGateway → InputGateway. Agent-driven business effects, including UI changes, use Agent → OutputGateway → registered Action/Tool → capability endpoint; actual returning feedback enters InputGateway again.
+
+Each Agent declares model-callable Actions/Tools and communication permissions in JSON v6. Fixed internal behavior and output permissions belong to Agent code. App binds concrete handlers; Gateway validates coverage and authorization. Runtime control notices describe protocol completion/failure, not unregistered business effects.
+
+1. Contracts and permissions are explicit: validate payload/schema, allowed source, live identity, session, deadline and capacity before admission. Publish selects exact static subscriptions; send selects an explicit recipient. Unknown contracts and incompatible versions reject, with no fallback recipient.
+2. Admission means accepted for processing. It does not imply inference, rendering or physical completion. Returning Tools provide correlated results; completion-only Tools return execution outcomes without injecting a ToolResult. Actions retain their execution/lifecycle semantics.
+3. Forwarded observations cannot extend the parent's deadline. Registered newly generated work receives a fresh bounded admission deadline while retaining causal association. Runtime result/cancellation producers follow their explicitly owned feedback contracts. Admission expiry is not an execution timeout or a hardware stop guarantee.
+4. Agents fence feedback by session and call/execution identity before continuation. Failed delivery is separate from failed execution; delivery retry must not repeat a completed effect. Cancellation uses the owning execution protocol and joins cleanup; a durable effect remains committed.
+5. Every admission, inbox and output buffer has an explicit bound and overflow policy. Gateway has bounded active admission and no waiting Signal queue or FIFO guarantee. Only explicitly declared latest-state observations may coalesce; intents, results and device actions must have explicit rejection/retry/failure handling rather than silent replacement.
+
+#### Result semantics and presentation
+
+| Event or result | Agent responsibility | Observable effect |
+| --- | --- | --- |
+| Input admission | Await actual processing/execution; handle rejection at the producer | No implied operation success or completed UI effect |
+| Data or successful execution feedback | Validate correlation, update task state and choose the next step | A new authorized Action/Tool may present results or perform another operation |
+| Progress / physical observation | Interpret domain facts under freshness and operation scope | Explicit presentation or behavior output; only declared latest-state inputs may coalesce |
+| Failure / cancellation | Stop or continue according to task policy; retain committed effects and join owned cleanup | Explicit status presentation where registered; no automatic effect replay |
+| UI endpoint completion | Respect the endpoint's declared completion semantics | State acceptance does not prove animation completion, audio drain or physical arrival |
+| New selection / changed environment | Treat as a fresh scoped input linked to its relevant task | Re-enter through InputGateway when business processing is required |
+
+Presentation endpoints fence session/request/turn identity before applying a business update, so late feedback cannot overwrite newer state.
+
+Rendering a state change does not automatically produce a new Signal. Only meaningful user, system or domain feedback re-enters the input boundary. This keeps the feedback loop explicit and avoids self-triggered presentation loops. Endpoint failures remain execution outcomes; completion-only UI Tools do not manufacture returning ToolResult Signals.
 
 ### Capability declaration and output resolution
 
@@ -435,26 +523,82 @@ Hello.
 
 Natural text, Action tags, Channel scopes and nested wait groups are parsed incrementally. Text boundaries may create code-owned speech/caption calls; explicit tags resolve only through the declared catalog. Raw markup, incomplete structures and unresolved aliases never reach Gateway. Native Tool calls use the separate ToolCall parser.
 
+### Canonical Functions and Protocol Bindings
+
+Actions owns six business domains: UI, Speech, Camera, History, System and NexArm. Queries and effects are both callable business functions. A capability address is exactly `Domain.Module.function`: the domain identifies its directory, the module identifies a cohesive entry file, and the function identifies the operation. Channels, serialization keys, resources and call protocols are separate properties.
+
+| Domain | Module | Canonical functions |
+| --- | --- | --- |
+| UI | Expression | express, setExpression |
+| UI | Gaze | moveEyes |
+| UI | Caption | print, setTranscript, finishTranscript, beginReplyTurn |
+| UI | VoiceState | setVoiceState |
+| UI | Pose | showPose |
+| UI | HistoryPresentation | showHistory |
+| Speech | Playback | speak |
+| Camera | Capture | open, close, flip |
+| History | Conversation | list, read, delete |
+| System | Runtime | runtimeInfo |
+| NexArm | Motion | moveMotor, resetMotor, reset, shakeBase |
+| NexArm | Gesture | nodHead, shakeHead, waveWrist, tiltWrist, lookAround, celebrate, dance |
+| NexArm | Tracking | aim |
+
+`@Action` produces one protocol-neutral `ActionFunction` with a `FunctionInput` handler, completion metadata, serialization key, resources and static/dynamic execution budgets. `ActionCompletion` carries its value, bounded child report and terminal issue. FunctionRequest contains canonical address and parameters, without Channel, wait membership or a protocol discriminator. Opaque execution context and a host-supplied report sink preserve correlation without granting permission.
+
+App freezes one validated catalog (at most 32 domains and 256 functions) and creates `ActionBinding` values. Bindings independently select protocol availability, native direct/scheduled execution and native feedback policy. Unknown modules, duplicate addresses and invalid metadata fail startup. Neither protocol projection nor an Agent argument may weaken intrinsic constraints. Registration availability does not grant Agent permission.
+
+```mermaid
+flowchart LR
+    Source["Actions / @Action"] --> Function[Protocol-neutral ActionFunction]
+    Function --> Catalog[Validated immutable catalog]
+    Host[App registration profiles] --> Binding[ActionBinding]
+    Catalog --> Binding
+    Binding --> Registry[Action and Tool protocol views]
+    Grants[Agent JSON and internal permissions] --> Gateway[OutputGateway authorization]
+    Registry --> Gateway
+    Gateway --> Execute[Common resources and FunctionExecutor]
+    Execute --> Function
+    Function --> Outcome[ActionCompletion and producer errors]
+    Outcome --> Feedback[Protocol adapters / InputGateway]
+```
+
+FunctionContracts under Actions/Contracts is the independent input/metadata/outcome leaf. Gateway/Runtime compiles as ExecutionRuntime and owns FunctionRegistry, FunctionExecutor, bounded report storage, deadlines and joined cleanup. Gateway/Output/Registration and Protocols compile as CallRuntime and own bindings and request/result adapters. Gateway orchestration adds AgentCore ownership, authorization, scheduling and feedback. Business Actions imports no Gateway execution or call-protocol types; BehaviorAssembly imports no AgentCore.
+
+| Layer | Shared contract | Protocol-specific concern |
+| --- | --- | --- |
+| Business implementation | FunctionInput, ActionExecutionContext, ActionFunction, ActionCompletion | None |
+| Agent declaration | Canonical address and independent grants | Text aliases/default Channels versus native names/schemas |
+| Model input | Selected capabilities | Action catalog in context prompt versus declarations in ChatRequest.tools |
+| Output parsing | Canonical address and validated parameters | Text tags become ActionCall; native events become ToolCall |
+| Execution | Resources, budgets, reports and joined cleanup | Channel/wait scheduling versus binding-selected direct/scheduled native policy |
+| Feedback | Actual outcome and causal context | ActionResult versus ToolResponse/ToolResult and declared feedback policy |
+
+Agent JSON v6 uses three-field Action paths and native declarations shaped as `{path: {domain, module, function}, definition: ...}`. Only the native definition reaches the provider; its name is an Agent-local alias. Incompatible configuration versions fail explicitly. Text deltas pass through AgentGenerator and native events through ToolCallParser; both resolve inside Agents. Tool results never implicitly become executable markup. Unsupported providers receive no native declarations.
+
+Returned values are limited to 64 KiB UTF-8 and reject explicitly before delivery. Structured report limits are independent; oversize values are not silently truncated or replayed.
+
+`System.Runtime.runtimeInfo` currently returns fixed informational text; it is not a live diagnostic capability.
+
 ### Action and Tool execution
 
 | Dimension | ActionCall | ToolCall |
 | --- | --- | --- |
 | Resolution | Action path, arguments and effective Channel | Tool path and arguments |
-| Dispatch | OutputGateway → ChannelScheduler → CallRuntime → ExecutionRuntime | OutputGateway → CallRuntime.ToolExecutor → ExecutionRuntime |
-| Ordering | Task-local Channel FIFO and nested wait groups | Direct awaited execution; no Channel queue |
+| Dispatch | OutputGateway → ChannelScheduler → CallRuntime → ExecutionRuntime | OutputGateway → ToolDispatcher → direct ToolExecutor or scheduled native projection → ExecutionRuntime |
+| Ordering | Task-local Channel FIFO and nested wait groups | Binding selects direct execution or an isolated scheduled child on its declared Channel |
 | Completion | Registered handler boundary plus task finish barrier | Returned value or completion-only, fixed at registration |
 | Feedback | Optional correlated ActionResult and ActivityEvent | Returning ToolResult re-enters InputGateway |
 
-Both may produce side effects and both can declare shared resources. Their difference is scheduling and feedback semantics.
+Both protocols execute the same function and preserve its resources, budgets and cleanup. A scheduled native call uses one isolated child scope outside model XML waits, with one admitted job and one bounded result receipt. Cancellation joins that child; native feedback produces one ToolResult and no duplicate ActionResult.
 
 ```mermaid
 flowchart LR
     Calls[Resolved Actions / wait controls] --> Admission[Output validation and bounded admission]
     Admission --> Tree[Per-input nested execution tree]
     Tree --> Heads[Eligible Channel FIFO heads]
-    Heads --> Module[Process-wide Action-module exclusion]
+    Heads --> Module[Process-wide serialization-key exclusion]
     Module --> Resource[Declared resource coordinator]
-    Resource --> Runtime[FunctionContracts / handler]
+    Resource --> Runtime[ExecutionRuntime / canonical handler]
     Runtime --> Result[Completion, failure or activity]
     Result --> Tree
     Result --> Feedback[Correlated feedback through InputGateway]
@@ -463,7 +607,7 @@ flowchart LR
     Presentation --> UI[Generic execution presentation]
 ```
 
-Each input owns a scheduling tree. Channels order work within that tree; equal names in other tasks do not create a global FIFO. A wait group joins its parent's preceding work and all children before releasing the continuation. Module exclusion is process-wide. Resource leases/fences coordinate Actions, Tools and App-owned paths across module boundaries. Capacity exhaustion rejects explicitly, and cancellation joins cooperative handlers.
+Each input owns a scheduling tree. Channels order work within that tree; equal names in other tasks do not create a global FIFO. A wait group joins its parent's preceding work and all children before releasing the continuation. Serialization-key exclusion is process-wide and independent of canonical path and Channel. Production scheduled UI, Speech and NexArm functions declare their exclusion keys explicitly; the key remains held until handler cleanup joins. Resource leases/fences coordinate Actions, Tools and App-owned paths across module boundaries. Capacity exhaustion rejects explicitly, and cancellation joins cooperative handlers.
 
 Gateway reserves bounded terminal-feedback capacity before admitting an Action that requests feedback. `ActionResult` is correlated to the originating Agent incarnation/session and describes the handler's declared completion boundary; `ActivityEvent` reports later ongoing activity. Retrying feedback never repeats the effect. Separately, the scheduler publishes payload-free `ActionExecutionSnapshot` values for App/UI observation. Their display name comes from validated Action metadata, while raw arguments, device telemetry and permission decisions are excluded.
 
@@ -476,6 +620,23 @@ Action handler reports preserve completed child entries and attach later excepti
 ToolExecutor converts ordinary exceptions and operation-local cancellation into ToolResponse errors. Function-defined Tool timeouts take precedence over the 30-second Runtime fallback; registration validates them in (0,86400] seconds. Action function budget resolvers likewise override a 30-second Runtime fallback, preserving NexArm dynamic estimates. Invalid explicit declarations fail rather than falling back. Timeout cancels and joins cleanup before returning; cancellation of the calling task propagates. Returning Tool feedback failures preserve value/isError/callID and add a bounded deliveryFailure copied into output.failure. Completion-only Tools never inject ToolResult input events.
 
 Assistant records rejected native Tools when possible; failure to write that outcome produces a separate assistant.historyError result and preserves the original rejection. Conversation admission, raw history and terminal durability remain strict. See [result fields and failure boundaries](Gateway/Output/Results/README.md#outcome-fields-and-failure-boundaries).
+
+### Execution Feedback Causality
+
+`SignalCausality` captures immutable inputID, rootID, hops, turn and sequence from the initiating OutputEnvelope. ActionResult and ActivityEvent require that context. InputGateway preserves the original root, uses the initiating inputID as parent, increments hops once and creates a fresh bounded feedback admission deadline. Returning Tool feedback follows the same causal rules. Invalid/exhausted hops or a stale Agent incarnation/session close delivery without replaying the effect.
+
+Action terminal feedback reserves capacity before effects. Its bounded outbox retries delivery of the same result and execution identity; it never re-executes the operation. Execution outcome and delivery outcome remain distinct. Host-originated camera activity has an explicit lease-scoped causal root. AgentInput remains an in-process contract, not a remote authentication or durable transport format.
+
+```mermaid
+flowchart LR
+    Intent[Typed intent / observation] --> Input[InputGateway]
+    Input --> Agent[Agent]
+    Agent --> Output[OutputEnvelope with initiating context]
+    Output --> Execute[Shared callable execution]
+    Execute --> Result[Outcome and SignalCausality]
+    Result --> Feedback[Owner-fenced feedback / original root / next hop]
+    Feedback --> Input
+```
 
 ### Resource control ownership and cleanup
 
@@ -658,7 +819,7 @@ Bluetooth discovery/connection is an App workflow because preferred-device order
 
 Actions tracking converges the last two counts at low speed, committing only after native admission; this never establishes physical arrival.
 
-Ordinary passive-link reset uses the legacy five-arm-axis reference; tracking rest remains separate. Actions owns target selection, shared Settings/Agent execution and configured motor-home precedence; PlatformKit remains a native SDK.
+Ordinary passive-link reset uses the configured five-arm-axis reference; tracking rest remains separate. Actions owns target selection, shared Settings/Agent execution and configured motor-home precedence; PlatformKit remains a native SDK.
 
 ### Bluetooth connection, recovery and presentation
 
@@ -685,14 +846,17 @@ flowchart TB
     Facade --> Diagnostics[Diagnostics workflow]
     Settings --> Documents[Storage LocalDocumentStore]
     Settings --> Provider[App-injected provider operations]
-    History --> Intent[Root-owned history intent transport]
+    History --> Intent[Typed history intent / root transport]
     Intent --> Input[InputGateway]
     Input --> Memory[ConversationMemory Agent]
     Memory --> Output[OutputGateway]
+    Output --> Delete[History.Conversation.delete]
+    Delete --> Journal
+    Delete -->|Correlated result| Input
     Output --> Present[UI.HistoryPresentation.showHistory host adapter]
     Present --> State
     Present --> Journal[StorageChat]
-    History -->|Legacy mutation operations| Journal
+    History -->|Archive and title operations| Journal
     History --> Title[App-injected title generation]
     Bluetooth --> Device[Actions + PlatformKit]
     Speech --> Audio[StorageAudio + injected playback]
@@ -702,7 +866,19 @@ flowchart TB
 
 The facade holds no mutable feature state. Each feature target owns its effects and depends only on the values/services needed by that feature. UI owns editable presentation state; workflows own persistence, validation and asynchronous operation boundaries. Credentials use the Keychain through App-supplied operations, while non-secret settings and conversation records use local document storage.
 
-Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant JSON also declares History.Conversation.list/read; Actions.History projects read-only paged previews from the same injected journal, returns at most 1800 UTF-8 bytes with explicit truncation, and routes results through InputGateway. UI load/refresh emits a structured user intent through InputGateway to root-owned ConversationMemory, whose internal UI.HistoryPresentation.showHistory call crosses OutputGateway. One active refresh rejects overlap and joins cancellation cleanup; the scoped host adapter reads raw records into UI state. Archive/title remain existing feature operations, and Tool feedback does not yet continue model inference. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
+Conversation history keeps one current conversation and archived records. Assistant and history operations share the injected journal. Assistant selects ten completed rounds and assembles the exact request; StorageChat supplies an opaque process-local read token and admits persistence only while that token remains current. Mutation and terminal recovery invalidate the token; conflicts fail before inference without implicit retry. UI owns display-title defaults. Browsing records does not replay effects.
+
+History.Conversation.list/read return bounded paged previews (at most 1800 UTF-8 bytes with explicit truncation) through InputGateway. Native Tool declarations and outcomes are persisted independently of generation completion. Assistant does not automatically start another model turn after ToolResult.
+
+### Deterministic History Mutation Contract
+
+Refresh, confirmed archive deletion and cancellation use typed `ConversationMemoryIntent` under `history.intent/1`, carried by AgentMessage. Legacy string history commands reject. User-source refresh/delete and trusted host runtime-source cancel remain external-origin input, not forged runtime execution feedback.
+
+ConversationMemory interprets intent without inference or I/O. Refresh emits UI.HistoryPresentation.showHistory; deletion emits History.Conversation.delete and waits for runtime feedback matching session and callID before requesting presentation. Actions/History validates archive-only deletion and invokes the atomic Storage transaction. App composes the journal and carries intents/results without selecting the next business call.
+
+One pending mutation and one root request reject overlap without backlog. Root transport executes at most two business calls. Cancellation joins execution, sends the typed cancellation input and drains at most eight buffered outputs until a non-business acknowledgment crosses OutputGateway. Cancelled presentation is retired before retry. A committed deletion survives later cancellation or presentation failure; missing/current archive IDs fail explicitly. There is no automatic deletion retry.
+
+HistoryPresentationAdapter validates root session/source, reads actual records and applies scoped MainActor state. Completion means accepted state, not rendering. Archive/title and preview operations currently belong to feature workflows; their Agent routes are outstanding. ModelResourceInteractionWorkflow owns 32-slot reject-on-overflow admission, source persistence before download, cancel-after-admission ordering and independent voice-preference rollback; App retains host effects and root lifetime.
 
 <a id="391-platformkit-versus-modelkit"></a>
 
@@ -712,7 +888,7 @@ Existing history records retain actual request Tool declarations, complete nativ
 
 ### Settings audio detection
 
-音频识别 includes an explicit 10-second microphone/spatial diagnostic. PlatformKit exposes native input/capability/fallback facts; App Lifecycle owns an isolated capture and source-only SpeechPerception session through both Gateways; AppDiagnosticWorkflow owns admission, freshness/deadline monitoring and joined cleanup; UI owns simple result presentation. Actual received layout distinguishes four-channel capture from mono fallback. No model warmup, conversation, Photographer consumer or robot action is added.
+音频识别 includes an explicit 10-second microphone/spatial diagnostic. PlatformKit exposes native input/capability/fallback facts; App Lifecycle owns an isolated capture and source-only SpeechPerception session through both Gateways; AppDiagnosticWorkflow owns admission, freshness/deadline monitoring and joined cleanup; UI owns simple result presentation. Actual received layout distinguishes four-channel capture from mono fallback. The diagnostic session performs no model warmup and starts no conversation, Photographer consumer or robot action. Retry becomes available only after endpoint/monitor cleanup joins and the operation slot is released.
 
 ### PlatformKit versus ModelKit
 
@@ -793,45 +969,218 @@ Actions/Camera follows the domain root + Support layout and binds Camera.Capture
 
 ### Cloud native Tool generation
 
-Cloud ChatRequest carries JSON v6 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; ToolResult retains existing feedback behavior. Local Gemma 4 E2B and automatic result-driven continuation remain unsupported.
+Cloud ChatRequest carries JSON v6 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; Returning ToolResult enters InputGateway under the captured owner and causal context. Local Gemma 4 E2B and automatic result-driven continuation remain unsupported.
 
-## Model resource interaction migration — ADR0146
+### Signal and Effect Scenarios
 
-✅ AppSettingsWorkflow now owns ModelResourceInteractionWorkflow, its32-slot reject-on-overflow admission, cancel-after-admission ordering, source save before download and independent voice-preference rollback. The scene root retains it and injects typed controls plus passive UI state. Installation prerequisites and effect/error contracts moved from UI into this feature target. Existing ModelResourcesWorkflow retains persistence and host effects; target dependencies remain UI/Storage.
+These flows apply the common contracts above. A task can cross several scenarios; the categories are not separate Signal types. App adapts input and forwards output without selecting business operations. Diagrams describe the architecture; actual coverage and staged exceptions are recorded under [implementation coverage](#implementation-coverage).
 
-❌ Direct resource controls, page-visible polling/debounce and UI-owned draft/catalog values are documented staged exceptions. No new Agent, Tool or conversational resource management is claimed.
+#### Scenario coverage
 
-## History mutation continuation — ADR0147
+Six categories cover human intent, Agent collaboration, independent observations, host facts and execution feedback:
 
-✅ The authoritative Agent-driven design was updated before implementation. Confirmed history deletion crosses InputGateway → ConversationMemory → OutputGateway → History.Conversation.delete, with an actual ToolResult through InputGateway before UI.HistoryPresentation.showHistory. Actions owns archive-only validation/persistence invocation; App binds the same journal and carries correlated outputs without choosing behavior. One pending Agent mutation and one root request reject overlap. Transport executes at most2 business calls and drains at most8 buffered outputs through a cancellation acknowledgment; stale presentation is retired and committed data is retained.
+| Scenario | Input / origin | Business processing and effects |
+| --- | --- | --- |
+| 1. Direct UI interaction | External intent | Agent selects an operation and presentation; local drafts/scroll remain in UI. |
+| 2. Conversation | External text/audio, followed by internal perception messages | Business Agent interprets intent and handles actual results; inference itself is local computation. |
+| 3. Agent collaboration | Internal Agent message | Receiver processes content, optionally replies or emits registered effects. |
+| 4. Physical-world observation | External capture/native fact, optionally followed by internal perception messages | Agent may react without a new human request, within an enabled task and declared permissions. |
+| 5. System and capability event | External lifecycle, permission, route or availability fact | Host handles immediate lifecycle mechanisms; Agents decide scoped business reactions. |
+| 6. Execution lifecycle | Internal runtime feedback | Agent interprets progress, actual completion, failure or cancellation and chooses continuation/presentation. |
 
-❌ No Assistant mutation catalog, model continuation, automatic retry, title/archive migration or native acceptance is claimed.
+#### 1. Human interaction with UI
 
-## Active Agent-driven architecture — ADR0148
+Preserve familiar mobile interactions—taps, gestures, forms, navigation and confirmation—to support existing user habits and direct, precise control. An Agent-driven app still offers these interactions alongside conversation.
 
-✅ [Agent-Driven App Architecture](Agent-Driven-App.md) is the authoritative active design. Reading order separates goals/ownership, Signal origin/envelope/payload, execution and feedback, six scenarios, cross-cutting task rules, and implementation/migration status. Familiar mobile controls remain available; direct intent can execute deterministically and shares business capabilities with conversation. Signal origins share AgentInput; typed origin admission and owner-fenced Tool feedback are implemented, while typed host controls and complete Action/activity roots remain pending.
+The difference is the business path: UI emits explicit intent instead of implementing business processing or directly coordinating services. The responsible Agent handles that intent, selects registered Actions/Tools through OutputGateway, processes actual feedback through InputGateway and requests the resulting presentation. Direct UI intent can be handled deterministically without invoking an LLM; conversational intent uses the same business capabilities, permissions and execution contracts. UI retains rendering and local interaction state.
 
-❌ Typed history events, remaining business input routes, model continuation and versioned remote/durable transport remain pending. The document reorganization changes no runtime behavior.
+The implemented deletion flow below shows the shared intent/effect boundary and explicit user confirmation. Outstanding routes are listed under implementation coverage.
 
-## Signal origin and Tool feedback — ADR0149
+```mermaid
+sequenceDiagram
+    actor Human
+    participant UI
+    participant App as App input adapter
+    participant Input as InputGateway
+    participant Agent as ConversationMemory
+    participant Output as OutputGateway
+    participant Effects as Registered Tools / capabilities
+    Human->>UI: Confirm archive deletion
+    UI->>App: Delete intent + archive ID
+    App->>Input: Signal with request/session identity
+    Input->>Agent: Validated input
+    Agent->>Output: Resolved History.Conversation.delete call
+    Output->>Effects: Authorized Tool executes Storage transaction
+    Effects-->>Output: Actual success or failure + call ID
+    Output->>Input: Correlated ToolResult Signal
+    Input->>Agent: Scoped feedback
+    alt Deletion succeeded
+        Agent->>Output: Resolved UI.HistoryPresentation.showHistory call
+        Output->>Effects: Invoke registered presentation Tool
+        Effects->>UI: Apply scoped actual snapshot on MainActor
+        UI-->>Human: Updated history
+    else Deletion failed
+        Agent->>Output: Failure control / execution outcome
+        Note over App,UI: Current root workflow shows localized error.<br/>Agent error presentation is pending
+    end
+```
 
-✅ Implemented the first Signal migration stage against the revised authoritative contract: explicit origin, External-only public admission, bound Agent messaging and owner-fenced Runtime Tool feedback. OutputEnvelope retains original metadata; returning Tools preserve root/parent/turn/hops with fresh bounded admission. Actual effects are retained separately from delivery failure without replay.
-❌ Next: complete Action/activity original roots, then typed legacy history/control inputs, archive/title Agent policy and bounded Assistant continuation. UI/resource/device entry-point migrations remain pending.
+The target failure path is also Agent → OutputGateway → registered status-presentation Action/Tool → UI. Failure presentation currently belongs to the root history workflow; its registered Agent presentation route is outstanding.
 
-## Unified execution lifetime — ADR0150
+UI-local scrolling, expansion, focus and unsubmitted drafts stay in UI. Business gestures and submitted forms emit intent; continuous controls require explicit cadence and overflow policy.
 
-## Completed executable capability consolidation — ADR0157
+#### 2. Conversation
 
-✅ Actions owns all six domain implementations, cohesive entry files and canonical definitions. FunctionContracts independently owns standard inputs/handlers/completions; ExecutionRuntime owns deadlines/cancellation cleanup and CallRuntime owns protocol adapters. Tools/ToolRuntime compatibility targets and namespace aliases are removed; sources compile once.
+After InputGateway admission, typed text reaches the business Agent; speech reaches a perception Agent first. Recognized content becomes a typed Agent message through both Gateways. Model inference remains an injected computation inside the Agent's decision process.
 
-✅ Paths are Domain.Module.function; Agent configuration v6 explicitly binds native definitions to canonical paths while retaining model aliases. UI/Speech/NexArm serialization keys preserve exclusion. The same implementation can be projected to ActionCall and ToolCall with independent Agent permissions. Scheduled native calls use the same Channel/resource admission and joined cleanup, outside XML waits; typed native completion crosses InputGateway once.
+```mermaid
+flowchart TB
+    Human[Human] -->|Typed text| App[App input adapters]
+    Human -->|Speech| World[Microphone capture]
+    World --> App
+    App -->|Audio Signal| Input[InputGateway]
+    App -->|Text intent Signal| Input
+    Input -->|Captured media| Perception[Perception Agent]
+    Perception <-->|Recognition / perception capability| Model[ModelKit]
+    Perception -->|Typed observation via AgentMessaging| Output[OutputGateway]
+    Output -->|Validated transcript / observation Signal| Input
+    Input -->|Intent / recognized content / feedback| Business[Business Agent]
+    Business <-->|Context and decision computation| Model
+    Business -->|Resolved calls| Output
+    Output -->|Authorize and execute| Execute[Actions / Tools]
+    Execute --> Native[Platform / Storage capabilities]
+    Native -->|Declared native observations| App
+    Execute -->|Presentation / speech behavior| UI[UI / playback endpoints]
+    Execute -->|Actual execution outcome| Output
+    Output -->|Correlated feedback Signal| Input
+    Business -->|Next operation or final presentation| Output
+```
 
-❌ Remaining Agent-driven work: typed host intents/control producers, original Action/activity causal roots, registered failure presentation, remaining settings/device routes and bounded model continuation. Physical/native/model acceptance is separate from fixture/build checks.
+For the planned conversational “scan nearby devices” route, the business Agent selects a registered discovery capability; it reports actual devices or failure and requests their display through registered UI behavior. Starting discovery, observing a device and completing a scan are distinct events. Device effects can change later observations; those measured facts enter as new Signals rather than being inferred from the issued command. If discovery is asynchronous, native facts arrive through App input adapters under a declared session/operation contract; returning feedback must match the operation's registered result semantics.
 
-✅ ADR0159 unifies @Action metadata and invocation contracts; all business and injected endpoints receive one FunctionInput/ActionExecutionContext. Three-level ownership, existing availability/resources/deadlines and independent Agent grants are preserved.
+Result-driven model continuation requires a finite step budget, execution deadline and cancellation owner per task. LLM predictions never stand in for execution success; current Assistant continuation and discovery limitations are listed under implementation status.
 
-✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+#### 3. Agent-to-Agent collaboration
 
-✅ ADR0160/0161: Actions catalogs expose pure ActionFunction values through Actions/Contracts (FunctionContracts). Gateway/Runtime (ExecutionRuntime) owns the canonical function registry and shared execution. Gateway/Output/Registration and Protocols (CallRuntime) own bindings and calling protocols; App/Composition/Behaviors freezes one function store and supplies grouped registration profiles. Business functions receive FunctionInput without Channel or protocol selection. ❌ Remaining feature Signal/Agent continuation and physical acceptance are separate.
+Agents exchange domain messages through both Gateways. They do not call each other's business methods or use UI updates as a communication channel. A receiver decides whether a message requires further processing, a reply or a registered effect.
 
-✅ ADR0161: Actions imports FunctionContracts only for callable metadata/input/output; it cannot see Gateway runtime/protocol types. Gateway/Runtime compiles as ExecutionRuntime, while Gateway/Output/Registration and Protocols compile as CallRuntime. Gateway excludes these shared sources and depends on their independent targets plus AgentCore. Standard FunctionRequest has no Channel; FunctionInput reporting is injected and runtime-owned. ❌ Remaining feature Signal/causal-root/continuation and physical acceptance remain separate.
+```mermaid
+sequenceDiagram
+    participant A as Producer Agent
+    participant Output as OutputGateway
+    participant Input as InputGateway
+    participant B as Consumer Agent
+    participant Effects as Actions / Tools
+    participant UI
+    A->>Output: AgentMessaging.send / publish + causal parent
+    Output->>Output: Validate source, schema and communication permission
+    Output->>Input: Signal with bound source and causal metadata
+    Input->>B: Validate target/session and admit
+    Input-->>Output: Per-target admission report
+    Output-->>A: DeliveryReport, not processing completion
+    B->>B: Process typed content
+    opt Explicit domain reply is declared
+        B->>Output: Send typed result message to A
+        Output->>Input: Result Signal with declared correlation
+        Input->>A: Validate and process reply
+    end
+    opt Consumer requests a UI effect
+        B->>Output: Registered presentation Action / Tool call
+        Output->>Effects: Validate and execute
+        Effects->>UI: Update scoped presentation on MainActor
+    end
+```
+
+`send` chooses one permitted target; `publish` selects declared subscribers. The root and parent identify causality, not a generic request/reply service. A domain needing a reply must declare its payload, request correlation, pending-work bound, timeout and cancellation behavior before implementation. Such a reply is a new message with its own permission checks. A directed message alone does not create an automatic request/reply service.
+
+#### 4. Physical-world observation without a new user request
+
+An enabled camera/tracking task, device discovery or sensor monitor can receive new facts independently of a click or conversation. App adapts capture/native events into Signals; a perception Agent is optional for already-structured device facts.
+
+```mermaid
+flowchart LR
+    World[Physical change] --> Capture[Platform capture / native feedback]
+    Capture --> App[App input adapter]
+    App --> Input[InputGateway]
+    Input --> Agent[Perception / business Agents]
+    Agent -->|Messages / resolved calls| Output[OutputGateway]
+    Output --> Effect[Actions / Tools]
+    Effect --> UI[UI presentation]
+    Effect --> Platform[Platform effect]
+    Platform -->|Changes subsequently observed| World
+    Effect -->|Actual outcome via runtime| Output
+    Output -->|Messages / feedback Signals| Input
+```
+
+Observation is evidence, not authorization to start arbitrary behavior. The enabled task owns its scope, cadence, freshness and resource use. Only declared latest-state observations may coalesce; discrete device facts need an explicit delivery policy. Issuing a command does not prove the resulting physical state.
+
+#### 5. System and capability events
+
+Foreground/background changes, permission changes, audio-route interruption and model/device availability changes can alter what a task may do. The target business path is **OS/native fact → App adapter → InputGateway → responsible Agent → OutputGateway → registered reaction**.
+
+App remains responsible for immediate lifecycle mechanisms: suspending capture, joining owned execution, releasing resources and starting/stopping runtime scopes. Those mechanisms cannot depend on a delayed Agent response or inference. Publish business-relevant lifecycle facts only into valid scopes; an unavailable Agent/session cannot be assumed to receive a shutdown event. Permission denial and unavailable capability must not become fabricated success.
+
+Foreground return does not automatically replay prior device effects.
+
+#### 6. Execution lifecycle and long-running work
+
+A returning Tool can finish in one result; discovery, downloads, playback or motion may have separate admission, progress and terminal outcomes. Declare each operation's feedback channel, owner, correlation and completion semantics before implementation.
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant Output as OutputGateway / execution runtime
+    participant Operation as Action / Tool and capability
+    participant Input as InputGateway
+    Agent->>Output: Authorized operation call
+    Output->>Operation: Start under execution ownership
+    opt Declared bounded progress feedback
+        Operation-->>Output: Actual progress + operation identity
+        Output->>Input: Runtime feedback Signal
+        Input->>Agent: Validate owner/session and interpret
+    end
+    alt Completed or failed
+        Operation-->>Output: Actual terminal outcome
+        Output->>Input: Declared correlated result Signal
+        Input->>Agent: Choose continuation or status presentation
+    else Cancellation requested
+        Note over Agent,Input: Human cancellation first enters through App and InputGateway
+        Agent->>Output: Registered cancellation behavior, if supported
+        Output->>Operation: Cancel and join owned cleanup
+        Operation-->>Output: Actual terminal cancellation / partial effects
+        Output->>Input: Declared correlated feedback Signal
+        Input->>Agent: Reconcile committed effects and finish
+    end
+```
+
+This is a target lifecycle pattern for contracts that return feedback, not a generic progress/cancellation API implemented by every Tool. Native asynchronous facts still use the external adapter paths in scenarios 4 and 5. Completion-only Tools retain execution outcomes without a new ToolResult. Runtime control notices cannot encode unregistered business cancellation.
+
+### Cross-cutting Task Contracts
+
+| Case | Required contract |
+| --- | --- |
+| User decision during a task | Picker selection, confirmation or clarification returns as a scoped external Signal through App → InputGateway, distinct from successful prompt presentation. Declare pending-task bounds, response correlation, timeout and cancellation; opening the prompt is not the user's decision. |
+| Concurrent inputs / multiple views | Define explicit task/session ownership, overlap rejection/queueing and resource arbitration. Human and model requests share authorization; manual priority exists only where policy declares it. Fence late presentation by its intended scope. |
+| Scheduled or periodic trigger | Declare whether an OS trigger is external or an owned runtime timer is internal. Bound timers/work, supply scope and deadlines, and prevent feedback-driven recurrence. Do not imply background execution guarantees. |
+| Restart / reconnect / recovery | Restore durable records through Storage capabilities, reconcile actual native state and create fresh live scopes. Persisted data is not automatically a Signal; never replay stale requests or completed effects by default. |
+| Future remote integration | Reuse the envelope concept only through an explicit adapter with authentication, codecs, version and replay policy. Authentication/admission alone does not grant internal execution authority; remote transport remains unimplemented. |
+
+System permission prompts still require user interaction. Presenting a picker does not grant unrestricted library access. Physical robot safety cannot depend on iOS background execution.
+
+### Implementation Coverage
+
+✅ marks implemented contracts; ❌ marks outstanding design or integration. Detailed delivery priorities and acceptance evidence belong in docs/.
+
+| Area | Implemented | Outstanding |
+| --- | --- | --- |
+| Signal envelope and contracts | ✅ AgentInput, metadata/payload, domain-message schemas, JSON permissions and both Gateway paths; supported input contract version 1; typed SignalOrigin, owner-fenced returning Tool admission, typed history.intent and Action/activity causal transport | ❌ Other typed host control producers. Video/binary kinds have no payload cases. |
+| Executable capabilities | ✅ One definition/outcome/execution core, three-level addresses, v6 explicit bindings, dual protocol projections, scheduled native adaptation | ❌ Additional capability exposure and physical acceptance |
+| UI and history | ✅ ConversationMemory refresh and confirmed archive deletion through both Gateways; returning History.list/read Tools | ❌ Remaining direct controls, archive/title policy, general navigation/picker/device intent routes and registered failure presentation |
+| Conversation and collaboration | ✅ Registered perception/synthesis/pose messages and current Assistant Tool feedback | ❌ Automatic model continuation, conversational BLE discovery and generic request/reply |
+| Physical and host events | ✅ Existing perception/tracking pipelines and App-owned lifecycle/cleanup | ❌ General sensor/native fact coverage and unified lifecycle/capability business Signals |
+| Execution lifecycle | ✅ Specific ActionResult/ActivityEvent contracts, role-owned cancellation and history cancellation cleanup | ❌ Common long-task Agent progress/cancellation contract and remaining feature routes |
+| Model resources | ✅ Passive UI state with interaction/admission policy moved into independent AppSettingsWorkflow | ❌ Agent/Gateway resource controls, remaining UI policy and native transfer acceptance |
+| Foundational independence | ✅ Base ModelKit, PlatformKit and Storage have no project dependencies | ❌ UI imports StorageChat domain values; full foundational independence remains outstanding |
+| Transport evolution | ✅ Process-local admission and bounded domain content encoding | ❌ Contract-version migration, whole-envelope remote codecs/authentication, durable/replay delivery and dynamic subscriptions |
+
+Current Gateway limits include 128 active admissions, 16 recipients per operation, 256 active branches, 8 MiB observation reservations and at most 8 causal hops. Agent inbox/output limits are role-specific. See [InputGateway](Gateway/Input/README.md) and [communication policy](Agents/Core/Communication/README.md). AgentMessage encoding is not serialization of the whole Signal envelope.

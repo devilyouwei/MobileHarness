@@ -2,6 +2,12 @@
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
+## 2026-10-07 — Consolidated technical design
+
+- Consolidated the active Agent-driven design into MobileHarness/README.md as the single overall technical design document.
+- Integrated ownership, Signal semantics, six interaction scenarios, shared callable/protocol execution, typed history intent and feedback causality into responsibility-based sections; removed outdated migration summaries.
+- Redirected links to the consolidated design and removed the redundant Agent-Driven-App.md file. Runtime code and historical evidence remain unchanged.
+
 ## 2026-10-07 — Current callable architecture documentation
 
 - Reconciled public architecture, concepts, technical module mapping, roadmap/index and Resource-State-Plan with FunctionContracts, Gateway-owned ExecutionRuntime/CallRuntime and the retired Tools directory.

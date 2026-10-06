@@ -23,10 +23,12 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 
 ## Future implementation directions
 
+Foundational independence: UI currently imports StorageChat domain values. Remove that cross-module dependency while preserving history presentation contracts; ModelKit, PlatformKit and Storage already have independent base targets. See the [current compilation map](../MobileHarness/README.md#target-map).
+
 | Direction | Boundary before implementation |
 | --- | --- |
 | [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
-| [Agent-driven app](../MobileHarness/Agent-Driven-App.md) | Active architecture and unified Signal contract; Storage cleanup, history Tools, refresh and confirmed deletion are implemented. Typed legacy intents, BLE Tools, archive/title and model continuation remain pending. |
+| [Agent-driven app](../MobileHarness/README.md) | Active architecture and unified Signal contract; Storage cleanup, history Tools, refresh and confirmed deletion are implemented. Typed legacy intents, BLE Tools, archive/title and model continuation remain pending. |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
 | Local native Tool events and result-driven request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |

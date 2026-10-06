@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: design adopted; documentation implemented, runtime mig
 
 ## Decision
 
-Move the authoritative Agent-Driven App Architecture from docs into [MobileHarness](../../MobileHarness/Agent-Driven-App.md). It governs an architecture already being implemented; implemented contracts and outstanding routes are labeled separately.
+Move the authoritative Agent-Driven App Architecture from docs into [MobileHarness](../../MobileHarness/README.md). It governs an architecture already being implemented; implemented contracts and outstanding routes are labeled separately.
 
 Signal means immutable information admitted to an Agent, including human intent, physical observations, Agent messages and actual execution feedback. AgentInput is the canonical in-process envelope; do not add a duplicate Signal envelope. Keep domain payloads and schema validation outside generic AgentCore. Resolved execution calls remain OutputEnvelope outputs, and their returning feedback becomes input.
 

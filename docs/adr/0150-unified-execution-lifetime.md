@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: first stage implemented.
 
 ## Decision
 
-Adopt the [unified executable capability design](../../MobileHarness/Agent-Driven-App.md#unified-executable-capabilities--adopted-design) before implementation. One capability may be exposed as ActionCall and ToolCall; protocol registration does not override its execution/resource policy. Actions will own query and effect implementations.
+Adopt the [unified executable capability design](../../MobileHarness/README.md#canonical-functions-and-protocol-bindings) before implementation. One capability may be exposed as ActionCall and ToolCall; protocol registration does not override its execution/resource policy. Actions will own query and effect implementations.
 
 Start with CooperativeExecution in ActionRuntime: a generic handler/deadline race, structured cancellation and joined cleanup, retaining the handler result after a winning timeout. ActionDeadline and ToolExecutor adapt outcomes to existing report/response policies. No queues, workers, permissions or business classification are added.
 

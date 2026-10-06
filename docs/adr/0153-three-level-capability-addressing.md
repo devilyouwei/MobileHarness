@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: adopted target, implementation pending.
 
 ## Decision
 
-Use Domain.Module.function for executable capabilities: directory/domain, cohesive entry file/namespace, and function. Keep six business-domain catalogs, each aggregating its modules. The single DomainActions namespace is a transitional facade, not the target addressing model. See the [module mapping](../../MobileHarness/Agent-Driven-App.md#three-level-capability-addressing--required-target).
+Use Domain.Module.function for executable capabilities: directory/domain, cohesive entry file/namespace, and function. Keep six business-domain catalogs, each aggregating its modules. The single DomainActions namespace is a transitional facade, not the target addressing model. See the [module mapping](../../MobileHarness/README.md#canonical-functions-and-protocol-bindings).
 
 Paths do not determine invocation protocol, Channel, exclusion key or resources. Explicit domain/module/function values belong independently to AgentCore and ActionRuntime, with Gateway translation. Agent configuration requires a versioned migration; Agents resolves legacy names and Gateway only receives resolved calls. Preserve exclusion/resource policy explicitly during path changes.
 

@@ -24,7 +24,7 @@ Read the relevant documentation before designing or implementing a change. Docum
 - First-level directories under `MobileHarness/` represent the application's core modules. Keep them highly decoupled, with explicit ownership and clear responsibilities.
 - ModelKit, PlatformKit, UI, and Storage are foundational capability modules. They must not depend on other project modules or own upper-layer business logic or application orchestration.
 - Use explicit module interfaces. Do not introduce circular dependencies, duplicate ownership, or reach into another module's implementation details.
-- Consult `MobileHarness/Agent-Driven-App.md`, `MobileHarness/README.md`, and the owning module README for dependency and flow design before choosing where code belongs.
+- Consult the architecture and dependency sections in `MobileHarness/README.md` and the owning module README for dependency and flow design before choosing where code belongs.
 - Treat existing dependencies that conflict with these principles as outstanding migration work, not as precedent for new dependencies.
 
 ## 3. Obtain Approval Before Adding Directories or Modules
