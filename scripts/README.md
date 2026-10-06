@@ -156,3 +156,7 @@ flowchart LR
 ✅ Boundary validation permits the documented AppHistoryWorkflow Agent/Gateway/Tool transport dependencies and separately enforces transport, legacy workflow and presentation-adapter imports. ConversationMemory may import only AgentCore/Foundation; UI and AgentCore remain independent. Final-app resource validation discovers all six Agent JSON resources. ❌ Physical UI intent acceptance is separate.
 
 ✅ Boundary checks reject resource Task/effect implementations and installation policy in UI.ModelResourcesState, and keep effect tests under AppWorkflowTests. ❌ Agent-based resource admission remains future work.
+
+✅ Boundary checks prohibit direct journal deletion in the legacy history workflow; ConversationMemory remains AgentCore/Foundation-only. ❌ Native UI confirmation acceptance remains separate.
+
+✅ ADR0149 boundary checks prevent returning Tool feedback from reverting to public external admission and require retained output input context. ❌ These source checks do not establish runtime or physical correctness; regression tests validate delivery behavior.

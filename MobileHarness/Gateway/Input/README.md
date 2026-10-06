@@ -26,7 +26,7 @@ External producers supply native `AgentInput` values through App adapters. Input
 
 ```mermaid
 flowchart TB
-    External["External Inputs<br/>Microphone / Camera / User / Runtime"]
+    External["External Inputs<br/>Microphone / Camera / User / Legacy host events"]
     App["App Adapters<br/>Build AgentInput"]
     External --> App
 
@@ -87,3 +87,20 @@ SpeechPerception owns SpeechRecognitionTurn and VoiceActivitySegmenter. VisionPe
 ✅ Observation admission and byte accounting use the injected schema registry, including type/contract/size validation. External sources use the policy allowlist rather than hard-coded phone identifiers; all capacity and identity fences are preserved.
 
 ✅ ADR0129: failed/partial/cancelled ActionResult may retain an AgentActionReport describing partial effects. Success still requires completion and no failure; non-success requires failure and rejects success-only completion kinds. Runtime-only delivery, owner/session fences and size bounds remain mandatory.
+
+## Typed origin admission — ADR0149
+
+✅ Public send/publish require External origin with no incarnation and reject Tool/Action/activity feedback payloads. Internal Agent delivery requires Agent origin and a bound incarnation. Runtime Tool delivery is module-internal and validates the captured ExecutionOwner before recipient support and again during reception; stale results never reach a replacement Agent. Runtime feedback does not depend on the external-source allowlist.
+
+```mermaid
+flowchart LR
+    External[App external adapters] --> Public[External-only send / publish]
+    Agent[Bound OutputGateway messaging] --> Internal[Agent-origin sendInternal]
+    Runtime[Execution owner and actual result] --> Feedback[Owner-fenced runtime delivery]
+    Public --> Admit[Shared bounded admission]
+    Internal --> Admit
+    Feedback --> Admit
+    Admit --> Receiver[Live receiver]
+```
+
+Returning Tool feedback uses a fresh10-second admission deadline, preserved rootID/turn, parent inputID and one added hop; hop exhaustion is a delivery failure and never replays the effect. Completion-only Tools remain outcomes without feedback. ❌ Legacy runtime.event host commands retain External origin, and original Action/activity roots await their separate migration.

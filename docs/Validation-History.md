@@ -350,3 +350,39 @@ Baseline commit: 2a4ecf0 on codex/agent-driven-app. Scope: resource operation/ad
 ✅ scripts/check.sh passed, including all484 integration tests, all37 AppWorkflowTests, strict Swift formatting, architecture boundaries, six Python checks and project/privacy/entitlements plist validation. The former audio retry timeout did not recur in this run. Final focused verification after the last workflow adjustment passed12 tests: all11 migrated/new resource interaction regressions plus isolated audio diagnostic retry. The final per-file boundary/format/whitespace checks passed.
 
 ✅ The unsigned generic iOS device build passed with Xcode27; final-app verification confirmed all six Agent JSON resources. ❌ build-ios.sh stopped at its first simulator scheme because external CoreAIShared cannot resolve CoreAI; remaining three schemes were not attempted. No native page, background transfer, live cloud/model or physical-device acceptance was performed. Page polling/debounce and shared draft/catalog values remain documented migration exceptions; Technical_Design.docx remains unchanged.
+
+## 2026-10-06 — History deletion and deterministic result continuation
+
+Baseline commit: e9592f3 on codex/agent-driven-app. The Agent-Driven App Architecture mutation/cancellation contract was written before implementation. Confirmed deletion now uses internal History.delete, correlated runtime ToolResult and success-only UI.showHistory; legacy App history code performs no direct journal deletion.
+
+✅ Final scripts/check.sh passed, including all488 integration tests, all37 AppWorkflowTests, strict Swift formatting, architectural boundaries, six Python checks and plist metadata. Final focused verification passed15 tests, including four new deletion/fencing/cancellation regressions, existing Gateway/history/legacy workflow coverage, and isolated vision-budget/audio-retry regressions. Initial full-run vision/audio timeouts did not recur in the final full run; no timing-flakiness fix is claimed.
+
+✅ Final unsigned generic iOS device build passed with Xcode27 and all six packaged Agent configurations matched source. Diff whitespace and original Technical_Design.docx preservation were verified. ❌ build-ios.sh stopped at the first simulator scheme because external CoreAIShared cannot resolve CoreAI; remaining three schemes were not attempted. No native confirmation/gesture, cloud/model continuation or physical device acceptance was performed. Committed deletion survives later cancellation/presentation failure; no automatic deletion retry or model mutation permission is added.
+
+## 2026-10-06 — Unified Signal scenario documentation
+
+Documentation-only refinement of MobileHarness/Agent-Driven-App.md: direct UI intent, conversation/perception and Agent collaboration diagrams distinguish admission, actual feedback and registered presentation effects. The implemented history deletion diagram explicitly retains legacy host failure presentation; general continuation and request/reply remain pending. Links, internal anchors, five Mermaid code fences and whitespace checks passed; no rendered-diagram verification was performed.
+
+The required check.sh run passed all488 IntegrationTests, but AppWorkflowTests reported the existing audioDetectionKeepsFailedPermissionResultAndAllowsRetry timeout. Its isolated rerun passed; no timeout fix is claimed. With full Xcode selected through DEVELOPER_DIR, build-ios.sh failed on the simulator's unavailable CoreAI dependency; later schemes were not reached. No runtime code was changed or device installation performed in this documentation stage.
+
+## 2026-10-06 — Signal origin and scenario coverage
+
+Documentation-only expansion defines external, internal Agent and internal runtime origins under the common AgentInput envelope. Six primary scenarios cover UI, conversation, collaboration, independent observation, system/capability events and execution lifecycle. Cross-cutting contracts address decisions during a task, concurrency, triggers, recovery and future remote integration. Typed origin APIs and general long-task/lifecycle migration remain pending. Links, anchors, seven Mermaid fences and whitespace checks passed; diagrams were reviewed as source, not rendered. The original Technical_Design.docx is unchanged.
+
+The required full check.sh run failed: bluetoothSettingsCongestionRetainsOnlyLatestTestAndResetCancelsEnding recorded an issue and timeout in IntegrationTests, and audioDetectionKeepsFailedPermissionResultAndAllowsRetry timed out in AppWorkflowTests. Both passed isolated reruns; no test instability fix is claimed. Full-Xcode build-ios.sh still failed on unavailable simulator CoreAI and did not reach later schemes. No runtime code change or device installation belongs to this documentation stage.
+
+## 2026-10-06 — Agent-driven design organization
+
+Reorganized the active architecture into goals/ownership, unified Signal contract, execution/feedback rules, six scenarios, cross-cutting cases and implementation/migration status. Common rules now precede scenarios; implementation gaps and current bounds are consolidated, while traditional mobile interaction and history mutation/cancellation constraints remain explicit. Removed the redundant generic flow diagram and preserved existing incoming anchors. No runtime behavior changed. Links/anchors, six Mermaid fences and whitespace checks passed; no rendered-diagram verification was performed.
+
+The required full check.sh run reported visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers timing/expectation failure and audioDetectionKeepsFailedPermissionResultAndAllowsRetry timeout. Both passed isolated reruns; no instability fix is claimed. Full-Xcode build-ios.sh failed on the simulator's unavailable CoreAI dependency and did not reach later schemes. The original Technical_Design.docx remains unchanged; no device installation was performed.
+
+## 2026-10-06 — Typed Signal origin and returning Tool feedback
+
+The authoritative Agent-Driven-App.md contract was updated before runtime implementation (ADR0149). SignalOrigin now distinguishes External, Agent and Runtime without granting authority through a constructor. Gateway admission rejects forged internal origins and externally supplied execution feedback. Returning Tool results retain original causal metadata and validate the captured Agent incarnation/session; a replacement Agent cannot receive an old execution result. Feedback rejection preserves the actual execution outcome without replaying effects.
+
+✅ scripts/check.sh passed, including all 492 IntegrationTests, all 37 AppWorkflowTests, architecture boundaries, strict Swift formatting, Python checks and project/privacy/entitlements metadata. A subsequent test-only refinement restricted the feedback recipient's external-source allowlist to user; final focused verification passed 11 tests, including successful/failed Tool feedback, causal continuity, forged-origin rejection, Agent replacement, hop exhaustion and existing history/communication coverage. Production code did not change after the full check; no second full-suite run is claimed.
+
+✅ The unsigned generic iOS device build passed, and all six packaged Agent configurations matched source. Diff whitespace and original Technical_Design.docx preservation were verified. ❌ scripts/build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; remaining schemes were not attempted. No device installation, physical interaction or live-model acceptance was performed.
+
+Typed host controls and complete ActionResult/ActivityEvent original-root propagation remain outstanding. Legacy host runtime.event controls still enter as External; this stage does not claim complete Signal migration.

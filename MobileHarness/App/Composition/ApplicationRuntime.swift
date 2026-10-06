@@ -103,6 +103,7 @@ final class ApplicationRuntime {
             presentation: presentation, playback: presentation, pose: presentation,
             historyPresentation: historyPresentation, camera: presentation,
             history: HistoryQueryService(store: conversations),
+            historyMutations: HistoryMutationService(store: conversations),
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
             shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) },
             aim: { base, pitch, invocation in try await robot.aim(base, pitch, invocation) })

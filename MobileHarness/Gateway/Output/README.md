@@ -110,3 +110,5 @@ The observation path neither injects a new Agent result nor invokes device recov
 
 
 ✅ ADR0140/ADR0141: ResourceCoordinator owns cancellation-independent bounded cleanup. Public resource state is unlocked/locked(owner), including transient use. Cleanup timeout fails only its requester; retained work automatically unlocks when it finishes. Stop errors after joined cleanup release occupancy. Execution permits invalidate stale inherited context. ❌ Physical stop acknowledgment remains outside this software contract.
+
+✅ ADR0149: AgentMessaging constructs Agent-origin metadata; output envelopes retain input context. Returning Tools route Runtime-origin feedback through captured-owner delivery and preserve actual values/errors when delivery fails. ❌ Complete Action/activity original-root propagation remains pending.

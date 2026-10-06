@@ -43,3 +43,5 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ✅ Built-in assembly requires HistoryQueryCapability and registers History.list/read alongside existing Tools. Missing handlers remain startup errors; this assembly imports no StorageChat. ❌ No default empty-result fallback.
 
 ✅ Built-in assembly also requires HistoryPresentationCapability for UI.showHistory; Gateway validates ConversationMemory internal permission. ❌ Assembly does not import Agents or UI.
+
+✅ Required HistoryMutationCapability binds History.delete. Startup coverage validates ConversationMemory internal deletion permission; no mutation alias is added to Assistant. ❌ Assembly owns no deletion or continuation policy.

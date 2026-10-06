@@ -1,12 +1,45 @@
 import AgentCore
 import Foundation
 
-public enum ConversationMemoryIntent: String, Sendable {
-    case refresh = "history.refresh"
+public enum ConversationMemoryIntent: Sendable, Equatable {
+    case refresh
+    case delete(UUID)
+    case cancel(UUID)
+    public init?(rawValue: String) {
+        if rawValue == "history.refresh" {
+            self = .refresh
+            return
+        }
+        let parts = rawValue.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, let id = UUID(uuidString: String(parts[1])) else { return nil }
+        switch parts[0] {
+        case "history.delete": self = .delete(id)
+        case "history.cancel": self = .cancel(id)
+        default: return nil
+        }
+    }
     public func input(sessionID: UUID) -> AgentInput {
-        let payload = InputPayload.event(rawValue)
+        let raw: String
+        let requestID: UUID
+        let source: String
+        switch self {
+        case .refresh:
+            source = "user"
+            raw = "history.refresh"
+            requestID = UUID()
+        case .delete(let id):
+            source = "user"
+            raw = "history.delete:" + id.uuidString
+            requestID = UUID()
+        case .cancel(let id):
+            source = "runtime"
+            raw = "history.cancel:" + id.uuidString
+            requestID = id
+        }
+        let payload = InputPayload.event(raw)
         return AgentInput(
-            sessionID: sessionID, payload: payload, metadata: InputMetadata(payload: payload, source: "user"))
+            id: requestID, sessionID: sessionID, payload: payload,
+            metadata: InputMetadata(payload: payload, source: source, rootID: requestID))
     }
 }
 
@@ -19,16 +52,18 @@ public actor ConversationMemoryAgent: Agent {
     private var lifecycle = AgentLifecycle.registered
     private var processed = 0
     private var sequence: UInt64 = 0
+    private var pending: (input: AgentInput, callID: UUID)?
+    private static let deletion = InternalTool(path: "History.delete", required: ["id"])
     private static let presentation = InternalTool(path: "UI.showHistory")
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try capabilities.adding(internalTools: [presentation])
+        try capabilities.adding(internalTools: [presentation, deletion])
     }
     public init(sessionID: UUID, configuration: AgentConfiguration? = nil) throws {
         let configuration = try configuration ?? AgentConfigurations.load(named: "ConversationMemory")
         guard configuration.agentID == .conversationMemory else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
-            id: .conversationMemory, name: "ConversationMemory", inputs: [.event],
-            outputs: [.toolCall], capabilities: try Self.runtimeCapabilities(configuration.capabilities))
+            id: .conversationMemory, name: "ConversationMemory", inputs: [.event, .toolResult],
+            outputs: [.toolCall, .control], capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
         outputs = stream.stream
@@ -48,23 +83,60 @@ public actor ConversationMemoryAgent: Agent {
     }
     public func stop() {
         lifecycle = .stopped
+        pending = nil
         continuation.finish()
     }
     public func receive(_ input: AgentInput) throws {
         try Task.checkCancellation()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
-        guard input.metadata.source == "user", input.sessionID == sessionID, !input.metadata.expired,
-            case .event(let raw) = input.payload, ConversationMemoryIntent(rawValue: raw) == .refresh
-        else { throw CommunicationError.invalidPayload }
+        guard input.sessionID == sessionID, !input.metadata.expired else { throw CommunicationError.invalidPayload }
+        switch input.payload {
+        case .toolResult(let result):
+            guard input.metadata.source == "runtime", let active = pending, active.callID == result.callID else {
+                throw CommunicationError.invalidPayload
+            }
+            pending = nil
+            if result.isError {
+                try emit(.control("history.delete.failed"), for: active.input)
+            } else {
+                try emit(.toolCall(Self.presentation.call([:])), for: active.input)
+            }
+        case .event(let raw):
+            guard let intent = ConversationMemoryIntent(rawValue: raw) else {
+                throw CommunicationError.invalidPayload
+            }
+            switch intent {
+            case .cancel(let id):
+                guard input.metadata.source == "runtime", id == input.id, pending == nil || pending?.input.id == id
+                else {
+                    throw CommunicationError.invalidPayload
+                }
+                pending = nil
+                try emit(.control("history.cancelled"), for: input)
+            case .refresh:
+                guard input.metadata.source == "user" else { throw CommunicationError.invalidPayload }
+                guard pending == nil else { throw CommunicationError.capacityExceeded }
+                try emit(.toolCall(Self.presentation.call([:])), for: input)
+            case .delete(let id):
+                guard input.metadata.source == "user" else { throw CommunicationError.invalidPayload }
+                guard pending == nil else { throw CommunicationError.capacityExceeded }
+                let call = try Self.deletion.call(["id": id.uuidString])
+                pending = (input, call.id)
+                try emit(.toolCall(call), for: input)
+            }
+        default: throw CommunicationError.invalidPayload
+        }
+        processed += 1
+    }
+    private func emit(_ output: AgentOutput, for input: AgentInput) throws {
         sequence += 1
-        let output = OutputEnvelope(
-            source: descriptor.id, input: input, output: .toolCall(try Self.presentation.call([:])), sequence: sequence)
-        guard case .enqueued = continuation.yield(output) else {
+        let envelope = OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: sequence)
+        guard case .enqueued = continuation.yield(envelope) else {
+            pending = nil
             lifecycle = .failed
             continuation.finish()
             throw CommunicationError.capacityExceeded
         }
-        processed += 1
     }
     public func status() -> AgentStatus {
         AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)

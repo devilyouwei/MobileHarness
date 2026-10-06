@@ -6,7 +6,7 @@ The biological analogy describes functional organization: sensing provides signa
 
 | Concept | Meaning | Biological analogy |
 | --- | --- | --- |
-| Signal | Typed input/observation carrying source and processing context. | Sensory and inter-region signals. |
+| Signal | Immutable Agent input: intent, observation, Agent message or execution feedback, carried by AgentInput. | Sensory and inter-region signals. |
 | Agent | Stateful processor with a distinct role, input ownership and permitted outputs. | Specialized functional brain region. |
 | Gateway | Validation, communication routing and execution coordination boundary. | Neural pathways coordinating signals and commands. |
 | Capability | Typed model/device/data operation supplied to a consumer. | Processing machinery or sensory/effector capacity. |
@@ -34,3 +34,5 @@ Model residency is separate from model operation ownership. A retained capabilit
 Edge/cloud collaboration means explicitly selecting remote processing where provided; it does not imply automatic compute escalation. Fast/slow cognition describes complementary responsive and deliberative processes; general orchestration remains a planned direction. Embodied intelligence means behavior has observable device/environment effects; it does not establish autonomous robot safety.
 
 [Architecture](Architecture.md) describes current collaboration. The [technical design](../MobileHarness/README.md#part-iii--key-techniques) defines cross-module flows and module READMEs define the algorithms.
+
+The active [Signal contract](../MobileHarness/Agent-Driven-App.md#unified-signal-contract) defines the shared envelope, payload ownership, admission and feedback rules, with current implementation gaps explicitly marked.

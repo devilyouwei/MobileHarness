@@ -239,3 +239,5 @@ flowchart LR
 ✅ History load/refresh crosses InputGateway → ConversationMemory → OutputGateway → UI.showHistory. Its root-owned slot rejects overlap and joins cancelled Tool cleanup before retry. ❌ Archive/delete/title migration remains pending; this is a documented History feature dependency exception.
 
 ✅ ModelResourceInteractionWorkflow moves model-resource tasks/admission and preference coordination out of UI into existing AppSettingsWorkflow. Pending submission bound32 rejects overflow; cancel joins admission and page cancellation does not own admitted transfers. ❌ Resource Agent/Gateway routing and cloud-form coordination remain pending.
+
+✅ Confirmed history deletion leaves the legacy feature implementation: ConversationMemory selects History.delete and success-only UI.showHistory; transport carries up to2 calls and bounded cancellation cleanup. ❌ Archive/title and resource Agent routes remain pending.

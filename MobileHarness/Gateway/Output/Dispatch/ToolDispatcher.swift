@@ -26,20 +26,14 @@ struct ToolDispatcher: Sendable {
         guard let result else { return nil }
         try Task.checkCancellation()
         if case .completion? = await registry.handler(for: call.toolPath) { return result }
-        let acceptsResult = await input.acceptsToolResults(envelope.source)
-        guard acceptsResult else { return result }
         let failure: String?
         do {
-            let report = try await input.send(
-                AgentInput(
-                    sessionID: envelope.sessionID,
-                    payload: .toolResult(
-                        ToolResult(
-                            callID: result.callID, value: result.value, isError: result.isError,
-                            failureCode: result.failureCode?.rawValue)),
-                    turn: envelope.turn),
-                to: envelope.source)
-            failure = report.rejected.isEmpty ? nil : "Result delivery rejected: \(report.rejected)"
+            let report = try await input.deliverToolResult(
+                ToolResult(
+                    callID: result.callID, value: result.value, isError: result.isError,
+                    failureCode: result.failureCode?.rawValue),
+                owner: owner, envelope: envelope)
+            failure = report.flatMap { $0.rejected.isEmpty ? nil : "Result delivery rejected: \($0.rejected)" }
         } catch {
             try Task.checkCancellation()
             failure = String(describing: error)

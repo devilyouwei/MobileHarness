@@ -3,9 +3,10 @@ import StorageChat
 import ToolRuntime
 
 public enum HistoryQueryError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
-    case missingConversation, resultTooLarge
+    case missingConversation, resultTooLarge, currentConversation
     public var toolFailureCode: ToolResponse.FailureCode {
         switch self {
+        case .currentConversation: .invalidArguments
         case .missingConversation: .init(rawValue: "notFound")
         case .resultTooLarge: .init(rawValue: "resultTooLarge")
         }

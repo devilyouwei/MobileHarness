@@ -3,12 +3,14 @@ import Foundation
 /// Source identity is attached by the runtime, never accepted from model output.
 public struct OutputEnvelope: Sendable {
     public let source: AgentID
+    public let inputMetadata: InputMetadata
     public let inputID: UUID
     public let sessionID: UUID
     public let turn: AgentTurn?
     public let sequence: UInt64
     public let output: AgentOutput
     public init(source: AgentID, input: AgentInput, output: AgentOutput, sequence: UInt64 = 0) {
+        self.inputMetadata = input.metadata
         self.turn = input.turn
         self.sequence = sequence
         self.source = source

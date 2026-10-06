@@ -21,4 +21,8 @@ flowchart LR
 
 ✅ Independent target dependencies: UI, StorageChat, AgentCore, Agents, Gateway, Tools and ToolRuntime. App composes the root session, Agent and adapter; UI imports none of these services. The AppWorkflows facade retains no state. Archive/reset commits before title inference; cancellation retains archived data and retry state.
 
-❌ Archive/delete/title and preview remain existing feature operations. This dependency exception is transitional: moving mutation policy into ConversationMemory and exposing navigation/model intent remains pending. No durable execution, background retry or new journal instance is added.
+❌ Archive/title and preview remain existing feature operations. This dependency exception is transitional: moving remaining mutation policy into ConversationMemory and exposing navigation/model intent remains pending. No durable execution, background retry or new journal instance is added.
+
+✅ Confirmed deletion now invokes the required typed deleteArchive operation; the feature facade performs no journal deletion or snapshot refresh itself. Root transport executes at most two Agent-selected business calls, accepting the follow-up only after successful correlated Tool feedback. On failure/cancellation it sends a fresh cancel intent through InputGateway, joins cleanup and drains at most8 envelopes until the non-business acknowledgment crosses OutputGateway. Cancelled UI calls are explicitly retired; no device calls use this transport. Committed data is never rolled back.
+
+❌ This is deterministic continuation only; no model replanning, deletion retry or navigation is added. Remaining title/archive operations retain the legacy journal dependency.

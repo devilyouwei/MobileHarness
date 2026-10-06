@@ -5,14 +5,14 @@ Purpose: connect classified resolved calls to execution runtimes while preservin
 - ✅ ActionDispatcher accepts ActionCall and delegates admission/execution to ChannelScheduler; no alias parsing occurs here.
 - ✅ Scheduler bounds: 32 unfinished Actions per Channel name across all tasks (including running and dormant work), 16 live names, 64 tracked tasks, 120 Actions and 32 waits per task. Overflow is explicit.
 - ✅ Completion/cancellation barriers use source AgentID and inputID; session cancellation is supported.
-- ✅ ToolDispatcher awaits ToolExecutor and preserves callID; InputGateway.send explicitly targets the originating Agent/session.
+- ✅ ToolDispatcher awaits ToolExecutor and preserves callID; Owner-scoped InputGateway delivery targets the originating Agent incarnation/session.
 - ❌ Durable Action/Tool result delivery and automatic replay.
 
 Update this README when dispatch behavior or contracts change.
 
 ## Queue and asynchronous processing contract
 
-ActionDispatcher forwards resolved calls to ChannelScheduler; the scheduler owns queue capacity, ordering and completion. ToolDispatcher deliberately bypasses Action lanes: await ToolExecutor; send returning-handler results through InputGateway.send only when the originating Agent accepts toolResult. Successful completion tools return nil; failed completion tools return an error ToolResponse without producing a ToolResult input. A rejected result delivery is retained in the execution result. Tools have no separate waiting queue or replay policy here. A dispatch caller that awaits each envelope serializes tool execution with later envelope dispatch, but already running Actions may continue.
+ActionDispatcher forwards resolved calls to ChannelScheduler; the scheduler owns queue capacity, ordering and completion. ToolDispatcher deliberately bypasses Action lanes: await ToolExecutor; deliver returning-handler results through the module-internal owner-fenced InputGateway path only when the originating Agent accepts toolResult. Successful completion tools return nil; failed completion tools return an error ToolResponse without producing a ToolResult input. A rejected result delivery is retained in the execution result. Tools have no separate waiting queue or replay policy here. A dispatch caller that awaits each envelope serializes tool execution with later envelope dispatch, but already running Actions may continue.
 
 ```mermaid
 flowchart LR
@@ -57,3 +57,8 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 ✅ ADR0132: ToolDispatcher copies producer failure codes into Core ToolResult and preserves them when attaching a separate deliveryFailure. It never infers Bluetooth health or recovery.
 
 ❌ Sustained physical-device acceptance and durable error history remain pending.
+
+## Returning Tool provenance — ADR0149
+
+✅ ToolDispatcher uses module-internal deliverToolResult with the captured execution owner and original envelope. Source incarnation/session are fenced even if another Agent reuses the same ID/session. Causal root, parent inputID, turn, sequence and bounded hops survive feedback; execution may outlive admission, so feedback gets a fresh10-second admission deadline.
+❌ No waiting feedback queue, durable transport or automatic effect replay is introduced. Delivery rejection stays distinct from Tool failure.

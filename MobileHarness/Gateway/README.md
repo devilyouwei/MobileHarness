@@ -119,3 +119,8 @@ Each active task phase runs FIFO per Channel and shares process-wide Action-modu
 
 
 ✅ ADR0140/ADR0141: cancelled lifecycle cleanup still awaits acknowledgment. ResourceCoordinator exposes unlocked/locked(owner) from one occupancy authority, retires completed writers even after errors, and automatically unlocks late completed cleanup after timeout. Revocable permits reject stale execution context. Queues, Action/Tool outcomes and transport recovery remain independent. ❌ Physical stop verification remains outstanding.
+
+## Signal provenance and Tool feedback — ADR0149
+
+✅ External, Agent and Runtime provenance share one envelope and the same bounded admission. Only identity-bound messaging admits Agent origin; runtime feedback validates original execution ownership. Returning Tools preserve causal root/parent, hop count and interaction scope without a new queue or retry.
+❌ Original-root propagation for Action/activity feedback and typed legacy controls remain pending.

@@ -43,6 +43,10 @@ func archiveCommitsBeforeTitleAndRejectsOverlappingPageOperations() async throws
     let chat = ControlledTitle()
     let workflow = ConversationHistoryWorkflow(
         state: state, loadStore: { store }, refresh: { state.archive = try await store.snapshot() },
+        deleteArchive: { id in
+            try await store.deleteArchived(id)
+            state.archive = try await store.snapshot()
+        },
         summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }, previewOutput: { _ in "" })
     await workflow.load()
     let old = try #require(state.archive?.current.id)
@@ -70,6 +74,10 @@ func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry(
     let state = ConversationHistoryState()
     let workflow = ConversationHistoryWorkflow(
         state: state, loadStore: { store }, refresh: { state.archive = try await store.snapshot() },
+        deleteArchive: { id in
+            try await store.deleteArchived(id)
+            state.archive = try await store.snapshot()
+        },
         summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }, previewOutput: { _ in "" })
     await workflow.load()
     var started = chat.started.stream.makeAsyncIterator()
@@ -94,6 +102,7 @@ func failedHistoryLoadDoesNotCreateAnEphemeralStore() async {
     let workflow = ConversationHistoryWorkflow(
         state: state, loadStore: { throw CancellationError() },
         refresh: { Issue.record("Must not refresh after failed preparation") },
+        deleteArchive: { _ in Issue.record("Must not delete after failed preparation") },
         summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: ControlledTitle()) },
         previewOutput: { _ in "" })
     await workflow.load()

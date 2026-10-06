@@ -56,6 +56,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
         history: HistoryQueryService(store: ConversationHistoryStore()),
+        historyMutations: HistoryMutationService(store: ConversationHistoryStore()),
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw ToolExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable") })

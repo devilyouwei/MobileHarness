@@ -117,7 +117,9 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
         capabilities: configuration.capabilities)
     #expect(call.toolPath == "History.list" && call.id == id)
     let registry = try ToolRegistry(modules: [
-        HistoryToolModule(history: HistoryQueryService(store: ConversationHistoryStore()))
+        HistoryToolModule(
+            history: HistoryQueryService(store: ConversationHistoryStore()),
+            mutations: HistoryMutationService(store: ConversationHistoryStore()))
     ])
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
     let envelope = OutputEnvelope(source: .assistant, input: input, output: .toolCall(call))

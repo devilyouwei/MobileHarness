@@ -275,4 +275,6 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 
 ✅ Assistant JSON declares read-only History.list/read. Aliases resolve inside Agents and execution/results cross both Gateways. ❌ Tool feedback does not yet resume model reasoning.
 
-✅ ConversationMemory accepts structured history refresh independently of voice/models and emits internal UI.showHistory through OutputGateway. ❌ Memory mutations and model-driven navigation remain staged work.
+✅ ConversationMemory accepts structured refresh/confirmed archive deletion independently of voice/models. It emits History.delete, validates correlated runtime feedback and emits UI.showHistory only after success. ❌ Archive/title and model-driven navigation remain staged work.
+
+✅ ADR0149: shared Signal provenance and owner-fenced returning Tool delivery are implemented; speech parent adaptation preserves origin. ❌ Typed intent/control migration and full business-entry coverage remain pending.

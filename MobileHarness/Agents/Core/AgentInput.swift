@@ -1,5 +1,10 @@
 import Foundation
 
+/// Provenance is independent of payload meaning; Gateway entry points enforce authority.
+public enum SignalOrigin: String, Sendable {
+    case external, agent, runtime
+}
+
 public enum InputPayload: Sendable {
     case text(String)
     case event(String)
@@ -52,6 +57,7 @@ public struct AgentInput: Sendable {
 }
 
 public struct InputMetadata: Sendable {
+    public let origin: SignalOrigin
     public let contract: String
     public let version: Int
     public let topic: String
@@ -64,7 +70,7 @@ public struct InputMetadata: Sendable {
     public let hops: Int
     public let deadline: ContinuousClock.Instant
     public init(
-        payload: InputPayload, source: String? = nil, incarnation: UUID? = nil,
+        payload: InputPayload, source: String? = nil, incarnation: UUID? = nil, origin: SignalOrigin = .external,
         capturedAt: TimeInterval? = nil, sequence: UInt64 = 0, rootID: UUID = UUID(),
         parentID: UUID? = nil, hops: Int = 0, deadline: ContinuousClock.Instant? = nil
     ) {
@@ -88,6 +94,7 @@ public struct InputMetadata: Sendable {
         case .observation(let observation):
             contract = observation.contract
         }
+        self.origin = origin
         self.contract = contract
         version = 1
         topic = contract

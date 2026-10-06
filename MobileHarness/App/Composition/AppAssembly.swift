@@ -138,6 +138,10 @@ final class AppAssembly {
                 guard let self else { throw CancellationError() }
                 try await self.runtime().historyIntents.refresh()
             },
+            deleteArchive: { [weak self] id in
+                guard let self else { throw CancellationError() }
+                try await self.runtime().historyIntents.deleteArchived(id)
+            },
             summarizeTitle: { [weak self] conversation in
                 guard let self else { throw CancellationError() }
                 let chat = try await self.makeHistoryChat()

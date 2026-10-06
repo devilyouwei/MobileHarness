@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: implemented.
 
 ## Context
 
-Storage had independent imports but selected Assistant context, supplied UI title defaults and named/localized synthesis failures. These responsibilities obstruct the staged [Agent-driven app](../Agent-Driven-App.md) design.
+Storage had independent imports but selected Assistant context, supplied UI title defaults and named/localized synthesis failures. These responsibilities obstruct the staged [Agent-driven app](../../MobileHarness/Agent-Driven-App.md) design.
 
 ## Decision
 

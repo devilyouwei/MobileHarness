@@ -26,7 +26,7 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 | Direction | Boundary before implementation |
 | --- | --- |
 | [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions/Tools 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
-| [Agent-driven app](Agent-Driven-App.md) | Storage cleanup, shared read-only history Tools and structured ConversationMemory refresh intent are implemented; BLE Tools, remaining UI intents/memory mutations and model result continuation remain pending. |
+| [Agent-driven app](../MobileHarness/Agent-Driven-App.md) | Active architecture and unified Signal contract; Storage cleanup, history Tools, refresh and confirmed deletion are implemented. Typed legacy intents, BLE Tools, archive/title and model continuation remain pending. |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
 | Local native Tool events and result-driven request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |
@@ -213,3 +213,13 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ✅ [ADR0145](adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned ConversationMemory Agent and both Gateways, with bounded admission and joined cancellation. ❌ Archive/delete/title, navigation, other UI intents and model continuation remain pending.
 
 ✅ [ADR0146](adr/0146-model-resource-interaction-ownership.md): model-resource task/admission, source-save and voice-switch policy moved from UI into independent AppSettingsWorkflow. ❌ Resource Agent/Gateway registration, cloud-form coordination and shared draft-value migration remain pending.
+
+✅ [ADR0147](adr/0147-history-delete-result-continuation.md): the authoritative Agent-driven contract was revised before implementation; confirmed archive deletion now uses internal History.delete, correlated runtime feedback and success-only UI refresh. ❌ Archive/title, resource Agent routes and model continuation remain pending.
+
+✅ [ADR0148](adr/0148-unified-signal-contract.md): the active Agent-driven architecture moved into MobileHarness and defines one Signal vocabulary using the existing AgentInput envelope. ❌ Typed legacy events, remaining UI/device routes and versioned remote/durable transport remain pending.
+
+✅ Agent-driven scenario design now documents UI intent, conversation/perception and Agent collaboration with explicit result-to-effect boundaries. ❌ Registered failure presentation, asynchronous discovery contracts and bounded model continuation require staged implementation; diagrams are not feature-completion claims.
+
+✅ Agent-driven scenario coverage now distinguishes six primary categories and external/Agent/runtime origins, with cross-cutting decisions, concurrency, triggers and recovery. ✅ Typed origin admission and Tool owner fencing are implemented in ADR0149. ❌ Unified lifecycle/capability Signals and common long-task feedback/cancellation remain unimplemented.
+
+✅ [ADR0149](adr/0149-signal-origin-and-tool-feedback.md): Signal origin and owner-fenced Tool feedback are implemented with preserved causal context and explicit delivery failures. ❌ Next stages: Action/activity root propagation → typed intent/control → history archive/title → Assistant continuation → settings/resources and device entry points. Each stage must reconcile actual code with the authoritative architecture and report remaining work.

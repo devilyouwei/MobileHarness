@@ -92,3 +92,7 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ IntegrationTests adds deterministic history intent/Gateway lifecycle coverage. ❌ This does not establish native navigation or model-driven history continuation.
 
 ✅ Model-resource task/admission regressions now run in AppWorkflowTests, matching their AppSettingsWorkflow ownership; UITests remains UI-only. ❌ Native download/form interaction acceptance remains separate.
+
+✅ IntegrationTests covers deterministic history mutation continuation through both Gateways and cancellation after commit; feature fixtures inject deletion explicitly. ❌ Physical UI behavior remains unverified.
+
+✅ ADR0149 adds Signal provenance, returning Tool causal continuity and replacement-owner fencing regressions. ❌ Original-root Action/activity migration and native acceptance remain pending.

@@ -165,3 +165,5 @@ flowchart LR
 ✅ `Mode.soundSourceOnly` shares the same bounded input worker, estimator, latest-state publisher and sound.source Gateway contract. It does not open VAD/ASR sessions, extract/resample W for a model, emit speech observations or grant transcript/voice-state Tools. The default `speechAndSoundSource` retains conversational behavior. Mode is a host lifecycle choice, not a model-callable Tool or duplicated JSON registry. Mono still publishes direction unavailable.
 
 ❌ This diagnostic mode measures dominant direction only; it does not test ASR accuracy or establish physical axis calibration.
+
+✅ ADR0149: the scoped sound-source parent preserves explicit Signal origin while narrowing its deadline; capture origin is not reclassified by payload kind. ❌ New native/system business Signal contracts remain separate migration work.

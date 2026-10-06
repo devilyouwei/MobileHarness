@@ -102,3 +102,8 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 
 
 ✅ ADR0141 adds generic ResourceExecutionPermit to trusted Output context. It carries a revocable validation closure only; actual ownership remains Gateway-owned, concrete effect checks App-owned. ❌ No device health, scheduler or platform dependency is introduced.
+
+## Signal origin — ADR0149
+
+✅ InputMetadata now carries SignalOrigin.external/agent/runtime independently of payload meaning; external is the default value, not an inferred authority. OutputEnvelope retains original input metadata for feedback correlation. Gateway entry points enforce provenance and execution ownership.
+❌ Typed replacement of legacy event/control strings and complete Action/activity root propagation remain pending.

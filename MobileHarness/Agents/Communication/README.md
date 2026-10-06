@@ -44,4 +44,4 @@ flowchart LR
 
 ✅ SoundSourceObservation is the immutable sound.source/1 domain value. active requires a finite unit direction with consistent radian azimuth/elevation; inactive/uncertain/unavailable prohibit a direction. RMS, correlation quality, capture timestamp/window duration and fixed ambisonic coordinate convention are validated. The catalog registers a 500 ms observation lifetime; factories and JSON permissions remain Agent-owned. No PCM is broadcast. ❌ Photographer has no sound.source subscription yet.
 
-✅ Built-in identities include conversationMemory; its JSON declares runtime.event input. ❌ History mutation intents and cross-Agent memory requests are not yet registered.
+✅ Built-in identities include conversationMemory; its JSON declares runtime.event input. ✅ Confirmed deletion uses the legacy runtime.event history intent and correlated tool.result feedback. ❌ Typed history intent schemas and cross-Agent memory requests remain pending.

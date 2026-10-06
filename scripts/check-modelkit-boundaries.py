@@ -351,6 +351,10 @@ if 'ModelResourceSelectionError' in resource_state or 'func isInstalled(in:' in 
     errors.append('Resource installation policy belongs to AppSettingsWorkflow')
 if (ROOT / 'Tests/UITests/ModelResourcesStateTests.swift').exists():
     errors.append('Resource operation tests belong to AppWorkflowTests')
+# History deletion must be selected by Agents/Tools, never the legacy host workflow.
+legacy_history = (ROOT / 'MobileHarness/App/Workflows/History/ConversationHistoryWorkflow.swift').read_text()
+if 'store.deleteArchived(' in legacy_history:
+    errors.append('History deletion bypasses the Agent/Tool path')
 # Discovery/connection presentation must not consume device Action diagnostics.
 bluetooth_view = (ROOT / 'MobileHarness/UI/Settings/BluetoothSettingsView.swift').read_text()
 discovery_view = bluetooth_view.split('private struct BluetoothArmDetailView', 1)[0]
@@ -648,3 +652,11 @@ tool_contract = (ROOT / 'MobileHarness/Tools/Runtime/Contracts/ToolResponse.swif
 if 'FailureCode' not in tool_contract or 'ToolExecutionFailureProviding' not in tool_contract:
     raise SystemExit('Tools require independent bounded producer failure codes.')
 print('Latest Bluetooth status and independent Tool failure codes pass.')
+
+# Returning Tool feedback must not use the public external Signal entry point.
+tool_dispatch_source = (ROOT / 'MobileHarness/Gateway/Output/Dispatch/ToolDispatcher.swift').read_text()
+if 'input.send(' in tool_dispatch_source or 'input.deliverToolResult(' not in tool_dispatch_source:
+    raise SystemExit('Returning Tool feedback must use captured-owner runtime admission.')
+output_envelope_source = (ROOT / 'MobileHarness/Agents/Core/Output/OutputEnvelope.swift').read_text()
+if 'self.inputMetadata = input.metadata' not in output_envelope_source:
+    raise SystemExit('Output envelopes must retain original Signal context for feedback.')

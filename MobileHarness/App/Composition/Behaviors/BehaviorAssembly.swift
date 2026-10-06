@@ -14,7 +14,7 @@ public struct BehaviorAssembly: Sendable {
         playback: any SpeechPlaybackCapability,
         pose: any PosePresentationCapability,
         historyPresentation: any HistoryPresentationCapability, camera: any CameraControlCapability,
-        history: any HistoryQueryCapability,
+        history: any HistoryQueryCapability, historyMutations: any HistoryMutationCapability,
         gesture: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void,
         shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
         aim: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void
@@ -24,7 +24,7 @@ public struct BehaviorAssembly: Sendable {
                 presentation: presentation, playback: playback, gesture: gesture, shakeBase: shakeBase),
             toolModules: ToolModules.builtIn(
                 presentation: pose, updates: presentation, historyPresentation: historyPresentation, camera: camera,
-                history: history, aim: aim))
+                history: history, historyMutations: historyMutations, aim: aim))
     }
 
     /// Explicit catalog injection for isolated tests or other hosts; never runtime discovery.

@@ -9,6 +9,11 @@
         "contract": "runtime.event",
         "version": 1,
         "kind": "event"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
       }
     ],
     "subscriptions": [],

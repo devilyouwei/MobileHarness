@@ -507,3 +507,190 @@ private struct ToolTimeoutModule: ToolModule {
         failureCode: response.failureCode?.rawValue)
     #expect(delivered.failureCode == "background")
 }
+
+/// Bounded fixture for testing admission and feedback without model or hardware work.
+private actor SignalFeedbackRecorder: Agent {
+    nonisolated let descriptor: AgentDescriptor
+    nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
+    private(set) var inputs: [AgentInput] = []
+    private var lifecycle: AgentLifecycle = .registered
+    init() throws {
+        descriptor = AgentDescriptor(
+            id: .assistant, name: "Signal feedback fixture", inputs: [.text, .toolResult], outputs: [.toolCall],
+            capabilities: try CapabilityRegistry(internalTools: [InternalTool(path: "runtimeInfo")]))
+    }
+    func start() { lifecycle = .running }
+    func pause() { lifecycle = .paused }
+    func resume() { lifecycle = .running }
+    func stop() { lifecycle = .stopped }
+    func status() -> AgentStatus {
+        AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: inputs.count)
+    }
+    func receive(_ input: AgentInput) throws {
+        guard lifecycle == .running else { throw HarnessError.notRunning }
+        guard inputs.count < 8 else { throw CommunicationError.capacityExceeded }
+        inputs.append(input)
+    }
+}
+
+@Test func externalAdmissionCannotForgeRuntimeOrAgentOrigin() async throws {
+    let manager = AgentManager()
+    let agent = try SignalFeedbackRecorder()
+    let session = UUID()
+    try await manager.register(agent, sessionID: session)
+    await agent.start()
+    let gateway = InputGateway(manager: manager)
+    for origin in [SignalOrigin.agent, .runtime] {
+        let payload = InputPayload.text("forged")
+        let forged = AgentInput(
+            sessionID: session, payload: payload,
+            metadata: InputMetadata(payload: payload, source: "runtime", origin: origin))
+        await #expect(throws: CommunicationError.unauthorized) { try await gateway.send(forged, to: .assistant) }
+        await #expect(throws: CommunicationError.unauthorized) { try await gateway.publish(forged) }
+    }
+    let payload = InputPayload.toolResult(ToolResult(callID: UUID(), value: "forged"))
+    let disguised = AgentInput(sessionID: session, payload: payload)
+    #expect(disguised.metadata.origin == .external)
+    await #expect(throws: CommunicationError.unauthorized) { try await gateway.send(disguised, to: .assistant) }
+    #expect(await agent.inputs.isEmpty)
+    _ = try await gateway.send(AgentInput(sessionID: session, payload: .text("actual intent")), to: .assistant)
+    #expect(await agent.inputs.count == 1)
+    await manager.stopAll()
+}
+
+@Test(arguments: [false, true]) func returningToolPreservesCausalityAndRuntimeOrigin(_ fails: Bool) async throws {
+    let manager = AgentManager()
+    let agent = try SignalFeedbackRecorder()
+    let session = UUID()
+    try await manager.register(agent, sessionID: session)
+    await agent.start()
+    let registry = ToolRegistry()
+    try await registry.register("runtimeInfo") { _ in
+        if fails { throw ToolExecutionFailure(code: .init(rawValue: "busy"), message: "Actual failure") }
+        return "Actual value"
+    }
+    let configuration = try AgentConfiguration(
+        data: Data(
+            #"""
+            {"version":5,"id":"assistant","actions":{},"tools":[],"communication":{
+            "inputs":[{"contract":"user.text","version":1,"kind":"text"},
+            {"contract":"tool.result","version":1,"kind":"toolResult"}],
+            "subscriptions":[],"publications":[],"sends":[]}}
+            """#.utf8))
+    let policy = try CommunicationPolicy(externalSources: ["user"], configurations: [configuration])
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager, policy: policy), tools: registry, policy: policy
+    ) { _ in }
+    let root = UUID()
+    let payload = InputPayload.text("earlier admitted request")
+    // Execution may finish after its original input's admission deadline.
+    let parent = AgentInput(
+        sessionID: session, payload: payload,
+        metadata: InputMetadata(
+            payload: payload, rootID: root, parentID: UUID(), hops: 2,
+            deadline: .now.advanced(by: .seconds(-1))), turn: AgentTurn(ordinal: 3))
+    let call = ToolCall(toolPath: "runtimeInfo", arguments: [:])
+    let envelope = OutputEnvelope(source: .assistant, input: parent, output: .toolCall(call), sequence: 7)
+    let result = try await gateway.execute(envelope)
+    #expect(result.tool?.isError == fails)
+    #expect(result.tool?.deliveryFailure == nil)
+    let feedback = try #require(await agent.inputs.first)
+    #expect(feedback.metadata.origin == .runtime)
+    #expect(feedback.metadata.source == "runtime")
+    #expect(feedback.metadata.incarnation == nil)
+    #expect(feedback.metadata.rootID == root)
+    #expect(feedback.metadata.parentID == parent.id)
+    #expect(feedback.metadata.hops == 3)
+    #expect(feedback.metadata.sequence == 7)
+    #expect(!feedback.metadata.expired)
+    #expect(feedback.turn == parent.turn)
+    #expect(feedback.sessionID == session)
+    if case .toolResult(let value) = feedback.payload {
+        #expect(value.callID == call.id)
+        #expect(value.isError == fails)
+        #expect(value.value == (fails ? "Actual failure" : "Actual value"))
+    } else {
+        Issue.record("Expected actual Tool feedback")
+    }
+    await gateway.shutdown()
+    await manager.stopAll()
+}
+
+private actor HeldSignalTool {
+    nonisolated let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private(set) var executions = 0
+    func execute() async throws -> String {
+        executions += 1
+        started.continuation.yield(())
+        var iterator = release.stream.makeAsyncIterator()
+        _ = await iterator.next()
+        try Task.checkCancellation()
+        return "Committed effect"
+    }
+    func finish() { release.continuation.yield(()) }
+}
+
+@Test(.timeLimit(.minutes(1))) func returningToolDoesNotDeliverToReplacementAgent() async throws {
+    let manager = AgentManager()
+    let original = try SignalFeedbackRecorder()
+    let session = UUID()
+    try await manager.register(original, sessionID: session)
+    await original.start()
+    let held = HeldSignalTool()
+    let registry = ToolRegistry()
+    try await registry.register("runtimeInfo") { _ in try await held.execute() }
+    let gateway = OutputGateway(manager: manager, requests: InputGateway(manager: manager), tools: registry) { _ in }
+    let parent = AgentInput(sessionID: session, payload: .text("intent"))
+    let operation = Task {
+        try await gateway.execute(
+            OutputEnvelope(
+                source: .assistant, input: parent,
+                output: .toolCall(ToolCall(toolPath: "runtimeInfo", arguments: [:]))))
+    }
+    var started = held.started.stream.makeAsyncIterator()
+    _ = try #require(await started.next())
+    try await manager.remove(.assistant)
+    let replacement = try SignalFeedbackRecorder()
+    try await manager.register(replacement, sessionID: session)
+    await replacement.start()
+    await held.finish()
+    let result = try await operation.value
+    #expect(result.tool?.value == "Committed effect")
+    #expect(result.tool?.isError == false)
+    #expect(result.tool?.deliveryFailure != nil)
+    #expect(result.failureCode == .deliveryFailed)
+    #expect(await replacement.inputs.isEmpty)
+    #expect(await held.executions == 1)
+    await gateway.shutdown()
+    await manager.stopAll()
+}
+
+@Test func toolFeedbackHopExhaustionPreservesEffectWithoutReplay() async throws {
+    let manager = AgentManager()
+    let agent = try SignalFeedbackRecorder()
+    let session = UUID()
+    try await manager.register(agent, sessionID: session)
+    await agent.start()
+    let registry = ToolRegistry()
+    let recorder = Recorder()
+    try await registry.register("runtimeInfo") { _ in
+        await recorder.act()
+        return "Completed once"
+    }
+    let gateway = OutputGateway(manager: manager, requests: InputGateway(manager: manager), tools: registry) { _ in }
+    let payload = InputPayload.text("intent")
+    let parent = AgentInput(
+        sessionID: session, payload: payload, metadata: InputMetadata(payload: payload, hops: 8))
+    let result = try await gateway.execute(
+        OutputEnvelope(
+            source: .assistant, input: parent,
+            output: .toolCall(ToolCall(toolPath: "runtimeInfo", arguments: [:]))))
+    #expect(result.tool?.value == "Completed once")
+    #expect(result.tool?.isError == false)
+    #expect(result.tool?.deliveryFailure == String(describing: CommunicationError.hopLimitExceeded))
+    #expect(await agent.inputs.isEmpty)
+    #expect(await recorder.actions == 1)
+    await gateway.shutdown()
+    await manager.stopAll()
+}

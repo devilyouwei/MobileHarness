@@ -194,3 +194,5 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ Composition injects the shared conversation journal into Tools.HistoryQueryService. ✅ History load/refresh now uses the root ConversationMemory transport and scoped presentation adapter. ❌ Archive/delete/title remain legacy workflow operations.
 
 ✅ Root composition injects typed model-resource controls beside passive UI state; resource admission/save/cancel policy is independently compiled in AppSettingsWorkflow. ❌ Model resource Agent routing remains pending.
+
+✅ History deletion composition passes a typed transport operation, and the shared journal is bound to Tools.HistoryMutationService. App does not delete or select follow-up presentation. ❌ Archive/title and resource Agent routes remain staged work.

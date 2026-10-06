@@ -102,3 +102,5 @@ flowchart LR
     Gateway --> Schema[Registered type / size / lifetime validation]
     Schema --> Receiver[Agent-owned inbox]
 ```
+
+✅ ADR0149: origin is explicit metadata, separate from domain schema. OutputGateway constructs Agent-origin messages with a bound incarnation; public external admission rejects claimed Agent/Runtime origin and execution feedback payloads. Runtime execution feedback uses owner-scoped delivery. ❌ Legacy host runtime.event commands remain externally admitted until typed control migration.

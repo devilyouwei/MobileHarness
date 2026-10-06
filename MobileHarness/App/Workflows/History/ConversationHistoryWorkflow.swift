@@ -6,6 +6,7 @@ import UI
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     public let state: ConversationHistoryState
+    private let deleteArchive: @MainActor (UUID) async throws -> Void
     private let refresh: @MainActor () async throws -> Void
     private let loadStore: @MainActor () async throws -> ConversationHistoryStore
     private let summarizeTitle: @MainActor (StoredConversation) async throws -> String
@@ -15,9 +16,11 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     public init(
         state: ConversationHistoryState, loadStore: @escaping @MainActor () async throws -> ConversationHistoryStore,
         refresh: @escaping @MainActor () async throws -> Void,
+        deleteArchive: @escaping @MainActor (UUID) async throws -> Void,
         summarizeTitle: @escaping @MainActor (StoredConversation) async throws -> String,
         previewOutput: @escaping @MainActor (ConversationRecord) -> String
     ) {
+        self.deleteArchive = deleteArchive
         self.refresh = refresh
         self.state = state
         self.loadStore = loadStore
@@ -55,10 +58,9 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         }
     }
     public func delete(_ id: UUID) {
-        perform { store in
+        perform { _ in
             do {
-                try await store.deleteArchived(id)
-                self.state.archive = try await store.snapshot()
+                try await self.deleteArchive(id)
             } catch { self.state.status = "删除失败：\(error)" }
         }
     }

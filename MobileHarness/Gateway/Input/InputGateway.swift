@@ -2,11 +2,6 @@ import AgentCore
 import Foundation
 
 public actor InputGateway {
-    func acceptsToolResults(_ source: AgentID) async -> Bool {
-        guard let agent = try? await manager.agent(source) else { return false }
-        return agent.descriptor.inputs.contains(.toolResult)
-    }
-
     private var activeAdmissions = 0
     private var activeBranches = 0
     private var observationBytes = 0
@@ -27,7 +22,9 @@ public actor InputGateway {
     }
     // Module-internal: only OutputGateway supplies resolved targets and a bound source identity.
     func sendInternal(_ input: AgentInput, targets: [(AgentID, UUID)]) async throws -> DeliveryReport {
-        guard input.metadata.incarnation != nil else { throw CommunicationError.unauthorized }
+        guard input.metadata.origin == .agent, input.metadata.incarnation != nil else {
+            throw CommunicationError.unauthorized
+        }
         return try await deliver(input, targets: targets.map { ($0.0, Optional($0.1)) })
     }
     private func validatePayload(_ input: AgentInput) throws -> Int {
@@ -36,6 +33,16 @@ public actor InputGateway {
             input.metadata.version == 1, input.metadata.hops >= 0, input.metadata.hops <= 8,
             input.metadata.capturedAt.isFinite, input.metadata.capturedAt >= 0
         else { throw CommunicationError.invalidPayload }
+        switch input.metadata.origin {
+        case .external:
+            guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
+        case .agent:
+            guard input.metadata.incarnation != nil else { throw CommunicationError.unauthorized }
+        case .runtime:
+            guard input.metadata.source == "runtime", input.metadata.incarnation == nil else {
+                throw CommunicationError.unauthorized
+            }
+        }
         switch input.payload {
         case .actionResult(let result):
             guard result.owner.sessionID == input.sessionID, result.owner.agent.rawValue.utf8.count <= 64,
@@ -59,33 +66,59 @@ public actor InputGateway {
         return 0
     }
     public func publish(_ input: AgentInput) async throws -> DeliveryReport {
-        try rejectRuntimePayload(input)
-        guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
+        try validateExternal(input)
         return try await deliver(input, targets: destinations(for: input).map { ($0, nil) })
     }
     public func send(_ input: AgentInput, to target: AgentID) async throws -> DeliveryReport {
-        try rejectRuntimePayload(input)
-        guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
+        try validateExternal(input)
         return try await deliver(input, targets: [(target, nil)])
     }
-    private func rejectRuntimePayload(_ input: AgentInput) throws {
+    private func validateExternal(_ input: AgentInput) throws {
+        guard input.metadata.origin == .external, input.metadata.incarnation == nil else {
+            throw CommunicationError.unauthorized
+        }
         switch input.payload {
-        case .actionResult, .activityEvent: throw CommunicationError.unauthorized
+        case .toolResult, .actionResult, .activityEvent: throw CommunicationError.unauthorized
         default: break
         }
+    }
+
+    /// Module-internal: returning Tools bind the original execution owner, never public external admission.
+    func deliverToolResult(_ result: ToolResult, owner: ExecutionOwner, envelope: OutputEnvelope) async throws
+        -> DeliveryReport?
+    {
+        guard owner.agent == envelope.source, owner.sessionID == envelope.sessionID else {
+            throw CommunicationError.unauthorized
+        }
+        try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
+        let agent = try await manager.agent(owner.agent)
+        guard agent.descriptor.inputs.contains(.toolResult) else { return nil }
+        let context = envelope.inputMetadata
+        guard (0..<8).contains(context.hops) else { throw CommunicationError.hopLimitExceeded }
+        let payload = InputPayload.toolResult(result)
+        let input = AgentInput(
+            sessionID: owner.sessionID, payload: payload,
+            metadata: InputMetadata(
+                payload: payload, source: "runtime", origin: .runtime, sequence: envelope.sequence,
+                rootID: context.rootID, parentID: envelope.inputID, hops: context.hops + 1),
+            turn: envelope.turn)
+        return try await deliver(input, targets: [(owner.agent, owner.incarnation)])
     }
 
     public func deliverActionResult(_ result: ActionResult) async -> ActionResultDelivery {
         let input = AgentInput(
             sessionID: result.owner.sessionID, payload: .actionResult(result),
             metadata: InputMetadata(
-                payload: .actionResult(result), source: "runtime", rootID: result.inputID,
+                payload: .actionResult(result), source: "runtime", origin: .runtime, rootID: result.inputID,
                 parentID: result.inputID), turn: result.turn)
         return await deliverRuntime(input, owner: result.owner)
     }
 
     public func deliverActivityEvent(_ event: ActivityEvent) async -> ActionResultDelivery {
-        let input = AgentInput(sessionID: event.owner.sessionID, payload: .activityEvent(event))
+        let payload = InputPayload.activityEvent(event)
+        let input = AgentInput(
+            sessionID: event.owner.sessionID, payload: payload,
+            metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime))
         return await deliverRuntime(input, owner: event.owner)
     }
 
@@ -114,7 +147,7 @@ public actor InputGateway {
         guard targets.count <= 16, Set(targets.map(\.0)).count == targets.count else {
             throw CommunicationError.capacityExceeded
         }
-        if input.metadata.incarnation == nil {
+        if input.metadata.origin == .external {
             guard (policy?.externalSources ?? ["user", "runtime"]).contains(input.metadata.source) else {
                 throw CommunicationError.unauthorized
             }

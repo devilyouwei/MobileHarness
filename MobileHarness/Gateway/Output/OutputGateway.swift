@@ -132,7 +132,7 @@ public actor OutputGateway {
         let input = AgentInput(
             sessionID: parent.sessionID, payload: payload,
             metadata: InputMetadata(
-                payload: payload, source: source.rawValue, incarnation: incarnation,
+                payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
                 capturedAt: parent.metadata.capturedAt, sequence: sequences[source]!, rootID: parent.metadata.rootID,
                 parentID: parent.id, hops: parent.metadata.hops + 1,
                 deadline: min(

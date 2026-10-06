@@ -401,6 +401,7 @@ public actor SpeechPerceptionAgent: Agent {
             id: parent.id, sessionID: parent.sessionID, payload: parent.payload,
             metadata: InputMetadata(
                 payload: parent.payload, source: metadata.source, incarnation: metadata.incarnation,
+                origin: metadata.origin,
                 capturedAt: metadata.capturedAt, sequence: metadata.sequence, rootID: metadata.rootID,
                 parentID: metadata.parentID, hops: metadata.hops,
                 deadline: min(metadata.deadline, capturedAt.advanced(by: .milliseconds(500)))),

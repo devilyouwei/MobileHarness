@@ -17,6 +17,9 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 | ID | Decision |
 | --- | --- |
 | 0001 | [ADR 0001 原生模块化 Runtime](0001-native-modular-runtime.md) |
+| 0149 | [Signal origin and returning Tool feedback](0149-signal-origin-and-tool-feedback.md) |
+| 0148 | [Unified Signal contract and active architecture](0148-unified-signal-contract.md) |
+| 0147 | [History deletion and result continuation](0147-history-delete-result-continuation.md) |
 | 0146 | [Model resource interaction ownership](0146-model-resource-interaction-ownership.md) |
 | 0145 | [History refresh Agent intent](0145-history-refresh-agent-intent.md) |
 | 0144 | [Shared read-only history Tools](0144-read-only-history-tools.md) |
@@ -223,3 +226,7 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 
 
 - ✅ [ADR0141 — Resource control ownership](0141-resource-control-ownership.md): unlocked/locked(owner), one actual holding authority, revocable execution permits and automatic late cleanup release; no faulted/recover latch. ❌ Physical stop/native isolation acceptance remains pending.
+
+✅ [ADR0148 — Unified Signal contract](0148-unified-signal-contract.md): active architecture location, canonical AgentInput envelope, common Signal/execution rules before six scenario examples, with origin, feedback/effect diagrams and consolidated implementation gaps; no runtime change.
+
+✅ ADR0149 implements origin admission and owner-fenced Tool feedback. ❌ Action/activity causal roots and typed host controls remain pending.

@@ -2,6 +2,18 @@ import Foundation
 import ToolRuntime
 
 public enum HistoryTools {
+    @Tool(path: "History.delete", title: "delete")
+    public static func delete(call: ToolRequest, using history: any HistoryMutationCapability) async throws -> String {
+        try Task.checkCancellation()
+        let arguments = ToolArguments(call.arguments)
+        try arguments.validateAllowedKeys(["id"])
+        let rawID = try arguments.requiredString("id", maximumUTF8Bytes: 36)
+        guard let id = UUID(uuidString: rawID) else { throw ToolArguments.ValidationError.invalidValue("id") }
+        try await history.deleteArchived(id)
+        try Task.checkCancellation()
+        return "{\"deleted\":\"" + id.uuidString + "\"}"
+    }
+
     @Tool(path: "History.list", title: "list")
     public static func list(call: ToolRequest, using history: any HistoryQueryCapability) async throws
         -> String

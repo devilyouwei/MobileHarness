@@ -131,4 +131,4 @@ flowchart LR
 
 ✅ Persisted schemas, atomic revisions, bounded writers and reply/session audio ownership remain unchanged. See [ADR0143](../../docs/adr/0143-storage-consumer-policy-boundaries.md).
 
-❌ Broader workflow migration, unified UI intent and conversation-driven task continuation remain planned in [Agent-driven app](../../docs/Agent-Driven-App.md). No implicit business/service dependency is permitted in Storage.
+❌ Broader workflow migration, unified UI intent and conversation-driven task continuation remain planned in [Agent-driven app](../Agent-Driven-App.md). No implicit business/service dependency is permitted in Storage.

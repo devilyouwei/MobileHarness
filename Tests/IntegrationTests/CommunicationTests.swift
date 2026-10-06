@@ -81,6 +81,7 @@ actor ObservationRecorder: Agent {
     let parent = AgentInput(sessionID: session, payload: .text("source"))
     let published = try await port.publish(.transcript("hello", final: true), parent: parent)
     #expect(published.delivered == [consumer.descriptor.id])
+    #expect(await consumer.inputs.first?.metadata.origin == .agent)
     #expect(await direct.inputs.isEmpty)
     let sent = try await port.send(.transcript("direct", final: true), parent: parent, to: direct.descriptor.id)
     #expect(sent.delivered == [direct.descriptor.id])
