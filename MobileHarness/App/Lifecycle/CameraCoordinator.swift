@@ -1,9 +1,11 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
 import CoreGraphics
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import OSLog
 import PlatformKit
@@ -73,7 +75,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
     }
 
     /// Tool calls reject overlap rather than replacing another command's intent.
-    func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
+    func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
         guard foreground else { throw CameraControlError.notForeground }
         guard worker == nil else { throw CameraControlError.busy }
@@ -93,7 +95,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         try await finishCameraControl(enabled: enabled)
     }
 
-    func flip(invocation: ToolInvocation) async throws {
+    func flip(invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
         guard foreground else { throw CameraControlError.notForeground }
         guard worker == nil else { throw CameraControlError.busy }
@@ -201,7 +203,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         state.visionMessage = message
         if message != nil { state.skeleton = nil }
     }
-    func present(_ target: UIActions.Gaze, invocation: ToolInvocation) throws {
+    func present(_ target: UIActions.Gaze, invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard visionSession == invocation.context.sessionID, foreground, state.isEnabled, state.isVisible else {
             throw CancellationError()
@@ -211,7 +213,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         state.gaze = CGSize(width: target.x, height: target.y)
     }
 
-    func present(_ overlay: ToolPoseOverlay, sessionID: UUID) throws {
+    func present(_ overlay: Actions.PoseOverlay, sessionID: UUID) throws {
         try Task.checkCancellation()
         guard visionSession == sessionID, foreground, state.isEnabled, state.isVisible else {
             throw CancellationError()
@@ -219,11 +221,11 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         guard state.skeleton.map({ overlay.sequence > $0.sequence }) ?? true else {
             throw CommunicationError.outOfOrder
         }
-        state.skeleton = PoseOverlay(
+        state.skeleton = UI.PoseOverlay(
             sequence: overlay.sequence, timestamp: overlay.timestamp, rotation: overlay.rotation,
-            people: overlay.people.map { $0.map { PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) } },
+            people: overlay.people.map { $0.map { UI.PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) } },
             statistics: overlay.statistics.map {
-                PoseOverlay.Statistics(
+                UI.PoseOverlay.Statistics(
                     queueMilliseconds: $0.queueMilliseconds, inferenceMilliseconds: $0.inferenceMilliseconds,
                     totalMilliseconds: $0.totalMilliseconds, framesPerSecond: $0.framesPerSecond,
                     replacements: $0.replacements, detectionIntervalMilliseconds: $0.detectionIntervalMilliseconds,

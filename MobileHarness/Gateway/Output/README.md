@@ -1,6 +1,6 @@
 # Output — Resolved Invocation Gateway
 
-Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter ChannelScheduler; ToolCalls execute through Actions/Runtime and return results through InputGateway. Alias binding belongs to Agents.
+Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter ChannelScheduler; ToolCalls execute through Gateway/Runtime and return results through InputGateway. Alias binding belongs to Agents.
 
 - ✅ OutputGateway connects validation, routing, dispatch and the observation sink, with error propagation and cancellation/completion barriers.
 - ✅ Validation, Routing, Dispatch and Scheduling have separate responsibilities.
@@ -8,7 +8,7 @@ Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter C
 - ✅ Session cancellation covers the session across Agents. ToolCalls bypass Action queues.
 - ✅ Resolved ActionCall/ToolCall inputs and runtime control notifications. Raw text and FunctionToken events are not accepted.
 - ✅ Task-local Channel FIFO and nested wait groups, bounded admission and process-wide module exclusion. Different channels may run concurrently when modules permit; main is an ordinary channel.
-- ✅ Imports independent ActionRuntime/ToolRuntime and AgentCore contracts; never imports concrete Actions/Tools or directly invokes behavior helpers.
+- ✅ Imports independent FunctionContracts, ExecutionRuntime and CallRuntime and AgentCore contracts; never imports concrete Actions/Tools or directly invokes behavior helpers.
 - ✅ Typed ActionResult feedback and declared resource leases/fences; details below.
 - ❌ Priority scheduling and generic activity subscriptions.
 
@@ -33,7 +33,7 @@ flowchart LR
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
-✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. VisionPerception skeletons use validated ToolCalls through Actions/Runtime; no UI payload bypass exists.
+✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. VisionPerception skeletons use validated ToolCalls through Gateway/Runtime; no UI payload bypass exists.
 
 
 ## Typed event path
@@ -73,7 +73,7 @@ The configured observer consumes only current speech state and has no unbounded 
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
-✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
+✅ ADR0098: Gateway imports AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
 
 ✅ Production consumers use execute rather than low-level dispatch: ordinary output failures become correlated outcomes. Permissions still validate before effects and cancellation still propagates.
 
@@ -116,6 +116,12 @@ The observation path neither injects a new Agent result nor invokes device recov
 ✅ ChannelScheduler fences execution by definition-owned serializationKey captured at admission, releasing only after joined cleanup. Existing FIFO, wait, capacity, feedback and resource policies remain intact.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; business implementations import FunctionContracts; Gateway imports independent execution and call SDKs. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

@@ -1,13 +1,15 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Testing
 
 /// Reuse scheduler fixtures in argument validation tests while constructing a genuine immediate Tool envelope.
-func uiToolInvocation(_ invocation: ActionInvocation) -> ToolInvocation {
+func uiActionInvocation(_ invocation: any FunctionInput) -> ActionInvocation {
     let call = ToolCall(
         toolPath: "Fixture.Control.UI." + invocation.call.actionPath.function, arguments: invocation.call.parameters)
     let e = invocation.testEnvelope
@@ -15,23 +17,23 @@ func uiToolInvocation(_ invocation: ActionInvocation) -> ToolInvocation {
         source: e.source,
         input: AgentInput(id: e.inputID, sessionID: e.sessionID, payload: .event("fixture"), turn: e.turn),
         output: .toolCall(call), sequence: e.sequence)
-    return ToolInvocation(call: call, envelope: envelope)
+    return ActionInvocation(call: call, envelope: envelope)
 }
 
 private actor CaptionEndpoint {
     var policy = ConversationPresentation()
     var reply = ""
     var transcript = ""
-    func begin(_ invocation: ToolInvocation) {
+    func begin(_ invocation: any FunctionInput) {
         if policy.accept(invocation.context, update: .beginReply) { reply = "" }
     }
-    func append(_ text: String, _ invocation: ToolInvocation) {
+    func append(_ text: String, _ invocation: any FunctionInput) {
         if policy.accept(invocation.context, update: .reply) { reply += text }
     }
-    func replace(_ text: String, _ invocation: ToolInvocation) {
+    func replace(_ text: String, _ invocation: any FunctionInput) {
         if policy.accept(invocation.context, update: .transcript) { transcript = text }
     }
-    func close(_ invocation: ToolInvocation) {
+    func close(_ invocation: any FunctionInput) {
         if policy.accept(invocation.context, update: .finishTranscript) { transcript = "" }
     }
 }
@@ -39,9 +41,9 @@ private actor CaptionEndpoint {
 @Test func immediateCaptionToolsPreserveAppendReplacementAndTurnFences() async throws {
     let endpoint = CaptionEndpoint()
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"), turn: AgentTurn(ordinal: 1))
-    func invocation(_ function: String, text: String? = nil, source: AgentID, sequence: UInt64) -> ToolInvocation {
+    func invocation(_ function: String, text: String? = nil, source: AgentID, sequence: UInt64) -> ActionInvocation {
         let call = ToolCall(toolPath: "Fixture.Control.UI." + function, arguments: text.map { ["text": $0] } ?? [:])
-        return ToolInvocation(
+        return ActionInvocation(
             call: call,
             envelope: OutputEnvelope(
                 source: source, input: input,

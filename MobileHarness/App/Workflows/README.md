@@ -198,7 +198,7 @@ flowchart LR
 
 ✅ SpeechPlayback passes ActionExecutionContext.source directly into StorageAudio; no AgentID conversion or AgentCore import is required in that playback adapter.
 
-✅ Settings depends only on UI/Storage and History on UI/StorageChat plus AgentCore/Agents/Gateway/Tools/ToolRuntime for its staged intent transport. Concrete provider and Agent parsing/title bindings live in App/Adapters. SpeechPlayback imports ActionRuntime and StorageAudio; presentation imports only execution/shared/UI values. Existing bounded operation policies and cancellation are unchanged.
+✅ Settings depends only on UI/Storage and History on UI/StorageChat plus AgentCore/Agents/Gateway/Actions/FunctionContracts/ExecutionRuntime/CallRuntime for its staged intent transport. Concrete provider and Agent parsing/title bindings live in App/Adapters. SpeechPlayback imports FunctionContracts and StorageAudio; presentation imports only execution/shared/UI values. Existing bounded operation policies and cancellation are unchanged.
 
 ❌ The facade is not a service locator and owns no runtime state; independent multi-window arbitration remains future work.
 
@@ -241,3 +241,5 @@ flowchart LR
 ✅ ModelResourceInteractionWorkflow moves model-resource tasks/admission and preference coordination out of UI into existing AppSettingsWorkflow. Pending submission bound32 rejects overflow; cancel joins admission and page cancellation does not own admitted transfers. ❌ Resource Agent/Gateway routing and cloud-form coordination remain pending.
 
 ✅ Confirmed history deletion leaves the legacy feature implementation: ConversationMemory selects History.Conversation.delete and success-only UI.HistoryPresentation.showHistory; transport carries up to2 calls and bounded cancellation cleanup. ❌ Archive/title and resource Agent routes remain pending.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.

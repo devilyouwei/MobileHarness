@@ -52,13 +52,13 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 
 ✅ SpeechActions validates the audio identifier with a module-owned SpeechActionError. The injected playback endpoint owns checkout and drain; AppWorkflows.SpeechPlayback adapts StorageAudio ownership.
 
-✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+✅ ADR0098: Execution values and services are imported from independent FunctionContracts; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
 
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
-❌ Unified capability definitions and protocol registration adapters remain pending.
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
+✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
 
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
-❌ Unified callable definitions and migration of compatibility names remain pending.
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one pure `<Domain>Module`; host registration creates Action/Tool projections. Superseded aliases/protocol catalogs are retired.
+✅ Unified definitions and compatibility retirement are implemented in ADR0157.
 
 ## Cohesive module files — ADR0154
 
@@ -67,7 +67,7 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 - [PlaybackActions.swift](PlaybackActions.swift)
 
 ✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
-❌ Explicit three-field paths, versioned Agent configuration and unified definitions/results remain the next coordinated stage.
+✅ Three-field addresses, Agent v6 configuration and shared definitions/results are implemented in ADR0156/0157.
 
 ✅ Playback Action definitions explicitly use serializationKey Speech, preserving process-wide exclusion independently of future three-level addresses.
 
@@ -75,6 +75,12 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

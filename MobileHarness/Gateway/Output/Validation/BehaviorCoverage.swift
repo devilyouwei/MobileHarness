@@ -1,5 +1,7 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
+import FunctionContracts
 
 /// Startup permission coverage, separate from behavior construction and effect execution.
 public enum BehaviorCoverage {

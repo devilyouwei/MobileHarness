@@ -1,17 +1,18 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 /// UI.VoiceState function ownership; current invocation paths remain compatible.
 extension UIActions {
-    @Tool(path: "UI.VoiceState.setVoiceState", title: "setVoiceState")
+    @Action(
+        domain: "UI", module: "VoiceState", title: "setVoiceState", serializationKey: "UI")
     public static func setVoiceState(
-        invocation: ToolInvocation,
-        using present: @escaping @Sendable (VoiceState, ToolInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (VoiceState, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let state: VoiceState
         do {
-            let arguments = ToolArguments(invocation.call.arguments)
+            let arguments = ActionArguments(invocation.call.parameters)
             try arguments.validateAllowedKeys(["state"])
             state = try arguments.requiredEnum("state", as: VoiceState.self)
         } catch { throw PresentationError.invalidCall }

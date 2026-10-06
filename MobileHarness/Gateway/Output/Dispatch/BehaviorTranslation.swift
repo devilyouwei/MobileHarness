@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 extension ActionCall {
     public var executionRequest: ActionRequest {
@@ -16,14 +18,10 @@ extension OutputEnvelope {
             source: source.rawValue, sessionID: sessionID, inputID: inputID, sequence: sequence,
             correlationID: turn?.id, ordinal: turn?.ordinal)
     }
-    public var toolContext: ToolExecutionContext {
-        .init(
-            source: source.rawValue, sessionID: sessionID, inputID: inputID, sequence: sequence,
-            correlationID: turn?.id, ordinal: turn?.ordinal)
-    }
+
 }
 extension ActionRegistry {
-    public func definition(for path: ActionPath) throws -> ActionDefinition {
+    public func definition(for path: ActionPath) throws -> ActionBinding {
         try definition(for: ActionIdentifier(domain: path.domain, module: path.module, function: path.function))
     }
     public func validate(capabilities: CapabilityRegistry) throws {
@@ -31,9 +29,9 @@ extension ActionRegistry {
         for action in capabilities.internalActions { _ = try definition(for: action.path) }
     }
 }
-extension ActionDefinition {
+extension ActionBinding {
     public func requiredResources(for call: ActionCall) throws -> Set<ResourceID> {
-        Set(try requiredResources(for: call.executionRequest).map { ResourceID(rawValue: $0.rawValue) })
+        Set(try requiredResources(for: call.executionRequest.functionRequest).map { ResourceID(rawValue: $0.rawValue) })
     }
 }
 extension ActionCompletion {

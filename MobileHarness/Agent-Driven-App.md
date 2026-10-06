@@ -195,19 +195,19 @@ sequenceDiagram
     UI->>App: Delete intent + archive ID
     App->>Input: Signal with request/session identity
     Input->>Agent: Validated input
-    Agent->>Output: Resolved History.delete call
+    Agent->>Output: Resolved History.Conversation.delete call
     Output->>Effects: Authorized Tool executes Storage transaction
     Effects-->>Output: Actual success or failure + call ID
     Output->>Input: Correlated ToolResult Signal
     Input->>Agent: Scoped feedback
     alt Deletion succeeded
-        Agent->>Output: Resolved UI.showHistory call
+        Agent->>Output: Resolved UI.HistoryPresentation.showHistory call
         Output->>Effects: Invoke registered presentation Tool
         Effects->>UI: Apply scoped actual snapshot on MainActor
         UI-->>Human: Updated history
     else Deletion failed
         Agent->>Output: Failure control / execution outcome
-        Note over App,UI: Current root workflow shows localized error; Agent error presentation is pending
+        Note over App,UI: Current root workflow shows localized error.<br/>Agent error presentation is pending
     end
 ```
 
@@ -365,7 +365,7 @@ Action feedback keeps its existing owner fencing; complete original-root propaga
 
 ### Unified executable capabilities — adopted design
 
-Actions is the target owner of all executable business capabilities, including queries. One capability definition owns its handler, parameters, resources, budget, execution policy and result contract. Agent configuration controls permission and ActionCall/ToolCall exposure; it cannot override resource requirements, execution policy or completion guarantees. The same implementation may be exposed through both protocols without duplicating effects or registration metadata.
+Actions is the target owner of all executable business capabilities, including queries. One ActionFunction owns its handler, parameters, resources, budget and shared completion contract. Host-created ActionBinding owns invocation protocols, native scheduling and feedback. Agent configuration controls permission and model exposure; it cannot override intrinsic requirements or host execution policy. The same implementation may be exposed through both protocols without duplicating effects or registration metadata.
 
 Invocation protocol, execution policy and feedback policy are independent. A ToolCall to a scheduled capability must use the same Channel/resource admission as its ActionCall counterpart; registration cannot make hardware execution direct. Gateway retains trusted ownership, scheduling and feedback delivery. AgentCore retains independent protocol contracts. Capability results adapt to ActionResult or ToolResult without confusing admission, committed effects and feedback delivery.
 
@@ -381,7 +381,7 @@ flowchart LR
     Result --> Feedback[Protocol-specific feedback through InputGateway]
 ```
 
-✅ Consolidation is implemented in ADR0150–0157: one Actions source tree and ActionRuntime target, six canonical catalogs, cohesive module files, three-field addresses, v6 Agent bindings, shared definition/outcome/execution and direct/scheduled protocol adapters. Tools/ToolRuntime shims and old namespace aliases are removed. Protocol-specific transport values/registries remain explicit adapters, not separate business implementations. Production protocol grants are preserved.
+✅ ADR0150–0157 established consolidation; ADR0161 now separates FunctionContracts, Gateway-owned ExecutionRuntime and CallRuntime. The migration retains six canonical catalogs, cohesive module files, three-field addresses, v6 Agent bindings, shared definition/outcome/execution and direct/scheduled protocol adapters. Tools/ToolRuntime shims and old namespace aliases are removed. Protocol-specific transport values/registries remain explicit adapters, not separate business implementations. Production protocol grants are preserved.
 
 ### Current implementation status
 
@@ -422,18 +422,15 @@ This extends deterministic result-driven sequencing; it does not change the stag
 
 Update this design before changing runtime contracts. Each implementation stage must update owning READMEs, dependency checks, the technical plan, ADRs and roadmap, with explicit admission, lifetime and verification evidence. Architectural cleanup does not establish native UI/device acceptance.
 
-### Directory consolidation checkpoint — ADR0151
+### Directory consolidation and current ownership — ADR0151–0161
 
-✅ Actions owns the original Tool domains and all execution sources. Tools and ToolRuntime are re-export-only compatibility targets under Actions/Compatibility, with no implementations or catalogs. This moves source ownership before definition unification; existing JSON v6, protocol APIs, resource fences and feedback remain intact.
-❌ Next: unify definitions/results and protocol registration; migrate imports and remove compatibility targets. Directory consolidation alone does not make a scheduled capability callable through ToolCall.
+✅ Actions owns all six business domains and their protocol-neutral contracts. Gateway/Runtime owns shared execution, and Gateway/Output/Registration and Protocols own registration and calling adapters. Tools/ToolRuntime compatibility targets and Actions/Runtime are retired. Existing JSON v6 grants, resource fences and feedback policies remain explicit.
 
-### Domain classification before definition unification
+### Domain classification
 
-Group functions by business ownership before adapting call protocols. The implemented domains are UI (expression, gaze, captions, voice-state, pose/history presentation), Speech (playback), Camera (capture intent), History (journal query/mutation), System (configuration information) and NexArm (motor/gesture/base/tracking behavior). Each domain owns one canonical `<Domain>Actions` namespace and one `<Domain>Module` catalog with filtered protocol projections from one canonical definitions collection. Projection does not grant another call permission.
+Group functions by business ownership before adapting call protocols. The implemented domains are UI (expression, gaze, captions, voice-state, pose/history presentation), Speech (playback), Camera (capture intent), History (journal query/mutation), System (configuration information) and NexArm (motor/gesture/base/tracking behavior). Each owns cohesive module entry files and a canonical function catalog. App freezes one six-domain catalog and registers explicit protocol bindings; a projection never grants another call permission.
 
-NexArm owns the currently device-specific tracking target entry. Its existing Robot.aim Tool path is retained as an explicit compatibility identifier, not a separate generic Robot implementation. UI presentation of history belongs to UI; journal effects belong to History. Protocol-specific parameter/result types remain until a later contract migration.
-
-Legacy namespace aliases and partial NexArm catalog adapters may preserve current consumers/isolated tests, but contain no business implementation or duplicated registration lists. Production composition uses one six-domain catalog; modules must not be split by Action versus Tool protocol.
+NexArm owns the device-specific tracking function through its canonical three-field address. UI presentation of history belongs to Actions/UI; journal effects belong to Actions/History. Business input/result values are independent of calling protocols. Partial NexArm catalog adapters support isolated consumers without duplicating functions; no business namespace aliases or compatibility targets remain.
 
 ### Three-level capability addressing — required target
 
@@ -467,7 +464,7 @@ Entry splitting preserved the then-current protocol behavior. Subsequent ADR0156
 
 ### Explicit serialization identity before Path migration
 
-ActionDefinition owns a bounded serializationKey independent of path and Channel. ChannelScheduler captures it at admission, permits only one running action per key across tasks/Channels, and releases it only after handler cleanup joins. Resources remain separately declared and coordinated. Agent arguments/configuration cannot override this identity.
+ActionFunction owns a bounded serializationKey independent of path and Channel. ChannelScheduler captures it at admission, permits only one running action per key across tasks/Channels, and releases it only after handler cleanup joins. Resources remain separately declared and coordinated. Agent arguments/configuration cannot override this identity.
 
 Production scheduled entries explicitly retain the existing exclusion keys UI, Speech and NexArm. For source-compatible isolated definitions, omission defaults to the current path.module; this generic legacy default is not domain alias resolution. Empty/invalid/oversized keys fail registry validation before effects. Macro factories preserve this definition-owned key.
 
@@ -485,20 +482,153 @@ Production Action definitions retain explicit serialization keys from ADR0155. I
 
 ✅ ADR0156 implements three-field Action addresses, canonical direct Tool addresses and version6 explicit native bindings. ✅ ADR0157 completes shared definitions/adapters and compatibility retirement.
 
-### One executable definition, two protocol projections
+### One callable function, two protocol bindings
 
-ActionDefinition is the canonical implementation definition and ActionCompletion is its shared outcome. ToolDefinition becomes a source-compatible alias for that same definition rather than a second implementation store. A definition owns one resolved address, normalized ActionInvocation handler, completion/resource/deadline metadata and explicitly available call protocols. Existing attributed Action and Tool factories bind a canonical handler through adapters; they retain their production protocol availability. A domain exposes one definitions catalog; projections select definitions available to each protocol. Agent v6 configuration independently selects model exposure in actions or tools and Gateway validates exact coverage; implementation availability never grants permission.
+ActionFunction is the canonical callable descriptor and ActionCompletion its shared outcome. It owns one resolved address, normalized FunctionInput handler and intrinsic completion/resource/deadline metadata. @Action generates these pure function factories only. A domain exposes a CapabilityModule catalog. Host-created ActionBinding wraps a function with explicit protocol availability, native scheduling and feedback; ToolDefinition aliases this runtime binding. Agent v6 configuration independently selects model exposure in actions or tools and Gateway validates coverage. Registration availability never grants Agent permission.
 
 A direct invocation is adapted to the same opaque context and parameters, without a Channel or wait membership. Parameter-resolved resources and execution budgets must be evaluated for direct calls before execution, and resource coordination remains mandatory. Data-returning implementations use ActionCompletion.value; scheduled results retain that value in ActionResult, while direct calls encode the same shared outcome in ToolResponse. Completion-only direct effects retain no-feedback behavior; failures still return correlated errors. Reports and activity identities have explicit direct serialization rather than invoking a second business implementation. Cancellation/deadlines join the same canonical handler cleanup.
 
-Protocol-specific request/result envelopes, registries and scheduling remain transport adapters inside Actions/Runtime; removing them is not required to unify implementation. Re-export-only Tools/ToolRuntime targets and namespace aliases are retired once consumers import Actions/ActionRuntime. No production function becomes callable through a second protocol until explicitly available in its implementation and granted in Agent configuration/code.
+Protocol-specific request/result envelopes, registries and scheduling remain transport adapters inside Gateway/Output; removing them is not required to unify implementation. Re-export-only Tools/ToolRuntime targets and namespace aliases are retired with FunctionContracts/ExecutionRuntime/CallRuntime imports. No production function becomes callable through a second protocol until explicitly bound by the host and granted in Agent configuration/code.
 
 Returned value outcomes are limited to 64 KiB UTF-8 and rejected explicitly before result delivery; there is no truncation or replay. Structured reports retain their own bounded entry/detail contract.
 
 ### Scheduled native Tool projection
 
-Definition-owned execution policy is explicit: direct or scheduled with a validated default native-Tool Channel. ActionCall remains scheduled; a ToolCall to a scheduled definition crosses the same ChannelScheduler, serialization keys and ResourceCoordinator. Native Tool execution uses one isolated child scheduling scope outside model XML waits, preserving original handler context and causal metadata. Each child contains one admitted job and one bounded single-result receipt; existing global task/Channel/job bounds reject excess. Caller cancellation cancels and joins that child before returning. Native feedback remains one ToolResult for the original call; no duplicate ActionResult is emitted. A definition exposed to scheduled native calls is also present in the Action execution projection, and Agent permissions remain independently checked.
+Binding-owned execution policy is explicit: direct or scheduled with a validated default native-Tool Channel. ActionCall remains scheduled; a ToolCall to a scheduled definition crosses the same ChannelScheduler, serialization keys and ResourceCoordinator. Native Tool execution uses one isolated child scheduling scope outside model XML waits, preserving original handler context and causal metadata. Each child contains one admitted job and one bounded single-result receipt; existing global task/Channel/job bounds reject excess. Caller cancellation cancels and joins that child before returning. Native feedback remains one ToolResult for the original call; no duplicate ActionResult is emitted. A definition exposed to scheduled native calls is also present in the Action execution projection, and Agent permissions remain independently checked.
 
 ✅ ADR0157 implements definition/outcome/execution unification, scheduled native projection with bounded cancellation receipts, typed Tool feedback and compatibility-target retirement. ❌ General Agent continuation, remaining business-input migration and physical acceptance remain separate work.
 
 ✅ Composition freezes CapabilityCatalog once before projection: at most32 domains/256 canonical definitions, shared metadata validation before filtering, and duplicate addresses rejected across protocols. The same handler/metadata snapshot feeds both registries; invalid unexposed definitions cannot disappear silently.
+
+### Unified implementation and model transport — ADR0159
+
+| Layer | Shared contract | Difference between call protocols |
+| --- | --- | --- |
+| Implementation | One @Action, ActionFunction, FunctionInput, ActionExecutionContext and ActionCompletion | None: business entries and injected capabilities receive the same values |
+| Agent registration | Canonical address and separately authorized aliases | actions declares text tags/default Channels; tools declares native function schemas/names |
+| Model transport | Same selected capability | Action catalog enters context prompt; native declarations enter request tools |
+| Output interpretation | Resolved canonical address and validated parameters | Text tags become ActionCall; native model events become ToolCall with provider/call IDs |
+| Runtime admission | Same resources, serialization, budgets and joined cleanup | ActionCall participates in Channel/wait ordering; ToolCall selects binding-owned direct/scheduled policy |
+| Feedback transport | Same typed ActionCompletion and causal context | Scheduled ActionResult versus native ToolResult/result encoding and feedback policy |
+
+Business function signatures never accept ToolInvocation, ToolExecutionContext, ToolRequest or a protocol-specific handler. Gateway/execution adapters normalize protocol requests into standard FunctionInput before handler execution. Context/parameters/report storage are shared; protocol-specific aliases, call IDs and scheduling remain adapter concerns. No reverse toolInvocation view is passed to business code. ADR0161 removes Channel from the common FunctionRequest; scheduling adapters retain it outside FunctionInput.
+
+@Action has one metadata signature and emits ActionHandler/ActionCompletionHandler factories only. Static/dynamic resources and deadlines are function metadata; ADR0160 moves protocol availability, native execution and result transport policy into host registration bindings. Host profiles retain former native entries’ existing tool availability and direct execution policy; this migration grants no new permission or automatically exposes a function through both protocols.
+
+Native event transport does not imply direct execution: a scheduled definition invoked as ToolCall crosses the same ChannelScheduler/resources, with an isolated bounded receipt outside text wait scopes. ActionCall retains text scheduling. Both execute the same handler. Returning values and completion-only native effects retain their existing feedback policies.
+
+Model input uses the context/system prompt for text-callable actions and ChatRequest.tools for native declarations; there is no generic actions request parameter. Unsupported native providers receive no tools. Native events resolve through ToolCallParser; text deltas enter AgentGenerator, where registered action tags become ActionCall and ordinary text follows explicit Agent text-mapping policy. Tool results never implicitly become executable markup.
+
+```mermaid
+flowchart LR
+    Config[Agent registration] --> Text[Action catalog / context prompt]
+    Config --> Native[Native declarations / request tools]
+    Text --> Model[LLM generation]
+    Native --> Model
+    Model --> Tags[Text tags / ActionCall]
+    Model --> Events[Native events / ToolCall]
+    Tags --> Gateway[OutputGateway / authorization]
+    Events --> Gateway
+    Gateway --> Policy[Runtime policy / queues / resources]
+    Policy --> Invocation[Standard FunctionInput and context]
+    Invocation --> Function[One Action implementation]
+    Function --> Result[Shared ActionCompletion]
+    Result --> Feedback[Protocol result adapters / InputGateway]
+```
+
+❌ Remaining Signal/feature migration, bounded model continuation and physical acceptance are separate work.
+
+### Callable functions and registration bindings — ADR0160
+
+Actions owns protocol-neutral ActionFunction values: canonical address, callable FunctionInput handler, common completion kind, serialization/resources and constant/dynamic deadlines. @Action declares only these intrinsic function constraints. A function neither selects ActionCall/ToolCall nor decides native result transport. Business/injected functions consume no Tool request/response/error code or protocol-specific registration module.
+
+Runtime ActionBinding wraps one immutable ActionFunction with protocol availability, native direct/scheduled policy and native feedback policy. ActionModule/ToolModule and registry projections describe bindings, not implementations. Generic binding adapters belong to Gateway/Output/Registration and Protocols; built-in registration profiles belong to App/Composition/Behaviors. Profiles are grouped by canonical domain/module, preserving existing availability, scheduling and feedback, and reject unknown modules. They are implementation bindings, not a duplicate list of model-callable aliases; Agent JSON/code remains the permission authority. Other hosts can bind any function to either or both protocols explicitly.
+
+A pure CapabilityCatalog validates and freezes functions once before host registration; duplicate addresses or invalid intrinsic metadata cannot disappear through protocol filtering. ActionBinding independently validates its protocol/scheduling metadata. FunctionExecutor.perform receives ActionFunction only. ToolCall adapters normalize parameters/context and translate the common outcome according to binding policy. A scheduled native binding shares ChannelScheduler/resources and joined cleanup.
+
+ActionExecutionFailureCode/ActionExecutionFailureProviding supply protocol-neutral producer errors. ToolResponse maps these codes at the native boundary. PoseOverlay is UI domain data, independent of a call protocol. Partial NexArm catalogs describe Motion/Gesture/Tracking capabilities rather than Action/Tool registration.
+
+```mermaid
+flowchart LR
+    Source[Actions / @Action function] --> Function[Protocol-neutral ActionFunction]
+    Function --> Catalog[Validated function catalog]
+    Host[App registration profile / explicit host binding] --> Binding[Runtime ActionBinding]
+    Catalog --> Binding
+    Grants[Agent actions/tools permissions] --> Gateway[Gateway validation]
+    Binding --> Registry[Action/Tool binding registries]
+    Registry --> Gateway
+    Gateway --> Shared[Common invocation / resources / execution]
+    Shared --> Function
+    Function --> Outcome[Common completion / producer error]
+    Outcome --> Adapter[Protocol feedback adapter]
+```
+
+✅ Implemented: pure function factories/catalogs, explicit host bindings, shared execution, neutral producer failures/payloads and enforced source boundaries. ❌ Remaining Signal/business input migration and model continuation are separate work.
+
+### Tool code ownership audit
+
+ToolCall is a registration/transport protocol, also used by fixed internal Agent behavior without an LLM. It is not a second kind of business function. ADR0161 moves all protocol/runtime code out of Actions business sources.
+
+| Location | Responsibility |
+| --- | --- |
+| Actions/Contracts | Standard FunctionInput/FunctionRequest, callable metadata and intrinsic constraints only; no Channel or call protocol. |
+| Gateway/Runtime | Shared FunctionRegistry/FunctionExecutor, bounded report storage, cooperative deadlines and joined cleanup. |
+| Gateway/Output/Registration and Protocols | Action/Tool binding views, request normalization, scheduling adapters and protocol feedback. Independently compiled CallRuntime. |
+| Agents/Core | Native declarations/registration, alias resolution, permission validation, ToolCall/ToolResult and parsing. |
+| Business Agents and agent.json | Model-facing/fixed internal grants; emit calls and receive feedback through Gateways. |
+| ModelKit/Language/LLM | Provider-native declarations/events only; no business function dependency. |
+| Gateway orchestration | Trusted owner/permission checks, queues, resource admission and InputGateway feedback. |
+| App | Inject capabilities, assemble one function catalog and select host protocol profiles. |
+| StorageChat / UI | Persist/display model diagnostics; SwiftUI toolbar references are unrelated. |
+
+✅ All six business domains and @Action factories depend on standard contracts only. ToolDefinition/ToolResource aliases and Actions/Runtime are removed. Protocol registration views share the canonical function store; they cannot weaken its resource/budget requirements.
+
+❌ Native String-path binding convenience cleanup remains optional. General model continuation after ToolResult is pending: Assistant currently presents the result instead of requesting a further LLM turn. System.Runtime.runtimeInfo returns fixed text rather than live diagnostics.
+
+### Gateway-owned execution and isolated function contracts — ADR0161
+
+This decision supersedes ADR0160's physical Actions/Runtime placement. No new top-level directory is added. Actions/Contracts is an independently compiled FunctionContracts target with canonical function metadata, bounded parameters/results/reports, neutral failures and opaque execution context. Actions imports only FunctionContracts and its required foundational capability SDKs; it cannot import or resolve Gateway execution/call protocol types.
+
+Business handlers accept the standard FunctionInput interface. FunctionRequest carries canonical address and parameters only; it contains no Channel, wait, native call identifier or protocol discriminator. FunctionInvocation is the ordinary input value. FunctionInput offers a protocol-neutral report sink supplied by the host; report storage is runtime-owned. Context retains opaque correlation for host acceptance, never Agent permission or execution policy. Standard input is an execution contract, not a replacement for Signal.
+
+Gateway/Runtime is the independent ExecutionRuntime target: one FunctionRegistry/FunctionExecutor, bounded report storage, cooperative deadlines, cancellation and joined cleanup. It depends only on FunctionContracts, never AgentCore, concrete Actions, model or device services. Function resources, budgets and business completion requirements remain intrinsic and cannot be weakened by a protocol binding.
+
+Gateway/Output/Registration and Protocols compile as an independent CallRuntime target, depending only on FunctionContracts/ExecutionRuntime. Bindings and Action/Tool registration projections retain native scheduling/feedback policy. ActionInvocation is a scheduling adapter implementing FunctionInput with Channel outside the common request. ActionCall/ToolCall normalize at Gateway boundaries; both reach FunctionExecutor. The existing Action/Tool registry APIs become protocol registration views over the shared function registry. AgentCore retains independent Agent envelopes, alias resolution and permission contracts.
+
+Gateway orchestration depends on AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime. It still owns bounded Channel/wait/resource admission, trusted owners, lifecycle cancellation and result adaptation. All external Signals/results enter InputGateway and all Agent outputs cross OutputGateway. Fixed internal grants remain in Agent code; model exposure remains in versioned Agent JSON. No new permission or direct hardware bypass is introduced.
+
+App/Composition/Behaviors injects capabilities and freezes one FunctionRegistry before projecting registration views; it imports no AgentCore. Pure FunctionInput business signatures and host endpoints preserve context/report identity across both protocols. App composes the runtime; long-lived work remains independent of UI page lifetime. Superseded Tool aliases are removed; no compatibility target or duplicated source tree is introduced.
+
+```mermaid
+flowchart LR
+    Actions[Actions / business functions] --> Contracts[Actions/Contracts / FunctionContracts]
+    Runtime[Gateway/Runtime / ExecutionRuntime] --> Contracts
+    Calls[Gateway/Output registration and protocols / CallRuntime] --> Runtime
+    Calls --> Contracts
+    Gateway[Gateway / trusted admission and feedback] --> Calls
+    Gateway --> Runtime
+    Gateway --> Core[Independent AgentCore]
+    App[App composition / capability injection] --> Actions
+    App --> Gateway
+```
+
+Migration order: contract isolation and Channel removal; Gateway runtime relocation and shared function registry; protocol registration/adapters; host/test/build-map migration; source/dependency boundaries and validation. Queue bounds, overflow failures, resource fences, causal identity, report precedence and cancellation cleanup must remain unchanged. Remaining feature Signal routes, original-root Action/activity feedback and bounded model continuation are separate stages.
+
+### Terminal publication and retry readiness
+
+A host-owned diagnostic operation publishes a retryable terminal UI phase only after its endpoint and monitor cleanup have joined and the operation slot is released. UI observes readiness; it does not own cancellation or Agent/device lifetimes. This preserves the staged diagnostic workflow boundary while preventing a displayed retry from being silently ignored.
+
+### Invocation failure isolation and complete results — ADR0162
+
+Every callable Action, including former Tools, has the same failure contract. A normal handler exception terminates only that invocation; it must not stop its caller runtime, cancel sibling work or prevent later admitted calls. Preserve bounded child entries, producer error codes and the terminal cause in ActionReport/ActionCompletion before protocol adaptation. Scheduled ActionResult and native ToolResult carry this same semantic outcome through InputGateway; their correlation and wire formats remain protocol-specific. Completion-only native bindings retain their no-feedback policy, while failures remain observable in execution results.
+
+Admission, permission and invalid scheduling errors retain their documented scope. Explicit owner/session cancellation still cancels that owner's work. Deadline and cancellation cleanup must join before resources are released; isolation does not force unsafe continuation while hardware cleanup is unfinished. Feedback admission failure is recorded separately and never replays a completed effect. This contract does not change Action business algorithms, hardware arrival tolerances, stable-position criteria, per-step timeout budgets or child failure aggregation.
+
+```mermaid
+flowchart LR
+    Handler[Callable Action] --> Outcome[Completion or invocation failure]
+    Outcome --> Report[Bounded report and terminal cause]
+    Report --> Adapter[Gateway protocol adapter]
+    Adapter --> Input[InputGateway result Signal]
+    Outcome --> Next[Scheduler continues eligible calls]
+```

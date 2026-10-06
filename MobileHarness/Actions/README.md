@@ -1,35 +1,78 @@
-# Actions — Executable Capabilities
+# Actions — Protocol-Neutral Business Functions
 
-Purpose: own business operations, including queries, with one implementation per function. Design goals: cohesive directory/module/function ownership, explicit injected capabilities, shared execution metadata and protocol-independent permissions.
+Actions implements callable business operations, queries and composition. Agents choose what to do; Gateway controls how calls are authorized and executed. Each function receives standard input and returns a shared outcome without knowing whether it was invoked through ActionCall or ToolCall.
 
-## Layout and ownership
+Design goals: cohesive directory/module/function ownership, injected capabilities, intrinsic resource/budget constraints and independence from calling protocols.
 
-Six domains: UI, Speech, Camera, History, System and NexArm. Each domain has a README, a used namespace facade, cohesive `<Module>Actions.swift` entries and Support values/catalogs. Canonical paths are Domain.Module.function. `CapabilityModules` collects six domain catalogs; each CapabilityModule exposes one ActionDefinition collection.
+## Upstream and downstream
 
-Runtime is an independently compiled ActionRuntime target with Foundation-only contracts. Actions owns concrete functions and compile-time macro declarations; App binds injected capabilities and Gateway validates permissions/coverage. PlatformKit remains a device SDK and owns no business wrappers.
-
-## One definition, two call protocols
-
-✅ ActionDefinition owns one handler, address, completion, serialization key, resources, deadlines, explicit protocol availability and direct/scheduled execution policy. ToolDefinition and ToolResource are aliases of the same canonical definition/resource; they own no implementation store. `@Action` and `@Tool` factories adapt existing typed entry signatures into that common handler. Related functions remain in the same module files.
-
-✅ `module.actions` and `module.tools` are filtered registry projections. `definition.exposed(as: [.action, .tool])` enables both implementation adapters; Agent configuration/code must independently grant the corresponding permission. Production retains its existing protocol grants.
+Arrows show runtime execution; dashed arrows show assembly or injection, not imports. Agent calls always cross OutputGateway.
 
 ```mermaid
 flowchart LR
-    Entry[Canonical domain function] --> Factory[Macro metadata / canonical handler]
-    Factory --> Catalog[One domain definitions catalog]
-    Catalog --> Scheduled[Action projection]
-    Catalog --> Native[Tool projection]
-    Config[Agent v6 exposure / internal grants] --> Gateway[OutputGateway authorization]
-    Scheduled --> Gateway
-    Native --> Gateway
-    Gateway --> Policy[Definition-owned execution policy]
-    Policy --> Shared[ActionExecutor.perform / joined cleanup]
-    Shared --> Outcome[Shared completion / value / report / activity]
+    Agents -->|Resolved ActionCall or ToolCall| Gateway[OutputGateway / call adapters]
+    App[App composition] -.->|Catalog and protocol bindings| Gateway
+    App -.->|Inject capabilities| Functions[Actions business functions]
+    Gateway --> Executor[Shared FunctionExecutor]
+    Executor -->|FunctionInput| Functions
+    Functions -->|Native commands| PlatformKit
+    Functions -->|Injected presentation / playback / query operations| Endpoints[App capability endpoints]
+    Endpoints --> UI
+    Endpoints --> Storage[Storage / native services]
+    Functions -->|Shared completion / value / report| Executor
+    Executor -->|Protocol outcome| Gateway
+    Gateway -->|Returning feedback when declared| Input[InputGateway]
+    Input --> Agents
 ```
 
-✅ Scheduled native Tool calls use the same Gateway ChannelScheduler/resource guards as Action calls, outside XML wait membership. Direct calls still require Gateway resource coordination. Low-level SDK executors do not acquire leases or grant permission.
+Endpoint completion means the function's declared acceptance or completion, not necessarily animation, inference or physical arrival. Completion-only native calls do not manufacture ToolResult feedback.
 
-✅ UI/Speech/NexArm scheduled definitions explicitly preserve their serialization keys. Model aliases are resolved inside Agents. Sources compile once; Tools/ToolRuntime import shims and old namespace aliases are removed. NexArm partial catalog adapters support existing isolated hosts without duplicating definition lists.
+## Internal structure
 
-❌ General model continuation, new navigation/device capabilities and physical acceptance are outside this consolidation. Full JSON Schema, runtime discovery and durable replay are not provided.
+Solid arrows below show catalog construction and function processing. Contracts is independently compiled as FunctionContracts; business sources cannot import execution or calling SDKs.
+
+```mermaid
+flowchart TB
+    Domains[UI / Speech / Camera / History / System / NexArm] --> Modules[Cohesive module entry files]
+    Modules --> Factories["@Action factories / ActionFunction"]
+    Factories --> Catalog[CapabilityModule / CapabilityCatalog]
+    Catalog --> Host[App freezes functions and selects bindings]
+    Contracts[Actions/Contracts: FunctionInput / FunctionRequest / outcomes] --> Modules
+    Request[Standard input and opaque context] --> Validate[Business argument / availability validation]
+    Validate --> Behavior[Domain behavior / composition / completion policy]
+    Behavior --> Capability[Injected foundational capability]
+    Capability --> Outcome[Shared completion / producer failure / report]
+```
+
+## Design principles and core mechanisms
+
+**One implementation, explicit exposure.** A canonical `Domain.Module.function` identifies business behavior, not a scheduling lane or model alias. `@Action` generates ActionFunction metadata; it neither registers a call protocol nor grants permission. App freezes the catalog and selects bindings; Agents expose permitted aliases separately. This lets human and model entry points share implementation, validation and outcomes.
+
+**Constraints belong to the function.** Resource requirements, serialization keys, completion kind and budget are intrinsic metadata. Both protocol views resolve the canonical function from the same FunctionRegistry, so a binding cannot replace its handler or weaken its resource/budget constraints. Channel/wait policy stays outside FunctionRequest.
+
+| Standard contract | Function responsibility |
+| --- | --- |
+| FunctionRequest | Canonical address and string parameters; ActionArguments validates keys, required values, ranges and sizes |
+| FunctionInput | Request, execution ID, opaque correlation context and injected FunctionReporting sink; no protocol branching |
+| ActionCompletion | Finite completion/value/report, state acceptance or explicit activity start/stop identity, matching the declared kind |
+| Producer failure | Neutral code/message from the owning domain; protocol conversion and user-facing wording belong to consumers |
+
+A composed function retains leaf outcomes rather than hiding partial failure in a summary. The shared executor prefers an explicit returned report; for finite functions, a stored report takes precedence over an ordinary value and can retain failure evidence. Dynamic execution budget overrides constant timeout and runtime fallback; queue time is separate. Functions cooperate with cancellation, while the executor joins cleanup. A completed durable mutation cannot be rolled back merely because later presentation or feedback fails.
+
+## Ownership and boundaries
+
+- `Contracts/`: standard input/output, callable metadata, argument validation and neutral producer failures; no Channel or protocol discriminator.
+- `UI/`, `Speech/`, `Camera/`, `History/`, `System/`, `NexArm/`: functions and domain catalogs, with canonical addresses `Domain.Module.function`.
+- `@Action` declares intrinsic constraints only. App owns protocol profiles; Agent JSON/code owns grants. One function can be explicitly bound to either or both protocols.
+- `Actions` depends on FunctionContracts, PlatformKit, StorageChat and the compile-time BehaviorDefinitions plugin. It cannot import Gateway, AgentCore, ExecutionRuntime or CallRuntime.
+- Shared execution lives in [Gateway/Runtime](../Gateway/Runtime/README.md); registration and adapters live in [Gateway/Output](../Gateway/Output/README.md). Actions owns recipes, gestures, motion shaping and completion policy.
+
+## Implementation status
+
+✅ Six canonical domain catalogs, protocol-neutral factories/handlers and shared outcomes. Actions/Runtime, @Tool and business Tool aliases are removed; source/dependency checks enforce the boundary.
+
+❌ Additional application capabilities, complete feature Signal routing and physical acceptance remain separate work. `System.Runtime.runtimeInfo` returns fixed information, not live diagnostics.
+
+See [Contracts](Contracts/README.md), [Agent-driven architecture](../Agent-Driven-App.md) and [host profiles](../App/Composition/Behaviors/README.md).
+
+✅ Every function preserves its business completion policy independently of call protocol. On invocation failure, preserve bounded child outcomes and producer causes; Gateway normalizes and dispatches the common result without stopping unrelated work. Explicit cancellation still joins cleanup.

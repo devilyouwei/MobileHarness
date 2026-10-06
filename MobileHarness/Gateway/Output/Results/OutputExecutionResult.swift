@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// A single output outcome. Action terminal details remain in the scheduler's execution records.
 public struct OutputExecutionResult: Sendable {
@@ -10,10 +12,10 @@ public struct OutputExecutionResult: Sendable {
     public let tool: ToolResponse?
     public let failure: String?
     /// Dispatch/delivery failure is independent of the Tool handler failure code.
-    public let failureCode: ToolResponse.FailureCode?
+    public let failureCode: ActionExecutionFailureCode?
     public init(
         source: AgentID, inputID: UUID, sequence: UInt64, tool: ToolResponse?, failure: String?,
-        failureCode: ToolResponse.FailureCode? = nil
+        failureCode: ActionExecutionFailureCode? = nil
     ) {
         self.source = source
         self.inputID = inputID

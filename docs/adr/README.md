@@ -243,3 +243,13 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [ADR0156 — Three-level capability addresses](0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; serialization/resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
 
 ✅ [ADR0157 — Canonical executable definitions](0157-canonical-executable-definitions.md): completes shared definition/outcome/execution, protocol projections, scheduled native routing, typed feedback and compatibility retirement. Remaining work is broader Agent-driven input/feature migration and physical acceptance.
+
+✅ [ADR0158 — Unified Action authoring](0158-unified-action-authoring.md): one @Action attribute for all capabilities; model context supplies text actions and request tools supplies native declarations. Text tags and native events retain distinct ActionCall/ToolCall transports.
+
+✅ [ADR0159 — Protocol-independent invocations](0159-protocol-independent-action-invocations.md) removed native-only business signatures. ADR0161 completes the boundary with one FunctionInput/context/handler and @Action metadata; ActionInvocation remains a Gateway scheduling adapter. Differences remain in registration, model transport/parsing, runtime admission and feedback.
+
+✅ [ADR0160 — Callable functions and protocol bindings](0160-callable-functions-and-protocol-bindings.md) separates pure callable implementation from host registration/runtime protocol policy.
+
+✅ [ADR0161 — Gateway execution and isolated function contracts](0161-gateway-execution-and-function-contracts.md).
+
+✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](0162-invocation-failure-isolation.md).

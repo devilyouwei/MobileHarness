@@ -30,3 +30,5 @@ flowchart LR
 ```
 
 ❌ Real microphone routing, FOA axes and native interaction acceptance remain separate from workflow fixtures.
+
+✅ Terminal failure/finish/stop phases are published after joined monitor cleanup and operation-slot release. A visible retry is ready to start; no endpoint or Agent lifetime moves into UI. Existing permission-failure/retry coverage verifies this ordering.

@@ -1,130 +1,104 @@
-# Gateway — Input and Output Routing
+# Gateway — Signal Routing and Authorized Execution
 
-Validates and routes Agent input, communication and resolved calls. The goal is bounded admission, explicit failure and clear completion semantics. The target depends on AgentCore, ActionRuntime and ToolRuntime; model processing belongs to Agents.
+Gateway connects external inputs, Agent communication and permitted effects. InputGateway validates and admits Signals; OutputGateway validates resolved outputs, schedules execution and correlates feedback. It owns transport and execution coordination, while Agents own meaning and business decisions.
 
-## Directory structure
-
-```text
-Gateway/
-├── Input/
-│   └── InputGateway.swift            # Validation, static subscriptions and explicit delivery
-├── Output/
-│   ├── OutputGateway.swift           # Output dispatch and bound event ports
-│   ├── Validation/                   # Capability and call validation
-│   ├── Routing/                      # Select Action, scheduling, Tool or control path
-│   ├── Dispatch/                     # Invoke runtimes and return Tool results
-│   ├── Resources/                    # Shared leases and execution fences
-│   ├── Results/                      # Correlated Action result delivery
-│   └── Scheduling/                   # Task-local wait groups, Channel FIFO and module exclusion
-└── README.md                         # Module boundary
-```
+Design goals: trusted identity, explicit permissions, bounded admission, shared function execution and joined cancellation without silent loss of device work.
 
 ## Upstream and downstream
 
-Arrows show runtime data flow. ModelKit and PlatformKit are not Gateway dependencies.
+Arrows show runtime flow; dashed arrows show App assembly. Foundational SDK calls are ordinary capability calls and do not pass through Gateway.
 
 ```mermaid
 flowchart LR
-    App -->|Adapted external input| Input[InputGateway]
-    Input --> Agents
-    Agents -->|Resolved calls and typed events| Output[OutputGateway]
-    Output -->|Internal observation| Input
-    Output --> ActionExecution[ActionRuntime]
-    Output --> ToolExecution[ToolRuntime]
-    ToolExecution -->|Returning ToolResult via dispatcher| Input
-    Output -->|Runtime observations| App
+    External[UI / sensors / OS facts] --> Adapters[App input adapters]
+    Adapters --> Input[InputGateway]
+    Input -->|Validated AgentInput Signal| Agents
+    Agents -->|Resolved calls / messages / controls| Output[OutputGateway]
+    App[App composition] -.->|Registries / permissions / resource authority| Output
+    Output -->|Validated Agent message| Input
+    Output --> Runtime[Call adapters / shared function execution]
+    Runtime --> Functions[Actions business functions]
+    Functions --> Capabilities[Injected UI / storage / model / platform endpoints]
+    Runtime -->|Correlated outcome| Output
+    Output -->|Declared returning feedback| Input
+    Output -->|Execution snapshots| Observers[App supervision / presentation adapters]
 ```
 
-## Internal flow
+Signals use the common AgentInput envelope and typed provenance. Calls are OutputEnvelope execution requests; their feedback becomes input. Admission is not processing or physical completion.
 
-Gateway connects the Agent network to adapted external input, registered execution and feedback. The inner subgraph is Gateway-owned coordination; Agents own inboxes, and Actions/Tools own handlers. Arrows describe runtime flow rather than compilation dependencies. Semantic interpretation and fusion remain in Agents.
+## Internal structure
+
+This diagram shows processing inside Gateway; scheduling applies to ActionCall and explicitly scheduled native bindings. Direct native calls use the shared executor without Channel admission.
+
+✅ [ActionCall / ToolCall routing](Output/Protocols/README.md#protocol-selection-one-function-two-call-paths) documents registration, Agent transport/parsing, Gateway dispatch, shared execution and result feedback. One callable function can use both protocols; ToolCall can also use shared scheduling.
 
 ```mermaid
 flowchart TB
-    App[App adapters: external business input]
-    Agents[Agents: inboxes / state / decisions]
-    ActionRuntime[ActionRuntime: await registered handler]
-    ToolRuntime[ToolRuntime: await registered handler]
-    Endpoints[App-bound UI / device effect endpoints]
-
-    subgraph Gateway[Gateway internals]
-        Select[InputGateway: subscription or explicit target]
-        ValidateIn[Validate identity / session / contract / admission bounds]
-        Out[OutputGateway: validate source and permissions]
-        Route{Resolved output kind}
-        Dispatch[ActionDispatcher: bounded admission]
-        Queue[ChannelScheduler: task tree / Channel FIFO / wait / module exclusion]
-        Tool[ToolDispatcher: direct execution]
-        Event[Bound messaging port: metadata and target selection]
-        Barrier[Finish / cancel: join accepted Actions]
-        Resource[ResourceCoordinator: declared resource leases and fences]
-        Results[ActionResult delivery: bounded correlated feedback]
-        Return[Returning ToolResult: original Agent / session]
-
-        Select --> ValidateIn
-        Out --> Route
-        Route -->|Action / scheduling| Dispatch
-        Dispatch --> Queue
-        Route -->|Tool| Tool
-        Route -->|Internal event| Event
-        Event -->|Selected internal delivery| ValidateIn
-        Route -->|Finish / cancel| Barrier
-        Barrier --> Queue
-        Queue -.->|Resource validation and execution guard| Resource
-        Tool -.->|Declared resource guard| Resource
-        Queue -->|Terminal status under feedback policy| Results
-        Results -->|InputGateway result admission| ValidateIn
-        Tool -->|Non-nil result| Return
-        Return --> Select
-    end
-
-    App --> Select
-    ValidateIn -->|Prompt admission or rejection| Agents
-    Agents -->|Resolved calls / scheduling / control / messages| Out
-    Queue -->|Eligible Action| ActionRuntime
-    ActionRuntime -->|Completion / failure / cancellation| Queue
-    Tool --> ToolRuntime
-    ToolRuntime -->|Value or completion| Tool
-    ActionRuntime --> Endpoints
-    ToolRuntime --> Endpoints
+    Input[Input/InputGateway: identity / schema / scope / capacity] --> Receive[Registered Agent receive]
+    Output[Output/OutputGateway] --> Validate[Validation: live owner / permissions / call contract]
+    Validate --> Route{Routing}
+    Route -->|Message| Messaging[Bound messaging port]
+    Messaging --> Input
+    Route -->|Scheduled call| Scheduler[ChannelScheduler: task tree / FIFO / wait / serialization]
+    Route -->|Direct native call| Direct[ToolDispatcher]
+    Bindings[Registration: canonical function store + protocol views] --> Scheduler
+    Bindings --> Direct
+    Scheduler --> Guard[ResourceCoordinator: leases / fences]
+    Direct --> Guard
+    Guard --> Protocols[Protocols: normalize standard input]
+    Protocols --> Executor[Runtime/FunctionExecutor: budget / report / cancellation]
+    Executor --> Handler[Canonical function handler]
+    Handler --> Executor
+    Executor --> Outcome[Protocol outcome / correlated results]
+    Outcome -->|Returning feedback| Input
+    Outcome --> Observation[Bounded runtime observations]
 ```
 
-Declared resources are guarded around execution; Tools do not join Action queues. Resource declarations and registered handlers are supplied by App assembly. ActionResult delivery retries feedback without repeating an effect. Completion-only Tools produce no ToolResult. App lifecycle and UI workflows retain their typed host interfaces; this diagram covers Agent business communication and execution, not every application call.
+Cancellation and terminal controls join admitted work and cooperative cleanup before releasing its ownership. Feedback delivery retries do not repeat an effect. Completion-only calls return an execution outcome without injecting ToolResult.
 
-Input admission reports acceptance, not Agent processing completion. Action dispatch waits for queue admission; finish controls join admitted Actions. Tool dispatch awaits execution and any result delivery. App observers supervise runtime state and capture admission; they do not turn events into UI commands.
+## Design principles and core mechanisms
 
-| Owner | Default bound and overflow |
-| --- | --- |
-| InputGateway | 128 concurrent admissions shared by external/internal calls, 256 branches, 8 MiB observation bytes, up to 16 targets each; reject excess |
-| OutputGateway event port | 16 concurrent emissions per source; reject excess |
-| ChannelScheduler | 32 unfinished Actions per Channel name across tasks, including running/dormant work; 16 live names, 64 tracked tasks, 120 Actions and 32 waits per task; reject excess |
+**Authority is bound, not inferred.** External adapters, identity-bound Agent messaging and execution owners supply Signal origin and scope. Payload content cannot assign permissions. InputGateway checks schema/source/session/deadline/capacity; OutputGateway checks live producer identity and grants before effects. It accepts resolved calls and never interprets business aliases or decides the next task.
 
-Each active task phase runs FIFO per Channel and shares process-wide Action-module exclusion. Different Channels may run concurrently when modules permit; equal names in separate tasks do not share a FIFO. Wait gates only its parent continuation. Cancellation joins cooperative handlers. Discrete events and Actions are never silently replaced; only Agent-owned declared latest-state buffers coalesce pending state. Gateways do not queue signals. See [Input](Input/README.md), [Output](Output/README.md) and [Scheduling](Output/Scheduling/README.md) for detailed contracts.
+**A call protocol is not a business implementation.** The same function can have independent scheduled/native bindings. Native ToolCall is not inherently direct: its registered policy may project into the ordinary scheduler.
 
-## Scope and limitations
+| Concern | ActionCall | ToolCall |
+| --- | --- | --- |
+| Agent/model parsing | Text tags resolve inside Agents | Complete native events resolve inside Agents |
+| Invocation policy | Channel/task/wait scheduling | Explicit direct or scheduled binding; scheduled calls share the same fences/cleanup |
+| Business execution | Standard FunctionInput and shared FunctionExecutor | The same standard input and executor |
+| Feedback | Declared Action/lifecycle feedback | Returning ToolResult or completion-only execution outcome |
 
-✅ Static subscriptions/directed delivery, trusted admission, task-local Action scheduling, direct Tools, bounded result feedback and resource coordination are implemented.
+Fixed Agent code may also emit already-resolved ActionCall/ToolCall; model parsing is not required for deterministic intent handling.
 
-❌ General request/reply, dynamic subscriptions, Channel locks, priority/preemption and durable feedback are not implemented. Channel metadata does not grant physical ownership; declared resource leases/fences are the separate authority. Cleanup depends on cooperative handlers and each device capability's stop acknowledgment.
+**Ordering, exclusion and ownership are separate.** FIFO belongs to a Channel within one task; wait gates its parent continuation. A function's serialization key excludes conflicting work across Channels/tasks. ResourceCoordinator separately guards declared resources using leases and live execution permits. Owning a resource does not describe device health. Handoff cancels/joins old writers before granting the next owner; a cleanup timeout does not falsely unlock a writer still running.
 
-✅ An Agent output failure remains scoped to its source/input; it does not stop downstream or sibling Agents. Tools and admission/barrier failures are available from executionResults.
+**Effect success and delivery success are separate.** Receipts retain call/execution/session correlation; a failed feedback admission does not authorize replaying an already completed effect. Completion-only presentation produces no returning Signal. Runtime observation snapshots expose actual accepted work/failures without becoming unregistered business commands.
 
-✅ ADR0126: authorized intent calls carry trusted owner context to host workers. Gateway remains device-independent; registered long-lived resource uses join session/Agent cleanup while actual overlapping writes still fail explicitly.
+## Ownership and compilation
 
-✅ ADR0129: Bluetooth recovery does not control Gateway queues or Agent lifetime. Device handlers fail through the existing ActionResult/ToolResponse path; later accepted Actions execute under normal Channel policy. InputGateway accepts bounded report-bearing failures without accepting success-only completions on a failed result.
+| Location / target | Responsibility | Project dependencies |
+| --- | --- | --- |
+| `Input/`, Output orchestration / Gateway | Signal admission, output authorization, routing, queues, resources and feedback | AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime |
+| `Runtime/` / ExecutionRuntime | FunctionRegistry/FunctionExecutor, report storage, deadlines and cleanup | FunctionContracts |
+| `Output/Registration`, `Output/Protocols` / CallRuntime | Binding views and scheduled/native protocol adapters | FunctionContracts, ExecutionRuntime |
 
-✅ ADR0131: generic bounded Output failure observation complements Action execution snapshots for home presentation; no Bluetooth history or retry policy belongs in Gateway. ❌ Durable observation remains pending.
+Gateway never imports concrete Actions, UI, ModelKit, PlatformKit or App. App freezes one function catalog and supplies bindings; Gateway validates startup coverage. AgentCore remains independent. Business alias resolution belongs in Agents.
 
-✅ ADR0139 adds host-configured execution-group exclusion and owner preemption to ResourceCoordinator. Takeover gates, stops and joins old uses without removing Channel work; concrete Assistant/Photographer policy stays in App. ❌ Global priority/fairness scheduling remains outstanding.
+## Bounds and completion
 
+- InputGateway: 128 concurrent admissions, 256 branches, 8 MiB observation bytes and at most 16 recipients per input; excess rejects. It has no waiting Signal FIFO.
+- Bound messaging: at most 16 concurrent emissions per source; excess rejects.
+- ChannelScheduler: 32 unfinished Actions per Channel name across tasks, 16 live names, 64 tracked tasks, 120 Actions and 32 waits per task; excess rejects. FIFO is task-local; exclusion uses definition-owned serialization keys.
+- Registrations: common functions max 256; scheduled bindings max 256 and native bindings max 128, with max 32 modules per projection. Duplicate/invalid metadata fails startup.
+- Output failure history is a 100-record ring with explicit eviction count; max 8 observers receive newest-one complete snapshots. Other resource/result bounds are documented in their owning directories.
 
-✅ ADR0140/ADR0141: cancelled lifecycle cleanup still awaits acknowledgment. ResourceCoordinator exposes unlocked/locked(owner) from one occupancy authority, retires completed writers even after errors, and automatically unlocks late completed cleanup after timeout. Revocable permits reject stale execution context. Queues, Action/Tool outcomes and transport recovery remain independent. ❌ Physical stop verification remains outstanding.
+## Implementation status
 
-## Signal provenance and Tool feedback — ADR0149
+✅ Unified provenance, bound Agent messaging, shared function execution, distinct protocol views, task-local wait/Channel scheduling, resource fences and bounded feedback/observations.
 
-✅ External, Agent and Runtime provenance share one envelope and the same bounded admission. Only identity-bound messaging admits Agent origin; runtime feedback validates original execution ownership. Returning Tools preserve causal root/parent, hop count and interaction scope without a new queue or retry.
-❌ Original-root propagation for Action/activity feedback and typed legacy controls remain pending.
+❌ Complete original-root propagation for Action/activity feedback, generic activity subscriptions, priority scheduling and durable feedback/history remain outstanding. Physical stop acknowledgment is outside the software cleanup contract.
 
-✅ Scheduled Action admission copies definition-owned serializationKey; all Channels/tasks share exclusion by that key. Gateway resolves no business alias and derives no domain policy from future module names.
+Details: [Input](Input/README.md), [Output](Output/README.md), [Runtime](Runtime/README.md), [Registration](Output/Registration/README.md), [Protocols](Output/Protocols/README.md), [Scheduling](Output/Scheduling/README.md), [Resources](Output/Resources/README.md) and [Results](Output/Results/README.md).
 
-❌ Unified Action/Tool definitions remain outstanding; three-field runtime paths and v6 bindings are now implemented.
+✅ Invocation failure isolation preserves complete shared reports before protocol feedback. Ordinary handler failure cannot stop sibling or subsequent work; explicit cancellation and admission errors keep their existing scopes.

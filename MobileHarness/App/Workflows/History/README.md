@@ -19,7 +19,7 @@ flowchart LR
     Adapter --> State[UI history state]
 ```
 
-✅ Independent target dependencies: UI, StorageChat, AgentCore, Agents, Gateway, Tools and ToolRuntime. App composes the root session, Agent and adapter; UI imports none of these services. The AppWorkflows facade retains no state. Archive/reset commits before title inference; cancellation retains archived data and retry state.
+✅ Independent target dependencies: UI, StorageChat, AgentCore, Agents, Gateway, Actions, FunctionContracts, ExecutionRuntime and CallRuntime. App composes the root session, Agent and adapter; UI imports none of these services. The AppWorkflows facade retains no state. Archive/reset commits before title inference; cancellation retains archived data and retry state.
 
 ❌ Archive/title and preview remain existing feature operations. This dependency exception is transitional: moving remaining mutation policy into ConversationMemory and exposing navigation/model intent remains pending. No durable execution, background retry or new journal instance is added.
 
@@ -27,6 +27,12 @@ flowchart LR
 
 ❌ This is deterministic continuation only; no model replanning, deletion retry or navigation is added. Remaining title/archive operations retain the legacy journal dependency.
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

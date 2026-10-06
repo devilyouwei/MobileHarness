@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import Testing
 
@@ -60,7 +62,7 @@ private actor CompositionCounter {
         .init(path: "second", status: .succeeded),
     ])
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: path, displayName: "组合", kind: .finite, completion: "Terminal report",
             completing: { invocation in
                 if invocation.call.parameters["first"] == "true" { return .report(report) }

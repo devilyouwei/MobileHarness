@@ -2,6 +2,12 @@
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
+## 2026-10-07 — Current callable architecture documentation
+
+- Reconciled public architecture, concepts, technical module mapping, roadmap/index and Resource-State-Plan with FunctionContracts, Gateway-owned ExecutionRuntime/CallRuntime and the retired Tools directory.
+- Linked the two protocol-routing diagrams; clarified independent protocol availability, Agent exposure, native execution policy and feedback policy.
+- Corrected execution-record wording for direct versus scheduled native calls. Preserved historical ADR/validation entries and the original Word design source.
+
 ## 2026-09-27 — Module documentation audit
 
 - AgentCore: removed the InternalSignalBus description; Communication now documents contracts and policy while Agents own pending inboxes.

@@ -1,4 +1,4 @@
-import ActionRuntime
+import FunctionContracts
 
 extension UIActions {
     public enum VoiceState: String, Sendable { case listening, hearing, processing }
@@ -8,19 +8,19 @@ extension UIActions {
         public let x: Double
         public let y: Double
     }
-    public enum GazeError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
+    public enum GazeError: Error, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidTarget
-        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
+        public var executionFailureCode: ActionExecutionFailureCode { .invalidArguments }
     }
 
-    public enum PoseError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
+    public enum PoseError: Error, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidPayload
-        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
+        public var executionFailureCode: ActionExecutionFailureCode { .invalidArguments }
     }
 
-    public enum PresentationError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
+    public enum PresentationError: Error, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidText
         case invalidCall
-        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
+        public var executionFailureCode: ActionExecutionFailureCode { .invalidArguments }
     }
 }

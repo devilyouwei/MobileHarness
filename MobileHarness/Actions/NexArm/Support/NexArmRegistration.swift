@@ -1,10 +1,10 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 import PlatformKit
 
 /// Metadata available before device admission. Actual per-motor deadlines use live feedback.
 enum NexArmRegistration {
-    static func resources(_ call: ActionRequest) throws -> Set<ActionResource> {
+    static func resources(_ call: FunctionRequest) throws -> Set<ActionResource> {
         let motors: Set<Int>
         switch call.actionPath.function {
         case "nodHead": motors = [4]
@@ -17,7 +17,7 @@ enum NexArmRegistration {
         }
         return Set(motors.map { ActionResource(rawValue: "nexarm.motor.\($0)") })
     }
-    static func budget(_ call: ActionRequest) throws -> ActionExecutionBudget {
+    static func budget(_ call: FunctionRequest) throws -> ActionExecutionBudget {
         func value(_ name: String, fallback: Int, range: ClosedRange<Int>) throws -> Int {
             guard let raw = call.parameters[name] else { return fallback }
             guard let value = Int(raw), range.contains(value) else { throw NexArmExecutionError.invalidArguments }

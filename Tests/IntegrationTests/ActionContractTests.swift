@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import Testing
 
@@ -49,10 +51,10 @@ private func contractInvocation(path: ActionPath = contractPath) -> ActionInvoca
 }
 
 private func contractDefinition(
-    path: ActionPath = contractPath, kind: ActionDefinition.Kind = .finite,
+    path: ActionPath = contractPath, kind: ActionBinding.Kind = .finite,
     handler: @escaping ActionHandler = { _ in }
-) -> ActionDefinition {
-    ActionDefinition(
+) -> ActionBinding {
+    ActionBinding(
         path: path, displayName: "测试动作", kind: kind, completion: "Fixture operation acknowledged.", handler: handler)
 }
 
@@ -64,7 +66,7 @@ private func contractDefinition(
     for completion in [" ", String(repeating: "x", count: 513)] {
         #expect(throws: ActionExecutionError.invalidDefinition(contractPath.executionIdentifier)) {
             try ActionRegistry(definitions: [
-                ActionDefinition(
+                ActionBinding(
                     path: contractPath, displayName: "测试动作", kind: .finite, completion: completion, handler: { _ in })
             ])
         }
@@ -72,7 +74,7 @@ private func contractDefinition(
     for displayName in ["", " \n", String(repeating: "界", count: 86)] {
         #expect(throws: ActionExecutionError.invalidDefinition(contractPath.executionIdentifier)) {
             try ActionRegistry(definitions: [
-                ActionDefinition(
+                ActionBinding(
                     path: contractPath, displayName: displayName, kind: .finite,
                     completion: "Fixture acknowledged.", handler: { _ in })
             ])
@@ -124,7 +126,8 @@ private func contractDefinition(
     let call = ActionCall(actionPath: contractPath, channel: "Ordered", parameters: ["count": "2"])
     let invocation = try ActionInvocation(
         envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call), sequence: 7))
-    #expect(invocation.call == call.executionRequest)
+    #expect(invocation.call == call.executionRequest.functionRequest)
+    #expect(invocation.channel == "Ordered")
     #expect(invocation.testEnvelope.inputID == input.id && invocation.testEnvelope.sequence == 7)
 }
 
@@ -293,21 +296,23 @@ private enum ContractFailure: Error, Equatable { case failed }
     let restoring = ContractGate()
     let restored = ContractGate()
     let state = ContractState()
-    let definition = UIActions.expressDefinition(handler: { invocation in
-        try await UIActions.express(
-            invocation: invocation,
-            using: { _, _ in
-                await entered.release()
-                await animation.wait()
-            },
-            restoring: { _ in
-                await restoring.release()
-                await restored.wait()
-            })
-    })
-    let setter = UIActions.setExpressionDefinition(handler: { invocation in
-        try await UIActions.setExpression(invocation: invocation) { _, _ in await state.setExpression() }
-    })
+    let definition = ActionBinding(
+        function: UIActions.expressDefinition(handler: { invocation in
+            try await UIActions.express(
+                invocation: invocation,
+                using: { _, _ in
+                    await entered.release()
+                    await animation.wait()
+                },
+                restoring: { _ in
+                    await restoring.release()
+                    await restored.wait()
+                })
+        }))
+    let setter = ActionBinding(
+        function: UIActions.setExpressionDefinition(handler: { invocation in
+            try await UIActions.setExpression(invocation: invocation) { _, _ in await state.setExpression() }
+        }))
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [definition, setter]))
     let input = AgentInput(sessionID: UUID(), payload: .event("expression"))
     let perform = ActionInvocation(
@@ -421,7 +426,7 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
 }
 
 @Test func actionDefinitionBudgetOverridesRuntimeDefault() async throws {
-    let definition = ActionDefinition(
+    let definition = ActionBinding(
         path: contractPath.executionIdentifier, displayName: "Timeout fixture",
         kind: .finite, completion: "Joined cleanup",
         estimatingDuration: { _ in
@@ -439,7 +444,7 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
 }
 
 @Test func actionDeadlinePreservesChildCauseWithoutBorrowingItsRootMessage() async throws {
-    let definition = ActionDefinition(
+    let definition = ActionBinding(
         path: contractPath.executionIdentifier, displayName: "Timeout cause fixture",
         kind: .finite, completion: "Joined cleanup",
         estimatingDuration: { _ in try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(20)) },
@@ -471,7 +476,7 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
 }
 
 @Test func schedulerPreservesTerminalChildFailureInsteadOfEarlierSuccessfulReport() async throws {
-    let definition = ActionDefinition(
+    let definition = ActionBinding(
         path: contractPath.executionIdentifier, displayName: "Terminal fixture", kind: .finite,
         completion: "Terminal report",
         completing: { invocation in

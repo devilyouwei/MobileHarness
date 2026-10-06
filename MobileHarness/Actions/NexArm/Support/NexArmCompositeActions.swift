@@ -1,5 +1,5 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 import PlatformKit
 
 /// Presets own gesture geometry; callers select bounded repetition and native motion options.

@@ -1,6 +1,6 @@
-import ActionRuntime
 import AgentCore
 import Foundation
+import FunctionContracts
 import UI
 
 private struct ActionActivityMapping: Identifiable, Equatable, Sendable {

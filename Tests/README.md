@@ -102,3 +102,7 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ ADR0155 adds deterministic coverage for shared serialization keys across different paths/Channels, independent-key progress, rejected invalid registration and generated macro metadata.
 
 ❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
+
+✅ ADR0159 unifies @Action metadata and invocation contracts; all business and injected endpoints receive one FunctionInput/ActionExecutionContext. Three-level ownership, existing availability/resources/deadlines and independent Agent grants are preserved.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.

@@ -1,6 +1,7 @@
-# Compile-time macros
+# Compile-time Macros
 
-Purpose: build-time source generation shared by Actions and Tools. No runtime device, Agent or UI dependencies.
+Purpose: generate intrinsic metadata for callable Actions. Design goals: one attribute and no runtime device, Agent or UI dependency.
 
-✅ BehaviorDefinitions generates explicit metadata factories from `@Action` / `@Tool` on static functions. Host bindings and Agent JSON permissions stay explicit.
-❌ Automatic discovery, dependency construction and device policies are intentionally unsupported.
+✅ BehaviorDefinitions emits ActionFunction factories from @Action. Functions share FunctionInput/ActionExecutionContext. Protocol policy is absent from macro arguments and generated metadata; host registration creates ActionBinding separately.
+
+❌ Automatic discovery, dependency construction and permission inference are unsupported. See [macro design](BehaviorDefinitions/README.md) for the generation diagram.

@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// Owned only by ChannelScheduler. Active records share scheduling bounds; only terminal history evicts.
 struct ActionExecutionLedger {
@@ -16,7 +18,7 @@ struct ActionExecutionLedger {
         self.terminalCapacity = terminalCapacity
     }
 
-    mutating func admit(_ invocation: ScheduledAction, definition: ActionDefinition) {
+    mutating func admit(_ invocation: ScheduledAction, definition: ActionBinding) {
         let semantics: ActionExecutionRecord.Semantics
         switch definition.kind {
         case .finite: semantics = .finite
@@ -29,7 +31,7 @@ struct ActionExecutionLedger {
             id: invocation.executionID, path: invocation.call.actionPath, displayName: definition.displayName,
             source: invocation.envelope.source,
             sessionID: invocation.envelope.sessionID, inputID: invocation.envelope.inputID,
-            channel: invocation.call.channel, semantics: semantics)
+            channel: invocation.channel, semantics: semantics)
         order.append(invocation.executionID)
         revision += 1
     }

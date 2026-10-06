@@ -87,8 +87,18 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Both App source phases include SpeechFailurePresentation; shared Storage/Agent/UI helpers remain package-owned. ❌ Simulator CoreAI availability and physical acceptance remain separate.
 
 ✅ ADR0151: file references for former Tools sources now point into Actions, matching the shared package's single source ownership. The legacy navigator group is labeled ToolCall Entries; Swift package targets determine compilation.
-❌ Remove compatibility import targets after consumer migration; scheduled ToolCall and physical acceptance remain separate work.
+✅ Compatibility import targets have been removed. ❌ Physical acceptance remains separate work.
 
-✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
+✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ✅ Definitions are unified and compatibility targets removed.
 
-✅ ADR0154 implements cohesive module entry files with one copy of each function and unchanged protocol behavior. File ownership is checked explicitly. ❌ Three-field path/configuration/registration migration remains outstanding.
+✅ ADR0154 implements cohesive module entry files with one copy of each function and unchanged protocol behavior. File ownership is checked explicitly. ✅ Three-field path/configuration/registration migration is implemented.
+
+✅ ADR0159 unifies @Action metadata and invocation contracts; all business and injected endpoints receive standard FunctionInput/ActionExecutionContext. Three-level ownership, existing availability/resources/deadlines and independent Agent grants are preserved.
+
+✅ ADR0160: editor references include callable function/binding/failure contracts and grouped host profiles. The retired native arguments reference is removed; package targets continue to compile shared sources once. ❌ Physical acceptance remains separate.
+
+## Gateway execution migration — ADR0161
+
+✅ Navigator references now match Actions/Contracts, Gateway/Runtime and Gateway/Output/Registration and Protocols. Package targets independently compile FunctionContracts, ExecutionRuntime and CallRuntime; shared sources are compiled once. Business endpoints use FunctionInput without Channel or calling protocol. ❌ Simulator CoreAI availability and physical acceptance remain separate.
+
+✅ Actions navigator follows all six physical domain trees and Contracts; the obsolete ToolCall Entries/runtime group is removed. Gateway runtime and protocol groups are attached under their owning directories.

@@ -1,64 +1,72 @@
-# Resources — App Assets and Local Models
+# Resources — Packaged Assets and Model Metadata
 
-Stores privacy declarations, visual assets and development download profiles. The goal is reproducible local packaging without committing weights, user media, credentials or signing settings. This directory is resource storage, not a Swift runtime module.
+Resources stores app assets, privacy declarations and pinned model source/license metadata. It is a packaging directory, not an execution module or business service. Production builds package metadata; installed model weights live in the device sandbox and are not source-controlled or build prerequisites.
 
-## Directory structure
-
-```text
-Resources/
-├── PrivacyInfo.xcprivacy       # App privacy declarations
-├── AppIconVariants/           # Original and robot-camera artwork for build-time selection
-├── Assets.xcassets/
-│   ├── Contents.json          # Asset catalog metadata
-│   └── AppIcon.appiconset/     # Shared app icon and metadata
-├── Models/
-│   ├── *.download.json        # Pinned development download profiles
-│   └── <model directory>/     # Ignored local weights, created by download scripts
-└── README.md                  # Packaging boundary
-```
+Design goals: reproducible packaging, explicit sources/notices and separation of shipped metadata, ignored development artifacts and user-installed files.
 
 ## Upstream and downstream
 
-Arrows show download, packaging and resource loading.
+Arrows show metadata/build/download flow, not Swift dependencies. Agent configurations remain owned by Agents and bundled through that target's resources.
 
 ```mermaid
 flowchart LR
-    Upstream[Model repositories / release assets] --> Scripts[Download scripts]
-    Scripts --> Resources
-    Resources --> Build[Xcode staging and asset compilation]
-    Build --> App[App bundle]
-    App -->|Local resource root| Models[ModelKitDefaults / adapters]
-    App -->|Privacy declarations| OS[Operating system]
+    Source[Checked-in assets / privacy / model catalog and notices] --> Resources
+    Resources --> Build[Xcode staging / asset compilation]
+    Build --> Bundle[App bundle]
+    Bundle --> App[App resource-root injection]
+    App --> Management[ModelKit management / injected Hub backend]
+    Repositories[Model repositories / release assets] -->|Explicit runtime download| Management
+    Management --> Sandbox[User-installed sandbox model files]
+    Sandbox --> Adapters[ModelKit adapters]
+    Resources --> Scripts[Development download scripts]
+    Repositories --> Scripts
+    Scripts --> Local[Ignored local test artifacts]
 ```
 
-## Internal flow
+## Internal structure
+
+Arrows show the processing of each resource category. Downloads are performed by scripts or runtime services outside this directory.
 
 ```mermaid
-flowchart TD
-    Profile[Models download profile] --> Download[Download to temporary files]
-    Download --> Local[Ignored local model directory]
-    Catalog[Source declarations and licenses] --> Stage[Metadata-only staging]
-    Privacy[PrivacyInfo.xcprivacy] --> Bundle[App resources]
-    Icon[Assets.xcassets] --> Bundle
-    Stage --> Bundle
-    Bundle --> Acquire[Management and Hub SDK: explicit download]
-    Acquire --> Loader[Adapter loads sandbox files]
+flowchart TB
+    Icons[AppIconVariants: preserved artwork] --> Select[Build-time icon selection]
+    Select --> Assets[Assets.xcassets / AppIcon]
+    Assets --> Package[App resource packaging]
+    Privacy[PrivacyInfo.xcprivacy] --> Package
+    Catalog[Models/model-catalog.json: source declarations] --> Stage[Metadata / license staging]
+    Notices[docs/licenses source notices] --> Stage
+    Stage --> Package
+    Catalog --> Developer[Development provisioning profiles/scripts]
+    MacProfile[Gemma macOS test profile] --> Developer
+    Developer --> Ignored[Ignored local weights / graphs / tokenizer files]
 ```
 
-The local configuration uses Nemotron ASR, Gemma 4 E2B CoreAI chat, Silero VAD and YOLO26n-Pose; explicit cloud configuration selects the OpenAI-compatible chat provider. MOSS-TTS-Nano is default and diagnostic TTS (beta); Kokoro and Apple are not selected.  Gemma retains a matching macOS test profile; Audio8 and Kokoro provisioning are removed. Production developer wrappers share model-catalog.json, including the same Nemotron multilingual/2240ms Core ML export for Mac and iOS.
+## Design principles and core mechanisms
 
-Download scripts own bounded workers, temporary files and failures; [Models](Models/README.md) documents that workflow. YOLO reads its archive source/hash from the shared catalog; HF wrappers resolve selected remote metadata. Separate test profiles retain their own explicit sources. App/build settings choose packaged resources; ModelKit owns loading and execution.
+**Separate declarations from installations.** A source catalog says what can be acquired; an installation receipt records what was actually installed. Neither proves runtime availability or selects a model. App/ModelKit combines saved preferences, capability validation and real installation state.
 
-## Packaged scope
+| Artifact | Source / destination | Purpose |
+| --- | --- | --- |
+| Model catalog schema v2 | Checked-in Models → App bundle | Pinned repository/revision/selection or archive source, required files, compatibility and license references |
+| License notices / privacy / icons | Checked-in notices/assets → build staging | Reproducible packaging and platform declarations |
+| Installed model files / receipts | Explicit runtime download → device sandbox | Actual inference resources and installation evidence; not bundled weights |
+| Development model files | Provisioning scripts → ignored local directories | Opt-in tests; separate Mac profiles must not redefine production bindings |
+| Agent configuration JSON | Agents → SwiftPM resource bundle | Agent-owned grants and communication contracts; not a Resources prompt registry |
 
-- ✅ Privacy manifest, shared 1024 × 1024 app icon and model source metadata.
-- ✅ Original and robot-camera icons are preserved in [AppIconVariants](AppIconVariants/README.md); `scripts/select-app-icon.sh` selects the icon for the next build.
-- ✅ Model metadata/license staging; weights remain ignored by Git.
-- ✅ In-app model downloads; ❌ automatic cache repair and separate icon appearance variants.
-- ❌ Dedicated Prompts collection; current Agent configuration is bundled from Agents.
+**Validation follows the source contract.** HF file metadata/selection is resolved by the injected Hub SDK; bundled per-file hashes are not invented. YOLO's ZIP uses its explicit archive hash and safe extraction checks. Bounded staging/atomic publication belongs to runtime management/storage or development scripts, not an asset-directory service. Downloading a model does not automatically enable a saved speech mode.
 
-## Local model resources — current contract
+## Ownership and boundaries
 
-✅ Device/simulator staging includes only model-catalog.json schema-v2 source declarations and license notices. HF repositories/selection rules replace per-file links/hashes; weights/config/tokenizers/graphs/voice assets are installed in the sandbox via Management and ModelKitHub. Production developer wrappers share this catalog; only Gemma macOS uses a separate test profile. Local weights are not build prerequisites.
+- [AppIconVariants](AppIconVariants/README.md) preserves original/robot-camera artwork; `scripts/select-app-icon.sh` selects the next build's icon.
+- `Assets.xcassets/` owns asset-catalog metadata and the shared app icon. `PrivacyInfo.xcprivacy` supplies platform privacy declarations.
+- [Models](Models/README.md) owns schema-v2 source/selection metadata, license references and development provisioning profiles. Source notices come from [docs/licenses](../../docs/licenses/README.md) and are staged into the bundle by the build script. HF resolution uses remote SDK metadata; YOLO has its explicit archive hash/source. Gemma's macOS test profile is separate from production.
+- App supplies resource roots; ModelKitDefaults owns provider bindings, Management owns installation/removal and adapters own model loading. Resources chooses no active model or inference policy.
+- Agent JSON configurations belong in Agents and are packaged by SwiftPM. Credentials, local signing settings, weights and user media must not be committed.
 
-❌ Full iPhone/network acceptance and HF durable background/partial resume remain pending. See [Management](../ModelKit/Management/README.md#local-model-resources--current-contract).
+## Implementation status
+
+✅ Metadata-only production staging, privacy/icon assets, pinned source declarations/notices and shared development provisioning. In-app downloads use sandbox storage; HF native background-session restoration is implemented outside Resources.
+
+❌ Dedicated prompt collection and separate icon appearance variants remain unimplemented. Physical background/server-resume acceptance is separate from packaged metadata and synthetic tests.
+
+See [ModelKit](../ModelKit/README.md) for current providers and [Management](../ModelKit/Management/README.md#local-model-resources--current-contract) for resource lifetimes. This directory makes no fixed TTS/ASR default claim: installed availability and saved preferences are resolved by the model assembly.

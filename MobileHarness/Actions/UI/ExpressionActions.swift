@@ -1,5 +1,5 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 /// UI.Expression function ownership; current invocation paths remain compatible.
 extension UIActions {
@@ -7,11 +7,11 @@ extension UIActions {
         domain: "UI", module: "Expression", title: "表情演出", kind: .finite,
         completion: "One expression transition and restoration finish; cancellation joins override cleanup.",
         serializationKey: "UI",
-        timeout: { _ in try ActionExecutionBudget(expected: .seconds(2), timeout: .seconds(5)) })
+        estimatingDuration: { _ in try ActionExecutionBudget(expected: .seconds(2), timeout: .seconds(5)) })
     public static func express(
-        invocation: ActionInvocation,
-        using present: @escaping @Sendable (Emotion, ActionInvocation) async throws -> Void,
-        restoring restore: @escaping @Sendable (ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (Emotion, any FunctionInput) async throws -> Void,
+        restoring restore: @escaping @Sendable (any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let emotion = try decode(invocation)
@@ -35,8 +35,8 @@ extension UIActions {
         domain: "UI", module: "Expression", title: "设置持续表情", kind: .state,
         completion: "Base expression target is committed; visual interpolation is not joined.", serializationKey: "UI")
     public static func setExpression(
-        invocation: ActionInvocation,
-        using apply: @escaping @Sendable (Emotion, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using apply: @escaping @Sendable (Emotion, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let emotion = try decode(invocation)
@@ -44,7 +44,7 @@ extension UIActions {
         try Task.checkCancellation()
     }
 
-    private static func decode(_ invocation: ActionInvocation) throws -> Emotion {
+    private static func decode(_ invocation: any FunctionInput) throws -> Emotion {
         do {
             let arguments = ActionArguments(invocation.call.parameters)
             try arguments.validateAllowedKeys(["emotion"])

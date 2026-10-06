@@ -35,7 +35,7 @@ No Channel is implicitly main or blocking. DefaultChannel remains an internal ru
 
 ✅ CallArguments provides shared, bounded transport decoding for Action and Tool domains. Actions retains the ActionArguments compatibility name; Tools has no Actions dependency. ❌ Domain-specific defaults/meaning remain outside this decoder.
 
-✅ Capability permissions remain Agent-owned. Execution argument readers live separately in Actions/Runtime/Contracts and Actions/Runtime/Contracts; the unused AgentCore reader was removed.
+✅ Capability permissions remain Agent-owned. Execution argument readers live separately in Actions/Contracts and Actions/Contracts; the unused AgentCore reader was removed.
 
 ✅ CapabilityContextBuilder contains no automatic synthesis/playback assumptions. AssistantAgent.outputContext adds that Agent’s Speech-channel, wait/playback guidance and examples. Catalog metadata is still resolved solely from versioned Agent JSON.
 
@@ -44,6 +44,6 @@ No Channel is implicitly main or blocking. DefaultChannel remains an internal ru
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.

@@ -73,7 +73,7 @@ The earlier Channel-lock takeover proposal is superseded by resource ownership. 
 
 ✅ Capacity, input lifecycle and wait errors now belong to `ActionSchedulingError.swift` in Gateway. Runtime lookup/definition/invocation failures remain ActionExecutionError. Completion errors still cancel the owning input and preserve its original error.
 
-✅ The scheduler actor owns the bounded ActionDiagnostics ring: 256 records by default (configuration 1–4096), oldest-record overwrite with an explicit eviction counter. It records admitted/started and terminal succeeded/failed/cancelled transitions; queued cancellation is notStarted and running failure/cancellation conservatively has unknown effects. No parameters/errors/media are retained. Terminal records follow handler cleanup. `diagnosticSnapshot()` is a bounded chronological copy, not a stream or new queue. Diagnostic eviction never discards Actions. Full algorithm and lifecycle limits are in [Runtime](../../../Actions/Runtime/README.md).
+✅ The scheduler actor owns the bounded ActionDiagnostics ring: 256 records by default (configuration 1–4096), oldest-record overwrite with an explicit eviction counter. It records admitted/started and terminal succeeded/failed/cancelled transitions; queued cancellation is notStarted and running failure/cancellation conservatively has unknown effects. No parameters/errors/media are retained. Terminal records follow handler cleanup. `diagnosticSnapshot()` is a bounded chronological copy, not a stream or new queue. Diagnostic eviction never discards Actions. Full algorithm and lifecycle limits are in [Runtime](../../../Gateway/Runtime/README.md).
 
 ❌ Persistent resources, activity ownership, execution/cleanup deadlines and Agent-facing ActionResult remain unimplemented; ADR 0065 does not change the future Channel ownership proposal above.
 
@@ -126,9 +126,9 @@ flowchart LR
 
 ✅ A Runtime deadline keeps `ActionReport.executionFailure` when the invocation also has stored child results. The terminal result releases the lane only after cooperative cleanup joins; later accepted Actions still run. Queue time is outside the registered execution budget.
 
-✅ Scheduling and ActionDiagnostics operate on ScheduledAction. Only its ActionInvocation execution value crosses into Actions; Channel ordering, cancellation, admission identity and resource fencing remain unchanged.
+✅ Scheduling and ActionDiagnostics operate on ScheduledAction. Only its standard FunctionInput interface crosses into Actions; Channel ordering, cancellation, admission identity and resource fencing remain unchanged.
 
-✅ ADR0098: Gateway imports AgentCore and ActionRuntime only. Concrete Actions, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
+✅ ADR0098: Gateway imports AgentCore and FunctionContracts only. Concrete Actions, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
 
 ✅ Stored child reports no longer replace subsequent exceptions or cancellation; the execution-level issue is retained before releasing the lane. ❌ No effect rollback.
 
@@ -178,12 +178,12 @@ flowchart LR
 
 ❌ Global priority/fairness scheduling remains outstanding.
 
-✅ ADR0155: admission captures ActionDefinition.serializationKey, validated by the registry. One running Action per key across tasks/Channels; joined cleanup releases that same captured key. Production retains UI/Speech/NexArm keys; omitted keys default to path.module for legacy/isolated definitions. Parameters and Channels cannot override exclusion. ❌ Three-field Path migration is implemented.
+✅ ADR0155: admission captures ActionFunction.serializationKey, validated by the registry. One running Action per key across tasks/Channels; joined cleanup releases that same captured key. Production retains UI/Speech/NexArm keys; omitted keys default to path.module for legacy/isolated definitions. Parameters and Channels cannot override exclusion. ❌ Three-field Path migration is implemented.
 
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
@@ -208,3 +208,9 @@ flowchart LR
 ✅ Queued cancellation completes the receipt with cancellation without executing the job; running cancellation joins cleanup before returning. Serial keys remain held during cleanup. Child scope context adaptation is internal to Gateway; public ScheduledAction construction derives its context from the envelope.
 
 ❌ Uncooperative handlers cannot be forcibly terminated, and software cleanup is not proof of physical stop.
+
+✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+✅ Ordinary handler failure completes only its job, records the terminal cause in ActionResult and leaves later eligible work running. Accepted native projection failures return the same structured report; pre-admission errors and owner cancellation retain their scope.

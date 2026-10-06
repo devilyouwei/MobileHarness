@@ -1,9 +1,12 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 public struct ScheduledAction: Sendable {
-    public var results: ActionReportStore { execution.results }
+    public var channel: String { call.channel }
+    public var results: any FunctionReporting { execution.results }
     public let execution: ActionInvocation
     public let executionID: UUID
     public let envelope: OutputEnvelope

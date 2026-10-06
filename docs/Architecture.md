@@ -1,6 +1,6 @@
 # MobileHarness architecture
 
-MobileHarness uses an iPhone as the host for a **Signal → Cognition → Action** loop. Microphone/camera input becomes observations; stateful Agents use model capabilities to interpret them and select behavior. Validated Actions and Tools produce speech, presentation and connected-device effects.
+MobileHarness uses an iPhone as the host for a **Signal → Cognition → Action** loop. Microphone/camera input becomes observations; stateful Agents use model capabilities to interpret them and select behavior. Authorized Action functions produce speech, presentation and connected-device effects through scheduled/native call protocols.
 
 ```mermaid
 flowchart LR
@@ -8,7 +8,7 @@ flowchart LR
     Input --> Agents[Perception and cognitive Agents]
     Agents <--> Models[Model capabilities: local or explicit cloud chat]
     Agents --> Output[OutputGateway]
-    Output --> Behaviors[Actions / Tools]
+    Output --> Behaviors[Callable Actions / shared execution]
     Behaviors --> Effects[Speaker / UI / connected robot]
     Output -->|observations and results| Input
 ```
@@ -19,11 +19,11 @@ SpeechPerception and VisionPerception share recognition/pose processing and publ
 
 Agents own their cognitive state and processing. Communication carries trusted source, session and causal context. Gateways validate admission and requested behavior, while Agent inboxes own pending messages.
 
-## Scheduled behavior and direct functions
+## Callable Actions and two call protocols
 
-Actions represent scheduled skills such as speech playback, expression changes and NexArm movement. Channels order Actions within a task; nested wait groups synchronize that task's stages. Shared module/resource coordination prevents conflicting execution.
+Actions implements the business functions for UI, speech, camera, history, system and NexArm. Each function accepts protocol-neutral input and returns a shared completion/report. App-owned ActionBinding exposes it through ActionCall, ToolCall or both; Agent configuration/code independently authorizes use. Agents parse registered text tags into ActionCall and native function events into ToolCall before OutputGateway admission.
 
-Tools provide direct functions such as captions, gaze, skeleton display and runtime information. A Tool's registered contract selects result feedback or completion-only behavior. Both kinds cross validated output dispatch; presentation state acceptance and physical completion are distinct boundaries.
+ActionCall uses Channel scheduling and nested wait groups. ToolCall selects binding-owned direct execution or a scheduled projection into the same ChannelScheduler. Both paths preserve canonical function resources, budgets and joined cleanup. Returning feedback crosses InputGateway; completion-only native calls retain their no-feedback policy. Ordinary handler errors end only their invocation and preserve child outcomes and causes; explicit owner cancellation retains its scope. Presentation acceptance and physical completion remain distinct boundaries. See the [registration and dispatch diagrams](../MobileHarness/Gateway/Output/Protocols/README.md).
 
 ## Host, presentation and foundations
 
@@ -35,7 +35,7 @@ Tools provide direct functions such as captions, gaze, skeleton display and runt
 | PlatformKit | Own capture, native output, connections, device protocol and feedback. |
 | Storage | Retain settings/conversation records and bounded transient audio handles. |
 
-UI pages do not own model/device sessions. Long-lived work belongs to App lifecycle owners and runtime services. ActionRuntime is the shared execution foundation; Tools/ToolRuntime compatibility targets are retired; Gateway depends only on AgentCore and ActionRuntime, while concrete functions live in Actions. ModelKit and PlatformKit have no project dependencies, including Types, and own their capability inputs/outputs. App transports native device data; each calling Agent adapts it into ModelKit inputs. StorageAudio owns its own PCM contract.
+UI pages do not own model/device sessions. Long-lived work belongs to App lifecycle owners and runtime services. FunctionContracts is the independent contract leaf under Actions/Contracts. Gateway/Runtime owns ExecutionRuntime; Gateway/Output owns independent CallRuntime registration/adapters. Gateway orchestration depends on these execution/call contracts and AgentCore, while concrete business functions remain in Actions. Legacy runtime/compatibility targets are retired. ModelKit and PlatformKit have no project dependencies, including Types, and own their capability inputs/outputs. App transports native device data; each calling Agent adapts it into ModelKit inputs. StorageAudio owns its own PCM contract.
 
 ## Conversation, settings and devices
 
@@ -51,7 +51,7 @@ The [technical design](../MobileHarness/README.md) defines dependencies and full
 
 Camera.open/close/flip Tools request the App camera owner through a typed capability after active Assistant session validation. The same foreground permission and capture lease lifecycle governs UI and Tool controls; Tool dispatch does not create a second device owner.
 
-Cloud chat supports native function declarations from Agent JSON v5. Complete calls are resolved by the Agent and dispatched through OutputGateway; local chat remains text-only. Tool results use the existing InputGateway feedback contract, without automatic model continuation.
+Cloud chat supports native function declarations from Agent JSON v6. Complete calls are resolved by the Agent and dispatched through OutputGateway; local chat remains text-only. Tool results use the existing InputGateway feedback contract, without automatic model continuation.
 
 Photographer subscribes to VisionPerception pose observations and emits internal Robot.aim through OutputGateway. App binds the foreground BLE workflow; Actions owns aim mapping and admission, while PlatformKit supplies native command encoding. Transport acceptance does not establish physical arrival.
 
@@ -107,7 +107,7 @@ Model invocation resolution failures (unknown Action/Tool alias or invalid param
 
 ✅ ADR0103 failure isolation refinement: retained Action reports preserve later exceptions; invocation/resource rejection is call-local; Tools distinguish execution and feedback failures, with joined cooperative deadlines and task-scoped cancellation. ❌ Uncooperative handlers and physical acceptance remain outstanding.
 
-✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); native projections retain the same constant/dynamic budgets and canonical definition. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
+✅ Canonical function budgets and static timeouts apply equally to both protocols before the shared30-second default. Invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
 
 ✅ [ADR 0112: Gemma CoreAI chat](adr/0112-gemma-coreai-chat.md) replaces local Qwen/MLX with Gemma 4 E2B QAT CoreAI. iOS uses pinned h18p AOT resources; old Qwen downloads are incompatible. Shared package dependencies require OS 26; CoreAI execution requires OS 27. ✅ Mac real inference, cancellation and reload passed. ❌ Sustained device acceptance remains pending.
 
@@ -121,7 +121,7 @@ Adaptive image evidence is sampled/processed in VisionPerception using the exist
 
 ✅ Urgent YOLO detection now permits a zero scheduling interval. The single inference worker processes only the newest pending capture after the active call completes. Normal inference duration adds no scheduling floor; compute-dominated freshness pressure can temporarily impose a bounded cost floor. Camera close already clears skeleton and its statistics; no source-stall timer is added.
 
-✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
 
 ✅ AgentCore/domain separation places pose and speech message values in Agents/Communication, application Agent names in Agents, and automatic speech guidance in Assistant. Core has zero project dependencies; scheduling completion requires explicit source. ✅ Generic message/schema registration, domain freshness policy, explicit host input adaptation and Agent-owned sample transport are implemented in stage 2. See [ADR0115](adr/0115-agentcore-domain-separation.md).
 
@@ -208,7 +208,7 @@ flowchart LR
 
 The active [Agent-driven architecture](../MobileHarness/Agent-Driven-App.md#unified-signal-contract) defines Signal as immutable Agent input carried by AgentInput. Intent, observation, Agent message and execution feedback share envelope/admission rules while retaining domain-owned payloads. ✅ Existing envelopes, schemas and Gateway paths implement the common foundation. ❌ Typed legacy intents and full App entry-point migration remain pending; see [ADR0148](adr/0148-unified-signal-contract.md).
 
-The [scenario flows](../MobileHarness/Agent-Driven-App.md#signal-and-effect-scenarios) distinguish UI intent, conversational/perception input and Agent collaboration. All Agent-driven presentation uses registered Actions/Tools; actual feedback can drive further processing, while rendering alone generates no new Signal. ❌ General conversational continuation and domain request/reply remain pending.
+The [scenario flows](../MobileHarness/Agent-Driven-App.md#signal-and-effect-scenarios) distinguish UI intent, conversational/perception input and Agent collaboration. All Agent-driven presentation uses registered Action functions through authorized call protocols; actual feedback can drive further processing, while rendering alone generates no new Signal. ❌ General conversational continuation and domain request/reply remain pending.
 
 The same design separates external facts, internal Agent messages and internal runtime feedback under one envelope. Independent observation, system/capability changes and execution lifecycle supplement UI/conversation/collaboration. ✅ Typed origin admission and owner-fenced Tool feedback are implemented (ADR0149). ❌ Unified lifecycle/long-task contracts remain pending; host cleanup mechanisms remain App-owned.
 
@@ -231,3 +231,13 @@ The same design separates external facts, internal Agent messages and internal r
 ✅ [ADR0156 — Three-level capability addresses](adr/0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; serialization/resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
 
 ✅ [ADR0157 — Canonical executable definitions](adr/0157-canonical-executable-definitions.md): completes shared definition/outcome/execution, protocol projections, scheduled native routing, typed feedback and compatibility retirement. Remaining work is broader Agent-driven input/feature migration and physical acceptance.
+
+✅ [ADR0158 — Unified Action authoring](adr/0158-unified-action-authoring.md): one @Action attribute for all capabilities; model context supplies text actions and request tools supplies native declarations. Text tags and native events retain distinct ActionCall/ToolCall transports.
+
+✅ [ADR0159 — Protocol-independent invocations](adr/0159-protocol-independent-action-invocations.md) removed native-only business signatures. ADR0161 completes the boundary with one FunctionInput/context/handler and @Action metadata; ActionInvocation remains a Gateway scheduling adapter. Differences remain in registration, model transport/parsing, runtime admission and feedback.
+
+✅ [ADR0160 — Callable functions and protocol bindings](adr/0160-callable-functions-and-protocol-bindings.md): pure ActionFunction catalogs and @Action metadata; host-owned ActionBinding profiles select protocols/runtime feedback. Business errors and UI payloads are protocol-neutral. Shared execution consumes only the function. Remaining work: external feature Signal migration, Agent continuation, additional device/navigation capabilities and physical acceptance.
+
+✅ [ADR0161 — Gateway execution and isolated function contracts](adr/0161-gateway-execution-and-function-contracts.md): standard FunctionInput contracts under Actions/Contracts; common ExecutionRuntime under Gateway/Runtime; isolated CallRuntime registration/adapters under Gateway/Output. Actions has no execution/protocol imports and Channel stays outside the common request. Validation is recorded in Validation-History.md.
+
+✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](adr/0162-invocation-failure-isolation.md).

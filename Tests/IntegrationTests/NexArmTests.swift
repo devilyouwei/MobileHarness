@@ -1,9 +1,11 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import BehaviorAssembly
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import PlatformKit
 import Testing
@@ -265,14 +267,14 @@ private actor NexArmBaseFixture: NexArmWritableLink {
 }
 
 struct NexArmAssistantUIModule: ActionModule {
-    var definitions: [ActionDefinition] {
+    var definitions: [ActionBinding] {
         ["express", "setExpression", "beginReplyTurn", "print"].map {
-            ActionDefinition(
+            ActionBinding(
                 path: ActionPath(domain: "UI", module: "Expression", function: $0), displayName: "测试动作",
                 kind: $0 == "express" ? .finite : .state,
                 completion: "Test presentation accepted.", handler: { _ in })
         } + [
-            ActionDefinition(
+            ActionBinding(
                 path: ActionPath(domain: "Speech", module: "Playback", function: "speak"), displayName: "测试动作",
                 kind: .finite,
                 completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") })
@@ -308,7 +310,7 @@ func runNexArmAssistantAction(cycles: Int, move: @escaping @Sendable (Int) async
 
 private func runNexArmAssistantMarkup(
     _ markup: String, function: String, move: @escaping @Sendable (Int) async throws -> Void,
-    gesture: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void = { _, _ in
+    gesture: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void = { _, _ in
         throw NexArmError.invalidMotion
     }
 ) async throws {
@@ -325,8 +327,8 @@ private func runNexArmAssistantMarkup(
     let input = InputGateway(manager: manager, policy: policy)
     let assembly = try BehaviorAssembly(
         actionModules: [
-            NexArmBaseActionModule { count, _ in try await move(count) },
-            NexArmGestureActionModule(perform: gesture),
+            ScheduledFunctionFixture(NexArmBaseModule { count, _ in try await move(count) }),
+            ScheduledFunctionFixture(NexArmGestureModule(perform: gesture)),
             NexArmAssistantUIModule(),
         ],
         toolModules: [])
@@ -572,7 +574,7 @@ func nexArmGestureActionsRejectMalformedArgumentsBeforeEffects(_ function: Strin
         ? [[:], ["direction": "up"], ["direction": "left", "speed": "0"]]
         : [[:], [key: "0"], [key: "4"], [key: "1.5"], [key: "nan"], [key: "1", "speed": "0"]]
     let registry = try ActionRegistry(modules: [
-        NexArmGestureActionModule { _, _ in
+        NexArmGestureModule { _, _ in
             Issue.record("Invalid gesture reached physical binding")
         }
     ])
@@ -995,7 +997,7 @@ func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) a
 
 @Test func nexArmInvalidDanceArgumentsReportValidationWithoutDeviceEffects() async throws {
     let registry = try ActionRegistry(modules: [
-        NexArmGestureActionModule { _, _ in Issue.record("Invalid parameters must not reach the device") }
+        NexArmGestureModule { _, _ in Issue.record("Invalid parameters must not reach the device") }
     ])
     let call = ActionInvocation(
         source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
@@ -1006,7 +1008,7 @@ func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) a
         _ = try await ActionExecutor(registry: registry).execute(call)
         Issue.record("Expected invalid repetitions")
     } catch {
-        #expect((error as? any ActionExecutionFailureProviding)?.actionExecutionFailure == .invalidArguments)
+        #expect((error as? any ActionReportFailureProviding)?.actionExecutionFailure == .invalidArguments)
         #expect(error.localizedDescription == "跳舞次数必须是 1 到 3 的整数")
     }
 }

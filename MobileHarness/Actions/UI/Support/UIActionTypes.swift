@@ -1,4 +1,4 @@
-import ActionRuntime
+import FunctionContracts
 
 extension UIActions {
     /// Semantic identifiers only; presentation owns the procedural eye geometry.

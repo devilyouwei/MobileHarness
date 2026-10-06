@@ -1,4 +1,4 @@
-# Camera Tools
+# Camera Actions
 
 Purpose: expose explicit camera/vision controls through OutputGateway. Design goals: domain-owned entries, typed host injection, no direct device ownership and honest completion.
 
@@ -8,12 +8,12 @@ Purpose: expose explicit camera/vision controls through OutputGateway. Design go
 | Camera.Capture.close | No arguments; idempotently disable capture and vision |
 | Camera.Capture.flip | No arguments; switch front/rear lens; disabled camera fails |
 
-✅ CameraActions.swift owns @Tool entries; Support/CameraModule.swift owns definitions, capability and errors. All entries check cancellation and reject unknown arguments before effects. Completion-only success produces no ToolResult or Action history. Host errors propagate.
+✅ CaptureActions.swift owns @Action entries; Support/CameraModule.swift owns definitions, capability and errors. All entries check cancellation and reject unknown arguments before effects. Host registration retains completion-only native success without ToolResult or Action history. Host errors propagate.
 
 ```mermaid
 flowchart LR
     Agent[Assistant JSON Tool declaration] --> Gateway[OutputGateway permissions]
-    Gateway --> Runtime[ActionRuntime]
+    Gateway --> Runtime[FunctionContracts]
     Runtime --> Entry[CameraActions]
     Entry --> Adapter[App session validation]
     Adapter --> Owner[CameraCoordinator]
@@ -24,15 +24,15 @@ flowchart LR
 
 ✅ App validates the active Assistant voice session and foreground. The coordinator rejects overlapping Tool operations with busy; UI/scene changes can supersede an admitted operation, which then fails cancellation. There is no Tool queue. Open/flip wait for native capture reconciliation; close waits for capture release and vision cleanup. Open does not promise pose-model readiness. Existing bounded frame streams and permission validation remain.
 
-✅ Tool definitions claim no camera.capture lock: they request the single App camera owner to change intent; that owner alone acquires/renews/releases the lease. Taking another lease at Gateway would conflict with the active capture owner. Tools imports only Foundation/ActionRuntime and gains no PlatformKit dependency.
+✅ Camera function constraints claim no camera.capture lock: they request the single App camera owner to change intent; that owner alone acquires/renews/releases the lease. Taking another lease at Gateway would conflict with the active capture owner. Camera Actions imports only Foundation/FunctionContracts and gains no PlatformKit dependency.
 
 ❌ Native model Tool event transport, background capture, forced interruption of native calls and physical-device acceptance are not added. Cancelling after an intent is accepted does not roll back that intent; scene shutdown still owns cleanup.
 
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
-❌ Unified capability definitions and protocol registration adapters remain pending.
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
+✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
 
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
-❌ Unified callable definitions and migration of compatibility names remain pending.
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one pure `<Domain>Module`; host registration creates Action/Tool projections. Legacy aliases are retired; isolated registration views retain one canonical catalog.
+✅ Unified definitions and compatibility retirement are implemented in ADR0157.
 
 ## Cohesive module files — ADR0154
 
@@ -41,4 +41,10 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 - [CaptureActions.swift](CaptureActions.swift)
 
 ✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
-❌ Explicit three-field paths, versioned Agent configuration and unified definitions/results remain the next coordinated stage.
+✅ Three-field addresses, Agent v6 configuration and shared definitions/results are implemented in ADR0156/0157.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

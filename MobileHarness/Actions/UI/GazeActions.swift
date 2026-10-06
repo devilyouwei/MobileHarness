@@ -1,17 +1,18 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 /// UI.Gaze function ownership; current invocation paths remain compatible.
 extension UIActions {
-    @Tool(path: "UI.Gaze.moveEyes", title: "moveEyes")
+    @Action(
+        domain: "UI", module: "Gaze", title: "moveEyes", serializationKey: "UI")
     public static func moveEyes(
-        invocation: ToolInvocation,
-        using present: @escaping @Sendable (Gaze, ToolInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (Gaze, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let target: Gaze
         do {
-            let arguments = ToolArguments(invocation.call.arguments)
+            let arguments = ActionArguments(invocation.call.parameters)
             try arguments.validateAllowedKeys(["x", "y"])
             target = try Gaze(
                 x: arguments.requiredFiniteDouble("x", range: -1...1),

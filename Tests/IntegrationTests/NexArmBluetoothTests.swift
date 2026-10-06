@@ -1,9 +1,11 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import ModelKit
 import Storage
@@ -2159,7 +2161,7 @@ func bluetoothAssistantActionPreemptsTrackingAndKeepsQueuedActions(motor: Int) a
     try await until { await !link.liveCommands.isEmpty }
     await link.blockLiveEnd()
     await link.holdTelemetry()
-    let module = NexArmGestureActionModule { request, invocation in
+    let module = NexArmGestureModule { request, invocation in
         try await workflow.moveMotor(
             id: try #require(request.motor), target: request.target, speed: request.speed,
             acceleration: request.acceleration,
@@ -2267,7 +2269,7 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
     try await manager.register(photographer, sessionID: session)
     try await photographer.start()
     let tools = try ToolRegistry(modules: [
-        NexArmTrackingToolModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
+        NexArmTrackingModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
     ])
     let output = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: tools,
@@ -2523,10 +2525,10 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let expressionPath = ActionPath(domain: "UI", module: "Expression", function: "setExpression")
     let registry = try ActionRegistry(
         definitions:
-            NexArmBaseActionModule { count, invocation in
+            NexArmBaseModule { count, invocation in
                 try await workflow.shakeBase(cycles: count, recordReport: { try await invocation.results.record($0) })
-            }.definitions + [
-                ActionDefinition(
+            }.definitions.map { ActionBinding(function: $0) } + [
+                ActionBinding(
                     path: speechPath, displayName: "Simulated speech", kind: .finite, completion: "Gate released.",
                     handler: { invocation in
                         let id = try #require(invocation.call.parameters["audioID"])
@@ -2539,7 +2541,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
                             try Task.checkCancellation()
                         }
                     }),
-                ActionDefinition(
+                ActionBinding(
                     path: expressionPath, displayName: "Simulated presentation", kind: .state,
                     completion: "State accepted.",
                     handler: { _ in
@@ -2550,9 +2552,9 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
         await input.deliverActionResult($0)
     }
     let tools = try ToolRegistry(modules: [
-        NexArmTrackingToolModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
+        NexArmTrackingModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
     ])
-    try await tools.registerCompletion("UI.Caption.print") { _, _ in }
+    try await tools.registerCompletion("UI.Caption.print") { _ in }
     let output = OutputGateway(
         manager: manager, requests: input, tools: tools, actions: scheduler, actionFeedback: .terminal, sink: { _ in })
     let observer = Task { await workflow.run() }
@@ -2780,7 +2782,7 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     var attempts = 0
     var firstFailed = false
     let registry = try ActionRegistry(
-        definitions: NexArmBaseActionModule { count, invocation in
+        definitions: NexArmBaseModule { count, invocation in
             let first = await MainActor.run {
                 attempts += 1
                 return attempts == 1
@@ -2797,7 +2799,7 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
                 }
                 throw error
             }
-        }.definitions)
+        }.definitions.map { ActionBinding(function: $0) })
     let scheduler = ChannelScheduler(registry: registry, resources: try nexArmTestResources()) {
         await inputGateway.deliverActionResult($0)
     }

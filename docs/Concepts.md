@@ -10,18 +10,18 @@ The biological analogy describes functional organization: sensing provides signa
 | Agent | Stateful processor with a distinct role, input ownership and permitted outputs. | Specialized functional brain region. |
 | Gateway | Validation, communication routing and execution coordination boundary. | Neural pathways coordinating signals and commands. |
 | Capability | Typed model/device/data operation supplied to a consumer. | Processing machinery or sensory/effector capacity. |
-| Action | Permission-checked skill executed under scheduling and completion rules. | Coordinated motor skill. |
-| Tool | Direct registered function with result or completion semantics. | Immediately available focused function. |
+| Action | Protocol-neutral callable business function with shared input, completion and failure rules. | Coordinated behavior. |
+| ActionCall / ToolCall | Scheduled text-call and native function-call protocols over permitted Actions. Native calls may use direct or shared scheduled execution. | Alternative command pathways. |
 | App / UI | Whole-system lifetime/composition and user-facing interaction. | Organism and expressive surface. |
-| Storage / Types | Retained data and shared value vocabulary. | Retained information and signal representation. |
+| Storage / shared values | Retained data and shared value vocabulary. | Retained information and signal representation. |
 
 ## Communication and execution
 
 Publication selects declared subscribers; directed delivery selects an explicit recipient. Admission means acceptance for processing rather than completed inference or behavior. Agent messages and Tool/Action results return through the input boundary.
 
-Function Token is a mixed natural-text/XML behavior protocol, not a tokenizer token. Agents interpret it and resolve aliases before execution. A Channel is a task-local Action ordering scope. A wait group joins relevant Action work without making unrelated tasks share a global barrier. Tools bypass Channel queues but still obey permission/resource checks.
+Function Token is a mixed natural-text/XML behavior protocol, not a tokenizer token. Agents interpret it and resolve aliases before execution. A Channel is a task-local Action ordering scope. A wait group joins relevant Action work without making unrelated tasks share a global barrier. Native ToolCall bypasses Channel queues only when its binding selects direct execution; scheduled native bindings use the shared scheduler. Both enforce permission/resource checks.
 
-A capability call is foundational processing, such as inference or data retention. A business effect, such as playback, UI presentation or robot movement, is a registered Action/Tool. This distinction keeps model computation separate from effect authorization.
+A capability call is foundational processing, such as inference or data retention. A business effect, such as playback, UI presentation or robot movement, is a registered Action invoked through an authorized call protocol. This distinction keeps model computation separate from effect authorization.
 
 ## Identity, ownership and completion
 

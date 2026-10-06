@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import Testing
 
@@ -282,7 +284,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     try await manager.register(assistant, sessionID: replySession)
     try await manager.start(.assistant)
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: lifecyclePath, displayName: "Test move", kind: .finite, completion: "Acknowledged.",
             resources: [armResource]
         ) { _ in await actions.increment() }
@@ -477,7 +479,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let input = InputGateway(manager: manager)
     let counter = LifecycleCounter()
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Effect completed.") {
+        ActionBinding(path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Effect completed.") {
             _ in
             await counter.increment()
         }
@@ -535,7 +537,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let releaseDelivery = LifecycleGate()
     let counter = LifecycleCounter()
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: lifecyclePath, displayName: "测试动作", kind: .state, completion: "State committed.") { _ in
+        ActionBinding(path: lifecyclePath, displayName: "测试动作", kind: .state, completion: "State committed.") { _ in
             await counter.increment()
         }
     ])
@@ -563,7 +565,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
 @Test func activityStartReturnsAHandleWithoutWaitingForActivityTermination() async throws {
     let activityID = UUID()
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: lifecyclePath, displayName: "测试动作", kind: .activityStart, completion: "Capture active.",
             completing: { _ in
                 .activityStarted(activityID)
@@ -633,7 +635,7 @@ private actor RevocationDevice {
     let device = RevocationDevice()
     let resources = try lifecycleResources { await device.stop() }
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Device stopped.",
             resources: [armResource]
         ) {
@@ -723,7 +725,7 @@ private actor RevocationDevice {
     try await manager.start(otherAgent)
     let input = InputGateway(manager: manager)
     let count = LifecycleCounter()
-    let definition = ActionDefinition(
+    let definition = ActionBinding(
         path: .init(domain: "Fixture", module: "Control", function: "move"), displayName: "Move",
         kind: .finite, completion: "Effect accepted.", protocols: [.tool], executionPolicy: .direct,
         resolvingResources: { _ in [ActionResource(rawValue: armResource.rawValue)] },
@@ -765,7 +767,7 @@ private actor RevocationDevice {
     let device = RevocationDevice()
     let resources = try lifecycleResources { await device.stop() }
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Device stopped.",
             resources: [armResource]
         ) {
@@ -788,7 +790,7 @@ private actor RevocationDevice {
 
 @Test func activityCompletionMustMatchItsRegisteredKind() async throws {
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Finite operation.",
             completing: { _ in
                 .activityStarted(UUID())
@@ -809,7 +811,7 @@ private actor RevocationDevice {
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
     let input = InputGateway(manager: manager)
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: lifecyclePath, displayName: "Simulated failure", kind: .finite, completion: "Report retained.",
             completing: { _ in
                 .report(ActionReport.failure(.handlerFailed))
@@ -832,4 +834,4 @@ private actor RevocationDevice {
     try await manager.stop(.assistant)
 }
 
-private struct DynamicResourceToolFixture: ToolModule { let definitions: [ActionDefinition] }
+private struct DynamicResourceToolFixture: ToolModule { let definitions: [ActionBinding] }

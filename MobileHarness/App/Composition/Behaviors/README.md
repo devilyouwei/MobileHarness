@@ -1,22 +1,22 @@
 # Behavior Assembly
 
-Purpose: bind host capabilities to domain-owned executable catalogs. Design goals: explicit composition, one definition per implementation and no AgentCore dependency.
+Purpose: inject host capabilities and assemble canonical business functions plus call bindings. Design goals: one frozen function store, explicit grouped profiles and no AgentCore dependency.
 
 ```mermaid
 flowchart LR
-    Host[Injected endpoints] --> Domains[Six CapabilityModule catalogs]
-    Domains --> Definitions[Canonical ActionDefinitions]
-    Definitions --> Actions[Scheduled projection]
-    Definitions --> Tools[Native projection]
-    Actions --> Assembly[BehaviorAssembly]
-    Tools --> Assembly
-    Assembly --> Coverage[Gateway startup coverage]
+    Host[Injected capabilities] --> Domains[Six pure CapabilityModules]
+    Domains --> Catalog[Validated frozen function catalog]
+    Catalog --> Store[ExecutionRuntime FunctionRegistry]
+    Catalog --> Profiles[Grouped BehaviorProtocolBindings]
+    Profiles --> Bindings[CallRuntime binding projections]
+    Store --> Bindings
+    Bindings --> Gateway[Gateway startup coverage / permission / scheduling]
 ```
 
-✅ Production builds the six-domain collection once and supplies filtered Action/Tool projections. It retains canonical paths, resource/budget metadata and protocol availability. App supplies handlers but defines no per-function metadata/registration lists. BehaviorAssembly imports Actions/ActionRuntime only.
+✅ BehaviorAssembly freezes the catalog once, creates FunctionRegistry and supplies it to both registration views. Canonical execution/resource/budget metadata always comes from that store. Explicit protocol-module injection remains for isolated hosts; duplicate functions or missing implementations fail without fallback.
 
-✅ Explicit protocol-module injection remains available for isolated hosts/tests; startup coverage rejects missing implementations. Tools/ToolRuntime compatibility dependencies are removed.
+✅ BehaviorProtocolBindings owns grouped host profiles and rejects unknown modules. Existing expression/speech/motion/gesture scheduling, returning history/system calls and completion-only presentation/camera/tracking calls are preserved. Agent aliases/exposure lists remain in Agent JSON/code.
 
-❌ Runtime discovery, permission inference and configuration fallback are not implemented.
+✅ This target depends on Actions, FunctionContracts, ExecutionRuntime and CallRuntime only. Gateway's AgentCore-dependent orchestration is not imported. Business functions and injected endpoints accept standard FunctionInput, not scheduling/native invocations.
 
-✅ Composition freezes CapabilityCatalog once before projection: at most32 domains/256 canonical definitions, shared metadata validation before filtering, and duplicate addresses rejected across protocols. The same handler/metadata snapshot feeds both registries; invalid unexposed definitions cannot disappear silently.
+❌ Discovery, permission inference and configuration fallback are not implemented.

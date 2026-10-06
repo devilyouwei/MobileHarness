@@ -55,11 +55,11 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 
 ✅ Debug-only `-actions-preview` renders the actual conversation/status components with explicitly labeled synthetic records for parallel, queued, cancelling and failed states; it bypasses models, camera, audio and Bluetooth startup. Release ignores the flag. ❌ Preview data is not execution acceptance.
 
-✅ The execution footer uses native iOS26+ Liquid Glass (`glassEffect`) with a material fallback on earlier supported systems. Home and detail records include all scheduled Actions without filtering. Fixed internal UI updates are immediate Tools. Tool calls are not execution records.
+✅ The execution footer uses native iOS26+ Liquid Glass (`glassEffect`) with a material fallback on earlier supported systems. Home and detail records include all scheduled Actions without filtering. Fixed internal UI updates are immediate Tools. Direct native calls do not create scheduled execution records; explicitly scheduled native bindings can appear in the shared scheduler.
 
 ## Action and Tool presentation boundary
 
-✅ The native glass panel receives every scheduled Action, including expression; fixed presentation Tools generate no records. Failed rows use the description from the thrown error rather than a frontend error catalog. ❌ Tools/audio recognition are not synthetic Action rows.
+✅ The native glass panel receives every scheduled Action, including expression; fixed presentation Tools generate no records. Failed rows use the description from the thrown error rather than a frontend error catalog. ❌ Direct native calls/audio recognition are not synthetic scheduled rows.
 
 ## Generic Action presentation
 

@@ -1,15 +1,16 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 /// UI.Caption function ownership; current invocation paths remain compatible.
 extension UIActions {
-    @Tool(path: "UI.Caption.beginReplyTurn", title: "beginReplyTurn")
+    @Action(
+        domain: "UI", module: "Caption", title: "beginReplyTurn", serializationKey: "UI")
     public static func beginReplyTurn(
-        invocation: ToolInvocation,
-        using present: @escaping @Sendable (ToolInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        do { try ToolArguments(invocation.call.arguments).validateAllowedKeys([]) } catch {
+        do { try ActionArguments(invocation.call.parameters).validateAllowedKeys([]) } catch {
             throw PresentationError.invalidCall
         }
         try await present(invocation)
@@ -17,15 +18,16 @@ extension UIActions {
     }
 
     /// Replace the recognition caption; unlike UI.print, empty text is an explicit clear.
-    @Tool(path: "UI.Caption.setTranscript", title: "setTranscript")
+    @Action(
+        domain: "UI", module: "Caption", title: "setTranscript", serializationKey: "UI")
     public static func setTranscript(
-        invocation: ToolInvocation,
-        using present: @escaping @Sendable (String, ToolInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (String, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let text: String
         do {
-            let arguments = ToolArguments(invocation.call.arguments)
+            let arguments = ActionArguments(invocation.call.parameters)
             try arguments.validateAllowedKeys(["text"])
             text = try arguments.requiredString("text", maximumUTF8Bytes: 4096, allowBlank: true)
         } catch { throw PresentationError.invalidText }
@@ -33,28 +35,30 @@ extension UIActions {
         try Task.checkCancellation()
     }
 
-    @Tool(path: "UI.Caption.finishTranscript", title: "finishTranscript")
+    @Action(
+        domain: "UI", module: "Caption", title: "finishTranscript", serializationKey: "UI")
     public static func finishTranscript(
-        invocation: ToolInvocation,
-        using present: @escaping @Sendable (ToolInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        do { try ToolArguments(invocation.call.arguments).validateAllowedKeys([]) } catch {
+        do { try ActionArguments(invocation.call.parameters).validateAllowedKeys([]) } catch {
             throw PresentationError.invalidCall
         }
         try await present(invocation)
         try Task.checkCancellation()
     }
 
-    @Tool(path: "UI.Caption.print", title: "print")
+    @Action(
+        domain: "UI", module: "Caption", title: "print", serializationKey: "UI")
     public static func print(
-        invocation: ToolInvocation,
-        using present: @escaping @Sendable (String, ToolInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (String, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let text: String
         do {
-            let arguments = ToolArguments(invocation.call.arguments)
+            let arguments = ActionArguments(invocation.call.parameters)
             try arguments.validateAllowedKeys(["text"])
             text = try arguments.requiredString("text", maximumUTF8Bytes: 2000, allowBlank: false)
         } catch { throw PresentationError.invalidText }

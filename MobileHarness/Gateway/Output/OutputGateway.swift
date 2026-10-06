@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
@@ -30,7 +32,7 @@ public actor OutputGateway {
     private func failureSnapshot() -> OutputFailureSnapshot {
         .init(revision: failureRevision, records: failures, evictedCount: evictedFailures)
     }
-    private func recordFailure(_ envelope: OutputEnvelope, message: String, code: ToolResponse.FailureCode?) {
+    private func recordFailure(_ envelope: OutputEnvelope, message: String, code: ActionExecutionFailureCode?) {
         let title: String
         switch envelope.output {
         case .toolCall(let call): title = call.toolPath
@@ -226,7 +228,7 @@ public actor OutputGateway {
     @discardableResult
     public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         let failure: String?
-        var code: ToolResponse.FailureCode?
+        var code: ActionExecutionFailureCode?
         var tool: ToolResponse?
         do {
             tool = try await dispatch(envelope)
@@ -234,9 +236,9 @@ public actor OutputGateway {
             code = failure == nil ? nil : .deliveryFailed
         } catch {
             try Task.checkCancellation()
-            if let producer = error as? any ToolExecutionFailureProviding {
-                code = producer.toolFailureCode
-            } else if let producer = error as? any ActionExecutionFailureProviding {
+            if let producer = error as? any ActionExecutionFailureProviding {
+                code = producer.executionFailureCode
+            } else if let producer = error as? any ActionReportFailureProviding {
                 code = .init(rawValue: producer.actionExecutionFailure.rawValue)
             } else if let resource = error as? ResourceError {
                 code = resource == .unauthorized ? .permissionDenied : .resourceUnavailable

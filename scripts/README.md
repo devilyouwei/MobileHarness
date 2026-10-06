@@ -46,7 +46,7 @@ flowchart LR
 
 ✅ Agent boundary validation now allows Foundation-only Storage for the shared conversation journal. ModelKit remains independent of Storage and business modules.
 
-✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, compile standalone ActionRuntime/ToolRuntime targets without business dependencies and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
+✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, compile independent FunctionContracts/ExecutionRuntime/CallRuntime targets with their explicit dependency boundaries and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
 
 ✅ Boundary checks enforce the independent UI target at MobileHarness/UI, shared value-only dependencies, no service construction/App coordinator references, explicit ApplicationRuntime injection, and README coverage in both App and UI directories.
 
@@ -161,7 +161,7 @@ flowchart LR
 
 ✅ ADR0149 boundary checks prevent returning Tool feedback from reverting to public external admission and require retained output input context. ❌ These source checks do not establish runtime or physical correctness; regression tests validate delivery behavior.
 
-✅ ADR0150 boundary checks allow only ToolRuntime → ActionRuntime for shared execution lifetime; ActionRuntime remains a dependency leaf and both runtime trees prohibit business imports. ❌ Unified definition/configuration migration checks remain pending.
+✅ ADR0161 boundary checks require protocol-neutral business Actions, FunctionContracts as the contract leaf, ExecutionRuntime depending only on that leaf and CallRuntime depending on both. Retired runtime imports, @Tool and business protocol aliases are rejected. Agent v6 permissions remain independently validated.
 
 ✅ ADR0151: Actions is the single executable capability directory; Tools and ToolRuntime are re-export-only compatibility targets. Boundary checks reject recreated Tools sources or nontrivial shims. ❌ Unified definitions and compatibility import removal remain pending.
 
@@ -176,3 +176,9 @@ flowchart LR
 ✅ ADR0156/0157 boundary checks require v6 explicit Agent bindings, three-field paths, canonical domain definition catalogs, shared metadata validation, one lifetime implementation and absent retired compatibility targets/imports. ❌ Runtime tests and native acceptance remain separate checks.
 
 ✅ Canonical metadata checks enforce directory/module-file/path alignment and one validated, frozen CapabilityCatalog before protocol projection; duplicate cross-protocol addresses and hidden invalid definitions fail before startup.
+
+✅ ADR0159 unifies @Action metadata and invocation contracts; all business and injected endpoints receive one ActionInvocation/ActionExecutionContext. Three-level ownership, existing availability/resources/deadlines and independent Agent grants are preserved.
+
+✅ ADR0160: boundary checks reject Tool contracts, ActionBinding and protocol/runtime policy in business Action domains or @Action factories. Production assembly must bind the validated pure catalog through grouped host profiles. ❌ Static checks do not establish physical/model acceptance.
+
+✅ ADR0161: checks enforce FunctionContracts/ExecutionRuntime/CallRuntime target separation, Actions import isolation, standard input without Channel, removed aliases and unique shared-source ownership. ❌ Static checks cannot establish physical/model acceptance.

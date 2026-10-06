@@ -1,6 +1,6 @@
 # AppBluetoothWorkflow
 
-Purpose: own Bluetooth discovery, selection, foreground lifetime, manual control and bounded native recovery. Design goals: one connection owner, latest current status, no stale writes or motion replay, and independent Action/Tool execution results. Dependencies: UI, AgentCore, Storage, Actions, ActionRuntime and PlatformKit.
+Purpose: own Bluetooth discovery, selection, foreground lifetime, manual control and bounded native recovery. Design goals: one connection owner, latest current status, no stale writes or motion replay, and independent Action/Tool execution results. Dependencies: UI, AgentCore, Storage, Actions, FunctionContracts and PlatformKit.
 
 ## Current connection and presentation — ADR0134 / ADR0138
 
@@ -83,3 +83,5 @@ flowchart LR
 
 
 ✅ ADR0141: Agent finite-motion entry and each tracking native startup/write validate the inherited ResourceExecutionPermit. Held IDs alone cannot bypass arbitration; ended/revoked execution is rejected before a new effect. App maps generic validation failure into Actions-owned resourceUnavailable, while expected task cancellation remains cancellation. Settings presets/sliders remain outside these Agent checks; SDK session fencing and connection recovery remain independent. ❌ This introduces no forced release of an unfinished native writer or physical stop guarantee.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

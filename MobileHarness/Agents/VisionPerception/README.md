@@ -176,7 +176,7 @@ flowchart TD
 
 ✅ 持久算法状态包含一份 4096 个 UInt8 的灰度参考、一份 4096 项 ROI 并集、最多六人的 COCO-17 快照及标量时间/计数；临时数组大小固定。除此之外，Agent 仍只有一项活动推理和一项最新等待输入，没有新增 worker、帧队列或完整图像历史。
 
-✅ 有效 Pose 与同帧统计一起生成 `UI.Pose.showPose`，沿 `OutputGateway → Actions/Runtime → App 会话/序号校验 → UI` 更新骨架和左上角统计。统计中的间隔是反馈更新后用于下一次检测的间隔，实际 FPS 另按至少一秒窗口统计；图像运动强度为 0...1，尚无参考时为空。过期结果不会触发这条输出路径。
+✅ 有效 Pose 与同帧统计一起生成 `UI.Pose.showPose`，沿 `OutputGateway → Gateway/Runtime → App 会话/序号校验 → UI` 更新骨架和左上角统计。统计中的间隔是反馈更新后用于下一次检测的间隔，实际 FPS 另按至少一秒窗口统计；图像运动强度为 0...1，尚无参考时为空。过期结果不会触发这条输出路径。
 
 ❌ 真机参数、持续功耗/发热、严重裁剪或非均匀曝光、小目标在 64×64 采样下的敏感度仍需验证。六人之外的详细姿态运动、交叉人物身份关联、独立人脸检测、深度和热状态反馈尚未实现。机器人运动策略不属于本 Agent。
 
@@ -258,7 +258,7 @@ people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye�
 | people | 从模型结果取前六人，按其置信排序；显示镜像和裁剪由预览层坐标转换处理。共享观测仍可保留最多 300 人。 |
 | statistics | 可选的同帧等待/推理/总延迟（ms）、实际 FPS、替换帧数、下一次检测间隔（ms）与图像运动强度（0...1）；无采集时间或参考时相应字段为空。 |
 
-Tool 经 `outputs → App transport pump → OutputGateway → Actions/Runtime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
+Tool 经 `outputs → App transport pump → OutputGateway → Gateway/Runtime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
 
 ### 其他输出与 send 边界
 
@@ -286,7 +286,7 @@ flowchart LR
     Lock --> Filter[Deadband / adaptive smoothing]
     Filter --> Resolve[Code-owned gaze ToolCall]
     Resolve --> Gateway[OutputGateway]
-    Gateway --> Tool[Actions/Runtime: UI.Gaze.moveEyes validation]
+    Gateway --> Tool[Gateway/Runtime: UI.Gaze.moveEyes validation]
     Tool --> Scene[Active camera session / sequence check]
     Scene --> Eyes[Native spring / stable eye shapes]
 ```
@@ -309,7 +309,7 @@ flowchart LR
 
 ✅ Each showPose payload includes optional statistics: capture callback to capability start (including upstream/queue/preparation), capability-call duration, callback-to-result total latency, successful fresh-result FPS over windows of at least one second, and cumulative latest-slot replacements the next adaptive detection interval and optional normalized image-motion activity (0...1, not changed-pixel percentage). ContinuousClock measures elapsed time independently of image media timestamps. FPS is absent until the first window completes; session recreation resets counters. No timer, frame queue or extra output worker is added. ❌ UI rendering/sensor exposure delay and physical sustained performance are not measured.
 
-✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
 
 ✅ PoseObservation is owned by Agents/Communication, while PoseOverlay remains in UI/Camera. COCO value validation belongs to the Agent message contract; cadence, gaze and observation projection remain here. AgentCore owns neither pose-value schema nor detection algorithms.
 
@@ -324,6 +324,6 @@ flowchart LR
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.

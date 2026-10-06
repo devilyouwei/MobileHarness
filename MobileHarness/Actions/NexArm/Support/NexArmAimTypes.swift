@@ -1,10 +1,10 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 extension NexArmActions {
-    public enum AimError: LocalizedError, Equatable, Sendable, ToolExecutionFailureProviding {
+    public enum AimError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidAngle
-        public var toolFailureCode: ToolResponse.FailureCode { .invalidArguments }
+        public var executionFailureCode: ActionExecutionFailureCode { .invalidArguments }
         public var errorDescription: String? { "跟踪目标角度无效" }
     }
 }

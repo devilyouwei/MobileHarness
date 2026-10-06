@@ -1,16 +1,18 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import StorageChat
 import Testing
 import UI
 
 private struct HistoryPresentationModule: ToolModule {
-    let definitions: [ToolDefinition]
+    let definitions: [ActionBinding]
 }
 
 private struct UnusedHistoryMutation: HistoryMutationCapability {
@@ -27,12 +29,14 @@ private func intentRuntime(
         contracts: AgentContracts.communication, externalSources: ["user", "runtime"],
         configurations: [AgentConfigurations.load(named: "ConversationMemory")])
     let input = InputGateway(manager: manager, policy: policy)
-    let definition = UIActions.showHistoryDefinition(completing: { call, context in
-        try await UIActions.showHistory(invocation: ToolInvocation(call: call, context: context), using: presentation)
-    })
-    let deletion = HistoryActions.deleteDefinition(handler: { call in
-        try await HistoryActions.delete(call: call, using: mutations)
-    })
+    let definition = ActionBinding(
+        function: UIActions.showHistoryDefinition(handler: { invocation in
+            try await UIActions.showHistory(invocation: invocation, using: presentation)
+        }), protocols: [.tool], executionPolicy: .direct)
+    let deletion = ActionBinding(
+        function: HistoryActions.deleteDefinition(completing: { invocation in
+            .value(try await HistoryActions.delete(invocation: invocation, using: mutations))
+        }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
     let gateway = OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [HistoryPresentationModule(definitions: [definition, deletion])]),
@@ -62,7 +66,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
     private var release: CheckedContinuation<Void, Never>?
     private var held = true
     var completed = 0
-    func showHistory(invocation: ToolInvocation) async throws {
+    func showHistory(invocation: any FunctionInput) async throws {
         if held {
             held = false
             await withTaskCancellationHandler {
@@ -124,9 +128,9 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
 @Test @MainActor func historyPresentationRejectsForeignScopeWithoutChangingState() async throws {
     let state = ConversationHistoryState()
     let adapter = HistoryPresentationAdapter(state: state, store: ConversationHistoryStore(), sessionID: UUID())
-    let invocation = ToolInvocation(
+    let invocation = ActionInvocation(
         call: ToolRequest(toolPath: "UI.HistoryPresentation.showHistory"),
-        context: ToolExecutionContext(source: "assistant", sessionID: UUID(), inputID: UUID()))
+        context: ActionExecutionContext(source: "assistant", sessionID: UUID(), inputID: UUID()))
     await #expect(throws: (any Error).self) { try await adapter.showHistory(invocation: invocation) }
     #expect(state.archive == nil)
 }

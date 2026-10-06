@@ -1,10 +1,12 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import AppWorkflows
 import BehaviorAssembly
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import ModelKit
 import Storage
@@ -240,41 +242,44 @@ import UI
         let input = InputGateway(manager: manager, policy: policy)
         let assembly = try BehaviorAssembly(
             actionModules: [
-                NexArmGestureActionModule { request, invocation in
-                    let record: @Sendable (ActionReport) async throws -> Void = {
-                        try await invocation.results.record($0)
-                    }
-                    switch request.gesture {
-                    case .moveMotor, .resetMotor:
-                        guard let motor = request.motor else { throw NexArmExecutionError.invalidArguments }
-                        try await workflow.moveMotor(
-                            id: motor, target: request.target, speed: request.speed, acceleration: request.acceleration,
-                            recordReport: record)
-                    case .reset:
-                        try await workflow.resetArm(
-                            speed: request.speed, acceleration: request.acceleration, recordReport: record)
-                    default:
-                        let gesture: NexArmGesture
-                        switch request.gesture {
-                        case .nod: gesture = .nod
-                        case .shakeHead: gesture = .shakeHead
-                        case .wave: gesture = .wave
-                        case .tiltLeft: gesture = .tiltLeft
-                        case .tiltRight: gesture = .tiltRight
-                        case .lookAround: gesture = .lookAround
-                        case .celebrate: gesture = .celebrate
-                        case .dance: gesture = .dance
-                        case .moveMotor, .resetMotor, .reset: throw NexArmExecutionError.invalidArguments
+                ScheduledFunctionFixture(
+                    NexArmGestureModule { request, invocation in
+                        let record: @Sendable (ActionReport) async throws -> Void = {
+                            try await invocation.results.record($0)
                         }
-                        try await workflow.performGesture(
-                            gesture, repetitions: request.repetitions, speed: request.speed,
-                            acceleration: request.acceleration, recordReport: record)
-                    }
-                },
-                NexArmBaseActionModule { cycles, invocation in
-                    try await workflow.shakeBase(
-                        cycles: cycles, recordReport: { try await invocation.results.record($0) })
-                },
+                        switch request.gesture {
+                        case .moveMotor, .resetMotor:
+                            guard let motor = request.motor else { throw NexArmExecutionError.invalidArguments }
+                            try await workflow.moveMotor(
+                                id: motor, target: request.target, speed: request.speed,
+                                acceleration: request.acceleration,
+                                recordReport: record)
+                        case .reset:
+                            try await workflow.resetArm(
+                                speed: request.speed, acceleration: request.acceleration, recordReport: record)
+                        default:
+                            let gesture: NexArmGesture
+                            switch request.gesture {
+                            case .nod: gesture = .nod
+                            case .shakeHead: gesture = .shakeHead
+                            case .wave: gesture = .wave
+                            case .tiltLeft: gesture = .tiltLeft
+                            case .tiltRight: gesture = .tiltRight
+                            case .lookAround: gesture = .lookAround
+                            case .celebrate: gesture = .celebrate
+                            case .dance: gesture = .dance
+                            case .moveMotor, .resetMotor, .reset: throw NexArmExecutionError.invalidArguments
+                            }
+                            try await workflow.performGesture(
+                                gesture, repetitions: request.repetitions, speed: request.speed,
+                                acceleration: request.acceleration, recordReport: record)
+                        }
+                    }),
+                ScheduledFunctionFixture(
+                    NexArmBaseModule { cycles, invocation in
+                        try await workflow.shakeBase(
+                            cycles: cycles, recordReport: { try await invocation.results.record($0) })
+                    }),
                 NexArmAssistantUIModule(),
             ], toolModules: [])
         try assembly.actions.validate(capabilities: assistant.descriptor.capabilities)
@@ -349,12 +354,12 @@ import UI
         let input = InputGateway(manager: manager, policy: policy)
         let failures = SerialControlFailureProbe()
         let tools = try ToolRegistry(modules: [
-            NexArmTrackingToolModule { base, pitch, invocation in
+            NexArmTrackingModule { base, pitch, invocation in
                 try await workflow.aim(
                     base: base, pitch: pitch,
                     origin: .init(
                         source: invocation.context.source, sessionID: invocation.context.sessionID,
-                        inputID: invocation.context.inputID, callID: invocation.call.id),
+                        inputID: invocation.context.inputID, callID: invocation.executionID),
                     failed: { await failures.record($0) })
             }
         ])

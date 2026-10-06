@@ -1,17 +1,18 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 /// UI.Pose function ownership; current invocation paths remain compatible.
 extension UIActions {
     /// Atomically replaces all displayed skeletons; an empty people list clears them.
-    @Tool(path: "UI.Pose.showPose", title: "showPose")
+    @Action(
+        domain: "UI", module: "Pose", title: "showPose", serializationKey: "UI")
     public static func showPose(
-        call: ToolRequest, context: ToolExecutionContext,
-        present: @escaping @Sendable (ToolPoseOverlay, ToolExecutionContext) async throws -> Void
+        invocation: any FunctionInput,
+        present: @escaping @Sendable (PoseOverlay, ActionExecutionContext) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        guard let payload = call.arguments["payload"], payload.utf8.count <= 3000,
-            let overlay = try? JSONDecoder().decode(ToolPoseOverlay.self, from: Data(payload.utf8)),
+        guard let payload = invocation.call.parameters["payload"], payload.utf8.count <= 3000,
+            let overlay = try? JSONDecoder().decode(PoseOverlay.self, from: Data(payload.utf8)),
             overlay.timestamp.isFinite, overlay.timestamp >= 0, (0...3).contains(overlay.rotation),
             overlay.people.count <= 6, overlay.statistics?.isValid ?? true,
             overlay.people.allSatisfy({ person in
@@ -22,7 +23,7 @@ extension UIActions {
                     }
             })
         else { throw PoseError.invalidPayload }
-        try await present(overlay, context)
+        try await present(overlay, invocation.context)
         try Task.checkCancellation()
     }
 }

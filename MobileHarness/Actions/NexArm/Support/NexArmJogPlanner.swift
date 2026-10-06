@@ -1,5 +1,5 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 import PlatformKit
 
 /// Bounded velocity shaping with finite look-ahead position goals; no telemetry/ACK dependency.

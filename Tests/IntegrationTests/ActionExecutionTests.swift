@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import Testing
 
@@ -615,7 +617,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     let second = ActionPath(domain: "Second", module: "Control", function: "run")
     let independent = ActionPath(domain: "Independent", module: "Control", function: "run")
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: ActionIdentifier(domain: first.domain, module: first.module, function: first.function),
             displayName: "First",
             kind: .finite, completion: "Completed", serializationKey: "shared"
@@ -625,14 +627,14 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
             await release.wait()
             await log.append("first:end")
         },
-        ActionDefinition(
+        ActionBinding(
             path: ActionIdentifier(domain: second.domain, module: second.module, function: second.function),
             displayName: "Second",
             kind: .finite, completion: "Completed", serializationKey: "shared"
         ) { _ async throws -> Void in
             await log.append("second")
         },
-        ActionDefinition(
+        ActionBinding(
             path: ActionIdentifier(
                 domain: independent.domain, module: independent.module, function: independent.function),
             displayName: "Independent", kind: .finite, completion: "Completed"
@@ -664,7 +666,7 @@ func registryRejectsInvalidSerializationKeyBeforeExecution(_ key: String) {
     let path = ActionIdentifier(domain: "Fixture", module: "Control", function: "run")
     #expect(throws: ActionExecutionError.invalidDefinition(path)) {
         try ActionRegistry(definitions: [
-            ActionDefinition(
+            ActionBinding(
                 path: path, displayName: "Fixture", kind: .finite, completion: "Completed", serializationKey: key
             ) { _ async throws -> Void in Issue.record("Invalid registration must not execute") }
         ])

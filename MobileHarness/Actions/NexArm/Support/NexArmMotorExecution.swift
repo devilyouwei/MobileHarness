@@ -1,5 +1,5 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 import PlatformKit
 
 public struct NexArmMotorCompletion: Sendable, Equatable {
@@ -54,7 +54,7 @@ public enum NexArmMotorReset {
 }
 
 /// Invocation/admission errors owned by Actions; unrelated to Bluetooth diagnostic events.
-public enum NexArmExecutionError: LocalizedError, Sendable, Equatable, ActionExecutionFailureProviding {
+public enum NexArmExecutionError: LocalizedError, Sendable, Equatable, ActionReportFailureProviding {
     case disconnected, busy, background, controlNotReady, feedbackTimeout
     case invalidArguments, unsupportedFirmware, firmwareUnavailable, admissionTimeout
     case resourceBusy

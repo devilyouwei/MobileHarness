@@ -67,7 +67,7 @@ Local user settings now use Storage-backed cached persistence in the application
 
 - [ADR 0064 — App and UI boundaries](adr/0064-app-ui-boundaries.md): explicit composition, independently compiled pages and application workflows.
 
-✅ [ADR 0065](adr/0065-action-runtime-contracts.md) and [Actions/Runtime](../MobileHarness/Actions/Runtime/README.md) record the implemented Action contract stage and its limits. ❌ Ongoing activity owners, persistent resource enforcement and execution deadlines remain future work.
+✅ [ADR 0065](adr/0065-action-runtime-contracts.md) and the then-current Actions/Runtime directory (now split into [function contracts](../MobileHarness/Actions/Contracts/README.md) and [Gateway execution](../MobileHarness/Gateway/Runtime/README.md)) record the implemented Action contract stage and its limits. ❌ Ongoing activity owners, persistent resource enforcement and execution deadlines remain future work.
 
 ## Action runtime stage 2
 

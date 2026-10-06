@@ -1,15 +1,15 @@
-import ActionRuntime
+import FunctionContracts
 
 /// NexArm.Gesture function ownership; current invocation paths remain compatible.
 extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Gesture", title: "点头", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func nodHead(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let cycles: Int
@@ -29,11 +29,11 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Gesture", title: "摇头", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func shakeHead(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let cycles: Int
@@ -53,11 +53,11 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Gesture", title: "挥手", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func waveWrist(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let count: Int
@@ -77,11 +77,11 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Gesture", title: "歪头", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func tiltWrist(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let direction: TiltDirection
@@ -101,11 +101,11 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Gesture", title: "左右张望", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func lookAround(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let count: Int
@@ -125,11 +125,11 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Gesture", title: "庆祝", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func celebrate(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let count: Int
@@ -149,11 +149,11 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Gesture", title: "跳舞", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func dance(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let count: Int

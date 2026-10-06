@@ -1,15 +1,15 @@
-import ActionRuntime
+import FunctionContracts
 
 /// NexArm.Motion function ownership; current invocation paths remain compatible.
 extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Motion", title: "整臂归位", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func reset(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         try ActionArguments(invocation.call.parameters).validateAllowedKeys(["speed", "acceleration"])
@@ -24,11 +24,11 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Motion", title: "底座晃动", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func shakeBase(
-        invocation: ActionInvocation,
-        using move: @escaping @Sendable (Int, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using move: @escaping @Sendable (Int, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let cycles: Int
@@ -44,26 +44,26 @@ extension NexArmActions {
     @Action(
         domain: "NexArm", module: "Motion", title: "单舵机运动", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func moveMotor(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws { try await motor(invocation: invocation, reset: false, using: perform) }
 
     @Action(
         domain: "NexArm", module: "Motion", title: "单舵机归位", kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources, timeout: NexArmRegistration.budget)
+        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
+        estimatingDuration: NexArmRegistration.budget)
     public static func resetMotor(
-        invocation: ActionInvocation,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws { try await motor(invocation: invocation, reset: true, using: perform) }
 
     private static func motor(
-        invocation: ActionInvocation, reset: Bool,
-        using perform: @escaping @Sendable (GestureRequest, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput, reset: Bool,
+        using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
     ) async throws {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(

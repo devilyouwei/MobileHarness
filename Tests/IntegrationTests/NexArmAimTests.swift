@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import PlatformKit
 import Testing
 
@@ -139,9 +141,9 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     }
     #expect(call.toolPath == "NexArm.Tracking.aim")
     try await NexArmActions.aim(
-        invocation: ToolInvocation(
+        invocation: ActionInvocation(
             call: ToolRequest(toolPath: call.toolPath, arguments: call.arguments),
-            context: ToolExecutionContext(
+            context: ActionExecutionContext(
                 source: aimed.source.rawValue, sessionID: aimed.sessionID, inputID: aimed.inputID))
     ) { base, pitch, _ in
         #expect(base < 0)
@@ -263,9 +265,9 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let envelope = OutputEnvelope(source: .photographer, input: input, output: .toolCall(call))
     await #expect(throws: NexArmActions.AimError.invalidAngle) {
         try await NexArmActions.aim(
-            invocation: ToolInvocation(
+            invocation: ActionInvocation(
                 call: ToolRequest(toolPath: call.toolPath, arguments: call.arguments),
-                context: ToolExecutionContext(
+                context: ActionExecutionContext(
                     source: envelope.source.rawValue, sessionID: envelope.sessionID, inputID: envelope.inputID))
         ) { _, _, _ in
             Issue.record("Invalid angle was sent")
@@ -372,7 +374,7 @@ private actor AimLink: NexArmWritableLink {
 }
 
 @Test func robotAimPublishesIntentWithoutHoldingTheWorkersMotorFence() async throws {
-    let module = NexArmTrackingToolModule { _, _, _ in }
+    let module = NexArmTrackingModule { _, _, _ in }
     let registry = try ToolRegistry(modules: [module])
     let resources = await registry.resources(for: "NexArm.Tracking.aim")
     #expect(resources.isEmpty)

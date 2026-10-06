@@ -1,6 +1,6 @@
-import ActionRuntime
 import Actions
 import Foundation
+import FunctionContracts
 import StorageChat
 import UI
 
@@ -15,7 +15,7 @@ public final class HistoryPresentationAdapter: HistoryPresentationCapability {
         self.store = store
         self.sessionID = sessionID
     }
-    public func showHistory(invocation: ToolInvocation) async throws {
+    public func showHistory(invocation: any FunctionInput) async throws {
         guard invocation.context.source == "conversationMemory", invocation.context.sessionID == sessionID else {
             throw HistoryIntentFailure.execution("Invalid history presentation scope")
         }

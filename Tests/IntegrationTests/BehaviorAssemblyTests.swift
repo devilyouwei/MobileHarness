@@ -1,9 +1,11 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import BehaviorAssembly
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import StorageChat
 import Testing
@@ -11,37 +13,37 @@ import Testing
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability
 {
-    func showHistory(invocation: ToolInvocation) async throws {}
+    func showHistory(invocation: any FunctionInput) async throws {}
     private(set) var cameraCalls: [String] = []
-    func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
+    func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         cameraCalls.append(enabled ? "open" : "close")
     }
-    func flip(invocation: ToolInvocation) async throws { cameraCalls.append("flip") }
+    func flip(invocation: any FunctionInput) async throws { cameraCalls.append("flip") }
     private(set) var emotion: UIActions.Emotion?
     private(set) var gaze: UIActions.Gaze?
-    private(set) var pose: ToolPoseOverlay?
-    func play(audioID: UUID, invocation: ActionInvocation) async throws {}
-    func present(_ text: String, invocation: ToolInvocation) async throws {}
-    func presentTranscript(_ text: String, invocation: ToolInvocation) async throws {}
-    func finishTranscript(invocation: ToolInvocation) async throws {}
-    func beginReplyTurn(invocation: ToolInvocation) async throws {}
-    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ToolInvocation) async throws {}
-    func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
+    private(set) var pose: PoseOverlay?
+    func play(audioID: UUID, invocation: any FunctionInput) async throws {}
+    func present(_ text: String, invocation: any FunctionInput) async throws {}
+    func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {}
+    func finishTranscript(invocation: any FunctionInput) async throws {}
+    func beginReplyTurn(invocation: any FunctionInput) async throws {}
+    func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) async throws {}
+    func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
         self.emotion = emotion
     }
-    func restoreExpression(invocation: ActionInvocation) async throws {}
-    func setExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
+    func restoreExpression(invocation: any FunctionInput) async throws {}
+    func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
         self.emotion = emotion
     }
-    func present(_ target: UIActions.Gaze, invocation: ToolInvocation) async throws { gaze = target }
-    func present(_ overlay: ToolPoseOverlay, sessionID: UUID) async throws { pose = overlay }
+    func present(_ target: UIActions.Gaze, invocation: any FunctionInput) async throws { gaze = target }
+    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws { pose = overlay }
 }
 
 private struct FixtureActionModule: ActionModule {
-    let definitions: [ActionDefinition]
+    let definitions: [ActionBinding]
 }
 private struct FixtureToolModule: ToolModule {
-    let definitions: [ToolDefinition]
+    let definitions: [ActionBinding]
 }
 private func behaviorInvocation(_ function: String, parameters: [String: String] = [:]) -> ActionInvocation {
     ActionInvocation(
@@ -59,7 +61,8 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         historyMutations: HistoryMutationService(store: ConversationHistoryStore()),
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
-        aim: { _, _, _ in throw ToolExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable") })
+        aim: { _, _, _ in throw ActionExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable")
+        })
     try BehaviorCoverage.validate(
         actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [
@@ -103,16 +106,16 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 }
 
 @Test func behaviorModulesRejectDuplicatesInvalidPathsAndExcessCapacity() throws {
-    let tool = FixtureToolModule(definitions: [ToolDefinition(path: "Fixture.Control.fixture", handler: { _ in "ok" })])
+    let tool = FixtureToolModule(definitions: [ActionBinding(path: "Fixture.Control.fixture", handler: { _ in "ok" })])
     #expect(throws: ToolRegistryError.duplicateHandler) { try ToolRegistry(modules: [tool, tool]) }
     #expect(throws: ToolRegistrationError.invalidDefinition("bad path")) {
         try ToolRegistry(modules: [
-            FixtureToolModule(definitions: [ToolDefinition(path: "bad path", handler: { _ in "" })])
+            FixtureToolModule(definitions: [ActionBinding(path: "bad path", handler: { _ in "" })])
         ])
     }
     #expect(throws: ToolRegistryError.queueFull) { try ToolRegistry(modules: Array(repeating: tool, count: 33)) }
     let action = FixtureActionModule(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: ActionPath(domain: "Fixture", module: "Control", function: "apply"), displayName: "测试动作",
             kind: .state,
             completion: "Committed.",
@@ -131,22 +134,23 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let path = ActionPath(domain: "Fixture", module: "Control", function: "smile")
     let resource = ResourceID(rawValue: "fixture.output")
     let action = FixtureActionModule(definitions: [
-        ActionDefinition(
+        ActionBinding(
             path: path, displayName: "测试动作", kind: .state, completion: "Expression accepted.", resources: [resource],
             handler: {
                 try await endpoint.presentExpression(.smile, invocation: $0)
             })
     ])
     let tool = FixtureToolModule(definitions: [
-        ToolDefinition(
-            path: "Fixture.Control.read", resources: [ToolResource(rawValue: resource.rawValue)],
+        ActionBinding(
+            path: "Fixture.Control.read", resources: [ActionResource(rawValue: resource.rawValue)],
             handler: { _ in
                 await endpoint.emotion?.rawValue ?? "clear"
             })
     ])
     let assembly = try BehaviorAssembly(actionModules: [action], toolModules: [tool])
     #expect(try assembly.actions.definition(for: path).resources == [ActionResource(rawValue: resource.rawValue)])
-    #expect(await assembly.tools.resources(for: "Fixture.Control.read") == [ToolResource(rawValue: resource.rawValue)])
+    #expect(
+        await assembly.tools.resources(for: "Fixture.Control.read") == [ActionResource(rawValue: resource.rawValue)])
     let invocation = ActionInvocation(
         source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
         call: ActionCall(actionPath: path, channel: "main"))
@@ -158,7 +162,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 
 @Test func cameraToolsValidateBeforeEffectsAndKeepCompletionSemantics() async throws {
     let endpoint = BehaviorEndpoint()
-    let executor = ToolExecutor(registry: try ToolRegistry(modules: [CameraModule(camera: endpoint).tools]))
+    let executor = ToolExecutor(registry: try ToolRegistry(modules: [CameraModule(camera: endpoint)]))
     let envelope = behaviorInvocation("express").testEnvelope
     for name in ["open", "close", "flip"] {
         let result = try await executor.execute(
@@ -183,15 +187,15 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 }
 
 private struct UnavailableCameraEndpoint: CameraControlCapability {
-    func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
+    func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         throw CameraControlError.permissionDenied
     }
-    func flip(invocation: ToolInvocation) async throws { throw CameraControlError.disabled }
+    func flip(invocation: any FunctionInput) async throws { throw CameraControlError.disabled }
 }
 
 @Test func cameraToolsRecordHostFailureWithoutSuccessFeedback() async throws {
     let executor = ToolExecutor(
-        registry: try ToolRegistry(modules: [CameraModule(camera: UnavailableCameraEndpoint()).tools]))
+        registry: try ToolRegistry(modules: [CameraModule(camera: UnavailableCameraEndpoint())]))
     let envelope = behaviorInvocation("express").testEnvelope
     let open = try #require(
         try await executor.execute(ToolCall(toolPath: "Camera.Capture.open", arguments: [:]), envelope: envelope))
@@ -204,8 +208,9 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
 @Test func unifiedUIDomainBindsExpressionAndGazeWithoutChangingValidation() async throws {
     let endpoint = BehaviorEndpoint()
     let module = UIModule(expression: endpoint, pose: endpoint, updates: endpoint, history: endpoint)
-    let actions = try ActionRegistry(modules: [module.actions])
-    let tools = try ToolRegistry(modules: [module.tools])
+    let assembly = try BehaviorAssembly(capabilityModules: [module])
+    let actions = assembly.actions
+    let tools = assembly.tools
     try await ActionExecutor(registry: actions).execute(
         behaviorInvocation("setExpression", parameters: ["emotion": "smile"]))
     let envelope = behaviorInvocation("setExpression").testEnvelope

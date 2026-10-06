@@ -1,7 +1,9 @@
-import ActionRuntime
 import Actions
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 
 // Test callers explicitly cross the same validated Gateway boundary as production.
@@ -14,11 +16,11 @@ extension ActionInvocation {
     }
 }
 extension ChannelScheduler {
-    func enqueue(invocation: ActionInvocation) async throws -> UUID {
+    func enqueue(invocation: any FunctionInput) async throws -> UUID {
         try await enqueue(invocation: ScheduledAction(envelope: invocation.testEnvelope))
     }
 }
-extension ActionInvocation {
+extension FunctionInput {
     var testEnvelope: OutputEnvelope {
         OutputEnvelope(
             source: AgentID(rawValue: context.source),
@@ -32,7 +34,8 @@ extension ActionInvocation {
                     actionPath: .init(
                         domain: call.actionPath.domain, module: call.actionPath.module,
                         function: call.actionPath.function),
-                    channel: call.channel, parameters: call.parameters)), sequence: context.sequence)
+                    channel: (self as? ActionInvocation)?.channel ?? "main", parameters: call.parameters)),
+            sequence: context.sequence)
     }
 }
 extension ActionExecutor {
@@ -40,7 +43,7 @@ extension ActionExecutor {
         try await execute(invocation.execution)
     }
 }
-extension ActionDefinition {
+extension ActionBinding {
     init(
         path: ActionPath, displayName: String, kind: Kind, completion: String, resources: Set<ResourceID> = [],
         handler: @escaping ActionHandler
@@ -66,15 +69,28 @@ extension ActionDefinition {
 }
 extension ToolExecutor {
     func execute(_ call: ToolCall, envelope: OutputEnvelope) async throws -> ToolResponse? {
-        try await execute(call.executionRequest, context: envelope.toolContext)
+        try await execute(call.executionRequest, context: envelope.executionContext)
     }
 }
-extension ToolInvocation {
+extension ActionInvocation {
     init(call: ToolCall, envelope: OutputEnvelope) {
-        self.init(call: call.executionRequest, context: envelope.toolContext)
+        self.init(tool: call.executionRequest, context: envelope.executionContext)
     }
 }
 
 extension ActionPath {
     var executionIdentifier: ActionIdentifier { .init(domain: domain, module: module, function: function) }
+}
+
+extension ActionInvocation {
+    init(call: ToolRequest, context: ActionExecutionContext) {
+        self.init(tool: call, context: context)
+    }
+}
+
+struct ScheduledFunctionFixture: ActionModule {
+    let definitions: [ActionBinding]
+    init(_ module: any CapabilityModule) {
+        definitions = module.definitions.map { ActionBinding(function: $0) }
+    }
 }

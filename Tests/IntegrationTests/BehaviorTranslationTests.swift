@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Testing
 
 @testable import Gateway
@@ -24,8 +26,8 @@ import Testing
     #expect(execution.context.correlationID == turn.id)
     #expect(execution.context.ordinal == 9 && execution.context.sequence == 42)
     #expect(execution.call.parameters == call.parameters)
-    #expect(envelope.toolContext.correlationID == turn.id)
-    #expect(envelope.toolContext.inputID == input.id)
+    #expect(envelope.executionContext.correlationID == turn.id)
+    #expect(envelope.executionContext.inputID == input.id)
 }
 
 @Test func behaviorResultTranslationPreservesChildDetailsAndExecutionFailure() throws {
@@ -75,7 +77,7 @@ import Testing
 }
 
 @Test func runtimeTransportsProducerReportCodeWithoutInterpretingFailureIdentity() {
-    struct FixtureError: ActionExecutionFailureProviding {
+    struct FixtureError: ActionReportFailureProviding {
         let actionExecutionFailure = ActionFailure(rawValue: "feedbackTimeout")
         let actionReportCode = ActionReport.Entry.Code(rawValue: "fixture.customOutcome")
     }

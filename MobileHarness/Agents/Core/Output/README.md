@@ -9,7 +9,7 @@ Purpose: define executable values at the Agent boundary. ActionCall and ToolCall
 - ✅ `.control` carries runtime completion/error notifications and supports cancellation/playback barriers. It is not a model generation protocol.
 - ❌ Typed lifecycle notifications replacing control strings, durable ActionResult feedback, public ActionCall invocation IDs and priorities.
 
-ActionCall is a value type correlated with input through OutputEnvelope. ChannelScheduler allocates an internal UUID per admitted job; cross-process idempotent replay is not provided. ToolResult is shared by input/output contracts without introducing a dependency on Actions/Runtime.
+ActionCall is a value type correlated with input through OutputEnvelope. ChannelScheduler allocates an internal UUID per admitted job; cross-process idempotent replay is not provided. ToolResult is shared by input/output contracts without introducing a dependency on Gateway/Runtime.
 
 ```mermaid
 flowchart LR
@@ -52,7 +52,7 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 
 ## Self-described execution observation
 
-✅ ActionExecutionRecord carries an immutable displayName copied from its validated ActionDefinition at admission. This is a shared String value with no Actions, App or UI dependency. Producers provide the name; consumers never resolve domain paths into display titles. The existing bounded, versioned snapshots still carry raw Channel identity and generic execution/completion facts.
+✅ ActionExecutionRecord carries an immutable displayName copied from its validated ActionBinding at admission. This is a shared String value with no Actions, App or UI dependency. Producers provide the name; consumers never resolve domain paths into display titles. The existing bounded, versioned snapshots still carry raw Channel identity and generic execution/completion facts.
 
 ❌ Execution observation remains separate from ActionResult delivery and permission declarations; metadata does not grant execution rights. See ADR 0086.
 
@@ -64,7 +64,7 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 
 ✅ `ActionReport.executionFailure` retains an execution-level timeout alongside all child entries. Its status is failed/partialFailure even when deadline cleanup cancelled an in-flight child; explicit user cancellation remains cancelled.
 
-✅ ActionCall/ToolCall describe Agent intent; Gateway translates them to independent execution requests. AgentActionCompletion/AgentActionReport are delivery values, not execution interfaces. Action execution error protocols and argument readers now belong to Actions/Tools.
+✅ ActionCall/ToolCall describe Agent intent; Gateway translates them to independent execution requests. AgentActionCompletion/AgentActionReport are delivery values, not execution interfaces. Protocol-neutral execution errors and argument readers belong to FunctionContracts under Actions/Contracts; Gateway owns scheduling/native call adapters.
 
 ✅ rejectedCall carries a non-executable invocation rejection with Action/Tool output permission, bounded alias, typed reason and optional native Tool ID. Gateway records it alongside execution outcomes. ❌ It grants no execution or result-forging permission.
 
@@ -81,7 +81,7 @@ See [Generation](../Generation/README.md) for protocol definitions. Keep names, 
 
 ```mermaid
 flowchart LR
-    Producer[Business producer: code and details] --> Runtime[ActionRuntime bounded report]
+    Producer[Business producer: code and details] --> Runtime[FunctionContracts bounded report]
     Runtime --> Gateway[Gateway: copy identifiers and details]
     Gateway --> Core[AgentCore generic report]
     Core --> Agent[Agent consumer]
@@ -92,7 +92,7 @@ flowchart LR
 
 ✅ ADR0131: OutputFailureRecord/OutputFailureSnapshot are generic bounded source/title/message/time observation values, distinct from Agent-facing ToolResult and scheduled Action records. AgentActionReport carries producer failureDescription without SDK enums or device context. ❌ Durable failure history remains pending.
 
-✅ ADR0132: ToolResult and OutputFailureRecord transport optional bounded opaque failure-code strings. Core interprets no domain errors and imports no ToolRuntime/SDK classification.
+✅ ADR0132: ToolResult and OutputFailureRecord transport optional bounded opaque failure-code strings. Core interprets no domain errors and imports no Gateway execution/call SDKs or device classification.
 
 ❌ Sustained physical-device acceptance and durable error history remain pending.
 
@@ -101,7 +101,7 @@ flowchart LR
 
 ✅ ADR0149: OutputEnvelope retains immutable inputMetadata; returning Tool feedback preserves root, parent input, turn and hop context through Gateway. ❌ Original causal-root transport in ActionResult/ActivityEvent remains pending; no persisted/remote envelope format is added.
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 

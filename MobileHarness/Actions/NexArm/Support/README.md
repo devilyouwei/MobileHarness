@@ -24,7 +24,7 @@ flowchart LR
 
 ✅ Resource and budget resolvers consume Actions-owned contracts; domain failures use ActionFailure. No AgentCore import is needed.
 
-✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+✅ ADR0098: Execution values and services are imported from independent FunctionContracts; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
 
 ✅ NexArmJointCommand owns tracking rest/angle and speed policy; aim shares controller admission and motor ownership. Native encoding remains in PlatformKit. ❌ Tracking arrival is not measured.
 
@@ -67,8 +67,16 @@ flowchart LR
 
 ✅ ADR0133: Passive BLE nod/shake-head, whole-arm reset and per-motor reset no longer require an IK table, including after partial Cartesian preparation. Cartesian presets incrementally resolve only the requested frames plus home before sending; repeated poses reuse the connection-local cache. Explicit diagnostic `prepareArmControl` retains full-catalog preparation. Manual and Channel requests reuse the same Actions recipes and feedback executor. ❌ Physical motion/IK firmware acceptance remains pending.
 
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
-❌ Unified capability definitions and protocol registration adapters remain pending.
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
+✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
 
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
-❌ Unified callable definitions and migration of compatibility names remain pending.
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one pure `<Domain>Module`; host registration creates Action/Tool projections. Superseded aliases/protocol catalogs are retired.
+✅ Unified definitions and compatibility retirement are implemented in ADR0157.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
+
+✅ NexArmCapabilityModules.swift provides pure gesture/base/tracking catalogs that reuse NexArmModule function lists.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

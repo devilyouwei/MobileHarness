@@ -1,123 +1,86 @@
-# Agents — Perception and Business Policy
+# Agents — Signal Processing and Business Decisions
 
-Implements stateful actors that interpret input, request model capabilities and select outputs. The goal is independent roles with explicit permissions and bounded work. Agents depends on AgentCore, ModelKit, PlatformKit, StorageChat and the shared StorageAudio cache; App injects capabilities and binds executable handlers.
+Agents interpret admitted Signals, own task state and business decisions, use injected model/storage capabilities and emit permitted communication or execution requests. Explicit user intent can be handled deterministically; LLM selection is another entry into the same registered business capabilities.
 
-## Directory structure
-
-```text
-Agents/
-├── Core/                     # Independent AgentCore compilation boundary
-├── Communication/            # Shared domain messages, schema policy and built-in identities
-├── AgentConfigurations.swift  # Load versioned JSON from package resources
-├── ConversationMemory/        # Deterministic history refresh intent and internal UI Tool
-├── Assistant/                 # Chat, reply history and resolved speech Actions and UI Tools
-├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
-├── SpeechSynthesis/           # Directed serial synthesis into shared PCM handles
-├── VisionPerception/          # Latest-frame image/pose/cost cadence, pose inference and skeleton ToolCalls
-├── Photographer/              # Subscribed pose observations and optional arm aim
-└── README.md                  # Shared Agent and configuration rules
-```
-
-Each implemented Agent has `<AgentName>.agent.json`, an actor implementation and a README. Helper files remain in that Agent's directory. Shared parsers belong in Agents/Core/Generation. Add JSON resources to root Package.swift; the loader uses Bundle.module, not App bundle lookup.
+Design goals: independent AgentCore, domain-owned processing policy, explicit grants, bounded inbox/output state and effects through OutputGateway rather than direct UI/device mutation.
 
 ## Upstream and downstream
 
-Arrows show runtime data flow; Agents never call concrete Actions or Tools. Compile-time dependencies are `AgentCore` (contracts, permissions and parsers), `ModelKit` (capability protocols), `PlatformKit` (device values and caller-selected conversion), `StorageChat` (conversation history) and `StorageAudio` (shared PCM handles). App injects the production services; neither storage service delivers Agent messages.
+Arrows show runtime information/capability flow; dashed arrows show injection. Capability results stay local unless the Agent explicitly communicates them as Signals.
 
 ```mermaid
 flowchart LR
-    App -.->|Capability injection and lifecycle| Agents
-    Input[InputGateway] -->|AgentInput and ToolResult| Agents
-    Agents -->|Read context and persist turns| Storage[StorageChat ConversationHistoryStore]
-    Storage -->|Raw records + admission token| Agents
-    Agents -->|Register and write synthesized PCM| Audio[StorageAudio SpeechAudioStore]
-    Audio -->|Scoped audioID checkout| Playback[AppSpeechPlayback endpoint]
-    Agents -->|Device values / PCM conversion| PlatformKit
-    Agents -->|Inference| ModelKit
-    ModelKit -->|Typed results| Agents
-    Agents -->|Resolved calls and typed events| Output[OutputGateway]
-    Output --> Runtime[Action / Tool runtimes]
-    Output --> Input
+    External[UI / native world / system facts] --> Adapter[App input adapters]
+    Adapter --> Input[InputGateway]
+    Input -->|AgentInput / observations / correlated feedback| Agents
+    App[App composition and lifecycle] -.->|Model / storage / scoped capability interfaces| Agents
+    Agents -->|Inference requests| ModelKit
+    ModelKit -->|Typed local results / events| Agents
+    Agents <-->|Raw journal records / owned PCM handles| Storage[StorageChat / StorageAudio]
+    Agents -->|Resolved calls / messages / controls| Output[OutputGateway]
+    Output -->|Validated Agent message or runtime feedback| Input
+    Output --> Runtime[Gateway scheduling / call adapters / shared executor]
+    Runtime --> Functions[Actions business functions]
+    Functions --> Effects[Injected presentation / native / storage endpoints]
 ```
 
-## Current compilation and ownership
+SignalOrigin distinguishes external, Agent and runtime producers within the same AgentInput envelope; trusted adapters/ports bind it rather than deriving authority from payload content.
 
-✅ Root Package.swift compiles Core once as the independent AgentCore target with no project dependencies; the Agents target excludes Core. All six business Agent directories, Communication and AgentConfigurations currently compile together in one Agents target. Its dependencies are AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio. Each actor owns its processing state; the shared target does not enforce per-Agent import isolation.
+Agents does not import concrete Actions, Gateway, UI or execution SDKs. The target depends on AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio. Perception callers adapt SDK media values; this does not grant permission to perform unregistered device effects.
 
-✅ Model-callable registrations are loaded from each JSON v6 resource. Code owns fixed internal permissions and behavior, capability protocols are injected, and communication/execution requests cross Gateways. AgentCore supplies generic contracts/parsers/registries rather than business messages or native services.
+## Internal structure
 
-❌ Per-Agent targets and separate speech/vision communication targets are not implemented. Assistant owns request context selection and SpeechSynthesis owns producer errors; Storage retains records and neutral media/cache contracts.
-
-## Internal structure and data flow
-
-Agents combine injected processing capabilities with explicit messages and executable calls. Solid arrows show capability use or runtime flow, not imports. Dashed arrows show validated configuration. Model/storage interfaces are used directly; communication and skill calls cross Gateway. The external subgraph is a boundary, not Agent-owned implementation.
+The diagram shows Agent roles and their capability use. All role-to-role communication is routed through the Gateway nodes; arrows are runtime flow rather than compile dependencies.
 
 ```mermaid
 flowchart TB
-    JSON[Five Agent JSON v6 resources] --> Loader[AgentConfigurations / AgentCore validation]
-    Loader --> Policy[Model-callable catalogs and communication policy]
-    Internal[Agent code: fixed internal permissions] --> Grants[Assembled runtime capabilities]
-    Policy --> Grants
-
-    subgraph Cognitive[Agent-owned state and processing]
-        Speech[SpeechPerception: segmentation / recognition]
-        Assistant[Assistant: context / generation / output parsing]
-        Synth[SpeechSynthesis: directed serial synthesis]
-        Vision[VisionPerception: latest-frame cadence / pose interpretation]
-        Photographer[Photographer: shared-pose target selection]
-    end
-    Grants -.-> Speech
-    Grants -.-> Assistant
-    Grants -.-> Synth
-    Grants -.-> Vision
-    Grants -.-> Photographer
-
-    subgraph Capabilities[Injected model and storage interfaces]
-        VAD[VoiceActivityCapability]
-        ASR[SpeechRecognitionCapability]
-        Chat[ChatCapability]
-        TTS[SpeechSynthesisCapability]
-        Pose[PoseCapability]
-        History[ConversationHistoryStore]
-        Cache[SpeechAudioStore]
-    end
-    Speech --> VAD
-    Speech --> ASR
-    Assistant --> Chat
-    Assistant <-->|Records and context| History
-    Synth --> TTS
-    Synth -->|Write owned audio handles| Cache
-    Vision --> Pose
-
-    subgraph External[External communication and execution boundary]
-        Input[InputGateway]
-        Output[OutputGateway]
-        Actions[Scheduled Actions: speech / expressions / NexArm]
-        Tools[Direct Tools: captions / voice state / turn / gaze / pose]
-        Endpoints[App-bound presentation and device endpoints]
-    end
-    Input -->|Admitted PCM| Speech
-    Input -->|Final speech / phase / ToolResult| Assistant
-    Input -->|Directed synthesis / cancellation| Synth
-    Input -->|Admitted image| Vision
-    Input -->|Published vision.pose| Photographer
-    Speech -->|Observations and transcript / voice-state Tools| Output
-    Assistant -->|Synthesis messages / resolved Actions and Tools / wait| Output
-    Vision -->|Pose observations / gaze and display Tools| Output
-    Photographer -->|Internal NexArm.Tracking.aim| Output
-    Output -->|Validated internal messages| Input
-    Output --> Actions
-    Output --> Tools
-    Actions --> Endpoints
-    Tools --> Endpoints
-    Cache -->|Single-use checkout by speech playback| Endpoints
+    JSON[Six Agent JSON v6 resources] --> Loader[AgentConfigurations / AgentCore validation]
+    Loader --> Grants[Model-callable catalogs / communication policy]
+    Code[Agent code: fixed internal behavior / permissions] --> Grants
+    Input[InputGateway] --> Core[Core: AgentInput / manager / bounded actor admission]
+    Core --> Speech[SpeechPerception: segmentation / ASR / sound direction]
+    Core --> Assistant[Assistant: context / generation / output policy]
+    Core --> Synthesis[SpeechSynthesis: directed serial synthesis]
+    Core --> Vision[VisionPerception: latest-frame pose / cadence]
+    Core --> Photographer[Photographer: pose target selection]
+    Core --> Memory[ConversationMemory: refresh / confirmed deletion / result sequencing]
+    Speech --> ASR[Injected ASR / VAD capabilities]
+    Assistant --> Chat[Injected ChatCapability / journal]
+    Synthesis --> TTS[Injected TTS / shared PCM store]
+    Vision --> Pose[Injected PoseCapability]
+    Assistant --> Parser[Core/Generation: text tags / native events / alias resolution]
+    Parser --> Output[OutputGateway]
+    Speech --> Output
+    Synthesis --> Output
+    Vision --> Output
+    Photographer --> Output
+    Memory --> Output
+    Grants -.->|Authorize emitted output| Output
+    Output -->|Messages and correlated execution feedback| Input
 ```
 
-The diagram groups current business paths; runtime control and ActionResult receipts use the same validated boundaries. Assistant requests synthesis by message, not by calling SpeechSynthesisAgent directly. Its audio-ID playback Action is scheduled separately from synthesis. App injects the same PCM store into synthesis and playback; the store is shared data, not a message transport. Model-callable registrations come from JSON; fixed text mapping and internal behavior remain code-owned.
+Each implemented Agent has an actor, README and `<AgentName>.agent.json`. Add configuration resources to root Package.swift; AgentConfigurations loads Bundle.module rather than searching the App bundle.
 
-SpeechPerception owns one utterance across ASR segments. Assistant consumes final speech and speech onset, maps generated text through its code-owned text policy and retains bounded durable conversation history. VisionPerception performs one shared pose request per admitted frame and independently publishes pose state and displays skeletons.
+Core compiles independently with no project dependencies and contains no concrete Agent, model or device adapter. Communication owns shared speech/pose schemas and built-in Agent identities. Each business Agent directory owns its actor, JSON and processing contract; all six currently share the Agents target.
 
-Each actor documents its own capacity, overflow, pause, stop and cleanup rules: [Assistant](Assistant/README.md), [SpeechPerception](SpeechPerception/README.md), [SpeechSynthesis](SpeechSynthesis/README.md) and [VisionPerception](VisionPerception/README.md). Audio and discrete work fail on overflow; vision can replace its latest pending frame, observation and display state. Generation completion does not mean playback completion. Stop must close admission and join owned work before a replacement session starts.
+Model-callable Actions appear in prompt/context by Channel; native declarations enter the provider request's tools parameter. Text action tags resolve to ActionCall and native events resolve to ToolCall inside Agents. Natural text follows Agent policy; it is not inherently an ActionCall. Both call protocols ultimately invoke the same protocol-neutral function implementation.
+
+## Design principles and core mechanisms
+
+**Agent-driven does not mean every step calls an LLM.** ConversationMemory performs deterministic intent/result sequencing; Assistant uses model generation. Both own task policy and emit permitted calls through OutputGateway. Basic model inference and internal storage access stay local capability calls; complete UI/device business effects cannot hide inside injected callbacks.
+
+**State is owned by an actor and scoped to an incarnation/session.** Registration binds a live identity. Stop invalidates that identity before joining cleanup, and replacement requires a new instance. AgentManager owns registration/lifecycle, while each Agent owns its worker, inbox and generation state; there is no generic Agent-owned factory/restart supervisor.
+
+| Kind of information | Handling principle |
+| --- | --- |
+| Explicit intent / discrete command | Validate and admit or reject; never silently replace accepted work |
+| Declared latest-state observation | Agent-specific bounded replacement/coalescing; freshness checked before use |
+| Local inference/cache result | Stays local unless explicitly published or sent |
+| Execution feedback | Check owner/session and call/execution correlation before changing task state |
+
+**Interpretation stays inside Agents.** Core/Generation provides shared parsing; each Agent supplies its text policy and resolves its aliases. JSON v6 is the sole model-callable catalog and communication declaration, while fixed internal behavior/grants are code-owned. Host registration supplies implementations but cannot infer broader Agent permissions. Admission receipts mean acceptance, not completed reasoning or effects.
+
+Result-driven sequencing is implemented for selected deterministic history flows. General LLM continuation after ToolResult remains pending; receipt consumption must not be described as automatic replanning.
 
 ## 输入输出文档约定
 
@@ -130,7 +93,7 @@ Each actor documents its own capacity, overflow, pause, stop and cleanup rules: 
 | publish | `communication.publications` 的 contract、typed `AgentMessage` payload、发送时机、消费者、可替换/丢失策略和接纳回执含义 | `AgentMessaging.publish(..., parent:)` 经 OutputGateway → InputGateway 广播；不是 Action/Tool 输出。 |
 | send | `communication.sends` 的 contract/target、typed payload 字段、因果与所有权、接纳/取消/超时语义 | `AgentMessaging.send(..., parent:, to:)` 走同一双 Gateway 链路，但只定向一个 Agent。 |
 
-公共 `AgentInput` 包含 `id: UUID`、`sessionID: UUID`、`turn: AgentTurn?` 和 `InputMetadata(contract, version, topic, source, incarnation, capturedAt, sequence, rootID, parentID, hops, deadline)`。publish/send 的端口绑定发送方身份，以 `parent` 继承会话、轮次和因果关系；接收方不能从业务 payload 自行推断授权身份。`DeliveryReport.delivered / rejected` 只表示目标 Agent 的接纳或拒绝，不代表推理、合成、Action 或播放完成。`OutputEnvelope` 含 `source / inputID / sessionID / turn / sequence / output`；它与共享观测消息是两条不同的输出通路。某方向没有声明或实现时，明确写“无”，不要把缓存副作用或本地方法误记为 publish/send。
+公共 `AgentInput` 包含 `id: UUID`、`sessionID: UUID`、`turn: AgentTurn?` 和 `InputMetadata(origin, contract, version, topic, source, incarnation, capturedAt, sequence, rootID, parentID, hops, deadline)`。publish/send 的端口绑定发送方身份，以 `parent` 继承会话、轮次和因果关系；接收方不能从业务 payload 自行推断授权身份。`DeliveryReport.delivered / rejected` 只表示目标 Agent 的接纳或拒绝，不代表推理、合成、Action 或播放完成。`OutputEnvelope` 含 `source / inputID / sessionID / turn / sequence / output`；它与共享观测消息是两条不同的输出通路。某方向没有声明或实现时，明确写“无”，不要把缓存副作用或本地方法误记为 publish/send。
 
 ### 业务输出与系统功能调用边界
 
@@ -199,13 +162,14 @@ Limits: at most 128 combined model/internal capability entries, 16 distinct Chan
 
 JSON has no `channels`, `textActions`, `textOutput`, `internal`, `hidden` or per-Action `defaultChannel` fields. Agent code owns fixed business behavior and creates typed `InternalAction` / `InternalTool` permissions without model aliases or documentation:
 
+- ConversationMemory: deterministic history refresh and confirmed-delete sequencing with correlated results and history presentation.
 - Assistant: reply initialization, automatic speech synthesis/audioID playback and captions.
 - SpeechPerception: transcript updates/closure and voice-state presentation.
 - VisionPerception: gaze targets and skeleton display.
 - Photographer: optional `NexArm.Tracking.aim` from a subscribed pose. The model catalog stays empty.
 - SpeechSynthesis: directed synthesis/cancellation only; no device-output permission.
 
-These declarations form the descriptor's immutable runtime capability snapshot together with the JSON model catalog. Internal calls are never resolved from model XML or native Tool names. All calls still pass OutputGateway permission validation, Action module exclusion/Channel/wait scheduling or the independent Tool runtime. App retains explicit implementation handlers. Internal permissions are mandatory code policy, not recovery for an invalid JSON resource.
+These declarations form the descriptor's immutable runtime capability snapshot together with the JSON model catalog. Internal calls are never resolved from model XML or native Tool names. All calls still pass OutputGateway permission validation, Action module exclusion/Channel/wait scheduling or the Gateway call adapter and shared function executor. App retains explicit implementation handlers. Internal permissions are mandatory code policy, not recovery for an invalid JSON resource.
 
 Assistant supplies a bounded text-mapping callback to AgentGenerator. It preserves sentence boundaries and event position, sends synthesis requests, and replaces each speech text call with audioID playback before Gateway admission. Only audioID playback is authorized downstream. Speech retains its default Speech Channel unless a Channel scope overrides it. Captions are immediate Tools without a Channel or wait membership. The system prompt explains automatic audio and wait; it does not disclose internal methods or subtitle mechanics.
 
@@ -220,7 +184,7 @@ flowchart LR
     Mapping --> Calls
     Calls --> Gateway[OutputGateway validates against descriptor]
     Runtime -.-> Gateway
-    Gateway --> Execution[Action scheduler or Tool runtime]
+    Gateway --> Execution[Gateway scheduling / protocol adapters / shared executor]
 ```
 
 ## Registration and implementation rules
@@ -240,44 +204,12 @@ An Agent interpreting wait markup declares OutputKind.scheduling and forwards th
 
 Assistant, SpeechPerception and VisionPerception accept action.result receipts without triggering inference. Startup permission coverage uses the descriptor's model and internal grants; Action kind/completion metadata remains implementation-side.
 
-## Implemented scope and limitations
+## Implementation status
 
-✅ ConversationMemory, Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v6 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio.
+✅ Six implemented roles: ConversationMemory, Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer. Shared parsers stay in Core/Generation; domain values stay outside Core. JSON v6 and code-owned internal grants are independent from host implementation bindings.
 
-Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.Expression.express is a scheduled finite model-callable Action; UI.Expression.setExpression is a scheduled state Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
+✅ Shared Signal provenance, bound publish/send, owner-fenced returning feedback and deterministic history refresh/delete continuation. Vision uses explicit latest-state replacement; discrete outputs reject overflow. Synthesis and playback share PCM data without using Storage as message transport.
 
-❌ Configuration hot reload, full executable value schemas, local native Tool deltas, general request/reply, result-driven replanning and activity subscriptions are not implemented.
+❌ Full typed intent/control migration, remaining settings/device business routes, complete Action/activity causality and bounded model continuation are outstanding. Assistant currently displays Tool feedback without starting another LLM reasoning turn. Per-Agent target isolation, configuration hot reload, generic request/reply and activity subscriptions are not implemented.
 
-See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production configuration. Per-Agent limits and processing algorithms belong to their own READMEs.
-
-✅ Photographer subscribes to vision.pose and emits internal NexArm.Tracking.aim with a bounded output stream. Camera lifecycle enables this Agent; physical tracking acceptance remains outstanding.
-
-✅ Photographer validates decoded pose before target selection; malformed values fail without indexing joints. Its eight-call output bound rejects excess calls without stopping the actor and retains previously accepted calls for normal stream consumption.
-
-✅ VisionPerception retains independent visualization when an optional subscriber rejects an observation. Photographer command failures remain scoped to its output consumer; Gateway authorization is not bypassed.
-
-✅ Every production producer uses publishResult/sendResult: delivery failure affects only dependent work. App output consumers use OutputGateway.execute to retain execution failures rather than terminating another Agent. Startup configuration errors and explicit cancellation retain their existing validation/cleanup semantics.
-
-✅ Output overflow rejects only the current unaccepted aim; Photographer remains running and queued accepted calls are retained.
-
-✅ Business Agents own their domain values and output payloads. VisionPerception builds PoseOverlayPayload; AgentCore retains generic runtime contracts. This does not allow UI/service imports or bypass OutputGateway.
-
-✅ Communication/AgentContracts.swift owns built-in application Agent names as AgentID extensions. Core defines only the raw identity type. Shared pose and speech message values belong to Communication/SpeechValues.swift and PoseObservation.swift; output syntax stays Core-owned while speech policy stays Assistant-owned.
-
-✅ Shared application messages and registry metadata are grouped in Communication/AgentContracts.swift. Core exposes generic messages/schema registration only. Generic media inputs are grouped in AgentCore/Input; host input adapters supply device sources/deadlines. No per-domain file or compatibility alias remains under Core.
-
-✅ Capability callers own SDK data adaptation: VisionPerception converts retained CameraFrame to ModelKit ImageFrame; SpeechPerception selects/resamples native-rate transport to ModelKit PCM; SpeechSynthesis converts model PCM into StorageAudio values. App injects capabilities and transports inputs, without injecting model input conversion closures. ❌ No model-specific tensor preprocessing is moved out of ModelKit adapters.
-
-✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
-
-✅ SpeechPerception additionally estimates the single dominant direction of any obvious sound in its listening interval and publishes sound.source. Its deterministic estimator is separate from ASR/VAD, and Communication owns the immutable observation. ❌ Source identity, multiple-source separation and Photographer audio-driven movement are unimplemented.
-
-✅ ADR0131: generic Core observations transport producer execution descriptions without Bluetooth classification; business Agent result/session policies are unchanged. ❌ Physical device failure acceptance remains pending.
-
-✅ ADR0139: Photographer exposes monotonic usable-pose freshness as a read-only host signal; source silence releases the App writer after one second. Assistant priority over Photographer is host resource policy, not Agent-to-Agent cancellation or a model-callable permission.
-
-✅ Assistant JSON declares read-only History.Conversation.list/read. Aliases resolve inside Agents and execution/results cross both Gateways. ❌ Tool feedback does not yet resume model reasoning.
-
-✅ ConversationMemory accepts structured refresh/confirmed archive deletion independently of voice/models. It emits History.Conversation.delete, validates correlated runtime feedback and emits UI.HistoryPresentation.showHistory only after success. ❌ Archive/title and model-driven navigation remain staged work.
-
-✅ ADR0149: shared Signal provenance and owner-fenced returning Tool delivery are implemented; speech parent adaptation preserves origin. ❌ Typed intent/control migration and full business-entry coverage remain pending.
+Detailed capacities/cleanup and real-device limitations: [Core](Core/README.md), [Communication](Communication/README.md), [ConversationMemory](ConversationMemory/README.md), [Assistant](Assistant/README.md), [SpeechPerception](SpeechPerception/README.md), [SpeechSynthesis](SpeechSynthesis/README.md), [VisionPerception](VisionPerception/README.md) and [Photographer](Photographer/README.md). Architecture: [Agent-Driven-App.md](../Agent-Driven-App.md).

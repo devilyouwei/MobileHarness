@@ -1,6 +1,8 @@
-# ModelKit — Model Capabilities and Runtime
+# ModelKit — Independent Inference Capabilities
 
 Processes supplied data through typed model capabilities. The goal is to keep recognition, generation and pose inference independent of Agent policy, UI and device I/O. Consumers receive capability protocols; internal assembly selects concrete models.
+
+Design goals: typed requests/results, independent capability contracts, stable provider identity and explicit admission/cleanup without Agent or presentation policy.
 
 The physical directory contains several Swift targets. Base ModelKit has no project or third-party target dependencies and owns its public input/output values. ModelKitRuntime depends only on ModelKit; adapters and backends compile separately. Root Package.swift owns all targets and the source targets share one root build map.
 
@@ -24,7 +26,7 @@ ModelKit/
 └── README.md                 # Capability boundary
 ```
 
-## External upstream and downstream
+## Upstream and downstream
 
 App is the composition and lifetime owner. It supplies the model resource root to `ModelKitDefaults`, obtains the process-wide `ModelManager`, resolves typed capability handles and injects only the capabilities required by each consumer. Consumers call capability protocols directly; Gateway does not proxy model work. PlatformKit has no ModelKit dependency: App packages captured media for Agent transport; the calling Agent adapts that transport into ModelKit inputs.
 
@@ -41,9 +43,10 @@ flowchart LR
     Composition -->|inject chat / ASR / VAD / TTS / pose| Agents[Agents]
     Composition -->|inject diagnostic capability| Workflows[App diagnostic workflows]
     Composition -->|inject chat capability| Titles[Conversation title operation]
-    Composition -.->|when a concrete behavior requires inference| Behaviors[Actions / Tools]
+    Composition -.->|when a concrete behavior requires inference| Behaviors[Actions functions via injected capabilities]
 
-    Host -->|adapt and admit observations| Agents
+    Host -->|adapt external observations| Input[InputGateway]
+    Input -->|admitted Signal| Agents
     Agents -->|typed requests| Capability[ModelKit capability protocols]
     Workflows -->|typed requests| Capability
     Titles -->|typed request| Capability
@@ -51,9 +54,9 @@ flowchart LR
     Capability -->|events / text / PCM / pose results / errors| Consumers[Calling consumer]
 ```
 
-The current `Agents` target consumes ModelKit; diagnostic workflows and title generation receive capabilities through App. Current Actions and Tools do not import ModelKit, although the architecture permits a narrowly injected capability for a concrete behavior. UI, Gateway and PlatformKit do not depend on ModelKit. ModelKit and StorageAudio own distinct PCM values; SpeechSynthesis converts model output into the storage contract. Neither SDK depends on the other or on Types.
+The current `Agents` target consumes ModelKit; diagnostic workflows and title generation receive capabilities through App. Current Actions does not import ModelKit, although the architecture permits a narrowly injected capability for a concrete behavior. UI, Gateway and PlatformKit do not depend on ModelKit. ModelKit and StorageAudio own distinct PCM values; SpeechSynthesis converts model output into the storage contract. Neither SDK depends on the other or on Types.
 
-## Internal targets and processing flow
+## Internal structure
 
 Dependency arrows below point from a target to what it imports. Base `ModelKit` contains value/session contracts and capability protocols. Runtime management, default assembly, adapters and engine backends remain separate targets so consumers never acquire concrete engines.
 
@@ -92,6 +95,20 @@ flowchart LR
     Policy -->|unload, pressure or shutdown| Teardown[Release resource]
 ```
 
+## Design principles and core mechanisms
+
+**Capabilities are stable interfaces; providers are internal choices.** Consumers request typed capabilities and never select engine classes through application code. Separate adapter/backend targets isolate external SDK dependencies. ModelManager retains provider identity, while unload changes residency rather than replacing the capability handle.
+
+| Distinction | Technical consequence |
+| --- | --- |
+| Capability acquisition vs model residency | Obtaining a handle need not load weights; availability and load state are queried separately |
+| Provider identity vs operation lease | One shared provider may serve successive operations, but overlapping work on one model fails admission |
+| Cancellation request vs cleanup completion | Admission remains held until backend cleanup joins; non-cooperative inference cannot be forcibly interrupted generically |
+| Transport adaptation vs model preprocessing | Calling Agents convert native/transport values; adapters own tokenizer, tensor, graph and decoder details |
+| Technical error vs presentation policy | SDK returns typed neutral diagnostics; consumers own localization, recovery and explicit provider changes |
+
+Output is delivered through typed results or single-consumer inference sessions with explicit bounds. Unsupported capability/provider combinations fail rather than silently changing the user's model. Model-generated native call events are data for Agents to interpret; ModelKit does not dispatch business functions or route Signals.
+
 ### Ownership and limits
 
 - ModelKitDefaults owns fixed registrations and default bindings. Production uses one process-wide manager; construction/registration require ModelAssembly SPI for internal assembly and isolated tests.
@@ -122,7 +139,7 @@ The physical App requires iOS 27. Speech defaults select enabled installed avail
 
 ## Adapter boundaries
 
-ModelKitOpenAI exposes explicitly configured endpoint/key/model chat over bounded SSE. Absent cloud configuration selects the local binding; cloud speech/vision is not provided. ModelKitMossNano owns the synthesis adapter and ModelKitMossCoreML owns its backend. Defaults selects MOSS; Kokoro is an optional target outside the aggregate App product.
+ModelKitOpenAI exposes explicitly configured endpoint/key/model chat over bounded SSE. Absent cloud configuration selects the local binding; cloud speech/vision is not provided. ModelKitMossNano owns the synthesis adapter and ModelKitMossCoreML owns its backend. Defaults selects enabled, installed and available MOSS or Apple synthesis; Kokoro is an optional historical test target outside the aggregate App product.
 
 Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns no Agent permissions, device I/O or business state. Streams define byte estimates, admission and cleanup; unsupported capabilities fail explicitly. Non-cooperative backend calls can delay cancellation/shutdown; no generic forced interruption is provided.
 
@@ -138,3 +155,9 @@ Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns
 ✅ Independent custom recognition/synthesis switches default off; enabled recognition requires the Nemotron installation, enabled synthesis requires MOSS. Apple recognition uses SpeechTranscriber+SpeechDetector together; Silero or Energy provides external silence scores independently of the ASR choice because native detector normal events were unavailable in the real probe.
 
 ✅ Errors and availability expose typed outcomes plus neutral technical diagnostics. Consumers own localization and recovery guidance. Chinese warm-up utterances are model input fixtures, not display text. ❌ SDK diagnostics must not prescribe App settings or UI workflows.
+
+## Implementation status
+
+✅ Independent ModelKit contracts, ModelKitRuntime management, ModelKitDefaults assembly and separate adapters/backends. Agent-specific preprocessing of transport values stays with callers; model-specific tensor/tokenizer work stays with adapters. Models have no business-call registration, Channel scheduling or Signal routing responsibility.
+
+❌ Model continuation belongs to Agents; measured cross-model budgets, unsupported capability providers and physical/model acceptance remain separate. See [Agent-driven architecture](../Agent-Driven-App.md) for business/capability boundaries.

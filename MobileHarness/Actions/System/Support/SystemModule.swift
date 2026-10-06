@@ -1,8 +1,8 @@
-import ActionRuntime
+import FunctionContracts
 
 public struct SystemModule: CapabilityModule {
     public init() {}
-    public var definitions: [ToolDefinition] {
-        [SystemActions.runtimeInfoDefinition(handler: { try await SystemActions.runtimeInfo($0) })]
+    public var definitions: [ActionFunction] {
+        [SystemActions.runtimeInfoDefinition(completing: { .value(try await SystemActions.runtimeInfo($0)) })]
     }
 }

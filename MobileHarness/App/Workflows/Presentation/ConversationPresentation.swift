@@ -1,6 +1,6 @@
-import ActionRuntime
 import AgentCore
 import Foundation
+import FunctionContracts
 
 /// Bounded acceptance policy for UI handlers. No device, view, queue or callback ownership.
 public struct ConversationPresentation: Sendable {
@@ -53,18 +53,10 @@ extension ConversationPresentation {
     public func isCurrent(_ context: ActionExecutionContext) -> Bool {
         context.correlationID != nil && context.correlationID == turn?.id && context.ordinal == turn?.ordinal
     }
-    public func isCurrent(_ context: ToolExecutionContext) -> Bool {
-        context.correlationID != nil && context.correlationID == turn?.id && context.ordinal == turn?.ordinal
-    }
     public mutating func accept(_ context: ActionExecutionContext, update: Update) -> Bool {
         accept(
-            source: context.source, sequence: context.sequence,
-            id: context.correlationID, ordinal: context.ordinal, update: update)
-    }
-    public mutating func accept(_ context: ToolExecutionContext, update: Update) -> Bool {
-        accept(
-            source: context.source, sequence: context.sequence,
-            id: context.correlationID, ordinal: context.ordinal, update: update)
+            source: context.source, sequence: context.sequence, id: context.correlationID, ordinal: context.ordinal,
+            update: update)
     }
     private mutating func accept(
         source: String, sequence: UInt64, id: UUID?, ordinal: UInt64?, update: Update

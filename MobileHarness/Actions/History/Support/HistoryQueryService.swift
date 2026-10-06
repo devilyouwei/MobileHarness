@@ -1,10 +1,10 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 import StorageChat
 
-public enum HistoryQueryError: Error, Equatable, Sendable, ToolExecutionFailureProviding {
+public enum HistoryQueryError: Error, Equatable, Sendable, ActionExecutionFailureProviding {
     case missingConversation, resultTooLarge, currentConversation
-    public var toolFailureCode: ToolResponse.FailureCode {
+    public var executionFailureCode: ActionExecutionFailureCode {
         switch self {
         case .currentConversation: .invalidArguments
         case .missingConversation: .init(rawValue: "notFound")
@@ -61,7 +61,7 @@ public struct HistoryQueryService: HistoryQueryCapability {
     }
     public func list(offset: Int, limit: Int) async throws -> String {
         guard (0...64).contains(offset), (1...5).contains(limit) else {
-            throw ToolArguments.ValidationError.invalidValue("pagination")
+            throw ActionArguments.ValidationError.invalidValue("pagination")
         }
         try Task.checkCancellation()
         let snapshot = try await store.snapshot()
@@ -78,7 +78,7 @@ public struct HistoryQueryService: HistoryQueryCapability {
     }
     public func read(id: UUID, offset: Int, limit: Int) async throws -> String {
         guard (0...256).contains(offset), (1...2).contains(limit) else {
-            throw ToolArguments.ValidationError.invalidValue("pagination")
+            throw ActionArguments.ValidationError.invalidValue("pagination")
         }
         try Task.checkCancellation()
         let snapshot = try await store.snapshot()

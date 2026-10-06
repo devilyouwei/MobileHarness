@@ -1,37 +1,37 @@
-import ActionRuntime
+import FunctionContracts
 
 /// Motor, gesture, base and tracking behavior share one domain catalog.
 public struct NexArmModule: CapabilityModule {
-    private let perform: @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void
-    private let move: @Sendable (Int, ActionInvocation) async throws -> Void
-    private let aim: @Sendable (Double, Double, ToolInvocation) async throws -> Void
+    private let perform: @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void
+    private let move: @Sendable (Int, any FunctionInput) async throws -> Void
+    private let aim: @Sendable (Double, Double, any FunctionInput) async throws -> Void
     public init(
-        perform: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void,
-        move: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
-        aim: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void
+        perform: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void,
+        move: @escaping @Sendable (Int, any FunctionInput) async throws -> Void,
+        aim: @escaping @Sendable (Double, Double, any FunctionInput) async throws -> Void
     ) {
         self.perform = perform
         self.move = move
         self.aim = aim
     }
-    public var definitions: [ActionDefinition] { scheduledDefinitions + directDefinitions }
-    private var scheduledDefinitions: [ActionDefinition] {
+    public var definitions: [ActionFunction] { motionFunctions + trackingFunctions }
+    private var motionFunctions: [ActionFunction] {
         Self.gestureDefinitions(perform: perform) + Self.baseDefinitions(move: move)
     }
-    private var directDefinitions: [ToolDefinition] { Self.trackingDefinitions(aim: aim) }
+    private var trackingFunctions: [ActionFunction] { Self.trackingDefinitions(aim: aim) }
     static func trackingDefinitions(
-        aim: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void
-    ) -> [ToolDefinition] {
+        aim: @escaping @Sendable (Double, Double, any FunctionInput) async throws -> Void
+    ) -> [ActionFunction] {
         [
-            NexArmActions.aimDefinition(completing: { [aim] call, context in
-                try await NexArmActions.aim(invocation: ToolInvocation(call: call, context: context), using: aim)
+            NexArmActions.aimDefinition(handler: { [aim] invocation in
+                try await NexArmActions.aim(invocation: invocation, using: aim)
             })
         ]
     }
 
     static func gestureDefinitions(
-        perform: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void
-    ) -> [ActionDefinition] {
+        perform: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void
+    ) -> [ActionFunction] {
         [
             NexArmActions.moveMotorDefinition { [perform] in
                 try await NexArmActions.moveMotor(invocation: $0, using: perform)
@@ -66,8 +66,8 @@ public struct NexArmModule: CapabilityModule {
         ]
     }
     static func baseDefinitions(
-        move: @escaping @Sendable (Int, ActionInvocation) async throws -> Void
-    ) -> [ActionDefinition] {
+        move: @escaping @Sendable (Int, any FunctionInput) async throws -> Void
+    ) -> [ActionFunction] {
         [
             NexArmActions.shakeBaseDefinition { [move] invocation in
                 try await NexArmActions.shakeBase(invocation: invocation, using: move)

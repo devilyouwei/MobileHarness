@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// Payload-free execution history. The scheduler owns mutation; snapshots are immutable values.
 public struct ActionDiagnostics: Sendable {
@@ -20,7 +22,7 @@ public struct ActionDiagnostics: Sendable {
         public let sessionID: UUID
         public let inputID: UUID
         public let channel: String
-        public let kind: ActionDefinition.Kind
+        public let kind: ActionBinding.Kind
         public let phase: Phase
         public let effect: Effect
         public let time: ContinuousClock.Instant
@@ -42,12 +44,12 @@ public struct ActionDiagnostics: Sendable {
     }
 
     public mutating func record(
-        _ invocation: ScheduledAction, kind: ActionDefinition.Kind, phase: Phase, effect: Effect
+        _ invocation: ScheduledAction, kind: ActionBinding.Kind, phase: Phase, effect: Effect
     ) {
         let record = Record(
             executionID: invocation.executionID, path: invocation.call.actionPath,
             source: invocation.envelope.source, sessionID: invocation.envelope.sessionID,
-            inputID: invocation.envelope.inputID, channel: invocation.call.channel,
+            inputID: invocation.envelope.inputID, channel: invocation.channel,
             kind: kind, phase: phase, effect: effect, time: .now)
         if records.count < capacity {
             records.append(record)

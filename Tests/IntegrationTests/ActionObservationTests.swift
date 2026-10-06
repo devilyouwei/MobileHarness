@@ -1,9 +1,11 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Testing
 import UI
 
@@ -44,10 +46,10 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let armPath = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
     let speechPath = ActionPath(domain: "Speech", module: "Playback", function: "speak")
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: armPath, displayName: "测试动作", kind: .finite, completion: "Fixture gate.") { _ in
+        ActionBinding(path: armPath, displayName: "测试动作", kind: .finite, completion: "Fixture gate.") { _ in
             await arm.wait()
         },
-        ActionDefinition(path: speechPath, displayName: "测试动作", kind: .finite, completion: "Fixture gate.") { _ in
+        ActionBinding(path: speechPath, displayName: "测试动作", kind: .finite, completion: "Fixture gate.") { _ in
             await speech.wait()
         },
     ])
@@ -82,8 +84,8 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let path = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
-            ActionDefinition(path: path, displayName: "测试动作", kind: .finite, completion: "Committed fixture is joined.")
-            { _ in
+            ActionBinding(path: path, displayName: "测试动作", kind: .finite, completion: "Committed fixture is joined.") {
+                _ in
                 await gate.wait()
             }
         ]))
@@ -113,7 +115,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let input = AgentInput(sessionID: UUID(), payload: .event("bounds"))
     let path = ActionPath(domain: "Fixture", module: "Control", function: "work")
     let active = observationCall(path, input: input, channel: "Robot")
-    let definition = ActionDefinition(
+    let definition = ActionBinding(
         path: path, displayName: "测试动作", kind: .finite, completion: "Fixture completed.", handler: { _ in })
     ledger.admit(active, definition: definition)
     ledger.transition(active.executionID, to: .running)
@@ -139,7 +141,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let path = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
-            ActionDefinition(path: path, displayName: "测试动作", kind: .finite, completion: "Failure fixture.") {
+            ActionBinding(path: path, displayName: "测试动作", kind: .finite, completion: "Failure fixture.") {
                 _ async throws -> Void in
                 throw NexArmExecutionError.feedbackTimeout
             }
@@ -166,7 +168,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     // Explicit test-only behavior: no device, model or media access.
     let path = ActionPath(domain: "NewDomain", module: "Control", function: "newOperation")
     let registry = try ActionRegistry(definitions: [
-        ActionDefinition(path: path, displayName: "新领域操作", kind: .finite, completion: "Fixture acknowledged.") { _ in }
+        ActionBinding(path: path, displayName: "新领域操作", kind: .finite, completion: "Fixture acknowledged.") { _ in }
     ])
     let scheduler = ChannelScheduler(registry: registry)
     let state = ActionActivityState()
@@ -217,7 +219,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     let path = ActionPath(domain: "Fixture", module: "Control", function: "failure")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
-            ActionDefinition(
+            ActionBinding(
                 path: path, displayName: "Fixture", kind: .finite, completion: "Preserved error",
                 completing: { _ in .report(try await composition.run()) })
         ]))

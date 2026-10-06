@@ -1,9 +1,11 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import ModelKit
 import StorageAudio
@@ -37,7 +39,7 @@ private actor PlaybackSynthesisFixture: SpeechSynthesisCapability {
     }
 }
 private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String = "assistant", session: UUID = UUID())
-    async throws -> (UUID, SpeechAudioStore.Owner, ActionInvocation)
+    async throws -> (UUID, SpeechAudioStore.Owner, any FunctionInput)
 {
     let parent = AgentInput(sessionID: session, payload: .text(text))
     let request = try SpeechSynthesisInput(text: text)

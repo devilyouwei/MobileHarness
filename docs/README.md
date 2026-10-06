@@ -100,7 +100,7 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 
 ✅ Directory contract audit reconciles Tools, Gateway dispatch/routing/results/validation, Agent generation/output/history and App lifecycle documentation with ADR0103. ❌ Live-provider/device acceptance remains separate from documentation and unit validation.
 
-✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
+✅ Canonical ActionFunction owns static timeout and request-dependent execution budgets (including NexArm), shared by both call protocols. FunctionExecutor uses the declared budget before its30-second default; invalid explicit declarations fail without fallback. @Action creates protocol-neutral factories; host bindings select protocol/runtime policy. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
 
 ✅ [ADR 0112: Gemma CoreAI chat](adr/0112-gemma-coreai-chat.md) replaces local Qwen/MLX with Gemma 4 E2B QAT CoreAI. iOS uses pinned h18p AOT resources; old Qwen downloads are incompatible. Shared package dependencies require OS 26; CoreAI execution requires OS 27. ✅ Mac real inference, cancellation and reload passed. ❌ Sustained device acceptance remains pending.
 
@@ -177,3 +177,11 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 - [ADR0157](adr/0157-canonical-executable-definitions.md): one definition/handler/outcome catalog, protocol projections, shared scheduled native execution, typed feedback and compatibility retirement.
 
 ❌ Remaining work is broader Agent-driven input/feature migration, bounded model continuation and physical acceptance; Action/Tool source and implementation consolidation is complete.
+
+✅ [ADR0158 — Unified Action authoring](adr/0158-unified-action-authoring.md): one @Action attribute for all capabilities; model context supplies text actions and request tools supplies native declarations. Text tags and native events retain distinct ActionCall/ToolCall transports.
+
+✅ [ADR0159 — Protocol-independent invocations](adr/0159-protocol-independent-action-invocations.md) removed native-only business signatures. ADR0161 completes the boundary with one FunctionInput/context/handler and @Action metadata; ActionInvocation remains a Gateway scheduling adapter. Differences remain in registration, model transport/parsing, runtime admission and feedback.
+
+✅ [ADR0160 — Callable functions and protocol bindings](adr/0160-callable-functions-and-protocol-bindings.md) separates pure callable implementation from host registration/runtime protocol policy.
+
+✅ [ADR0161 — Gateway execution and isolated function contracts](adr/0161-gateway-execution-and-function-contracts.md).

@@ -4,9 +4,9 @@
 
 | Area | Delivered scope |
 | --- | --- |
-| Agent runtime | Six business Agents, JSON v5 permissions, static communication and independent AgentCore. |
+| Agent runtime | Six business Agents, JSON v6 permissions, static communication and independent AgentCore. |
 | Processing | Local speech/chat/pose capabilities, explicit cloud chat configuration and shared model management. |
-| Behavior | Scheduled Actions, direct Tools, nested wait, result feedback and declared-resource coordination. |
+| Behavior | Shared callable Actions, scheduled/native protocols, nested wait, structured results and declared-resource coordination. |
 | Host | Independent UI, role-specific lifecycle dependencies, six feature workflows and typed App adapters. |
 | Data | Persistent settings/conversation history and reply-owned transient PCM. |
 | Devices | Foreground camera/audio and NexArm connection, native feedback and shared Action bindings. |
@@ -25,7 +25,7 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 
 | Direction | Boundary before implementation |
 | --- | --- |
-| [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions/Tools 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
+| [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
 | [Agent-driven app](../MobileHarness/Agent-Driven-App.md) | Active architecture and unified Signal contract; Storage cleanup, history Tools, refresh and confirmed deletion are implemented. Typed legacy intents, BLE Tools, archive/title and model continuation remain pending. |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
@@ -100,7 +100,7 @@ Historical validation (2026-10-03; superseded environment status): 35 isolated s
 
 ✅ ADR0103 failure isolation refinement: retained Action reports preserve later exceptions; invocation/resource rejection is call-local; Tools distinguish execution and feedback failures, with joined cooperative deadlines and task-scoped cancellation. ❌ Uncooperative handlers and physical acceptance remain outstanding.
 
-✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
+✅ Canonical ActionFunction owns static timeout and request-dependent execution budgets (including NexArm), shared by both call protocols. FunctionExecutor uses the declared budget before its30-second default; invalid explicit declarations fail without fallback. @Action creates protocol-neutral factories; host bindings select protocol/runtime policy. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
 
 ✅ [ADR 0112: Gemma CoreAI chat](adr/0112-gemma-coreai-chat.md) replaces local Qwen/MLX with Gemma 4 E2B QAT CoreAI. iOS uses pinned h18p AOT resources; old Qwen downloads are incompatible. Shared package dependencies require OS 26; CoreAI execution requires OS 27. ✅ Mac real inference, cancellation and reload passed. ❌ Sustained device acceptance remains pending.
 
@@ -124,7 +124,7 @@ Adaptive validation: 21 filtered vision/UI tests, source formatting, module/reso
 
 Fusion validation: 28 explicitly selected vision/UI tests, module/resource boundaries, changed-source formatting, project plist and unsigned generic iOS device build passed. Full check.sh was excluded by the user’s no-robot-test instruction; the known simulator CoreAI limitation remains. No robot tests or hardware actions were run. Physical small-target/exposure sensitivity, sustained latency/thermal behavior and UI acceptance remain pending.
 
-✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
 
 ✅ AgentCore/domain separation places pose and speech message values in Agents/Communication, application Agent names in Agents, and automatic speech guidance in Assistant. Core has zero project dependencies; scheduling completion requires explicit source. ✅ Generic message/schema registration, domain freshness policy, explicit host input adaptation and Agent-owned sample transport are implemented in stage 2. See [ADR0115](adr/0115-agentcore-domain-separation.md).
 
@@ -229,3 +229,13 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ✅ ADR0150–0157: shared cooperative execution, one Actions source tree, six domain catalogs and cohesive entry files, explicit serialization keys, three-field paths and v6 native bindings, one canonical definition/outcome/handler, direct/scheduled adapters and retired Tools/ToolRuntime targets. Scheduled native calls preserve resource/serialization admission, original handler context, one typed feedback and joined cancellation.
 
 ❌ Next Agent-driven stages: complete Action/activity original-root propagation, typed host intent/control producers, remaining settings/device entry points and registered failure presentation, then bounded result-driven model continuation. These are feature migration tasks rather than unfinished Action/Tool source consolidation. Physical/native/model acceptance remains separate from fixture and build evidence.
+
+✅ [ADR0158 — Unified Action authoring](adr/0158-unified-action-authoring.md): one @Action attribute for all capabilities; model context supplies text actions and request tools supplies native declarations. Text tags and native events retain distinct ActionCall/ToolCall transports.
+
+✅ [ADR0159 — Protocol-independent invocations](adr/0159-protocol-independent-action-invocations.md) removed native-only business signatures. ADR0161 completes the boundary with one FunctionInput/context/handler and @Action metadata; ActionInvocation remains a Gateway scheduling adapter. Differences remain in registration, model transport/parsing, runtime admission and feedback.
+
+✅ [ADR0160 — Callable functions and protocol bindings](adr/0160-callable-functions-and-protocol-bindings.md): pure ActionFunction catalogs and @Action metadata; host-owned ActionBinding profiles select protocols/runtime feedback. Business errors and UI payloads are protocol-neutral. Shared execution consumes only the function. Remaining work: external feature Signal migration, Agent continuation, additional device/navigation capabilities and physical acceptance.
+
+✅ [ADR0161 — Gateway execution and isolated function contracts](adr/0161-gateway-execution-and-function-contracts.md): standard FunctionInput contracts under Actions/Contracts; common ExecutionRuntime under Gateway/Runtime; isolated CallRuntime registration/adapters under Gateway/Output. Actions has no execution/protocol imports and Channel stays outside the common request. Validation is recorded in Validation-History.md.
+
+✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](adr/0162-invocation-failure-isolation.md).

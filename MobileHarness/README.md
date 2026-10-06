@@ -24,7 +24,7 @@ The system is divided into four groups. App is the composition root and lifetime
 | --- | --- | --- |
 | Host and interaction | App, UI | Assemble the process, own application/session lifetime and present state. |
 | Cognition and coordination | Agents, AgentCore, Gateway | Interpret signals, retain cognitive state and validate communication/execution. |
-| Behavior execution | Actions, ActionRuntime | Define concrete skills and execute trusted invocations. |
+| Behavior implementation and execution | Actions; Gateway execution SDKs | Define protocol-neutral functions; register and execute permitted calls through Gateway. |
 | Foundations | ModelKit, PlatformKit, Storage, Resources | Supply processing, device I/O, retained data and packaged artifacts. |
 
 ```mermaid
@@ -87,7 +87,7 @@ flowchart TB
 
 - **App assembles and owns lifetime.** It constructs Agents, Gateways, behavior registries, workflows and shared services, then injects role-specific interfaces. It does not become a global container that modules query at runtime.
 - **Agents generate behavior.** They interpret input, use injected foundational capabilities and emit resolved Agent messages, `ActionCall`, `ToolCall` and scheduling controls through OutputGateway. The current Agents target uses ModelKit and StorageAudio/StorageChat; the architecture also permits a scoped PlatformKit capability when an Agent has a concrete need.
-- **Actions and Tools execute behavior.** Either may use injected ModelKit or PlatformKit capabilities required by its contract. Current Actions uses PlatformKit; current Tools uses neither SDK and operates through App-bound endpoints. Adding a dependency requires a concrete implementation need and must preserve the Runtime targets' independence.
+- **Actions implement behavior.** Canonical functions use injected capabilities and are registered for scheduled ActionCall or native ToolCall through Gateway. Current Actions uses PlatformKit and App-bound endpoints. Adding a dependency requires a concrete implementation need and must preserve execution SDK independence.
 - **Gateway mediates Agent boundaries.** External input, Agent-to-Agent messages, generated Action/Tool calls, Tool results and Action/runtime feedback cross Gateway validation. Gateway does not mediate ordinary ModelKit, PlatformKit or Storage capability calls, nor App/UI feature-workflow operations.
 - **Observable Agent-selected effects remain explicit.** An Agent may use foundational capabilities internally, but device commands, presentation changes and other complete business effects selected by the Agent are emitted as permitted Actions or Tools. App lifecycle code may use PlatformKit directly for host-owned capture, preview and connection workflows.
 
@@ -114,11 +114,18 @@ flowchart TB
     Agents --> StorageAudio
 
     Gateway --> AgentCore
-    Gateway --> ActionRuntime
+    Gateway --> FunctionContracts
+    Gateway --> ExecutionRuntime
+    Gateway --> CallRuntime
+    CallRuntime --> ExecutionRuntime
+    CallRuntime --> FunctionContracts
+    ExecutionRuntime --> FunctionContracts
 
     Assembly --> Actions
-    Assembly --> ActionRuntime
-    Actions --> ActionRuntime
+    Assembly --> FunctionContracts
+    Assembly --> ExecutionRuntime
+    Assembly --> CallRuntime
+    Actions --> FunctionContracts
     Actions --> PlatformKit
 
     Workflows --> UI
@@ -131,7 +138,9 @@ flowchart TB
     Workflows --> Agents
     Workflows --> Gateway
     Workflows --> AgentCore
-    Workflows --> ActionRuntime
+    Workflows --> FunctionContracts
+    Workflows --> ExecutionRuntime
+    Workflows --> CallRuntime
 
     Actions --> StorageChat
     StorageChat --> Storage
@@ -143,7 +152,7 @@ flowchart TB
     Adapters --> ModelKit
 ```
 
-The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `ActionRuntime`, `Storage` and `AgentCore` have no project dependencies. Tools/ToolRuntime compatibility targets are removed; ActionRuntime is the independent execution SDK. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
+The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `FunctionContracts`, `Storage` and `AgentCore` have no project dependencies. Tools/ToolRuntime compatibility targets are removed; FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -181,10 +190,11 @@ MobileHarness/
 │   ├── VisionPerception/
 │   └── Photographer/
 ├── Gateway/
+│   ├── Runtime/                 # ExecutionRuntime: common function execution
 │   ├── Input/                   # External/internal admission and delivery
 │   └── Output/                  # Validation, routing, scheduling, results/resources
 ├── Actions/
-│   ├── Runtime/                 # ActionRuntime: both invocation protocols
+│   ├── Contracts/               # FunctionContracts: protocol-neutral function interfaces
 │   ├── NexArm/
 │   ├── Speech/
 │   ├── History/
@@ -224,20 +234,22 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | Source path | Target | Direct project dependencies |
 | --- | --- | --- |
 | `App/` excluding package-owned subtrees | Xcode App targets | Host composition, adapters and lifecycle dependencies |
-| `App/Composition/Behaviors/` | BehaviorAssembly | Actions, ActionRuntime |
+| `App/Composition/Behaviors/` | BehaviorAssembly | Actions, FunctionContracts, ExecutionRuntime, CallRuntime |
 | `App/Workflows/` facade | AppWorkflows | Six feature workflow targets |
 | `App/Workflows/Settings/` | AppSettingsWorkflow | UI, Storage |
-| `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat, AgentCore, Agents, Gateway, Actions, ActionRuntime (staged intent transport) |
-| `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, ActionRuntime, PlatformKit |
-| `App/Workflows/Speech/` | AppSpeechPlayback | ActionRuntime, StorageAudio |
-| `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime |
+| `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat, AgentCore, Agents, Gateway, Actions, FunctionContracts, ExecutionRuntime, CallRuntime (staged intent transport) |
+| `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, FunctionContracts, ExecutionRuntime, CallRuntime, PlatformKit |
+| `App/Workflows/Speech/` | AppSpeechPlayback | FunctionContracts, StorageAudio |
+| `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, FunctionContracts |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
 | `UI/` | UI | StorageChat |
 | `Agents/Core/` | AgentCore | None |
 | `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, PlatformKit, StorageChat, StorageAudio |
-| `Gateway/` | Gateway | AgentCore, ActionRuntime |
-| `Actions/Runtime/` | ActionRuntime | None |
-| `Actions/` excluding `Runtime/` | Actions | ActionRuntime, PlatformKit, BehaviorDefinitions, StorageChat |
+| `Gateway/` excluding Runtime/Registration/Protocols | Gateway | AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime |
+| `Actions/Contracts/` | FunctionContracts | None |
+| `Gateway/Runtime/` | ExecutionRuntime | FunctionContracts |
+| `Gateway/Output/Registration/` and `Protocols/` | CallRuntime | FunctionContracts, ExecutionRuntime |
+| `Actions/` excluding `Contracts/` | Actions | FunctionContracts, PlatformKit, BehaviorDefinitions, StorageChat |
 | `Storage/` core | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
 | `Storage/Audio/` | StorageAudio | Storage |
@@ -249,6 +261,14 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `ModelKit/Backends/HuggingFace/` | ModelKitHub | ModelKitRuntime, HuggingFace product |
 | ModelKit adapters/backends | Separate targets | ModelKit or engine-specific backend targets |
 
+### Module README contract
+
+Every direct-child module README keeps this minimum order: **title → summary/design goals → upstream/downstream diagram → internal structure diagram**. Diagrams identify whether arrows mean runtime flow, injection or compile dependencies. Quote node labels containing Mermaid control characters (for example `@Action`). Avoid literal semicolons inside sequence messages/notes; use a sentence break or `<br/>`. Validate diagrams with a Mermaid parser, not only Markdown fence checks.
+
+After that core structure, explain the module's essential principles, rationale and technical mechanisms: ownership, contracts, state/lifetime, ordering, bounds/overflow, completion/failure and cancellation where applicable. Use a short comparison table or an additional flow/state/sequence diagram when it clarifies a real distinction. Keep detailed algorithms in owning subdirectory READMEs and link to them; do not replace important contracts with diagrams alone.
+
+Describe implemented behavior separately from migration targets using ✅/❌. Update the README when contracts or ownership change, and remove superseded claims rather than accumulating contradictory checkpoints. The architecture must not imply that every staged host workflow already enters Agents.
+
 ### Architectural boundaries
 
 - App owns concrete assembly, adaptation and application/session lifetime. Feature workflows expose typed operations and retain no global container access.
@@ -256,7 +276,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 - AgentCore is independent of concrete Agents, UI, model engines and device adapters.
 - All external inputs, Tool results and Action/runtime feedback enter through InputGateway; all Agent messages and executable outputs leave through OutputGateway.
 - Actions owns business behavior, motion shaping, composition and completion policy. PlatformKit owns native I/O, protocol encoding, hardware limits and device feedback.
-- ActionRuntime owns neutral execution contracts for both protocols; ActionRuntime re-exports them. Gateway owns scheduling, admission, result routing and shared resource coordination.
+- FunctionContracts owns standard callable input/output and ActionFunction metadata only. Gateway/Runtime (ExecutionRuntime) owns shared function registration/execution; Gateway/Output registration/protocol adapters (CallRuntime) own ActionBinding and calling policies. Gateway orchestration owns scheduling, admission, feedback and shared resource coordination.
 - ModelKit is a capability SDK. Provider registration/default selection belongs to ModelKitDefaults; process-wide model ownership belongs to ModelKitRuntime.
 - AgentCore/Input owns generic input transport; UI owns presentation values. Storage owns lifetime and retention, not inference or business policy.
 
@@ -275,10 +295,10 @@ This section is an architectural directory. It describes why each module exists 
 | [Agents](Agents/README.md) | Interpret observations, use processing/storage capabilities and select permitted outputs. | Cognitive state and policy; executable effects always cross OutputGateway. | Specialized brain regions. |
 | [AgentCore](Agents/Core/README.md) | Define Agent identity, input/output, capability, communication and lifecycle contracts. | Stable independent vocabulary; no concrete cognition or host services. | Organization of the nervous system. |
 | [Gateway](Gateway/README.md) | Validate input/output, route messages, schedule Actions and coordinate results/resources. | Coordination only; no inference or domain behavior implementation. | Neural pathways and motor coordination. |
-| [Actions](Actions/README.md) | Implement scheduled speech, expression and NexArm behavior. | Owns business parameters and completion policy; consumes injected native capabilities. | Learned motor skills. |
-| [ActionRuntime](Actions/Runtime/README.md) | Register and execute trusted Action invocations. | Neutral execution contracts; Channel/wait policy remains in Gateway. | Motor execution machinery. |
-| [Tools](Actions/README.md) | Implement direct System/UI/Camera/Robot functions with declared result semantics. | Current domains use injected endpoints and have no UI or PlatformKit import. | Immediate reflexes and focused functions. |
-| [ActionRuntime](Actions/Runtime/README.md) | Register and execute trusted Tool invocations. | No concrete Tool domain, Agent, UI or hardware dependency. | Direct function execution machinery. |
+| [Actions](Actions/README.md) | Implement callable UI, speech, camera, history, system and NexArm behavior. | Owns business parameters and completion policy; knows no calling protocol and consumes foundational/injected capabilities. | Learned behavior. |
+| [FunctionContracts](Actions/Contracts/README.md) | Define standard function inputs, outputs and constraints. | No runtime, Channel or calling protocol dependency. | Shared function contracts. |
+| [ExecutionRuntime](Gateway/Runtime/README.md) | Store and execute canonical functions. | Depends only on FunctionContracts; joined deadlines and cancellation. | Shared execution machinery. |
+| [CallRuntime](Gateway/Output/Registration/README.md) | Bind and adapt scheduled/native calls. | Depends on FunctionContracts and ExecutionRuntime; no AgentCore. | Calling protocol views. |
 | [ModelKit](ModelKit/README.md) | Expose typed speech, language and vision processing capabilities. | Base SDK knows neither Agent policy nor device I/O; engines live in adapters/backends. | Recognition and generation machinery. |
 | [PlatformKit](PlatformKit/README.md) | Capture/output media, manage links and expose native commands/feedback. | Device SDK only; no gestures, model inference, localization or workflow policy. | Sensory organs and effectors. |
 | [Storage](Storage/README.md) | Provide bounded transient storage and durable local records. | StorageAudio owns PCM handles; StorageChat owns conversation records; no routing or inference. | Short- and long-term retained material. |
@@ -290,7 +310,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation and response policy; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
 
-**Behavior.** Actions are scheduled, ordered skills with a completion boundary. Tools are direct calls with either a returned value or completion-only semantics. Their independent Runtime targets keep Gateway free from concrete behavior catalogs. BehaviorAssembly binds explicit domain modules without importing AgentCore.
+**Behavior.** Actions owns protocol-neutral callable functions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall follows its binding's direct or scheduled policy. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
 **Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates reusable mechanisms from Chat and Audio domains. ModelKit, PlatformKit and StorageAudio own their separate capability/storage contracts.
 
@@ -420,7 +440,7 @@ Natural text, Action tags, Channel scopes and nested wait groups are parsed incr
 | Dimension | ActionCall | ToolCall |
 | --- | --- | --- |
 | Resolution | Action path, arguments and effective Channel | Tool path and arguments |
-| Dispatch | OutputGateway → ChannelScheduler → ActionRuntime | OutputGateway → ActionRuntime.ToolExecutor |
+| Dispatch | OutputGateway → ChannelScheduler → CallRuntime → ExecutionRuntime | OutputGateway → CallRuntime.ToolExecutor → ExecutionRuntime |
 | Ordering | Task-local Channel FIFO and nested wait groups | Direct awaited execution; no Channel queue |
 | Completion | Registered handler boundary plus task finish barrier | Returned value or completion-only, fixed at registration |
 | Feedback | Optional correlated ActionResult and ActivityEvent | Returning ToolResult re-enters InputGateway |
@@ -434,7 +454,7 @@ flowchart LR
     Tree --> Heads[Eligible Channel FIFO heads]
     Heads --> Module[Process-wide Action-module exclusion]
     Module --> Resource[Declared resource coordinator]
-    Resource --> Runtime[ActionRuntime / handler]
+    Resource --> Runtime[FunctionContracts / handler]
     Runtime --> Result[Completion, failure or activity]
     Result --> Tree
     Result --> Feedback[Correlated feedback through InputGateway]
@@ -581,7 +601,7 @@ flowchart LR
     Vision <--> Pose[ModelKit pose capability]
     Vision --> Output[OutputGateway]
     Output -->|vision.pose observation| Input
-    Output -->|UI.Pose.showPose / UI.Gaze.moveEyes| Tools[ActionRuntime / UI Tools]
+    Output -->|UI.Pose.showPose / UI.Gaze.moveEyes| Tools[CallRuntime adapter / Actions UI function]
     Tools --> Adapter[App presentation adapter]
     Adapter --> UI[Camera overlay / gaze state]
 ```
@@ -600,7 +620,7 @@ FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-f
 
 Urgent YOLO detection permits a zero scheduling interval. The single inference worker processes only the newest pending capture after the active call completes. Normal inference duration adds no scheduling floor; compute-dominated freshness pressure can temporarily impose a bounded cost floor. Camera close clears skeleton and its statistics.
 
-UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies.
+UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; PoseOverlay remains the independently validated callable-function payload. App maps callable outcome values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies.
 
 ### Photographer tracking and control handoff
 
@@ -618,7 +638,7 @@ Agent fault isolation: ordinary messaging and behavior execution failures are ou
 flowchart LR
     Agent[Agent ActionCall] --> Gateway[OutputGateway / scheduler]
     Gateway --> AgentFence[Shared resource guard]
-    AgentFence --> Runtime[ActionRuntime]
+    AgentFence --> Runtime[FunctionContracts]
     Runtime --> Actions
     Settings[Bluetooth workflow user operation] --> Manual[Cancel prior writer / manual submission]
     Manual --> Actions[Shared Actions NexArm recipes]
@@ -802,8 +822,16 @@ Cloud ChatRequest carries JSON v6 Tools separately from the Action prompt. The c
 
 ## Completed executable capability consolidation — ADR0157
 
-✅ Actions owns all six domain implementations, cohesive entry files and canonical definitions. ActionRuntime independently owns shared handlers, completions, deadline/cancellation cleanup and protocol adapters. Tools/ToolRuntime compatibility targets and namespace aliases are removed; sources compile once.
+✅ Actions owns all six domain implementations, cohesive entry files and canonical definitions. FunctionContracts independently owns standard inputs/handlers/completions; ExecutionRuntime owns deadlines/cancellation cleanup and CallRuntime owns protocol adapters. Tools/ToolRuntime compatibility targets and namespace aliases are removed; sources compile once.
 
 ✅ Paths are Domain.Module.function; Agent configuration v6 explicitly binds native definitions to canonical paths while retaining model aliases. UI/Speech/NexArm serialization keys preserve exclusion. The same implementation can be projected to ActionCall and ToolCall with independent Agent permissions. Scheduled native calls use the same Channel/resource admission and joined cleanup, outside XML waits; typed native completion crosses InputGateway once.
 
 ❌ Remaining Agent-driven work: typed host intents/control producers, original Action/activity causal roots, registered failure presentation, remaining settings/device routes and bounded model continuation. Physical/native/model acceptance is separate from fixture/build checks.
+
+✅ ADR0159 unifies @Action metadata and invocation contracts; all business and injected endpoints receive one FunctionInput/ActionExecutionContext. Three-level ownership, existing availability/resources/deadlines and independent Agent grants are preserved.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160/0161: Actions catalogs expose pure ActionFunction values through Actions/Contracts (FunctionContracts). Gateway/Runtime (ExecutionRuntime) owns the canonical function registry and shared execution. Gateway/Output/Registration and Protocols (CallRuntime) own bindings and calling protocols; App/Composition/Behaviors freezes one function store and supplies grouped registration profiles. Business functions receive FunctionInput without Channel or protocol selection. ❌ Remaining feature Signal/Agent continuation and physical acceptance are separate.
+
+✅ ADR0161: Actions imports FunctionContracts only for callable metadata/input/output; it cannot see Gateway runtime/protocol types. Gateway/Runtime compiles as ExecutionRuntime, while Gateway/Output/Registration and Protocols compile as CallRuntime. Gateway excludes these shared sources and depends on their independent targets plus AgentCore. Standard FunctionRequest has no Channel; FunctionInput reporting is injected and runtime-owned. ❌ Remaining feature Signal/causal-root/continuation and physical acceptance remain separate.

@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import StorageAudio
 import Testing
 
@@ -52,4 +54,42 @@ private enum AuthoringFailure: Error { case device }
     }
     await #expect(throws: CancellationError.self) { try await task.value }
     #expect(await probe.ids.count == 1)
+}
+
+private struct UnifiedAuthoringToolModule: ToolModule {
+    let definitions: [ActionBinding]
+}
+
+private enum UnifiedAuthoringFixture {
+    @Action(
+        domain: "Fixture", module: "Control", title: "Shared native value", serializationKey: "fixture",
+        resources: [.init(rawValue: "fixtureResource")], timeout: .seconds(2))
+    public static func shared() {}
+}
+
+@Test func unifiedActionAttributeExecutesOneNativeHandlerThroughBothProtocols() async throws {
+    let definition = ActionBinding(
+        function: UnifiedAuthoringFixture.sharedDefinition(completing: { invocation in
+            .value(try ActionArguments(invocation.call.parameters).requiredString("value", maximumUTF8Bytes: 32))
+        }), protocols: [.action, .tool], executionPolicy: .scheduled(channel: "Fixture"), directResultPolicy: .returning
+    )
+    let actionRegistry = try ActionRegistry(definitions: [definition])
+    let nativeRegistry = try ToolRegistry(modules: [UnifiedAuthoringToolModule(definitions: [definition])])
+    let input = AgentInput(sessionID: UUID(), payload: .event("authoring"))
+    let invocation = ActionInvocation(
+        source: .assistant, input: input,
+        call: ActionCall(
+            actionPath: .init(domain: "Fixture", module: "Control", function: "shared"), channel: "Fixture",
+            parameters: ["value": "same outcome"]))
+    let scheduled = try await ActionExecutor(registry: actionRegistry).execute(invocation)
+    let native = try #require(
+        try await ToolExecutor(registry: nativeRegistry).execute(
+            ToolRequest(toolPath: "Fixture.Control.shared", arguments: ["value": "same outcome"]),
+            context: invocation.context))
+    #expect(scheduled == .value("same outcome"))
+    #expect(native.completion == scheduled && native.value == "same outcome")
+    #expect(definition.protocols == [.action, .tool])
+    #expect(definition.serializationKey == "fixture")
+    #expect(definition.resources == [.init(rawValue: "fixtureResource")])
+    #expect(definition.timeout == .seconds(2))
 }

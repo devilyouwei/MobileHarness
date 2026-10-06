@@ -41,7 +41,7 @@ See [resources](../Resources/README.md), [scheduling](../Scheduling/README.md) a
 
 ✅ The result ledger translates ActionCompletion into AgentActionCompletion before delivery, preserving every child result and execution-level failure.
 
-✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
+✅ ADR0098: Gateway imports AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
 
 ✅ OutputGateway.execute returns an OutputExecutionResult for ordinary validation/admission/execution failures. executionResults combines256 retained correlated output outcomes with the existing bounded Action execution snapshot; oldest output eviction is counted. Terminal controls join Actions before returning normal/error completion. This history is in-memory diagnostics, not durable storage.
 
@@ -72,6 +72,10 @@ Output failure/delivery descriptions are bounded to512 characters. Tool data and
 
 ❌ Sustained physical-device acceptance and durable error history remain pending.
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

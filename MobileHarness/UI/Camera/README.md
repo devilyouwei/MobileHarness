@@ -44,6 +44,6 @@ Sources compile once in the UI target; there is no App source membership for thi
 
 ✅ The upper-left panel also displays optional 0...1 image-motion activity with two decimals. This is Agent-supplied normalized evidence, not a threshold control or raw pixel-change percentage; UI still renders values only.
 
-✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.

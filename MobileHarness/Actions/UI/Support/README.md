@@ -1,74 +1,24 @@
 # UI Action Support
 
-Purpose: keep non-callable implementation support separate from registered entry points. Design goals: cohesive definitions, explicit typed injection, stable public names and no hidden registration.
+Purpose: assemble callable presentation functions and typed host endpoints. Design goals: protocol-neutral catalogs, explicit injection, bounded values and no SwiftUI/Agent dependency.
 
-UIModule and UIPresentationCapability define registration and host injection; UIActionTypes owns semantic emotion and validation errors.
+✅ UIModule.swift supplies ten ActionFunctions across Expression, Gaze, Caption, VoiceState, Pose and HistoryPresentation. UIPresentationCapabilities.swift declares expression/transition, update, pose and history endpoints; App injects their implementations. Catalogs select no call protocol, scheduler or native feedback policy.
 
-```mermaid
-flowchart LR
-    Capability[Host presentation capability] --> Module[UIModule]
-    Module --> Entry[UIActions.express / setExpression]
-    Types[Emotion / ExpressionError] --> Entry
-```
-
-✅ Sources compile once in Actions. Public visibility exists where App/test composition requires it; it does not grant model access. Definitions remain explicit, and Agent declarations remain the permission source. See the [domain contract](../README.md) for completion, lifetime, cancellation and limits.
-
-✅ This directory adds no queue or scheduler. Definitions and typed values introduce no background work, buffering or mutable runtime owner.
-
-❌ No automatic discovery or hidden host binding.
-
-✅ Entry attributes own displayName and completion metadata; the Support catalog binds handlers. Execution records carry this value; no App or UI switch enumerates domain actions. ❌ This is human-readable metadata, not model permission or a SwiftUI dependency.
-
-✅ Entry metadata is declared with `@Action`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
-
-✅ Presentation capability contracts consume module-owned Action context, without importing UI or AgentCore.
-
-✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
-
-✅ UIPresentationCapability separates awaited transition/restore from base-state commitment. Both entries share one module; unavailable/busy errors propagate without fallback. ❌ No looping Activity owner.
-
-## ToolCall protocol entries
-
-# UI Tool support
-
-Purpose: support immediate presentation tools without exposing implementation files as callable entries. The design keeps registration and host interfaces together, values separate, and stateful acceptance policy independently reusable.
-
-- ✅ `UIModule.swift`: eight completion-only definitions, `UIUpdateCapability`, `PosePresentationCapability` and `HistoryPresentationCapability`; App injects endpoints.
-- ✅ `UIToolTypes.swift`: `UIActions.Gaze`, `VoiceState` and validation errors; existing public names are preserved.
-- ✅ App-owned `App/Workflows/ConversationPresentation.swift`: current turn, transcript/reply flags and one sequence per six update kinds. New accepted turns reset bounded state; stale/duplicate updates are rejected. It owns no queue; App validates session identity.
-- ❌ Rendering acknowledgement and new host primitives are not implemented here.
+✅ UIActionTypes.swift owns expression values/errors. UIPresentationTypes.swift owns gaze, voice-state and update validation. PoseOverlay.swift owns decoded pose data, including optional timing/adaptive statistics. Domain errors provide neutral FunctionContracts producer codes.
 
 ```mermaid
 flowchart LR
-    Module[UIModule] --> Entries[UIActions functions]
-    Entries --> Capability[Injected presentation capability]
-    Capability --> Adapter[App endpoint]
-    Adapter --> Policy[AppWorkflows.ConversationPresentation acceptance]
-    Policy --> State[UI state]
+    Module[UIModule / pure function catalog] --> Entries[UIActions validation / composition]
+    Entries --> Capability[Typed injected presentation endpoint]
+    Capability --> Adapter[App session / turn adaptation]
+    Adapter --> Policy[AppWorkflows bounded acceptance]
+    Policy --> State[UI presentation state]
 ```
 
-The callback must complete before the Tool completes. Types and policy do not register themselves or grant Agent permissions.
+✅ Expression functions own awaited enter/restore composition and persistent-state commitment. Other presentation functions validate arguments and await the endpoint. Call protocol and completion-only/returning native feedback are chosen by host ActionBinding profiles; the same functions can be explicitly registered through either protocol.
 
-✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
+✅ App/Workflows/Presentation/ConversationPresentation.swift owns turn/sequence acceptance; camera adaptation owns session/frame acceptance. Support creates no runtime owner, queue or scheduler and grants no Agent permission.
 
-✅ Support contains capability interfaces and explicit bindings. ConversationPresentation moved to App/Workflows; Tools does not choose permitted Agent identities.
+❌ No automatic discovery, rendering acknowledgment for ordinary state updates or new host primitives. Physical animation/display acceptance remains separate.
 
-✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.
-
-✅ ToolPoseOverlay optionally decodes timing/FPS/replacement statistics independently of AgentCore. Validation rejects negative/nonfinite values and inconsistent total/queue/inference measurements; App converts the values at its existing boundary.
-
-✅ Optional detectionIntervalMilliseconds decodes independently of AgentCore and validates as finite, nonnegative and ≤1000ms; App maps it to the shared presentation value.
-
-✅ Optional imageMotion validates as finite 0...1. Legacy pose/statistics payloads without the field remain valid; no Agent/ModelKit dependency is added.
-
-✅ ADR0132: Domain validation/availability errors provide bounded ActionRuntime producer codes; generic execution and home observation preserve them without importing platform errors. ❌ Physical acceptance remains pending.
-
-✅ HistoryPresentationCapability carries scoped ToolInvocation for completion-only UI.HistoryPresentation.showHistory. ❌ Support does not read Storage or choose Agent identities.
-
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
-❌ Unified capability definitions and protocol registration adapters remain pending.
-
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
-❌ Unified callable definitions and migration of compatibility names remain pending.
-
-The current catalog is UIModule.swift. UIPresentationCapabilities.swift declares host endpoints; UIActionTypes.swift and UIPresentationTypes.swift hold domain values/errors. Both expression and gaze/display handlers are bound here; no separate UIActionModule or UIToolModule implementation remains.
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

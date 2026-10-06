@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import ModelKit
 import PlatformKit
@@ -71,7 +73,7 @@ private func sampleFrame() throws -> AudioFrame {
 
 private func preparedSpeech(
     text: String, input: AgentInput, probe: VoiceProbe, producesAudio: Bool = true
-) async throws -> (SpeechSynthesisAgent, SpeechAudioStore, SpeechPlayback, ActionInvocation) {
+) async throws -> (SpeechSynthesisAgent, SpeechAudioStore, SpeechPlayback, any FunctionInput) {
     let store = SpeechAudioStore()
     let agent = try SpeechSynthesisAgent(
         synthesis: SynthesisFixture(probe: probe, producesAudio: producesAudio), store: store)
@@ -118,8 +120,8 @@ private func preparedSpeech(
             }
         ]))
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.Caption.print") { call, envelope in
-        try await UIActions.print(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
+    try await tools.registerCompletion("UI.Caption.print") { invocation in
+        try await UIActions.print(invocation: invocation) { text, _ in
             await probe.displayed(text)
         }
     }
@@ -342,7 +344,8 @@ func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async 
         parameters: text.map { ["text": $0] } ?? [:])
     let invocation = ActionInvocation(source: .assistant, input: input, call: call)
     await #expect(throws: UIActions.PresentationError.invalidText) {
-        try await UIActions.print(invocation: uiToolInvocation(invocation)) { value, _ in await probe.displayed(value) }
+        try await UIActions.print(invocation: uiActionInvocation(invocation)) { value, _ in await probe.displayed(value)
+        }
     }
     #expect(throws: SpeechValidationError.invalidRequest) { _ = try SpeechSynthesisInput(text: text ?? "") }
     #expect(await probe.displayedText.isEmpty)
@@ -359,7 +362,7 @@ func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async 
     }
     let call = expectedActionCall(name: "print", parameters: ["text": text])
     let display = ActionInvocation(source: .assistant, input: input, call: call)
-    try await UIActions.print(invocation: uiToolInvocation(display)) { value, _ in await probe.displayed(value) }
+    try await UIActions.print(invocation: uiActionInvocation(display)) { value, _ in await probe.displayed(value) }
     #expect(await probe.spokenText == [text])
     #expect(await probe.displayedText == [text])
     #expect(await probe.audio.count == 1)
@@ -444,17 +447,18 @@ private actor EndpointVADSession: VoiceActivitySession {
     let captions = VoiceProbe()
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.VoiceState.setVoiceState") { call, envelope in
-        try await UIActions.setVoiceState(invocation: ToolInvocation(call: call, context: envelope)) { _, _ in }
+    try await tools.registerCompletion("UI.VoiceState.setVoiceState") { invocation in
+        try await UIActions.setVoiceState(invocation: invocation) { _, _ in }
     }
-    try await tools.registerCompletion("UI.Caption.finishTranscript") { call, envelope in
-        try await UIActions.finishTranscript(invocation: ToolInvocation(call: call, context: envelope)) { _ in
+    try await tools.registerCompletion("UI.Caption.finishTranscript") { invocation in
+        try await UIActions.finishTranscript(invocation: invocation) { _ in
             await captions.displayed("")
         }
     }
-    try await tools.registerCompletion("UI.Caption.setTranscript") { call, envelope in
-        #expect(envelope.source == AgentID.speechPerception.rawValue && envelope.sessionID == session)
-        try await UIActions.setTranscript(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
+    try await tools.registerCompletion("UI.Caption.setTranscript") { invocation in
+        #expect(
+            invocation.context.source == AgentID.speechPerception.rawValue && invocation.context.sessionID == session)
+        try await UIActions.setTranscript(invocation: invocation) { text, _ in
             await captions.displayed(text)
         }
     }
@@ -549,19 +553,20 @@ private actor EndpointVADSession: VoiceActivitySession {
         actionPath: .init(domain: "UI", module: "Caption", function: "setTranscript"), channel: "Transcript",
         parameters: ["text": ""])
     let invocation = ActionInvocation(source: .speechPerception, input: input, call: call)
-    try await UIActions.setTranscript(invocation: uiToolInvocation(invocation)) { value, _ in
+    try await UIActions.setTranscript(invocation: uiActionInvocation(invocation)) { value, _ in
         await probe.displayed(value)
     }
     #expect(await probe.displayedText == [""])
     await #expect(throws: CancellationError.self) {
-        try await UIActions.setTranscript(invocation: uiToolInvocation(invocation)) { _, _ in throw CancellationError()
+        try await UIActions.setTranscript(invocation: uiActionInvocation(invocation)) { _, _ in
+            throw CancellationError()
         }
     }
     for parameters in [[:], ["text": String(repeating: "a", count: 4097)]] {
         let invalid = ActionCall(actionPath: call.actionPath, channel: call.channel, parameters: parameters)
         await #expect(throws: UIActions.PresentationError.invalidText) {
             try await UIActions.setTranscript(
-                invocation: uiToolInvocation(ActionInvocation(source: .speechPerception, input: input, call: invalid))
+                invocation: uiActionInvocation(ActionInvocation(source: .speechPerception, input: input, call: invalid))
             ) { _, _ in Issue.record("Invalid caption reached presentation") }
         }
     }
@@ -587,8 +592,8 @@ private actor EndpointVADSession: VoiceActivitySession {
     let probe = VoiceProbe()
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.Caption.beginReplyTurn") { call, envelope in
-        try await UIActions.beginReplyTurn(invocation: ToolInvocation(call: call, context: envelope)) { _ in
+    try await tools.registerCompletion("UI.Caption.beginReplyTurn") { invocation in
+        try await UIActions.beginReplyTurn(invocation: invocation) { _ in
             await probe.displayed("reply and expression cleared atomically")
         }
     }

@@ -23,7 +23,7 @@ flowchart LR
     Cloud --> Join[Bounded per-index argument assembly]
     Join --> Call[Complete ChatEvent.toolCall]
     Call --> Resolve[AgentCore ToolCallParser and permission resolution]
-    Resolve --> Gateway[OutputGateway / ToolRuntime]
+    Resolve --> Gateway[OutputGateway / CallRuntime]
     Gateway --> Result[Existing InputGateway result feedback]
 ```
 

@@ -1,9 +1,11 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
 import CoreVideo
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import ModelKit
 import Testing
@@ -207,13 +209,13 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let recorder = OverlayRecorder()
     let actions = ChannelScheduler(registry: try testActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.Gaze.moveEyes") { call, envelope in
-        try await UIActions.moveEyes(invocation: ToolInvocation(call: call, context: envelope)) { target, _ in
+    try await tools.registerCompletion("UI.Gaze.moveEyes") { invocation in
+        try await UIActions.moveEyes(invocation: invocation) { target, _ in
             #expect(target.x == 0 && target.y == 0)
         }
     }
-    try await tools.registerCompletion("UI.Pose.showPose") { call, envelope in
-        try await UIActions.showPose(call: call, context: envelope) { overlay, _ in
+    try await tools.registerCompletion("UI.Pose.showPose") { invocation in
+        try await UIActions.showPose(invocation: invocation) { overlay, _ in
             #expect(overlay.people.isEmpty)
             await recorder.record(overlay.sequence)
         }
@@ -270,11 +272,13 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     )
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
     await #expect(throws: UIActions.PoseError.invalidPayload) {
-        try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { _, _ in
+        try await UIActions.showPose(
+            invocation: ActionInvocation(tool: call.executionRequest, context: envelope.executionContext)
+        ) { _, _ in
             Issue.record("Invalid pose reached UI")
         }
     }
-    let point = PoseOverlay.Joint(x: 2500, y: 7500, confidence: 1000)
+    let point = UI.PoseOverlay.Joint(x: 2500, y: 7500, confidence: 1000)
     #expect(point.sensorPoint(rotation: 0).x == 0.25)
     #expect(point.sensorPoint(rotation: 1).x == 0.75)
     #expect(point.sensorPoint(rotation: 1).y == 0.75)
@@ -321,12 +325,15 @@ private struct CrowdPose: PoseCapability {
         return
     }
     #expect((call.arguments["payload"]?.utf8.count ?? Int.max) <= 3000)
-    try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+    try await UIActions.showPose(
+        invocation: ActionInvocation(tool: call.executionRequest, context: envelope.executionContext)
+    ) {
+        overlay, _ in
         #expect(overlay.statistics?.isValid == true)
         #expect(overlay.statistics?.inferenceMilliseconds != nil)
         #expect(overlay.people.count == 6)
         #expect(overlay.people.allSatisfy { $0.count == 17 })
-        #expect(overlay.people[0][0] == ToolPoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
+        #expect(overlay.people[0][0] == Actions.PoseOverlay.Joint(x: 5000, y: 7500, confidence: 900))
     }
     let gazeEnvelope = try #require(await stream.next())
     guard case .toolCall(let gazeCall) = gazeEnvelope.output else {
@@ -334,7 +341,7 @@ private struct CrowdPose: PoseCapability {
         return
     }
     #expect(gazeEnvelope.sequence == 1 && gazeEnvelope.sessionID == session)
-    try await UIActions.moveEyes(invocation: ToolInvocation(call: gazeCall, envelope: gazeEnvelope)) { gaze, _ in
+    try await UIActions.moveEyes(invocation: ActionInvocation(call: gazeCall, envelope: gazeEnvelope)) { gaze, _ in
         #expect(abs(gaze.x) < 0.001 && gaze.y > 0)
     }
     await agent.stop()
@@ -362,7 +369,10 @@ private struct CrowdPose: PoseCapability {
         Issue.record("Missing tool")
         return
     }
-    try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+    try await UIActions.showPose(
+        invocation: ActionInvocation(tool: call.executionRequest, context: envelope.executionContext)
+    ) {
+        overlay, _ in
         #expect(overlay.sequence == 9)
     }
     await agent.stop()
@@ -479,7 +489,9 @@ private actor BlockedPosePublication {
             Issue.record("Missing tool")
             return
         }
-        try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+        try await UIActions.showPose(
+            invocation: ActionInvocation(tool: call.executionRequest, context: envelope.executionContext)
+        ) { overlay, _ in
             #expect(overlay.sequence == i)
         }
         guard case .toolCall = try #require(await displays.next()).output else {
@@ -617,10 +629,13 @@ private struct FailingSecondPose: PoseCapability {
         return
     }
     let payload = try #require(call.arguments["payload"])
-    let presentation = try JSONDecoder().decode(PoseOverlay.self, from: Data(payload.utf8))
+    let presentation = try JSONDecoder().decode(UI.PoseOverlay.self, from: Data(payload.utf8))
     #expect(presentation.sequence == frame.sequence)
     #expect(presentation.rotation == frame.rotation)
-    try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+    try await UIActions.showPose(
+        invocation: ActionInvocation(tool: call.executionRequest, context: envelope.executionContext)
+    ) {
+        overlay, _ in
         let statistics = try #require(overlay.statistics)
         #expect(presentation.people.count == overlay.people.count)
         #expect(presentation.statistics?.inferenceMilliseconds == statistics.inferenceMilliseconds)
@@ -637,18 +652,18 @@ private struct FailingSecondPose: PoseCapability {
 
 @Test func poseStatisticsRemainOptionalAndRejectInvalidMeasurements() throws {
     let legacy = Data(#"{"sequence":1,"timestamp":0,"rotation":0,"people":[]}"#.utf8)
-    #expect(try JSONDecoder().decode(PoseOverlay.self, from: legacy).statistics == nil)
-    #expect(try JSONDecoder().decode(ToolPoseOverlay.self, from: legacy).statistics == nil)
-    let valid = ToolPoseOverlay.Statistics(
+    #expect(try JSONDecoder().decode(UI.PoseOverlay.self, from: legacy).statistics == nil)
+    #expect(try JSONDecoder().decode(Actions.PoseOverlay.self, from: legacy).statistics == nil)
+    let valid = Actions.PoseOverlay.Statistics(
         queueMilliseconds: 10, inferenceMilliseconds: 20, totalMilliseconds: 30,
         framesPerSecond: 10, replacements: 2)
     #expect(valid.isValid)
-    let invalid = ToolPoseOverlay.Statistics(
+    let invalid = Actions.PoseOverlay.Statistics(
         queueMilliseconds: 10, inferenceMilliseconds: 20, totalMilliseconds: 15,
         framesPerSecond: 10, replacements: 2)
     #expect(!invalid.isValid)
     #expect(
-        !ToolPoseOverlay.Statistics(
+        !Actions.PoseOverlay.Statistics(
             queueMilliseconds: nil, inferenceMilliseconds: .nan, totalMilliseconds: nil,
             framesPerSecond: nil, replacements: 0
         ).isValid)
@@ -761,25 +776,26 @@ private func cadencePose(
 }
 
 @Test func poseAdaptiveIntervalStatisticsPreserveLegacyPayloadsAndBounds() throws {
-    let legacy = PoseOverlay(
+    let legacy = UI.PoseOverlay(
         sequence: 1, timestamp: 0, rotation: 0, people: [],
-        statistics: PoseOverlay.Statistics(
+        statistics: UI.PoseOverlay.Statistics(
             queueMilliseconds: 1, inferenceMilliseconds: 2, totalMilliseconds: 3,
             framesPerSecond: 10, replacements: 0))
-    let decoded = try JSONDecoder().decode(ToolPoseOverlay.self, from: JSONEncoder().encode(legacy))
+    let decoded = try JSONDecoder().decode(Actions.PoseOverlay.self, from: JSONEncoder().encode(legacy))
     #expect(decoded.statistics?.detectionIntervalMilliseconds == nil)
     #expect(decoded.statistics?.imageMotion == nil)
     #expect(decoded.statistics?.isValid == true)
     #expect(
-        !ToolPoseOverlay.Statistics(
+        !Actions.PoseOverlay.Statistics(
             queueMilliseconds: nil, inferenceMilliseconds: 1, totalMilliseconds: nil,
             framesPerSecond: nil, replacements: 0, detectionIntervalMilliseconds: 1001
         ).isValid)
-    let maximum = PoseOverlay(
+    let maximum = UI.PoseOverlay(
         sequence: UInt64.max, timestamp: 123456.789, rotation: 3,
         people: Array(
-            repeating: Array(repeating: PoseOverlay.Joint(x: -10000, y: 20000, confidence: 1000), count: 17), count: 6),
-        statistics: PoseOverlay.Statistics(
+            repeating: Array(repeating: UI.PoseOverlay.Joint(x: -10000, y: 20000, confidence: 1000), count: 17),
+            count: 6),
+        statistics: UI.PoseOverlay.Statistics(
             queueMilliseconds: 100, inferenceMilliseconds: 150, totalMilliseconds: 250,
             framesPerSecond: 6.666666666666667, replacements: Int.max, detectionIntervalMilliseconds: 250,
             imageMotion: 1))
@@ -925,17 +941,17 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
 
 @Test func poseImageMotionStatisticsRejectOutOfRangeAndNonfiniteActivity() throws {
     for activity in [-0.1, 1.1, Double.nan, Double.infinity] {
-        let statistics = ToolPoseOverlay.Statistics(
+        let statistics = Actions.PoseOverlay.Statistics(
             queueMilliseconds: nil, inferenceMilliseconds: 1, totalMilliseconds: nil,
             framesPerSecond: nil, replacements: 0, imageMotion: activity)
         #expect(!statistics.isValid)
     }
-    let overlay = PoseOverlay(
+    let overlay = UI.PoseOverlay(
         sequence: 1, timestamp: 0, rotation: 0, people: [],
-        statistics: PoseOverlay.Statistics(
+        statistics: UI.PoseOverlay.Statistics(
             queueMilliseconds: nil, inferenceMilliseconds: 1, totalMilliseconds: nil,
             framesPerSecond: nil, replacements: 0, imageMotion: 0.5))
-    let decoded = try JSONDecoder().decode(ToolPoseOverlay.self, from: JSONEncoder().encode(overlay))
+    let decoded = try JSONDecoder().decode(Actions.PoseOverlay.self, from: JSONEncoder().encode(overlay))
     #expect(decoded.statistics?.imageMotion == 0.5)
     #expect(decoded.statistics?.isValid == true)
 }
@@ -943,13 +959,13 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
 @Test func poseSharedJointRejectsMalformedArraysWithoutAgentErrors() throws {
     let decoder = JSONDecoder()
     #expect(
-        try decoder.decode(PoseOverlay.Joint.self, from: Data("[1,2,3]".utf8))
-            == PoseOverlay.Joint(x: 1, y: 2, confidence: 3))
+        try decoder.decode(UI.PoseOverlay.Joint.self, from: Data("[1,2,3]".utf8))
+            == UI.PoseOverlay.Joint(x: 1, y: 2, confidence: 3))
     #expect(throws: DecodingError.self) {
-        try decoder.decode(PoseOverlay.Joint.self, from: Data("[1,2,3,4]".utf8))
+        try decoder.decode(UI.PoseOverlay.Joint.self, from: Data("[1,2,3,4]".utf8))
     }
     #expect(throws: DecodingError.self) {
-        try decoder.decode(PoseOverlay.Joint.self, from: Data("[1,2]".utf8))
+        try decoder.decode(UI.PoseOverlay.Joint.self, from: Data("[1,2]".utf8))
     }
 }
 

@@ -49,14 +49,33 @@ if {next(iter(d.values()))[0] for d in hub_target['dependencies']} != {'ModelKit
     errors.append('ModelKitHub must depend only on Management contracts and the concrete Hub SDK')
 # Consolidated source ownership must retain an acyclic, non-overlapping build map.
 targets = {t['name']: t for t in package['targets']}
-runtime_target = targets.get('ActionRuntime', {})
-if runtime_target.get('path') != 'MobileHarness/Actions/Runtime' or runtime_target.get('dependencies', []):
-    errors.append('ActionRuntime must remain an independent execution target')
-for source in (ROOT / 'MobileHarness/Actions/Runtime').rglob('*.swift'):
-    if any(module not in {'Foundation', 'Synchronization'} for module in re.findall(r'\bimport\s+(\w+)', source.read_text())):
-        errors.append(f'Business dependency in ActionRuntime: {source.relative_to(ROOT)}')
-if 'Runtime' not in targets['Actions'].get('exclude', []):
-    errors.append('Actions must exclude its independent Runtime target')
+for target_name, path, dependencies in (
+    ('FunctionContracts', 'MobileHarness/Actions/Contracts', set()),
+    ('ExecutionRuntime', 'MobileHarness/Gateway/Runtime', {'FunctionContracts'}),
+    ('CallRuntime', 'MobileHarness/Gateway/Output', {'FunctionContracts', 'ExecutionRuntime'}),
+):
+    target = targets.get(target_name, {})
+    actual = {next(iter(d.values()))[0] for d in target.get('dependencies', [])}
+    if target.get('path') != path or actual != dependencies:
+        errors.append(f'Invalid isolated execution target {target_name}: {actual}')
+    folders = [ROOT / path] if target_name != 'CallRuntime' else [ROOT / path / 'Registration', ROOT / path / 'Protocols']
+    for folder in folders:
+        for source in folder.rglob('*.swift'):
+            imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
+            if imports - dependencies - {'Foundation', 'Synchronization'}:
+                errors.append(f'Forbidden isolated execution import: {source.relative_to(ROOT)}')
+if {next(iter(d.values()))[0] for d in targets['FunctionContractTests'].get('dependencies', [])} != {'FunctionContracts'}:
+    errors.append('FunctionContractTests must prove contracts without execution/call dependencies')
+if {next(iter(d.values()))[0] for d in targets['Gateway'].get('dependencies', [])} != {'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}:
+    errors.append('Gateway must depend only on AgentCore and the three isolated execution SDKs')
+if 'Contracts' not in targets['Actions'].get('exclude', []):
+    errors.append('Actions must exclude its independent FunctionContracts source target')
+if {next(iter(d.values()))[0] for d in targets['Actions'].get('dependencies', [])} != {'FunctionContracts', 'PlatformKit', 'BehaviorDefinitions', 'StorageChat'}:
+    errors.append('Actions must not depend on Gateway, execution or call protocol targets')
+if 'Runtime' not in targets['Gateway'].get('exclude', []) or 'Output/Registration' not in targets['Gateway'].get('exclude', []) or 'Output/Protocols' not in targets['Gateway'].get('exclude', []):
+    errors.append('Gateway must exclude separately compiled execution and protocol sources')
+if 'ActionRuntime' in targets or (ROOT / 'MobileHarness/Actions/Runtime').exists():
+    errors.append('Retired Actions/Runtime target/source tree must not return')
 for retired in ('Tools', 'ToolRuntime'):
     if retired in targets:
         errors.append(f'Retired compatibility target recreated: {retired}')
@@ -66,15 +85,15 @@ for retired in ('Tools', 'Actions/Compatibility'):
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     if re.search(r'\bimport\s+(?:Tools|ToolRuntime)\b', source.read_text()):
         errors.append(f'Retired compatibility import: {source.relative_to(ROOT)}')
-for path in ('Actions/Runtime/ActionDeadline.swift', 'Actions/Runtime/ToolExecutor.swift'):
+for path in ('Gateway/Runtime/ActionDeadline.swift', 'Gateway/Output/Protocols/ToolExecutor.swift'):
     content = (ROOT / 'MobileHarness' / path).read_text()
-    if ('CooperativeExecution.run' not in content and 'ActionExecutor.perform' not in content) or 'withThrowingTaskGroup' in content:
+    if ('CooperativeExecution.run' not in content and 'FunctionExecutor.perform' not in content) or 'withThrowingTaskGroup' in content:
         errors.append(f'Execution lifetime must use the shared ActionRuntime mechanism: {path}')
 if targets['AgentCore'].get('path') != 'MobileHarness/Agents/Core':
     errors.append('AgentCore must compile Agents/Core')
 if 'Core' not in targets['Agents'].get('exclude', []):
     errors.append('Agents must exclude the separately compiled Core directory')
-if not (ROOT / 'MobileHarness/Actions/Runtime/README.md').is_file():
+if not (ROOT / 'MobileHarness/Gateway/Runtime/README.md').is_file():
     errors.append('Missing consolidated execution Runtime')
 # Gateway is transport-only; AgentCore remains independent of models/platform/business.
 for module, forbidden in {
@@ -197,11 +216,11 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'Hidden application runtime lookup: {source.relative_to(ROOT)}')
 # Domain libraries cannot reach back into application composition or concrete services.
 for root, allowed in [
-    ('Actions', {'Foundation', 'Synchronization', 'PlatformKit', 'ActionRuntime'}),
-    ('App/Composition/Behaviors', {'Actions', 'Tools', 'ActionRuntime', 'ToolRuntime'}),
+    ('Actions', {'Foundation', 'Synchronization', 'PlatformKit', 'FunctionContracts'}),
+    ('App/Composition/Behaviors', {'Actions', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}),
 ]:
     for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
-        if root in {'Actions', 'Tools'} and source.relative_to(ROOT / 'MobileHarness' / root).parts[0] in {'Runtime', 'Compatibility'}:
+        if root in {'Actions', 'Tools'} and source.relative_to(ROOT / 'MobileHarness' / root).parts[0] in {'Contracts', 'Compatibility'}:
             continue  # Independent runtime imports are validated above, not as concrete domains.
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
             history_storage = (root == 'Actions' and source.relative_to(ROOT / 'MobileHarness/Actions').parts[0] == 'History' and imported == 'StorageChat')
@@ -211,12 +230,14 @@ for root, allowed in [
 behavior_target = targets.get('BehaviorAssembly', {})
 if behavior_target.get('path') != 'MobileHarness/App/Composition/Behaviors':
     errors.append('BehaviorAssembly must compile the isolated composition directory')
-if [next(iter(d.values()))[0] for d in behavior_target.get('dependencies', [])] != ['Actions', 'ActionRuntime']:
+if [next(iter(d.values()))[0] for d in behavior_target.get('dependencies', [])] != ['Actions', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime']:
     errors.append('BehaviorAssembly may depend only on behavior domains and execution runtimes')
 for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
     content = source.read_text()
-    if re.search(r'\b(?:ActionDefinition|ToolDefinition)\s*\(|\.registerCompletion\s*\(', content):
+    if re.search(r'\b(?:ActionFunction|ToolDefinition)\s*\(|\.registerCompletion\s*\(', content):
         errors.append(f'App contains per-function behavior registration: {source.relative_to(ROOT)}')
+    if 'Composition/Behaviors' not in str(source) and re.search(r'\bActionBinding\s*\(', content):
+        errors.append(f'App protocol bindings must stay in behavior composition: {source.relative_to(ROOT)}')
     if re.search(r'\b(?:UIActions|UITools|SystemTools|CameraTools)\.[a-z]\w*\s*\(', content):
         errors.append(f'App invokes a domain behavior helper: {source.relative_to(ROOT)}')
     if re.search(r'\bActionPath\s*\(|\.register\s*\(\s*"', content):
@@ -230,8 +251,29 @@ for source in (ROOT / 'MobileHarness/Actions').rglob('*.swift'):
         errors.append(f'Production Action imports a historical test algorithm: {source.relative_to(ROOT)}')
 # Canonical business domains own both protocols; source names do not classify by Tool versus Action.
 actions_root = ROOT / 'MobileHarness/Actions'
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    content = source.read_text()
+    if any(re.search(r'\b' + retired + r'\b', content) for retired in ('ToolInvocation', 'ToolExecutionContext', 'ToolHandler', 'ToolCompletionHandler')):
+        errors.append(f'Retired protocol-specific implementation contract: {source.relative_to(ROOT)}')
+for domain in ('UI', 'Speech', 'Camera', 'History', 'System', 'NexArm'):
+    for source in (actions_root / domain).rglob('*.swift'):
+        if re.search(r'\b(?:Tool\w*|ActionInvocation|ActionRequest|ActionBinding|CallProtocol|executionPolicy|directResultPolicy|protocols)\b', source.read_text()):
+            errors.append(f'Business implementation consumes native wire request: {source.relative_to(ROOT)}')
+macro_source = (actions_root / 'ActionMacro.swift').read_text()
+if re.search(r'\b(?:protocols|executionPolicy|directResultPolicy|ActionBinding|Tool\w*)\b', macro_source):
+    errors.append('@Action must describe callable functions without registration policies')
+if macro_source.count('public macro Action(') != 1:
+    errors.append('@Action must have one protocol-independent metadata signature')
+function_contract = (actions_root / 'Contracts/ActionFunction.swift').read_text()
+if re.search(r'\b(?:Tool\w*|ActionBinding|CallProtocol|protocols|executionPolicy|directResultPolicy)\b', function_contract):
+    errors.append('Callable ActionFunction must remain independent of registration/runtime protocols')
+macro_implementation = (ROOT / 'Macros/BehaviorDefinitions/BehaviorDefinitionMacro.swift').read_text()
+if 'ToolHandler' in macro_implementation or 'ToolCompletionHandler' in macro_implementation or 'ActionBinding' in macro_implementation:
+    errors.append('@Action factories must bind canonical handlers only')
+if (actions_root / 'ToolMacro.swift').exists():
+    errors.append('Retired @Tool macro must not be recreated')
 expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm'}
-domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Runtime', 'Compatibility'}
+domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Contracts', 'Compatibility'}
 if domains != expected_domains:
     errors.append(f'Executable business domains must be classified explicitly: {domains}')
 for folder, directories, files in os.walk(actions_root):
@@ -259,10 +301,8 @@ for name in sorted(expected_domains):
         for declared_domain, declared_module in re.findall(r'@Action\(\s*domain: "([^"]+)", module: "([^"]+)"', content):
             if (declared_domain, declared_module) != (name, expected_module):
                 errors.append(f'Invalid three-level Action metadata owner: {source.relative_to(ROOT)}')
-        for path in re.findall(r'@Tool\(\s*path: "([^"]+)"', content):
-            segments = path.split('.')
-            if len(segments) != 3 or segments[:2] != [name, expected_module]:
-                errors.append(f'Invalid three-level Tool metadata owner: {source.relative_to(ROOT)}: {path}')
+        if '@Tool(' in content:
+            errors.append(f'Capability entries must use unified @Action: {source.relative_to(ROOT)}')
     for source, content in sources.items():
         for function in re.findall(namespace_name + r'\.(\w+)Definition\(', content):
             if source.parent != domain / 'Support' or len(entries.get(function, [])) != 1:
@@ -271,7 +311,7 @@ for retired in ('ActionModules.swift', 'ToolModules.swift'):
     if (actions_root / retired).exists():
         errors.append(f'Production catalogs must use CapabilityModules instead of {retired}')
 assembly = (ROOT / 'MobileHarness/App/Composition/Behaviors/BehaviorAssembly.swift').read_text()
-if 'CapabilityModules.builtIn' not in assembly or 'CapabilityCatalog(modules:' not in assembly or 'catalog.actions' not in assembly or 'catalog.tools' not in assembly:
+if 'CapabilityModules.builtIn' not in assembly or 'CapabilityCatalog(modules:' not in assembly or 'bindings.actions' not in assembly or 'bindings.tools' not in assembly or 'BehaviorProtocolBindings.bind' not in assembly:
     errors.append('BehaviorAssembly must project both registries from one business-domain catalog')
 # Directory/module-file/function ownership is explicit while invocation paths migrate separately.
 entry_modules = {
@@ -301,7 +341,7 @@ for domain, modules in entry_modules.items():
 for domain in ('UI', 'Speech', 'NexArm'):
     for source in (actions_root / domain).glob('*.swift'):
         for metadata in re.findall(r'@Action\((.*?)\)\s*public static func', source.read_text(), re.S):
-            if f'serializationKey: "{domain}"' not in metadata:
+            if any(f'module: "{module}"' in metadata for module in ('Expression', 'Playback', 'Motion', 'Gesture')) and f'serializationKey: "{domain}"' not in metadata:
                 errors.append(f'Production serialization identity must remain explicit: {source.relative_to(ROOT)}')
 scheduler = (ROOT / 'MobileHarness/Gateway/Output/Scheduling/ChannelScheduler.swift').read_text()
 if 'busyModules' in scheduler or 'definition.serializationKey' not in scheduler or 'busySerializationKeys.contains(job.serializationKey)' not in scheduler:
@@ -328,10 +368,10 @@ for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Te
         errors.append(f'Retired Types import: {source.relative_to(ROOT)}')
 workflow_boundaries = {
     'Settings': ('AppSettingsWorkflow', {'UI', 'Storage'}),
-    'History': ('AppHistoryWorkflow', {'UI', 'StorageChat', 'AgentCore', 'Agents', 'Gateway', 'Actions', 'ActionRuntime'}),
-    'Bluetooth': ('AppBluetoothWorkflow', {'UI', 'AgentCore', 'Storage', 'Actions', 'ActionRuntime', 'PlatformKit'}),
-    'Speech': ('AppSpeechPlayback', {'ActionRuntime', 'StorageAudio'}),
-    'Presentation': ('AppPresentationWorkflow', {'UI', 'AgentCore', 'ActionRuntime'}),
+    'History': ('AppHistoryWorkflow', {'UI', 'StorageChat', 'AgentCore', 'Agents', 'Gateway', 'Actions', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}),
+    'Bluetooth': ('AppBluetoothWorkflow', {'UI', 'AgentCore', 'Storage', 'Actions', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime', 'PlatformKit'}),
+    'Speech': ('AppSpeechPlayback', {'FunctionContracts', 'StorageAudio'}),
+    'Presentation': ('AppPresentationWorkflow', {'UI', 'AgentCore', 'FunctionContracts'}),
     'Diagnostics': ('AppDiagnosticWorkflow', {'UI', 'ModelKit', 'PlatformKit'}),
 }
 for folder, (target, allowed) in workflow_boundaries.items():
@@ -346,7 +386,7 @@ for folder, (target, allowed) in workflow_boundaries.items():
 history_source_boundaries = {
     'ConversationHistoryWorkflow.swift': {'UI', 'StorageChat'},
     'HistoryIntentRuntime.swift': {'AgentCore', 'Agents', 'Gateway'},
-    'HistoryPresentationAdapter.swift': {'UI', 'StorageChat', 'Actions', 'ActionRuntime'},
+    'HistoryPresentationAdapter.swift': {'UI', 'StorageChat', 'Actions', 'FunctionContracts'},
 }
 for name, allowed in history_source_boundaries.items():
     source = ROOT / 'MobileHarness/App/Workflows/History' / name
@@ -444,7 +484,7 @@ if 'StorageChat' not in tool_dependencies:
     errors.append('History Tools require the explicit StorageChat dependency')
 for source in (ROOT / 'MobileHarness/Actions/History').rglob('*.swift'):
     imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
-    if imports - {'Foundation', 'ActionRuntime', 'StorageChat'}:
+    if imports - {'Foundation', 'FunctionContracts', 'StorageChat'}:
         errors.append(f'History Tools have non-foundational imports: {source.relative_to(ROOT)}')
 # Feature-specific presentation contracts must not return to Agent infrastructure.
 if (ROOT / "MobileHarness/Agents/Core/Output/PoseOverlay.swift").exists():
@@ -513,14 +553,19 @@ if audio_context.exists() and re.findall(r'^import (\w+)', audio_context.read_te
     errors.append('AudioCaptureContext must remain an independent native SDK fact value')
 
 # A domain owns one executable catalog; protocol adapters share definition/result types.
-if 'public typealias ToolDefinition = ActionDefinition' not in (actions_root / 'Runtime/Contracts/ToolDefinition.swift').read_text():
-    errors.append('Tool definitions must remain aliases of the canonical executable definition')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if re.search(r'\b(?:ToolDefinition|ToolResource)\b', source.read_text()):
+        errors.append(f'Retired protocol naming alias: {source.relative_to(ROOT)}')
+input_contract = (actions_root / 'Contracts/FunctionInput.swift').read_text()
+request_contract = (actions_root / 'Contracts/FunctionRequest.swift').read_text()
+if 'public protocol FunctionInput: Sendable' not in input_contract or re.search(r'\b(?:channel|protocols|ActionRequest|ToolRequest)\b', request_contract):
+    errors.append('Function contracts must expose standard input without call protocol or Channel')
 for source in actions_root.glob('*/Support/*Module.swift'):
     if ': CapabilityModule' in source.read_text() and 'public var definitions:' not in source.read_text():
         errors.append(f'Domain lacks canonical executable catalog: {source.relative_to(ROOT)}')
 
 for registry in ('ActionRegistry.swift', 'ToolRegistry.swift'):
-    if 'definition.validate()' not in (actions_root / 'Runtime' / registry).read_text():
+    if 'definition.validate()' not in (ROOT / 'MobileHarness/Gateway/Output/Registration' / registry).read_text():
         errors.append(f'Registry must use shared executable metadata validation: {registry}')
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.agent.json'):
     configuration = json.loads(source.read_text())
@@ -610,7 +655,7 @@ for source in KIT.rglob('*.swift'):
 print('ModelKit diagnostics remain independent of localized presentation.')
 
 # Execution Runtime must not regain concrete resources or device classification.
-for directory in ('Actions/Runtime',):
+for directory in ('Gateway/Runtime', 'Gateway/Output/Registration', 'Gateway/Output/Protocols'):
     for source in (ROOT / 'MobileHarness' / directory).rglob('*.swift'):
         content = source.read_text()
         if any(marker in content for marker in ('cameraCapture', '"camera.capture"', 'invalidPose', 'controlNotReady', 'feedbackTimeout', 'completionTimeout', 'feedbackLost', 'targetNotReached', 'sendingFailed')):
@@ -684,8 +729,8 @@ if any(marker in settings_source + settings_view for marker in ('detailDevice', 
     raise SystemExit('Bluetooth connection snapshots and page appearance must not mutate navigation or auto-open details.')
 if 'LabeledContent("通信"' in settings_view:
     raise SystemExit('Bluetooth communication issues belong to the combined connection status and current error.')
-tool_contract = (ROOT / 'MobileHarness/Actions/Runtime/Contracts/ToolResponse.swift').read_text()
-if 'FailureCode' not in tool_contract or 'ToolExecutionFailureProviding' not in tool_contract:
+tool_contract = (ROOT / 'MobileHarness/Gateway/Output/Protocols/ToolResponse.swift').read_text()
+if 'typealias FailureCode = ActionExecutionFailureCode' not in tool_contract or 'ActionExecutionFailureProviding' not in (actions_root / 'Contracts/ActionExecutionFailure.swift').read_text():
     raise SystemExit('Tools require independent bounded producer failure codes.')
 print('Latest Bluetooth status and independent Tool failure codes pass.')
 

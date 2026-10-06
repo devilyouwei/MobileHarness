@@ -20,7 +20,7 @@ MobileHarness uses an iPhone as a host for stateful Agents, shared model capabil
 | Presentation | Recognition/reply captions, expressions/gaze, spectrum and pose overlay. |
 | Robot | Foreground NexArm discovery/connection, manual controls and permitted Agent-selected movement. |
 | History/settings | Device-local configuration/credentials and persistent current/archived conversations. |
-| Runtime | Independent stateful Agents, validated communication, scheduled Actions and direct Tools. |
+| Runtime | Independent stateful Agents, validated communication, shared callable Actions and scheduled/native call protocols. |
 
 ```mermaid
 flowchart LR
@@ -28,7 +28,7 @@ flowchart LR
     Input --> Agents[Stateful Agents]
     Agents <--> Models[Model capabilities]
     Agents --> Output[OutputGateway]
-    Output --> Behaviors[Actions / Tools]
+    Output --> Behaviors[Callable Actions / shared execution]
     Behaviors --> Effects[Speech / UI / connected devices]
     Output -->|observations / results| Input
 ```
@@ -155,13 +155,10 @@ Sound direction: supported built-in microphone routes can provide FOA for Speech
 
 ✅ Settings → 音频识别 provides an explicit 10-second audio detection section with actual microphone/input mode, spatial support/fallback, level and current sound direction. The session reuses SpeechPerception/Gateway without starting conversation or robot consumers. See [ADR0128](docs/adr/0128-settings-audio-detection.md). ❌ Physical capture/coordinates remain unverified by synthetic tests.
 
-✅ Unified execution migration has started: Actions and Tools share cooperative deadline/cleanup lifetime. ❌ Unified capability registration and compatibility import removal remain pending; see [ADR0150](docs/adr/0150-unified-execution-lifetime.md).
+✅ Executable consolidation is complete: all six business domains use one @Action attribute and protocol-neutral FunctionInput/ActionCompletion contracts. App registers either or both call protocols explicitly; Agent JSON v6/code remains the permission authority. Gateway owns shared execution, deadlines, cancellation and protocol adapters. Legacy Tools/ToolRuntime shims and Actions/Runtime are removed; see [ADR0161](docs/adr/0161-gateway-execution-and-function-contracts.md).
 
-✅ Executable source directories are consolidated under Actions. Tools and ToolRuntime remain only as temporary Swift import shims; see [ADR0151](docs/adr/0151-consolidated-capability-sources.md). ❌ Unified capability definitions and dual-protocol registration remain pending.
-
-✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
-
-
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ Canonical addresses use Domain.Module.function. [Call routing](MobileHarness/Gateway/Output/Protocols/README.md#protocol-selection-one-function-two-call-paths) separates ActionCall/ToolCall transport from direct/scheduled native execution. Invocation failures preserve bounded child reports and causes without stopping unrelated work; see [ADR0162](docs/adr/0162-invocation-failure-isolation.md).
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

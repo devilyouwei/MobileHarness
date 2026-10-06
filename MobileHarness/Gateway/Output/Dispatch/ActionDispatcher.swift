@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// Dispatches resolved calls; alias resolution belongs to the Agent.
 /// The channel scheduler retains FIFO ordering and completion/cancellation barriers.

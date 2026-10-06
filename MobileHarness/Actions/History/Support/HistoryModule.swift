@@ -1,5 +1,5 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 public protocol HistoryQueryCapability: Sendable {
     func list(offset: Int, limit: Int) async throws -> String
@@ -17,16 +17,16 @@ public struct HistoryModule: CapabilityModule {
         self.history = history
         self.mutations = mutations
     }
-    public var definitions: [ToolDefinition] {
+    public var definitions: [ActionFunction] {
         [
-            HistoryActions.deleteDefinition(handler: { [mutations] call in
-                try await HistoryActions.delete(call: call, using: mutations)
+            HistoryActions.deleteDefinition(completing: { [mutations] invocation in
+                .value(try await HistoryActions.delete(invocation: invocation, using: mutations))
             }),
-            HistoryActions.listDefinition(handler: { [history] call in
-                try await HistoryActions.list(call: call, using: history)
+            HistoryActions.listDefinition(completing: { [history] invocation in
+                .value(try await HistoryActions.list(invocation: invocation, using: history))
             }),
-            HistoryActions.readDefinition(handler: { [history] call in
-                try await HistoryActions.read(call: call, using: history)
+            HistoryActions.readDefinition(completing: { [history] invocation in
+                .value(try await HistoryActions.read(invocation: invocation, using: history))
             }),
         ]
     }

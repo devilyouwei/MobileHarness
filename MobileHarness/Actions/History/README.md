@@ -1,4 +1,4 @@
-# History Tools
+# History Actions
 
 Purpose: expose conversation discovery, record previews and explicit archive-only deletion through the existing output boundary. Design goals: shared deterministic queries, bounded results, explicit truncation and no effect replay.
 
@@ -15,7 +15,7 @@ Both return JSON pages with items, total and optional nextOffset (absent at end)
 ```mermaid
 flowchart LR
     JSON[Assistant JSON declarations] --> Gateway[OutputGateway authorization]
-    Gateway --> Runtime[ActionRuntime]
+    Gateway --> Runtime[FunctionContracts]
     Runtime --> Entries[HistoryActions]
     Entries --> Service[HistoryQueryService: bounded projection]
     App[App composition] -.->|Inject shared journal| Service
@@ -23,19 +23,19 @@ flowchart LR
     Runtime -->|Correlated ToolResult| Input[InputGateway]
 ```
 
-✅ Tools depends on StorageChat for the concrete query implementation. Runtime and BehaviorAssembly retain their independent contracts; no new store, queue or Agent is added. See [Support](Support/README.md).
+✅ Actions/History depends on StorageChat for the concrete query implementation. Runtime and BehaviorAssembly retain their independent contracts; no new store, queue or Agent is added. See [Support](Support/README.md).
 
-✅ Refresh and confirmed deletion use the memory Agent intent route. ❌ Full-text export/search, archival, title inference and model result-driven continuation remain pending. Cloud native calls can invoke these Tools; local chat remains text-only. Current Assistant presents escaped Tool results without continued model reasoning.
+✅ Refresh and confirmed deletion use the memory Agent intent route. ❌ Full-text export/search, archival, title inference and model result-driven continuation remain pending. Cloud native calls can invoke these functions through host ToolCall bindings; local chat remains text-only. Current Assistant presents escaped Tool results without continued model reasoning.
 
-✅ History.Conversation.delete uses an injected HistoryMutationCapability. HistoryMutationService validates the archive against the shared journal and invokes its atomic transaction; Tools owns no UI or model effect. It returns a small JSON acknowledgment only after persistence succeeds. Cancellation before the transaction prevents the call; later cancellation cannot undo a committed write. No automatic retry or missing-ID success fallback.
+✅ History.Conversation.delete uses an injected HistoryMutationCapability. HistoryMutationService validates the archive against the shared journal and invokes its atomic transaction; Actions/History owns no UI or model effect. It returns a small JSON acknowledgment only after persistence succeeds. Cancellation before the transaction prevents the call; later cancellation cannot undo a committed write. No automatic retry or missing-ID success fallback.
 
 ❌ Assistant JSON exposes only read-only list/read; deletion is not model-callable in this stage.
 
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
-❌ Unified capability definitions and protocol registration adapters remain pending.
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
+✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
 
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
-❌ Unified callable definitions and migration of compatibility names remain pending.
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one pure `<Domain>Module`; host registration creates Action/Tool projections. Superseded aliases/protocol catalogs are retired.
+✅ Unified definitions and compatibility retirement are implemented in ADR0157.
 
 ## Cohesive module files — ADR0154
 
@@ -44,4 +44,10 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 - [ConversationActions.swift](ConversationActions.swift)
 
 ✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
-❌ Explicit three-field paths, versioned Agent configuration and unified definitions/results remain the next coordinated stage.
+✅ Three-field addresses, Agent v6 configuration and shared definitions/results are implemented in ADR0156/0157.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

@@ -26,6 +26,7 @@ import UI
         let generation = UUID()
         self.generation = generation
         operation = Task {
+            var terminalPhase: AudioDetectionState.Phase = .finished
             do {
                 try await endpoint.run { [weak self] snapshot in
                     guard let self, self.generation == generation, self.state.isActive,
@@ -39,18 +40,18 @@ import UI
                     }
                 }
                 try Task.checkCancellation()
-                state.phase = .finished
+                terminalPhase = .finished
             } catch is CancellationError {
-                state.phase = completed ? .finished : .stopped
+                terminalPhase = completed ? .finished : .stopped
             } catch {
                 if Task.isCancelled {
-                    state.phase = completed ? .finished : .stopped
+                    terminalPhase = completed ? .finished : .stopped
                 } else {
                     state.error = "检测失败：\(error.localizedDescription)"
                     if state.snapshot.permissionGranted == true && state.snapshot.capture == .waiting {
                         state.snapshot.signal = .noAudio
                     }
-                    state.phase = .failed
+                    terminalPhase = .failed
                 }
             }
             let previousMonitor = monitor
@@ -61,6 +62,7 @@ import UI
             state.clearDirection()
             self.generation = nil
             operation = nil
+            state.phase = terminalPhase
         }
         monitor = Task {
             do {

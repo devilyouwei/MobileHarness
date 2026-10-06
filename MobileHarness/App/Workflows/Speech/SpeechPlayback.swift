@@ -1,5 +1,5 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 import StorageAudio
 import Synchronization
 
@@ -8,8 +8,8 @@ public actor SpeechPlayback {
     private let store: SpeechAudioStore
     public init(store: SpeechAudioStore) { self.store = store }
     public func play(
-        audioID id: UUID, invocation: ActionInvocation,
-        using playback: @escaping @Sendable (SpeechAudio, ActionInvocation) async throws -> Void
+        audioID id: UUID, invocation: any FunctionInput,
+        using playback: @escaping @Sendable (SpeechAudio, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let owner = SpeechAudioStore.Owner(

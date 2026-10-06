@@ -1,20 +1,22 @@
-import ActionRuntime
 import Actions
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// Host adaptation only; gesture/execution business policy remains in Actions.
 @MainActor
 struct NexArmBehaviorAdapter {
     let bluetooth: BluetoothWorkflow
     let activity: ActionActivityWorkflow
-    func aim(_ base: Double, _ pitch: Double, _ invocation: ToolInvocation) async throws {
+    func aim(_ base: Double, _ pitch: Double, _ invocation: any FunctionInput) async throws {
         do {
             try await bluetooth.aim(
                 base: base, pitch: pitch,
                 origin: .init(
                     source: invocation.context.source, sessionID: invocation.context.sessionID,
-                    inputID: invocation.context.inputID, callID: invocation.call.id)
+                    inputID: invocation.context.inputID, callID: invocation.executionID)
             ) { [activity] failure in
                 await activity.recordFailure(
                     title: "NexArm.Tracking.aim", source: failure.origin?.source ?? "持续控制", message: failure.message,
@@ -24,12 +26,12 @@ struct NexArmBehaviorAdapter {
                         inputID: failure.origin?.inputID, callID: failure.origin?.callID))
             }
         } catch let error as NexArmExecutionError {
-            throw ToolExecutionFailure(
+            throw ActionExecutionFailure(
                 code: .init(rawValue: error.actionExecutionFailure.rawValue),
                 message: ActionReport.description(for: error))
         }
     }
-    func gesture(_ request: NexArmActions.GestureRequest, _ invocation: ActionInvocation) async throws {
+    func gesture(_ request: NexArmActions.GestureRequest, _ invocation: any FunctionInput) async throws {
         let composition = try ActionComposition(
             .action("gesture", [], maximumResults: 100) {
                 let reports = ActionReportStore()
@@ -73,7 +75,7 @@ struct NexArmBehaviorAdapter {
             })
         try await invocation.results.record(composition.run())
     }
-    func shakeBase(_ cycles: Int, _ invocation: ActionInvocation) async throws {
+    func shakeBase(_ cycles: Int, _ invocation: any FunctionInput) async throws {
         let reports = ActionReportStore()
         do {
             let args = ActionArguments(invocation.call.parameters)

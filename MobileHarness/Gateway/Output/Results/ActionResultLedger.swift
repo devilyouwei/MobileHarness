@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// Scheduler-owned bounded outbox: every feedback-producing admission reserves its terminal slot.
 struct ActionResultLedger {

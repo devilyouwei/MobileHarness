@@ -1,16 +1,15 @@
-import ActionRuntime
 import Foundation
+import FunctionContracts
 
 /// Speech.Playback function ownership; current invocation paths remain compatible.
 extension SpeechActions {
     /// Play an existing single-use audio handle; never synthesize text here.
     @Action(
         domain: "Speech", module: "Playback", title: "朗读回复", kind: .finite,
-        completion: "Playback drained and audio lease released.",
-        serializationKey: "Speech")
+        completion: "Playback drained and audio lease released.", serializationKey: "Speech")
     public static func speak(
-        invocation: ActionInvocation,
-        using play: @escaping @Sendable (UUID, ActionInvocation) async throws -> Void
+        invocation: any FunctionInput,
+        using play: @escaping @Sendable (UUID, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
         let id: UUID

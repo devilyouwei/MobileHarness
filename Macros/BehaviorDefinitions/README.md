@@ -1,43 +1,25 @@
-# Behavior definition macros
+# Callable Action Macro
 
-Purpose: keep metadata next to its canonical implementation. Design goal: eliminate duplicated paths/titles without changing runtime ownership.
+Purpose: declare intrinsic metadata beside a business function. Design goals: one attribute/signature, canonical invocation and explicit dependency injection.
 
 ```mermaid
 flowchart LR
-    Attribute[Action or Tool attribute] --> Compiler[SwiftSyntax peer macro]
-    Compiler --> Factory[Typed Definition factory]
-    Catalog[Domain Support catalog] --> Factory
-    Factory --> Registry[Runtime registry]
+    Attribute[Intrinsic @Action metadata] --> Compiler[SwiftSyntax peer macro]
+    Compiler --> Factory[ActionFunction factory]
+    Dependencies[Support catalog injection] --> Factory
+    Factory --> Catalog[Pure CapabilityModule]
+    Catalog --> Host[Host registration / protocol bindings]
 ```
 
-✅ Static functions receive two `nameDefinition` factories for returning/completing handlers. Action attributes accept an optional serializationKey and resource and budget resolver functions; Tool attributes accept resources and an optional Duration timeout; both generated factory overloads retain it. Swift validates types and captured values. SwiftSyntax603.0.2 is pinned to the already resolved dependency.
-
-❌ No runtime reflection, global registration, permission changes or injected-device construction. Invalid attachment produces a compiler diagnostic.
-
-## Authoring
+✅ @Action generates factories accepting ActionHandler or ActionCompletionHandler with FunctionInput. Functions may return ordinary values that their catalog adapts to ActionCompletion.value. Metadata includes address, kind/completion, serialization key, resources and constant/dynamic budgets.
 
 ```swift
-@Action(domain: "NexArm", module: "Gesture", title: "点头", kind: .finite,
-        completion: "Fresh arrival; retain failed child outcomes.",
-        serializationKey: "NexArm",
-        resources: NexArmRegistration.resources,
-        timeout: NexArmRegistration.budget)
-public static func nodHead(invocation: ActionInvocation, using perform: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void) async throws {
-    // Validate parameters and await the injected capability.
-}
+@Action(domain: "UI", module: "Gaze", title: "moveEyes", serializationKey: "UI")
+public static func moveEyes(invocation: any FunctionInput, using update: ...) async throws { ... }
 ```
 
-The domain Support catalog calls `NexArmActions.nodHeadDefinition(handler: ...)` or `completing: ...`. The attribute generates metadata factories, not dependency injection or argument validation. `@Tool(path: "UI.Caption.print", title: "print", resources: [], timeout: .seconds(5))` generates matching Tool factories. Ordinary constructors remain available for runtime-built definitions and tests.
+✅ Protocol availability, direct/scheduled execution and native feedback are absent from the attribute and generated ActionFunction. Host-created ActionBinding owns these policies; Agent configuration/code separately grants exposure and permission. Support catalogs explicitly bind dependencies and Swift checks captured values. Invalid attachment produces a compiler diagnostic. SwiftSyntax603.0.2 remains pinned.
 
-✅ Action factories now construct ActionIdentifier from Actions/Runtime/Contracts. Tool factories consume the same Runtime-owned definitions; no runtime Agent dependency is generated.
+❌ No runtime reflection, automatic permissions, global registration, dependency injection or physical/model acceptance. Native wire contracts remain in Runtime/Gateway/AgentCore.
 
-✅ Both generated Action factories retain serializationKey in definition metadata; the runtime registry validates it. ❌ Macros do not assign Agent permissions. The factory signature selects canonical implementation availability; Agent grants remain separate.
-
-✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
-
-
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
-
-❌ Physical acceptance and additional business capability exposure are not established by this migration.
-
-✅ Action and Tool attributes both construct ActionDefinition; Tool factories normalize request/context into the same handler contract. Distinct factory signatures are protocol adapters, not separate business metadata stores.
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

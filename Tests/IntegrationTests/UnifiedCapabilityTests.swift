@@ -1,12 +1,15 @@
-import ActionRuntime
 import Actions
 import AgentCore
+import BehaviorAssembly
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import Testing
 
-private struct UnifiedFixtureModule: CapabilityModule {
-    let definitions: [ActionDefinition]
+private struct UnifiedFixtureModule: ActionBindingModule {
+    let definitions: [ActionBinding]
 }
 private actor UnifiedFixtureLog {
     private(set) var values: [String] = []
@@ -14,27 +17,30 @@ private actor UnifiedFixtureLog {
 }
 
 @Test func oneImplementationReturnsTheSameValueThroughBothProtocols() async throws {
-    let log = UnifiedFixtureLog()
-    let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
-    let definition = ActionDefinition(
-        path: path, displayName: "Read", kind: .finite, completion: "Return the selected value.",
-        serializationKey: "fixture.query", protocols: [.action, .tool], directResultPolicy: .returning,
-        resolvingResources: { request in
-            [ActionResource(rawValue: "fixture." + (request.parameters["target"] ?? "missing"))]
-        }, estimatingDuration: { _ in try .init(expected: .zero, timeout: .seconds(2)) },
-        completing: { invocation in
-            await log.record(invocation.context.source)
-            return .value(invocation.call.parameters["target"] ?? "missing")
-        })
-    let module = UnifiedFixtureModule(definitions: [definition])
-    let actionRegistry = try ActionRegistry(modules: [module.actions])
-    let toolRegistry = try ToolRegistry(modules: [module.tools])
     let session = UUID()
     let input = UUID()
     let correlation = UUID()
     let context = ActionExecutionContext(
         source: "fixture", sessionID: session, inputID: input,
         sequence: 4, correlationID: correlation, ordinal: 2)
+    let log = UnifiedFixtureLog()
+    let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
+    let function = ActionFunction(
+        path: path, displayName: "Read", kind: .finite, completion: "Return the selected value.",
+        serializationKey: "fixture.query",
+        resolvingResources: { request in
+            [ActionResource(rawValue: "fixture." + (request.parameters["target"] ?? "missing"))]
+        }, estimatingDuration: { _ in try .init(expected: .zero, timeout: .seconds(2)) },
+        completing: { invocation in
+            #expect(invocation.context == context)
+            await log.record(invocation.context.source)
+            return .value(invocation.call.parameters["target"] ?? "missing")
+        })
+    let actionBinding = ActionBinding(function: function)
+    let toolBinding = ActionBinding(
+        function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+    let actionRegistry = try ActionRegistry(definitions: [actionBinding])
+    let toolRegistry = try ToolRegistry(modules: [UnifiedFixtureModule(definitions: [toolBinding]).tools])
     let scheduled = ActionInvocation(
         call: .init(actionPath: path, channel: "main", parameters: ["target": "one"]),
         context: context)
@@ -54,11 +60,13 @@ private actor UnifiedFixtureLog {
 
 @Test func oneGazeFunctionRunsScheduledAndDirectWithPreservedContext() async throws {
     let log = UnifiedFixtureLog()
-    let definition = UIActions.moveEyesDefinition(completing: { call, context in
-        try await UIActions.moveEyes(invocation: .init(call: call, context: context)) { _, invocation in
-            await log.record(invocation.context.source + ":" + String(invocation.context.sequence))
-        }
-    }).exposed(as: [.action, .tool])
+    let definition = ActionBinding(
+        function: UIActions.moveEyesDefinition(handler: { invocation in
+            try await UIActions.moveEyes(invocation: invocation) { _, invocation in
+                await log.record(invocation.context.source + ":" + String(invocation.context.sequence))
+            }
+        }), protocols: [.action, .tool], executionPolicy: .direct
+    ).exposed(as: [.action, .tool])
     let module = UnifiedFixtureModule(definitions: [definition])
     let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
@@ -79,7 +87,7 @@ private actor UnifiedFixtureLog {
 @Test func implementationProtocolAvailabilityDoesNotGrantAgentPermission() throws {
     let path = ActionPath(domain: "Fixture", module: "Query", function: "read")
     let module = UnifiedFixtureModule(definitions: [
-        ActionDefinition(path: path.description, handler: { _ in "ok" })
+        ActionBinding(path: path.description, handler: { _ in "ok" })
     ])
     let permissions = try CapabilityRegistry(internalActions: [
         InternalAction(domain: "Fixture", module: "Query", function: "read", channel: "main")
@@ -136,7 +144,7 @@ private actor UnifiedReceiptAgent: Agent {
     let cleaned = UnifiedGate()
     let log = UnifiedFixtureLog()
     let path = ActionIdentifier(domain: "Fixture", module: "Work", function: "run")
-    let definition = ActionDefinition(
+    let definition = ActionBinding(
         path: path, displayName: "Work", kind: .finite,
         completion: "Return after work or joined cleanup.", serializationKey: "fixture.work",
         protocols: [.action, .tool], executionPolicy: .scheduled(channel: "native"), directResultPolicy: .returning,
@@ -214,14 +222,177 @@ private actor UnifiedReceiptAgent: Agent {
 
 @Test func canonicalCatalogRejectsCrossProtocolDuplicatesAndHiddenInvalidMetadata() throws {
     let path = ActionIdentifier(domain: "Fixture", module: "Work", function: "run")
-    let scheduled = ActionDefinition(
+    let scheduled = ActionBinding(
         path: path, displayName: "Run", kind: .finite, completion: "Completed.", handler: { _ in })
-    let native = ActionDefinition(path: path.description, completing: { _, _ in })
+    let native = ActionBinding(path: path.description, completing: { _ in })
     #expect(throws: ActionExecutionError.duplicateDefinition(path)) {
-        try CapabilityCatalog(modules: [UnifiedFixtureModule(definitions: [scheduled, native])])
+        try ActionBindingCatalog(definitions: [scheduled, native])
     }
     let hidden = scheduled.exposed(as: [])
     #expect(throws: ActionExecutionError.invalidDefinition(path)) {
-        try CapabilityCatalog(modules: [UnifiedFixtureModule(definitions: [hidden])])
+        try ActionBindingCatalog(definitions: [hidden])
     }
+}
+
+@Test func normalizedNativeInvocationRetainsReportPrecedenceAndCallIdentity() async throws {
+    let id = UUID()
+    let context = ActionExecutionContext(
+        source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 7,
+        correlationID: UUID(), ordinal: 3)
+    let report = try ActionReport(entries: [.init(path: "Fixture.Query.read", status: .succeeded)])
+    let definition = ActionBinding(
+        path: .init(domain: "Fixture", module: "Query", function: "read"),
+        displayName: "Read", kind: .finite, completion: "Read acknowledged.",
+        serializationKey: "fixture", protocols: [.tool], executionPolicy: .direct,
+        directResultPolicy: .returning,
+        completing: { invocation in
+            #expect(invocation.executionID == id)
+            #expect(invocation.context == context)
+            #expect(invocation.call.parameters == ["value": "native"])
+            try await invocation.results.record(report)
+            return .value("lower priority value")
+        })
+    let module = UnifiedFixtureModule(definitions: [definition])
+    let response = try #require(
+        try await ToolExecutor(registry: ToolRegistry(modules: [module.tools])).execute(
+            ToolRequest(id: id, toolPath: "Fixture.Query.read", arguments: ["value": "native"]), context: context))
+    #expect(response.callID == id && !response.isError)
+    #expect(response.completion == .report(report))
+}
+
+private struct PureFunctionFixture: CapabilityModule {
+    let definitions: [ActionFunction]
+}
+
+@Test func pureCatalogValidatesBeforeRegistrationAndHostRejectsUnknownModules() throws {
+    let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
+    let function = ActionFunction(
+        path: path, displayName: "Read", kind: .finite, completion: "Read completed.", handler: { _ in })
+    #expect(throws: ActionExecutionError.duplicateDefinition(path)) {
+        try CapabilityCatalog(modules: [PureFunctionFixture(definitions: [function, function])])
+    }
+    let invalid = ActionFunction(
+        path: path, displayName: "", kind: .finite, completion: "Completed.", handler: { _ in })
+    #expect(throws: ActionExecutionError.invalidDefinition(path)) {
+        try CapabilityCatalog(modules: [PureFunctionFixture(definitions: [invalid])])
+    }
+    #expect(throws: (any Error).self) {
+        try BehaviorAssembly(capabilityModules: [PureFunctionFixture(definitions: [function])])
+    }
+}
+
+@Test func producerFailureCodeIsIndependentOfCallProtocol() async throws {
+    let log = UnifiedFixtureLog()
+    let function = UIActions.moveEyesDefinition(handler: { invocation in
+        try await UIActions.moveEyes(invocation: invocation) { _, _ in await log.record("effect") }
+    })
+    let path = function.path
+    let invocation = ActionInvocation(
+        call: .init(actionPath: path, channel: "main", parameters: ["x": "2", "y": "0"]),
+        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()))
+    let action = try ActionExecutor(registry: ActionRegistry(definitions: [ActionBinding(function: function)]))
+    do {
+        _ = try await action.execute(invocation)
+        Issue.record("Invalid arguments executed")
+    } catch {
+        #expect(ActionReport.code(for: error).rawValue == "invalidArguments")
+    }
+    let binding = ActionBinding(function: function, protocols: [.tool], executionPolicy: .direct)
+    let native = try ToolExecutor(registry: ToolRegistry(modules: [UnifiedFixtureModule(definitions: [binding]).tools]))
+    let response = try await native.execute(
+        ToolRequest(toolPath: path.description, arguments: invocation.call.parameters), context: invocation.context)
+    #expect(response?.failureCode == .invalidArguments && response?.isError == true)
+    #expect(await log.values.isEmpty)
+}
+
+@Test func sharedFunctionRegistryOwnsImplementationResourcesAndBudgetAcrossProtocolViews() async throws {
+    let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
+    let log = UnifiedFixtureLog()
+    let function = ActionFunction(
+        path: path, displayName: "Read", kind: .finite, completion: "Read completed.",
+        resources: [.init(rawValue: "fixture.journal")], timeout: .seconds(2),
+        completing: { input in
+            await log.record(input.context.source)
+            return .value("canonical")
+        })
+    let functions = try FunctionRegistry(definitions: [function])
+    let shadow = ActionFunction(
+        path: path, displayName: "Read", kind: .finite, completion: "Read completed.",
+        completing: { _ in
+            Issue.record("Registration must not replace the canonical handler")
+            return .value("shadow")
+        })
+    let actions = try ActionRegistry(definitions: [ActionBinding(function: shadow)], functions: functions)
+    let native = ActionBinding(
+        function: shadow, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+    let tools = try ToolRegistry(modules: [UnifiedFixtureModule(definitions: [native]).tools], functions: functions)
+    let invocation = ActionInvocation(
+        call: .init(actionPath: path, channel: "main"),
+        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()))
+    #expect(try actions.definition(for: path).resources == function.resources)
+    let call = ToolRequest(toolPath: path.description)
+    #expect(try await tools.resources(for: call) == function.resources)
+    #expect(try await tools.timeout(for: call) == .seconds(2))
+    #expect(try await ActionExecutor(registry: actions).execute(invocation) == .value("canonical"))
+    #expect(try await ToolExecutor(registry: tools).execute(call, context: invocation.context)?.value == "canonical")
+    #expect(await log.values == ["fixture", "fixture"])
+}
+
+@Test(arguments: [false, true]) func invocationFailurePreservesReportAndAllowsNextCall(_ scheduled: Bool) async throws {
+    let path = ActionIdentifier(domain: "Fixture", module: "Work", function: "run")
+    let report = try ActionReport(entries: [
+        .init(path: "step.motor1", status: .succeeded),
+        .init(
+            path: "step.motor2", status: .failed, code: .disconnected,
+            details: ["failureDescription": "Motor feedback disconnected"]),
+    ])
+    let function = ActionFunction(
+        path: path, displayName: "Work", kind: .finite, completion: "Return the measured outcome.",
+        completing: { input in
+            if input.call.parameters["mode"] == "fail" { throw ActionReportedError(report) }
+            return .value("next completed")
+        })
+    let binding = ActionBinding(
+        function: function, protocols: [.action, .tool],
+        executionPolicy: scheduled ? .scheduled(channel: "native") : .direct,
+        directResultPolicy: .returning)
+    let module = UnifiedFixtureModule(definitions: [binding])
+    let permissions = try CapabilityRegistry(
+        tools: [ToolRegistration(alias: "run", path: path.description, requiredParameters: ["mode"])])
+    let agent = UnifiedReceiptAgent(capabilities: permissions)
+    let manager = AgentManager()
+    let session = UUID()
+    try await manager.register(agent, sessionID: session)
+    try await manager.start(agent.descriptor.id)
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager),
+        tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
+    let failed = try await gateway.dispatch(
+        .init(
+            source: agent.descriptor.id, input: .init(sessionID: session, payload: .event("failure")),
+            output: .toolCall(.init(toolPath: path.description, arguments: ["mode": "fail"])), sequence: 1))
+    #expect(failed?.isError == true && failed?.failureCode?.rawValue == "disconnected")
+    guard case .report(let returned) = failed?.completion else {
+        Issue.record("Structured producer report was lost")
+        return
+    }
+    #expect(returned.entries == report.entries)
+    #expect(returned.failureDescription == "Motor feedback disconnected")
+    let next = try await gateway.dispatch(
+        .init(
+            source: agent.descriptor.id, input: .init(sessionID: session, payload: .event("next")),
+            output: .toolCall(.init(toolPath: path.description, arguments: ["mode": "next"])), sequence: 2))
+    #expect(next?.completion == .value("next completed"))
+    let receipts = await agent.receipts
+    #expect(receipts.count == 2)
+    guard case .report(let feedback) = receipts.first?.completion else {
+        Issue.record("Structured feedback was lost")
+        return
+    }
+    #expect(feedback.entries.map(\.path) == returned.entries.map(\.path))
+    #expect(feedback.entries.map(\.details) == returned.entries.map(\.details))
+    #expect(feedback.executionFailure?.rawValue == returned.executionFailure?.rawValue)
+    #expect(feedback.failureDescription == returned.failureDescription)
+    #expect(receipts.last?.completion == .value("next completed"))
 }

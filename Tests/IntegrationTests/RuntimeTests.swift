@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import Testing
 
@@ -145,7 +147,7 @@ private actor Recorder {
     let requests = InputGateway(manager: manager)
     let tools = ToolRegistry()
     try await tools.register("System.Runtime.runtimeInfo") { _ in
-        if fails { throw ToolExecutionFailure(code: .init(rawValue: "busy"), message: "Fixture busy") }
+        if fails { throw ActionExecutionFailure(code: .init(rawValue: "busy"), message: "Fixture busy") }
         return "runtime healthy"
     }
     let recorder = Recorder()
@@ -239,8 +241,10 @@ private actor Recorder {
     let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
     let call = ToolCall(toolPath: "UI.Pose.showPose")
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
-    try await registry.registerCompletion("UI.Pose.showPose") { received, origin in
-        #expect(received == call.executionRequest)
+    try await registry.registerCompletion("UI.Pose.showPose") { invocation in
+        let origin = invocation.context
+        #expect(invocation.executionID == call.id)
+        #expect(invocation.call.parameters == call.arguments)
         #expect(origin.sessionID == input.sessionID)
         #expect(origin.source == AgentID.visionPerception.rawValue)
     }
@@ -250,18 +254,18 @@ private actor Recorder {
     }
     try await registry.register("Fixture.Control.value") { _ in "" }
     await #expect(throws: ToolRegistryError.duplicateHandler) {
-        try await registry.registerCompletion("Fixture.Control.value") { _, _ in }
+        try await registry.registerCompletion("Fixture.Control.value") { _ in }
     }
     let value = ToolCall(toolPath: "Fixture.Control.value")
     let result = try #require(try await ToolExecutor(registry: registry).execute(value, envelope: envelope))
     #expect(result.value.isEmpty)  // Empty data is still a result, unlike Void completion.
-    try await registry.registerCompletion("Fixture.Control.failure") { _, _ in throw HarnessError.notRunning }
+    try await registry.registerCompletion("Fixture.Control.failure") { _ in throw HarnessError.notRunning }
     let failed = try #require(
         try await ToolExecutor(registry: registry).execute(
             ToolCall(toolPath: "Fixture.Control.failure"), envelope: envelope))
     #expect(failed.isError)
     #expect(failed.value.contains("notRunning"))
-    try await registry.registerCompletion("Fixture.Control.cancel") { _, _ in throw CancellationError() }
+    try await registry.registerCompletion("Fixture.Control.cancel") { _ in throw CancellationError() }
     let cancelled = try #require(
         try await ToolExecutor(registry: registry).execute(
             ToolCall(toolPath: "Fixture.Control.cancel"), envelope: envelope))
@@ -275,7 +279,7 @@ private actor Recorder {
     let recorder = Recorder()
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
-            ActionDefinition(
+            ActionBinding(
                 path: .init(domain: "UI", module: "Expression", function: "express"), displayName: "Expression",
                 kind: .finite, completion: "Acknowledged",
                 resolvingResources: { request in
@@ -335,8 +339,8 @@ private actor Recorder {
     _ = try await bindSpeechRequests(agent)
     try await manager.start(.assistant)
     let registry = ToolRegistry()
-    try await registry.registerCompletion("UI.Caption.print") { _, _ in throw HarnessError.notRunning }
-    try await registry.registerCompletion("UI.Caption.beginReplyTurn") { _, _ in }
+    try await registry.registerCompletion("UI.Caption.print") { _ in throw HarnessError.notRunning }
+    try await registry.registerCompletion("UI.Caption.beginReplyTurn") { _ in }
     let gateway = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: registry, sink: { _ in })
     let failures = try await gateway.observeFailures()
@@ -394,14 +398,14 @@ private actor Recorder {
 @Test func toolDeadlineJoinsCleanupAndExplicitCancellationPropagates() async throws {
     let registry = ToolRegistry()
     let cleanup = Recorder()
-    try await registry.registerCompletion("Fixture.Control.slow") { _, _ in
+    try await registry.registerCompletion("Fixture.Control.slow") { _ in
         do { try await Task.sleep(for: .seconds(60)) } catch {
             await cleanup.act()
             throw error
         }
     }
     let call = ToolRequest(toolPath: "Fixture.Control.slow")
-    let context = ToolExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)
+    let context = ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)
     let result = try #require(
         try await ToolExecutor(registry: registry, timeout: .milliseconds(10)).execute(
             call, context: context))
@@ -441,27 +445,30 @@ private actor Recorder {
 }
 
 private enum ToolTimeoutFixture {
-    @Tool(path: "Fixture.Control.slow", title: "Slow fixture", timeout: .milliseconds(10))
+    @Action(
+        domain: "Fixture", module: "Control", title: "Slow fixture", serializationKey: "Fixture",
+        timeout: .milliseconds(10))
     static func slow() {}
 }
 private struct ToolTimeoutModule: ToolModule {
-    let definitions: [ToolDefinition]
+    let definitions: [ActionBinding]
 }
 @Test func toolDefinitionTimeoutOverridesRuntimeDefaultAndRejectsInvalidDefinition() async throws {
-    let definition = ToolTimeoutFixture.slowDefinition(completing: { _, _ in
-        try await Task.sleep(for: .seconds(60))
-    })
+    let definition = ActionBinding(
+        function: ToolTimeoutFixture.slowDefinition(handler: { _ in
+            try await Task.sleep(for: .seconds(60))
+        }), protocols: [.tool], executionPolicy: .direct)
     #expect(definition.timeout == .milliseconds(10))
     let registry = try ToolRegistry(modules: [ToolTimeoutModule(definitions: [definition])])
     let result = try #require(
         try await ToolExecutor(registry: registry).execute(
             ToolRequest(toolPath: "Fixture.Control.slow"),
-            context: ToolExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
+            context: ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
     #expect(result.isError && result.value.contains("timed out"))
     #expect(throws: ToolRegistrationError.invalidDefinition("Fixture.Control.bad")) {
         try ToolRegistry(modules: [
             ToolTimeoutModule(definitions: [
-                ToolDefinition(path: "Fixture.Control.bad", timeout: .zero, completing: { _, _ in })
+                ActionBinding(path: "Fixture.Control.bad", timeout: .zero, completing: { _ in })
             ])
         ])
     }
@@ -470,11 +477,11 @@ private struct ToolTimeoutModule: ToolModule {
 @Test func toolFailureCapturesProducerDescriptionWithoutDeviceClassification() async throws {
     struct FixtureFailure: LocalizedError { var errorDescription: String? { String(repeating: "业务资源异常", count: 200) } }
     let registry = ToolRegistry()
-    try await registry.registerCompletion("Fixture.Control.failure") { _, _ in throw FixtureFailure() }
+    try await registry.registerCompletion("Fixture.Control.failure") { _ in throw FixtureFailure() }
     let result = try #require(
         try await ToolExecutor(registry: registry).execute(
             ToolRequest(toolPath: "Fixture.Control.failure"),
-            context: ToolExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
+            context: ActionExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
     #expect(result.isError)
     #expect(result.value.count == 512)
     #expect(result.value.hasPrefix("业务资源异常"))
@@ -482,13 +489,13 @@ private struct ToolTimeoutModule: ToolModule {
 
 @Test func toolProducerCodesPreserveAdmissionAndArgumentSemantics() async throws {
     let registry = ToolRegistry()
-    try await registry.registerCompletion("Fixture.Control.argument") { _, _ in
-        _ = try ToolArguments([:]).requiredInt("count", range: 1...3)
+    try await registry.registerCompletion("Fixture.Control.argument") { _ in
+        _ = try ActionArguments([:]).requiredInt("count", range: 1...3)
     }
-    try await registry.registerCompletion("Fixture.Control.background") { _, _ in
-        throw ToolExecutionFailure(code: .init(rawValue: "background"), message: "App must be foreground")
+    try await registry.registerCompletion("Fixture.Control.background") { _ in
+        throw ActionExecutionFailure(code: .init(rawValue: "background"), message: "App must be foreground")
     }
-    let context = ToolExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID())
+    let context = ActionExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID())
     for (path, code) in [
         ("Fixture.Control.argument", "invalidArguments"), ("Fixture.Control.background", "background"),
         ("Fixture.Control.unknown", "unknownTool"),
@@ -567,7 +574,7 @@ private actor SignalFeedbackRecorder: Agent {
     await agent.start()
     let registry = ToolRegistry()
     try await registry.register("System.Runtime.runtimeInfo") { _ in
-        if fails { throw ToolExecutionFailure(code: .init(rawValue: "busy"), message: "Actual failure") }
+        if fails { throw ActionExecutionFailure(code: .init(rawValue: "busy"), message: "Actual failure") }
         return "Actual value"
     }
     let configuration = try AgentConfiguration(

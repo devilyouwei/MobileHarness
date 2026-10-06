@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import PlatformKit
 import Testing
@@ -350,7 +352,7 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
     let link = ObservableArmFixture(.push)
     let controller = NexArmActionController(link: link)
     let registry = try ActionRegistry(modules: [
-        NexArmGestureActionModule { request, _ in
+        NexArmGestureModule { request, _ in
             try await controller.performGesture(
                 request.gesture == .celebrate ? .celebrate : .dance,
                 repetitions: request.repetitions)

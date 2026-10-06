@@ -1,8 +1,10 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import PlatformKit
 import Testing
@@ -84,29 +86,31 @@ import Testing
 private enum MacroFixture {
     @Action(
         domain: "Fixture", module: "Control", title: "Generated action", kind: .finite, completion: "Done",
-        serializationKey: "fixture.control",
-        resources: { _ in [.init(rawValue: "fixture")] },
-        timeout: { _ in try .init(expected: .zero, timeout: .milliseconds(30)) })
+        serializationKey: "fixture.control", resolvingResources: { _ in [.init(rawValue: "fixture")] },
+        estimatingDuration: { _ in try .init(expected: .zero, timeout: .milliseconds(30)) })
     public static func run() {}
-    @Tool(path: "Fixture.Control.tool", title: "Generated tool", resources: [.init(rawValue: "fixture")])
+    @Action(
+        domain: "Fixture", module: "Control", title: "Generated tool", serializationKey: "Fixture",
+        resources: [.init(rawValue: "fixture")])
     public static func tool() {}
 }
 
 @Test func macroFactoriesPreserveTitlesResourcesAndTimeoutReportsThroughCleanup() async throws {
-    let tool = MacroFixture.toolDefinition(handler: { _ in "ok" })
+    let tool = MacroFixture.toolDefinition(completing: { _ in .value("ok") })
     #expect(tool.path.description == "Fixture.Control.tool" && tool.displayName == "Generated tool")
     #expect(tool.resources == [.init(rawValue: "fixture")])
-    let action = MacroFixture.runDefinition(completing: { invocation in
-        do { try await Task.sleep(for: .seconds(10)) } catch {
-            try await invocation.results.record(
-                ActionReport(entries: [
-                    .init(path: "first", status: .succeeded),
-                    .init(path: "running", status: .cancelled, code: .cancelled),
-                ]))
-            throw error
-        }
-        return .completed
-    })
+    let action = ActionBinding(
+        function: MacroFixture.runDefinition(completing: { invocation in
+            do { try await Task.sleep(for: .seconds(10)) } catch {
+                try await invocation.results.record(
+                    ActionReport(entries: [
+                        .init(path: "first", status: .succeeded),
+                        .init(path: "running", status: .cancelled, code: .cancelled),
+                    ]))
+                throw error
+            }
+            return .completed
+        }))
     #expect(action.serializationKey == "fixture.control")
     let call = ActionCall(
         actionPath: ActionPath(domain: action.path.domain, module: action.path.module, function: action.path.function),
@@ -160,18 +164,19 @@ private enum MacroFixture {
 #endif
 
 @Test func channelPreservesDeadlineOverStoredReportAndContinuesNextAction() async throws {
-    let action = MacroFixture.runDefinition(completing: { invocation in
-        if invocation.call.parameters["quick"] == "true" { return .completed }
-        do { try await Task.sleep(for: .seconds(10)) } catch {
-            try await invocation.results.record(
-                ActionReport(entries: [
-                    .init(path: "prior", status: .succeeded),
-                    .init(path: "interrupted", status: .cancelled, code: .cancelled),
-                ]))
-            throw error
-        }
-        return .completed
-    })
+    let action = ActionBinding(
+        function: MacroFixture.runDefinition(completing: { invocation in
+            if invocation.call.parameters["quick"] == "true" { return .completed }
+            do { try await Task.sleep(for: .seconds(10)) } catch {
+                try await invocation.results.record(
+                    ActionReport(entries: [
+                        .init(path: "prior", status: .succeeded),
+                        .init(path: "interrupted", status: .cancelled, code: .cancelled),
+                    ]))
+                throw error
+            }
+            return .completed
+        }))
     let resources = try ResourceCoordinator(definitions: [
         .init(id: .init(rawValue: "fixture"), allowedOwners: [.assistant], stop: {})
     ])

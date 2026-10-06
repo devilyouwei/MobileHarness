@@ -1,14 +1,19 @@
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
+import BehaviorAssembly
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import StorageChat
 import Testing
 
-private func historyRequest(_ path: String, _ arguments: [String: String]) -> ToolRequest {
-    ToolRequest(toolPath: path, arguments: arguments)
+private func historyRequest(_ path: String, _ arguments: [String: String]) -> ActionInvocation {
+    ActionInvocation(
+        tool: ToolRequest(toolPath: path, arguments: arguments),
+        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()))
 }
 private func historyObject(_ json: String) throws -> [String: Any] {
     try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
@@ -31,13 +36,13 @@ private func historyTurn(_ store: ConversationHistoryStore, user: String, respon
     let readFence = try await store.readCurrent()
     let first = try historyObject(
         await HistoryActions.list(
-            call: historyRequest("History.Conversation.list", ["offset": "0", "limit": "1"]), using: history))
+            invocation: historyRequest("History.Conversation.list", ["offset": "0", "limit": "1"]), using: history))
     let items = try #require(first["items"] as? [[String: Any]])
     #expect(items.count == 1 && items[0]["archived"] as? Bool == false)
     #expect(items[0]["createdAt"] is String)
     #expect(first["total"] as? Int == 2 && first["nextOffset"] as? Int == 1)
     let result = try await HistoryActions.read(
-        call: historyRequest(
+        invocation: historyRequest(
             "History.Conversation.read",
             [
                 "id": archived.id.uuidString, "offset": "0", "limit": "1",
@@ -93,18 +98,19 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
         ["offset": "0", "limit": "1", "extra": "x"],
     ] {
         await #expect(throws: (any Error).self) {
-            try await HistoryActions.list(call: historyRequest("History.Conversation.list", arguments), using: probe)
+            try await HistoryActions.list(
+                invocation: historyRequest("History.Conversation.list", arguments), using: probe)
         }
     }
     await #expect(throws: (any Error).self) {
         try await HistoryActions.read(
-            call: historyRequest("History.Conversation.read", ["id": "invalid", "offset": "0", "limit": "1"]),
+            invocation: historyRequest("History.Conversation.read", ["id": "invalid", "offset": "0", "limit": "1"]),
             using: probe)
     }
     let cancelled = Task {
         withUnsafeCurrentTask { $0?.cancel() }
         return try await HistoryActions.list(
-            call: historyRequest("History.Conversation.list", ["offset": "0", "limit": "1"]), using: probe)
+            invocation: historyRequest("History.Conversation.list", ["offset": "0", "limit": "1"]), using: probe)
     }
     await #expect(throws: CancellationError.self) { try await cancelled.value }
     #expect(await probe.calls == 0)
@@ -117,12 +123,12 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
         id: id, alias: "History.list", argumentsJSON: Data("{\"offset\":\"0\",\"limit\":\"1\"}".utf8),
         capabilities: configuration.capabilities)
     #expect(call.toolPath == "History.Conversation.list" && call.id == id)
-    let registry = try ToolRegistry(modules: [
+    let registry = try BehaviorAssembly(capabilityModules: [
         HistoryModule(
             history: HistoryQueryService(store: ConversationHistoryStore()),
             mutations: HistoryMutationService(store: ConversationHistoryStore())
-        ).tools
-    ])
+        )
+    ]).tools
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
     let envelope = OutputEnvelope(source: .assistant, input: input, output: .toolCall(call))
     let response = try await ToolExecutor(registry: registry).execute(call, envelope: envelope)

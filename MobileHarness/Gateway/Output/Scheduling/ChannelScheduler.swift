@@ -1,6 +1,8 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 
 /// Task-local structured execution groups with process-wide definition-owned serialization exclusion.
 public actor ChannelScheduler {
@@ -19,7 +21,7 @@ public actor ChannelScheduler {
         let phase: Int
         let serializationKey: String
         let receipt: AsyncStream<Outcome>.Continuation?
-        let kind: ActionDefinition.Kind
+        let kind: ActionBinding.Kind
         let resources: Set<ResourceID>
         var path: ActionPath { invocation.call.actionPath }
         let invocation: ScheduledAction
@@ -206,7 +208,7 @@ public actor ChannelScheduler {
         try Task.checkCancellation()
         guard !isShutdown else { throw ActionSchedulingError.shutdown }
         try resultLedger.checkCapacity(invocation)
-        let channel = invocation.call.channel
+        let channel = invocation.channel
         guard channelCounts[channel] != nil || channelCounts.count < maximumChannels else {
             throw ActionSchedulingError.channelCountExceeded
         }
@@ -263,7 +265,7 @@ public actor ChannelScheduler {
                 try Task.checkCancellation()
                 switch result {
                 case .success(let completion): return completion
-                case .failure(let error): throw error
+                case .failure(let error): return .report(FunctionExecutor.failureReport(for: error))
                 }
             } catch {
                 await cancel(inputID: child.id, source: envelope.source)
@@ -394,7 +396,7 @@ public actor ChannelScheduler {
             guard !busySerializationKeys.contains(job.serializationKey), let state = inputs[job.inputKey] else {
                 continue
             }
-            let channel = job.invocation.call.channel
+            let channel = job.invocation.channel
             state.phases[job.phase].lanes[channel]?.queued.removeFirst()
             busySerializationKeys.insert(job.serializationKey)
             let task = Task {
@@ -442,11 +444,11 @@ public actor ChannelScheduler {
     }
     private func completed(_ job: Job, outcome: Outcome, started: Bool) {
         guard let state = inputs[job.inputKey],
-            state.phases[job.phase].lanes[job.invocation.call.channel]?.running?.job.id == job.id
+            state.phases[job.phase].lanes[job.invocation.channel]?.running?.job.id == job.id
         else { return }
-        state.phases[job.phase].lanes[job.invocation.call.channel]?.running = nil
+        state.phases[job.phase].lanes[job.invocation.channel]?.running = nil
         busySerializationKeys.remove(job.serializationKey)
-        decrementChannel(job.invocation.call.channel, by: 1)
+        decrementChannel(job.invocation.channel, by: 1)
         state.pending -= 1
         switch outcome {
         case .success(let completion):
@@ -474,12 +476,12 @@ public actor ChannelScheduler {
                 phase: status == .cancelled ? .cancelled : (status == .succeeded ? .succeeded : .failed),
                 effect: status == .succeeded ? .contractCompleted : .unknown)
         case .failure(let error):
-            let report = ActionReport.failure(ActionReport.code(for: error))
+            let report = FunctionExecutor.failureReport(for: error)
             executionTransition(
                 job.id, to: error is CancellationError ? .cancelled : .failed, completion: .report(report),
                 failure: error is CancellationError
                     ? nil
-                    : ((error as? any ActionExecutionFailureProviding)?.actionExecutionFailure.observationFailure
+                    : ((error as? any ActionReportFailureProviding)?.actionExecutionFailure.observationFailure
                         ?? (error is ResourceError ? .resourceUnavailable : .operationFailed)),
                 failureDescription: error is CancellationError ? nil : ActionReport.description(for: error))
             resultLedger.complete(

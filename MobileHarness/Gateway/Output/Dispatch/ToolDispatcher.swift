@@ -1,7 +1,9 @@
-import ActionRuntime
 import AgentCore
+import CallRuntime
+import ExecutionRuntime
+import FunctionContracts
 
-/// Tool calls bypass action queues; only data-returning tools feed results through the input gateway.
+/// Native call adapter: definition policy selects direct or shared scheduled execution; feedback crosses InputGateway.
 struct ToolDispatcher: Sendable {
     let registry: ToolRegistry
     let input: InputGateway
@@ -14,7 +16,7 @@ struct ToolDispatcher: Sendable {
         let execute: @Sendable () async throws -> ToolResponse? = {
             try await ResourceExecutionContext.$owner.withValue(owner) {
                 try await ToolExecutor(registry: registry).execute(
-                    call.executionRequest, context: envelope.toolContext)
+                    call.executionRequest, context: envelope.executionContext)
             }
         }
         let result: ToolResponse?

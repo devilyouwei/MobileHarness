@@ -28,27 +28,15 @@ Actions owns the finite enter/restore sequence; App adapts it to UI transactions
 
 New-turn/session reset invalidates the override and resumes any waiter with cancellation. Cancellation releases only the calling invocation's override and restores the current base immediately without promising a completed cancelled animation. Hidden/inactive rendering cancels the waiting transition; a missing renderer rejects activation. A stale session/turn fails with cancellation rather than reporting an unperformed finite effect as success. Already displayed effects are not rolled back.
 
-Fixed captions, transcript, voice state, reply initialization, gaze/following and skeleton display remain completion-only Tools without Channels or Action history. beginReplyTurn resets expression as part of its existing atomic turn policy.
+The host currently binds expression functions as scheduled Action calls and the eight update functions as completion-only direct Tool calls. These are registration choices; UIModule and the callable functions contain no protocol policy. beginReplyTurn retains its atomic reply/expression reset behavior.
 
-| File | Responsibility |
-| --- | --- |
-| UIActions.swift | finite/state entry validation, enter/restore composition and deadline metadata |
-| Support/UIActionTypes.swift | Emotion and validation/busy/unavailable errors |
-| Support/UIModule.swift | Both generated definitions and explicit presentation capability binding |
+✅ UI imports neither Actions nor FunctionContracts. App owns session lifetime; pages render transactions and report completion/availability. A one-shot expression includes a6% eye emphasis and return, so the base emotion can still produce an animated endpoint.
 
-✅ Runtime kind metadata remains finite/state; no new dispatch algorithm or activity is introduced. UI imports neither Actions nor ActionRuntime. App owns session lifetime; pages only render transactions and report completion/availability.
+❌ Physical animation, Reduce Motion and repeated-turn acceptance remain pending. Persistent looping performances and Activity control are not implemented.
 
-❌ Physical-device animation, Reduce Motion and repeated-turn visual acceptance remain pending. Persistent looping performances and Activity control are not implemented.
+## Presentation update functions
 
-✅ A one-shot performance includes a 6% eye emphasis and return, so performing the same emotion as the base still has an animated endpoint; persistent base setting never adds this emphasis.
-
-## ToolCall protocol entries
-
-# UI Tools
-
-Purpose: immediate presentation effects through OutputGateway and Actions/Runtime. Design goals: explicit text semantics, bounded arguments, session/turn validation and no Channel scheduling. Tools owns its execution contracts; App supplies typed endpoints and UI owns display state.
-
-| Tool | State operation | Argument contract |
+| Function | State operation | Argument contract |
 | --- | --- | --- |
 | UI.Caption.print | Append one reply sentence/chunk exactly once per accepted output sequence | Nonblank text, <=2000 UTF-8 bytes; preserves whitespace |
 | UI.Caption.setTranscript | Replace the entire recognition preview; empty clears | Text <=4096 UTF-8 bytes; SpeechPerception sends its current preview tail, never an append delta |
@@ -59,71 +47,28 @@ Purpose: immediate presentation effects through OutputGateway and Actions/Runtim
 | UI.HistoryPresentation.showHistory | Replace history snapshot through a scoped host endpoint | No arguments; internal ConversationMemory permission |
 | UI.Pose.showPose | Replace all skeletons; empty people clears | <=3000 UTF-8 bytes, <=6 COCO-17 skeletons |
 
-✅ UIModule owns completion-only definitions. UIUpdateCapability and PosePresentationCapability expose typed effects; ToolInvocation retains opaque host correlation. ToolArguments decodes keys and values without a dependency on Actions. Cancellation is checked before and after each effect. Completion means state accepted, not animation/rendering finished; no ToolResult is generated.
 
-✅ AppWorkflows.ConversationPresentation retains one turn, closed-transcript/reply flags and at most six sequence entries. App first validates the active session. It rejects old turns, same-ordinal conflicting IDs, wrong sources and non-increasing sequences. Reply/expression require beginReplyTurn. Fresh print sequences append; duplicate sequences never append twice. Only speech updates or Assistant beginReplyTurn can advance the turn. The scheduled expression Action uses this same acceptance policy.
+✅ Every function consumes FunctionInput and validates bounded arguments before effects. Completion means the endpoint accepted the update, not that animation/rendering finished. Native completion-only success yields no ToolResult because of the host binding, not because the function implements a Tool protocol.
+
+✅ AppWorkflows.ConversationPresentation retains one turn, transcript/reply flags and at most six sequence entries. App first validates the session. Old turns, conflicting IDs, wrong sources and non-increasing sequences are rejected. Reply/expression require beginReplyTurn; only speech updates or Assistant beginReplyTurn advance the turn. Fresh reply chunks append and duplicates do not. Camera adaptation separately validates frame/session identity.
 
 ```mermaid
 flowchart LR
-    Agent[Agent internal ToolCall] --> Gateway[OutputGateway validation]
-    Gateway --> Tool[Immediate completion handler]
-    Tool --> Validate[Bounded typed arguments]
-    Validate --> Session[App session validation]
-    Session --> Policy[Turn and output sequence / camera frame sequence]
-    Policy --> State[MainActor append or replacement]
-    State --> Done[Completion without feedback or Action history]
+    Call[Authorized ActionCall / ToolCall] --> Gateway[OutputGateway / binding policy]
+    Gateway --> Function[Canonical UI function / argument validation]
+    Function --> Host[Injected endpoint / session validation]
+    Host --> Acceptance[Turn or frame sequence acceptance]
+    Acceptance --> UI[MainActor state / rendering]
 ```
 
-✅ App voice/camera output consumers await each Tool sequentially; history transport awaits its correlated output separately. Tool execution introduces no Channel wait or detached task. A wait scope applies only to ActionCalls; Tools do not become barrier members. MainActor scheduling can still take time. VisionPerception's two-entry newest output buffer explicitly coalesces only replaceable gaze/skeleton state, counting replacements; reply chunks are never coalesced.
+✅ Current voice/camera consumers await native presentation calls sequentially. Direct native bindings do not join XML wait membership; explicitly scheduled native bindings use shared scheduling. VisionPerception coalesces only replaceable gaze/pose outputs in its two-entry newest buffer and counts replacements. Reply chunks are never coalesced.
 
-❌ No generic Tool replacement, physical device control or native model Tool transport is added. Model-selected expression remains the scheduled UI.Expression.express Action by explicit product choice. Physical display latency still requires device acceptance.
+## Source ownership
 
-## Source layout
+UIActions.swift is the namespace facade. Callable bodies live in ExpressionActions.swift, GazeActions.swift, CaptionActions.swift, VoiceStateActions.swift, PoseActions.swift and HistoryPresentationActions.swift. Support owns UIModule, typed endpoints and values; see [Support](Support/README.md). App/Workflows/Presentation owns conversation acceptance; UI owns display state.
 
-✅ `UIActions.swift` groups the eight callable presentation entries. `Support/UIModule.swift` owns registrations and typed host capability contracts; `Support/UIToolTypes.swift` owns nested value/error types. `App/Workflows/ConversationPresentation.swift` retains the bounded turn/sequence acceptance policy as a separate cohesive implementation. See [Support](Support/README.md).
+✅ Expression functions retain explicit serializationKey UI. Pose validation retains the3000-byte/six-person bound, optional finite timing measurements, adaptive interval0...1000ms and normalized image motion0...1. Existing payloads remain valid. History presentation uses the required memory-session endpoint and its internal Agent permission.
 
-❌ This organization adds no rendering acknowledgement, queue or native model Tool transport.
+❌ No automatic model exposure, generic replacement, rendering acknowledgment for state updates or new navigation/device primitive. Physical acceptance remains separate. ADR0160 defines the function/binding boundary.
 
-✅ Entry metadata is declared with `@Tool`; the Support catalog binds generated definition factories to explicit capabilities. Runtime behavior and Agent permissions are unchanged.
-
-✅ ToolPoseOverlay is the tool-owned decoded payload. App converts it to the UI overlay value. Conversation source/turn acceptance belongs to AppWorkflows, not Tools.
-
-✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Tool domains, pose payload and macro declarations remain in Tools. Published paths, feedback and cancellation behavior are unchanged.
-
-✅ UI.Pose.showPose accepts optional finite nonnegative statistics and validates timing consistency before the host effect; existing payloads remain valid and the 3000-byte/six-person bound is unchanged.
-
-✅ Optional adaptive interval statistics remain in UI.Pose.showPose; validation accepts 0...1000ms finite values and legacy statistics without the field. No new callable entry or output queue is added.
-
-✅ UI.Pose.showPose retains its existing permission and 3000-byte bound while carrying optional normalized image-motion activity in statistics. Invalid activity is rejected before effects.
-
-✅ UI.HistoryPresentation.showHistory invokes the required HistoryPresentationCapability; App validates the root memory session and adapts raw records into UI state. ❌ Navigation and model-callable history presentation remain pending.
-
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
-❌ Unified capability definitions and protocol registration adapters remain pending.
-
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
-❌ Unified callable definitions and migration of compatibility names remain pending.
-
-## Cohesive module files — ADR0154
-
-Purpose: implement directory/module-file/function ownership while preserving current protocol APIs. The domain Actions enum remains a used namespace facade; callable bodies belong exclusively to the files below. Support owns one domain catalog, values and host capabilities.
-
-- [ExpressionActions.swift](ExpressionActions.swift)
-- [GazeActions.swift](GazeActions.swift)
-- [CaptionActions.swift](CaptionActions.swift)
-- [VoiceStateActions.swift](VoiceStateActions.swift)
-- [PoseActions.swift](PoseActions.swift)
-- [HistoryPresentationActions.swift](HistoryPresentationActions.swift)
-
-✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
-❌ Explicit three-field paths, versioned Agent configuration and unified definitions/results remain the next coordinated stage.
-
-✅ Expression Action definitions explicitly use serializationKey UI, preserving existing global exclusion as entry modules evolve. Gaze and other Tool calls retain their existing execution protocol.
-
-
-✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
-
-
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
-
-❌ Physical acceptance and additional business capability exposure are not established by this migration.
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

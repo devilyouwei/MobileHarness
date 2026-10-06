@@ -1,10 +1,12 @@
 import AVFAudio
-import ActionRuntime
 import Actions
 import AgentCore
 import Agents
 import AppWorkflows
+import CallRuntime
+import ExecutionRuntime
 import Foundation
+import FunctionContracts
 import Gateway
 import ModelKit
 import OSLog
@@ -157,7 +159,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                     if Task.isCancelled { throw CancellationError() }
                 } catch {
                     stopVoice(
-                        message: (error is any ActionExecutionFailureProviding ? "动作未完成：" : "语音处理失败：")
+                        message: (error is any ActionReportFailureProviding ? "动作未完成：" : "语音处理失败：")
                             + error.localizedDescription)
                     record("处理失败：\(String(describing: error))")
                     await cleanupTask?.value
@@ -462,7 +464,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard voiceGeneration == generation else { return }
         handlingTurn = false
     }
-    func play(audioID: UUID, invocation: ActionInvocation) async throws {
+    func play(audioID: UUID, invocation: any FunctionInput) async throws {
         guard let speechPlayback else { throw CommunicationError.scopeClosed }
         do {
             try await speechPlayback.play(audioID: audioID, invocation: invocation) { [weak self] stream, invocation in
@@ -514,28 +516,28 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         session == voiceGeneration
     }
 
-    func validateCameraControl(invocation: ToolInvocation) throws {
+    func validateCameraControl(invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard invocation.context.source == AgentID.assistant.rawValue,
             accepts(session: invocation.context.sessionID)
         else { throw CancellationError() }
     }
 
-    func presentTranscript(_ text: String, invocation: ToolInvocation) throws {
+    func presentTranscript(_ text: String, invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.context, update: .transcript) else { return }
         state.liveTranscript = text
     }
 
-    func finishTranscript(invocation: ToolInvocation) throws {
+    func finishTranscript(invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.context, update: .finishTranscript) else { return }
         state.liveTranscript = ""
     }
 
-    func beginReplyTurn(invocation: ToolInvocation) throws {
+    func beginReplyTurn(invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.context, update: .beginReply) else { return }
@@ -543,7 +545,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         resetExpression()
     }
 
-    func presentVoiceState(_ voiceState: UIActions.VoiceState, invocation: ToolInvocation) throws {
+    func presentVoiceState(_ voiceState: UIActions.VoiceState, invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         // In-flight perception Tools cannot restore listening after capture admission has closed.
@@ -568,7 +570,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         }
     }
 
-    func setExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws {
+    func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.context, update: .expression) else {
@@ -578,7 +580,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         if expressionOwner == nil { state.expression = baseExpression }
     }
 
-    func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws {
+    func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID),
             conversationPresentation.accept(invocation.context, update: .expression)
@@ -588,7 +590,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         try await transitionExpression(to: EyeExpression(emotion), emphasized: true)
     }
 
-    func restoreExpression(invocation: ActionInvocation) async throws {
+    func restoreExpression(invocation: any FunctionInput) async throws {
         guard expressionOwner == invocation.executionID else { return }
         if Task.isCancelled || !state.expressionRendererAvailable || !accepts(session: invocation.context.sessionID)
             || !conversationPresentation.isCurrent(invocation.context)
@@ -649,7 +651,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         state.expression = nil
     }
 
-    func present(_ text: String, invocation: ToolInvocation) throws {
+    func present(_ text: String, invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         guard conversationPresentation.accept(invocation.context, update: .reply) else { return }

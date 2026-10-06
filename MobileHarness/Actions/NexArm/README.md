@@ -22,7 +22,7 @@ flowchart LR
     Results --> Channel
 ```
 
-Only NexArm/Support may import PlatformKit within Actions; PlatformKit owns its device values and has no project dependencies. Actions/Runtime remains device-independent. Callable registration belongs to the domain modules; Agent JSON grants model access. Public helpers and diagnostic methods are not automatically model-callable.
+Only NexArm/Support may import PlatformKit within Actions; PlatformKit owns its device values and has no project dependencies. Gateway/Runtime remains device-independent. Callable registration belongs to the domain modules; Agent JSON grants model access. Public helpers and diagnostic methods are not automatically model-callable.
 
 ## Source map
 
@@ -43,7 +43,7 @@ Only NexArm/Support may import PlatformKit within Actions; PlatformKit owns its 
 
 ## Motor operations and parameters
 
-`NexArmActions.moveMotor` and `resetMotor` validate an `ActionInvocation` and call the injected handler. The shared controller accepts motor ID, target, `NexArmMotorOptions` and `NexArmMotorCompletion`. Reset resolves that motor's software home and uses the same position encoder and completion executor as move. It never controls another motor.
+`NexArmActions.moveMotor` and `resetMotor` validate an `FunctionInput` and call the injected handler. The shared controller accepts motor ID, target, `NexArmMotorOptions` and `NexArmMotorCompletion`. Reset resolves that motor's software home and uses the same position encoder and completion executor as move. It never controls another motor.
 
 All entries are finite. Unknown parameters fail validation. Optional `speed` defaults to 1400 (range 1–1400); `acceleration` defaults to 30 (range 1–254). These are native register units. The two intervening position-packet bytes remain zero; they are not exposed as time or deceleration. Torque, mode and calibration are not ordinary movement parameters.
 
@@ -107,11 +107,11 @@ This is a conservative empirical envelope, not a claimed physical acceleration c
 
 ## Composition and resource ownership
 
-[ActionComposition](../Runtime/ActionComposition.swift) supports `sequence`, `parallel`, `repeated` and `delay`. Sequential children continue after ordinary failure. Parallel children retain separate outcomes and must use disjoint resources. Intentional rhythm belongs in `delay`, not in atomic completion.
+[ActionComposition](../../Gateway/Runtime/ActionComposition.swift) supports `sequence`, `parallel`, `repeated` and `delay`. Sequential children continue after ordinary failure. Parallel children retain separate outcomes and must use disjoint resources. Intentional rhythm belongs in `delay`, not in atomic completion.
 
 Current presets use a bounded `NexArmMotionPlan`, not a generic composition node for every waypoint. A plan contains at most 20 groups, each with up to 6 distinct addressed motors. Simultaneous groups send one synchronized packet and check each motor independently; they must not become five sequential motor moves.
 
-`ActionDefinition.resolvingResources` computes motor resources from call parameters; entry handlers validate the full argument set. Plan validation requires the lock set to equal the union of addressed motors. The parent holds that union throughout execution, including delays; children inherit the fence instead of reacquiring it. These resource fences apply to Agent-selected execution. Settings presets/reset/jog bypass the coordinator and cancel/join old writers through App manual takeover; motor-scope metadata still validates addressed packets (ADR0127).
+`ActionFunction.resolvingResources` computes motor resources from call parameters; entry handlers validate the full argument set. Plan validation requires the lock set to equal the union of addressed motors. The parent holds that union throughout execution, including delays; children inherit the fence instead of reacquiring it. These resource fences apply to Agent-selected execution. Settings presets/reset/jog bypass the coordinator and cancel/join old writers through App manual takeover; motor-scope metadata still validates addressed packets (ADR0127).
 
 | Operation or illustrative composition | Resource union |
 |---|---|
@@ -233,9 +233,9 @@ Cancellation stops future writes and joins cooperative tasks while retaining pri
 
 Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros.md), [ADR0091](../../../docs/adr/0091-nexarm-motor-scoped-feedback.md), [ADR0092](../../../docs/adr/0092-atomic-actions-and-composed-results.md), [ADR0093](../../../docs/adr/0093-nexarm-platform-action-boundary.md). This document describes current code, not superseded implementations or unimplemented proposal interfaces.
 
-✅ Registration uses ActionRequest, ActionResource and ActionExecutionBudget from Actions/Runtime/Contracts. Motor profiles, movement and completion algorithms are unchanged by the contract migration.
+✅ Registration uses ActionRequest, ActionResource and ActionExecutionBudget from Actions/Contracts. Motor profiles, movement and completion algorithms are unchanged by the contract migration.
 
-✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+✅ ADR0098: Execution values and services are imported from independent FunctionContracts; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
 
 ✅ Support/NexArmJointCommand maps tracking radians to five motor targets on the 2026-10-03 rest `[2047, 2087, 1984, 2045, 2048]`: shoulder lift extends with wrist pitch above 0.25 rad down to `reachLiftMinimum`, and the elbow levels the forearm (`forearmLevelSum` 4071) with a 40 count lead only while extending (`NexArmForearmLeveler`). `NexArmJogPlanner.approach` moves one of those counts with the manual-jog jerk limit, caps aim speed at 200 counts/s (100 for lift and elbow), and holds position for one step before reversing. Production tracking streams that step on the live Bluetooth loop and does not wait for arrival. ❌ Physical tracking acceptance with the phone mounted remains pending.
 
@@ -265,11 +265,11 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 
 ❌ Sustained physical-device motion/IK/takeover acceptance and durable execution history remain pending.
 
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
-❌ Unified capability definitions and protocol registration adapters remain pending.
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
+✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
 
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
-❌ Unified callable definitions and migration of compatibility names remain pending.
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one pure `<Domain>Module`; host registration creates Action/Tool projections. Superseded aliases/protocol catalogs are retired.
+✅ Unified definitions and compatibility retirement are implemented in ADR0157.
 
 ## Cohesive module files — ADR0154
 
@@ -280,14 +280,22 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 - [TrackingActions.swift](TrackingActions.swift)
 
 ✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
-❌ Explicit three-field paths, versioned Agent configuration and unified definitions/results remain the next coordinated stage.
+✅ Three-field addresses, Agent v6 configuration and shared definitions/results are implemented in ADR0156/0157.
 
-✅ Motion and Gesture Action definitions explicitly use serializationKey NexArm, preserving process-wide exclusion across Channels independently of future three-level addresses. Tracking Tool calls retain their existing resource-controlled protocol.
+✅ Motion and Gesture Action definitions explicitly use serializationKey NexArm, preserving process-wide exclusion across Channels independently of future three-level addresses. Tracking functions retain their resource constraints; host bindings select the native protocol.
 
 
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+✅ Arrival thresholds, stable feedback checks, movement budgets and per-motor failure aggregation remain business policy in NexArm. The ADR0162 feedback repair changes Gateway normalization only. Against b5888f8, controller, composite actions, jog planner, motion plan, motor profiles and simple action bodies are unchanged apart from imports.

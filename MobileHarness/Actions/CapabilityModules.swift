@@ -1,4 +1,4 @@
-import ActionRuntime
+import FunctionContracts
 
 /// One production catalog organized by business domain, independent of invocation protocol.
 public enum CapabilityModules {
@@ -7,9 +7,9 @@ public enum CapabilityModules {
         pose: any PosePresentationCapability, historyPresentation: any HistoryPresentationCapability,
         camera: any CameraControlCapability, history: any HistoryQueryCapability,
         historyMutations: any HistoryMutationCapability,
-        gesture: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void,
-        shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
-        aim: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void
+        gesture: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void,
+        shakeBase: @escaping @Sendable (Int, any FunctionInput) async throws -> Void,
+        aim: @escaping @Sendable (Double, Double, any FunctionInput) async throws -> Void
     ) -> [any CapabilityModule] {
         [
             UIModule(expression: presentation, pose: pose, updates: presentation, history: historyPresentation),

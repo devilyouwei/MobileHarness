@@ -1,8 +1,11 @@
-import ActionRuntime
 import Actions
+import CallRuntime
+import ExecutionRuntime
+import FunctionContracts
 
 /// Pure behavior assembly. Device creation and runtime lifetime stay with the host.
 public struct BehaviorAssembly: Sendable {
+    public let functions: FunctionRegistry
     public let actions: ActionRegistry
     public let tools: ToolRegistry
     public let toolPaths: Set<String>
@@ -13,9 +16,9 @@ public struct BehaviorAssembly: Sendable {
         pose: any PosePresentationCapability,
         historyPresentation: any HistoryPresentationCapability, camera: any CameraControlCapability,
         history: any HistoryQueryCapability, historyMutations: any HistoryMutationCapability,
-        gesture: @escaping @Sendable (NexArmActions.GestureRequest, ActionInvocation) async throws -> Void,
-        shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
-        aim: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void
+        gesture: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void,
+        shakeBase: @escaping @Sendable (Int, any FunctionInput) async throws -> Void,
+        aim: @escaping @Sendable (Double, Double, any FunctionInput) async throws -> Void
     ) throws {
         let modules = CapabilityModules.builtIn(
             presentation: presentation, playback: playback, pose: pose,
@@ -26,15 +29,24 @@ public struct BehaviorAssembly: Sendable {
 
     public init(capabilityModules: [any CapabilityModule]) throws {
         let catalog = try CapabilityCatalog(modules: capabilityModules)
-        try self.init(actionModules: [catalog.actions], toolModules: [catalog.tools])
+        let bindings = try ActionBindingCatalog(definitions: catalog.definitions.map(BehaviorProtocolBindings.bind))
+        try self.init(
+            actionModules: [bindings.actions], toolModules: [bindings.tools],
+            functions: FunctionRegistry(definitions: catalog.definitions))
     }
 
     /// Explicit catalog injection for isolated tests or other hosts; never runtime discovery.
     public init(
-        actionModules: [any ActionModule], toolModules: [any ToolModule]
+        actionModules: [any ActionModule], toolModules: [any ToolModule], functions: FunctionRegistry? = nil
     ) throws {
-        let actions = try ActionRegistry(modules: actionModules)
-        let tools = try ToolRegistry(modules: toolModules)
+        let store =
+            try functions
+            ?? FunctionRegistry(
+                definitions: (actionModules.flatMap(\.definitions) + toolModules.flatMap(\.definitions)).map(\.function)
+            )
+        let actions = try ActionRegistry(modules: actionModules, functions: store)
+        let tools = try ToolRegistry(modules: toolModules, functions: store)
+        self.functions = store
         self.actions = actions
         self.tools = tools
         toolPaths = Set(toolModules.flatMap { $0.definitions.map { $0.path.description } })

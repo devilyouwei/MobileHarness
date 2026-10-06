@@ -37,11 +37,11 @@ flowchart LR
 
 ## Action and Tool presentation boundary
 
-✅ RuntimePresentation implements immediate UIUpdateCapability using ToolInvocation, while speech and expression retain ActionInvocation. Voice/camera endpoint ownership, session/turn/sequence checks and weak bindings are preserved. ❌ No presentation effect bypasses OutputGateway.
+✅ RuntimePresentation implements immediate UIUpdateCapability using the same FunctionInput contract as speech and expression. Voice/camera endpoint ownership, session/turn/sequence checks and weak bindings are preserved. ❌ No presentation effect bypasses OutputGateway.
 
 ✅ CameraPreviewAdapter explicitly selects preview resizeAspectFill. PlatformKit binds the native session without imposing application view layout.
 
-✅ UI Tool endpoints receive ToolPoseOverlay; lifecycle adaptation converts it to the UI value. Action and Tool callbacks retain only opaque module-owned execution context.
+✅ UI capability endpoints receive Actions.PoseOverlay; lifecycle adaptation converts it to the UI value. Action and Tool callbacks retain only opaque module-owned execution context.
 
 ✅ ADR0098: NexArmBehaviorAdapter owns the unchanged host gesture/report bindings; SettingsProviderAdapter validates/applies the configured provider; HistoryAgentAdapter owns Assistant-specific dry-run preview. These adapters create no queues or new lifecycle owners.
 
@@ -96,7 +96,7 @@ flowchart LR
 
 ✅ NexArm bindings allocate a private ActionReportStore per invocation and receive motor outcomes through the call-specific recordReport sink. They preserve composition paths and original thrown errors; no shared last-result lookup or Bluetooth diagnostic interpretation remains. ❌ Physical execution acceptance remains pending.
 
-✅ ADR0132: NexArmBehaviorAdapter preserves Actions availability reasons as ToolRuntime producer codes/messages, and supplies the initiating Tool provenance to the App-owned worker. No completed Tool result is rewritten by a later worker error.
+✅ ADR0132: NexArmBehaviorAdapter preserves Actions availability reasons as neutral producer codes/messages, and supplies the initiating Tool provenance to the App-owned worker. No completed Tool result is rewritten by a later worker error.
 
 ❌ Sustained physical-device acceptance and durable error history remain pending.
 
@@ -105,6 +105,12 @@ flowchart LR
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
+
+✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.

@@ -1,62 +1,81 @@
-# UI — Pages, State and User Controls
+# UI — Presentation State and Human Interaction
 
-Purpose: render application state and collect user intent. Design goals: MainActor UI isolation, independent compilation and previews, narrow operation interfaces and no model/device/service construction.
+UI renders application state, captures human intent and owns local presentation behavior. It preserves familiar touch interaction while allowing the same exposed business operations to be driven through Agents. Pages receive state and narrow operation interfaces; they do not construct Agents, models, Gateways or device services.
 
-UI covers SwiftUI views, observable page state, user interaction and the operation interfaces consumed by those pages. Files are grouped by feature; reusable visuals live in Components. Cross-module workflows and runtime ownership remain in [App](../App/README.md).
-
-```text
-UI/
-├── Conversation/  # ConversationState, ready/startup views and labeled visual preview
-├── Camera/        # CameraState, user-control protocol and camera surface
-├── Components/    # Eyes, spectra and captions
-├── Settings/      # Form/history states, operation protocols and views
-└── Diagnostics/   # Diagnostic state/control protocol and views
-```
+Design goals: MainActor isolation, independent compilation/previews, passive business state and explicit presentation acceptance.
 
 ## Upstream and downstream
 
-UI is a separate SwiftPM target. Its only project dependencies are StorageChat (conversation record values). It does not import App, AppWorkflows, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit. Platform rendering content is supplied by App; no full service container is passed to a page.
-
-[Actions/UI](../Actions/UI/README.md) and [Actions/UI](../Actions/UI/README.md) declare executable behavior in their owning modules. They reach this UI module's state through App-bound handlers; their `UI.*` call paths are protocol names, independent of the Swift module name.
+Arrows show runtime interaction; UI has no import dependency on the services shown outside its boundary. Dashed lines identify staged host workflows.
 
 ```mermaid
 flowchart LR
-    App[App composition and lifetime owners] -->|Inject state and operations| View[UI views]
-    Effects[App session-validated effect adapter] --> State[Observable presentation state]
-    State --> View
-    View -->|User intent through declared interfaces| Operations[App workflow / session implementation]
-    Operations -->|Result and status| State
-    Preview[App native camera preview adapter] -->|View content| View
+    Human[Human touch / selection] --> Views[UI views]
+    Views -->|Intent via injected operation interface| Host[App input adapter]
+    Host -->|Migrated Signal| Input[InputGateway]
+    Input --> Agents
+    Agents --> Output[OutputGateway]
+    Output --> Functions[Actions/UI functions]
+    Functions --> Endpoint[App presentation adapter]
+    Endpoint -->|Session / turn / request-fenced state| State[UI observable state]
+    State --> Views
+    Host -.->|Staged feature operations| Workflows[App workflows / lifecycle]
+    Workflows -.-> State
+    App[App composition] -.->|State / controls / native preview content| Views
 ```
 
-The diagram shows runtime use; compile-time dependency goes from App/AppWorkflows to UI. Operation protocols live beside their consuming pages. Conversation receives ConversationState and a toggle closure; Camera receives CameraState, CameraControlling and injected preview content. SettingsState invokes SettingsOperating while owning edits/loading/error UI. History and MOSS receive state plus control interfaces. The Debug chat page awaits an injected diagnostic operation. Effects and model/session handling live in App workflows, adapters and lifecycle owners.
+Business rendering does not automatically generate another Signal. Scrolling, expansion, animation and form drafts remain local UI state. Completion-only presentation calls do not inject a synthetic ToolResult. Migrated business output follows OutputGateway; existing host workflows remain documented exceptions.
 
-Pages can own short-lived rendering/load tasks and cancel their scoped operations on disappearance. They never own voice runtime, camera capture, model construction or long-running application supervision. Background/session cleanup belongs to the App host. Storage record types used for display do not grant access to the journal service.
+## Internal structure
 
-## Presentation scope
+Arrows show presentation/data ownership and user intent, not business-service calls.
 
-Conversation renders captions, eyes, spectra, generic Action execution state and injected robot connection state. Settings includes Bluetooth discovery/connection controls and manual-operation presentation. Actual device spectrum data is injected; standalone previews use labeled synthetic bands. UI never owns a BLE connection, controller, registry or model service.
+```mermaid
+flowchart TB
+    Inject[Injected state / controls / preview content] --> Conversation[Conversation: eyes / captions / execution status]
+    Inject --> Camera[Camera: preview / overlay / camera controls]
+    Inject --> Settings[Settings: forms / history / resources / Bluetooth]
+    Inject --> Diagnostics[Diagnostics: status / controls / results]
+    Components[Components: reusable eyes / spectra / captions] --> Conversation
+    Components --> Camera
+    Records[StorageChat record values] --> History[Settings history presentation / title fallback]
+    History --> Settings
+    Conversation --> Intent[Operation interfaces / closures]
+    Camera --> Intent
+    Settings --> Intent
+    Diagnostics --> Intent
+    Draft[Page-local drafts / expansion / rendering state] --> Settings
+    Intent --> Host[Injected host implementation]
+```
 
-✅ Conversation, camera, settings/history and diagnostic pages expose typed operations and shared domain values.
+## Design principles and core mechanisms
 
-❌ Cross-platform views and independent multi-window state routing are not implemented.
+**Render state and express intent.** UI operation protocols describe what a page needs, without naming the service that implements it. Traditional touch interaction remains available; migrated business intents enter the same Agent flow as conversational requests. UI never assembles a model, device session, registry or business runtime.
 
-✅ UI expression transactions expose display IDs, completion callbacks and renderer availability only. App owns Action waits and lifecycle; no runtime service or execution queue lives in a view. ❌ Device animation acceptance remains pending.
+| State/effect | Owner and acceptance rule |
+| --- | --- |
+| Draft / scroll / expansion | Page-local presentation state; no automatic business Signal |
+| Business result / captions / pose | Supplied by host adapters after applicable session/turn/request/frame freshness checks |
+| Localization / title fallback | UI presentation policy, independent of persisted raw records |
+| Animation / rendering completion | Renderer-specific identity/callback; distinct from accepting a state update |
+| Long-lived capture / model / device operation | Host lifecycle/workflow owner; page lifetime cannot define cleanup |
 
-✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; ToolPoseOverlay remains the independently validated Tool contract. App maps Tool values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+**Acceptance and visual completion are distinct.** A registered presentation function can complete when the current scope accepts state. It must not claim that an animation finished unless its renderer contract actually acknowledges it. App converts independent domain payloads into UI-owned values; UI does not inspect Agent permission or call protocol metadata.
 
-✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+**Presentation is not a feedback generator.** Re-rendering observable state does not emit another Signal. Meaningful user or domain feedback uses explicit operation interfaces, preventing accidental self-triggered business loops. Existing settings/device workflow paths remain staged exceptions and are labeled separately from Agent routing.
 
-✅ NexArm Settings operations return immediately while App owns cancellable feedback-driven motion; verified manual controls remain available during execution. ❌ Physical touch/takeover acceptance remains pending (ADR0128).
+## Ownership and boundaries
 
-## Passive BLE connection — ADR0130
+- Conversation, Camera, Settings and Diagnostics own SwiftUI pages, observable states and their consuming operation protocols. Components owns reusable visuals.
+- The UI target depends only on StorageChat record values. It imports no App, AppWorkflows, Agents, AgentCore, Gateway, Actions, ModelKit or PlatformKit services.
+- [Actions/UI](../Actions/UI/README.md) owns callable presentation behavior. App maps Actions.PoseOverlay into UI/Camera.PoseOverlay and validates acceptance before mutation; canonical `UI.*` addresses are independent of Swift target names.
+- Pages may own rendering/load tasks and scoped cancellation, but not capture, model residency or long-lived runtime supervision. Native preview content is supplied by App.
+- UI owns localized wording and history title fallback; Storage retains original data. ModelResourcesState retains drafts/status snapshots, while AppSettingsWorkflow owns resource work.
 
-✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+## Implementation status
 
-❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+✅ Conversation, camera, settings/history/resource and diagnostic interfaces, independent previews, bounded execution-status presentation and typed state acceptance. Expression render IDs/callbacks do not embed a runtime queue.
 
-✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+❌ Complete Agent/typed-Signal routing for every UI business operation, cross-platform presentation and independent multi-window routing remain outstanding. Real animation, microphone/BLE touch interaction and device tracking need physical acceptance.
 
-✅ History title selection and fallback wording belong to UI/Settings, not StorageChat. ❌ Agent-driven UI intent routing remains planned.
-
-✅ ModelResourcesState contains passive draft/status/operation snapshots only; resource tasks and business prerequisites moved to AppSettingsWorkflow. ModelResourcesControlling exposes typed user intent without service imports. ❌ SettingsState request coordination and resource Agent routing remain pending.
+See [App](../App/README.md), [Conversation](Conversation/README.md), [Camera](Camera/README.md), [Settings](Settings/README.md), [Components](Components/README.md) and [Diagnostics](Diagnostics/README.md).

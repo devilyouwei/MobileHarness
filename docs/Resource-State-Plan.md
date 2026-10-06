@@ -15,19 +15,19 @@
 | 现有位置 | 计划职责 |
 | --- | --- |
 | Storage/ | 通用 ResourceStateStore actor、状态记录/快照结构、版本和有界内存存取；不认识具体设备或 UI 业务字段。 |
-| Actions、Tools 的现有领域目录及 Support | 定义领域属性和类型化状态写入契约；向实现注入写入能力，在实际效果发生时报告变化。 |
+| Actions 的现有领域目录及 Support | 定义领域属性和类型化状态写入契约；向实现注入写入能力，在实际效果发生时报告变化。 |
 | App/Adapters | 绑定状态写入能力，将 UI 接受结果、Platform 原生反馈转换成状态更新；避免同一事实重复写入。 |
 | App/Lifecycle、App/Workflows 的现有领域目录 | 接入手动操作、资源关闭/释放、断连和恢复等变化，保持当前状态完整。 |
 | App/Composition | 创建唯一共享 Store，显式注入生产者写入端和消费者只读端；生命周期不依赖页面。 |
 | Agents/Communication、Agents/Assistant | 定义 Agent 消费的状态视图，按需读取快照并组织 LLM 上下文。 |
 
-Store 不放在 AgentCore。Storage 保持 Foundation-only；Actions/Tools 不必依赖具体 Store，App 适配双方契约。通用 ActionRuntime/ToolRuntime、Gateway 不解释领域状态。PlatformKit 继续提供原生设备事实，UI 继续接收展示值；仅在缺少必要事实或确认接口时补充对应领域接口。
+Store 不放在 AgentCore。Storage 保持 Foundation-only；Actions 不必依赖具体 Store，App 适配双方契约。Gateway 的 ExecutionRuntime/CallRuntime 不解释领域状态。PlatformKit 继续提供原生设备事实，UI 继续接收展示值；仅在缺少必要事实或确认接口时补充对应领域接口。
 
 ## 更新与读取
 
 ```mermaid
 flowchart LR
-    Calls[Actions / Tools] --> Effects[App 绑定的 UI / Platform 效果]
+    Calls[Callable Actions] --> Effects[App 绑定的 UI / Platform 效果]
     Effects --> Updates[类型化状态更新]
     Other[手动操作 / 生命周期 / 设备反馈] --> Updates
     Updates --> Store[Storage ResourceStateStore]
