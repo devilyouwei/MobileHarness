@@ -11,8 +11,9 @@ import ToolRuntime
 import Tools
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
-    PosePresentationCapability, CameraControlCapability
+    PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability
 {
+    func showHistory(invocation: ToolInvocation) async throws {}
     private(set) var cameraCalls: [String] = []
     func setEnabled(_ enabled: Bool, invocation: ToolInvocation) async throws {
         cameraCalls.append(enabled ? "open" : "close")
@@ -53,7 +54,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 @Test func builtInBehaviorAssemblyCoversAllAgentCatalogsAndPreservesTypedValidation() async throws {
     let endpoint = BehaviorEndpoint()
     let assembly = try BehaviorAssembly(
-        presentation: endpoint, playback: endpoint, pose: endpoint, camera: endpoint,
+        presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
         history: HistoryQueryService(store: ConversationHistoryStore()),
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
@@ -66,6 +67,8 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
             PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
             AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
+            ConversationMemoryAgent.runtimeCapabilities(
+                AgentConfigurations.load(named: "ConversationMemory").capabilities),
         ])
     let executor = ActionExecutor(registry: assembly.actions)
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {

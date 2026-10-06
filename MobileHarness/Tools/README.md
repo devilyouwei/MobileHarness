@@ -55,4 +55,4 @@ VisionPerception coalesces its bounded replaceable gaze/skeleton output before d
 
 ✅ ToolRuntime resources are generic raw identifiers; the unused cameraCapture constant is removed. Concrete resource declarations remain with Tool domains and host lifetime owners. ❌ Runtime contains no built-in Tool catalog.
 
-✅ History.list/read return bounded JSON previews from the shared journal; the Tools target now depends on StorageChat. ❌ UI intent unification and model continuation remain pending.
+✅ History.list/read return bounded JSON previews from the shared journal; the Tools target now depends on StorageChat. ✅ History refresh has a structured ConversationMemory intent and completion-only UI.showHistory endpoint. ❌ Other UI intents and model continuation remain pending.

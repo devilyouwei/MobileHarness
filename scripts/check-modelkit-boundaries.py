@@ -313,7 +313,7 @@ for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Te
         errors.append(f'Retired Types import: {source.relative_to(ROOT)}')
 workflow_boundaries = {
     'Settings': ('AppSettingsWorkflow', {'UI', 'Storage'}),
-    'History': ('AppHistoryWorkflow', {'UI', 'StorageChat'}),
+    'History': ('AppHistoryWorkflow', {'UI', 'StorageChat', 'AgentCore', 'Agents', 'Gateway', 'Tools', 'ToolRuntime'}),
     'Bluetooth': ('AppBluetoothWorkflow', {'UI', 'AgentCore', 'Storage', 'Actions', 'ActionRuntime', 'PlatformKit'}),
     'Speech': ('AppSpeechPlayback', {'ActionRuntime', 'StorageAudio'}),
     'Presentation': ('AppPresentationWorkflow', {'UI', 'AgentCore', 'ActionRuntime', 'ToolRuntime'}),
@@ -327,6 +327,21 @@ for folder, (target, allowed) in workflow_boundaries.items():
         imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
         if imports - allowed - {'Foundation', 'Synchronization', 'Security', 'AVFAudio', 'UIKit'}:
             errors.append(f'Unexpected workflow import: {source.relative_to(ROOT)}')
+# History transport is a narrow staged exception, not blanket feature policy access.
+history_source_boundaries = {
+    'ConversationHistoryWorkflow.swift': {'UI', 'StorageChat'},
+    'HistoryIntentRuntime.swift': {'AgentCore', 'Agents', 'Gateway'},
+    'HistoryPresentationAdapter.swift': {'UI', 'StorageChat', 'Tools', 'ToolRuntime'},
+}
+for name, allowed in history_source_boundaries.items():
+    source = ROOT / 'MobileHarness/App/Workflows/History' / name
+    imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
+    if imports - allowed - {'Foundation'}:
+        errors.append(f'Unexpected history role import: {source.relative_to(ROOT)}')
+for source in (ROOT / 'MobileHarness/Agents/ConversationMemory').glob('*.swift'):
+    imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
+    if imports - {'Foundation', 'AgentCore'}:
+        errors.append(f'ConversationMemory must emit capabilities rather than call services: {source.relative_to(ROOT)}')
 # Discovery/connection presentation must not consume device Action diagnostics.
 bluetooth_view = (ROOT / 'MobileHarness/UI/Settings/BluetoothSettingsView.swift').read_text()
 discovery_view = bluetooth_view.split('private struct BluetoothArmDetailView', 1)[0]

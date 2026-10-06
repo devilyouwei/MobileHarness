@@ -6,6 +6,7 @@ extension AgentID {
     public static let speechPerception = AgentID(rawValue: "speechPerception")
     public static let visionPerception = AgentID(rawValue: "visionPerception")
     public static let photographer = AgentID(rawValue: "photographer")
+    public static let conversationMemory = AgentID(rawValue: "conversationMemory")
     public static let assistant = AgentID(rawValue: "assistant")
 }
 public enum PerceptionMessage: Codable, Sendable, Equatable {

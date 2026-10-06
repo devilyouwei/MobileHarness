@@ -2,6 +2,16 @@ import Foundation
 import ToolRuntime
 
 public enum UITools {
+    @Tool(path: "UI.showHistory", title: "showHistory")
+    public static func showHistory(invocation: ToolInvocation, using history: any HistoryPresentationCapability)
+        async throws
+    {
+        try Task.checkCancellation()
+        try ToolArguments(invocation.call.arguments).validateAllowedKeys([])
+        try await history.showHistory(invocation: invocation)
+        try Task.checkCancellation()
+    }
+
     @Tool(path: "UI.beginReplyTurn", title: "beginReplyTurn")
     public static func beginReplyTurn(
         invocation: ToolInvocation,

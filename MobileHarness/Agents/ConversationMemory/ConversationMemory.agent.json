@@ -1,0 +1,18 @@
+{
+  "version": 5,
+  "id": "conversationMemory",
+  "actions": {},
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {
+        "contract": "runtime.event",
+        "version": 1,
+        "kind": "event"
+      }
+    ],
+    "subscriptions": [],
+    "publications": [],
+    "sends": []
+  }
+}

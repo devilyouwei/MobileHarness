@@ -17,6 +17,7 @@ import UI
 @MainActor
 final class ApplicationRuntime {
     private let bluetooth: BluetoothWorkflow
+    let historyIntents: HistoryIntentRuntime
     let conversations: ConversationHistoryStore
     let manager: AgentManager
     let input: InputGateway
@@ -26,7 +27,10 @@ final class ApplicationRuntime {
     let actionActivity: ActionActivityWorkflow
     let resources: ResourceCoordinator
 
-    init(camera: AppleCamera, cameraControl: any CameraControlCapability, bluetooth: BluetoothWorkflow) throws {
+    init(
+        camera: AppleCamera, cameraControl: any CameraControlCapability, bluetooth: BluetoothWorkflow,
+        historyState: ConversationHistoryState
+    ) throws {
         let root = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         var directory = root.appendingPathComponent("MobileHarness/Conversations", isDirectory: true)
@@ -39,12 +43,19 @@ final class ApplicationRuntime {
             url: directory.appendingPathComponent("history.json"),
             maximumBytes: ConversationHistoryStore.maximumBytes)
         conversations = ConversationHistoryStore(document: document)
+        let historySessionID = UUID()
+        let historyAgent = try ConversationMemoryAgent(sessionID: historySessionID)
+        let historyPresentation = HistoryPresentationAdapter(
+            state: historyState, store: conversations, sessionID: historySessionID)
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
-            configurations: ["Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis"]
-                .map {
-                    try AgentConfigurations.load(named: $0)
-                })
+            configurations: [
+                "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis",
+                "ConversationMemory",
+            ]
+            .map {
+                try AgentConfigurations.load(named: $0)
+            })
         let manager = AgentManager()
         let input = InputGateway(manager: manager, policy: policy)
         let presentation = RuntimePresentation(cameraControl: cameraControl)
@@ -89,7 +100,8 @@ final class ApplicationRuntime {
         let activity = ActionActivityWorkflow(state: ActionActivityState())
         let robot = NexArmBehaviorAdapter(bluetooth: bluetooth, activity: activity)
         let behaviors = try BehaviorAssembly(
-            presentation: presentation, playback: presentation, pose: presentation, camera: presentation,
+            presentation: presentation, playback: presentation, pose: presentation,
+            historyPresentation: historyPresentation, camera: presentation,
             history: HistoryQueryService(store: conversations),
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
             shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) },
@@ -104,6 +116,7 @@ final class ApplicationRuntime {
                     AgentConfigurations.load(named: "VisionPerception").capabilities),
                 PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
                 AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
+                historyAgent.descriptor.capabilities,
             ])
         let actions = ChannelScheduler(registry: behaviors.actions, resources: resources) {
             await input.deliverActionResult($0)
@@ -120,6 +133,8 @@ final class ApplicationRuntime {
             observedContracts: ["speech.partial", "speech.final", "speech.phase"],
             observeEvent: { try await presentation.observe($0) }, sink: { await presentation.output($0) })
         output = gateway
+        historyIntents = HistoryIntentRuntime(
+            sessionID: historySessionID, manager: manager, input: input, output: gateway, agent: historyAgent)
         activity.startFailures { try await gateway.observeFailures() }
     }
     var voiceDependencies: VoiceRuntimeDependencies {

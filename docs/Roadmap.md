@@ -26,7 +26,7 @@ Current contracts and dependencies live in the [technical design](../MobileHarne
 | Direction | Boundary before implementation |
 | --- | --- |
 | [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions/Tools 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
-| [Agent-driven app](Agent-Driven-App.md) | Storage cleanup and shared read-only history Tools are implemented; BLE Tools, structured UI intent, Agent-owned workflows and model result continuation remain pending. |
+| [Agent-driven app](Agent-Driven-App.md) | Storage cleanup, shared read-only history Tools and structured ConversationMemory refresh intent are implemented; BLE Tools, remaining UI intents/memory mutations and model result continuation remain pending. |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
 | Local native Tool events and result-driven request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |
@@ -209,3 +209,5 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 
 ✅ [ADR0141](adr/0141-resource-control-ownership.md): public unlocked/locked(owner) replaces persistent faulted/recover. One occupancy authority includes transient writers, and revocable execution permits protect App effects. Cleanup timeout fails only its request; retained late cleanup automatically unlocks. Cancellation-independent acknowledgment remains. ❌ Physical camera-close/takeover timing and native uncooperative-I/O isolation acceptance remain pending.
+
+✅ [ADR0145](adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned ConversationMemory Agent and both Gateways, with bounded admission and joined cancellation. ❌ Archive/delete/title, navigation, other UI intents and model continuation remain pending.

@@ -17,6 +17,7 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 | ID | Decision |
 | --- | --- |
 | 0001 | [ADR 0001 原生模块化 Runtime](0001-native-modular-runtime.md) |
+| 0145 | [History refresh Agent intent](0145-history-refresh-agent-intent.md) |
 | 0144 | [Shared read-only history Tools](0144-read-only-history-tools.md) |
 | 0143 | [Storage and consumer policy boundaries](0143-storage-consumer-policy-boundaries.md) |
 | 0002 | [ADR 0002 模型能力与后端解耦](0002-model-capabilities.md) |

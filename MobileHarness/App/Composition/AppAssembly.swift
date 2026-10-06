@@ -120,16 +120,21 @@ final class AppAssembly {
                 }
             })
     }
+    private let historyState = ConversationHistoryState()
     @ObservationIgnored lazy var history = makeHistory()
     private func makeHistory() -> ConversationHistoryWorkflow {
         ConversationHistoryWorkflow(
-            state: ConversationHistoryState(),
+            state: historyState,
             loadStore: { [weak self] in
                 guard let self else { throw CancellationError() }
                 await self.container?.lifecycle.beginSettingsChange()
                 defer { self.container?.lifecycle.endSettingsChange() }
                 try Task.checkCancellation()
                 return try self.runtime().conversations
+            },
+            refresh: { [weak self] in
+                guard let self else { throw CancellationError() }
+                try await self.runtime().historyIntents.refresh()
             },
             summarizeTitle: { [weak self] conversation in
                 guard let self else { throw CancellationError() }
@@ -148,7 +153,8 @@ final class AppAssembly {
     }
     private func runtime() throws -> ApplicationRuntime {
         if let runtimeValue { return runtimeValue }
-        let runtime = try ApplicationRuntime(camera: cameraDevice, cameraControl: camera, bluetooth: bluetooth)
+        let runtime = try ApplicationRuntime(
+            camera: cameraDevice, cameraControl: camera, bluetooth: bluetooth, historyState: historyState)
         runtimeValue = runtime
         return runtime
     }

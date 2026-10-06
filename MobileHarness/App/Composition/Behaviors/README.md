@@ -41,3 +41,5 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ✅ Robot Tool resource metadata is generated from its callable declaration; BehaviorAssembly binds the injected sender without duplicating resource or Agent permissions.
 
 ✅ Built-in assembly requires HistoryQueryCapability and registers History.list/read alongside existing Tools. Missing handlers remain startup errors; this assembly imports no StorageChat. ❌ No default empty-result fallback.
+
+✅ Built-in assembly also requires HistoryPresentationCapability for UI.showHistory; Gateway validates ConversationMemory internal permission. ❌ Assembly does not import Agents or UI.

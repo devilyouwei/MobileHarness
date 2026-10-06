@@ -62,7 +62,8 @@ let package = Package(
             name: "AppSettingsWorkflow", dependencies: ["UI", "Storage"], path: "MobileHarness/App/Workflows/Settings",
             exclude: ["README.md"]),
         .target(
-            name: "AppHistoryWorkflow", dependencies: ["UI", "StorageChat"],
+            name: "AppHistoryWorkflow",
+            dependencies: ["UI", "StorageChat", "AgentCore", "Agents", "Gateway", "Tools", "ToolRuntime"],
             path: "MobileHarness/App/Workflows/History", exclude: ["README.md"]),
         .target(
             name: "AppBluetoothWorkflow",
@@ -131,7 +132,7 @@ let package = Package(
             exclude: [
                 "Core", "Communication/README.md", "SpeechSynthesis/README.md", "Assistant/README.md",
                 "SpeechPerception/README.md",
-                "VisionPerception/README.md", "Photographer/README.md", "README.md",
+                "VisionPerception/README.md", "Photographer/README.md", "ConversationMemory/README.md", "README.md",
             ],
             resources: [
                 .process("Assistant/Assistant.agent.json"),
@@ -139,6 +140,7 @@ let package = Package(
                 .process("SpeechPerception/SpeechPerception.agent.json"),
                 .process("VisionPerception/VisionPerception.agent.json"),
                 .process("Photographer/Photographer.agent.json"),
+                .process("ConversationMemory/ConversationMemory.agent.json"),
             ]),
         .target(
             name: "Storage", path: "MobileHarness/Storage",

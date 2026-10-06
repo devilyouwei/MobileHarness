@@ -334,3 +334,11 @@ Baseline commit: 892a382 on codex/agent-driven-app. History.list/read are declar
 ✅ Final focused run passed six tests: history paging/truncation/overflow, pre-query validation/cancellation, native declaration resolution and correlated result, startup coverage, and isolated audio diagnostic retry. Boundary checks, strict formatting, six Python checks, diff whitespace and project/privacy/entitlements metadata passed. Full check.sh passed all 480 integration tests but returned failure because the same AppWorkflowTests.audioDetectionKeepsFailedPermissionResultAndAllowsRetry timed out; its isolated rerun passed. Whole-suite success is not claimed.
 
 ✅ The final unsigned generic iOS device build passed with Xcode 27. ❌ build-ios.sh stopped at the first simulator scheme because external CoreAIShared cannot resolve CoreAI; the remaining three schemes were not attempted. No live cloud invocation, physical phone interaction, UI button Agent routing or multi-step conversational acceptance was performed.
+
+## 2026-10-06 — Structured history refresh intent
+
+Baseline commit: fbdeff6 on codex/agent-driven-app. Scope: deterministic ConversationMemory, typed user refresh through both Gateways, completion-only UI.showHistory and root-owned bounded/cancellable transport. Archive/delete/title and navigation remain legacy or pending.
+
+✅ Final focused run passed six tests: four new history intent/lifecycle regressions, built-in startup coverage, and isolated audio diagnostic retry. Full check.sh passed all 484 integration tests, boundary checks, strict Swift formatting and six Python checks. Final tightened per-file boundaries, diff whitespace and project/privacy/entitlements metadata passed. The unsigned generic iOS device build passed with Xcode 27; final-app verification confirmed all six Agent JSON resources.
+
+❌ Full check.sh returned failure because AppWorkflowTests.audioDetectionKeepsFailedPermissionResultAndAllowsRetry again timed out in the full run; its isolated rerun passed. Whole-suite success is not claimed. build-ios.sh stopped at the first simulator scheme because external CoreAIShared cannot resolve CoreAI; its remaining three schemes were not attempted. No native page interaction, cloud/model continuation or physical device acceptance was performed. Technical_Design.docx remains unchanged.

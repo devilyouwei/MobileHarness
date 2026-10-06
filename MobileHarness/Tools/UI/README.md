@@ -10,6 +10,7 @@ Purpose: immediate presentation effects through OutputGateway and Tools/Runtime.
 | UI.beginReplyTurn | Clear reply and expression once per turn | No arguments; recognition preview remains independent |
 | UI.setVoiceState | Replace listening/hearing/processing phase | Required state; no microphone admission effect |
 | UI.moveEyes | Replace current gaze target | Finite x/y in [-1,1]; negative left/up |
+| UI.showHistory | Replace history snapshot through a scoped host endpoint | No arguments; internal ConversationMemory permission |
 | UI.showPose | Replace all skeletons; empty people clears | <=3000 UTF-8 bytes, <=6 COCO-17 skeletons |
 
 ✅ UIToolModule owns completion-only definitions. UIUpdateCapability and PosePresentationCapability expose typed effects; ToolInvocation retains opaque host correlation. ToolArguments decodes keys and values without a dependency on Actions. Cancellation is checked before and after each effect. Completion means state accepted, not animation/rendering finished; no ToolResult is generated.
@@ -27,13 +28,13 @@ flowchart LR
     State --> Done[Completion without feedback or Action history]
 ```
 
-✅ App awaits each Tool on its sequential output consumer. There is no Channel wait or detached task. A wait scope applies only to ActionCalls; Tools do not become barrier members. MainActor scheduling can still take time. VisionPerception's two-entry newest output buffer explicitly coalesces only replaceable gaze/skeleton state, counting replacements; reply chunks are never coalesced.
+✅ App voice/camera output consumers await each Tool sequentially; history transport awaits its correlated output separately. Tool execution introduces no Channel wait or detached task. A wait scope applies only to ActionCalls; Tools do not become barrier members. MainActor scheduling can still take time. VisionPerception's two-entry newest output buffer explicitly coalesces only replaceable gaze/skeleton state, counting replacements; reply chunks are never coalesced.
 
 ❌ No generic Tool replacement, physical device control or native model Tool transport is added. Model-selected expression remains the scheduled UI.express Action by explicit product choice. Physical display latency still requires device acceptance.
 
 ## Source layout
 
-✅ `UITools.swift` groups the seven callable presentation entries. `Support/UIToolModule.swift` owns registrations and typed host capability contracts; `Support/UIToolTypes.swift` owns nested value/error types. `App/Workflows/ConversationPresentation.swift` retains the bounded turn/sequence acceptance policy as a separate cohesive implementation. See [Support](Support/README.md).
+✅ `UITools.swift` groups the eight callable presentation entries. `Support/UIToolModule.swift` owns registrations and typed host capability contracts; `Support/UIToolTypes.swift` owns nested value/error types. `App/Workflows/ConversationPresentation.swift` retains the bounded turn/sequence acceptance policy as a separate cohesive implementation. See [Support](Support/README.md).
 
 ❌ This organization adds no rendering acknowledgement, queue or native model Tool transport.
 
@@ -48,3 +49,5 @@ flowchart LR
 ✅ Optional adaptive interval statistics remain in UI.showPose; validation accepts 0...1000ms finite values and legacy statistics without the field. No new callable entry or output queue is added.
 
 ✅ UI.showPose retains its existing permission and 3000-byte bound while carrying optional normalized image-motion activity in statistics. Invalid activity is rejected before effects.
+
+✅ UI.showHistory invokes the required HistoryPresentationCapability; App validates the root memory session and adapts raw records into UI state. ❌ Navigation and model-callable history presentation remain pending.

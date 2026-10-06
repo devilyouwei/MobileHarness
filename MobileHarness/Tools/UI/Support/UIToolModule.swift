@@ -15,15 +15,27 @@ public protocol PosePresentationCapability: Sendable {
     func present(_ overlay: ToolPoseOverlay, sessionID: UUID) async throws
 }
 
+public protocol HistoryPresentationCapability: Sendable {
+    func showHistory(invocation: ToolInvocation) async throws
+}
+
 public struct UIToolModule: ToolModule {
+    private let history: any HistoryPresentationCapability
     private let updates: any UIUpdateCapability
     private let presentation: any PosePresentationCapability
-    public init(presentation: any PosePresentationCapability, updates: any UIUpdateCapability) {
+    public init(
+        presentation: any PosePresentationCapability, updates: any UIUpdateCapability,
+        history: any HistoryPresentationCapability
+    ) {
+        self.history = history
         self.presentation = presentation
         self.updates = updates
     }
     public var definitions: [ToolDefinition] {
         [
+            UITools.showHistoryDefinition(completing: { [history] call, context in
+                try await UITools.showHistory(invocation: ToolInvocation(call: call, context: context), using: history)
+            }),
             UITools.finishTranscriptDefinition(
                 completing: { [updates] call, context in
                     try await UITools.finishTranscript(invocation: ToolInvocation(call: call, context: context)) {

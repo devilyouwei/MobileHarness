@@ -6,6 +6,7 @@ import UI
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     public let state: ConversationHistoryState
+    private let refresh: @MainActor () async throws -> Void
     private let loadStore: @MainActor () async throws -> ConversationHistoryStore
     private let summarizeTitle: @MainActor (StoredConversation) async throws -> String
     private let previewOutput: @MainActor (ConversationRecord) -> String
@@ -13,9 +14,11 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     private var task: Task<Void, Never>?
     public init(
         state: ConversationHistoryState, loadStore: @escaping @MainActor () async throws -> ConversationHistoryStore,
+        refresh: @escaping @MainActor () async throws -> Void,
         summarizeTitle: @escaping @MainActor (StoredConversation) async throws -> String,
         previewOutput: @escaping @MainActor (ConversationRecord) -> String
     ) {
+        self.refresh = refresh
         self.state = state
         self.loadStore = loadStore
         self.summarizeTitle = summarizeTitle
@@ -29,7 +32,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
             let loaded = try await loadStore()
             try Task.checkCancellation()
             store = loaded
-            state.archive = try await loaded.snapshot()
+            try await refresh()
             state.status = nil
         } catch { state.status = "历史读取失败：\(error)" }
     }

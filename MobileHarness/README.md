@@ -132,6 +132,9 @@ flowchart TB
     Workflows --> ModelKit
     Workflows --> PlatformKit
     Workflows --> Actions
+    Workflows --> Agents
+    Workflows --> Gateway
+    Workflows --> Tools
     Workflows --> AgentCore
     Workflows --> ActionRuntime
     Workflows --> ToolRuntime
@@ -177,6 +180,7 @@ MobileHarness/
 │   │   ├── Generation/          # Function Token, Channel/wait and Tool parsers
 │   │   ├── Output/              # Resolved calls and trusted envelopes
 │   │   └── Communication/       # Typed messages and routing contracts
+│   ├── ConversationMemory/      # Structured history refresh
 │   ├── Assistant/
 │   ├── SpeechPerception/
 │   ├── SpeechSynthesis/
@@ -233,7 +237,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `App/Composition/Behaviors/` | BehaviorAssembly | Actions, Tools, ActionRuntime, ToolRuntime |
 | `App/Workflows/` facade | AppWorkflows | Six feature workflow targets |
 | `App/Workflows/Settings/` | AppSettingsWorkflow | UI, Storage |
-| `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat |
+| `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat, AgentCore, Agents, Gateway, Tools, ToolRuntime (staged intent transport) |
 | `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, ActionRuntime, PlatformKit |
 | `App/Workflows/Speech/` | AppSpeechPlayback | ActionRuntime, StorageAudio |
 | `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime, ToolRuntime |
@@ -616,7 +620,7 @@ Photographer consumes validated `vision.pose` through InputGateway and emits int
 
 RobotTools validates intent arguments; Gateway authorizes source/session and Tool permission. The App worker holds motors1–4 through ResourceCoordinator, with monotonic usable-pose freshness from Photographer; one second without fresh input joins/releases the writer. App groups all six motors under nexarm.writer and explicitly allows Assistant to preempt Photographer after joined cleanup, including disjoint motor5/6 actions. Queued same-owner Actions survive the takeover gate; no scheduler/session cancellation or radio recovery occurs. VisionSession camera closure removes its owned work; old targets never replay. Actions owns mapping/motion, PlatformKit native encoding; return is target admission, not physical arrival.
 
-Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until App reconnects the link. Final App resource validation requires all five Agent JSON files.
+Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until App reconnects the link. Final App resource validation requires all six Agent JSON files.
 
 Agent fault isolation: ordinary messaging and behavior execution failures are outcomes, never a reason to terminate sibling Agents. Photographer owns offline command suppression; Gateway retains bounded output/Action diagnostics. Startup configuration validation and explicit cancellation remain strict.
 
@@ -673,7 +677,14 @@ flowchart TB
     Facade --> Diagnostics[Diagnostics workflow]
     Settings --> Documents[Storage LocalDocumentStore]
     Settings --> Provider[App-injected provider operations]
-    History --> Journal[StorageChat]
+    History --> Intent[Root-owned history intent transport]
+    Intent --> Input[InputGateway]
+    Input --> Memory[ConversationMemory Agent]
+    Memory --> Output[OutputGateway]
+    Output --> Present[UI.showHistory host adapter]
+    Present --> State
+    Present --> Journal[StorageChat]
+    History -->|Legacy mutation operations| Journal
     History --> Title[App-injected title generation]
     Bluetooth --> Device[Actions + PlatformKit]
     Speech --> Audio[StorageAudio + injected playback]
@@ -683,7 +694,7 @@ flowchart TB
 
 The facade holds no mutable feature state. Each feature target owns its effects and depends only on the values/services needed by that feature. UI owns editable presentation state; workflows own persistence, validation and asynchronous operation boundaries. Credentials use the Keychain through App-supplied operations, while non-secret settings and conversation records use local document storage.
 
-Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant JSON also declares History.list/read; Tools projects read-only paged previews from the same injected journal, returns at most 1800 UTF-8 bytes with explicit truncation, and routes results through InputGateway. UI still uses its existing history workflow; Tool feedback does not yet continue model inference. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
+Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant JSON also declares History.list/read; Tools projects read-only paged previews from the same injected journal, returns at most 1800 UTF-8 bytes with explicit truncation, and routes results through InputGateway. UI load/refresh emits a structured user intent through InputGateway to root-owned ConversationMemory, whose internal UI.showHistory call crosses OutputGateway. One active refresh rejects overlap and joins cancellation cleanup; the scoped host adapter reads raw records into UI state. Archive/delete/title remain existing feature operations, and Tool feedback does not yet continue model inference. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
 
 <a id="391-platformkit-versus-modelkit"></a>
 

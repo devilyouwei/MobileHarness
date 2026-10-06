@@ -9,6 +9,7 @@ Agents/
 ├── Core/                     # Independent AgentCore compilation boundary
 ├── Communication/            # Shared domain messages, schema policy and built-in identities
 ├── AgentConfigurations.swift  # Load versioned JSON from package resources
+├── ConversationMemory/        # Deterministic history refresh intent and internal UI Tool
 ├── Assistant/                 # Chat, reply history and resolved speech Actions and UI Tools
 ├── SpeechPerception/          # VAD, segmentation, ASR and speech observations
 ├── SpeechSynthesis/           # Directed serial synthesis into shared PCM handles
@@ -41,7 +42,7 @@ flowchart LR
 
 ## Current compilation and ownership
 
-✅ Root Package.swift compiles Core once as the independent AgentCore target with no project dependencies; the Agents target excludes Core. All five business Agent directories, Communication and AgentConfigurations currently compile together in one Agents target. Its dependencies are AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio. Each actor owns its processing state; the shared target does not enforce per-Agent import isolation.
+✅ Root Package.swift compiles Core once as the independent AgentCore target with no project dependencies; the Agents target excludes Core. All six business Agent directories, Communication and AgentConfigurations currently compile together in one Agents target. Its dependencies are AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio. Each actor owns its processing state; the shared target does not enforce per-Agent import isolation.
 
 ✅ Model-callable registrations are loaded from each JSON v5 resource. Code owns fixed internal permissions and behavior, capability protocols are injected, and communication/execution requests cross Gateways. AgentCore supplies generic contracts/parsers/registries rather than business messages or native services.
 
@@ -238,7 +239,7 @@ Assistant, SpeechPerception and VisionPerception accept action.result receipts w
 
 ## Implemented scope and limitations
 
-✅ Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio.
+✅ ConversationMemory, Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio.
 
 Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.express is a scheduled finite model-callable Action; UI.setExpression is a scheduled state Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
 
@@ -273,3 +274,5 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 ✅ ADR0139: Photographer exposes monotonic usable-pose freshness as a read-only host signal; source silence releases the App writer after one second. Assistant priority over Photographer is host resource policy, not Agent-to-Agent cancellation or a model-callable permission.
 
 ✅ Assistant JSON declares read-only History.list/read. Aliases resolve inside Agents and execution/results cross both Gateways. ❌ Tool feedback does not yet resume model reasoning.
+
+✅ ConversationMemory accepts structured history refresh independently of voice/models and emits internal UI.showHistory through OutputGateway. ❌ Memory mutations and model-driven navigation remain staged work.

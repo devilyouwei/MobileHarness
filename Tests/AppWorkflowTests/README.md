@@ -56,3 +56,5 @@ Purpose: test cross-module history operations using the real journal and a contr
 ✅ ADR0131 regressions cover independent output failure projection, stale-revision rejection, bounded background issues and eviction counts without creating scheduler Action records. ❌ Physical UI acceptance remains pending.
 
 ✅ History workflow fixtures use exact requests with read tokens; archive/title/delete operation behavior remains unchanged. ❌ Agent-based history coordination remains planned.
+
+✅ History fixtures explicitly inject refresh effects; failed preparation cannot invoke refresh, and archive/title cancellation contracts remain tested. ❌ Native page interaction remains unverified.

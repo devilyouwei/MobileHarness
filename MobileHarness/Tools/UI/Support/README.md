@@ -2,7 +2,7 @@
 
 Purpose: support immediate presentation tools without exposing implementation files as callable entries. The design keeps registration and host interfaces together, values separate, and stateful acceptance policy independently reusable.
 
-- ✅ `UIToolModule.swift`: seven completion-only definitions, `UIUpdateCapability` and `PosePresentationCapability`; App injects endpoints.
+- ✅ `UIToolModule.swift`: eight completion-only definitions, `UIUpdateCapability`, `PosePresentationCapability` and `HistoryPresentationCapability`; App injects endpoints.
 - ✅ `UIToolTypes.swift`: `UITools.Gaze`, `VoiceState` and validation errors; existing public names are preserved.
 - ✅ App-owned `App/Workflows/ConversationPresentation.swift`: current turn, transcript/reply flags and one sequence per six update kinds. New accepted turns reset bounded state; stale/duplicate updates are rejected. It owns no queue; App validates session identity.
 - ❌ Rendering acknowledgement and new host primitives are not implemented here.
@@ -31,3 +31,5 @@ The callback must complete before the Tool completes. Types and policy do not re
 ✅ Optional imageMotion validates as finite 0...1. Legacy pose/statistics payloads without the field remain valid; no Agent/ModelKit dependency is added.
 
 ✅ ADR0132: Domain validation/availability errors provide bounded ToolRuntime producer codes; generic execution and home observation preserve them without importing platform errors. ❌ Physical acceptance remains pending.
+
+✅ HistoryPresentationCapability carries scoped ToolInvocation for completion-only UI.showHistory. ❌ Support does not read Storage or choose Agent identities.
