@@ -235,7 +235,9 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
 
     private func recordCapture(_ state: ActivityEvent.State, id: UUID) {
         eventSequence &+= 1
-        captureEvent = ActivityEvent(activityID: id, owner: captureOwner, state: state, sequence: eventSequence)
+        let causality = captureEvent.flatMap { $0.activityID == id ? $0.causality : nil } ?? .root(id: id)
+        captureEvent = ActivityEvent(
+            activityID: id, owner: captureOwner, state: state, sequence: eventSequence, causality: causality)
     }
 
     private func startCapture(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error> {

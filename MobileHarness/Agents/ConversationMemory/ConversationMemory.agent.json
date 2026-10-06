@@ -6,9 +6,9 @@
   "communication": {
     "inputs": [
       {
-        "contract": "runtime.event",
+        "contract": "history.intent",
         "version": 1,
-        "kind": "event"
+        "kind": "observation"
       },
       {
         "contract": "tool.result",

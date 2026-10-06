@@ -560,8 +560,8 @@ private struct FailingSecondPose: PoseCapability {
     let owner = ExecutionOwner(
         agent: .visionPerception, incarnation: try await manager.identity(.visionPerception), sessionID: session)
     let result = ActionResult(
-        executionID: UUID(), owner: owner, inputID: UUID(), turn: nil,
-        path: ActionPath(domain: "UI", module: "Gaze", function: "moveEyes"),
+        executionID: UUID(), owner: owner,
+        path: ActionPath(domain: "UI", module: "Gaze", function: "moveEyes"), causality: .root(),
         status: .succeeded, effect: .contractCompleted, completion: .completed)
     #expect(await input.deliverActionResult(result) == .accepted)
     #expect(await agent.actionResults() == [result])

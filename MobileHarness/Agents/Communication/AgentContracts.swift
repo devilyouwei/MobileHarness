@@ -72,6 +72,14 @@ public enum AgentContracts {
                 contract("sound.source", lifetime: 0.5),
                 contract("vision.pose", lifetime: 1, maximumBytes: 262_144),
                 contract("speech.synthesize", startsNewWork: true), contract("speech.cancel", startsNewWork: true),
+                CommunicationContract(
+                    name: ConversationMemoryIntent.contract, kind: .observation,
+                    maximumBytes: 512, startsNewWork: true,
+                    validateMessage: { message in
+                        guard message.contract == ConversationMemoryIntent.contract, message.historyIntent != nil else {
+                            throw CommunicationError.invalidPayload
+                        }
+                    }),
             ])
         }
     }
@@ -95,4 +103,32 @@ extension InputPayload {
         guard case .observation(let message) = self else { return nil }
         return message.perception
     }
+}
+
+/// Typed human/history host intent; never embedded in framework business enums.
+public enum ConversationMemoryIntent: Codable, Sendable, Equatable {
+    case refresh
+    case delete(UUID)
+    case cancel(UUID)
+    public static let contract = "history.intent"
+    public func input(sessionID: UUID) -> AgentInput {
+        let requestID: UUID
+        let source: String
+        if case .cancel(let id) = self {
+            requestID = id
+            source = "runtime"
+        } else {
+            requestID = UUID()
+            source = "user"
+        }
+        let message = AgentMessage(contract: Self.contract, content: self, maximumBytes: 512, validate: { _ in })
+        let payload = InputPayload.observation(message)
+        return AgentInput(
+            id: requestID, sessionID: sessionID, payload: payload,
+            metadata: InputMetadata(payload: payload, source: source, rootID: requestID))
+    }
+}
+
+extension AgentMessage {
+    public var historyIntent: ConversationMemoryIntent? { content(as: ConversationMemoryIntent.self) }
 }

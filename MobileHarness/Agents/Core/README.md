@@ -106,4 +106,6 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ## Signal origin — ADR0149
 
 ✅ InputMetadata now carries SignalOrigin.external/agent/runtime independently of payload meaning; external is the default value, not an inferred authority. OutputEnvelope retains original input metadata for feedback correlation. Gateway entry points enforce provenance and execution ownership.
-❌ Typed replacement of legacy event/control strings and complete Action/activity root propagation remain pending.
+✅ ADR0163 completes Action/activity causal transport. ❌ Typed replacement of remaining host event/control strings stays pending.
+
+✅ ADR0163: Output contracts carry explicit SignalCausality for Action/activity feedback. Typed history content remains in the business Agents communication catalog rather than Core payload enums.

@@ -23,6 +23,31 @@ public enum AgentActionCompletion: Equatable, Sendable {
     case activityStopped(UUID)
 }
 
+/// Causal identity only; retaining feedback never retains the initiating media or service lifetime.
+public struct SignalCausality: Sendable, Equatable {
+    public let inputID: UUID
+    public let rootID: UUID
+    public let hops: Int
+    public let turn: AgentTurn?
+    public let sequence: UInt64
+    public init(inputID: UUID, rootID: UUID, hops: Int, turn: AgentTurn? = nil, sequence: UInt64 = 0) {
+        self.inputID = inputID
+        self.rootID = rootID
+        self.hops = hops
+        self.turn = turn
+        self.sequence = sequence
+    }
+    public init(envelope: OutputEnvelope) {
+        self.init(
+            inputID: envelope.inputID, rootID: envelope.inputMetadata.rootID,
+            hops: envelope.inputMetadata.hops, turn: envelope.turn, sequence: envelope.sequence)
+    }
+    /// Explicit host activity root when no Agent input exists.
+    public static func root(id: UUID = UUID()) -> Self {
+        .init(inputID: id, rootID: id, hops: 0)
+    }
+}
+
 public struct ActionResult: Sendable, Equatable {
     public enum Status: String, Sendable { case succeeded, partialFailure, failed, cancelled }
     public enum Effect: String, Sendable { case notStarted, contractCompleted, unknown }
@@ -30,8 +55,9 @@ public struct ActionResult: Sendable, Equatable {
 
     public let executionID: UUID
     public let owner: ExecutionOwner
-    public let inputID: UUID
-    public let turn: AgentTurn?
+    public let causality: SignalCausality
+    public var inputID: UUID { causality.inputID }
+    public var turn: AgentTurn? { causality.turn }
     public let path: ActionPath
     public let status: Status
     public let effect: Effect
@@ -43,13 +69,12 @@ public struct ActionResult: Sendable, Equatable {
     }
 
     public init(
-        executionID: UUID, owner: ExecutionOwner, inputID: UUID, turn: AgentTurn?, path: ActionPath,
+        executionID: UUID, owner: ExecutionOwner, path: ActionPath, causality: SignalCausality,
         status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil
     ) {
         self.executionID = executionID
         self.owner = owner
-        self.inputID = inputID
-        self.turn = turn
+        self.causality = causality
         self.path = path
         self.status = status
         self.effect = effect
@@ -61,11 +86,13 @@ public struct ActionResult: Sendable, Equatable {
 public struct ActivityEvent: Sendable, Equatable {
     public enum State: String, Sendable { case started, stopped, failed, revoked }
     public let activityID: UUID
+    public let causality: SignalCausality
     public let owner: ExecutionOwner
     public let state: State
     public let sequence: UInt64
 
-    public init(activityID: UUID, owner: ExecutionOwner, state: State, sequence: UInt64) {
+    public init(activityID: UUID, owner: ExecutionOwner, state: State, sequence: UInt64, causality: SignalCausality) {
+        self.causality = causality
         self.activityID = activityID
         self.owner = owner
         self.state = state

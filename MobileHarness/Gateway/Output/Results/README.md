@@ -79,3 +79,5 @@ Output failure/delivery descriptions are bounded to512 characters. Tool data and
 ✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
 
 ✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+✅ ADR0163: ActionResultLedger captures SignalCausality from the original scheduled envelope. Retries retain that immutable root/parent context and terminal outcome; expiry/closed admission never replays effects. Existing outbox bounds, retry count and10-second delivery window are unchanged.

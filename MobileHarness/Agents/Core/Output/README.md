@@ -99,10 +99,12 @@ flowchart LR
 
 ✅ ADR0141: ResourceExecutionPermit is a generic Sendable validation capability bound to one actual execution. ResourceExecutionContext carries it beside owner/held IDs; App effects validate inherited authority rather than trusting IDs alone. Core contains no coordinator/device implementation or priority policy. ❌ Permits do not prove device availability or physical stop.
 
-✅ ADR0149: OutputEnvelope retains immutable inputMetadata; returning Tool feedback preserves root, parent input, turn and hop context through Gateway. ❌ Original causal-root transport in ActionResult/ActivityEvent remains pending; no persisted/remote envelope format is added.
+✅ ADR0149: OutputEnvelope retains immutable inputMetadata; returning Tool feedback preserves root, parent input, turn and hop context through Gateway. ✅ ADR0163 completes explicit causal context on ActionResult/ActivityEvent; no persisted/remote envelope format is added.
 
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
 ✅ ADR0157: AgentActionCompletion.value is bounded to64 KiB UTF-8. Both ActionResult and returning ToolResult transport this same independent completion type; ToolResult retains its native string value/error fields. ❌ AgentCore imports no execution implementation and result receipt does not automatically resume reasoning.
+
+✅ ADR0163: SignalCausality captures inputID/rootID/hops/turn/output sequence without retaining payloads. ActionResult and ActivityEvent require explicit context; inputID/turn on ActionResult derive from it. Runtime feedback advances one hop, retains root/parent/turn and uses fresh bounded admission. No remote codec is implied.

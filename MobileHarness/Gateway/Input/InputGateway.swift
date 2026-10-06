@@ -113,20 +113,26 @@ public actor InputGateway {
     }
 
     public func deliverActionResult(_ result: ActionResult) async -> ActionResultDelivery {
-        let input = AgentInput(
-            sessionID: result.owner.sessionID, payload: .actionResult(result),
-            metadata: InputMetadata(
-                payload: .actionResult(result), source: "runtime", origin: .runtime, rootID: result.inputID,
-                parentID: result.inputID), turn: result.turn)
-        return await deliverRuntime(input, owner: result.owner)
+        await deliverFeedback(.actionResult(result), owner: result.owner, causality: result.causality)
     }
 
     public func deliverActivityEvent(_ event: ActivityEvent) async -> ActionResultDelivery {
-        let payload = InputPayload.activityEvent(event)
+        await deliverFeedback(
+            .activityEvent(event), owner: event.owner,
+            causality: event.causality, sequence: event.sequence)
+    }
+
+    private func deliverFeedback(
+        _ payload: InputPayload, owner: ExecutionOwner, causality: SignalCausality, sequence: UInt64? = nil
+    ) async -> ActionResultDelivery {
+        guard (0..<8).contains(causality.hops) else { return .closed }
         let input = AgentInput(
-            sessionID: event.owner.sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime))
-        return await deliverRuntime(input, owner: event.owner)
+            sessionID: owner.sessionID, payload: payload,
+            metadata: InputMetadata(
+                payload: payload, source: "runtime", origin: .runtime,
+                sequence: sequence ?? causality.sequence, rootID: causality.rootID,
+                parentID: causality.inputID, hops: causality.hops + 1), turn: causality.turn)
+        return await deliverRuntime(input, owner: owner)
     }
 
     private func deliverRuntime(_ input: AgentInput, owner: ExecutionOwner) async -> ActionResultDelivery {

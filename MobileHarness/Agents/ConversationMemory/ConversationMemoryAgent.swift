@@ -1,48 +1,6 @@
 import AgentCore
 import Foundation
 
-public enum ConversationMemoryIntent: Sendable, Equatable {
-    case refresh
-    case delete(UUID)
-    case cancel(UUID)
-    public init?(rawValue: String) {
-        if rawValue == "history.refresh" {
-            self = .refresh
-            return
-        }
-        let parts = rawValue.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 2, let id = UUID(uuidString: String(parts[1])) else { return nil }
-        switch parts[0] {
-        case "history.delete": self = .delete(id)
-        case "history.cancel": self = .cancel(id)
-        default: return nil
-        }
-    }
-    public func input(sessionID: UUID) -> AgentInput {
-        let raw: String
-        let requestID: UUID
-        let source: String
-        switch self {
-        case .refresh:
-            source = "user"
-            raw = "history.refresh"
-            requestID = UUID()
-        case .delete(let id):
-            source = "user"
-            raw = "history.delete:" + id.uuidString
-            requestID = UUID()
-        case .cancel(let id):
-            source = "runtime"
-            raw = "history.cancel:" + id.uuidString
-            requestID = id
-        }
-        let payload = InputPayload.event(raw)
-        return AgentInput(
-            id: requestID, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: source, rootID: requestID))
-    }
-}
-
 /// Deterministic history role; never constructs UI, stores or model services.
 public actor ConversationMemoryAgent: Agent {
     public nonisolated let descriptor: AgentDescriptor
@@ -62,7 +20,7 @@ public actor ConversationMemoryAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "ConversationMemory")
         guard configuration.agentID == .conversationMemory else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
-            id: .conversationMemory, name: "ConversationMemory", inputs: [.event, .toolResult],
+            id: .conversationMemory, name: "ConversationMemory", inputs: [.observation, .toolResult],
             outputs: [.toolCall, .control], capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
@@ -101,8 +59,8 @@ public actor ConversationMemoryAgent: Agent {
             } else {
                 try emit(.toolCall(Self.presentation.call([:])), for: active.input)
             }
-        case .event(let raw):
-            guard let intent = ConversationMemoryIntent(rawValue: raw) else {
+        case .observation(let message):
+            guard message.contract == ConversationMemoryIntent.contract, let intent = message.historyIntent else {
                 throw CommunicationError.invalidPayload
             }
             switch intent {

@@ -53,8 +53,8 @@ struct ActionResultLedger {
             return
         }
         entry.result = ActionResult(
-            executionID: invocation.executionID, owner: owner, inputID: invocation.envelope.inputID,
-            turn: invocation.envelope.turn, path: invocation.call.actionPath,
+            executionID: invocation.executionID, owner: owner, path: invocation.call.actionPath,
+            causality: SignalCausality(envelope: invocation.envelope),
             status: status, effect: effect, completion: completion?.agentValue, failure: failure)
         entry.deadline = .now.advanced(by: .seconds(10))
         entries[invocation.executionID] = entry

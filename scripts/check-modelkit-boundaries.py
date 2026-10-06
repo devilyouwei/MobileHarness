@@ -397,6 +397,14 @@ for source in (ROOT / 'MobileHarness/Agents/ConversationMemory').glob('*.swift')
     imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
     if imports - {'Foundation', 'AgentCore'}:
         errors.append(f'ConversationMemory must emit capabilities rather than call services: {source.relative_to(ROOT)}')
+# Typed history content belongs to business Agents; framework input stays domain-neutral.
+history_agent = (ROOT / 'MobileHarness/Agents/ConversationMemory/ConversationMemoryAgent.swift').read_text()
+core_input = (ROOT / 'MobileHarness/Agents/Core/AgentInput.swift').read_text()
+if 'ConversationMemoryIntent(rawValue:' in history_agent or 'ConversationMemoryIntent' in core_input:
+    errors.append('History intent must use typed domain content outside Core payloads')
+result_ledger = (ROOT / 'MobileHarness/Gateway/Output/Results/ActionResultLedger.swift').read_text()
+if 'SignalCausality(envelope: invocation.envelope)' not in result_ledger:
+    errors.append('Scheduled feedback must retain original envelope causality')
 # Resource UI state must remain passive; asynchronous effects belong to the feature.
 resource_state = (ROOT / 'MobileHarness/UI/Settings/ModelResourcesState.swift').read_text()
 resource_implementation = resource_state.split('public final class ModelResourcesState', 1)[1]

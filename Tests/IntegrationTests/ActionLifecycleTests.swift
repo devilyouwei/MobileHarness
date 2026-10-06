@@ -43,6 +43,7 @@ private actor ReceiptAgent: Agent {
     private var lifecycle: AgentLifecycle = .registered
     private var inbox = ActionResultInbox()
     private(set) var activities: [ActivityEvent] = []
+    private(set) var lastInput: AgentInput?
     private var rejectOnce: Bool
 
     init(id: AgentID = .assistant, rejectOnce: Bool = false, capabilities: CapabilityRegistry? = nil) throws {
@@ -72,6 +73,7 @@ private actor ReceiptAgent: Agent {
             activities.append(event)
         default: throw HarnessError.unsupportedInput
         }
+        lastInput = input
     }
     func results() -> [ActionResult] { inbox.results }
 }
@@ -517,11 +519,12 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     try await manager.start(.assistant)
     let input = InputGateway(manager: manager)
     let result = ActionResult(
-        executionID: UUID(), owner: owner, inputID: UUID(), turn: nil, path: lifecyclePath,
+        executionID: UUID(), owner: owner, path: lifecyclePath, causality: .root(),
         status: .succeeded, effect: .contractCompleted, completion: .completed)
     #expect(await input.deliverActionResult(result) == .closed)
     #expect(
-        await input.deliverActivityEvent(ActivityEvent(activityID: UUID(), owner: owner, state: .failed, sequence: 1))
+        await input.deliverActivityEvent(
+            ActivityEvent(activityID: UUID(), owner: owner, state: .failed, sequence: 1, causality: .root()))
             == .closed)
     #expect(await replacement.results().isEmpty)
     #expect(await replacement.activities.isEmpty)
@@ -529,7 +532,8 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
     #expect(
         await input.deliverActivityEvent(
-            ActivityEvent(activityID: UUID(), owner: current, state: .started, sequence: 1)) == .accepted)
+            ActivityEvent(activityID: UUID(), owner: current, state: .started, sequence: 1, causality: .root()))
+            == .accepted)
 }
 
 @Test(.timeLimit(.minutes(1))) func terminalSlotIsReservedBeforeActionAdmissionAndDoesNotHoldLane() async throws {
@@ -826,7 +830,7 @@ private actor RevocationDevice {
     #expect(results.count == 1 && results.first?.status == .failed)
     #expect(results.first?.report != nil && results.first?.failure == .handlerFailed)
     let invalid = ActionResult(
-        executionID: UUID(), owner: owner, inputID: UUID(), turn: nil, path: lifecyclePath,
+        executionID: UUID(), owner: owner, path: lifecyclePath, causality: .root(),
         status: .failed, effect: .unknown, completion: .completed, failure: .handlerFailed)
     #expect(await input.deliverActionResult(invalid) == .closed)
     #expect(await agent.results().count == 1)
@@ -835,3 +839,72 @@ private actor RevocationDevice {
 }
 
 private struct DynamicResourceToolFixture: ToolModule { let definitions: [ActionBinding] }
+
+@Test func scheduledFeedbackPreservesInitiatingCausalChainAfterInputExpiry() async throws {
+    let session = UUID()
+    let agent = try ReceiptAgent()
+    let manager = AgentManager()
+    try await manager.register(agent, sessionID: session)
+    try await manager.start(.assistant)
+    let owner = ExecutionOwner(
+        agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
+    let inputGateway = InputGateway(manager: manager)
+    let root = UUID()
+    let turn = AgentTurn(ordinal: 9)
+    let payload = InputPayload.event("fixture")
+    let input = AgentInput(
+        sessionID: session, payload: payload,
+        metadata: .init(
+            payload: payload, rootID: root, parentID: UUID(), hops: 3,
+            deadline: .now.advanced(by: .seconds(-1))), turn: turn)
+    let call = ActionCall(actionPath: lifecyclePath, channel: "main")
+    let invocation = try ScheduledAction(
+        envelope: .init(source: .assistant, input: input, output: .actionCall(call), sequence: 17),
+        owner: owner, feedback: .terminal)
+    let registry = try ActionRegistry(definitions: [
+        ActionBinding(
+            path: lifecyclePath, displayName: "Fixture", kind: .finite,
+            completion: "Completed.", handler: { _ in })
+    ])
+    let scheduler = ChannelScheduler(registry: registry) { await inputGateway.deliverActionResult($0) }
+    _ = try await scheduler.enqueue(invocation: invocation)
+    try await scheduler.finish(inputID: input.id, source: .assistant)
+    await scheduler.finishResultDelivery()
+    let received = try #require(await agent.lastInput)
+    #expect(received.metadata.rootID == root && received.metadata.parentID == input.id)
+    #expect(received.metadata.hops == 4 && received.metadata.sequence == 17)
+    #expect(received.turn == turn && received.metadata.origin == .runtime)
+    #expect(!received.metadata.expired && received.id != input.id)
+    #expect(await agent.results().first?.causality == SignalCausality(envelope: invocation.envelope))
+    await scheduler.shutdown()
+    try await manager.stop(.assistant)
+}
+
+@Test(arguments: [-1, 0, 7, 8]) func activityFeedbackPreservesCausalityAndClosesExhaustedHops(_ hops: Int) async throws
+{
+    let session = UUID()
+    let agent = try ReceiptAgent()
+    let manager = AgentManager()
+    try await manager.register(agent, sessionID: session)
+    try await manager.start(.assistant)
+    let owner = ExecutionOwner(
+        agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
+    let gateway = InputGateway(manager: manager)
+    let context = SignalCausality(inputID: UUID(), rootID: UUID(), hops: hops, turn: AgentTurn(ordinal: 3))
+    let event = ActivityEvent(activityID: UUID(), owner: owner, state: .started, sequence: 12, causality: context)
+    let result = await gateway.deliverActivityEvent(event)
+    if (0..<8).contains(hops) {
+        #expect(result == .accepted)
+        let input = try #require(await agent.lastInput)
+        #expect(input.metadata.rootID == context.rootID && input.metadata.parentID == context.inputID)
+        #expect(input.metadata.hops == hops + 1 && input.metadata.sequence == 12 && input.turn == context.turn)
+    } else {
+        #expect(result == .closed)
+        #expect(await agent.activities.isEmpty)
+    }
+    let action = ActionResult(
+        executionID: UUID(), owner: owner, path: lifecyclePath, causality: context,
+        status: .succeeded, effect: .contractCompleted, completion: .completed)
+    #expect(await gateway.deliverActionResult(action) == ((0..<8).contains(hops) ? .accepted : .closed))
+    try await manager.stop(.assistant)
+}

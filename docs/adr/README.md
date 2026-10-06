@@ -253,3 +253,5 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [ADR0161 — Gateway execution and isolated function contracts](0161-gateway-execution-and-function-contracts.md).
 
 ✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](0162-invocation-failure-isolation.md).
+
+✅ [ADR0163 — Typed history and feedback causality](0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Remaining typed host controls, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.

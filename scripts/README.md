@@ -182,3 +182,5 @@ flowchart LR
 ✅ ADR0160: boundary checks reject Tool contracts, ActionBinding and protocol/runtime policy in business Action domains or @Action factories. Production assembly must bind the validated pure catalog through grouped host profiles. ❌ Static checks do not establish physical/model acceptance.
 
 ✅ ADR0161: checks enforce FunctionContracts/ExecutionRuntime/CallRuntime target separation, Actions import isolation, standard input without Channel, removed aliases and unique shared-source ownership. ❌ Static checks cannot establish physical/model acceptance.
+
+✅ ADR0163 checks keep history intent outside Core business enums, reject legacy history string parsing and require scheduled result context capture at the Gateway ledger boundary.

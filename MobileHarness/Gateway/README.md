@@ -97,8 +97,10 @@ Gateway never imports concrete Actions, UI, ModelKit, PlatformKit or App. App fr
 
 ✅ Unified provenance, bound Agent messaging, shared function execution, distinct protocol views, task-local wait/Channel scheduling, resource fences and bounded feedback/observations.
 
-❌ Complete original-root propagation for Action/activity feedback, generic activity subscriptions, priority scheduling and durable feedback/history remain outstanding. Physical stop acknowledgment is outside the software cleanup contract.
+✅ ADR0163 completes original-root propagation for Action/activity feedback. ❌ Generic activity subscriptions, priority scheduling and durable feedback/history remain outstanding. Physical stop acknowledgment is outside the software cleanup contract.
 
 Details: [Input](Input/README.md), [Output](Output/README.md), [Runtime](Runtime/README.md), [Registration](Output/Registration/README.md), [Protocols](Output/Protocols/README.md), [Scheduling](Output/Scheduling/README.md), [Resources](Output/Resources/README.md) and [Results](Output/Results/README.md).
 
 ✅ Invocation failure isolation preserves complete shared reports before protocol feedback. Ordinary handler failure cannot stop sibling or subsequent work; explicit cancellation and admission errors keep their existing scopes.
+
+✅ ADR0163: scheduled/action and activity feedback retain initiating causality just like native feedback. Hop exhaustion closes delivery while retaining the actual effect/result. Typed history intent uses the existing external domain-schema admission path.

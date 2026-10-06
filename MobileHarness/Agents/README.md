@@ -213,3 +213,5 @@ Assistant, SpeechPerception and VisionPerception accept action.result receipts w
 ❌ Full typed intent/control migration, remaining settings/device business routes, complete Action/activity causality and bounded model continuation are outstanding. Assistant currently displays Tool feedback without starting another LLM reasoning turn. Per-Agent target isolation, configuration hot reload, generic request/reply and activity subscriptions are not implemented.
 
 Detailed capacities/cleanup and real-device limitations: [Core](Core/README.md), [Communication](Communication/README.md), [ConversationMemory](ConversationMemory/README.md), [Assistant](Assistant/README.md), [SpeechPerception](SpeechPerception/README.md), [SpeechSynthesis](SpeechSynthesis/README.md), [VisionPerception](VisionPerception/README.md) and [Photographer](Photographer/README.md). Architecture: [Overall technical design](../README.md).
+
+✅ ADR0163: ConversationMemory consumes typed history.intent/1 from the domain catalog; execution feedback carries explicit SignalCausality. Remaining legacy host events and business workflow migration are separate stages.

@@ -103,7 +103,7 @@ flowchart LR
     Admit --> Receiver[Live receiver]
 ```
 
-Returning Tool feedback uses a fresh10-second admission deadline, preserved rootID/turn, parent inputID and one added hop; hop exhaustion is a delivery failure and never replays the effect. Completion-only Tools remain outcomes without feedback. ❌ Legacy runtime.event host commands retain External origin, and original Action/activity roots await their separate migration.
+Returning Tool feedback uses a fresh10-second admission deadline, preserved rootID/turn, parent inputID and one added hop; hop exhaustion is a delivery failure and never replays the effect. Completion-only Tools remain outcomes without feedback. ✅ ADR0163 completes Action/activity causal transport. ❌ Other legacy runtime.event host commands retain External origin until separate migration.
 
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
@@ -111,3 +111,5 @@ Returning Tool feedback uses a fresh10-second admission deadline, preserved root
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0163: ActionResult/ActivityEvent now preserve explicit initiating root/input/turn and advance hops once, with fresh bounded feedback admission. Invalid or exhausted hop contexts return closed before reception; owner fencing and existing capacity retry remain. Public external admission still rejects feedback payloads.

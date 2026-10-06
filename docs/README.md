@@ -163,7 +163,7 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 
 ✅ [History deletion validation](Validation-History.md#2026-10-06--history-deletion-and-deterministic-result-continuation): final full checks,15 focused tests and unsigned device build passed. ❌ Simulator CoreAI dependency and native confirmation acceptance remain pending.
 
-✅ [Signal origin and returning Tool feedback](adr/0149-signal-origin-and-tool-feedback.md) records typed admission and stale-owner/causal fencing. ❌ Action/activity roots and legacy typed controls remain pending.
+✅ [Signal origin and returning Tool feedback](adr/0149-signal-origin-and-tool-feedback.md) records typed admission and stale-owner/causal fencing. ✅ ADR0163 adds Action/activity roots and typed history intent. ❌ Other typed host controls remain pending.
 
 ✅ Unified executable capabilities are implemented under the [active Agent-driven architecture](../MobileHarness/README.md#canonical-functions-and-protocol-bindings). The decisions below record the migration stages; their original transitional contracts are historical.
 
@@ -184,3 +184,5 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [ADR0160 — Callable functions and protocol bindings](adr/0160-callable-functions-and-protocol-bindings.md) separates pure callable implementation from host registration/runtime protocol policy.
 
 ✅ [ADR0161 — Gateway execution and isolated function contracts](adr/0161-gateway-execution-and-function-contracts.md).
+
+✅ [ADR0163 — Typed history and feedback causality](adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Remaining typed host controls, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.

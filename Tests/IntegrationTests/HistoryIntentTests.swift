@@ -273,3 +273,21 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
     }
     await agent.stop()
 }
+
+@Test func typedHistorySchemaRejectsForeignContentAndLegacyStringIntent() async throws {
+    let contracts = try AgentContracts.communication
+    let invalid = AgentMessage(
+        contract: ConversationMemoryIntent.contract, content: "history.refresh", validate: { _ in })
+    #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(invalid) }
+    let session = UUID()
+    let agent = try ConversationMemoryAgent(sessionID: session)
+    try await agent.start()
+    let payload = InputPayload.event("history.refresh")
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await agent.receive(
+            AgentInput(
+                sessionID: session, payload: payload,
+                metadata: .init(payload: payload, source: "user")))
+    }
+    await agent.stop()
+}

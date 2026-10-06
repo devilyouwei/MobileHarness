@@ -4,7 +4,7 @@ Purpose: interpret explicit history intent without voice or model inference. Des
 
 | Direction | Implemented contract |
 | --- | --- |
-| Input | JSON v6 runtime.event/1: unexpired input, fixed root session. User-source refresh/delete(archive UUID), runtime-source cancel(request UUID); unknown payloads reject. tool.result/1: runtime source, matching session and pending callID; foreign/duplicate results reject. |
+| Input | JSON v6 history.intent/1 typed domain content: unexpired input, fixed root session. User-source refresh/delete(archive UUID), runtime-source cancel(request UUID); unknown payloads reject. tool.result/1: runtime source, matching session and pending callID; foreign/duplicate results reject. |
 | Output | Refresh emits internal UI.HistoryPresentation.showHistory. Delete emits internal History.Conversation.delete(id); successful correlated feedback emits UI.HistoryPresentation.showHistory using the original request identity. Failure emits non-business history.delete.failed; cancellation emits history.cancelled. All executed calls/control acknowledgments cross OutputGateway. |
 | Publish | None. |
 | Send | None. Tool feedback uses InputGateway; no direct Agent messages or effect services. |
@@ -32,3 +32,5 @@ flowchart LR
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0163: legacy history strings reject; refresh/delete/cancel use typed history.intent/1. The cancel request remains an external-origin trusted host command with runtime source and matching request UUID; it cannot masquerade as execution feedback. Generic host-control authority, archive/title policy and model continuation remain pending.

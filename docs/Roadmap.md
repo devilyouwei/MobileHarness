@@ -212,7 +212,7 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ [ADR0141](adr/0141-resource-control-ownership.md): public unlocked/locked(owner) replaces persistent faulted/recover. One occupancy authority includes transient writers, and revocable execution permits protect App effects. Cleanup timeout fails only its request; retained late cleanup automatically unlocks. Cancellation-independent acknowledgment remains. ❌ Physical camera-close/takeover timing and native uncooperative-I/O isolation acceptance remain pending.
 
-✅ [ADR0145](adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned ConversationMemory Agent and both Gateways, with bounded admission and joined cancellation. ❌ Archive/delete/title, navigation, other UI intents and model continuation remain pending.
+✅ [ADR0145](adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned ConversationMemory Agent and both Gateways, with bounded admission and joined cancellation. ✅ Confirmed deletion is also implemented. ❌ Archive/title, navigation, other UI intents and model continuation remain pending.
 
 ✅ [ADR0146](adr/0146-model-resource-interaction-ownership.md): model-resource task/admission, source-save and voice-switch policy moved from UI into independent AppSettingsWorkflow. ❌ Resource Agent/Gateway registration, cloud-form coordination and shared draft-value migration remain pending.
 
@@ -224,13 +224,13 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ Agent-driven scenario coverage now distinguishes six primary categories and external/Agent/runtime origins, with cross-cutting decisions, concurrency, triggers and recovery. ✅ Typed origin admission and Tool owner fencing are implemented in ADR0149. ❌ Unified lifecycle/capability Signals and common long-task feedback/cancellation remain unimplemented.
 
-✅ [ADR0149](adr/0149-signal-origin-and-tool-feedback.md): Signal origin and owner-fenced Tool feedback are implemented with preserved causal context and explicit delivery failures. ❌ Next stages: Action/activity root propagation → typed intent/control → history archive/title → Assistant continuation → settings/resources and device entry points. Each stage must reconcile actual code with the authoritative architecture and report remaining work.
+✅ [ADR0149](adr/0149-signal-origin-and-tool-feedback.md): Signal origin and owner-fenced Tool feedback are implemented with preserved causal context and explicit delivery failures. ✅ ADR0163 completes Action/activity roots and typed history intent. ❌ Next stages: remaining typed host controls → history archive/title → Assistant continuation → settings/resources and device entry points. Each stage must reconcile actual code with the authoritative architecture and report remaining work.
 
 ## Unified executable capabilities — completed consolidation
 
 ✅ ADR0150–0157: shared cooperative execution, one Actions source tree, six domain catalogs and cohesive entry files, explicit serialization keys, three-field paths and v6 native bindings, one canonical definition/outcome/handler, direct/scheduled adapters and retired Tools/ToolRuntime targets. Scheduled native calls preserve resource/serialization admission, original handler context, one typed feedback and joined cancellation.
 
-❌ Next Agent-driven stages: complete Action/activity original-root propagation, typed host intent/control producers, remaining settings/device entry points and registered failure presentation, then bounded result-driven model continuation. These are feature migration tasks rather than unfinished Action/Tool source consolidation. Physical/native/model acceptance remains separate from fixture and build evidence.
+❌ Next Agent-driven stages: remaining typed host control producers, archive/title and settings/device entry points and registered failure presentation, then bounded result-driven model continuation. These are feature migration tasks rather than unfinished Action/Tool source consolidation. Physical/native/model acceptance remains separate from fixture and build evidence.
 
 ✅ [ADR0158 — Unified Action authoring](adr/0158-unified-action-authoring.md): one @Action attribute for all capabilities; model context supplies text actions and request tools supplies native declarations. Text tags and native events retain distinct ActionCall/ToolCall transports.
 
@@ -241,3 +241,5 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ✅ [ADR0161 — Gateway execution and isolated function contracts](adr/0161-gateway-execution-and-function-contracts.md): standard FunctionInput contracts under Actions/Contracts; common ExecutionRuntime under Gateway/Runtime; isolated CallRuntime registration/adapters under Gateway/Output. Actions has no execution/protocol imports and Channel stays outside the common request. Validation is recorded in Validation-History.md.
 
 ✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](adr/0162-invocation-failure-isolation.md).
+
+✅ [ADR0163 — Typed history and feedback causality](adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Remaining typed host controls, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.
