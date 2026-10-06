@@ -271,3 +271,5 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 ✅ ADR0131: generic Core observations transport producer execution descriptions without Bluetooth classification; business Agent result/session policies are unchanged. ❌ Physical device failure acceptance remains pending.
 
 ✅ ADR0139: Photographer exposes monotonic usable-pose freshness as a read-only host signal; source silence releases the App writer after one second. Assistant priority over Photographer is host resource policy, not Agent-to-Agent cancellation or a model-callable permission.
+
+✅ Assistant JSON declares read-only History.list/read. Aliases resolve inside Agents and execution/results cross both Gateways. ❌ Tool feedback does not yet resume model reasoning.

@@ -190,3 +190,5 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ ADR0139: Composition configures Assistant-over-Photographer resource takeover across the NexArm writer; BluetoothWorkflow ends tracking on stale usable-pose input. Normal Action results, vision sessions, Settings takeover and native recovery retain independent scopes.
 
 ✅ Known speech storage/producer failures receive localized wording in SpeechFailurePresentation after playback cleanup. The adapter retains the underlying error; unknown errors and cancellation pass through unchanged. ❌ Business-workflow Agent migration remains planned.
+
+✅ Composition injects the shared conversation journal into Tools.HistoryQueryService. ❌ History UI still uses its existing workflow until the structured-intent migration.

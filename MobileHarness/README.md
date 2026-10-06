@@ -136,6 +136,7 @@ flowchart TB
     Workflows --> ActionRuntime
     Workflows --> ToolRuntime
 
+    Tools --> StorageChat
     StorageChat --> Storage
     StorageAudio --> Storage
     Defaults --> ModelKit
@@ -191,6 +192,7 @@ MobileHarness/
 │   └── UI/
 ├── Tools/
 │   ├── Runtime/                 # Independent ToolRuntime and Contracts
+│   ├── History/                 # Read-only paged conversation queries
 │   ├── System/
 │   ├── Camera/
 │   ├── Robot/
@@ -243,7 +245,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `Actions/Runtime/` | ActionRuntime | None |
 | `Actions/` excluding `Runtime/` | Actions | ActionRuntime, PlatformKit, BehaviorDefinitions |
 | `Tools/Runtime/` | ToolRuntime | None |
-| `Tools/` excluding `Runtime/` | Tools | ToolRuntime, BehaviorDefinitions |
+| `Tools/` excluding `Runtime/` | Tools | ToolRuntime, BehaviorDefinitions, StorageChat |
 | `Storage/` core | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
 | `Storage/Audio/` | StorageAudio | Storage |
@@ -681,7 +683,7 @@ flowchart TB
 
 The facade holds no mutable feature state. Each feature target owns its effects and depends only on the values/services needed by that feature. UI owns editable presentation state; workflows own persistence, validation and asynchronous operation boundaries. Credentials use the Keychain through App-supplied operations, while non-secret settings and conversation records use local document storage.
 
-Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
+Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant JSON also declares History.list/read; Tools projects read-only paged previews from the same injected journal, returns at most 1800 UTF-8 bytes with explicit truncation, and routes results through InputGateway. UI still uses its existing history workflow; Tool feedback does not yet continue model inference. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
 
 <a id="391-platformkit-versus-modelkit"></a>
 

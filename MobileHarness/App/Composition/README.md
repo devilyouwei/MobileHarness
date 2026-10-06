@@ -132,3 +132,5 @@ flowchart TD
 ✅ All six NexArm resources share nexarm.writer executionGroup. Host policy explicitly permits Assistant to preempt Photographer; reverse, equal-owner and unknown-owner conflicts reject. Cleanup uses stopAgentActions and preserves Settings ownership. The Photographer factory binds a weak read-only hasFreshPose query into BluetoothWorkflow, avoiding a retained Agent cycle; default production freshness is one second. Generic Gateway contains no concrete identities/device policy.
 
 ❌ Physical interruption and camera/Bluetooth coexistence acceptance remain pending.
+
+✅ ApplicationRuntime binds HistoryQueryService using its existing shared journal; no new history lifecycle or business query implementation is added to App. ❌ UI intent migration remains pending.

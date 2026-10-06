@@ -11,6 +11,7 @@ Purpose: implement functions reached through resolved ToolCalls. Design goals: e
 | Root | ToolModules domain catalog and ToolMacro declarations |
 | System | Fixed runtime-information function |
 | Robot | Completion-only five-motor tracking target; Gateway resource metadata and injected App sender |
+| History | Read-only bounded conversation metadata and turn previews from injected StorageChat |
 | Camera | Foreground camera/vision intent through an injected App owner |
 | UI | Immediate presentation entries; Support owns injected interfaces and values; App owns turn acceptance policy |
 
@@ -30,7 +31,7 @@ flowchart LR
 
 ## Registration
 
-`@Tool(path:title:resources:timeout:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule, UIToolModule, CameraToolModule and RobotToolModule; BehaviorAssembly atomically constructs the registry; Gateway BehaviorCoverage checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
+`@Tool(path:title:resources:timeout:)` generates `nameDefinition(handler:)` and `nameDefinition(completing:)`. Domain Support catalogs bind explicit handlers. `ToolModules.builtIn` lists SystemToolModule, UIToolModule, CameraToolModule, RobotToolModule and HistoryToolModule; BehaviorAssembly atomically constructs the registry; Gateway BehaviorCoverage checks every model/internal Tool permission before producers start. Attributes do not grant permissions, discover implementations or create dependencies.
 
 Public entry signatures remain explicit: UI updates receive ToolInvocation and an injected callback; showPose receives a request, execution context and presentation callback; runtimeInfo returns a String. Add an entry in its domain catalog; only adding a domain changes ToolModules.
 
@@ -46,10 +47,12 @@ VisionPerception coalesces its bounded replaceable gaze/skeleton output before d
 
 ## Scope and limitations
 
-✅ SystemToolModule, UIToolModule, CameraToolModule and RobotToolModule provide explicit functions under the independent ToolRuntime contracts. See [Runtime](Runtime/README.md), [UI](UI/README.md) and [System](System/README.md).
+✅ SystemToolModule, UIToolModule, CameraToolModule, RobotToolModule and HistoryToolModule provide explicit functions under the independent ToolRuntime contracts. See [Runtime](Runtime/README.md), [UI](UI/README.md) and [System](System/README.md).
 
-❌ Local native model Tool transport, live health reporting, additional network/storage/device domains and rendering acknowledgment are not implemented. Non-cooperative callbacks can delay callers; metadata does not imply forced interruption.
+❌ Local native model Tool transport, live health reporting, additional network/device domains and rendering acknowledgment are not implemented. Non-cooperative callbacks can delay callers; metadata does not imply forced interruption.
 
 ✅ Camera domain adds Camera.open/close/flip with a required CameraControlCapability; completion-only controls reuse the App camera owner and its lease. See [Camera](Camera/README.md). No direct platform dependency or Tool queue. ❌ Local native model Tool transport remains unsupported; cloud complete Tool calls are supported.
 
 ✅ ToolRuntime resources are generic raw identifiers; the unused cameraCapture constant is removed. Concrete resource declarations remain with Tool domains and host lifetime owners. ❌ Runtime contains no built-in Tool catalog.
+
+✅ History.list/read return bounded JSON previews from the shared journal; the Tools target now depends on StorageChat. ❌ UI intent unification and model continuation remain pending.

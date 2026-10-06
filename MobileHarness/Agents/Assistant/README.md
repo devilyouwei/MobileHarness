@@ -283,3 +283,5 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ✅ ConversationContextBuilder selects the last ten completed rounds and preserves exact raw text. Assistant reads records with a token, builds the request, persists it with fenced admission and sends that stored request to ChatCapability. Archived/failed/cancelled/interrupted rounds are excluded. Conflicts and persistence errors terminate this input without calling the model or retrying.
 
 ❌ Retrieval-based context and automatic conflict retry are not implemented.
+
+✅ JSON v5 declares History.list/read with required string pagination parameters. Cloud complete native calls reach bounded read-only history previews. Returned data uses the existing escaped ToolResult path, not Action parsing. ❌ Local native calls, full history search/export and result-driven model continuation remain unsupported.

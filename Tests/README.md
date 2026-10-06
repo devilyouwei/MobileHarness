@@ -86,3 +86,5 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ Optional `NEXARM_SERIAL_AIM_STRESS=1` extends the tracking acceptance gate with three supervised six-second Robot.aim fixtures: 5Hz bounded base sweep (−0.08…0.08 rad), 50Hz identical target, then 5Hz ±0.01 rad target alternation. Centered poses pass InputGateway to maintain real Photographer freshness; explicit internal Tool envelopes pass OutputGateway into the production worker. SDK 30ms pacing and 512-write bound remain active. Stress mode skips the unrelated manual takeover trial. ❌ Encoder samples do not determine visible/high-frequency vibration; user observation and BLE acceptance remain separate.
 
 ✅ Storage boundary migration regressions cover fenced admission, Agent-owned context, producer failures and UI title rules. ❌ These tests do not establish device acceptance.
+
+✅ Shared history Tool tests verify real journal queries and native declaration/execution compatibility. ❌ Full conversational task continuation remains a later stage.

@@ -150,10 +150,12 @@ let package = Package(
             name: "StorageAudio", dependencies: ["Storage"],
             path: "MobileHarness/Storage/Audio", exclude: ["README.md"]),
         .target(
-            name: "Tools", dependencies: ["ToolRuntime", "BehaviorDefinitions"], path: "MobileHarness/Tools",
+            name: "Tools", dependencies: ["ToolRuntime", "BehaviorDefinitions", "StorageChat"],
+            path: "MobileHarness/Tools",
             exclude: [
                 "Runtime",
                 "Camera/README.md", "Camera/Support/README.md",
+                "History/README.md", "History/Support/README.md",
                 "Robot/README.md", "Robot/Support/README.md",
                 "README.md", "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",
             ]),

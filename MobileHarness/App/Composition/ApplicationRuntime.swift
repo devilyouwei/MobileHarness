@@ -90,6 +90,7 @@ final class ApplicationRuntime {
         let robot = NexArmBehaviorAdapter(bluetooth: bluetooth, activity: activity)
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation, camera: presentation,
+            history: HistoryQueryService(store: conversations),
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
             shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) },
             aim: { base, pitch, invocation in try await robot.aim(base, pitch, invocation) })

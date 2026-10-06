@@ -5,6 +5,7 @@ import Agents
 import BehaviorAssembly
 import Foundation
 import Gateway
+import StorageChat
 import Testing
 import ToolRuntime
 import Tools
@@ -53,6 +54,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let endpoint = BehaviorEndpoint()
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint, camera: endpoint,
+        history: HistoryQueryService(store: ConversationHistoryStore()),
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw ToolExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable") })

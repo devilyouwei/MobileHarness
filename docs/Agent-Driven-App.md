@@ -98,7 +98,7 @@ Capabilities expose typed outcomes and operating conditions. System permission p
 ## Staged Migration
 
 1. **Clean Storage boundaries — implemented.** Assistant owns ten-turn selection/request assembly, SpeechSynthesis owns producer errors, and UI owns title fallback wording. Exact request admission uses an opaque read token; persisted schemas, atomic writes and audio ownership are preserved. See [ADR0143](adr/0143-storage-consumer-policy-boundaries.md).
-2. **Expose shared capabilities.** Add history queries and BLE discovery through Tools, reusing existing implementations. Define navigation and picker endpoints in UI. Keep business Action behavior in Actions and native device mechanisms in PlatformKit.
+2. **Expose shared capabilities — in progress.** History.list/read now provide read-only bounded previews through returning Tools and Assistant JSON. BLE discovery remains pending. Define navigation and picker endpoints in UI. Keep business Action behavior in Actions and native device mechanisms in PlatformKit.
 3. **Route UI business intent through Agents.** Replace direct feature-workflow calls incrementally. Add request correlation, progress and cancellation; maintain page-independent task ownership.
 4. **Move business coordination out of App.** Introduce a ConversationMemory Agent when history, archival, summary and retrieval form a coherent responsibility. Do not create an Agent solely for default title wording. Keep Assistant responsible for its reply context strategy.
 5. **Enable conversational task continuation.** Resume decision-making from actual Tool results, with bounded steps/deadlines and per-Agent permissions. Validate equivalent outcomes for button and conversational entry points.

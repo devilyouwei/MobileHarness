@@ -39,3 +39,5 @@ No new queue or long-lived task. Maximum 32 Action modules and 32 Tool modules; 
 ✅ RobotToolModule receives an explicit completion-only aim sender alongside CameraToolModule. Gateway continues to own startup permission coverage.
 
 ✅ Robot Tool resource metadata is generated from its callable declaration; BehaviorAssembly binds the injected sender without duplicating resource or Agent permissions.
+
+✅ Built-in assembly requires HistoryQueryCapability and registers History.list/read alongside existing Tools. Missing handlers remain startup errors; this assembly imports no StorageChat. ❌ No default empty-result fallback.

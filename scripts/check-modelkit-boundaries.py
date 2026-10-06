@@ -192,7 +192,8 @@ for root, allowed in [
 ]:
     for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
-            if imported not in allowed:
+            history_storage = (root == 'Tools' and source.relative_to(ROOT / 'MobileHarness/Tools').parts[0] == 'History' and imported == 'StorageChat')
+            if imported not in allowed and not history_storage:
                 errors.append(f'Forbidden behavior-layer import {imported}: {source.relative_to(ROOT)}')
 # Behavior registration belongs to domain catalogs, not individual App call sites.
 behavior_target = targets.get('BehaviorAssembly', {})
@@ -394,6 +395,14 @@ def visit(name):
     visited.add(name)
 for name in targets:
     visit(name)
+# History uses only a foundational journal; runtime/assembly remain independent.
+tool_dependencies = {next(iter(d.values()))[0] for d in targets['Tools'].get('dependencies', [])}
+if 'StorageChat' not in tool_dependencies:
+    errors.append('History Tools require the explicit StorageChat dependency')
+for source in (ROOT / 'MobileHarness/Tools/History').rglob('*.swift'):
+    imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
+    if imports - {'Foundation', 'ToolRuntime', 'StorageChat'}:
+        errors.append(f'History Tools have non-foundational imports: {source.relative_to(ROOT)}')
 # Feature-specific presentation contracts must not return to Agent infrastructure.
 if (ROOT / "MobileHarness/Agents/Core/Output/PoseOverlay.swift").exists():
     errors.append("PoseOverlay belongs to UI/Camera, not AgentCore")
