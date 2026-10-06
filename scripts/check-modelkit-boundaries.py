@@ -342,6 +342,15 @@ for source in (ROOT / 'MobileHarness/Agents/ConversationMemory').glob('*.swift')
     imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
     if imports - {'Foundation', 'AgentCore'}:
         errors.append(f'ConversationMemory must emit capabilities rather than call services: {source.relative_to(ROOT)}')
+# Resource UI state must remain passive; asynchronous effects belong to the feature.
+resource_state = (ROOT / 'MobileHarness/UI/Settings/ModelResourcesState.swift').read_text()
+resource_implementation = resource_state.split('public final class ModelResourcesState', 1)[1]
+if re.search(r'\bTask\b|\basync\b|\bModelResourcesOperating\b', resource_implementation):
+    errors.append('ModelResourcesState owns resource operation effects')
+if 'ModelResourceSelectionError' in resource_state or 'func isInstalled(in:' in resource_state:
+    errors.append('Resource installation policy belongs to AppSettingsWorkflow')
+if (ROOT / 'Tests/UITests/ModelResourcesStateTests.swift').exists():
+    errors.append('Resource operation tests belong to AppWorkflowTests')
 # Discovery/connection presentation must not consume device Action diagnostics.
 bluetooth_view = (ROOT / 'MobileHarness/UI/Settings/BluetoothSettingsView.swift').read_text()
 discovery_view = bluetooth_view.split('private struct BluetoothArmDetailView', 1)[0]

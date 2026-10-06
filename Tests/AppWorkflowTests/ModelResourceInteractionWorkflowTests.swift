@@ -1,3 +1,4 @@
+import AppSettingsWorkflow
 import Foundation
 import Testing
 import UI
@@ -34,6 +35,7 @@ import UI
     func download(_ id: String) async throws {
         downloads += 1
         if blockAdmission { try await withCheckedThrowingContinuation { admission = $0 } }
+        try Task.checkCancellation()
         if failDownload { throw CocoaError(.fileReadUnknown) }
         active = true
     }
@@ -49,26 +51,27 @@ import UI
     let operations = ResourceOperationsFixture()
     operations.blockAdmission = true
     operations.blockCancellation = true
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
-    let download = Task { await state.perform("model", operation: "download") }
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+    let download = Task { await workflow.perform("model", operation: .download) }
     while operations.admission == nil { await Task.yield() }
     let item = state.items[0]
     #expect(state.isDownloading(item))
     #expect(state.status(item) == "正在提交下载…")
-    await state.perform("model", operation: "download")
-    await state.perform("model", operation: "remove")
+    await workflow.perform("model", operation: .download)
+    await workflow.perform("model", operation: .remove)
     #expect(operations.downloads == 1)
     #expect(operations.removals == 0)
-    let cancel = Task { await state.perform("model", operation: "cancel") }
+    let cancel = Task { await workflow.perform("model", operation: .cancel) }
     while !state.isCancelling("model") { await Task.yield() }
-    await state.perform("model", operation: "cancel")
+    await workflow.perform("model", operation: .cancel)
     #expect(operations.cancellations == 0)
     operations.admission?.resume()
     operations.admission = nil
     while operations.cancellation == nil { await Task.yield() }
-    await state.perform("model", operation: "cancel")
-    await state.perform("model", operation: "download")
+    await workflow.perform("model", operation: .cancel)
+    await workflow.perform("model", operation: .download)
     #expect(operations.cancellations == 1)
     #expect(state.status(item) == "正在取消…")
     operations.cancellation?.resume()
@@ -82,39 +85,41 @@ import UI
 @MainActor @Test func activeDownloadAllowsCancellationAndFailureReleasesSubmission() async {
     let operations = ResourceOperationsFixture()
     operations.active = true
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
-    await state.perform("model", operation: "download")
-    await state.perform("model", operation: "remove")
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+    await workflow.perform("model", operation: .download)
+    await workflow.perform("model", operation: .remove)
     #expect(operations.downloads == 0)
     #expect(operations.removals == 0)
     #expect(state.items[0].progress == 0.42)
-    await state.perform("model", operation: "cancel")
+    await workflow.perform("model", operation: .cancel)
     #expect(operations.cancellations == 1)
     operations.failDownload = true
-    await state.perform("model", operation: "download")
+    await workflow.perform("model", operation: .download)
     #expect(state.error != nil)
     #expect(!state.isBusy(state.items[0]))
     operations.failDownload = false
-    await state.perform("model", operation: "download")
+    await workflow.perform("model", operation: .download)
     #expect(operations.downloads == 2)
     #expect(state.items[0].active)
 }
 
 @MainActor @Test func failedStatusRefreshKeepsAdmittedDownloadLockedUntilCancellation() async {
     let operations = ResourceOperationsFixture()
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
     operations.failRefresh = true
-    await state.perform("model", operation: "download")
+    await workflow.perform("model", operation: .download)
     #expect(state.isDownloading(state.items[0]))
     #expect(state.error != nil)
-    await state.perform("model", operation: "download")
-    await state.perform("model", operation: "remove")
+    await workflow.perform("model", operation: .download)
+    await workflow.perform("model", operation: .remove)
     #expect(operations.downloads == 1)
     #expect(operations.removals == 0)
     operations.failRefresh = false
-    await state.perform("model", operation: "cancel")
+    await workflow.perform("model", operation: .cancel)
     #expect(operations.cancellations == 1)
     #expect(!state.isBusy(state.items[0]))
 }
@@ -133,10 +138,11 @@ import UI
 @MainActor @Test func failedSpeechPreferenceSaveRestoresActivePolicy() async {
     let operations = ResourceOperationsFixture()
     operations.failSave = true
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
     state.source.useCustomRecognition = true
-    await state.saveSource()
+    await workflow.saveSource()
     #expect(!state.source.useCustomRecognition)
     #expect(state.error != nil)
     #expect(!state.saving)
@@ -159,8 +165,8 @@ import UI
     let silero = ModelResourceItem(
         id: "silero", name: "VAD", status: "Installed", bytes: 1,
         progress: 1, installed: true, active: false, failure: nil)
-    #expect(ModelResourceGroup.recognition.isInstalled(in: [nemotron]))
-    #expect(!ModelResourceGroup.recognition.isInstalled(in: [silero]))
+    #expect(ModelResourcePolicy.isInstalled(.recognition, in: [nemotron]))
+    #expect(!ModelResourcePolicy.isInstalled(.recognition, in: [silero]))
     #expect(ModelResourceGroup.synthesis.modelIDs == ["moss-tts-nano"])
     #expect(ModelResourceGroup.language.modelIDs == ["gemma4-e2b"])
     #expect(ModelResourceGroup.vision.modelIDs == ["yolo26n-pose"])
@@ -169,9 +175,10 @@ import UI
 @MainActor @Test func missingRecognitionResourcesBounceSwitchAndPresentInstallNotice() async {
     let operations = ResourceOperationsFixture()
     operations.missingGroup = .recognition
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
-    await state.setCustomModel(.recognition, enabled: true)
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+    await workflow.setCustomModel(.recognition, enabled: true)
     #expect(!state.source.useCustomRecognition)
     #expect(!state.source.useCustomSynthesis)
     #expect(state.installationNotice == ModelResourceGroup.recognition.installationMessage)
@@ -181,11 +188,12 @@ import UI
 
 @MainActor @Test func speechSwitchPreservesUnsavedDownloadSourceEdits() async {
     let operations = ResourceOperationsFixture()
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
     state.source.endpoint = "unfinished-domain-edit"
     state.source.allowsCellular = true
-    await state.setCustomModel(.synthesis, enabled: true)
+    await workflow.setCustomModel(.synthesis, enabled: true)
     #expect(state.source.endpoint == "unfinished-domain-edit")
     #expect(state.source.allowsCellular)
     #expect(state.source.useCustomSynthesis)
@@ -199,11 +207,12 @@ import UI
     let operations = ResourceOperationsFixture()
     operations.storedSource.useCustomSynthesis = true
     operations.storedSource.allowsCellular = false
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
     state.source.endpoint = "https://hf-mirror.com"
     state.source.useCustomRecognition = true  // Unsaved switch draft must not leak into endpoint persistence.
-    await state.perform("model", operation: "download")
+    await workflow.perform("model", operation: .download)
     #expect(operations.downloads == 1)
     #expect(operations.storedSource.endpoint == "https://hf-mirror.com")
     #expect(operations.storedSource.allowsCellular)
@@ -213,17 +222,37 @@ import UI
 
 @MainActor @Test func failedAutomaticSourceSavePreventsDownloadAndRetainsRetryDraft() async {
     let operations = ResourceOperationsFixture()
-    let state = ModelResourcesState(operations: operations)
-    await state.restore()
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
     operations.failSave = true
     state.source.endpoint = "https://hf-mirror.com"
-    await state.perform("model", operation: "download")
+    await workflow.perform("model", operation: .download)
     #expect(operations.downloads == 0)
     #expect(state.source.endpoint == "https://hf-mirror.com")
     #expect(operations.storedSource.endpoint == "https://huggingface.co")
     #expect(state.error != nil)
     operations.failSave = false
-    await state.perform("model", operation: "download")
+    await workflow.perform("model", operation: .download)
     #expect(operations.downloads == 1)
     #expect(operations.storedSource.endpoint == "https://hf-mirror.com")
+}
+
+@MainActor @Test(.timeLimit(.minutes(1))) func modelResourceAdmissionSurvivesCancelledPageCaller() async throws {
+    let operations = ResourceOperationsFixture()
+    operations.blockAdmission = true
+    let state = ModelResourcesState()
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+    let page = Task { await workflow.perform("model", operation: .download) }
+    while operations.admission == nil { await Task.yield() }
+    page.cancel()
+    #expect(state.isDownloading(state.items[0]))
+    operations.admission?.resume()
+    operations.admission = nil
+    await page.value
+    #expect(operations.active)
+    #expect(state.isDownloading(state.items[0]))
+    await workflow.perform("model", operation: .cancel)
+    #expect(!state.isBusy(state.items[0]))
 }

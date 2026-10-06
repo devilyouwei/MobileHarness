@@ -58,3 +58,5 @@ Purpose: test cross-module history operations using the real journal and a contr
 ✅ History workflow fixtures use exact requests with read tokens; archive/title/delete operation behavior remains unchanged. ❌ Agent-based history coordination remains planned.
 
 ✅ History fixtures explicitly inject refresh effects; failed preparation cannot invoke refresh, and archive/title cancellation contracts remain tested. ❌ Native page interaction remains unverified.
+
+✅ ModelResourceInteractionWorkflowTests migrates resource admission/cancel/source/rollback regressions from UITests and adds cancelled-page-caller acceptance. Fixtures use the owning ModelResourcesOperating contract and no network/model weights. ❌ Native UI interaction remains separate.

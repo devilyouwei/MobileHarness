@@ -106,3 +106,5 @@ Capabilities expose typed outcomes and operating conditions. System permission p
 ✅ This proposal records the target architecture and migration sequence; the first Storage boundary stage is implemented.
 
 ✅ ConversationMemory and its scoped history presentation endpoint implement the first UI intent route. ❌ Other feature intent routing, memory mutations and model continuation remain pending. Each migration must update owning READMEs, dependency checks, the technical plan and an ADR before replacing current contracts.
+
+✅ UI boundary stage (ADR0146): model-resource interaction ownership moved into independent feature workflow, with passive state and typed controls. ❌ These controls are not yet Agent/Gateway endpoints; resource conversational access and remaining UI policy remain staged work.

@@ -199,3 +199,5 @@ flowchart LR
 
 
 ✅ [ADR0141](adr/0141-resource-control-ownership.md): ResourceCoordinator expresses control ownership only as unlocked/locked(owner), including transient execution. Internal handoff retains old work until actual completion; a timeout fails its request and late cleanup automatically unlocks. Joined stop errors do not create persistent resource faults. Cancellation-independent waiting remains from ADR0140. App validates revocable execution permits; Bluetooth recovery, Action/Tool outcomes and Channel queues remain independent. ❌ Physical stop/camera-close timing acceptance remains pending.
+
+✅ Model-resource interaction policy now belongs to AppSettingsWorkflow: bounded admission, ordered cancellation, source save and preference rollback. UI receives passive state and typed controls; App supplies lifetime and injected Management endpoints. ❌ Resource Agent/Gateway routing and cloud SettingsState coordination remain pending (ADR0146).

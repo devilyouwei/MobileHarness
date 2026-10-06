@@ -76,7 +76,9 @@ final class AppAssembly {
                 self.container?.lifecycle.endSettingsChange()
             })
     }
-    @ObservationIgnored lazy var modelResources = ModelResourcesState(operations: modelResourcesWorkflow)
+    let modelResources = ModelResourcesState()
+    @ObservationIgnored lazy var modelResourceControls = ModelResourceInteractionWorkflow(
+        state: modelResources, operations: modelResourcesWorkflow)
     private func quiesceForModelRemoval(_ id: String) async {
         if id == "yolo26n-pose" {
             await camera.pauseVisionForModelMaintenance()

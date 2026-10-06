@@ -134,3 +134,5 @@ flowchart TD
 ❌ Physical interruption and camera/Bluetooth coexistence acceptance remain pending.
 
 ✅ ApplicationRuntime binds HistoryQueryService using its existing shared journal; App retains no history query policy. ✅ Composition now supplies a separate root memory session, history Agent/transport and scoped presentation adapter. ❌ Mutation intent migration remains pending.
+
+✅ Composition retains ModelResourceInteractionWorkflow and its passive ModelResourcesState separately, passing both explicitly to SettingsView. ❌ Resource controls are not yet routed through an Agent/Gateway.

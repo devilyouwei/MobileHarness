@@ -49,6 +49,7 @@ struct MobileHarnessApp: App {
                         settings: assembly.settings, bluetooth: assembly.bluetooth.state,
                         bluetoothControls: assembly.bluetooth, history: assembly.history.state,
                         historyControls: assembly.history, modelResources: assembly.modelResources,
+                        modelResourceControls: assembly.modelResourceControls,
                         audioDetection: container?.audioDetection.state,
                         audioDetectionControls: container?.audioDetection
                     ) {

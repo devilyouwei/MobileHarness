@@ -4,7 +4,7 @@
 
 | Area | Delivered scope |
 | --- | --- |
-| Agent runtime | Five business Agents, JSON v5 permissions, static communication and independent AgentCore. |
+| Agent runtime | Six business Agents, JSON v5 permissions, static communication and independent AgentCore. |
 | Processing | Local speech/chat/pose capabilities, explicit cloud chat configuration and shared model management. |
 | Behavior | Scheduled Actions, direct Tools, nested wait, result feedback and declared-resource coordination. |
 | Host | Independent UI, role-specific lifecycle dependencies, six feature workflows and typed App adapters. |
@@ -211,3 +211,5 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ✅ [ADR0141](adr/0141-resource-control-ownership.md): public unlocked/locked(owner) replaces persistent faulted/recover. One occupancy authority includes transient writers, and revocable execution permits protect App effects. Cleanup timeout fails only its request; retained late cleanup automatically unlocks. Cancellation-independent acknowledgment remains. ❌ Physical camera-close/takeover timing and native uncooperative-I/O isolation acceptance remain pending.
 
 ✅ [ADR0145](adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned ConversationMemory Agent and both Gateways, with bounded admission and joined cancellation. ❌ Archive/delete/title, navigation, other UI intents and model continuation remain pending.
+
+✅ [ADR0146](adr/0146-model-resource-interaction-ownership.md): model-resource task/admission, source-save and voice-switch policy moved from UI into independent AppSettingsWorkflow. ❌ Resource Agent/Gateway registration, cloud-form coordination and shared draft-value migration remain pending.

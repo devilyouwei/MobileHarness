@@ -35,7 +35,7 @@ public struct ModelResourceItem: Identifiable, Sendable {
         self.failure = failure
     }
 }
-public enum ModelResourceGroup: String, Sendable {
+public enum ModelResourceGroup: String, Sendable, CaseIterable {
     case recognition, synthesis, language, vision
     public var title: String {
         switch self {
@@ -53,10 +53,6 @@ public enum ModelResourceGroup: String, Sendable {
         case .vision: ["yolo26n-pose"]
         }
     }
-    public func isInstalled(in items: [ModelResourceItem]) -> Bool {
-        let required = self == .recognition ? Set(["nemotron"]) : modelIDs
-        return required.allSatisfy { id in items.contains { $0.id == id && $0.installed && !$0.active } }
-    }
     public var installationMessage: String {
         switch self {
         case .recognition: "请先下载并安装 Nemotron 语音识别模型，再开启自定义识别模型。"
@@ -65,11 +61,6 @@ public enum ModelResourceGroup: String, Sendable {
         case .vision: "请先下载并安装 YOLO 姿态模型。"
         }
     }
-}
-public struct ModelResourceSelectionError: LocalizedError, Sendable {
-    public let group: ModelResourceGroup
-    public init(group: ModelResourceGroup) { self.group = group }
-    public var errorDescription: String? { group.installationMessage }
 }
 public struct ModelResourceSourceDraft: Codable, Sendable {
     public var endpoint: String
@@ -104,121 +95,29 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
         try values.encode(useCustomSynthesis, forKey: .useCustomSynthesis)
     }
 }
-@MainActor public protocol ModelResourcesOperating: AnyObject {
-    func refresh() async throws -> [ModelResourceItem]
-    func restoreSource() async throws -> ModelResourceSourceDraft
-    func saveSource(_ source: ModelResourceSourceDraft) async throws
-    func download(_ id: String) async throws
-    func cancel(_ id: String) async throws
-    func remove(_ id: String) async throws
+public enum ModelResourceOperation: Sendable { case download, remove, cancel }
+
+@MainActor public protocol ModelResourcesControlling: AnyObject {
+    func restore() async
+    func refresh() async
+    func saveSource() async
+    func saveDownloadSource() async -> Bool
+    func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async
+    func perform(_ id: String, operation: ModelResourceOperation) async
 }
+
 @MainActor @Observable public final class ModelResourcesState {
     public var source = ModelResourceSourceDraft()
-    public private(set) var items: [ModelResourceItem] = []
-    public private(set) var error: String?
-    public private(set) var saving = false
+    public var items: [ModelResourceItem] = []
+    public var installedGroups: Set<ModelResourceGroup> = []
+    public var error: String?
+    public var saving = false
     public var installationNotice: String?
-    public private(set) var hasRestored = false
-    private enum Operation { case download, remove }
-    private var pending: [String: Operation] = [:]
-    private var admitted: Set<String> = []
-    private var cancelling: Set<String> = []
-    @ObservationIgnored private var requests: [String: Task<Void, Error>] = [:]
-    @ObservationIgnored private var refreshGeneration: UInt64 = 0
-    @ObservationIgnored private let operations: any ModelResourcesOperating
-    public init(operations: any ModelResourcesOperating) { self.operations = operations }
-    public func restore() async {
-        do {
-            source = try await operations.restoreSource()
-            hasRestored = true
-            await refresh()
-        } catch { self.error = error.localizedDescription }
-    }
-    public func refresh() async {
-        refreshGeneration &+= 1
-        let generation = refreshGeneration
-        do {
-            let updated = try await operations.refresh()
-            guard generation == refreshGeneration else { return }
-            items = updated
-            if !saving {
-                let saved = try await operations.restoreSource()
-                source.useCustomRecognition = saved.useCustomRecognition
-                source.useCustomSynthesis = saved.useCustomSynthesis
-            }
-            admitted.subtract(updated.map(\.id))
-        } catch {
-            guard generation == refreshGeneration else { return }
-            self.error = error.localizedDescription
-        }
-    }
-    public func saveSource() async {
-        guard !saving else { return }
-        saving = true
-        defer { saving = false }
-        do {
-            try await operations.saveSource(source)
-            source = try await operations.restoreSource()
-            error = nil
-        } catch { await handleSaveFailure(error) }
-    }
-    /// Persist only the download endpoint; voice switches retain their durable values.
-    @discardableResult public func saveDownloadSource() async -> Bool {
-        guard hasRestored, !saving else { return false }
-        saving = true
-        defer { saving = false }
-        let endpoint = source.endpoint
-        do {
-            var draft = try await operations.restoreSource()
-            if draft.endpoint == endpoint && draft.allowsCellular {
-                error = nil
-                return true
-            }
-            draft.endpoint = endpoint
-            draft.allowsCellular = true
-            try await operations.saveSource(draft)
-            let saved = try await operations.restoreSource()
-            if source.endpoint == endpoint { source.endpoint = saved.endpoint }
-            source.allowsCellular = true
-            error = nil
-            return true
-        } catch {
-            self.error = error.localizedDescription
-            return false
-        }
-    }
-    private func handleSaveFailure(_ failure: any Error) async {
-        error = failure.localizedDescription
-        if failure is ModelResourceSelectionError {
-            installationNotice = failure.localizedDescription
-            error = nil
-        }
-        if let saved = try? await operations.restoreSource() {
-            source.useCustomRecognition = saved.useCustomRecognition
-            source.useCustomSynthesis = saved.useCustomSynthesis
-        }
-    }
-    public func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async {
-        guard !saving, group == .recognition || group == .synthesis else { return }
-        saving = true
-        defer { saving = false }
-        do {
-            // A voice switch must not save or validate an unfinished download-domain edit.
-            var draft = try await operations.restoreSource()
-            if group == .recognition {
-                draft.useCustomRecognition = enabled
-                source.useCustomRecognition = enabled
-            } else {
-                draft.useCustomSynthesis = enabled
-                source.useCustomSynthesis = enabled
-            }
-            try await operations.saveSource(draft)
-            let saved = try await operations.restoreSource()
-            source.useCustomRecognition = saved.useCustomRecognition
-            source.useCustomSynthesis = saved.useCustomSynthesis
-            error = nil
-        } catch { await handleSaveFailure(error) }
-    }
+    public var hasRestored = false
+    public var pending: [String: ModelResourceOperation] = [:]
+    public var admitted: Set<String> = []
+    public var cancelling: Set<String> = []
+    public init() {}
     public func isDownloading(_ item: ModelResourceItem) -> Bool {
         pending[item.id] == .download || admitted.contains(item.id) || (item.active && item.activity != .deleting)
     }
@@ -234,69 +133,4 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
         return item.status
     }
 
-    public func perform(_ id: String, operation: String) async {
-        guard let item = items.first(where: { $0.id == id }) else { return }
-        if operation == "cancel" {
-            guard isDownloading(item), !cancelling.contains(id), pending[id] != .remove else { return }
-            cancelling.insert(id)
-            defer {
-                cancelling.remove(id)
-                pending[id] = nil
-                requests[id] = nil
-            }
-            var admissionCompleted = false
-            do {
-                // Admission must finish before cancellation; otherwise a late admission could restart the download.
-                if let admission = requests[id] { try await admission.value }
-                admissionCompleted = true
-                try await operations.cancel(id)
-                admitted.remove(id)
-                error = nil
-                await refresh()
-            } catch {
-                self.error = error.localizedDescription
-                if admissionCompleted { admitted.insert(id) }
-            }
-            return
-        }
-        guard !isBusy(item) else { return }
-        guard pending.count < 32 else {
-            error = "同时提交的模型操作过多，请稍后重试"
-            return
-        }
-        let command: Operation
-        switch operation {
-        case "download":
-            guard !item.installed else { return }
-            if id != "yolo26n-pose" {
-                guard await saveDownloadSource(), !isBusy(item) else { return }
-            }
-            command = .download
-        case "remove": command = .remove
-        default: return
-        }
-        pending[id] = command
-        refreshGeneration &+= 1
-        error = nil
-        let request = Task { @MainActor in
-            switch command {
-            case .download: try await operations.download(id)
-            case .remove: try await operations.remove(id)
-            }
-        }
-        requests[id] = request
-        defer {
-            if !cancelling.contains(id) {
-                pending[id] = nil
-                requests[id] = nil
-            }
-        }
-        do {
-            try await request.value
-            if !cancelling.contains(id) {
-                if command == .download, pending[id] == .download { admitted.insert(id) }
-                await refresh()
-            }
-        } catch { self.error = error.localizedDescription }
-    }
 }

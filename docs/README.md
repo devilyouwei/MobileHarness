@@ -14,6 +14,7 @@
 | [Platform boundaries](Platform-Boundaries.md) | Foreground/device capabilities and physical-control constraints. |
 | [Roadmap](Roadmap.md) | Current delivery priorities, unimplemented directions and acceptance work. |
 | [Agent-driven app](Agent-Driven-App.md) | ❌ Proposed Agent business backend, shared UI/conversation capabilities and staged migration. |
+| [Model resource UI boundary](adr/0146-model-resource-interaction-ownership.md) | ✅ Resource interaction ownership moved to feature workflow; Agent routing pending. |
 | [History refresh intent](adr/0145-history-refresh-agent-intent.md) | ✅ Deterministic memory Agent and scoped presentation; mutations remain pending. |
 | [Shared history Tools](adr/0144-read-only-history-tools.md) | ✅ Read-only model-callable history previews; History refresh intent is implemented; mutations and model continuation remain pending. |
 | [Storage consumer policy](adr/0143-storage-consumer-policy-boundaries.md) | ✅ First Agent-driven migration stage: context, title and producer-error ownership. |
@@ -157,3 +158,5 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [Shared history Tool validation](Validation-History.md#2026-10-06--shared-read-only-history-tools) records bounded-query regressions and unsigned iOS build success. ❌ Full-run audio diagnostic timeout, simulator dependency and live/UI acceptance remain separate limits.
 
 ✅ [History intent validation](Validation-History.md#2026-10-06--structured-history-refresh-intent): focused lifecycle/Gateway tests, six packaged Agent resources and unsigned iOS build passed. ❌ Existing full-run audio timeout and simulator dependency limits remain explicit.
+
+✅ [Model resource interaction validation](Validation-History.md#2026-10-06--model-resource-interaction-ownership): full checks, final focused tests and unsigned device build passed. ❌ Simulator CoreAI dependency and native transfer acceptance remain pending.

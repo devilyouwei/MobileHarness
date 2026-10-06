@@ -53,8 +53,8 @@ import UI
     private func normalized(_ source: ModelResourceSourceDraft, items: [ModelResourceItem]) -> ModelResourceSourceDraft
     {
         var source = source
-        if !ModelResourceGroup.recognition.isInstalled(in: items) { source.useCustomRecognition = false }
-        if !ModelResourceGroup.synthesis.isInstalled(in: items) { source.useCustomSynthesis = false }
+        if !ModelResourcePolicy.isInstalled(.recognition, in: items) { source.useCustomRecognition = false }
+        if !ModelResourcePolicy.isInstalled(.synthesis, in: items) { source.useCustomSynthesis = false }
         return source
     }
     public func restoreSource() async throws -> ModelResourceSourceDraft {
@@ -90,10 +90,10 @@ import UI
         defer { changing = false }
         let value = try validate(source)
         let items = try await read()
-        if value.useCustomRecognition && !ModelResourceGroup.recognition.isInstalled(in: items) {
+        if value.useCustomRecognition && !ModelResourcePolicy.isInstalled(.recognition, in: items) {
             throw ModelResourceSelectionError(group: .recognition)
         }
-        if value.useCustomSynthesis && !ModelResourceGroup.synthesis.isInstalled(in: items) {
+        if value.useCustomSynthesis && !ModelResourcePolicy.isInstalled(.synthesis, in: items) {
             throw ModelResourceSelectionError(group: .synthesis)
         }
         let current = try await persistence().load()
@@ -109,5 +109,34 @@ import UI
     public func remove(_ id: String) async throws {
         try await removeOperation(id)
         _ = try await refresh()
+    }
+}
+
+@MainActor public protocol ModelResourcesOperating: AnyObject {
+    func refresh() async throws -> [ModelResourceItem]
+    func restoreSource() async throws -> ModelResourceSourceDraft
+    func saveSource(_ source: ModelResourceSourceDraft) async throws
+    func download(_ id: String) async throws
+    func cancel(_ id: String) async throws
+    func remove(_ id: String) async throws
+}
+
+public struct ModelResourceSelectionError: LocalizedError, Sendable {
+    public let group: ModelResourceGroup
+    public init(group: ModelResourceGroup) { self.group = group }
+    public var errorDescription: String? { group.installationMessage }
+}
+
+/// Installation requirements are business policy, independent of page presentation.
+public enum ModelResourcePolicy {
+    public static func isInstalled(_ group: ModelResourceGroup, in items: [ModelResourceItem]) -> Bool {
+        let required: Set<String>
+        switch group {
+        case .recognition: required = ["nemotron"]
+        case .synthesis: required = ["moss-tts-nano"]
+        case .language: required = ["gemma4-e2b"]
+        case .vision: required = ["yolo26n-pose"]
+        }
+        return required.allSatisfy { id in items.contains { $0.id == id && $0.installed && !$0.active } }
     }
 }

@@ -9,7 +9,7 @@ Purpose: present App configuration with accessible native SwiftUI controls. Desi
 | --- | --- |
 | SettingsState.swift | Editable CloudSettingsDraft, loading/saving/errors and SettingsOperating interface; invoke injected operations |
 | SettingsView.swift | Feature navigation and 大模型 cloud/local form; forward save and cancel only page-scoped model discovery on disappearance |
-| ModelResourcesState.swift | Shared source draft, independent speech choices, resource-group presentation, operation admission and installation alerts |
+| ModelResourcesState.swift | Shared source draft, independent speech choices, resource-group presentation, operation snapshots and installation alerts |
 | ModelResourcesView.swift | Recognition/synthesis/vision destinations and reusable filtered download/source sections for 大模型 |
 | AudioDetectionState.swift | Display-only detection values, direction/PCM freshness and injected whole-endpoint/control contracts |
 | AudioDetectionSection.swift | Compact recognition-page detection controls, capture/fallback results, level and current direction |
@@ -139,7 +139,7 @@ flowchart LR
 
 ✅ Silero remains on the recognition page as an independent optional VAD download. Installing it selects Silero on the next session for either Apple or Nemotron; deleting it selects Energy without disabling custom ASR. Nemotron alone satisfies the ASR switch prerequisite. No model/storage dependency is added to UI.
 
-✅ 下载源 appears within 自定义模型 / 本地大模型 with Hugging Face 官方, HF Mirror 中国镜像 and 自定义域名. YOLO has no source controls. No network toggle, save-source button or source footer remains. A single cancellable page task debounces endpoint edits by 600 ms; before download admission the state revalidates/persists the current endpoint using durable voice preferences. Failed saves prevent admission and retain the editable draft. Controls lock while saving; leaving the page cancels pending debounce without affecting background transfers. User guidance is brief and avoids implementation terminology.
+✅ 下载源 appears within 自定义模型 / 本地大模型 with Hugging Face 官方, HF Mirror 中国镜像 and 自定义域名. YOLO has no source controls. No network toggle, save-source button or source footer remains. A single cancellable page task debounces endpoint edits by 600 ms; before download admission the injected interaction workflow revalidates/persists the current endpoint using durable voice preferences. Failed saves prevent admission and retain the editable draft. Controls lock while saving; leaving the page cancels pending debounce without affecting background transfers. User guidance is brief and avoids implementation terminology.
 
 ✅ Settings helper copy is limited to short user guidance: model prerequisites/system fallback, local Gemma 4 E2B requirement, blank-URL default, conversation archiving/local privacy and Bluetooth connection/control behavior. The idle save instruction, developer explanations of context windows/record internals and model-page total storage row are removed. Each model retains its own size/status/license and progress; errors and destructive confirmations remain visible. ❌ Physical-page copy/layout acceptance remains pending.
 
@@ -166,3 +166,7 @@ flowchart LR
 ✅ ADR0133: Bluetooth lists use explicit borderless button behavior to isolate operation taps within native List rows. Recovery-success copy distinguishes restored connectivity from unverified movement. No Action failure or resource policy is added to Settings. ❌ Device touch/layout verification remains pending.
 
 ✅ ConversationHistoryPresentation centralizes current/archived title rules and localized defaults; record schemas remain in StorageChat. ❌ History operations still use the existing workflow pending Agent migration.
+
+✅ ADR0146: ModelResourcesState owns no Task, effect service or asynchronous operation implementation. Views receive required ModelResourcesControlling with typed download/remove/cancel intent. InstalledGroups and pending/admitted/cancelling snapshots come from AppSettingsWorkflow; UI retains status wording, form edits and confirmation. Installation policy/error and resource operation service contracts moved out of UI.
+
+❌ Cloud SettingsState coordination, page-visible resource polling/endpoint debounce and shared draft/catalog-value extraction remain pending. This stage does not add model-callable resource Tools.

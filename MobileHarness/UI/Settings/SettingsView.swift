@@ -10,6 +10,7 @@
         let history: ConversationHistoryState
         let historyControls: any ConversationHistoryControlling
         let modelResources: ModelResourcesState?
+        let modelResourceControls: (any ModelResourcesControlling)?
         let audioDetection: AudioDetectionState?
         let audioDetectionControls: (any AudioDetectionControlling)?
         let save: () async -> Bool
@@ -18,6 +19,7 @@
             settings: SettingsState, bluetooth: BluetoothSettingsState, bluetoothControls: any BluetoothControlling,
             history: ConversationHistoryState,
             historyControls: any ConversationHistoryControlling, modelResources: ModelResourcesState? = nil,
+            modelResourceControls: (any ModelResourcesControlling)? = nil,
             audioDetection: AudioDetectionState? = nil,
             audioDetectionControls: (any AudioDetectionControlling)? = nil,
             save: @escaping () async -> Bool
@@ -28,6 +30,7 @@
             self.history = history
             self.historyControls = historyControls
             self.modelResources = modelResources
+            self.modelResourceControls = modelResourceControls
             self.audioDetection = audioDetection
             self.audioDetectionControls = audioDetectionControls
             self.save = save
@@ -36,31 +39,35 @@
         public var body: some View {
             List {
                 Section("AI 模型") {
-                    if let modelResources {
+                    if let modelResources, let modelResourceControls {
                         NavigationLink {
                             ModelResourcesView(
-                                state: modelResources, group: .recognition, audioDetection: audioDetection,
+                                state: modelResources, controls: modelResourceControls, group: .recognition,
+                                audioDetection: audioDetection,
                                 audioDetectionControls: audioDetectionControls)
                         } label: {
                             Label("音频识别", systemImage: "waveform")
                         }
                         .accessibilityIdentifier("settings.recognition.open")
                         NavigationLink {
-                            ModelResourcesView(state: modelResources, group: .synthesis)
+                            ModelResourcesView(
+                                state: modelResources, controls: modelResourceControls, group: .synthesis)
                         } label: {
                             Label("语音合成", systemImage: "speaker.wave.2")
                         }
                         .accessibilityIdentifier("settings.synthesis.open")
                     }
                     NavigationLink {
-                        LanguageModelSettingsView(settings: settings, modelResources: modelResources, save: save)
+                        LanguageModelSettingsView(
+                            settings: settings, modelResources: modelResources,
+                            modelResourceControls: modelResourceControls, save: save)
                     } label: {
                         Label("大模型", systemImage: "brain")
                     }
                     .accessibilityIdentifier("settings.language.open")
-                    if let modelResources {
+                    if let modelResources, let modelResourceControls {
                         NavigationLink {
-                            ModelResourcesView(state: modelResources, group: .vision)
+                            ModelResourcesView(state: modelResources, controls: modelResourceControls, group: .vision)
                         } label: {
                             Label("视觉识别", systemImage: "viewfinder")
                         }
@@ -99,6 +106,7 @@
     private struct LanguageModelSettingsView: View {
         @Bindable var settings: SettingsState
         let modelResources: ModelResourcesState?
+        let modelResourceControls: (any ModelResourcesControlling)?
         let save: () async -> Bool
         @State private var missingLocalModel = false
 
@@ -111,7 +119,7 @@
                             get: { settings.isEnabled },
                             set: { value in
                                 if !value, let modelResources,
-                                    !ModelResourceGroup.language.isInstalled(in: modelResources.items)
+                                    !modelResources.installedGroups.contains(.language)
                                 {
                                     missingLocalModel = true
                                 } else {
@@ -187,7 +195,9 @@
                     }
                     .transaction { $0.animation = nil }
                 }
-                if let modelResources { ModelResourceSections(state: modelResources, group: .language) }
+                if let modelResources, let modelResourceControls {
+                    ModelResourceSections(state: modelResources, controls: modelResourceControls, group: .language)
+                }
             }
             .disabled(settings.isSaving)
             .navigationTitle("大模型")
@@ -198,9 +208,9 @@
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task {
-                            if !settings.isEnabled, let modelResources {
-                                await modelResources.refresh()
-                                guard ModelResourceGroup.language.isInstalled(in: modelResources.items) else {
+                            if !settings.isEnabled, let modelResources, let modelResourceControls {
+                                await modelResourceControls.refresh()
+                                guard modelResources.installedGroups.contains(.language) else {
                                     missingLocalModel = true
                                     return
                                 }

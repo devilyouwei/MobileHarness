@@ -192,3 +192,5 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ Known speech storage/producer failures receive localized wording in SpeechFailurePresentation after playback cleanup. The adapter retains the underlying error; unknown errors and cancellation pass through unchanged. ❌ Business-workflow Agent migration remains planned.
 
 ✅ Composition injects the shared conversation journal into Tools.HistoryQueryService. ✅ History load/refresh now uses the root ConversationMemory transport and scoped presentation adapter. ❌ Archive/delete/title remain legacy workflow operations.
+
+✅ Root composition injects typed model-resource controls beside passive UI state; resource admission/save/cancel policy is independently compiled in AppSettingsWorkflow. ❌ Model resource Agent routing remains pending.

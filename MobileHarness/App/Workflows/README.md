@@ -237,3 +237,5 @@ flowchart LR
 ❌ Background Bluetooth execution/state restoration and physical scene-lifetime acceptance remain outside the current [Bluetooth](Bluetooth/README.md) implementation.
 
 ✅ History load/refresh crosses InputGateway → ConversationMemory → OutputGateway → UI.showHistory. Its root-owned slot rejects overlap and joins cancelled Tool cleanup before retry. ❌ Archive/delete/title migration remains pending; this is a documented History feature dependency exception.
+
+✅ ModelResourceInteractionWorkflow moves model-resource tasks/admission and preference coordination out of UI into existing AppSettingsWorkflow. Pending submission bound32 rejects overflow; cancel joins admission and page cancellation does not own admitted transfers. ❌ Resource Agent/Gateway routing and cloud-form coordination remain pending.

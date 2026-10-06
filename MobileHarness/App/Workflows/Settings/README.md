@@ -40,3 +40,21 @@ flowchart LR
 ✅ Restore persists network-permission normalization even when voice choices are unchanged. Source autosave keeps existing validation/revision checks and mutation admission; source edits do not change voice mode. Downloads consume the durable endpoint after UI admission validation.
 
 ✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.
+
+## Model resource interaction ownership
+
+✅ `ModelResourceInteractionWorkflow` owns the former UI task/admission state: download/remove/cancel sequencing, at most32 pending operations with explicit overflow failure and no backlog, retained admitted-download locks after failed refresh, source save before download, voice-switch isolation and preference rollback. App retains this workflow and injects its passive state plus required typed `ModelResourcesControlling` into views. Cancelling a page caller does not cancel an admitted resource operation; explicit cancel joins download admission before reaching Management.
+
+✅ `ModelResourcesOperating`, `ModelResourceSelectionError` and `ModelResourcePolicy` belong here. Installation prerequisites are computed by workflow into display-only installedGroups; UI retains group labels/list grouping and status projection. The lower-level ModelResourcesWorkflow keeps durable source validation/application ordering. No new target, dependency or registration list is added.
+
+```mermaid
+flowchart LR
+    View[UI: draft and typed resource intent] --> Interaction[Root-owned ModelResourceInteractionWorkflow]
+    Interaction --> Operations[ModelResourcesOperating]
+    Operations --> Persistence[ModelResourcesWorkflow: source transaction]
+    Persistence --> Injected[App-injected Management endpoints]
+    Interaction --> State[Passive MainActor ModelResourcesState]
+    State --> View
+```
+
+❌ Resource intents still use direct feature controls; Agent/Gateway exposure is the next stage. UI-visible polling and endpoint-edit debounce remain page presentation triggers. Persisted draft schema and model-list grouping still use existing UI values; moving those shared contracts is separate work.

@@ -12,7 +12,7 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 
 ✅ Action-result translation tests moved to AppWorkflowTests, matching the App-owned mapping boundary.
 
-✅ ModelResourcesStateTests 覆盖即时锁定、重复下载/删除拒绝、提交与取消的顺序、取消重复点击拒绝、失败后重试，以及刷新失败时保持已提交下载锁定。使用注入操作，无网络或模型权重。❌ SwiftUI 设备渲染不由这些状态测试验证。
+✅ Model resource operation regressions moved to AppWorkflowTests/ModelResourceInteractionWorkflowTests.swift with their owning workflow. UI retains passive state/value contracts and independent imports. ❌ SwiftUI device rendering remains separate acceptance work.
 
 
 ✅ Legacy single speech-switch JSON decodes into independent recognition/synthesis flags; new JSON round-trips independent modes and no longer emits preferDownloadedSpeech.

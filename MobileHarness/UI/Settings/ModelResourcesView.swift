@@ -3,14 +3,17 @@
 
     @MainActor public struct ModelResourcesView: View {
         @Bindable private var state: ModelResourcesState
+        private let controls: any ModelResourcesControlling
         private let group: ModelResourceGroup
         private let audioDetection: AudioDetectionState?
         private let audioDetectionControls: (any AudioDetectionControlling)?
         public init(
-            state: ModelResourcesState, group: ModelResourceGroup, audioDetection: AudioDetectionState? = nil,
+            state: ModelResourcesState, controls: any ModelResourcesControlling, group: ModelResourceGroup,
+            audioDetection: AudioDetectionState? = nil,
             audioDetectionControls: (any AudioDetectionControlling)? = nil
         ) {
             self.state = state
+            self.controls = controls
             self.group = group
             self.audioDetection = audioDetection
             self.audioDetectionControls = audioDetectionControls
@@ -29,7 +32,7 @@
                             group == .recognition ? "使用自定义识别模型" : "使用自定义模型",
                             isOn: Binding(
                                 get: { customEnabled },
-                                set: { value in Task { await state.setCustomModel(group, enabled: value) } })
+                                set: { value in Task { await controls.setCustomModel(group, enabled: value) } })
                         )
                         .disabled(state.saving || !state.hasRestored)
                         .accessibilityIdentifier("settings.\(group.rawValue).custom")
@@ -40,7 +43,7 @@
                                 : "开启前请先下载 MOSS；关闭时使用 Apple 系统声音。")
                     }
                 }
-                ModelResourceSections(state: state, group: group)
+                ModelResourceSections(state: state, controls: controls, group: group)
             }
             .navigationTitle(group.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -58,6 +61,7 @@
 
     @MainActor struct ModelResourceSections: View {
         @Bindable var state: ModelResourcesState
+        let controls: any ModelResourcesControlling
         let group: ModelResourceGroup
         @State private var selectedSource = "official"
         @State private var removal: ModelResourceItem?
@@ -110,12 +114,12 @@
                             VStack(alignment: .trailing, spacing: 0) {
                                 if state.isDownloading(item) {
                                     Button(state.isCancelling(item.id) ? "正在取消…" : "取消下载") {
-                                        Task { await state.perform(item.id, operation: "cancel") }
+                                        Task { await controls.perform(item.id, operation: .cancel) }
                                     }.frame(minHeight: 44).disabled(state.isCancelling(item.id))
                                 } else if !state.isBusy(item) {
                                     if !item.installed {
                                         Button(item.failure == nil ? "下载" : "继续下载") {
-                                            Task { await state.perform(item.id, operation: "download") }
+                                            Task { await controls.perform(item.id, operation: .download) }
                                         }.frame(minHeight: 44).disabled(state.saving || !state.hasRestored)
                                     }
                                     if item.installed || item.failure != nil {
@@ -159,7 +163,7 @@
                 if let item = removal {
                     Button("停止并删除 \(item.name)", role: .destructive) {
                         removal = nil
-                        Task { await state.perform(item.id, operation: "remove") }
+                        Task { await controls.perform(item.id, operation: .remove) }
                     }
                 }
             } message: {
@@ -180,19 +184,19 @@
                         try await Task.sleep(for: .milliseconds(100))
                     }
                     try Task.checkCancellation()
-                    await state.saveDownloadSource()
+                    await controls.saveDownloadSource()
                 } catch {
                     // Editing or leaving the page cancels pending autosave.
                 }
             }
             .task {
-                await state.restore()
+                await controls.restore()
                 selectedSource =
                     state.source.endpoint == "https://huggingface.co"
                     ? "official" : (state.source.endpoint == "https://hf-mirror.com" ? "mirror" : "custom")
                 while !Task.isCancelled {
                     do { try await Task.sleep(for: .seconds(1)) } catch { break }
-                    await state.refresh()
+                    await controls.refresh()
                 }
             }
 

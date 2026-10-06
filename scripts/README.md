@@ -154,3 +154,5 @@ flowchart LR
 ✅ Boundary checks require the History domain to retain Tools-owned queries, injected StorageChat and independent BehaviorAssembly/ToolRuntime contracts. ❌ Static checks do not establish provider invocation quality.
 
 ✅ Boundary validation permits the documented AppHistoryWorkflow Agent/Gateway/Tool transport dependencies and separately enforces transport, legacy workflow and presentation-adapter imports. ConversationMemory may import only AgentCore/Foundation; UI and AgentCore remain independent. Final-app resource validation discovers all six Agent JSON resources. ❌ Physical UI intent acceptance is separate.
+
+✅ Boundary checks reject resource Task/effect implementations and installation policy in UI.ModelResourcesState, and keep effect tests under AppWorkflowTests. ❌ Agent-based resource admission remains future work.

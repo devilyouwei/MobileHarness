@@ -58,3 +58,5 @@ Conversation renders captions, eyes, spectra, generic Action execution state and
 ✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
 
 ✅ History title selection and fallback wording belong to UI/Settings, not StorageChat. ❌ Agent-driven UI intent routing remains planned.
+
+✅ ModelResourcesState contains passive draft/status/operation snapshots only; resource tasks and business prerequisites moved to AppSettingsWorkflow. ModelResourcesControlling exposes typed user intent without service imports. ❌ SettingsState request coordination and resource Agent routing remain pending.

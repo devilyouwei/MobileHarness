@@ -90,3 +90,5 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ Shared history Tool tests verify real journal queries and native declaration/execution compatibility. ❌ Full conversational task continuation remains a later stage.
 
 ✅ IntegrationTests adds deterministic history intent/Gateway lifecycle coverage. ❌ This does not establish native navigation or model-driven history continuation.
+
+✅ Model-resource task/admission regressions now run in AppWorkflowTests, matching their AppSettingsWorkflow ownership; UITests remains UI-only. ❌ Native download/form interaction acceptance remains separate.

@@ -786,3 +786,9 @@ Tools/Camera follows the domain root + Support layout and binds Camera.open/clos
 ### Cloud native Tool generation
 
 Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; ToolResult retains existing feedback behavior. Local Gemma 4 E2B and automatic result-driven continuation remain unsupported.
+
+## Model resource interaction migration — ADR0146
+
+✅ AppSettingsWorkflow now owns ModelResourceInteractionWorkflow, its32-slot reject-on-overflow admission, cancel-after-admission ordering, source save before download and independent voice-preference rollback. The scene root retains it and injects typed controls plus passive UI state. Installation prerequisites and effect/error contracts moved from UI into this feature target. Existing ModelResourcesWorkflow retains persistence and host effects; target dependencies remain UI/Storage.
+
+❌ Direct resource controls, page-visible polling/debounce and UI-owned draft/catalog values are documented staged exceptions. No new Agent, Tool or conversational resource management is claimed.
