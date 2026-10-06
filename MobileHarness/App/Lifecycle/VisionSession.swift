@@ -1,3 +1,4 @@
+import Actions
 import AgentCore
 import Agents
 import AppWorkflows
@@ -5,7 +6,6 @@ import Foundation
 import Gateway
 import OSLog
 import PlatformKit
-import Tools
 
 /// Owns one vision Agent session: frames enter InputGateway, effects leave through OutputGateway.
 @MainActor

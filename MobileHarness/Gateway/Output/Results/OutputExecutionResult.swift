@@ -1,6 +1,6 @@
+import ActionRuntime
 import AgentCore
 import Foundation
-import ToolRuntime
 
 /// A single output outcome. Action terminal details remain in the scheduler's execution records.
 public struct OutputExecutionResult: Sendable {

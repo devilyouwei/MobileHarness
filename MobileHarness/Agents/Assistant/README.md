@@ -26,7 +26,7 @@ flowchart TD
     Events --> Calls[Resolved ActionCall / ToolCall]
     Events -->|beginWait / endWait in order| Stream
     Calls -->|speech text| Synthesis[Directed SpeechSynthesisAgent]
-    Synthesis -->|admitted audioID| Playback[Speech.speak audioID]
+    Synthesis -->|admitted audioID| Playback[Speech.Playback.speak audioID]
     Playback --> Stream
     Queue --> Tool[Resolved ToolCall]
     Calls --> Stream[Bounded OutputEnvelope stream]
@@ -39,7 +39,7 @@ Speech is a scheduled Action on its default or explicit Channel; captions are im
 
 ## Configuration and initialization
 
-Follow the [Agent standard](../README.md). AgentConfigurations validates JSON v5 id=assistant. Assistant adds its fixed internal permissions to the immutable descriptor; these are not configuration fallbacks. Invalid configuration throws before registration. Hot reload is unsupported.
+Follow the [Agent standard](../README.md). AgentConfigurations validates JSON v6 id=assistant. Assistant adds its fixed internal permissions to the immutable descriptor; these are not configuration fallbacks. Invalid configuration throws before registration. Hot reload is unsupported.
 
 ChatCapability is a required dependency; tests inject FixedTextChat from IntegrationTests. Configuration/request validation does not guarantee real-model protocol compliance. Update this README with changes and retain ✅/❌ status distinctions.
 
@@ -75,9 +75,9 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 
 
-✅ JSON v5 subscribes to speech.final and user.text; final transcript uses the same conversation path as text. Inputs expire before dequeue, never during a started reply. Partial transcripts cannot enter Assistant.
+✅ JSON v6 subscribes to speech.final and user.text; final transcript uses the same conversation path as text. Inputs expire before dequeue, never during a started reply. Partial transcripts cannot enter Assistant.
 
-✅ JSON v5 also subscribes to speech.phase. Speech onset emits UI.beginReplyTurn once per turn as an immediate Tool, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
+✅ JSON v6 also subscribes to speech.phase. Speech onset emits UI.Caption.beginReplyTurn once per turn as an immediate Tool, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
 
 ✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Tool exists if onset was missed. Every output has a monotonically increasing source sequence; text/base expression survive normal reply completion until the next turn; finite expression overrides end after their performance.
 
@@ -109,9 +109,9 @@ flowchart LR
     Events --> Calls[Resolved ActionCall / ToolCall]
     Events -->|beginWait / endWait in order| OG2
     Calls -->|speech text| Synthesis[Directed speech.synthesize]
-    Synthesis -->|audioID| Play[Resolved Speech.speak audioID]
+    Synthesis -->|audioID| Play[Resolved Speech.Playback.speak audioID]
     Play --> OG2
-    A -->|speech onset / turn fallback| Begin[UI.beginReplyTurn]
+    A -->|speech onset / turn fallback| Begin[UI.Caption.beginReplyTurn]
     A -->|/status| Tool[runtimeInfo]
     Calls --> OG2[OutputGateway]
     Begin --> OG2
@@ -124,12 +124,12 @@ flowchart LR
 
 | 输出类别 | 调用路径 / Channel | 数据、触发与接收者 |
 | --- | --- | --- |
-| Agent 内部分段事件（尚未发送） | `Speech.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.speak(audioID)`。 |
-| Action | `Speech.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用该文本段的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
-| 无返回值 Tool | `UI.print`，无 Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
-| finite Action | `express → UI.express / Display` | `parameters["emotion"]` 为非 clear 的合法表情；等待单次目标过渡和恢复当前基础表情。 |
-| state Action | `setExpression → UI.setExpression / Display` | 同一表情集合加 clear；提交持续基础表情，clear 清除；不等待渲染结束。 |
-| 无返回值 Tool | `UI.beginReplyTurn`，无 Channel | 无参数；有 AgentTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
+| Agent 内部分段事件（尚未发送） | `Speech.Playback.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.Playback.speak(audioID)`。 |
+| Action | `Speech.Playback.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用该文本段的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
+| 无返回值 Tool | `UI.Caption.print`，无 Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
+| finite Action | `express → UI.Expression.express / Display` | `parameters["emotion"]` 为非 clear 的合法表情；等待单次目标过渡和恢复当前基础表情。 |
+| state Action | `setExpression → UI.Expression.setExpression / Display` | 同一表情集合加 clear；提交持续基础表情，clear 清除；不等待渲染结束。 |
+| 无返回值 Tool | `UI.Caption.beginReplyTurn`，无 Channel | 无参数；有 AgentTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
 | 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。同时支持云端模型原生 Tool 调用。 |
 | control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
 | control | `agent.finished` | speaking 阶段的输入完成通知（初始化展示通过 Tool 执行），释放该输入的 Action 跟踪。 |
@@ -145,7 +145,7 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再
 
 | contract / version / kind | typed payload 与字段标准 | 时机与失败语义 |
 | --- | --- | --- |
-| `speech.synthesize / 1 / observation` | `.speechSynthesis(SpeechSynthesisInput(audioID: UUID, text: String, locale: String))`；audioID 为每段新建的唯一句柄；text 为 Agent 分好的非空语义段，最多 2000 UTF-8 字节；locale 当前默认 `auto`，协议允许 `auto / zh-CN / en-US`。完整编码受 16 KiB 消息上限约束。 | 自然文本完成分段后立即提交；必须在回执中确认目标已接纳且无拒绝，才输出同一 audioID 的内部 Speech.speak(audioID) Action。合成与后续 Action 调度并行。 |
+| `speech.synthesize / 1 / observation` | `.speechSynthesis(SpeechSynthesisInput(audioID: UUID, text: String, locale: String))`；audioID 为每段新建的唯一句柄；text 为 Agent 分好的非空语义段，最多 2000 UTF-8 字节；locale 当前默认 `auto`，协议允许 `auto / zh-CN / en-US`。完整编码受 16 KiB 消息上限约束。 | 自然文本完成分段后立即提交；必须在回执中确认目标已接纳且无拒绝，才输出同一 audioID 的内部 Speech.Playback.speak(audioID) Action。合成与后续 Action 调度并行。 |
 | `speech.cancel / 1 / observation` | `.cancelSpeech(audioID: UUID)`；只带待取消的音频句柄，不携带文本或 PCM。 | 提交已接纳但 播放 Action 无法成功入队等清理场景发送；SpeechSynthesis 按发送方、session、父输入所有权校验，不能取消别的请求。当前清理发送失败被忽略，原始入队错误继续上抛。 |
 
 ❌ 图像理解与 partial 驱动回答仍未实现。云端 Tool 增量由适配器聚合为完整调用。
@@ -155,7 +155,7 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再
 ✅ Conversation replies follow the user language (Mandarin/English speech), with short spoken sentences and no Markdown/emoji. Agent-owned text handling preserves mixed Mandarin/English; the synthesis provider validates text. Prompt wording does not guarantee compliance.
 
 
-✅ Speech segments are sent to speechSynthesis with a runtime UUID. After admission, Assistant creates Speech.speak(audioID) on the original Channel through its internal permission. speech.synthesize / speech.cancel remain declared communication sends. No internal playback alias or TTS model dependency belongs in JSON.
+✅ Speech segments are sent to speechSynthesis with a runtime UUID. After admission, Assistant creates Speech.Playback.speak(audioID) on the original Channel through its internal permission. speech.synthesize / speech.cancel remain declared communication sends. No internal playback alias or TTS model dependency belongs in JSON.
 
 ✅ AssistantAgent.systemPrompt is shared by production and evaluation. Conversation history retains the actual prompt and raw model text. Its non-executing preview uses the same Assistant.mapText callback; no historical Action is replayed.
 
@@ -197,7 +197,7 @@ flowchart LR
 
 ## Supervised NexArm base Action
 
-✅ JSON is the only model registration: `<shakeBase cycles="1"/>` resolves to `NexArm.shakeBase` on Robot. Required integer `cycles` is 1...3; one cycle is origin → +2° → -2° → origin. No angle/speed parameters. All calls and completion receipts cross the Gateways. The domain handler validates arguments; the host binds a connected controller. The Mac USB integration harness exercises the real Assistant/parser with explicitly deterministic model output and test presentation.
+✅ JSON is the only model registration: `<shakeBase cycles="1"/>` resolves to `NexArm.Motion.shakeBase` on Robot. Required integer `cycles` is 1...3; one cycle is origin → +2° → -2° → origin. No angle/speed parameters. All calls and completion receipts cross the Gateways. The domain handler validates arguments; the host binds a connected controller. The Mac USB integration harness exercises the real Assistant/parser with explicitly deterministic model output and test presentation.
 
 ✅ iPhone binds the verified BLE profile through AppWorkflows. ❌ Unattended model motion and verified hardware stop/watchdog are unavailable; disconnected devices fail explicitly. Generation completion is not motion completion. Use only explicitly requested supervised motions; never automatically retry failures.
 
@@ -205,9 +205,9 @@ flowchart LR
 
 ## NexArm entertainment skills (2026-09-30)
 
-✅ Robot now exposes waveWrist(count), tiltWrist(direction), lookAround(cycles), celebrate(cycles) and dance(cycles), alongside shakeBase. JSON v5 alone lists model permissions. Docs distinguish motion geometry, finite completion, foreground/connection requirements and no automatic retry; examples use structured wait. Choose a gesture when the user requests robot motion/performance, not on every ordinary chat reply. ❌ No new receipt-driven model recovery or implicit motion on reconnect.
+✅ Robot now exposes waveWrist(count), tiltWrist(direction), lookAround(cycles), celebrate(cycles) and dance(cycles), alongside shakeBase. JSON v6 alone lists model permissions. Docs distinguish motion geometry, finite completion, foreground/connection requirements and no automatic retry; examples use structured wait. Choose a gesture when the user requests robot motion/performance, not on every ordinary chat reply. ❌ No new receipt-driven model recovery or implicit motion on reconnect.
 
-✅ Robot gesture descriptions now specify fixed preparation/body/home, larger coordinated angles and all-six-servo poses including grip. JSON v5 aliases and parameter schemas are unchanged. ❌ Physical choreography acceptance remains pending.
+✅ Robot gesture descriptions now specify fixed preparation/body/home, larger coordinated angles and all-six-servo poses including grip. JSON v6 aliases and parameter schemas are unchanged. ❌ Physical choreography acceptance remains pending.
 
 ✅ Robot docs now describe the phone base Action as ±30° and all performances as fixed Cartesian home/ready/body/home with800ms body interpolation. Joint calibration belongs to the device; no model-callable registry changes. ❌ Physical performance acceptance remains pending.
 
@@ -223,29 +223,29 @@ flowchart LR
 
 ## Head gestures
 
-✅ JSON v5 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Tool presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.
+✅ JSON v6 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Tool presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.
 
 ## NexArm feedback execution — 2026-10-01
 
-✅ The versioned Robot channel catalog includes `resetArm` → `NexArm.reset`, with no arguments. Nod and shakeHead descriptions specify motor4 and5 scope; all action failures still return through Gateway.
+✅ The versioned Robot channel catalog includes `resetArm` → `NexArm.Motion.reset`, with no arguments. Nod and shakeHead descriptions specify motor4 and5 scope; all action failures still return through Gateway.
 
 ❌ Sustained real-device acceptance remains pending.
 
 ## Atomic composition — ADR0092
 
-✅ Robot JSONv5 exposes moveMotor/resetMotor and optional speed/acceleration on existing composites. Errors are terminal outcomes, not implicit cancellation of later Channel actions.
+✅ Robot JSONv6 exposes moveMotor/resetMotor and optional speed/acceleration on existing composites. Errors are terminal outcomes, not implicit cancellation of later Channel actions.
 
 ❌ Sustained real-device acceptance and durable result delivery remain outstanding.
 
-✅ JSON v5 declares Camera.open, Camera.close and Camera.flip as no-argument native Tools, separately from Action Channels. They cross OutputGateway and reuse App camera lifecycle. ✅ Cloud ChatCapability emits complete native Tool calls.
+✅ JSON v6 declares Camera.Capture.open, Camera.Capture.close and Camera.Capture.flip as no-argument native Tools, separately from Action Channels. They cross OutputGateway and reuse App camera lifecycle. ✅ Cloud ChatCapability emits complete native Tool calls.
 
 ## Native cloud Tool calls
 
-✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
+✅ Cloud Chat Completions accepts JSON v6 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
 
 ```mermaid
 flowchart LR
-    JSON[Agent JSON v5 Tools] --> Request[ChatRequest tools]
+    JSON[Agent JSON v6 Tools] --> Request[ChatRequest tools]
     Request --> Cloud[Cloud request and SSE deltas]
     Cloud --> Join[Bounded per-index argument assembly]
     Join --> Call[Complete ChatEvent.toolCall]
@@ -284,4 +284,11 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ❌ Retrieval-based context and automatic conflict retry are not implemented.
 
-✅ JSON v5 declares History.list/read with required string pagination parameters. Cloud complete native calls reach bounded read-only history previews. Returned data uses the existing escaped ToolResult path, not Action parsing. ❌ Local native calls, full history search/export and result-driven model continuation remain unsupported.
+✅ JSON v6 declares History.Conversation.list/read with required string pagination parameters. Cloud complete native calls reach bounded read-only history previews. Returned data uses the existing escaped ToolResult path, not Action parsing. ❌ Local native calls, full history search/export and result-driven model continuation remain unsupported.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

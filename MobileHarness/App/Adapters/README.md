@@ -49,7 +49,7 @@ flowchart LR
 
 ✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Gemma 4 E2B reports no native Tool support and rejects requests carrying tools. See [technical flow](../../ModelKit/Language/LLM/OpenAI/README.md).
 
-✅ NexArmBehaviorAdapter binds the completion-only Robot.aim sender and converts connection/foreground availability errors to Tool errors. It neither selects targets nor constructs Agents.
+✅ NexArmBehaviorAdapter binds the completion-only NexArm.Tracking.aim sender and converts connection/foreground availability errors to Tool errors. It neither selects targets nor constructs Agents.
 
 ✅ CameraOutputHandling carries camera/pose display values only. OutputGateway failure observation supplies home scheduling issues; tracking execution failures never become camera banners or clear the accepted pose (ADR0131).
 
@@ -101,3 +101,10 @@ flowchart LR
 ❌ Sustained physical-device acceptance and durable error history remain pending.
 
 ✅ SpeechFailurePresentation maps neutral SpeechSynthesis/StorageAudio errors to localized playback failures and retains their underlying error; cancellation and unknown failures are unchanged. ❌ It performs no business decision, retry or audio cleanup.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

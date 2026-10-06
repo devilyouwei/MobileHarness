@@ -21,12 +21,14 @@ public struct BehaviorDefinitionMacro: PeerMacro {
         let isAction = node.attributeName.trimmedDescription == "Action"
         let title = values["title"] ?? "\"\(name)\""
         if isAction {
-            guard let module = values["module"], let kind = values["kind"], let completion = values["completion"] else {
+            guard let domain = values["domain"], let module = values["module"], let kind = values["kind"],
+                let completion = values["completion"]
+            else {
                 throw MacroError.missingMetadata
             }
             let metadata = """
-                path: ActionIdentifier(module: \(module), function: "\(name)"), displayName: \(title),
-                kind: \(kind), completion: \(completion),
+                path: ActionIdentifier(domain: \(domain), module: \(module), function: "\(name)"), displayName: \(title),
+                kind: \(kind), completion: \(completion), serializationKey: \(values["serializationKey"] ?? "nil"),
                 resolvingResources: \(values["resources"] ?? "nil"),
                 estimatingDuration: \(values["timeout"] ?? "nil")
                 """

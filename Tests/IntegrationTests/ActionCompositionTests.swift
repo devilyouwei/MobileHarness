@@ -52,7 +52,7 @@ private actor CompositionCounter {
 
 @Test func reportedPartialFailureReleasesWaitAndDeliversAllIssues() async throws {
     let counter = CompositionCounter()
-    let path = ActionPath(module: "Composite", function: "run")
+    let path = ActionPath(domain: "Composite", module: "Control", function: "run")
     let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: UUID())
     let input = AgentInput(sessionID: owner.sessionID, payload: .event("composition"))
     let report = try ActionReport(entries: [

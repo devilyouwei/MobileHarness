@@ -21,9 +21,9 @@ public struct CapabilityRegistry: Sendable {
         guard aliases.allSatisfy({ Self.validName($0) && $0 != "wait" && !$0.hasPrefix("channel.") }),
             channels.allSatisfy(Self.validName),
             actions.allSatisfy({
-                Self.validName($0.defaultChannel) && Self.validName($0.path.module) && Self.validName($0.path.function)
+                Self.validName($0.defaultChannel) && $0.path.isValid
             }),
-            tools.allSatisfy({ Self.validName($0.path) })
+            tools.allSatisfy({ Self.validPath($0.path) })
         else { throw GenerationError.invalidParameters }
         for action in actions {
             try Self.validateSchema(required: action.requiredParameters, optional: action.optionalParameters)
@@ -32,13 +32,14 @@ public struct CapabilityRegistry: Sendable {
             try Self.validateSchema(required: tool.requiredParameters, optional: tool.optionalParameters)
         }
         for action in internalActions {
-            guard Self.validName(action.path.module), Self.validName(action.path.function),
+            guard Self.validName(action.path.domain), Self.validName(action.path.module),
+                Self.validName(action.path.function),
                 Self.validName(action.channel)
             else { throw GenerationError.invalidParameters }
             try Self.validateSchema(required: action.requiredParameters, optional: action.optionalParameters)
         }
         for tool in internalTools {
-            guard Self.validName(tool.path) else { throw GenerationError.invalidParameters }
+            guard Self.validPath(tool.path) else { throw GenerationError.invalidParameters }
             try Self.validateSchema(required: tool.requiredParameters, optional: tool.optionalParameters)
         }
         self.internalActions = internalActions
@@ -111,6 +112,11 @@ public struct CapabilityRegistry: Sendable {
             guard let allowed = definition?.function.parameters.properties[name]?.enum else { return true }
             return allowed.contains(value)
         }
+    }
+
+    static func validPath(_ path: String) -> Bool {
+        let segments = path.split(separator: ".", omittingEmptySubsequences: false)
+        return segments.count == 3 && segments.allSatisfy { validName(String($0)) && !$0.contains(".") }
     }
 
     static func validName(_ name: String) -> Bool {

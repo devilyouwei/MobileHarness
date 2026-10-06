@@ -152,7 +152,7 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 
 ❌ Independent multi-window namespaces, background supervision and forced interruption of non-cooperative handlers are not implemented.
 
-✅ Camera.open/close/flip Tool bindings reuse the root-owned CameraCoordinator through RuntimePresentation after active Assistant session validation. Permission, foreground and camera lease policy stay in App lifecycle; closing confirms native stop and joins vision cleanup. ❌ Capture readiness does not imply pose-model readiness.
+✅ Camera.Capture.open/close/flip Tool bindings reuse the root-owned CameraCoordinator through RuntimePresentation after active Assistant session validation. Permission, foreground and camera lease policy stay in App lifecycle; closing confirms native stop and joins vision cleanup. ❌ Capture readiness does not imply pose-model readiness.
 
 ## Local model resources — current contract
 
@@ -196,3 +196,5 @@ Debug-only `-actions-preview` uses the real conversation/status components with 
 ✅ Root composition injects typed model-resource controls beside passive UI state; resource admission/save/cancel policy is independently compiled in AppSettingsWorkflow. ❌ Model resource Agent routing remains pending.
 
 ✅ History deletion composition passes a typed transport operation, and the shared journal is bound to Tools.HistoryMutationService. App does not delete or select follow-up presentation. ❌ Archive/title and resource Agent routes remain staged work.
+
+✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.

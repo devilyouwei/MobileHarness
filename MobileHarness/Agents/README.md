@@ -44,7 +44,7 @@ flowchart LR
 
 ✅ Root Package.swift compiles Core once as the independent AgentCore target with no project dependencies; the Agents target excludes Core. All six business Agent directories, Communication and AgentConfigurations currently compile together in one Agents target. Its dependencies are AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio. Each actor owns its processing state; the shared target does not enforce per-Agent import isolation.
 
-✅ Model-callable registrations are loaded from each JSON v5 resource. Code owns fixed internal permissions and behavior, capability protocols are injected, and communication/execution requests cross Gateways. AgentCore supplies generic contracts/parsers/registries rather than business messages or native services.
+✅ Model-callable registrations are loaded from each JSON v6 resource. Code owns fixed internal permissions and behavior, capability protocols are injected, and communication/execution requests cross Gateways. AgentCore supplies generic contracts/parsers/registries rather than business messages or native services.
 
 ❌ Per-Agent targets and separate speech/vision communication targets are not implemented. Assistant owns request context selection and SpeechSynthesis owns producer errors; Storage retains records and neutral media/cache contracts.
 
@@ -54,7 +54,7 @@ Agents combine injected processing capabilities with explicit messages and execu
 
 ```mermaid
 flowchart TB
-    JSON[Five Agent JSON v5 resources] --> Loader[AgentConfigurations / AgentCore validation]
+    JSON[Five Agent JSON v6 resources] --> Loader[AgentConfigurations / AgentCore validation]
     Loader --> Policy[Model-callable catalogs and communication policy]
     Internal[Agent code: fixed internal permissions] --> Grants[Assembled runtime capabilities]
     Policy --> Grants
@@ -104,7 +104,7 @@ flowchart TB
     Speech -->|Observations and transcript / voice-state Tools| Output
     Assistant -->|Synthesis messages / resolved Actions and Tools / wait| Output
     Vision -->|Pose observations / gaze and display Tools| Output
-    Photographer -->|Internal Robot.aim| Output
+    Photographer -->|Internal NexArm.Tracking.aim| Output
     Output -->|Validated internal messages| Input
     Output --> Actions
     Output --> Tools
@@ -121,7 +121,7 @@ Each actor documents its own capacity, overflow, pause, stop and cleanup rules: 
 
 ## 输入输出文档约定
 
-每个 Agent README 都要按下面四个方向描述当前实现，且以同目录 JSON v5 声明和 Swift 行为为准。JSON 的 `communication.inputs` 表示可接纳的 `contract / version / kind`；`subscriptions` 另限定广播消息的 `source / topic`。声明输入不自动创建订阅。定向消息由 Gateway 校验发送方、目标方和双方权限，不需要目标方订阅。
+每个 Agent README 都要按下面四个方向描述当前实现，且以同目录 JSON v6 声明和 Swift 行为为准。JSON 的 `communication.inputs` 表示可接纳的 `contract / version / kind`；`subscriptions` 另限定广播消息的 `source / topic`。声明输入不自动创建订阅。定向消息由 Gateway 校验发送方、目标方和双方权限，不需要目标方订阅。
 
 | 方向 | 数据标准至少写明 | 边界 |
 | --- | --- | --- |
@@ -142,26 +142,26 @@ Storage、ModelKit 等基础能力不属于这里的完整业务功能：Agent �
 
 `control` 是完成、失败等运行时协议通知，不是额外的业务输出或通用系统功能调用入口；它仍随输出流进入 OutputGateway，不能用于编码业务命令或触发未注册的业务功能。
 
-## Capability configuration v5 — JSON
+## Capability configuration v6 — JSON
 
-UTF-8 `<AgentName>.agent.json` is limited to 64 KiB and accepts version 5 only. Top-level fields are required and unknown fields fail. Version and identity are written first for readability; JSON key ordering has no semantic effect.
+UTF-8 `<AgentName>.agent.json` is limited to 64 KiB and accepts version 6 only. Top-level fields are required and unknown fields fail. Version and identity are written first for readability; JSON key ordering has no semantic effect.
 
 | Field | Contract |
 | --- | --- |
-| version | Integer, exactly 5 |
+| version | Integer, exactly 6 |
 | id | Stable Agent identity, matching its implementation |
 | actions | Object mapping Channel names to arrays of model-callable Actions; an empty array declares a Channel without callable Actions |
-| tools | OpenAI Chat Completions function declarations |
+| tools | Explicit three-field path plus nested OpenAI Chat Completions function definition |
 | communication | Inputs, subscriptions, publications and sends |
 
 ```json
 {
-  "version": 5,
+  "version": 6,
   "id": "example",
   "actions": {
     "Display": [{
       "alias": "express",
-      "path": {"module": "UI", "function": "express"},
+      "path": {"domain": "UI", "module": "Expression", "function": "express"},
       "doc": "Perform one expression and restore the current base.",
       "parameters": [{
         "name": "emotion", "valueType": "string", "required": true,
@@ -172,6 +172,8 @@ UTF-8 `<AgentName>.agent.json` is limited to 64 KiB and accepts version 5 only. 
     "Speech": []
   },
   "tools": [{
+    "path": {"domain": "System", "module": "Runtime", "function": "runtimeInfo"},
+    "definition": {
     "type": "function",
     "function": {
       "name": "runtimeInfo",
@@ -179,16 +181,17 @@ UTF-8 `<AgentName>.agent.json` is limited to 64 KiB and accepts version 5 only. 
       "parameters": {"type": "object", "properties": {}, "required": [], "additionalProperties": false},
       "strict": true
     }
+    }
   }],
   "communication": {"inputs": [], "subscriptions": [], "publications": [], "sends": []}
 }
 ```
 
-Each Action has exactly `alias`, `path` (`module` and `function`), `doc`, `parameters` and `examples`. The enclosing key supplies its default Channel. A Channel scope may override that default; module identity remains unchanged and controls process-wide mutual exclusion. Aliases must be unique across all Channel groups and Tools in one Agent. `wait` and `channel.*` aliases are reserved. `main` is an ordinary opt-in Channel.
+Each Action has exactly `alias`, `path` (`domain`, `module` and `function`), `doc`, `parameters` and `examples`. The enclosing key supplies its default Channel. A Channel scope may override that default; the resolved address remains unchanged; definition-owned serialization keys control process-wide exclusion. Aliases must be unique across all Channel groups and Tools in one Agent. `wait` and `channel.*` aliases are reserved. `main` is an ordinary opt-in Channel.
 
 Parameters contain exactly `name`, `valueType`, `required`, `description`, `constraints`. Types are string/integer/number/boolean documentation; XML transport values remain strings and handlers own semantic conversion, limits and defaults. Required/optional name sets are derived, never repeated in JSON. Each Action has 1–8 nonblank XML examples; every example must explicitly demonstrate that Action and resolve only model-callable aliases. Natural text in examples is allowed but does not authorize an internal method.
 
-Tools use `type: function` and nested `function` with `name`, `description`, `parameters`, optional `strict`. The callable name is also the handler registry key; App explicitly binds it. No internal path, alias, hidden flag or example list is added to the OpenAI declaration. The current ToolCall transport supports **string properties only**, optional string descriptions/enums, an object parameter schema with required names and `additionalProperties: false`. Strict mode requires all properties to be required. Unsupported schema features/types fail explicitly; full JSON Schema is unsupported; cloud SSE transport assembles complete Tool calls. The validated definition is retained separately; it is not appended to the XML system prompt.
+Tools use `type: function` and nested `function` with `name`, `description`, `parameters`, optional `strict`. Each tools entry contains exactly path (domain/module/function) and definition (the native declaration). The callable name is the Agent-local alias; the canonical address is the handler registry key. Only definition is passed to the model provider; path is never added to the native declaration. The current ToolCall transport supports **string properties only**, optional string descriptions/enums, an object parameter schema with required names and `additionalProperties: false`. Strict mode requires all properties to be required. Unsupported schema features/types fail explicitly; full JSON Schema is unsupported; cloud SSE transport assembles complete Tool calls. The validated definition is retained separately; it is not appended to the XML system prompt.
 
 Limits: at most 128 combined model/internal capability entries, 16 distinct Channels after internal permissions are assembled, 32 parameters per capability, 64-byte identifier names, and 2048-byte Action prose/examples. Configuration errors propagate without `try!`, silent fallback or inferred broad permissions.
 
@@ -199,7 +202,7 @@ JSON has no `channels`, `textActions`, `textOutput`, `internal`, `hidden` or per
 - Assistant: reply initialization, automatic speech synthesis/audioID playback and captions.
 - SpeechPerception: transcript updates/closure and voice-state presentation.
 - VisionPerception: gaze targets and skeleton display.
-- Photographer: optional `Robot.aim` from a subscribed pose. The model catalog stays empty.
+- Photographer: optional `NexArm.Tracking.aim` from a subscribed pose. The model catalog stays empty.
 - SpeechSynthesis: directed synthesis/cancellation only; no device-output permission.
 
 These declarations form the descriptor's immutable runtime capability snapshot together with the JSON model catalog. Internal calls are never resolved from model XML or native Tool names. All calls still pass OutputGateway permission validation, Action module exclusion/Channel/wait scheduling or the independent Tool runtime. App retains explicit implementation handlers. Internal permissions are mandatory code policy, not recovery for an invalid JSON resource.
@@ -208,7 +211,7 @@ Assistant supplies a bounded text-mapping callback to AgentGenerator. It preserv
 
 ```mermaid
 flowchart LR
-    JSON[JSON v5 grouped Actions and native Tools] --> Model[Model-callable catalog]
+    JSON[JSON v6 grouped Actions and native Tools] --> Model[Model-callable catalog]
     Code[Agent fixed behavior and typed permissions] --> Runtime[Descriptor runtime permissions]
     Model --> Runtime
     Model --> Parser[Alias resolution and prompt]
@@ -239,15 +242,15 @@ Assistant, SpeechPerception and VisionPerception accept action.result receipts w
 
 ## Implemented scope and limitations
 
-✅ ConversationMemory, Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v5 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio.
+✅ ConversationMemory, Assistant, SpeechPerception, SpeechSynthesis, VisionPerception and Photographer implement the declared JSON v6 and code-owned permissions. Core compiles independently as AgentCore; business Agents depend only on AgentCore, ModelKit, PlatformKit, StorageChat and StorageAudio.
 
-Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.express is a scheduled finite model-callable Action; UI.setExpression is a scheduled state Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
+Fixed captions, transcript closure, voice phase, gaze and reply-turn initialization use completion-only Tools. UI.Expression.express is a scheduled finite model-callable Action; UI.Expression.setExpression is a scheduled state Action. Assistant's durable journal is shared across voice sessions; archive-title generation is metadata-only and cannot dispatch behavior.
 
 ❌ Configuration hot reload, full executable value schemas, local native Tool deltas, general request/reply, result-driven replanning and activity subscriptions are not implemented.
 
 See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production configuration. Per-Agent limits and processing algorithms belong to their own READMEs.
 
-✅ Photographer subscribes to vision.pose and emits internal Robot.aim with a bounded output stream. Camera lifecycle enables this Agent; physical tracking acceptance remains outstanding.
+✅ Photographer subscribes to vision.pose and emits internal NexArm.Tracking.aim with a bounded output stream. Camera lifecycle enables this Agent; physical tracking acceptance remains outstanding.
 
 ✅ Photographer validates decoded pose before target selection; malformed values fail without indexing joints. Its eight-call output bound rejects excess calls without stopping the actor and retains previously accepted calls for normal stream consumption.
 
@@ -273,8 +276,8 @@ See [Assistant.agent.json](Assistant/Assistant.agent.json) for the production co
 
 ✅ ADR0139: Photographer exposes monotonic usable-pose freshness as a read-only host signal; source silence releases the App writer after one second. Assistant priority over Photographer is host resource policy, not Agent-to-Agent cancellation or a model-callable permission.
 
-✅ Assistant JSON declares read-only History.list/read. Aliases resolve inside Agents and execution/results cross both Gateways. ❌ Tool feedback does not yet resume model reasoning.
+✅ Assistant JSON declares read-only History.Conversation.list/read. Aliases resolve inside Agents and execution/results cross both Gateways. ❌ Tool feedback does not yet resume model reasoning.
 
-✅ ConversationMemory accepts structured refresh/confirmed archive deletion independently of voice/models. It emits History.delete, validates correlated runtime feedback and emits UI.showHistory only after success. ❌ Archive/title and model-driven navigation remain staged work.
+✅ ConversationMemory accepts structured refresh/confirmed archive deletion independently of voice/models. It emits History.Conversation.delete, validates correlated runtime feedback and emits UI.HistoryPresentation.showHistory only after success. ❌ Archive/title and model-driven navigation remain staged work.
 
 ✅ ADR0149: shared Signal provenance and owner-fenced returning Tool delivery are implemented; speech parent adaptation preserves origin. ❌ Typed intent/control migration and full business-entry coverage remain pending.

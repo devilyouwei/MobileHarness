@@ -1,7 +1,6 @@
 import ActionRuntime
 import AgentCore
 import Foundation
-import ToolRuntime
 
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
@@ -81,7 +80,8 @@ public actor OutputGateway {
         self.observedContracts = observedContracts
         self.observeEvent = observeEvent
         self.manager = manager
-        self.tools = ToolDispatcher(registry: tools, input: requests, resources: actions.resourceCoordinator)
+        self.tools = ToolDispatcher(
+            registry: tools, input: requests, resources: actions.resourceCoordinator, scheduler: actions)
         self.actions = ActionDispatcher(executor: actions)
         self.sink = sink
     }

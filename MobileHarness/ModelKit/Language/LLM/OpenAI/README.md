@@ -49,11 +49,11 @@ Protocol reference: [official OpenAI Chat API](https://developers.openai.com/api
 
 ## Native cloud Tool calls
 
-✅ Cloud Chat Completions accepts JSON v5 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
+✅ Cloud Chat Completions accepts JSON v6 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
 
 ```mermaid
 flowchart LR
-    JSON[Agent JSON v5 Tools] --> Request[ChatRequest tools]
+    JSON[Agent JSON v6 Tools] --> Request[ChatRequest tools]
     Request --> Cloud[Cloud request and SSE deltas]
     Cloud --> Join[Bounded per-index argument assembly]
     Join --> Call[Complete ChatEvent.toolCall]

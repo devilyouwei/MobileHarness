@@ -29,9 +29,9 @@ Only NexArm/Support may import PlatformKit within Actions; PlatformKit owns its 
 | Source | Responsibility |
 |---|---|
 | [NexArmActions.swift](NexArmActions.swift) | Gesture/reset entry points and arguments |
-| [NexArmMotorActions.swift](NexArmMotorActions.swift) | Callable single-motor move/reset entries |
+| [NexArmMotorActions.swift](MotionActions.swift) | Callable single-motor move/reset entries |
 | [Support/NexArmTypes.swift](Support/NexArmTypes.swift) | Typed requests and entry errors |
-| [Support/NexArmActionModules.swift](Support/NexArmActionModules.swift) | Explicit capability bindings to macro-generated definitions |
+| [Support/NexArmModule.swift](Support/NexArmModule.swift) | Explicit capability bindings to macro-generated definitions |
 | [Support/NexArmSimpleActions.swift](Support/NexArmSimpleActions.swift) | Nod and shake-head sequences |
 | [Support/NexArmCompositeActions.swift](Support/NexArmCompositeActions.swift) | Gesture geometry, home selection and IK plans |
 | [Support/NexArmActionController.swift](Support/NexArmActionController.swift) | Shared execution and feedback observation |
@@ -264,3 +264,30 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 ✅ Execution errors, invocation-owned reports and native Bluetooth faults follow the independent flows above (ADR0129–ADR0132). Passive nod/shake-head and resets need no IK table; Cartesian presets resolve only requested frames plus home and cache repeated poses. Explicit `prepareArmControl` retains full-catalog diagnostics (ADR0133).
 
 ❌ Sustained physical-device motion/IK/takeover acceptance and durable execution history remain pending.
+
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
+❌ Unified capability definitions and protocol registration adapters remain pending.
+
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
+❌ Unified callable definitions and migration of compatibility names remain pending.
+
+## Cohesive module files — ADR0154
+
+Purpose: implement directory/module-file/function ownership while preserving current protocol APIs. The domain Actions enum remains a used namespace facade; callable bodies belong exclusively to the files below. Support owns one domain catalog, values and host capabilities.
+
+- [MotionActions.swift](MotionActions.swift)
+- [GestureActions.swift](GestureActions.swift)
+- [TrackingActions.swift](TrackingActions.swift)
+
+✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
+❌ Explicit three-field paths, versioned Agent configuration and unified definitions/results remain the next coordinated stage.
+
+✅ Motion and Gesture Action definitions explicitly use serializationKey NexArm, preserving process-wide exclusion across Channels independently of future three-level addresses. Tracking Tool calls retain their existing resource-controlled protocol.
+
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

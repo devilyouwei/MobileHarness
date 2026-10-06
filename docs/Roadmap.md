@@ -223,3 +223,9 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ✅ Agent-driven scenario coverage now distinguishes six primary categories and external/Agent/runtime origins, with cross-cutting decisions, concurrency, triggers and recovery. ✅ Typed origin admission and Tool owner fencing are implemented in ADR0149. ❌ Unified lifecycle/capability Signals and common long-task feedback/cancellation remain unimplemented.
 
 ✅ [ADR0149](adr/0149-signal-origin-and-tool-feedback.md): Signal origin and owner-fenced Tool feedback are implemented with preserved causal context and explicit delivery failures. ❌ Next stages: Action/activity root propagation → typed intent/control → history archive/title → Assistant continuation → settings/resources and device entry points. Each stage must reconcile actual code with the authoritative architecture and report remaining work.
+
+## Unified executable capabilities — completed consolidation
+
+✅ ADR0150–0157: shared cooperative execution, one Actions source tree, six domain catalogs and cohesive entry files, explicit serialization keys, three-field paths and v6 native bindings, one canonical definition/outcome/handler, direct/scheduled adapters and retired Tools/ToolRuntime targets. Scheduled native calls preserve resource/serialization admission, original handler context, one typed feedback and joined cancellation.
+
+❌ Next Agent-driven stages: complete Action/activity original-root propagation, typed host intent/control producers, remaining settings/device entry points and registered failure presentation, then bounded result-driven model continuation. These are feature migration tasks rather than unfinished Action/Tool source consolidation. Physical/native/model acceptance remains separate from fixture and build evidence.

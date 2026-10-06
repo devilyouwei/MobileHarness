@@ -2,7 +2,7 @@
 
 Purpose: validate Agent configuration and resolve model-local names without depending on concrete Agents, models or device implementations. Design goal: keep model exposure distinct from trusted runtime output permissions.
 
-- ✅ AgentConfiguration accepts bounded JSON v5: version, id, Channel-grouped actions, standard nested function tools and unchanged communication.
+- ✅ AgentConfiguration accepts bounded JSON v6: version, id, Channel-grouped three-field actions, explicit Tool path/definition bindings and unchanged communication.
 - ✅ Group keys supply Channel defaults; empty groups declare Channels. Old channels/textActions/hidden/defaultChannel fields fail validation.
 - ✅ Action examples are parsed and resolved against the model-only catalog. Group traversal is sorted for deterministic prompt assembly; aliases are globally unique within an Agent.
 - ✅ InternalAction and InternalTool define code-owned paths and argument names without aliases/docs. Registry permits checks include internal grants, but resolveAction/resolveTool never search them.
@@ -14,7 +14,7 @@ Purpose: validate Agent configuration and resolve model-local names without depe
 
 ```mermaid
 flowchart LR
-    Data[At most 64 KiB JSON] --> Schema[Version 5 and strict field checks]
+    Data[At most 64 KiB JSON] --> Schema[Version 6 and strict field checks]
     Schema --> Catalog[Grouped Actions and native Tools]
     Catalog --> Examples[XML example validation]
     Examples --> Config[Immutable model configuration]
@@ -35,8 +35,15 @@ No Channel is implicitly main or blocking. DefaultChannel remains an internal ru
 
 ✅ CallArguments provides shared, bounded transport decoding for Action and Tool domains. Actions retains the ActionArguments compatibility name; Tools has no Actions dependency. ❌ Domain-specific defaults/meaning remain outside this decoder.
 
-✅ Capability permissions remain Agent-owned. Execution argument readers live separately in Actions/Runtime/Contracts and Tools/Runtime/Contracts; the unused AgentCore reader was removed.
+✅ Capability permissions remain Agent-owned. Execution argument readers live separately in Actions/Runtime/Contracts and Actions/Runtime/Contracts; the unused AgentCore reader was removed.
 
 ✅ CapabilityContextBuilder contains no automatic synthesis/playback assumptions. AssistantAgent.outputContext adds that Agent’s Speech-channel, wait/playback guidance and examples. Catalog metadata is still resolved solely from versioned Agent JSON.
 
 ✅ AgentConfiguration receives CommunicationContracts from its caller and validates JSON declarations against that registry. The standard registry has no speech/vision entries; business AgentConfigurations selects the application catalog explicitly.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

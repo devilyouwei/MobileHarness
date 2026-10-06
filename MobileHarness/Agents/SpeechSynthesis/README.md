@@ -1,6 +1,6 @@
 # SpeechSynthesis
 
-Purpose: a shared text-to-audio Agent, independent of Assistant and playback Channels. Owns a FIFO request queue and one serial ModelKit synthesis worker. Configuration and directed permissions use JSON v5.
+Purpose: a shared text-to-audio Agent, independent of Assistant and playback Channels. Owns a FIFO request queue and one serial ModelKit synthesis worker. Configuration and directed permissions use JSON v6.
 
 ```mermaid
 flowchart LR
@@ -80,7 +80,7 @@ sequenceDiagram
 | 正播放已提交的缓冲 | 失败不会直接回调播放器；下一次读取 PCM 时发现错误，再停止尚未播完的缓冲。已经出声的部分无法撤回。 |
 | Action 尚未执行 | 后续 checkout 在终态错误记录仍保留时抛出同一错误；记录过期或被容量淘汰后报告 missingAudio。终态记录最多 128 条、默认保留 30 秒，不保留 PCM。 |
 
-错误经 AppleAudioIO → SpeechPlayback → Speech.speak 向调度器/Gateway 传播，由既有 Action 失败和 App 回复清理流程处理。清理不会自动重新合成或重播；同一缓存句柄的首次失败会保留，后续取消不会覆盖已记录的超时。
+错误经 AppleAudioIO → SpeechPlayback → Speech.Playback.speak 向调度器/Gateway 传播，由既有 Action 失败和 App 回复清理流程处理。清理不会自动重新合成或重播；同一缓存句柄的首次失败会保留，后续取消不会覆盖已记录的超时。
 
 ✅ `SpeechPlaybackTests.synthesisExecutionDeadlineIsIndependentOfPlaybackDeadline` 验证 Agent 执行期限能让等待 PCM 的读取收到 `synthesisTimedOut`；延迟 PCM、显式读取期限和取消有各自回归测试。PCM 空读默认没有独立期限，硬件播放完成超时是另一项 PlatformKit 保护。
 

@@ -7,16 +7,16 @@ import Foundation
 import Gateway
 import ModelKit
 import Testing
-import ToolRuntime
-import Tools
 import UI
 
 @testable import PlatformKit
 
-private func image(_ value: UInt8, sequence: UInt64, rotation: Int = 1) throws -> ImageInput {
+private func image(_ value: UInt8, sequence: UInt64, rotation: Int = 1, capturedAt: ContinuousClock.Instant? = nil)
+    throws -> ImageInput
+{
     try ImageInput(
         width: 4, height: 4, rgb: Data(repeating: value, count: 48),
-        sequence: sequence, timestamp: Double(sequence), rotation: rotation)
+        sequence: sequence, timestamp: Double(sequence), rotation: rotation, capturedAt: capturedAt)
 }
 
 /// Gate each inference explicitly so mailbox/cancellation tests do not depend on model speed.
@@ -176,7 +176,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let secondConfig = try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 5, "id": "second", "actions": [String: [String]](), "tools": [],
+            "version": 6, "id": "second", "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
                 "subscriptions": [["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]],
@@ -186,7 +186,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let thirdConfig = try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 5, "id": "third", "actions": [String: [String]](), "tools": [],
+            "version": 6, "id": "third", "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
                 "subscriptions": [["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]],
@@ -207,13 +207,13 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let recorder = OverlayRecorder()
     let actions = ChannelScheduler(registry: try testActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.moveEyes") { call, envelope in
-        try await UITools.moveEyes(invocation: ToolInvocation(call: call, context: envelope)) { target, _ in
+    try await tools.registerCompletion("UI.Gaze.moveEyes") { call, envelope in
+        try await UIActions.moveEyes(invocation: ToolInvocation(call: call, context: envelope)) { target, _ in
             #expect(target.x == 0 && target.y == 0)
         }
     }
-    try await tools.registerCompletion("UI.showPose") { call, envelope in
-        try await UITools.showPose(call: call, context: envelope) { overlay, _ in
+    try await tools.registerCompletion("UI.Pose.showPose") { call, envelope in
+        try await UIActions.showPose(call: call, context: envelope) { overlay, _ in
             #expect(overlay.people.isEmpty)
             await recorder.record(overlay.sequence)
         }
@@ -265,11 +265,12 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
 @Test func poseToolRejectsMalformedPayloadBeforePresentation() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let call = ToolCall(
-        toolPath: "UI.showPose", arguments: ["payload": "{\"sequence\":1,\"timestamp\":0,\"rotation\":9,\"people\":[]}"]
+        toolPath: "UI.Pose.showPose",
+        arguments: ["payload": "{\"sequence\":1,\"timestamp\":0,\"rotation\":9,\"people\":[]}"]
     )
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
-    await #expect(throws: UITools.PoseError.invalidPayload) {
-        try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { _, _ in
+    await #expect(throws: UIActions.PoseError.invalidPayload) {
+        try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { _, _ in
             Issue.record("Invalid pose reached UI")
         }
     }
@@ -288,8 +289,8 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let registry = agent.descriptor.capabilities
     #expect(
         registry.permits(
-            ToolCall(toolPath: "UI.moveEyes", arguments: ["x": "0", "y": "0"])))
-    #expect(registry.permits(ToolCall(toolPath: "UI.showPose", arguments: ["payload": "{}"])))
+            ToolCall(toolPath: "UI.Gaze.moveEyes", arguments: ["x": "0", "y": "0"])))
+    #expect(registry.permits(ToolCall(toolPath: "UI.Pose.showPose", arguments: ["payload": "{}"])))
 }
 
 private struct CrowdPose: PoseCapability {
@@ -320,7 +321,7 @@ private struct CrowdPose: PoseCapability {
         return
     }
     #expect((call.arguments["payload"]?.utf8.count ?? Int.max) <= 3000)
-    try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+    try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
         #expect(overlay.statistics?.isValid == true)
         #expect(overlay.statistics?.inferenceMilliseconds != nil)
         #expect(overlay.people.count == 6)
@@ -333,7 +334,7 @@ private struct CrowdPose: PoseCapability {
         return
     }
     #expect(gazeEnvelope.sequence == 1 && gazeEnvelope.sessionID == session)
-    try await UITools.moveEyes(invocation: ToolInvocation(call: gazeCall, envelope: gazeEnvelope)) { gaze, _ in
+    try await UIActions.moveEyes(invocation: ToolInvocation(call: gazeCall, envelope: gazeEnvelope)) { gaze, _ in
         #expect(abs(gaze.x) < 0.001 && gaze.y > 0)
     }
     await agent.stop()
@@ -361,7 +362,7 @@ private struct CrowdPose: PoseCapability {
         Issue.record("Missing tool")
         return
     }
-    try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+    try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
         #expect(overlay.sequence == 9)
     }
     await agent.stop()
@@ -478,7 +479,7 @@ private actor BlockedPosePublication {
             Issue.record("Missing tool")
             return
         }
-        try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+        try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
             #expect(overlay.sequence == i)
         }
         guard case .toolCall = try #require(await displays.next()).output else {
@@ -548,7 +549,7 @@ private struct FailingSecondPose: PoseCapability {
         agent: .visionPerception, incarnation: try await manager.identity(.visionPerception), sessionID: session)
     let result = ActionResult(
         executionID: UUID(), owner: owner, inputID: UUID(), turn: nil,
-        path: ActionPath(module: "UI", function: "moveEyes"),
+        path: ActionPath(domain: "UI", module: "Gaze", function: "moveEyes"),
         status: .succeeded, effect: .contractCompleted, completion: .completed)
     #expect(await input.deliverActionResult(result) == .accepted)
     #expect(await agent.actionResults() == [result])
@@ -586,7 +587,7 @@ private struct FailingSecondPose: PoseCapability {
             await agent.stop()
             return
         }
-        #expect(call.toolPath == "UI.showPose")
+        #expect(call.toolPath == "UI.Pose.showPose")
         _ = await output.next()  // Independent gaze output.
     }
     for _ in 0..<10000 {
@@ -619,7 +620,7 @@ private struct FailingSecondPose: PoseCapability {
     let presentation = try JSONDecoder().decode(PoseOverlay.self, from: Data(payload.utf8))
     #expect(presentation.sequence == frame.sequence)
     #expect(presentation.rotation == frame.rotation)
-    try await UITools.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
+    try await UIActions.showPose(call: call.executionRequest, context: envelope.toolContext) { overlay, _ in
         let statistics = try #require(overlay.statistics)
         #expect(presentation.people.count == overlay.people.count)
         #expect(presentation.statistics?.inferenceMilliseconds == statistics.inferenceMilliseconds)
@@ -887,10 +888,11 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
 }
 
 @Test(.timeLimit(.minutes(1))) func visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers() async throws {
+    // A small RGB fixture and wider capture-to-result budget tolerate parallel admission load.
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.03))
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.5))
     try await agent.bind(
         AgentMessaging { _, parent, _ in
             guard case .image(let frame) = parent.payload else { throw CommunicationError.invalidPayload }
@@ -900,9 +902,9 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     try await agent.start()
     var started = model.started.makeAsyncIterator()
     try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(nativeCameraInput(sequence: 1, time: 0, capturedAt: .now))))
+        AgentInput(sessionID: session, payload: .image(image(0, sequence: 1, rotation: 0, capturedAt: .now))))
     #expect(await started.next() == 0)
-    try await Task.sleep(for: .milliseconds(50))
+    try await Task.sleep(for: .milliseconds(600))
     await model.release()
     for _ in 0..<10000 {
         if await agent.expiredInputs == 1 { break }
@@ -911,7 +913,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(await agent.expiredInputs == 1)
     try await Task.sleep(for: .milliseconds(200))
     try await agent.receive(
-        AgentInput(sessionID: session, payload: .image(nativeCameraInput(sequence: 2, time: 1, capturedAt: .now))))
+        AgentInput(sessionID: session, payload: .image(image(0, sequence: 2, rotation: 0, capturedAt: .now))))
     #expect(await started.next() == 0)
     await model.release()
     var outputs = agent.outputs.makeAsyncIterator()

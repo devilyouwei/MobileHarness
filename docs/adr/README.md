@@ -17,6 +17,11 @@ Current dependencies and flows belong to the [technical design](../../MobileHarn
 | ID | Decision |
 | --- | --- |
 | 0001 | [ADR 0001 原生模块化 Runtime](0001-native-modular-runtime.md) |
+| 0154 | [Cohesive capability entry files](0154-cohesive-capability-entry-files.md) |
+| 0153 | [Three-level capability addressing](0153-three-level-capability-addressing.md) |
+| 0152 | [Business-domain capability classification](0152-business-domain-capability-classification.md) |
+| 0151 | [Consolidated executable capability sources](0151-consolidated-capability-sources.md) |
+| 0150 | [Unified execution lifetime](0150-unified-execution-lifetime.md) |
 | 0149 | [Signal origin and returning Tool feedback](0149-signal-origin-and-tool-feedback.md) |
 | 0148 | [Unified Signal contract and active architecture](0148-unified-signal-contract.md) |
 | 0147 | [History deletion and result continuation](0147-history-delete-result-continuation.md) |
@@ -230,3 +235,11 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [ADR0148 — Unified Signal contract](0148-unified-signal-contract.md): active architecture location, canonical AgentInput envelope, common Signal/execution rules before six scenario examples, with origin, feedback/effect diagrams and consolidated implementation gaps; no runtime change.
 
 ✅ ADR0149 implements origin admission and owner-fenced Tool feedback. ❌ Action/activity causal roots and typed host controls remain pending.
+
+✅ [ADR0155 — Explicit Action serialization identity](0155-explicit-action-serialization-identity.md): definition-owned exclusion preserves existing scopes before three-field path/configuration migration.
+
+❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
+
+✅ [ADR0156 — Three-level capability addresses](0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; serialization/resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
+
+✅ [ADR0157 — Canonical executable definitions](0157-canonical-executable-definitions.md): completes shared definition/outcome/execution, protocol projections, scheduled native routing, typed feedback and compatibility retirement. Remaining work is broader Agent-driven input/feature migration and physical acceptance.

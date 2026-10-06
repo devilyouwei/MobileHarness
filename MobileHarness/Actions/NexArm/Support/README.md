@@ -66,3 +66,9 @@ flowchart LR
 ❌ Sustained physical-device acceptance and durable error history remain pending.
 
 ✅ ADR0133: Passive BLE nod/shake-head, whole-arm reset and per-motor reset no longer require an IK table, including after partial Cartesian preparation. Cartesian presets incrementally resolve only the requested frames plus home before sending; repeated poses reuse the connection-local cache. Explicit diagnostic `prepareArmControl` retains full-catalog preparation. Manual and Channel requests reuse the same Actions recipes and feedback executor. ❌ Physical motion/IK firmware acceptance remains pending.
+
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
+❌ Unified capability definitions and protocol registration adapters remain pending.
+
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
+❌ Unified callable definitions and migration of compatibility names remain pending.

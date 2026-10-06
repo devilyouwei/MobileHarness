@@ -8,9 +8,9 @@ public actor SpeechPerceptionAgent: Agent {
     /// Host-selected diagnostic scope; model capabilities/permissions remain in the versioned configuration.
     public enum Mode: Sendable { case speechAndSoundSource, soundSourceOnly }
     private let mode: Mode
-    private static let transcript = InternalTool(path: "UI.setTranscript", required: ["text"])
-    private static let voiceState = InternalTool(path: "UI.setVoiceState", required: ["state"])
-    private static let finishTranscript = InternalTool(path: "UI.finishTranscript")
+    private static let transcript = InternalTool(path: "UI.Caption.setTranscript", required: ["text"])
+    private static let voiceState = InternalTool(path: "UI.VoiceState.setVoiceState", required: ["state"])
+    private static let finishTranscript = InternalTool(path: "UI.Caption.finishTranscript")
     private var resultInbox = ActionResultInbox()
     public func actionResults() -> [ActionResult] { resultInbox.results }
     public nonisolated let descriptor: AgentDescriptor

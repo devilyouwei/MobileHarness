@@ -92,9 +92,10 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
     let camera = try CapabilityRegistry(
         actions: [
             ActionRegistration(
-                alias: "say", path: ActionPath(module: "Robot", function: "speak"), defaultChannel: "robot",
+                alias: "say", path: ActionPath(domain: "Robot", module: "Control", function: "speak"),
+                defaultChannel: "robot",
                 requiredParameters: ["text"])
-        ], tools: [ToolRegistration(alias: "lookup", path: "Memory.lookup", requiredParameters: ["query"])])
+        ], tools: [ToolRegistration(alias: "lookup", path: "Memory.Query.lookup", requiredParameters: ["query"])])
     var other = AgentGenerator(
         capabilities: camera,
         textMapping: { text, channel in
@@ -102,18 +103,19 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
         })
     let calls = try other.append("hello") + other.finish()
     #expect(
-        calls.count == 1 && calls[0].actionCall?.actionPath.module == "Robot" && calls[0].actionCall?.channel == "robot"
+        calls.count == 1 && calls[0].actionCall?.actionPath.domain == "Robot" && calls[0].actionCall?.channel == "robot"
     )
     let id = UUID()
     let tool = try ToolCallParser.parse(
         id: id, alias: "lookup", argumentsJSON: Data(#"{"query":"x"}"#.utf8), capabilities: camera)
-    #expect(tool.id == id && tool.toolPath == "Memory.lookup" && tool.arguments == ["query": "x"])
+    #expect(tool.id == id && tool.toolPath == "Memory.Query.lookup" && tool.arguments == ["query": "x"])
     #expect(throws: GenerationError.invalidParameters) {
         try ToolCallParser.parse(
             id: id, alias: "lookup", argumentsJSON: Data(#"{"query":4}"#.utf8), capabilities: camera)
     }
     #expect(throws: GenerationError.duplicateAlias) {
-        try CapabilityRegistry(actions: camera.actions, tools: [ToolRegistration(alias: "say", path: "Other.say")])
+        try CapabilityRegistry(
+            actions: camera.actions, tools: [ToolRegistration(alias: "say", path: "Other.Playback.say")])
     }
     var xmlTool = AgentGenerator(
         capabilities: camera,
@@ -162,7 +164,7 @@ private struct MarkupChat: ChatCapability {
         if case .actionCall(let call) = output {
             calls.append(call)
         } else if case .toolCall(let tool) = output {
-            #expect(tool.toolPath == "UI.print")
+            #expect(tool.toolPath == "UI.Caption.print")
         } else {
             #expect(output == .control("assistant.finished"))
         }
@@ -320,7 +322,9 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     #expect(throws: GenerationError.incompleteDocument) { try unfinished.finish() }
     #expect(throws: GenerationError.invalidParameters) {
         try CapabilityRegistry(actions: [
-            ActionRegistration(alias: "wait", path: .init(module: "UI", function: "wait"), defaultChannel: "Display")
+            ActionRegistration(
+                alias: "wait", path: .init(domain: "UI", module: "Control", function: "wait"), defaultChannel: "Display"
+            )
         ])
     }
     #expect(!((try AgentConfigurations.load(named: "Assistant")).capabilities.channels.contains("main")))

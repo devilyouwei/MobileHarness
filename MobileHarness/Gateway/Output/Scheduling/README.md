@@ -2,7 +2,7 @@
 
 Purpose: execute resolved Actions with task-local order and scoped synchronization. Design goals: streaming progress, bounded admission, explicit failure/cancellation and process-wide device exclusion. Tools stay outside this scheduler.
 
-✅ ChannelScheduler owns a tree per `(AgentID, inputID)`, with a validated session ID. The root group and each child wait group contain alternating ordinary phases and child groups. A phase owns FIFO lanes by Channel name. Channel.swift supplies one lane's queued and running state. Equal Channel names in different tasks do not share a FIFO; module exclusion remains process-wide.
+✅ ChannelScheduler owns a tree per `(AgentID, inputID)`, with a validated session ID. The root group and each child wait group contain alternating ordinary phases and child groups. A phase owns FIFO lanes by Channel name. Channel.swift supplies one lane's queued and running state. Equal Channel names in different tasks do not share a FIFO; definition-key exclusion remains process-wide.
 
 ✅ A wait joins its parent's earlier work before activation and joins all its own work before releasing the parent's continuation. Nested waits never wait on their ancestors or unrelated tasks. Channel scopes only choose a lane; closing one does not wait. No name, including main, has special scheduling semantics.
 
@@ -22,7 +22,7 @@ Agent output pumps send ordered ActionCall and typed SchedulingDirective events 
 
 No admitted Action is evicted on overflow. Gateway cancels the owning task on validation/admission errors; direct scheduler callers receive the error and must finish or cancel their producer. There is no producer backpressure or retry queue.
 
-The scheduler follows only the current entry of each group. A closed empty phase advances; a closed completed child advances its parent. An active unclosed phase may run received Actions, but cannot release its continuation. Only active phase lane heads compete, sorted by admission sequence. A head starts if its lane is idle and its module is free. Reserve the module immediately before invoking ActionExecutor; release it only after handler completion/cleanup, then reconsider all eligible heads. Groups and dormant Actions hold no resource locks. Same-lane jobs never overtake their head; unrelated tasks can bypass a dormant stage, avoiding cross-task head-of-line deadlocks. Queues use bounded arrays; tree traversal depth is at most eight wait groups plus root.
+The scheduler follows only the current entry of each group. A closed empty phase advances; a closed completed child advances its parent. An active unclosed phase may run received Actions, but cannot release its continuation. Only active phase lane heads compete, sorted by admission sequence. A head starts if its lane is idle and its serialization key is free. Reserve the definition key immediately before invoking ActionExecutor; release the key only after handler completion/cleanup, then reconsider all eligible heads. Groups and dormant Actions hold no resource locks. Same-lane jobs never overtake their head; unrelated tasks can bypass a dormant stage, avoiding cross-task head-of-line deadlocks. Queues use bounded arrays; tree traversal depth is at most eight wait groups plus root.
 
 ```mermaid
 flowchart TD
@@ -30,9 +30,9 @@ flowchart TD
     Admit --> Tree[Task root: phases and child wait groups]
     Tree --> Active[Walk active entries only]
     Active --> Heads[Collect idle lane heads across tasks]
-    Heads --> Resources{Module free?}
-    Resources -->|yes| Execute[Reserve module; await Action handler]
-    Execute --> Release[Release module; decrement pending]
+    Heads --> Resources{Serialization key free?}
+    Resources -->|yes| Execute[Reserve key; await Action handler]
+    Execute --> Release[Release key; decrement pending]
     Release --> Active
     Release --> Join[Closed and empty: advance parent]
     Join --> Active
@@ -49,18 +49,18 @@ Handler completion means the implementation's actual completion (including drain
 
 ## Channel ordering and resource ownership
 
-✅ ChannelScheduler owns bounded task/phase FIFO ordering and module exclusion. Process-wide hardware ownership belongs to [Resources/ResourceCoordinator](../Resources/README.md), with the current contract in [ADR0141](../../../../docs/adr/0141-resource-control-ownership.md). A Channel name does not grant a resource lease or represent device health.
+✅ ChannelScheduler owns bounded task/phase FIFO ordering and definition-key exclusion. Process-wide hardware ownership belongs to [Resources/ResourceCoordinator](../Resources/README.md), with the current contract in [ADR0141](../../../../docs/adr/0141-resource-control-ownership.md). A Channel name does not grant a resource lease or represent device health.
 
 ✅ Action admission calls validateAdmission; actual execution calls ResourceCoordinator.run with trusted owner/lease context. Declared writer groups and App-configured preemption govern takeover. Successful takeover joins the old writer before starting the requester. Later accepted Actions remain under normal Channel policy; takeover does not cancel their whole input or introduce a resource waiting queue. Explicit lease revocation retains its declared callback policy.
 
 ```mermaid
 flowchart LR
     Call[Resolved Action / trusted owner] --> Admission[Bounded Channel admission]
-    Admission --> FIFO[Active phase / lane head / module exclusion]
+    Admission --> FIFO[Active phase / lane head / definition-key exclusion]
     FIFO --> Resource[ResourceCoordinator.run]
     Resource -->|free or joined configured takeover| Execute[ActionExecutor / execution permit]
     Resource -->|busy or cleanup deadline| Failure[Action execution result]
-    Execute --> End[Join handler / release transient holding and module]
+    Execute --> End[Join handler / release transient holding and key]
 ```
 
 The earlier Channel-lock takeover proposal is superseded by resource ownership. Its channel acquire API, persistent fault gate and whole-input cancellation plan are not the current implementation. Channel.swift still contains immutable, always-unlocked ChannelLockState metadata; no runtime Channel lease is acquired or enforced. The authoritative lock snapshot comes from ResourceCoordinator, never that metadata.
@@ -79,7 +79,7 @@ The earlier Channel-lock takeover proposal is superseded by resource ownership. 
 
 ## Action runtime stage 2
 
-✅ Stage 2 reserves bounded feedback slots before enqueue, stores typed completion and performs delivery after releasing lane/module. Resource declarations add execution fences; cancel(resources:) and cancel(agent:incarnation:) cancel/join owning inputs. Session/shutdown closes matching receipts. ❌ Feedback delivery is not part of finish barrier and does not prove exactly-once processing. See sibling Results and Resources READMEs for algorithms and limits.
+✅ Stage 2 reserves bounded feedback slots before enqueue, stores typed completion and performs delivery after releasing lane/key. Resource declarations add execution fences; cancel(resources:) and cancel(agent:incarnation:) cancel/join owning inputs. Session/shutdown closes matching receipts. ❌ Feedback delivery is not part of finish barrier and does not prove exactly-once processing. See sibling Results and Resources READMEs for algorithms and limits.
 
 ## Execution observation
 
@@ -128,7 +128,7 @@ flowchart LR
 
 ✅ Scheduling and ActionDiagnostics operate on ScheduledAction. Only its ActionInvocation execution value crosses into Actions; Channel ordering, cancellation, admission identity and resource fencing remain unchanged.
 
-✅ ADR0098: Gateway imports AgentCore, ActionRuntime and ToolRuntime only. Concrete Actions/Tools, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
+✅ ADR0098: Gateway imports AgentCore and ActionRuntime only. Concrete Actions, platform and model implementations are outside this compilation boundary. Existing routing, queues, resource fences and cancellation order are unchanged.
 
 ✅ Stored child reports no longer replace subsequent exceptions or cancellation; the execution-level issue is retained before releasing the lane. ❌ No effect rollback.
 
@@ -177,3 +177,34 @@ flowchart LR
 ```
 
 ❌ Global priority/fairness scheduling remains outstanding.
+
+✅ ADR0155: admission captures ActionDefinition.serializationKey, validated by the registry. One running Action per key across tasks/Channels; joined cleanup releases that same captured key. Production retains UI/Speech/NexArm keys; omitted keys default to path.module for legacy/isolated definitions. Parameters and Channels cannot override exclusion. ❌ Three-field Path migration is implemented.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+## Scheduled native projection — ADR0157
+
+✅ Definition-owned scheduled ToolCalls enter this same scheduler as one child job outside model XML wait groups. The child scheduling ID is independent; the handler retains the original source/session/input/sequence/turn context. Existing64 task,16 Channel, per-Channel and cumulative job bounds apply. One bufferingOldest1 receipt per child stores its terminal outcome; no second delivery queue or duplicate ActionResult is created. The original native call receives its ToolResult through InputGateway.
+
+```mermaid
+flowchart LR
+    Native[Authorized native ToolCall] --> Policy[Scheduled definition / Channel]
+    Policy --> Child[Bounded child scope and single receipt]
+    Child --> Scheduler[Same serialization / resource fences]
+    Scheduler --> Handler[Canonical shared handler]
+    Handler --> Join[Join handler cleanup]
+    Join --> Receipt[Preserved completion]
+    Receipt --> Finish[Close child scope]
+    Finish --> Feedback[Original ToolResult]
+    Cancel[Caller cancellation] --> Cleanup[Cancel and join child]
+    Cleanup --> Finish
+```
+
+✅ Queued cancellation completes the receipt with cancellation without executing the job; running cancellation joins cleanup before returning. Serial keys remain held during cleanup. Child scope context adaptation is internal to Gateway; public ScheduledAction construction derives its context from the envelope.
+
+❌ Uncooperative handlers cannot be forcibly terminated, and software cleanup is not proof of physical stop.

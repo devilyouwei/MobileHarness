@@ -7,8 +7,6 @@ import Foundation
 import Gateway
 import PlatformKit
 import Testing
-import ToolRuntime
-import Tools
 
 /// Deliberately simple IK fixture; does not model physical kinematics.
 struct NexArmTestIK {
@@ -220,7 +218,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
             let invocation = ActionInvocation(
                 source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("test")),
                 call: ActionCall(
-                    actionPath: ActionPath(module: "NexArm", function: "shakeBase"), channel: "Robot",
+                    actionPath: ActionPath(domain: "NexArm", module: "Motion", function: "shakeBase"), channel: "Robot",
                     parameters: parameters))
             try await NexArmActions.shakeBase(invocation: invocation) { _, _ in
                 Issue.record("Invalid cycle request reached hardware")
@@ -270,12 +268,13 @@ struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionDefinition] {
         ["express", "setExpression", "beginReplyTurn", "print"].map {
             ActionDefinition(
-                path: ActionPath(module: "UI", function: $0), displayName: "测试动作",
+                path: ActionPath(domain: "UI", module: "Expression", function: $0), displayName: "测试动作",
                 kind: $0 == "express" ? .finite : .state,
                 completion: "Test presentation accepted.", handler: { _ in })
         } + [
             ActionDefinition(
-                path: ActionPath(module: "Speech", function: "speak"), displayName: "测试动作", kind: .finite,
+                path: ActionPath(domain: "Speech", module: "Playback", function: "speak"), displayName: "测试动作",
+                kind: .finite,
                 completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") })
         ]
     }
@@ -355,13 +354,25 @@ private func runNexArmAssistantMarkup(
         }
         var results = await assistant.actionResults()
         for _ in 0..<100 {
-            if results.contains(where: { $0.path == ActionPath(module: "NexArm", function: function) }) { break }
+            if results.contains(where: {
+                $0.path
+                    == ActionPath(
+                        domain: "NexArm",
+                        module: ["shakeBase", "reset", "moveMotor", "resetMotor"].contains(function)
+                            ? "Motion" : "Gesture", function: function)
+            }) {
+                break
+            }
             try await Task.sleep(for: .milliseconds(10))
             results = await assistant.actionResults()
         }
         #expect(
             results.contains {
-                $0.path == ActionPath(module: "NexArm", function: function) && $0.status == .succeeded
+                $0.path
+                    == ActionPath(
+                        domain: "NexArm",
+                        module: ["shakeBase", "reset", "moveMotor", "resetMotor"].contains(function)
+                            ? "Motion" : "Gesture", function: function) && $0.status == .succeeded
             })
         await output.shutdown()
         await assistant.stop()
@@ -569,7 +580,10 @@ func nexArmGestureActionsRejectMalformedArgumentsBeforeEffects(_ function: Strin
         let invocation = ActionInvocation(
             source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
             call: ActionCall(
-                actionPath: ActionPath(module: "NexArm", function: function), channel: "Robot", parameters: parameters))
+                actionPath: ActionPath(
+                    domain: "NexArm",
+                    module: ["shakeBase", "reset", "moveMotor", "resetMotor"].contains(function) ? "Motion" : "Gesture",
+                    function: function), channel: "Robot", parameters: parameters))
         await #expect(throws: (any Error).self) {
             try await ActionExecutor(registry: registry).execute(invocation)
         }
@@ -986,7 +1000,8 @@ func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) a
     let call = ActionInvocation(
         source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
         call: ActionCall(
-            actionPath: ActionPath(module: "NexArm", function: "dance"), channel: "Robot", parameters: ["cycles": "4"]))
+            actionPath: ActionPath(domain: "NexArm", module: "Gesture", function: "dance"), channel: "Robot",
+            parameters: ["cycles": "4"]))
     do {
         _ = try await ActionExecutor(registry: registry).execute(call)
         Issue.record("Expected invalid repetitions")

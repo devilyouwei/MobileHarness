@@ -11,7 +11,7 @@ Agents/Core/
 ├── HarnessError.swift                               # Shared errors
 ├── Input/                                           # Generic audio/image transport
 ├── Runtime/                                         # Registry, manager and lifecycle
-├── Capability/                                      # JSON v5 validation and local permissions
+├── Capability/                                      # JSON v6 validation and local permissions
 ├── Generation/                                      # Shared parsers and text-to-Action mapping
 ├── Output/                                          # Resolved calls, results and trusted context
 ├── Communication/                                   # Typed inputs, messaging contracts and policy
@@ -36,7 +36,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    JSON[Agent JSON v5] --> Capability[Capability configuration and registry]
+    JSON[Agent JSON v6] --> Capability[Capability configuration and registry]
     Capability --> Context[Scheduling rules and visible Action prompt context]
     Capability --> Resolve[AgentGenerator / alias resolution]
     Fragments[Model text or complete native Tool call] --> Parse[Generation parsers]
@@ -58,7 +58,7 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ## Feature status
 
 - ✅ Agent contracts, bounded registration, lifecycle and source/session identity.
-- ✅ JSON v5 permissions, Action prompt context, shared parsing and resolved output.
+- ✅ JSON v6 permissions, Action prompt context, shared parsing and resolved output.
 - ✅ Typed events, static communication policy, deadlines and bounded event delivery.
 - ❌ Generic AgentRuntime, AgentContext, StateStore and request/reply endpoints.
 - ❌ Incremental native Tool argument assembly and durable event delivery.

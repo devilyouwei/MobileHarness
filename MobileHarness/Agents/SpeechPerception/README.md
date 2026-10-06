@@ -7,7 +7,7 @@ flowchart LR
     InputGateway --> Inbox[128 frames / 64000 samples]
     Inbox --> VAD[VoiceActivitySegmenter]
     VAD --> ASR[SpeechRecognitionTurn / recognition capability]
-    ASR --> Caption[Code-owned UI.setTranscript Tool]
+    ASR --> Caption[Code-owned UI.Caption.setTranscript Tool]
     Caption --> OutputGateway
     OutputGateway --> ToolExecution --> UI[App presentation handler]
     ASR --> Port[Bound messaging port]
@@ -15,20 +15,20 @@ flowchart LR
     OutputGateway --> InputGateway
 ```
 
-✅ JSON v5 declarations; sequential raw audio admission; existing 128-event/64000-sample ASR queue and 60-second turn limit; partial/final separation; final publication once per nonempty turn. Empty turns resume capture. App resumes after Assistant actions finish.
+✅ JSON v6 declarations; sequential raw audio admission; existing 128-event/64000-sample ASR queue and 60-second turn limit; partial/final separation; final publication once per nonempty turn. Empty turns resume capture. App resumes after Assistant actions finish.
 
 ✅ Endpoint recognition suppresses queued capture after the endpoint while replies play. This is explicit conversational capture gating, not an audio overflow policy. Overflow fails; no unbounded tasks. Stop cancels and joins ASR/VAD/worker before completing. Models remain resident.
 
 ❌ Barge-in, background listening and physical sustained speech acceptance of this migration.
 
-✅ Accepted input kinds derive from the JSON v5 communication snapshot; Swift retains handlers, not a duplicate production input registry.
+✅ Accepted input kinds derive from the JSON v6 communication snapshot; Swift retains handlers, not a duplicate production input registry.
 
-✅ Code declares UI.setTranscript as an internal Tool without a Channel. Each preview publishes its shared observation and emits a resolved caption ToolCall containing the last 320 characters. Recognition completion emits UI.finishTranscript before publishing final (also clears empty turns). No XML parsing of recognized text is needed: typed InternalTool calls carry the code-owned permission. App awaits each completion-only Tool handler before consuming the following agent.finished control; these UI updates never enter Action scheduling.
+✅ Code declares UI.Caption.setTranscript as an internal Tool without a Channel. Each preview publishes its shared observation and emits a resolved caption ToolCall containing the last 320 characters. Recognition completion emits UI.Caption.finishTranscript before publishing final (also clears empty turns). No XML parsing of recognized text is needed: typed InternalTool calls carry the code-owned permission. App awaits each completion-only Tool handler before consuming the following agent.finished control; these UI updates never enter Action scheduling.
 
 ✅ The output stream holds at most 32 envelopes; overflow fails the session rather than silently dropping ToolCalls. App drains it serially through OutputGateway, awaiting each Tool handler. Stop cancels perception work, closes/drains output, cancels session Actions, and the App rejects stale-session presentation. Partial/final observations remain available to subscribers independently of UI Tools.
 ❌ Sustained device caption timing and overload acceptance remain unverified.
 
-✅ UI.setVoiceState is code-declared for hearing/processing/listening presentation. Phase Signals only communicate facts: App uses them for capture admission, Assistant chooses its atomic beginReplyTurn Tool on first onset. Resume emits a listening Tool; completion acknowledges accepted presentation state. No UI changes occur in Signal observers.
+✅ UI.VoiceState.setVoiceState is code-declared for hearing/processing/listening presentation. Phase Signals only communicate facts: App uses them for capture admission, Assistant chooses its atomic beginReplyTurn Tool on first onset. Resume emits a listening Tool; completion acknowledges accepted presentation state. No UI changes occur in Signal observers.
 
 ✅ AgentTurn is allocated at the first confirmed onset/audio event and remains stable across maximum-duration segments and short VAD transitions. It propagates through shared observations and output envelopes. Resume after reply (or empty recognition) arms a new utterance; ordinals increase within the capture session. Previews carry bounded text, finishTranscript seals it, and output sequences are monotonic.
 
@@ -89,9 +89,9 @@ flowchart LR
 
 | 内部 Tool 路径（无 Channel） | 参数结构 | 触发与语义 |
 | --- | --- | --- |
-| `UI.setTranscript` | `["text": String]`；handler 上限 4096 UTF-8 字节 | 预览先发布 partial，再发 ToolCall；当前投影保留最后 320 个字符。空串清空预览，但不封闭轮次。 |
-| `UI.finishTranscript` | `[:]` | 识别结束（包括空结果）清空并封闭本轮识别字幕，拒绝迟到的旧 partial；随后才发布非空 final。 |
-| `UI.setVoiceState` | `["state": "hearing"或"processing"或"listening"]` | speaking 映射 hearing，processing 同名，listening/empty 映射 listening；只改展示，不启动/停止设备。 |
+| `UI.Caption.setTranscript` | `["text": String]`；handler 上限 4096 UTF-8 字节 | 预览先发布 partial，再发 ToolCall；当前投影保留最后 320 个字符。空串清空预览，但不封闭轮次。 |
+| `UI.Caption.finishTranscript` | `[:]` | 识别结束（包括空结果）清空并封闭本轮识别字幕，拒绝迟到的旧 partial；随后才发布非空 final。 |
+| `UI.VoiceState.setVoiceState` | `["state": "hearing"或"processing"或"listening"]` | speaking 映射 hearing，processing 同名，listening/empty 映射 listening；只改展示，不启动/停止设备。 |
 | control | `agent.finished` | 每次上述展示更新后发出，保留输入完成协议；前面的 Tool handler 已由串行输出处理等待完成，不创建 UI Action。 |
 | control | `agent.error: speech perception failed: …` | 感知失败尝试发出并关闭流；32 项输出缓冲满时不能保证错误消息入队，failed 状态仍可查询。 |
 
@@ -101,7 +101,7 @@ Tool/控制携带 `OutputEnvelope(source, inputID, sessionID, turn, sequence, ou
 
 `communication.publications` 包含上表三个 `speech.*` contract 和 `sound.source`，typed payload、长度、触发时机和消费者均按“共享观测输出”表；它们不携带 PCM，也不作为 Agent `outputs` 流的 Action。`communication.sends = []`：SpeechPerception 不发送定向 Agent 消息；Assistant 接收 final/phase 是订阅广播，不是 send。JSON `actions / tools` 均为空；内部展示权限由代码声明，无 ToolResult 输入；不负责回复表情、回复字幕或摄像头。❌ 抢话和后台聆听未实现。
 
-✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v5. ❌ Activity/resource ownership is not introduced.
+✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v6. ❌ Activity/resource ownership is not introduced.
 
 ## File ownership and state transitions
 
@@ -167,3 +167,10 @@ flowchart LR
 ❌ This diagnostic mode measures dominant direction only; it does not test ASR accuracy or establish physical axis calibration.
 
 ✅ ADR0149: the scoped sound-source parent preserves explicit Signal origin while narrowing its deadline; capture origin is not reclassified by payload kind. ❌ New native/system business Signal contracts remain separate migration work.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

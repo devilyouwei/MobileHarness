@@ -10,8 +10,6 @@ import ModelKit
 import OSLog
 import PlatformKit
 import StorageAudio
-import ToolRuntime
-import Tools
 import UI
 
 @MainActor
@@ -545,7 +543,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         resetExpression()
     }
 
-    func presentVoiceState(_ voiceState: UITools.VoiceState, invocation: ToolInvocation) throws {
+    func presentVoiceState(_ voiceState: UIActions.VoiceState, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         // In-flight perception Tools cannot restore listening after capture admission has closed.

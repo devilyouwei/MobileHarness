@@ -4,8 +4,6 @@ import AgentCore
 import Agents
 import Foundation
 import Testing
-import ToolRuntime
-import Tools
 
 @testable import Gateway
 
@@ -14,7 +12,8 @@ import Tools
     let input = AgentInput(sessionID: UUID(), payload: .event("boundary"), turn: turn)
     let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: input.sessionID)
     let call = ActionCall(
-        actionPath: .init(module: "Fixture", function: "move"), channel: "Robot", parameters: ["target": "2048"])
+        actionPath: .init(domain: "Fixture", module: "Control", function: "move"), channel: "Robot",
+        parameters: ["target": "2048"])
     let envelope = OutputEnvelope(source: .assistant, input: input, output: .actionCall(call), sequence: 42)
     let scheduled = try ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal)
     let execution = scheduled.execution
@@ -55,13 +54,13 @@ import Tools
 @Test func genericAgentReportRetainsOpaqueProviderDetailsAndCancellation() throws {
     let report = try AgentActionReport(entries: [
         .init(
-            path: "fixture", status: .failed, code: .init(rawValue: "fixture.sensorUnavailable"),
+            path: "Fixture.Control.fixture", status: .failed, code: .init(rawValue: "fixture.sensorUnavailable"),
             details: ["sensor": "depth", "expected": "ready", "actual": "offline"])
     ])
     #expect(report.entries[0].code?.rawValue == "fixture.sensorUnavailable")
     #expect(report.entries[0].details["sensor"] == "depth")
     #expect(report.status == .failed)
-    let successful = try AgentActionReport(entries: [.init(path: "fixture", status: .succeeded)])
+    let successful = try AgentActionReport(entries: [.init(path: "Fixture.Control.fixture", status: .succeeded)])
     #expect(successful.withExecutionFailure(.cancelled).status == .cancelled)
 }
 

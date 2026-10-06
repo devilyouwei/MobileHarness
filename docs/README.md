@@ -165,3 +165,15 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [History deletion validation](Validation-History.md#2026-10-06--history-deletion-and-deterministic-result-continuation): final full checks,15 focused tests and unsigned device build passed. ❌ Simulator CoreAI dependency and native confirmation acceptance remain pending.
 
 ✅ [Signal origin and returning Tool feedback](adr/0149-signal-origin-and-tool-feedback.md) records typed admission and stale-owner/causal fencing. ❌ Action/activity roots and legacy typed controls remain pending.
+
+✅ Unified executable capabilities are implemented under the [active Agent-driven architecture](../MobileHarness/Agent-Driven-App.md#unified-executable-capabilities--adopted-design). The decisions below record the migration stages; their original transitional contracts are historical.
+
+- [ADR0150](adr/0150-unified-execution-lifetime.md): shared deadlines, cancellation and joined cleanup.
+- [ADR0151](adr/0151-consolidated-capability-sources.md): capability sources consolidated under Actions; temporary compatibility targets subsequently retired.
+- [ADR0152](adr/0152-business-domain-capability-classification.md): six business-domain catalogs with cohesive UI/NexArm ownership.
+- [ADR0153](adr/0153-three-level-capability-addressing.md) and [ADR0154](adr/0154-cohesive-capability-entry-files.md): directory/module-file/function ownership and addressing.
+- [ADR0155](adr/0155-explicit-action-serialization-identity.md): serialization identity independent of address.
+- [ADR0156](adr/0156-three-level-capability-addresses.md): explicit three-field addresses and Agent configuration v6.
+- [ADR0157](adr/0157-canonical-executable-definitions.md): one definition/handler/outcome catalog, protocol projections, shared scheduled native execution, typed feedback and compatibility retirement.
+
+❌ Remaining work is broader Agent-driven input/feature migration, bounded model continuation and physical acceptance; Action/Tool source and implementation consolidation is complete.

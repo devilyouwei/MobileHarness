@@ -386,3 +386,65 @@ The authoritative Agent-Driven-App.md contract was updated before runtime implem
 ✅ The unsigned generic iOS device build passed, and all six packaged Agent configurations matched source. Diff whitespace and original Technical_Design.docx preservation were verified. ❌ scripts/build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; remaining schemes were not attempted. No device installation, physical interaction or live-model acceptance was performed.
 
 Typed host controls and complete ActionResult/ActivityEvent original-root propagation remain outstanding. Legacy host runtime.event controls still enter as External; this stage does not claim complete Signal migration.
+
+## 2026-10-06 — Shared Action/Tool execution lifetime
+
+Baseline commit: 46497cd on codex/agent-driven-app. The adopted unified-capability design was written before code changes (ADR0150). CooperativeExecution in ActionRuntime now owns the shared handler/deadline race, cancellation and cleanup join. Existing Action report adaptation and Tool response/feedback policy remain separate. ToolRuntime has only the documented transitional ActionRuntime dependency; no capability definition or JSON v5 permission was changed.
+
+✅ All 492 IntegrationTests passed in the required check.sh run. Boundary checks, Python checks and strict Swift formatting passed. Subsequent focused verification passed six execution regressions covering both executors, timeout precedence, cleanup, cancellation and composition, plus the isolated audio-permission retry regression. Final strengthened boundary checks and diff whitespace passed; project/privacy/entitlements metadata was validated separately.
+
+❌ Full check.sh returned failure because AppWorkflowTests.audioDetectionKeepsFailedPermissionResultAndAllowsRetry timed out; its isolated rerun passed. No instability fix or whole-suite success is claimed. Required full-Xcode build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; remaining schemes were not attempted.
+
+✅ The unsigned generic iOS device build passed and all six packaged Agent configurations matched source. Original Technical_Design.docx remains unchanged. No physical installation, device interaction or real-model acceptance was performed. Unified definitions/results, dual-protocol registration and scheduled ToolCall adaptation remain the next stages.
+
+## 2026-10-06 — Executable capability directory consolidation
+
+The adopted Agent-Driven-App.md design was refined before moving sources (ADR0151). Original Tool domains, macro/catalog declarations and execution sources now live under Actions. Both protocol runtimes compile only in ActionRuntime; legacy Tools/ToolRuntime imports use two re-export-only compatibility targets. Actions alone acquires the moved History domain's StorageChat dependency. Definition/result unification and dual-protocol capability registration are still outstanding.
+
+✅ Final scripts/check.sh passed: all 492 IntegrationTests, all 37 AppWorkflowTests, boundaries, Python checks, strict Swift formatting and project/privacy/entitlements metadata. Boundaries reject a recreated concrete Tools directory, reverse dependencies and nontrivial compatibility shims. Consolidated README local links and diff whitespace passed. The original Technical_Design.docx remains unchanged.
+
+✅ Unsigned generic iOS device build passed and all six packaged Agent configurations matched source. ❌ Required full-Xcode scripts/build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; later schemes were not attempted. No physical installation, native interaction or live-model acceptance was performed. No execution policy, permissions, feedback semantics or automatic replay behavior changed in this source consolidation stage.
+
+## 2026-10-06 — Business-domain function and catalog classification
+
+The active design was updated before implementation (ADR0152). UI functions now share UIActions and UIModule; NexArm motor/gesture/base/tracking functions share NexArmActions and NexArmModule, retaining Robot.aim as a legacy wire path. Speech, Camera, History and System have canonical namespaces/catalogs. CapabilityModules supplies one six-domain production list and BehaviorAssembly projects both registries from it. Compatibility aliases and partial NexArm catalog views contain no duplicated behavior or definition lists. Invocation definitions/results remain protocol-specific.
+
+✅ Final check.sh passed all 493 IntegrationTests, including the new expression/gaze catalog and pre-effect rejection regression. Boundaries, six Python checks and strict Swift formatting passed. Final focused verification passed three composed domain tests plus the isolated audio-permission retry test. Metadata, consolidated README links, diff whitespace and preservation of Technical_Design.docx were verified.
+
+❌ Full check.sh returned failure because AppWorkflowTests.audioDetectionKeepsFailedPermissionResultAndAllowsRetry timed out; its isolated rerun passed. Whole-suite success and a timing-instability fix are not claimed. Required full-Xcode build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; remaining schemes were not attempted.
+
+✅ Final unsigned generic iOS device build passed and all six packaged Agent configurations matched source. No native UI interaction, physical motor/tracking or real-model acceptance was performed. No call permissions, scheduling, resource ownership or effect completion semantics were changed.
+
+## 2026-10-06 — Three-level address design correction
+
+Documentation-only ADR0153 adopts Domain.Module.function and maps directory, cohesive entry file/namespace and function. Six domain catalogs remain aggregators; current DomainActions facades and two-field paths are explicitly transitional. Three-field contract/configuration/registration migration and entry splitting are pending. No runtime code changed in this correction.
+
+✅ Required check.sh passed, including all 493 IntegrationTests and all 37 AppWorkflowTests, boundaries, Python checks, strict formatting and metadata. Diff whitespace passed. ❌ Full-Xcode build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; later schemes were not attempted. No new device build/install or physical acceptance belongs to this documentation-only correction; the previous runtime stage's final unsigned device build remains its own evidence.
+
+## 2026-10-06 — Cohesive module entry files
+
+The active design was refined before source changes (ADR0154). Callable implementations now live in directory/module-file/function groups: six UI module files, three NexArm module files and Playback/Capture/Conversation/Runtime for the remaining domains. Public domain namespace facades retain existing APIs without forwarding or duplicated business code. Private helpers stay with their consumers; SpeechActionError moved to Support. Existing paths, metadata and Agent JSON v5 remain active; explicit three-field addressing remains pending.
+
+✅ Final scripts/check.sh passed, including all 493 IntegrationTests, all 37 AppWorkflowTests, architecture boundaries, six Python checks, strict Swift formatting and metadata. Boundary checks enforce exact module-file/function ownership and prohibit public callable bodies in facades. README links and diff whitespace passed. The unsigned generic iOS device build passed and all six packaged Agent configurations matched source.
+
+❌ Required full-Xcode scripts/build-ios.sh stopped at its first simulator scheme because CoreAIShared could not resolve CoreAI; later schemes were not attempted. No installation, native interaction, physical motion or real-model acceptance was performed. Original Technical_Design.docx remains unchanged.
+
+## 2026-10-06 — Explicit Action serialization identity
+
+ADR0155 refines the active architecture before implementation: definitions and generated factories own a validated serializationKey; scheduler admission captures it independently of paths and caller parameters. Production UI/Speech/NexArm scopes, bounded queues, joined cleanup, resources and feedback remain unchanged. Three-field paths and Agent configuration migration remain pending.
+
+✅ Final scripts/check.sh passed: all 495 IntegrationTests (61.372 seconds), all 37 AppWorkflowTests, boundary checks, six Python checks, strict formatting and metadata. The first full run had a timeout in bluetoothUnconfirmedDisconnectNeverOpensASecondConnection; that test passed in isolation (0.057 seconds), and the final complete run passed. New fixtures verify shared-key cross-path exclusion, independent-key progress, invalid registration and macro metadata. Changed runtime README links and diff whitespace passed.
+
+✅ Unsigned generic iOS device build passed; all six packaged Agent configurations match source. ❌ Required full-Xcode build-ios.sh stopped at its first simulator scheme because CoreAIShared could not resolve CoreAI; later schemes were not attempted. No installation or physical device/real-model acceptance was performed. Technical_Design.docx remains unchanged.
+
+## 2026-10-06 — Three-level addresses and canonical executable capabilities
+
+The active Agent-Driven-App.md contract was revised before implementation (ADR0156/0157). All six Agent configurations now use version6 explicit Domain.Module.function bindings; provider-native aliases remain inside Agents. Actions owns one executable definition/handler/outcome catalog, immutable validated startup projections, shared resources/budgets/deadlines and scheduled native ToolCall routing through the same ChannelScheduler. ToolDefinition/ToolResource are aliases; request/result envelopes and registries remain protocol adapters. Tools/ToolRuntime re-export targets and legacy business namespace aliases are removed. Existing production permissions and serialization scopes are preserved.
+
+New fixtures cover strict v6 configuration, domain-specific permission identity, the same returned value and real gaze function through both protocols, independent protocol grants, scheduled native exclusion/context/cancellation cleanup with single feedback, and cross-protocol duplicate/hidden-invalid catalog rejection. The existing vision deadline fixture now uses a small timestamped RGB image and wider timing margin; its stale-result rejection and recovery assertions remain intact. Production perception timing policy is unchanged.
+
+✅ Final required check.sh passed all502 IntegrationTests (61.206 seconds), architecture boundaries, six Python checks, strict formatting and the other enabled package suites. ❌ The complete script returned failure because the existing audioDetectionKeepsFailedPermissionResultAndAllowsRetry workflow test timed out (3.960 seconds). The failure phase is observable before monitor cleanup releases the operation, so an immediate retry can be refused. No audio-workflow fix or complete-script success is claimed. Separate isolated retry passed, and a full AppWorkflowTests rerun passed all37 tests (0.210 seconds). Earlier complete runs exhibited the same workflow timeout. Project/privacy/entitlements metadata was validated separately after the script stopped.
+
+✅ Final unsigned generic iOS device build passed; all six packaged Agent configurations match source. Changed Markdown local targets and diff whitespace passed. ❌ Required full-Xcode build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; remaining schemes were not attempted. Original Technical_Design.docx remains unchanged. No installation, native/physical interaction or live-model acceptance was performed.
+
+Action/Tool source and implementation unification is complete. Remaining Agent-driven stages are Action/activity original-root propagation, typed host intent/control, remaining settings/device/business inputs and registered failure presentation, then bounded result-driven model continuation. Physical acceptance remains separate.

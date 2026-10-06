@@ -124,3 +124,7 @@ Each active task phase runs FIFO per Channel and shares process-wide Action-modu
 
 ✅ External, Agent and Runtime provenance share one envelope and the same bounded admission. Only identity-bound messaging admits Agent origin; runtime feedback validates original execution ownership. Returning Tools preserve causal root/parent, hop count and interaction scope without a new queue or retry.
 ❌ Original-root propagation for Action/activity feedback and typed legacy controls remain pending.
+
+✅ Scheduled Action admission copies definition-owned serializationKey; all Channels/tasks share exclusion by that key. Gateway resolves no business alias and derives no domain policy from future module names.
+
+❌ Unified Action/Tool definitions remain outstanding; three-field runtime paths and v6 bindings are now implemented.

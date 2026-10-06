@@ -39,3 +39,7 @@ Native Bluetooth diagnostics have a different subscriber/cache in AppBluetoothWo
 ✅ ADR0132: Home issue presentation preserves generic failure codes and optional App worker/source call provenance. Motor admission/read errors have stage-specific labels; device diagnostics remain absent.
 
 ❌ Sustained physical-device acceptance and durable error history remain pending.
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

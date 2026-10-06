@@ -29,14 +29,14 @@ private actor ActionTestLog {
 }
 
 private let actionTestAgent = AgentID.assistant
-private let sayPath = ActionPath(module: "Speech", function: "speak")
-private let printPath = ActionPath(module: "UI", function: "print")
+private let sayPath = ActionPath(domain: "Speech", module: "Playback", function: "speak")
+private let printPath = ActionPath(domain: "UI", module: "Caption", function: "print")
 
 private func actionInvocation(
     _ text: String, input: AgentInput, source: AgentID = actionTestAgent, path: ActionPath = sayPath,
     channel: String? = nil
 ) -> ActionInvocation {
-    let token = ActionCall(actionPath: path, channel: channel ?? path.module, parameters: ["text": text])
+    let token = ActionCall(actionPath: path, channel: channel ?? path.domain, parameters: ["text": text])
     return ActionInvocation(source: source, input: input, call: token)
 }
 
@@ -92,9 +92,13 @@ private func actionInvocation(
     try await executor.finish(inputID: first.id, source: AgentID(rawValue: "assistant"))
     try await executor.enqueue(invocation: actionInvocation("two", input: second, path: printPath))
     try await executor.finish(inputID: second.id, source: AgentID(rawValue: "assistant"))
-    await #expect(throws: ActionExecutionError.missingHandler(ActionIdentifier(module: "Device", function: "move"))) {
+    await #expect(
+        throws: ActionExecutionError.missingHandler(
+            ActionIdentifier(domain: "Device", module: "Control", function: "move"))
+    ) {
         try await executor.enqueue(
-            invocation: actionInvocation("three", input: second, path: ActionPath(module: "Device", function: "move")))
+            invocation: actionInvocation(
+                "three", input: second, path: ActionPath(domain: "Device", module: "Control", function: "move")))
     }
 }
 
@@ -600,4 +604,69 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     try await scheduler.finish(inputID: input.id, source: source)
     #expect(await log.values == ["custom"])
     await scheduler.shutdown()
+}
+
+@Test(.timeLimit(.minutes(1))) func definitionSerializationKeyFencesDifferentPathsAcrossChannels() async throws {
+    let started = ActionTestGate()
+    let release = ActionTestGate()
+    let independentFinished = ActionTestGate()
+    let log = ActionTestLog()
+    let first = ActionPath(domain: "First", module: "Control", function: "run")
+    let second = ActionPath(domain: "Second", module: "Control", function: "run")
+    let independent = ActionPath(domain: "Independent", module: "Control", function: "run")
+    let registry = try ActionRegistry(definitions: [
+        ActionDefinition(
+            path: ActionIdentifier(domain: first.domain, module: first.module, function: first.function),
+            displayName: "First",
+            kind: .finite, completion: "Completed", serializationKey: "shared"
+        ) { _ async throws -> Void in
+            await log.append("first:start")
+            await started.open()
+            await release.wait()
+            await log.append("first:end")
+        },
+        ActionDefinition(
+            path: ActionIdentifier(domain: second.domain, module: second.module, function: second.function),
+            displayName: "Second",
+            kind: .finite, completion: "Completed", serializationKey: "shared"
+        ) { _ async throws -> Void in
+            await log.append("second")
+        },
+        ActionDefinition(
+            path: ActionIdentifier(
+                domain: independent.domain, module: independent.module, function: independent.function),
+            displayName: "Independent", kind: .finite, completion: "Completed"
+        ) { _ async throws -> Void in
+            await log.append("independent")
+            await independentFinished.open()
+        },
+    ])
+    let scheduler = ChannelScheduler(registry: registry)
+    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
+    try await scheduler.enqueue(invocation: actionInvocation("first", input: input, path: first, channel: "one"))
+    await started.wait()
+    let attemptedOverride = ActionInvocation(
+        source: actionTestAgent, input: input,
+        call: ActionCall(actionPath: second, channel: "two", parameters: ["serializationKey": "Independent"]))
+    try await scheduler.enqueue(invocation: attemptedOverride)
+    try await scheduler.enqueue(
+        invocation: actionInvocation("independent", input: input, path: independent, channel: "three"))
+    await independentFinished.wait()
+    #expect(await log.values == ["first:start", "independent"])
+    let finish = Task { try await scheduler.finish(inputID: input.id, source: actionTestAgent) }
+    await release.open()
+    try await finish.value
+    #expect(await log.values == ["first:start", "independent", "first:end", "second"])
+}
+
+@Test(arguments: ["", "bad key", String(repeating: "x", count: 65)])
+func registryRejectsInvalidSerializationKeyBeforeExecution(_ key: String) {
+    let path = ActionIdentifier(domain: "Fixture", module: "Control", function: "run")
+    #expect(throws: ActionExecutionError.invalidDefinition(path)) {
+        try ActionRegistry(definitions: [
+            ActionDefinition(
+                path: path, displayName: "Fixture", kind: .finite, completion: "Completed", serializationKey: key
+            ) { _ async throws -> Void in Issue.record("Invalid registration must not execute") }
+        ])
+    }
 }

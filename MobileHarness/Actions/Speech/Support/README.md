@@ -2,11 +2,11 @@
 
 Purpose: keep non-callable implementation support separate from registered entry points. Design goals: cohesive definitions, explicit typed injection, stable public names and no hidden registration.
 
-SpeechActionModule and SpeechPlaybackCapability define registration and host injection; AppWorkflows.SpeechPlayback retains audio checkout, drain and cancellation cleanup.
+SpeechModule and SpeechPlaybackCapability define registration and host injection; AppWorkflows.SpeechPlayback retains audio checkout, drain and cancellation cleanup.
 
 ```mermaid
 flowchart LR
-    Capability[Host playback capability] --> Module[SpeechActionModule]
+    Capability[Host playback capability] --> Module[SpeechModule]
     Module --> Entry[SpeechActions.speak]
     Entry --> Host[Session endpoint]
     Host --> Playback[SpeechPlayback checkout / drain / cleanup]
@@ -25,3 +25,11 @@ flowchart LR
 ✅ This directory retains the playback capability and explicit module binding. SpeechPlayback moved to App/Workflows because it adapts Agent-owned stored audio to an Action context.
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
+❌ Unified capability definitions and protocol registration adapters remain pending.
+
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
+❌ Unified callable definitions and migration of compatibility names remain pending.
+
+✅ ADR0154: SpeechTypes.swift owns SpeechActionError after playback entries move to PlaybackActions.swift. SpeechModule still binds the same factory and endpoint. ❌ Three-level path registration remains pending.

@@ -58,10 +58,10 @@ public actor AssistantAgent: Agent {
             + (try outputContext(capabilities))
     }
 
-    private static let beginReply = InternalTool(path: "UI.beginReplyTurn")
+    private static let beginReply = InternalTool(path: "UI.Caption.beginReplyTurn")
     private static let playback = InternalAction(
-        module: "Speech", function: "speak", channel: "Speech", required: ["audioID"])
-    private static let caption = InternalTool(path: "UI.print", required: ["text"])
+        domain: "Speech", module: "Playback", function: "speak", channel: "Speech", required: ["audioID"])
+    private static let caption = InternalTool(path: "UI.Caption.print", required: ["text"])
 
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
         try model.adding(internalActions: [playback], internalTools: [beginReply, caption])
@@ -399,7 +399,9 @@ public actor AssistantAgent: Agent {
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
             guard count < 120 else { throw GenerationError.limitExceeded }
             count += 1
-            if call.actionPath == ActionPath(module: "Speech", function: "speak"), let text = call.parameters["text"] {
+            if call.actionPath == ActionPath(domain: "Speech", module: "Playback", function: "speak"),
+                let text = call.parameters["text"]
+            {
                 guard let port else { throw CommunicationError.scopeClosed }
                 let request = try SpeechSynthesisInput(text: text)
                 let target = AgentID(rawValue: "speechSynthesis")

@@ -3,7 +3,7 @@
 Purpose: define typed Agent communication without owning transport tasks, message queues or session lifecycle. Gateways validate and route; Agents own inbox buffering and processing. AgentCore remains independent of Gateway and concrete Agents.
 
 - ✅ AgentMessaging binds publish/send to the sender's live incarnation through an OutputGateway closure.
-- ✅ CommunicationPolicy validates JSON v5 inputs, exact contract/source/topic subscriptions, publications and direct-send permissions.
+- ✅ CommunicationPolicy validates JSON v6 inputs, exact contract/source/topic subscriptions, publications and direct-send permissions.
 - ✅ DeliveryReport describes per-target admission; AgentMessaging.swift groups the generic AgentMessage, sender port and admission reports.
 - ❌ Dynamic subscriptions, request/reply, remote transport, persistence and automatic retry.
 
@@ -82,7 +82,7 @@ See [external input delivery](../../../Gateway/Input/README.md#external-input-ad
 
 ## Action runtime stage 2
 
-✅ The contract catalog includes runtime-only action.result/actionResult and activity.event/activityEvent inputs. JSON v5 shape is unchanged. Agent publication remains restricted to permitted observations; dedicated InputGateway methods bind these runtime messages to a specific owner incarnation/session. ❌ No generic activity subscription service.
+✅ The contract catalog includes runtime-only action.result/actionResult and activity.event/activityEvent inputs. JSON v6 shape is unchanged. Agent publication remains restricted to permitted observations; dedicated InputGateway methods bind these runtime messages to a specific owner incarnation/session. ❌ No generic activity subscription service.
 
 ✅ AgentMessaging publishResult/sendResult return ordinary routing failures in DeliveryReport.failure; explicit task cancellation propagates; a cancelled delivery alone is a failed receipt. Each port retains128 correlated delivery receipts, evicts oldest with an explicit counter, and performs no retry. Legacy throwing methods remain low-level validation APIs.
 

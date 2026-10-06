@@ -9,8 +9,6 @@ import PlatformKit
 import StorageAudio
 import Synchronization
 import Testing
-import ToolRuntime
-import Tools
 
 @testable import Agents
 
@@ -85,7 +83,7 @@ private func preparedSpeech(
             sessionID: input.sessionID, payload: payload,
             metadata: InputMetadata(payload: payload, source: "assistant", parentID: input.id)))
     let call = ActionCall(
-        actionPath: ActionPath(module: "Speech", function: "speak"), channel: "Speech",
+        actionPath: ActionPath(domain: "Speech", module: "Playback", function: "speak"), channel: "Speech",
         parameters: ["audioID": request.audioID.uuidString])
     return (
         agent, store, SpeechPlayback(store: store),
@@ -113,15 +111,15 @@ private func preparedSpeech(
     let playback = SpeechPlayback(store: store)
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
-            ActionPath(module: "Speech", function: "speak"): { invocation in
+            ActionPath(domain: "Speech", module: "Playback", function: "speak"): { invocation in
                 try await playback.play(invocation) { audio, _ in
                     while let frame = try await audio.next() { await probe.played(frame) }
                 }
             }
         ]))
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.print") { call, envelope in
-        try await UITools.print(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
+    try await tools.registerCompletion("UI.Caption.print") { call, envelope in
+        try await UIActions.print(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
             await probe.displayed(text)
         }
     }
@@ -148,8 +146,8 @@ private func preparedSpeech(
         if envelope.output == .control("assistant.finished") { break }
     }
     await agent.stop()
-    #expect(tokens == ["speak", "UI.print"])
-    #expect(await scheduler.executionSnapshot().records.allSatisfy { $0.path.module == "Speech" })
+    #expect(tokens == ["speak", "UI.Caption.print"])
+    #expect(await scheduler.executionSnapshot().records.allSatisfy { $0.path.domain == "Speech" })
     #expect(await probe.spokenText == ["固定回复"])
     #expect(await probe.displayedText == ["你好", "固定回复"])
     #expect(await probe.audio.count == 1)
@@ -195,7 +193,7 @@ private func preparedSpeech(
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let actions = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
-            ActionPath(module: "Speech", function: "speak"): { invocation in
+            ActionPath(domain: "Speech", module: "Playback", function: "speak"): { invocation in
                 try await playback.play(invocation) { audio, _ in
                     while let frame = try await audio.next() {
                         entered.continuation.yield(())
@@ -340,11 +338,11 @@ func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async 
     let probe = VoiceProbe()
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
     let call = ActionCall(
-        actionPath: ActionPath(module: "UI", function: "print"), channel: "Display",
+        actionPath: ActionPath(domain: "UI", module: "Caption", function: "print"), channel: "Display",
         parameters: text.map { ["text": $0] } ?? [:])
     let invocation = ActionInvocation(source: .assistant, input: input, call: call)
-    await #expect(throws: UITools.PresentationError.invalidText) {
-        try await UITools.print(invocation: uiToolInvocation(invocation)) { value, _ in await probe.displayed(value) }
+    await #expect(throws: UIActions.PresentationError.invalidText) {
+        try await UIActions.print(invocation: uiToolInvocation(invocation)) { value, _ in await probe.displayed(value) }
     }
     #expect(throws: SpeechValidationError.invalidRequest) { _ = try SpeechSynthesisInput(text: text ?? "") }
     #expect(await probe.displayedText.isEmpty)
@@ -361,7 +359,7 @@ func textActionsRejectInvalidParametersBeforeSideEffects(_ text: String?) async 
     }
     let call = expectedActionCall(name: "print", parameters: ["text": text])
     let display = ActionInvocation(source: .assistant, input: input, call: call)
-    try await UITools.print(invocation: uiToolInvocation(display)) { value, _ in await probe.displayed(value) }
+    try await UIActions.print(invocation: uiToolInvocation(display)) { value, _ in await probe.displayed(value) }
     #expect(await probe.spokenText == [text])
     #expect(await probe.displayedText == [text])
     #expect(await probe.audio.count == 1)
@@ -374,7 +372,7 @@ func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async
     let probe = VoiceProbe()
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
     let call = ActionCall(
-        actionPath: ActionPath(module: "UI", function: "express"), channel: "Display",
+        actionPath: ActionPath(domain: "UI", module: "Expression", function: "express"), channel: "Display",
         parameters: emotion.map { ["emotion": $0] } ?? [:])
     let invocation = ActionInvocation(source: .assistant, input: input, call: call)
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
@@ -387,7 +385,8 @@ func expressionsRejectInvalidEmotionBeforePresentation(_ emotion: String?) async
 @Test func expressionPresentationPropagatesCancellation() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("request"))
     let call = ActionCall(
-        actionPath: ActionPath(module: "UI", function: "express"), channel: "Display", parameters: ["emotion": "happy"])
+        actionPath: ActionPath(domain: "UI", module: "Expression", function: "express"), channel: "Display",
+        parameters: ["emotion": "happy"])
     let invocation = ActionInvocation(source: .assistant, input: input, call: call)
     await #expect(throws: CancellationError.self) {
         try await UIActions.express(
@@ -445,17 +444,17 @@ private actor EndpointVADSession: VoiceActivitySession {
     let captions = VoiceProbe()
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.setVoiceState") { call, envelope in
-        try await UITools.setVoiceState(invocation: ToolInvocation(call: call, context: envelope)) { _, _ in }
+    try await tools.registerCompletion("UI.VoiceState.setVoiceState") { call, envelope in
+        try await UIActions.setVoiceState(invocation: ToolInvocation(call: call, context: envelope)) { _, _ in }
     }
-    try await tools.registerCompletion("UI.finishTranscript") { call, envelope in
-        try await UITools.finishTranscript(invocation: ToolInvocation(call: call, context: envelope)) { _ in
+    try await tools.registerCompletion("UI.Caption.finishTranscript") { call, envelope in
+        try await UIActions.finishTranscript(invocation: ToolInvocation(call: call, context: envelope)) { _ in
             await captions.displayed("")
         }
     }
-    try await tools.registerCompletion("UI.setTranscript") { call, envelope in
+    try await tools.registerCompletion("UI.Caption.setTranscript") { call, envelope in
         #expect(envelope.source == AgentID.speechPerception.rawValue && envelope.sessionID == session)
-        try await UITools.setTranscript(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
+        try await UIActions.setTranscript(invocation: ToolInvocation(call: call, context: envelope)) { text, _ in
             await captions.displayed(text)
         }
     }
@@ -547,18 +546,21 @@ private actor EndpointVADSession: VoiceActivitySession {
     let probe = VoiceProbe()
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
     let call = ActionCall(
-        actionPath: .init(module: "UI", function: "setTranscript"), channel: "Transcript", parameters: ["text": ""])
+        actionPath: .init(domain: "UI", module: "Caption", function: "setTranscript"), channel: "Transcript",
+        parameters: ["text": ""])
     let invocation = ActionInvocation(source: .speechPerception, input: input, call: call)
-    try await UITools.setTranscript(invocation: uiToolInvocation(invocation)) { value, _ in await probe.displayed(value)
+    try await UIActions.setTranscript(invocation: uiToolInvocation(invocation)) { value, _ in
+        await probe.displayed(value)
     }
     #expect(await probe.displayedText == [""])
     await #expect(throws: CancellationError.self) {
-        try await UITools.setTranscript(invocation: uiToolInvocation(invocation)) { _, _ in throw CancellationError() }
+        try await UIActions.setTranscript(invocation: uiToolInvocation(invocation)) { _, _ in throw CancellationError()
+        }
     }
     for parameters in [[:], ["text": String(repeating: "a", count: 4097)]] {
         let invalid = ActionCall(actionPath: call.actionPath, channel: call.channel, parameters: parameters)
-        await #expect(throws: UITools.PresentationError.invalidText) {
-            try await UITools.setTranscript(
+        await #expect(throws: UIActions.PresentationError.invalidText) {
+            try await UIActions.setTranscript(
                 invocation: uiToolInvocation(ActionInvocation(source: .speechPerception, input: input, call: invalid))
             ) { _, _ in Issue.record("Invalid caption reached presentation") }
         }
@@ -585,8 +587,8 @@ private actor EndpointVADSession: VoiceActivitySession {
     let probe = VoiceProbe()
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.beginReplyTurn") { call, envelope in
-        try await UITools.beginReplyTurn(invocation: ToolInvocation(call: call, context: envelope)) { _ in
+    try await tools.registerCompletion("UI.Caption.beginReplyTurn") { call, envelope in
+        try await UIActions.beginReplyTurn(invocation: ToolInvocation(call: call, context: envelope)) { _ in
             await probe.displayed("reply and expression cleared atomically")
         }
     }
@@ -609,7 +611,7 @@ private actor EndpointVADSession: VoiceActivitySession {
         try await output.dispatch(envelope)
         if envelope.output == .control("agent.finished") { break }
     }
-    #expect(functions == ["UI.beginReplyTurn"])
+    #expect(functions == ["UI.Caption.beginReplyTurn"])
     #expect(await probe.displayedText == ["reply and expression cleared atomically"])
     // A second VAD onset in the same long utterance must not issue another reset.
     _ = try await port.publish(.speechPhase(.speaking), parent: parent)

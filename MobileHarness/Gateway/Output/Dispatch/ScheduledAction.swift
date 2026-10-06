@@ -17,6 +17,14 @@ public struct ScheduledAction: Sendable {
         envelope: OutputEnvelope, owner: ExecutionOwner? = nil,
         feedback: ActionFeedback = .none, lease: ResourceLease? = nil
     ) throws {
+        try self.init(
+            envelope: envelope, owner: owner, feedback: feedback, lease: lease, context: envelope.executionContext)
+    }
+    /// Trusted Gateway-only projection may retain the parent's handler context in a child scope.
+    init(
+        envelope: OutputEnvelope, owner: ExecutionOwner?, feedback: ActionFeedback = .none,
+        lease: ResourceLease?, context: ActionExecutionContext
+    ) throws {
         guard case .actionCall(let call) = envelope.output else { throw ActionExecutionError.invalidInvocation }
         guard
             owner.map({ $0.agent == envelope.source && $0.sessionID == envelope.sessionID })
@@ -28,7 +36,7 @@ public struct ScheduledAction: Sendable {
         self.lease = lease
         self.executionID = UUID()
         self.execution = ActionInvocation(
-            call: call.executionRequest, context: envelope.executionContext, executionID: self.executionID)
+            call: call.executionRequest, context: context, executionID: self.executionID)
         self.envelope = envelope
         self.call = call
     }

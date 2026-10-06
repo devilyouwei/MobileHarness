@@ -363,7 +363,10 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
             invocation: ActionInvocation(
                 source: .assistant, input: input,
                 call: ActionCall(
-                    actionPath: ActionPath(module: "NexArm", function: function),
+                    actionPath: ActionPath(
+                        domain: "NexArm",
+                        module: ["shakeBase", "reset", "moveMotor", "resetMotor"].contains(function)
+                            ? "Motion" : "Gesture", function: function),
                     channel: channel, parameters: ["cycles": "1"])))
     }
     try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))

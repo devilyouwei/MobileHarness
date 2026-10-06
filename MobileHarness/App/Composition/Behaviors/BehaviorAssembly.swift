@@ -1,7 +1,5 @@
 import ActionRuntime
 import Actions
-import ToolRuntime
-import Tools
 
 /// Pure behavior assembly. Device creation and runtime lifetime stay with the host.
 public struct BehaviorAssembly: Sendable {
@@ -19,12 +17,16 @@ public struct BehaviorAssembly: Sendable {
         shakeBase: @escaping @Sendable (Int, ActionInvocation) async throws -> Void,
         aim: @escaping @Sendable (Double, Double, ToolInvocation) async throws -> Void
     ) throws {
-        try self.init(
-            actionModules: ActionModules.builtIn(
-                presentation: presentation, playback: playback, gesture: gesture, shakeBase: shakeBase),
-            toolModules: ToolModules.builtIn(
-                presentation: pose, updates: presentation, historyPresentation: historyPresentation, camera: camera,
-                history: history, historyMutations: historyMutations, aim: aim))
+        let modules = CapabilityModules.builtIn(
+            presentation: presentation, playback: playback, pose: pose,
+            historyPresentation: historyPresentation, camera: camera,
+            history: history, historyMutations: historyMutations, gesture: gesture, shakeBase: shakeBase, aim: aim)
+        try self.init(capabilityModules: modules)
+    }
+
+    public init(capabilityModules: [any CapabilityModule]) throws {
+        let catalog = try CapabilityCatalog(modules: capabilityModules)
+        try self.init(actionModules: [catalog.actions], toolModules: [catalog.tools])
     }
 
     /// Explicit catalog injection for isolated tests or other hosts; never runtime discovery.
@@ -35,6 +37,6 @@ public struct BehaviorAssembly: Sendable {
         let tools = try ToolRegistry(modules: toolModules)
         self.actions = actions
         self.tools = tools
-        toolPaths = Set(toolModules.flatMap { $0.definitions.map(\.path) })
+        toolPaths = Set(toolModules.flatMap { $0.definitions.map { $0.path.description } })
     }
 }

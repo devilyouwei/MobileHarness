@@ -27,7 +27,7 @@ public struct AgentConfiguration: Sendable {
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.version == 5 else {
+        guard decoded.version == 6 else {
             throw AgentConfigurationError.unsupportedVersion(decoded.version)
         }
         let communicationObject = try Self.dictionary(
@@ -51,10 +51,15 @@ public struct AgentConfiguration: Sendable {
                 let field = "actions.\(channel)[\(index)]"
                 let entry = try Self.entry(action, field: field)
                 _ = try Self.dictionary(
-                    entry["path"] ?? NSNull(), keys: ["module", "function"], field: "\(field).path")
+                    entry["path"] ?? NSNull(), keys: ["domain", "module", "function"], field: "\(field).path")
             }
         }
-        for tool in tools { try Self.validateTool(tool) }
+        for raw in tools {
+            let tool = try Self.dictionary(raw, keys: ["path", "definition"], field: "tools")
+            _ = try Self.dictionary(
+                tool["path"] ?? NSNull(), keys: ["domain", "module", "function"], field: "tools.path")
+            try Self.validateTool(tool["definition"] ?? NSNull())
+        }
         guard CapabilityRegistry.validName(decoded.id) else {
             throw AgentConfigurationError.invalidField("id")
         }
@@ -62,7 +67,8 @@ public struct AgentConfiguration: Sendable {
             actions: decoded.actions.keys.sorted().flatMap { channel in
                 decoded.actions[channel, default: []].map {
                     ActionRegistration(
-                        alias: $0.alias, path: ActionPath(module: $0.path.module, function: $0.path.function),
+                        alias: $0.alias,
+                        path: ActionPath(domain: $0.path.domain, module: $0.path.module, function: $0.path.function),
                         defaultChannel: channel,
                         requiredParameters: Set($0.parameters.filter(\.required).map(\.name)),
                         optionalParameters: Set($0.parameters.filter { !$0.required }.map(\.name)),
@@ -70,10 +76,15 @@ public struct AgentConfiguration: Sendable {
                 }
             },
             tools: try tools.map { raw in
-                let data = try JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys])
+                let binding = try Self.dictionary(raw, keys: ["path", "definition"], field: "tools")
+                let address = try JSONDecoder().decode(
+                    Document.Action.Path.self, from: JSONSerialization.data(withJSONObject: binding["path"] ?? NSNull())
+                )
+                let data = try JSONSerialization.data(
+                    withJSONObject: binding["definition"] ?? NSNull(), options: [.sortedKeys])
                 let tool = try JSONDecoder().decode(NativeToolDefinition.self, from: data)
                 return ToolRegistration(
-                    alias: tool.function.name, path: tool.function.name,
+                    alias: tool.function.name, path: "\(address.domain).\(address.module).\(address.function)",
                     requiredParameters: Set(tool.function.parameters.required),
                     optionalParameters: Set(tool.function.parameters.properties.keys)
                         .subtracting(tool.function.parameters.required), definition: tool)
@@ -196,6 +207,7 @@ public struct AgentConfiguration: Sendable {
                 CapabilityDocumentation(doc: doc, parameters: parameters, examples: examples)
             }
             struct Path: Decodable {
+                let domain: String
                 let module: String
                 let function: String
             }

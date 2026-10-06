@@ -40,7 +40,7 @@ private actor ContractState {
     }
 }
 
-private let contractPath = ActionPath(module: "Fixture", function: "perform")
+private let contractPath = ActionPath(domain: "Fixture", module: "Control", function: "perform")
 
 private func contractInvocation(path: ActionPath = contractPath) -> ActionInvocation {
     ActionInvocation(
@@ -78,7 +78,7 @@ private func contractDefinition(
             ])
         }
     }
-    let malformed = ActionPath(module: "bad module", function: "perform")
+    let malformed = ActionPath(domain: "bad module", module: "Control", function: "perform")
     #expect(throws: ActionExecutionError.invalidDefinition(malformed.executionIdentifier)) {
         try ActionRegistry(definitions: [contractDefinition(path: malformed)])
     }
@@ -90,7 +90,7 @@ private func contractDefinition(
         ActionRegistration(alias: "run", path: contractPath, defaultChannel: "Ordered")
     ])
     try registry.validate(capabilities: model)
-    let missing = InternalAction(module: "Fixture", function: "missing", channel: "Ordered")
+    let missing = InternalAction(domain: "Fixture", module: "Control", function: "missing", channel: "Ordered")
     #expect(throws: ActionExecutionError.missingHandler(missing.path.executionIdentifier)) {
         try registry.validate(capabilities: model.adding(internalActions: [missing]))
     }
@@ -109,9 +109,9 @@ private func contractDefinition(
     let synthesis = try AgentConfigurations.load(named: "SpeechSynthesis").capabilities
     let catalogs = [assistant, speech, vision, synthesis]
     let paths = Set(catalogs.flatMap { $0.actions.map(\.path) + $0.internalActions.map(\.path) })
-    #expect(paths.contains(ActionPath(module: "Speech", function: "speak")))
-    #expect(!paths.contains(ActionPath(module: "UI", function: "moveEyes")))
-    #expect(vision.internalTools.contains { $0.path == "UI.moveEyes" })
+    #expect(paths.contains(ActionPath(domain: "Speech", module: "Playback", function: "speak")))
+    #expect(!paths.contains(ActionPath(domain: "UI", module: "Gaze", function: "moveEyes")))
+    #expect(vision.internalTools.contains { $0.path == "UI.Gaze.moveEyes" })
     let registry = try ActionRegistry(definitions: paths.map { contractDefinition(path: $0) })
     for catalog in catalogs { try registry.validate(capabilities: catalog) }
 }
@@ -161,7 +161,7 @@ private func contractDefinition(
     let invocation = ActionInvocation(
         source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("contract")),
         call: ActionCall(
-            actionPath: .init(module: "UI", function: "express"), channel: "Display",
+            actionPath: .init(domain: "UI", module: "Expression", function: "express"), channel: "Display",
             parameters: ["emotion": "smile", "unexpected": "value"]))
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
         try await UIActions.setExpression(invocation: invocation) { _, _ in Issue.record("Unexpected effect") }
@@ -172,7 +172,7 @@ private func contractDefinition(
     let started = ContractGate()
     let release = ContractGate()
     let state = ContractState()
-    let setPath = ActionPath(module: "UI", function: "setExpression")
+    let setPath = ActionPath(domain: "UI", module: "Expression", function: "setExpression")
     let registry = try ActionRegistry(definitions: [
         contractDefinition { _ in
             await started.release()
@@ -225,7 +225,7 @@ private func contractDefinition(
     let snapshot = await scheduler.diagnosticSnapshot()
     #expect(snapshot.records.count == 2 && snapshot.evictedCount == 4)
     #expect(snapshot.records.last?.phase == .succeeded)
-    let missing = contractInvocation(path: .init(module: "Missing", function: "handler"))
+    let missing = contractInvocation(path: .init(domain: "Missing", module: "Control", function: "handler"))
     await #expect(throws: ActionExecutionError.missingHandler(missing.call.actionPath)) {
         try await scheduler.enqueue(invocation: missing)
     }
@@ -313,11 +313,12 @@ private enum ContractFailure: Error, Equatable { case failed }
     let perform = ActionInvocation(
         source: .assistant, input: input,
         call: ActionCall(
-            actionPath: .init(module: "UI", function: "express"), channel: "Display", parameters: ["emotion": "smile"]))
+            actionPath: .init(domain: "UI", module: "Expression", function: "express"), channel: "Display",
+            parameters: ["emotion": "smile"]))
     let set = ActionInvocation(
         source: .assistant, input: input,
         call: ActionCall(
-            actionPath: .init(module: "UI", function: "setExpression"), channel: "Another",
+            actionPath: .init(domain: "UI", module: "Expression", function: "setExpression"), channel: "Another",
             parameters: ["emotion": "thinking"]))
     _ = try await scheduler.enqueue(invocation: perform)
     await entered.wait()
@@ -340,7 +341,7 @@ private enum ContractFailure: Error, Equatable { case failed }
         source: .assistant,
         input: AgentInput(sessionID: UUID(), payload: .event("expression")),
         call: ActionCall(
-            actionPath: .init(module: "UI", function: "express"), channel: "Display",
+            actionPath: .init(domain: "UI", module: "Expression", function: "express"), channel: "Display",
             parameters: ["emotion": "smile"]))
     let task = Task {
         try await UIActions.express(
@@ -366,7 +367,7 @@ private enum ContractFailure: Error, Equatable { case failed }
         source: .assistant,
         input: AgentInput(sessionID: UUID(), payload: .event("expression")),
         call: ActionCall(
-            actionPath: .init(module: "UI", function: "express"), channel: "Display",
+            actionPath: .init(domain: "UI", module: "Expression", function: "express"), channel: "Display",
             parameters: ["emotion": "smile"]))
     do {
         try await UIActions.express(

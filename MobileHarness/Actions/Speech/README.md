@@ -4,7 +4,7 @@ Purpose: scheduled physical speech playback. Production synthesis is owned by Sp
 
 ```mermaid
 flowchart LR
-    Call[Speech.speak audioID] --> Gateway[OutputGateway validates Action declaration]
+    Call[Speech.Playback.speak audioID] --> Gateway[OutputGateway validates Action declaration]
     Gateway --> Channel[ChannelScheduler / Speech module]
     Channel --> Playback[SpeechPlayback]
     Playback --> Cache[StorageAudio checkout]
@@ -12,7 +12,7 @@ flowchart LR
     Player --> Done[Hardware drain then release]
 ```
 
-✅ Production `Speech.speak` accepts only `audioID`. SpeechActions.speak validates the audio ID; SpeechPlayback validates source/session/input ownership and obtains a single-consumer lease only when scheduled. Initial and intermediate empty PCM reads wait for synthesis progress; producer failure or cancellation wakes the reader immediately. Production reads have no independent first-frame or midstream deadline. The synthesis Agent retains its 60-second deadline from execution start, excluding its queue time; speak therefore has no fixed total PCM-wait timeout. Frames leave Storage as the player reads them; actual playback completion releases the single-use handle. Cancellation propagates to the individual synthesis job; input/session cancellation handles pending jobs too.
+✅ Production `Speech.Playback.speak` accepts only `audioID`. SpeechActions.speak validates the audio ID; SpeechPlayback validates source/session/input ownership and obtains a single-consumer lease only when scheduled. Initial and intermediate empty PCM reads wait for synthesis progress; producer failure or cancellation wakes the reader immediately. Production reads have no independent first-frame or midstream deadline. The synthesis Agent retains its 60-second deadline from execution start, excluding its queue time; speak therefore has no fixed total PCM-wait timeout. Frames leave Storage as the player reads them; actual playback completion releases the single-use handle. Cancellation propagates to the individual synthesis job; input/session cancellation handles pending jobs too.
 
 ✅ Gateway has no speech preparation or prevalidation stage. The App output consumer releases remaining source/input audio after reply completion/error dispatch has joined Actions, and when dispatch fails; session teardown cancels session audio, and runtime teardown closes the store. Pending audio does not expire while waiting for its Action. The reply owner is the originating source/input, not the whole multi-turn voice session. Generation completion alone does not release unplayed audio. The hardware watchdog is separate: each scheduled buffer allows queued audio duration plus three seconds for playback completion. AppWorkflows.SpeechPlayback owns only the scheduled playback operation; its error/cancellation path releases the current audio ID.
 
@@ -32,7 +32,7 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 
 ## Domain-owned behavior assembly
 
-✅ SpeechActionModule owns Speech.speak metadata and binds SpeechPlaybackCapability. Session-owned playback still owns audio checkout/drain/release; no new playback actor or queue is created. Adding behavior using this existing capability changes the module, not App registration. ❌ New playback primitives may require capability/adapter changes.
+✅ SpeechModule owns Speech.Playback.speak metadata and binds SpeechPlaybackCapability. Session-owned playback still owns audio checkout/drain/release; no new playback actor or queue is created. Adding behavior using this existing capability changes the module, not App registration. ❌ New playback primitives may require capability/adapter changes.
 
 ✅ ActionAuthoringTests exercises invalid/extra/oversized arguments before effects, typed UUID handoff, original dependency errors and cancellation after an effect. Existing SpeechPlaybackTests and VoiceTests exercise hardware-drain handoff, delayed first/midstream PCM beyond the former three-second limit, explicit opt-in read deadlines, synthesis execution timeout and cancellation using the canonical Action decoder. ❌ Real-device completion remains separately validated.
 
@@ -41,7 +41,7 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 | File | Responsibility |
 | --- | --- |
 | SpeechActions.swift | Canonical speak entry and audioID validation |
-| Support/SpeechActionModule.swift | Explicit definition and SpeechPlaybackCapability interface |
+| Support/SpeechModule.swift | Explicit definition and SpeechPlaybackCapability interface |
 | App/Workflows/SpeechPlayback.swift | Host-owned checkout, playback and cancellation cleanup |
 
 ✅ Entry and support share the existing Actions target. ❌ No synthesis, new queue or device resource lease is introduced.
@@ -53,3 +53,28 @@ The handle is single-use, so repeated playback is not idempotent and no automati
 ✅ SpeechActions validates the audio identifier with a module-owned SpeechActionError. The injected playback endpoint owns checkout and drain; AppWorkflows.SpeechPlayback adapts StorageAudio ownership.
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
+
+✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use ActionRuntime contracts. Host injection and permission/feedback behavior are unchanged.
+❌ Unified capability definitions and protocol registration adapters remain pending.
+
+✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one `<Domain>Module` with Action/Tool registry projections. Legacy names are aliases or registration projections, not duplicated implementations.
+❌ Unified callable definitions and migration of compatibility names remain pending.
+
+## Cohesive module files — ADR0154
+
+Purpose: implement directory/module-file/function ownership while preserving current protocol APIs. The domain Actions enum remains a used namespace facade; callable bodies belong exclusively to the files below. Support owns one domain catalog, values and host capabilities.
+
+- [PlaybackActions.swift](PlaybackActions.swift)
+
+✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
+❌ Explicit three-field paths, versioned Agent configuration and unified definitions/results remain the next coordinated stage.
+
+✅ Playback Action definitions explicitly use serializationKey Speech, preserving process-wide exclusion independently of future three-level addresses.
+
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

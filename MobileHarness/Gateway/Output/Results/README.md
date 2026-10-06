@@ -71,3 +71,7 @@ Output failure/delivery descriptions are bounded to512 characters. Tool data and
 ✅ ADR0132: OutputExecutionResult.failureCode identifies dispatch/delivery errors independently of ToolResponse.failureCode. Delivery rejection cannot overwrite the handler outcome.
 
 ❌ Sustained physical-device acceptance and durable error history remain pending.
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

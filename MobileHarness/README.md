@@ -24,7 +24,7 @@ The system is divided into four groups. App is the composition root and lifetime
 | --- | --- | --- |
 | Host and interaction | App, UI | Assemble the process, own application/session lifetime and present state. |
 | Cognition and coordination | Agents, AgentCore, Gateway | Interpret signals, retain cognitive state and validate communication/execution. |
-| Behavior execution | Actions, Tools, ActionRuntime, ToolRuntime | Define concrete skills and execute trusted invocations. |
+| Behavior execution | Actions, ActionRuntime | Define concrete skills and execute trusted invocations. |
 | Foundations | ModelKit, PlatformKit, Storage, Resources | Supply processing, device I/O, retained data and packaged artifacts. |
 
 ```mermaid
@@ -115,15 +115,11 @@ flowchart TB
 
     Gateway --> AgentCore
     Gateway --> ActionRuntime
-    Gateway --> ToolRuntime
 
     Assembly --> Actions
-    Assembly --> Tools
     Assembly --> ActionRuntime
-    Assembly --> ToolRuntime
     Actions --> ActionRuntime
     Actions --> PlatformKit
-    Tools --> ToolRuntime
 
     Workflows --> UI
     Workflows --> Storage
@@ -134,12 +130,10 @@ flowchart TB
     Workflows --> Actions
     Workflows --> Agents
     Workflows --> Gateway
-    Workflows --> Tools
     Workflows --> AgentCore
     Workflows --> ActionRuntime
-    Workflows --> ToolRuntime
 
-    Tools --> StorageChat
+    Actions --> StorageChat
     StorageChat --> Storage
     StorageAudio --> Storage
     Defaults --> ModelKit
@@ -149,7 +143,7 @@ flowchart TB
     Adapters --> ModelKit
 ```
 
-The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `ActionRuntime`, `ToolRuntime`, `Storage` and `AgentCore` have no project dependencies. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
+The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `ActionRuntime`, `Storage` and `AgentCore` have no project dependencies. Tools/ToolRuntime compatibility targets are removed; ActionRuntime is the independent execution SDK. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -190,16 +184,12 @@ MobileHarness/
 │   ├── Input/                   # External/internal admission and delivery
 │   └── Output/                  # Validation, routing, scheduling, results/resources
 ├── Actions/
-│   ├── Runtime/                 # Independent ActionRuntime and Contracts
+│   ├── Runtime/                 # ActionRuntime: both invocation protocols
 │   ├── NexArm/
 │   ├── Speech/
-│   └── UI/
-├── Tools/
-│   ├── Runtime/                 # Independent ToolRuntime and Contracts
-│   ├── History/                 # Read-only paged conversation queries
+│   ├── History/
 │   ├── System/
 │   ├── Camera/
-│   ├── Robot/
 │   └── UI/
 ├── Storage/
 │   ├── Audio/                   # StorageAudio: transient PCM ownership
@@ -234,22 +224,20 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | Source path | Target | Direct project dependencies |
 | --- | --- | --- |
 | `App/` excluding package-owned subtrees | Xcode App targets | Host composition, adapters and lifecycle dependencies |
-| `App/Composition/Behaviors/` | BehaviorAssembly | Actions, Tools, ActionRuntime, ToolRuntime |
+| `App/Composition/Behaviors/` | BehaviorAssembly | Actions, ActionRuntime |
 | `App/Workflows/` facade | AppWorkflows | Six feature workflow targets |
 | `App/Workflows/Settings/` | AppSettingsWorkflow | UI, Storage |
-| `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat, AgentCore, Agents, Gateway, Tools, ToolRuntime (staged intent transport) |
+| `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat, AgentCore, Agents, Gateway, Actions, ActionRuntime (staged intent transport) |
 | `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, ActionRuntime, PlatformKit |
 | `App/Workflows/Speech/` | AppSpeechPlayback | ActionRuntime, StorageAudio |
-| `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime, ToolRuntime |
+| `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, ActionRuntime |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
 | `UI/` | UI | StorageChat |
 | `Agents/Core/` | AgentCore | None |
 | `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, PlatformKit, StorageChat, StorageAudio |
-| `Gateway/` | Gateway | AgentCore, ActionRuntime, ToolRuntime |
+| `Gateway/` | Gateway | AgentCore, ActionRuntime |
 | `Actions/Runtime/` | ActionRuntime | None |
-| `Actions/` excluding `Runtime/` | Actions | ActionRuntime, PlatformKit, BehaviorDefinitions |
-| `Tools/Runtime/` | ToolRuntime | None |
-| `Tools/` excluding `Runtime/` | Tools | ToolRuntime, BehaviorDefinitions, StorageChat |
+| `Actions/` excluding `Runtime/` | Actions | ActionRuntime, PlatformKit, BehaviorDefinitions, StorageChat |
 | `Storage/` core | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
 | `Storage/Audio/` | StorageAudio | Storage |
@@ -268,7 +256,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 - AgentCore is independent of concrete Agents, UI, model engines and device adapters.
 - All external inputs, Tool results and Action/runtime feedback enter through InputGateway; all Agent messages and executable outputs leave through OutputGateway.
 - Actions owns business behavior, motion shaping, composition and completion policy. PlatformKit owns native I/O, protocol encoding, hardware limits and device feedback.
-- ActionRuntime and ToolRuntime own neutral execution contracts. Gateway owns scheduling, admission, result routing and shared resource coordination.
+- ActionRuntime owns neutral execution contracts for both protocols; ActionRuntime re-exports them. Gateway owns scheduling, admission, result routing and shared resource coordination.
 - ModelKit is a capability SDK. Provider registration/default selection belongs to ModelKitDefaults; process-wide model ownership belongs to ModelKitRuntime.
 - AgentCore/Input owns generic input transport; UI owns presentation values. Storage owns lifetime and retention, not inference or business policy.
 
@@ -289,8 +277,8 @@ This section is an architectural directory. It describes why each module exists 
 | [Gateway](Gateway/README.md) | Validate input/output, route messages, schedule Actions and coordinate results/resources. | Coordination only; no inference or domain behavior implementation. | Neural pathways and motor coordination. |
 | [Actions](Actions/README.md) | Implement scheduled speech, expression and NexArm behavior. | Owns business parameters and completion policy; consumes injected native capabilities. | Learned motor skills. |
 | [ActionRuntime](Actions/Runtime/README.md) | Register and execute trusted Action invocations. | Neutral execution contracts; Channel/wait policy remains in Gateway. | Motor execution machinery. |
-| [Tools](Tools/README.md) | Implement direct System/UI/Camera/Robot functions with declared result semantics. | Current domains use injected endpoints and have no UI or PlatformKit import. | Immediate reflexes and focused functions. |
-| [ToolRuntime](Tools/Runtime/README.md) | Register and execute trusted Tool invocations. | No concrete Tool domain, Agent, UI or hardware dependency. | Direct function execution machinery. |
+| [Tools](Actions/README.md) | Implement direct System/UI/Camera/Robot functions with declared result semantics. | Current domains use injected endpoints and have no UI or PlatformKit import. | Immediate reflexes and focused functions. |
+| [ActionRuntime](Actions/Runtime/README.md) | Register and execute trusted Tool invocations. | No concrete Tool domain, Agent, UI or hardware dependency. | Direct function execution machinery. |
 | [ModelKit](ModelKit/README.md) | Expose typed speech, language and vision processing capabilities. | Base SDK knows neither Agent policy nor device I/O; engines live in adapters/backends. | Recognition and generation machinery. |
 | [PlatformKit](PlatformKit/README.md) | Capture/output media, manage links and expose native commands/feedback. | Device SDK only; no gestures, model inference, localization or workflow policy. | Sensory organs and effectors. |
 | [Storage](Storage/README.md) | Provide bounded transient storage and durable local records. | StorageAudio owns PCM handles; StorageChat owns conversation records; no routing or inference. | Short- and long-term retained material. |
@@ -300,7 +288,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **App.** [Composition](App/Composition/README.md) builds the graph and validates registrations. [Lifecycle](App/Lifecycle/README.md) owns long-running voice/camera work and cleanup. [Workflows](App/Workflows/README.md) is a state-free facade over independent Settings, History, Bluetooth, Speech, Presentation and Diagnostics targets. [Adapters](App/Adapters/README.md) translate module contracts to host capabilities.
 
-**Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation and response policy; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs. Each Agent's JSON v5 file declares model-callable capabilities and communication permissions.
+**Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation and response policy; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
 
 **Behavior.** Actions are scheduled, ordered skills with a completion boundary. Tools are direct calls with either a returned value or completion-only semantics. Their independent Runtime targets keep Gateway free from concrete behavior catalogs. BehaviorAssembly binds explicit domain modules without importing AgentCore.
 
@@ -339,7 +327,7 @@ Voice and camera have independent App-owned sessions. A stop closes producer adm
 
 ### Signal and media representation
 
-Signal is the conceptual input abstraction; `AgentInput` is its implemented envelope. It separates payload from trusted source, contract/version, session, turn, sequence, capture time, incarnation, causal root/parent and admission deadline. Media streams are successive typed inputs rather than a second transport protocol. JSON v5 configures Agent capabilities and communication permissions; it is not the audio or image format.
+Signal is the conceptual input abstraction; `AgentInput` is its implemented envelope. It separates payload from trusted source, contract/version, session, turn, sequence, capture time, incarnation, causal root/parent and admission deadline. Media streams are successive typed inputs rather than a second transport protocol. JSON v6 configures Agent capabilities and communication permissions; it is not the audio or image format.
 
 | Payload | Meaning |
 | --- | --- |
@@ -360,7 +348,7 @@ Communication covers external input, Agent publications and directed messages, r
 
 ```mermaid
 flowchart TD
-    Config[Agent JSON v5] --> Policy[Immutable communication policy]
+    Config[Agent JSON v6] --> Policy[Immutable communication policy]
     External[App: user / microphone / camera / runtime] --> Input[InputGateway]
     Sender[AgentMessaging bound to sender identity] --> Output[OutputGateway]
     Output -->|Validated internal event| Input
@@ -402,7 +390,7 @@ Execution Runtime owns generic bounded resources and failure/report identifiers 
 
 ```mermaid
 flowchart LR
-    JSON[Agent JSON v5] --> Catalog[Agent-local callable catalog]
+    JSON[Agent JSON v6] --> Catalog[Agent-local callable catalog]
     Catalog --> Prompt[Model-visible aliases and schemas]
     Prompt --> Model[Generation]
     Model --> Parser[AgentCore generation parsers]
@@ -432,7 +420,7 @@ Natural text, Action tags, Channel scopes and nested wait groups are parsed incr
 | Dimension | ActionCall | ToolCall |
 | --- | --- | --- |
 | Resolution | Action path, arguments and effective Channel | Tool path and arguments |
-| Dispatch | OutputGateway → ChannelScheduler → ActionRuntime | OutputGateway → ToolRuntime |
+| Dispatch | OutputGateway → ChannelScheduler → ActionRuntime | OutputGateway → ActionRuntime.ToolExecutor |
 | Ordering | Task-local Channel FIFO and nested wait groups | Direct awaited execution; no Channel queue |
 | Completion | Registered handler boundary plus task finish barrier | Returned value or completion-only, fixed at registration |
 | Feedback | Optional correlated ActionResult and ActivityEvent | Returning ToolResult re-enters InputGateway |
@@ -545,11 +533,11 @@ SpeechPerception owns recognition captions and voice phase presentation; Assista
 
 ### Expression transactions
 
-Expression behavior follows Actions Perform/Set: UI.express is finite and awaits enter/restore transaction acknowledgments; UI.setExpression is state and commits the persistent base (clear resets it). App adapts session/turn ownership with one pending acknowledgment; UI supplies display-only callbacks. Cancellation/new-turn teardown invalidates old callbacks.
+Expression behavior follows Actions Perform/Set: UI.Expression.express is finite and awaits enter/restore transaction acknowledgments; UI.Expression.setExpression is state and commits the persistent base (clear resets it). App adapts session/turn ownership with one pending acknowledgment; UI supplies display-only callbacks. Cancellation/new-turn teardown invalidates old callbacks.
 
 ### Synthesis and playback ownership
 
-Speech synthesis and playback are separate, correlated paths. The originating Agent sends a directed `speech.synthesize(audioID, text, locale)` message and schedules `Speech.speak(audioID)` on its chosen Channel.
+Speech synthesis and playback are separate, correlated paths. The originating Agent sends a directed `speech.synthesize(audioID, text, locale)` message and schedules `Speech.Playback.speak(audioID)` on its chosen Channel.
 
 ```mermaid
 sequenceDiagram
@@ -570,7 +558,7 @@ sequenceDiagram
         M-->>S: ordered PCM frames
         S->>C: append / finish / fail
     and Schedule playback
-        A->>G: Speech.speak(audioID)
+        A->>G: Speech.Playback.speak(audioID)
         G->>Q: schedule on Channel
         Q->>R: execute when eligible
         R->>C: checkout with same owner
@@ -581,7 +569,7 @@ sequenceDiagram
     end
 ```
 
-Admission of the synthesis request does not mean synthesis completed. SpeechSynthesis owns a serial bounded FIFO and a per-job execution deadline; it does not inspect Action Channels. Playback can consume frames while synthesis continues. StorageAudio validates ownership and provides a single-use, reply-owned handle with no pending/ready expiry timer. Reply completion or session cleanup retires unused handles. Successful `Speech.speak` completion means platform playback drained and the lease was released. SpeechSynthesisError carries producer timeout/invalid-output failures through StorageAudio unchanged; neutral PCM/cache errors remain storage-owned. App maps known failures to user wording after playback cleanup.
+Admission of the synthesis request does not mean synthesis completed. SpeechSynthesis owns a serial bounded FIFO and a per-job execution deadline; it does not inspect Action Channels. Playback can consume frames while synthesis continues. StorageAudio validates ownership and provides a single-use, reply-owned handle with no pending/ready expiry timer. Reply completion or session cleanup retires unused handles. Successful `Speech.Playback.speak` completion means platform playback drained and the lease was released. SpeechSynthesisError carries producer timeout/invalid-output failures through StorageAudio unchanged; neutral PCM/cache errors remain storage-owned. App maps known failures to user wording after playback cleanup.
 
 ### Camera perception and UI projection
 
@@ -593,7 +581,7 @@ flowchart LR
     Vision <--> Pose[ModelKit pose capability]
     Vision --> Output[OutputGateway]
     Output -->|vision.pose observation| Input
-    Output -->|UI.showPose / UI.moveEyes| Tools[ToolRuntime / UI Tools]
+    Output -->|UI.Pose.showPose / UI.Gaze.moveEyes| Tools[ActionRuntime / UI Tools]
     Tools --> Adapter[App presentation adapter]
     Adapter --> UI[Camera overlay / gaze state]
 ```
@@ -604,9 +592,9 @@ App owns capture, the persistent camera resource lease and native-image resoluti
 
 VisionPerception retains every valid newest capture in its capacity-one slot. The worker consumes the newest slot at start, with expiry validation and adaptive cadence (initial 100ms, default bounds 0...250ms). Native clocked inputs also enforce the monotonic inter-start gap. Frame selection uses latest-frame admission and adaptive cadence; model calls never overlap.
 
-YOLO diagnostics share the bounded UI.showPose payload: callback-to-model wait, capability-call time, callback-to-result latency, one-second-window successful FPS and replacement count. App converts Tool values to UI/Camera presentation values; UI displays these without runtime dependencies. Capture timing uses ContinuousClock, not assumptions about media timestamp epochs.
+YOLO diagnostics share the bounded UI.Pose.showPose payload: callback-to-model wait, capability-call time, callback-to-result latency, one-second-window successful FPS and replacement count. App converts Tool values to UI/Camera presentation values; UI displays these without runtime dependencies. Capture timing uses ContinuousClock, not assumptions about media timestamp epochs.
 
-VisionPerception owns bounded latest-image motion, pose-motion/confidence/loss feedback and inference/total-latency budgeting for adaptive cadence. At most six skeleton snapshots are retained; fast changes accelerate immediately, stable targets relax gradually, and empty scenes retain periodic search. App injects bounds; next-interval statistics travel with pose through UI.showPose.
+VisionPerception owns bounded latest-image motion, pose-motion/confidence/loss feedback and inference/total-latency budgeting for adaptive cadence. At most six skeleton snapshots are retained; fast changes accelerate immediately, stable targets relax gradually, and empty scenes retain periodic search. App injects bounds; next-interval statistics travel with pose through UI.Pose.showPose.
 
 FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-frame reference, one padded six-person ROI union, bounded exposure/noise compensation and continuous urgency. FrameCadence fuses those signals with pose reliability and compute/freshness budgets. Frame cadence has no eligibility-filtered queue or PlatformKit/ModelKit/UI policy dependency; stale results cannot mutate presentation.
 
@@ -616,9 +604,9 @@ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Enc
 
 ### Photographer tracking and control handoff
 
-Photographer consumes validated `vision.pose` through InputGateway and emits internal `Robot.aim` through OutputGateway. Its JSON v5 contains the subscription and empty model-callable catalogs; fixed internal permission and target-selection policy stay in Agent code. The output buffer holds eight calls and fails explicitly on overflow.
+Photographer consumes validated `vision.pose` through InputGateway and emits internal `NexArm.Tracking.aim` through OutputGateway. Its JSON v6 contains the subscription and empty model-callable catalogs; fixed internal permission and target-selection policy stay in Agent code. The output buffer holds eight calls and fails explicitly on overflow.
 
-RobotTools validates intent arguments; Gateway authorizes source/session and Tool permission. The App worker holds motors1–4 through ResourceCoordinator, with monotonic usable-pose freshness from Photographer; one second without fresh input joins/releases the writer. App groups all six motors under nexarm.writer and explicitly allows Assistant to preempt Photographer after joined cleanup, including disjoint motor5/6 actions. Queued same-owner Actions survive the takeover gate; no scheduler/session cancellation or radio recovery occurs. VisionSession camera closure removes its owned work; old targets never replay. Actions owns mapping/motion, PlatformKit native encoding; return is target admission, not physical arrival.
+NexArmActions validates intent arguments; Gateway authorizes source/session and Tool permission. The App worker holds motors1–4 through ResourceCoordinator, with monotonic usable-pose freshness from Photographer; one second without fresh input joins/releases the writer. App groups all six motors under nexarm.writer and explicitly allows Assistant to preempt Photographer after joined cleanup, including disjoint motor5/6 actions. Queued same-owner Actions survive the takeover gate; no scheduler/session cancellation or radio recovery occurs. VisionSession camera closure removes its owned work; old targets never replay. Actions owns mapping/motion, PlatformKit native encoding; return is target admission, not physical arrival.
 
 Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until App reconnects the link. Final App resource validation requires all six Agent JSON files.
 
@@ -681,7 +669,7 @@ flowchart TB
     Intent --> Input[InputGateway]
     Input --> Memory[ConversationMemory Agent]
     Memory --> Output[OutputGateway]
-    Output --> Present[UI.showHistory host adapter]
+    Output --> Present[UI.HistoryPresentation.showHistory host adapter]
     Present --> State
     Present --> Journal[StorageChat]
     History -->|Legacy mutation operations| Journal
@@ -694,7 +682,7 @@ flowchart TB
 
 The facade holds no mutable feature state. Each feature target owns its effects and depends only on the values/services needed by that feature. UI owns editable presentation state; workflows own persistence, validation and asynchronous operation boundaries. Credentials use the Keychain through App-supplied operations, while non-secret settings and conversation records use local document storage.
 
-Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant JSON also declares History.list/read; Tools projects read-only paged previews from the same injected journal, returns at most 1800 UTF-8 bytes with explicit truncation, and routes results through InputGateway. UI load/refresh emits a structured user intent through InputGateway to root-owned ConversationMemory, whose internal UI.showHistory call crosses OutputGateway. One active refresh rejects overlap and joins cancellation cleanup; the scoped host adapter reads raw records into UI state. Archive/title remain existing feature operations, and Tool feedback does not yet continue model inference. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
+Conversation history keeps one current conversation and archived records. Starting a new conversation archives the current record before optional title generation. History browsing is data access and does not replay Actions or Tool effects. Assistant JSON also declares History.Conversation.list/read; Actions.History projects read-only paged previews from the same injected journal, returns at most 1800 UTF-8 bytes with explicit truncation, and routes results through InputGateway. UI load/refresh emits a structured user intent through InputGateway to root-owned ConversationMemory, whose internal UI.HistoryPresentation.showHistory call crosses OutputGateway. One active refresh rejects overlap and joins cancellation cleanup; the scoped host adapter reads raw records into UI state. Archive/title remain existing feature operations, and Tool feedback does not yet continue model inference. Assistant and the History workflow share the same injected journal service. Assistant selects ten completed rounds and assembles the exact model request. StorageChat readCurrent supplies records and an opaque process-local token; begin persists the request only with a current token. Successful mutations and terminal recovery invalidate it; conflicts fail before model inference without retry. UI owns title selection/default wording; on-disk records remain unchanged.
 
 <a id="391-platformkit-versus-modelkit"></a>
 
@@ -781,11 +769,11 @@ SwiftUI state is MainActor-isolated. Runtime services, Agents, stores, managers 
 
 Every queue or active-call pool has an explicit capacity and overflow rule in its owning module README. Cancellation is cooperative and propagates through structured tasks. Detached work, guessed success, silent device-action loss and unbounded retries are outside the architecture.
 
-Tools/Camera follows the domain root + Support layout and binds Camera.open/close/flip through a required CameraControlCapability. App validates the active Assistant session and retains single-owner permission/foreground/capture-lease policy; completion confirms capture reconciliation or close cleanup, not pose readiness. Camera control completion is independent of native model Tool event transport.
+Actions/Camera follows the domain root + Support layout and binds Camera.Capture.open/close/flip through a required CameraControlCapability. App validates the active Assistant session and retains single-owner permission/foreground/capture-lease policy; completion confirms capture reconciliation or close cleanup, not pose readiness. Camera control completion is independent of native model Tool event transport.
 
 ### Cloud native Tool generation
 
-Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; ToolResult retains existing feedback behavior. Local Gemma 4 E2B and automatic result-driven continuation remain unsupported.
+Cloud ChatRequest carries JSON v6 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; ToolResult retains existing feedback behavior. Local Gemma 4 E2B and automatic result-driven continuation remain unsupported.
 
 ## Model resource interaction migration — ADR0146
 
@@ -795,7 +783,7 @@ Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The c
 
 ## History mutation continuation — ADR0147
 
-✅ The authoritative Agent-driven design was updated before implementation. Confirmed history deletion crosses InputGateway → ConversationMemory → OutputGateway → History.delete, with an actual ToolResult through InputGateway before UI.showHistory. Tools owns archive-only validation/persistence invocation; App binds the same journal and carries correlated outputs without choosing behavior. One pending Agent mutation and one root request reject overlap. Transport executes at most2 business calls and drains at most8 buffered outputs through a cancellation acknowledgment; stale presentation is retired and committed data is retained.
+✅ The authoritative Agent-driven design was updated before implementation. Confirmed history deletion crosses InputGateway → ConversationMemory → OutputGateway → History.Conversation.delete, with an actual ToolResult through InputGateway before UI.HistoryPresentation.showHistory. Actions owns archive-only validation/persistence invocation; App binds the same journal and carries correlated outputs without choosing behavior. One pending Agent mutation and one root request reject overlap. Transport executes at most2 business calls and drains at most8 buffered outputs through a cancellation acknowledgment; stale presentation is retired and committed data is retained.
 
 ❌ No Assistant mutation catalog, model continuation, automatic retry, title/archive migration or native acceptance is claimed.
 
@@ -809,3 +797,13 @@ Cloud ChatRequest carries JSON v5 Tools separately from the Action prompt. The c
 
 ✅ Implemented the first Signal migration stage against the revised authoritative contract: explicit origin, External-only public admission, bound Agent messaging and owner-fenced Runtime Tool feedback. OutputEnvelope retains original metadata; returning Tools preserve root/parent/turn/hops with fresh bounded admission. Actual effects are retained separately from delivery failure without replay.
 ❌ Next: complete Action/activity original roots, then typed legacy history/control inputs, archive/title Agent policy and bounded Assistant continuation. UI/resource/device entry-point migrations remain pending.
+
+## Unified execution lifetime — ADR0150
+
+## Completed executable capability consolidation — ADR0157
+
+✅ Actions owns all six domain implementations, cohesive entry files and canonical definitions. ActionRuntime independently owns shared handlers, completions, deadline/cancellation cleanup and protocol adapters. Tools/ToolRuntime compatibility targets and namespace aliases are removed; sources compile once.
+
+✅ Paths are Domain.Module.function; Agent configuration v6 explicitly binds native definitions to canonical paths while retaining model aliases. UI/Speech/NexArm serialization keys preserve exclusion. The same implementation can be projected to ActionCall and ToolCall with independent Agent permissions. Scheduled native calls use the same Channel/resource admission and joined cleanup, outside XML waits; typed native completion crosses InputGateway once.
+
+❌ Remaining Agent-driven work: typed host intents/control producers, original Action/activity causal roots, registered failure presentation, remaining settings/device routes and bounded model continuation. Physical/native/model acceptance is separate from fixture/build checks.

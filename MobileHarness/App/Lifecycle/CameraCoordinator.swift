@@ -7,8 +7,6 @@ import Foundation
 import Gateway
 import OSLog
 import PlatformKit
-import ToolRuntime
-import Tools
 import UI
 
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
@@ -203,7 +201,7 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         state.visionMessage = message
         if message != nil { state.skeleton = nil }
     }
-    func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws {
+    func present(_ target: UIActions.Gaze, invocation: ToolInvocation) throws {
         try Task.checkCancellation()
         guard visionSession == invocation.context.sessionID, foreground, state.isEnabled, state.isVisible else {
             throw CancellationError()

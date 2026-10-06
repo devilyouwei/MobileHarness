@@ -72,7 +72,7 @@ flowchart LR
 
 ✅ Assistant terminal failure leaves independently registered perception/synthesis alive; the host lifetime waits for explicit cancellation before full cleanup. Its idle wait has no producer and an explicit capacity1. Recognition resume failure stops only recognition/capture.
 
-✅ Expression adaptation has capacity one override and one continuation, rejecting conflicting activation. SwiftUI transaction IDs acknowledge actual animation completion; cancellation, renderer disappearance, new turn and stop resume the waiter exactly once. Restoration is invocation-fenced and uses the current base. UI.express composition belongs to Actions; setExpression commits persistent state. ❌ Physical animation acceptance remains pending.
+✅ Expression adaptation has capacity one override and one continuation, rejecting conflicting activation. SwiftUI transaction IDs acknowledge actual animation completion; cancellation, renderer disappearance, new turn and stop resume the waiter exactly once. Restoration is invocation-fenced and uses the current base. UI.Expression.express composition belongs to Actions; setExpression commits persistent state. ❌ Physical animation acceptance remains pending.
 
 ## Conversation Tool execution evidence
 
@@ -127,3 +127,7 @@ flowchart LR
 ✅ ADR0141 removes CameraCoordinator's faulted/recover flag and branch. Retry performs normal lease acquisition against current occupancy; late completed cleanup unlocks automatically. Cancelled lifecycle removal and closure during an existing handoff still await bounded coordinator-owned acknowledgment. Camera capture leases retain deadlines, renewals and stale-lease checks. ❌ Software closure does not establish physical device stop.
 
 ✅ Voice playback adapts known producer/storage failures to user wording only after SpeechPlayback cleanup; cancellation and unknown errors propagate unchanged. ❌ No new lifecycle owner or Agent intent route is added.
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

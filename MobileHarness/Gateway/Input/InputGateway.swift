@@ -46,10 +46,14 @@ public actor InputGateway {
         switch input.payload {
         case .actionResult(let result):
             guard result.owner.sessionID == input.sessionID, result.owner.agent.rawValue.utf8.count <= 64,
-                result.path.module.utf8.count <= 64, result.path.function.utf8.count <= 64,
+                result.path.domain.utf8.count <= 64, result.path.module.utf8.count <= 64,
+                result.path.function.utf8.count <= 64,
                 result.status != .succeeded || result.completion != nil,
                 (result.status == .succeeded) == (result.failure == nil)
             else { throw CommunicationError.invalidPayload }
+            if case .value(let value) = result.completion, value.utf8.count > 65_536 {
+                throw CommunicationError.invalidPayload
+            }
             if result.status != .succeeded, let completion = result.completion {
                 // Failed/cancelled reports retain partial effects; success-only completion kinds are invalid.
                 guard case .report = completion else { throw CommunicationError.invalidPayload }
@@ -93,6 +97,9 @@ public actor InputGateway {
         try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
         let agent = try await manager.agent(owner.agent)
         guard agent.descriptor.inputs.contains(.toolResult) else { return nil }
+        if case .value(let value) = result.completion, value.utf8.count > 65_536 {
+            throw CommunicationError.invalidPayload
+        }
         let context = envelope.inputMetadata
         guard (0..<8).contains(context.hops) else { throw CommunicationError.hopLimitExceeded }
         let payload = InputPayload.toolResult(result)

@@ -5,7 +5,7 @@ import Testing
 
 private func document() -> [String: Any] {
     [
-        "version": 5,
+        "version": 6,
         "communication": [
             "inputs": [
                 ["contract": "user.text", "version": 1, "kind": "text"],
@@ -17,7 +17,7 @@ private func document() -> [String: Any] {
         "actions": [
             "screen": [
                 [
-                    "alias": "render", "path": ["module": "UI", "function": "print"],
+                    "alias": "render", "path": ["domain": "UI", "module": "Caption", "function": "print"],
                     "doc": "Render text.",
                     "parameters": [
                         [
@@ -109,7 +109,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(throws: (any Error).self) { try decode(root) }
 }
 
-@Test func bundledV5ConfigurationsSeparateModelCatalogFromInternalPermissions() throws {
+@Test func bundledV6ConfigurationsSeparateModelCatalogFromInternalPermissions() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     #expect(config.agentID == .assistant)
     #expect(
@@ -119,19 +119,19 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
             "shakeHead", "resetArm", "moveMotor", "resetMotor",
         ])
     #expect(config.capabilities.channels == ["Display", "Robot", "Speech"])
-    #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "runtimeInfo")
+    #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "System.Runtime.runtimeInfo")
     let agent = try AssistantAgent(chat: FixedTextChat())
     let registry = agent.descriptor.capabilities
     #expect(registry.internalActions.count == 1 && registry.internalTools.count == 2)
     #expect(
         registry.permits(
             ActionCall(
-                actionPath: .init(module: "Speech", function: "speak"),
+                actionPath: .init(domain: "Speech", module: "Playback", function: "speak"),
                 channel: "Speech", parameters: ["audioID": UUID().uuidString])))
     #expect(
         !registry.permits(
             ActionCall(
-                actionPath: .init(module: "Speech", function: "speak"),
+                actionPath: .init(domain: "Speech", module: "Playback", function: "speak"),
                 channel: "Speech", parameters: ["text": "unconverted"])))
     for name in ["say", "print", "playAudio", "beginReplyTurn"] {
         #expect(throws: GenerationError.unknownCapability) { try registry.resolveAction(name, parameters: [:]) }
@@ -192,7 +192,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let registry = try AssistantAgent.runtimeCapabilities(config.capabilities)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
     #expect(prompt.contains("AVAILABLE CHANNELS: Display, Robot, Speech"))
-    #expect(prompt.contains("Action express: module=UI; default Channel=Display"))
+    #expect(prompt.contains("Action express: path=UI.Expression.express; default Channel=Display"))
     #expect(prompt.contains("Channel Speech — automatic audio playback"))
     #expect(prompt.contains("played on the independent Speech Channel"))
     #expect(prompt.contains("<wait>I will finish speaking first.</wait><express emotion="))
@@ -225,17 +225,19 @@ private func nativeTool() -> [String: Any] {
 
 @Test func nativeToolSchemaRoundTripsAndValidatesCalls() throws {
     var root = document()
-    root["tools"] = [nativeTool()]
+    root["tools"] = [
+        ["path": ["domain": "Memory", "module": "Query", "function": "lookup"], "definition": nativeTool()]
+    ]
     let registry = try decode(root).capabilities
     let definition = try #require(registry.tools.first?.definition)
     let roundTrip = try JSONSerialization.jsonObject(with: JSONEncoder().encode(definition)) as! NSDictionary
     #expect(roundTrip == (nativeTool() as NSDictionary))
-    #expect(try registry.resolveTool("lookup", arguments: ["query": "one"]).toolPath == "lookup")
+    #expect(try registry.resolveTool("lookup", arguments: ["query": "one"]).toolPath == "Memory.Query.lookup")
     #expect(throws: GenerationError.invalidParameters) {
         try registry.resolveTool("lookup", arguments: ["query": "three"])
     }
     #expect(throws: GenerationError.invalidParameters) { try registry.resolveTool("lookup", arguments: [:]) }
-    #expect(!registry.permits(ToolCall(toolPath: "lookup", arguments: ["query": "three"])))
+    #expect(!registry.permits(ToolCall(toolPath: "Memory.Query.lookup", arguments: ["query": "three"])))
     #expect(!((try CapabilityContextBuilder.build(registry)).contains("lookup")))
 }
 
@@ -260,19 +262,19 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     }
     function["parameters"] = schema
     tool["function"] = function
-    root["tools"] = [tool]
+    root["tools"] = [["path": ["domain": "Memory", "module": "Query", "function": "lookup"], "definition": tool]]
     #expect(throws: (any Error).self) { try decode(root) }
 }
 
 @Test func internalToolsHavePermissionWithoutModelResolution() throws {
-    let internalTool = InternalTool(path: "UI.showPose", required: ["payload"])
+    let internalTool = InternalTool(path: "UI.Pose.showPose", required: ["payload"])
     let registry = try CapabilityRegistry(internalTools: [internalTool])
     let call = try internalTool.call(["payload": "{}"])
     #expect(registry.permits(call))
     #expect(throws: GenerationError.unknownCapability) {
-        try registry.resolveTool("UI.showPose", arguments: ["payload": "{}"])
+        try registry.resolveTool("UI.Pose.showPose", arguments: ["payload": "{}"])
     }
-    #expect(!registry.permits(ToolCall(toolPath: "UI.showPose", arguments: [:])))
+    #expect(!registry.permits(ToolCall(toolPath: "UI.Pose.showPose", arguments: [:])))
 }
 
 @Test func codeOwnedTextMappingIsBoundedAndOptional() throws {
@@ -287,7 +289,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
                 Array(
                     repeating: GenerationEvent.action(
                         ActionCall(
-                            actionPath: .init(module: "UI", function: "print"),
+                            actionPath: .init(domain: "UI", module: "Caption", function: "print"),
                             channel: "Display", parameters: ["text": "Hi"])), count: count)
             })
         #expect(throws: GenerationError.limitExceeded) { try invalid.append("Hi<wait></wait>") }
@@ -302,7 +304,8 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
 }
 
 @Test func internalPermissionBoundsAndArgumentValidationRemainEnforced() throws {
-    let action = InternalAction(module: "UI", function: "print", channel: "Display", required: ["text"])
+    let action = InternalAction(
+        domain: "UI", module: "Caption", function: "print", channel: "Display", required: ["text"])
     #expect(throws: GenerationError.invalidParameters) { try action.call() }
     let registry = try CapabilityRegistry(internalActions: [action])
     #expect(registry.permits(try action.call(["text": "Hi"])))
@@ -310,7 +313,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     #expect(
         !registry.permits(
             ActionCall(
-                actionPath: .init(module: "UI", function: "beginReplyTurn"),
+                actionPath: .init(domain: "UI", module: "Caption", function: "beginReplyTurn"),
                 channel: "Display", parameters: [:])))
     #expect(throws: GenerationError.limitExceeded) {
         try CapabilityRegistry(channels: Set((0..<16).map { "lane\($0)" }), internalActions: [action])
@@ -323,7 +326,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
 @Test func agentCoreContextContainsNoAutomaticSpeechPolicy() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let generic = try CapabilityContextBuilder.build(config.capabilities)
-    #expect(generic.contains("SCHEDULING: CHANNEL, MODULE, WAIT"))
+    #expect(generic.contains("SCHEDULING: CHANNEL, EXECUTION CONSTRAINTS, WAIT"))
     #expect(generic.contains("Action express:"))
     #expect(!generic.contains("automatically converted to audio"))
     #expect(!generic.contains("audio playback"))
@@ -331,4 +334,30 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     let assistant = try AssistantAgent.systemPrompt(capabilities: config.capabilities)
     #expect(assistant.contains("automatically converted to audio"))
     #expect(assistant.contains("Speak-then-act"))
+}
+
+@Test(arguments: ["v5", "missingDomain", "dottedModule", "missingBinding", "unknownBinding"])
+func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws {
+    var root = document()
+    var action = ((root["actions"] as! [String: [[String: Any]]])["screen"]!)[0]
+    var path = action["path"] as! [String: String]
+    switch mutation {
+    case "v5": root["version"] = 5
+    case "missingDomain": path.removeValue(forKey: "domain")
+    case "dottedModule": path["module"] = "Caption.Hidden"
+    case "missingBinding": root["tools"] = [nativeTool()]
+    case "unknownBinding": root["tools"] = [["path": path, "definition": nativeTool(), "extra": true]]
+    default: break
+    }
+    action["path"] = path
+    root["actions"] = ["screen": [action], "main": []]
+    #expect(throws: (any Error).self) { try decode(root) }
+}
+
+@Test func threeLevelDomainsRemainDistinctAtPermissionBoundary() throws {
+    let allowed = InternalAction(domain: "One", module: "Shared", function: "run", channel: "main")
+    let registry = try CapabilityRegistry(internalActions: [allowed])
+    #expect(registry.permits(try allowed.call()))
+    let other = ActionCall(actionPath: .init(domain: "Two", module: "Shared", function: "run"), channel: "main")
+    #expect(!registry.permits(other))
 }

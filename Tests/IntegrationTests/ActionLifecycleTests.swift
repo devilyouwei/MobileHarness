@@ -5,8 +5,6 @@ import Agents
 import Foundation
 import Gateway
 import Testing
-import ToolRuntime
-import Tools
 
 private actor LifecycleGate {
     private var open = false
@@ -76,7 +74,7 @@ private actor ReceiptAgent: Agent {
     func results() -> [ActionResult] { inbox.results }
 }
 
-private let lifecyclePath = ActionPath(module: "Device", function: "perform")
+private let lifecyclePath = ActionPath(domain: "Device", module: "Control", function: "perform")
 private let armResource = ResourceID(rawValue: "robot.arm")
 private let secondResource = ResourceID(rawValue: "robot.head")
 private let otherAgent = AgentID(rawValue: "other")
@@ -713,22 +711,24 @@ private actor RevocationDevice {
     }
 }
 
-@Test func protectedToolCannotBypassResourceOwnership() async throws {
+@Test func protectedToolResolvesSharedDefinitionResourcesBeforeExecution() async throws {
     let resources = try lifecycleResources()
     let original = lifecycleOwner()
     let lease = try await resources.acquire(resources: [armResource], owner: original, duration: .seconds(10)) { _ in }
     let manager = AgentManager()
-    let capabilities = try CapabilityRegistry(tools: [ToolRegistration(alias: "move", path: "move")])
+    let capabilities = try CapabilityRegistry(tools: [ToolRegistration(alias: "move", path: "Fixture.Control.move")])
     let agent = try ReceiptAgent(id: otherAgent, capabilities: capabilities)
     let session = UUID()
     try await manager.register(agent, sessionID: session)
     try await manager.start(otherAgent)
     let input = InputGateway(manager: manager)
-    let tools = ToolRegistry()
     let count = LifecycleCounter()
-    try await tools.registerCompletion("move", resources: [ToolResource(rawValue: armResource.rawValue)]) { _, _ in
-        await count.increment()
-    }
+    let definition = ActionDefinition(
+        path: .init(domain: "Fixture", module: "Control", function: "move"), displayName: "Move",
+        kind: .finite, completion: "Effect accepted.", protocols: [.tool], executionPolicy: .direct,
+        resolvingResources: { _ in [ActionResource(rawValue: armResource.rawValue)] },
+        handler: { _ in await count.increment() })
+    let tools = try ToolRegistry(modules: [DynamicResourceToolFixture(definitions: [definition])])
     let output = OutputGateway(
         manager: manager, requests: input, tools: tools,
         actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })
@@ -736,7 +736,7 @@ private actor RevocationDevice {
         try await output.dispatch(
             OutputEnvelope(
                 source: otherAgent, input: AgentInput(sessionID: session, payload: .event("test")),
-                output: .toolCall(ToolCall(toolPath: "move", arguments: [:]))))
+                output: .toolCall(ToolCall(toolPath: "Fixture.Control.move", arguments: [:]))))
     }
     #expect(await count.value == 0)
     try await resources.release(lease, owner: original)
@@ -831,3 +831,5 @@ private actor RevocationDevice {
     await scheduler.shutdown()
     try await manager.stop(.assistant)
 }
+
+private struct DynamicResourceToolFixture: ToolModule { let definitions: [ActionDefinition] }

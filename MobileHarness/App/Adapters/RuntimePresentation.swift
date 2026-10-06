@@ -2,8 +2,6 @@ import ActionRuntime
 import Actions
 import AgentCore
 import Foundation
-import ToolRuntime
-import Tools
 
 @MainActor
 protocol VoiceOutputHandling: AnyObject, Sendable {
@@ -13,7 +11,7 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
     func presentTranscript(_ text: String, invocation: ToolInvocation) throws
     func finishTranscript(invocation: ToolInvocation) throws
     func beginReplyTurn(invocation: ToolInvocation) throws
-    func presentVoiceState(_ state: UITools.VoiceState, invocation: ToolInvocation) throws
+    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ToolInvocation) throws
     func presentExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) async throws
     func restoreExpression(invocation: ActionInvocation) async throws
     func setExpression(_ emotion: UIActions.Emotion, invocation: ActionInvocation) throws
@@ -23,7 +21,7 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
 
 @MainActor
 protocol CameraOutputHandling: AnyObject, Sendable {
-    func present(_ target: UITools.Gaze, invocation: ToolInvocation) throws
+    func present(_ target: UIActions.Gaze, invocation: ToolInvocation) throws
     func present(_ overlay: ToolPoseOverlay, sessionID: UUID) throws
     func visionStatus(_ message: String?, sessionID: UUID)
 }
@@ -81,7 +79,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.beginReplyTurn(invocation: invocation)
     }
-    func presentVoiceState(_ state: UITools.VoiceState, invocation: ToolInvocation) async throws {
+    func presentVoiceState(_ state: UIActions.VoiceState, invocation: ToolInvocation) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.presentVoiceState(state, invocation: invocation)
     }
@@ -97,7 +95,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.setExpression(emotion, invocation: invocation)
     }
-    func present(_ target: UITools.Gaze, invocation: ToolInvocation) async throws {
+    func present(_ target: UIActions.Gaze, invocation: ToolInvocation) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(target, invocation: invocation)
     }

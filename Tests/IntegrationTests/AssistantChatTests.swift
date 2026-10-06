@@ -217,7 +217,7 @@ private struct LongReplyChat: ChatCapability {
     var captions = ""
     for await envelope in agent.outputs {
         switch envelope.output {
-        case .toolCall(let call) where call.toolPath == "UI.print":
+        case .toolCall(let call) where call.toolPath == "UI.Caption.print":
             captions += call.arguments["text"] ?? ""
         case .control(let message):
             #expect(message == "assistant.finished")

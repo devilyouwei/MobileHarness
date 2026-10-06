@@ -240,7 +240,8 @@ private actor HistoryModel: ChatCapability {
     let id = UUID()
     _ = try await store.beginFixture(id: id, user: "打开摄像头", system: "system", model: "fixture")
     try await store.recordToolDefinitions(["camera declaration"], for: id)
-    let call = ConversationToolCall(id: UUID(), providerID: "provider-1", name: "Camera.open", argumentsJSON: "{}")
+    let call = ConversationToolCall(
+        id: UUID(), providerID: "provider-1", name: "Camera.open", argumentsJSON: "{}")
     try await store.recordToolCall(call, for: id)
     try await store.recordTokenUsage(ConversationTokenUsage(input: 12, generated: 4, total: 16), for: id)
     try await store.finish(id, state: .completed, reason: "toolCalls")
@@ -273,7 +274,8 @@ private struct NativeCameraHistoryChat: ChatCapability {
         #expect(request.tools.contains { $0.name == "Camera.open" })
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         try pair.emitter.yield(.text("<express emotion=\"smile\"/>"))
-        try pair.emitter.yield(.toolCall(ChatToolCall(id: "cloud-camera", name: "Camera.open", argumentsJSON: "{}")))
+        try pair.emitter.yield(
+            .toolCall(ChatToolCall(id: "cloud-camera", name: "Camera.open", argumentsJSON: "{}")))
         try pair.emitter.yield(.usage(try ChatTokenUsage(input: 100, generated: 20, total: 120)))
         try pair.emitter.yield(.finished(.toolCalls))
         pair.emitter.finish()
@@ -296,7 +298,7 @@ private struct NativeCameraHistoryChat: ChatCapability {
         Issue.record("Missing native tool")
         return
     }
-    #expect(call.toolPath == "Camera.open")
+    #expect(call.toolPath == "Camera.Capture.open")
     #expect(await outputs.next()?.output == .control("assistant.finished"))
     let record = try #require(try await store.snapshot().current.turns.first)
     #expect(record.state == .completed && record.finishReason == "toolCalls")

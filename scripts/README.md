@@ -160,3 +160,19 @@ flowchart LR
 ✅ Boundary checks prohibit direct journal deletion in the legacy history workflow; ConversationMemory remains AgentCore/Foundation-only. ❌ Native UI confirmation acceptance remains separate.
 
 ✅ ADR0149 boundary checks prevent returning Tool feedback from reverting to public external admission and require retained output input context. ❌ These source checks do not establish runtime or physical correctness; regression tests validate delivery behavior.
+
+✅ ADR0150 boundary checks allow only ToolRuntime → ActionRuntime for shared execution lifetime; ActionRuntime remains a dependency leaf and both runtime trees prohibit business imports. ❌ Unified definition/configuration migration checks remain pending.
+
+✅ ADR0151: Actions is the single executable capability directory; Tools and ToolRuntime are re-export-only compatibility targets. Boundary checks reject recreated Tools sources or nontrivial shims. ❌ Unified definitions and compatibility import removal remain pending.
+
+✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
+
+✅ ADR0154 implements cohesive module entry files with one copy of each function and unchanged protocol behavior. File ownership is checked explicitly. ❌ Three-field path/configuration/registration migration remains outstanding.
+
+✅ Boundary checks require explicit production serialization keys for UI/Speech/NexArm Actions and definition-owned scheduler exclusion before three-level path migration.
+
+❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
+
+✅ ADR0156/0157 boundary checks require v6 explicit Agent bindings, three-field paths, canonical domain definition catalogs, shared metadata validation, one lifetime implementation and absent retired compatibility targets/imports. ❌ Runtime tests and native acceptance remain separate checks.
+
+✅ Canonical metadata checks enforce directory/module-file/path alignment and one validated, frozen CapabilityCatalog before protocol projection; duplicate cross-protocol addresses and hidden invalid definitions fail before startup.

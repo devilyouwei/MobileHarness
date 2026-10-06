@@ -8,8 +8,6 @@ import Gateway
 import ModelKit
 import StorageAudio
 import Testing
-import ToolRuntime
-import Tools
 
 private func pcm(_ sequence: UInt64 = 0) throws -> AudioFrame {
     try AudioFrame(
@@ -49,7 +47,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
             sessionID: session, payload: payload,
             metadata: InputMetadata(payload: payload, source: source, parentID: parent.id)))
     let call = ActionCall(
-        actionPath: ActionPath(module: "Speech", function: "speak"), channel: "Speech",
+        actionPath: ActionPath(domain: "Speech", module: "Playback", function: "speak"), channel: "Speech",
         parameters: ["audioID": request.audioID.uuidString])
     return (
         request.audioID, .init(source: source, session: session, input: parent.id),
@@ -230,7 +228,7 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
     try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 5, "id": name, "actions": [String: [String]](), "tools": [],
+            "version": 6, "id": name, "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [], "subscriptions": [], "publications": [],
                 "sends": permitted ? [["contract": "speech.synthesize", "target": "speechSynthesis"]] : [],
@@ -315,7 +313,7 @@ private actor ReplyCompletionGate {
     await store.complete(id)
     let started = ReplyCompletionGate()
     let release = ReplyCompletionGate()
-    let path = ActionPath(module: "UI", function: "express")
+    let path = ActionPath(domain: "UI", module: "Expression", function: "express")
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
             path: { _ in

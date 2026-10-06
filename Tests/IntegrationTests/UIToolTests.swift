@@ -5,12 +5,11 @@ import Agents
 import AppWorkflows
 import Foundation
 import Testing
-import ToolRuntime
-import Tools
 
 /// Reuse scheduler fixtures in argument validation tests while constructing a genuine immediate Tool envelope.
 func uiToolInvocation(_ invocation: ActionInvocation) -> ToolInvocation {
-    let call = ToolCall(toolPath: "UI." + invocation.call.actionPath.function, arguments: invocation.call.parameters)
+    let call = ToolCall(
+        toolPath: "Fixture.Control.UI." + invocation.call.actionPath.function, arguments: invocation.call.parameters)
     let e = invocation.testEnvelope
     let envelope = OutputEnvelope(
         source: e.source,
@@ -41,38 +40,38 @@ private actor CaptionEndpoint {
     let endpoint = CaptionEndpoint()
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"), turn: AgentTurn(ordinal: 1))
     func invocation(_ function: String, text: String? = nil, source: AgentID, sequence: UInt64) -> ToolInvocation {
-        let call = ToolCall(toolPath: "UI." + function, arguments: text.map { ["text": $0] } ?? [:])
+        let call = ToolCall(toolPath: "Fixture.Control.UI." + function, arguments: text.map { ["text": $0] } ?? [:])
         return ToolInvocation(
             call: call,
             envelope: OutputEnvelope(
                 source: source, input: input,
                 output: .toolCall(call), sequence: sequence))
     }
-    try await UITools.beginReplyTurn(invocation: invocation("beginReplyTurn", source: .assistant, sequence: 1)) {
+    try await UIActions.beginReplyTurn(invocation: invocation("beginReplyTurn", source: .assistant, sequence: 1)) {
         await endpoint.begin($0)
     }
     let first = invocation("print", text: "第一句。", source: .assistant, sequence: 2)
     for _ in 0..<2 {
-        try await UITools.print(invocation: first) { await endpoint.append($0, $1) }
+        try await UIActions.print(invocation: first) { await endpoint.append($0, $1) }
     }
-    try await UITools.print(invocation: invocation("print", text: "第二句。", source: .assistant, sequence: 3)) {
+    try await UIActions.print(invocation: invocation("print", text: "第二句。", source: .assistant, sequence: 3)) {
         await endpoint.append($0, $1)
     }
     #expect(await endpoint.reply == "第一句。第二句。")
     for (offset, text) in ["你", "你好", "你好世界"].enumerated() {
-        try await UITools.setTranscript(
+        try await UIActions.setTranscript(
             invocation: invocation(
                 "setTranscript", text: text,
                 source: .speechPerception, sequence: UInt64(offset + 1))
         ) { await endpoint.replace($0, $1) }
     }
     #expect(await endpoint.transcript == "你好世界")
-    try await UITools.finishTranscript(
+    try await UIActions.finishTranscript(
         invocation: invocation("finishTranscript", source: .speechPerception, sequence: 4)
     ) {
         await endpoint.close($0)
     }
-    try await UITools.setTranscript(
+    try await UIActions.setTranscript(
         invocation: invocation(
             "setTranscript", text: "迟到的结果",
             source: .speechPerception, sequence: 5)

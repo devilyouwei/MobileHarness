@@ -3,8 +3,6 @@ import Actions
 import AgentCore
 import Foundation
 import Gateway
-import ToolRuntime
-import Tools
 
 // Test callers explicitly cross the same validated Gateway boundary as production.
 extension ActionInvocation {
@@ -31,7 +29,9 @@ extension ActionInvocation {
                 }),
             output: .actionCall(
                 ActionCall(
-                    actionPath: .init(module: call.actionPath.module, function: call.actionPath.function),
+                    actionPath: .init(
+                        domain: call.actionPath.domain, module: call.actionPath.module,
+                        function: call.actionPath.function),
                     channel: call.channel, parameters: call.parameters)), sequence: context.sequence)
     }
 }
@@ -46,8 +46,10 @@ extension ActionDefinition {
         handler: @escaping ActionHandler
     ) {
         self.init(
-            path: .init(module: path.module, function: path.function), displayName: displayName, kind: kind,
-            completion: completion, resources: Set(resources.map { ActionResource(rawValue: $0.rawValue) }),
+            path: .init(domain: path.domain, module: path.module, function: path.function), displayName: displayName,
+            kind: kind,
+            completion: completion, serializationKey: path.domain,
+            resources: Set(resources.map { ActionResource(rawValue: $0.rawValue) }),
             handler: handler)
     }
     init(
@@ -55,8 +57,10 @@ extension ActionDefinition {
         completing: @escaping ActionCompletionHandler
     ) {
         self.init(
-            path: .init(module: path.module, function: path.function), displayName: displayName, kind: kind,
-            completion: completion, resources: Set(resources.map { ActionResource(rawValue: $0.rawValue) }),
+            path: .init(domain: path.domain, module: path.module, function: path.function), displayName: displayName,
+            kind: kind,
+            completion: completion, serializationKey: path.domain,
+            resources: Set(resources.map { ActionResource(rawValue: $0.rawValue) }),
             completing: completing)
     }
 }
@@ -72,5 +76,5 @@ extension ToolInvocation {
 }
 
 extension ActionPath {
-    var executionIdentifier: ActionIdentifier { .init(module: module, function: function) }
+    var executionIdentifier: ActionIdentifier { .init(domain: domain, module: module, function: function) }
 }

@@ -35,7 +35,7 @@ Tools provide direct functions such as captions, gaze, skeleton display and runt
 | PlatformKit | Own capture, native output, connections, device protocol and feedback. |
 | Storage | Retain settings/conversation records and bounded transient audio handles. |
 
-UI pages do not own model/device sessions. Long-lived work belongs to App lifecycle owners and runtime services. ActionRuntime and ToolRuntime are independent execution targets; Gateway depends on their contracts rather than concrete behavior domains. ModelKit and PlatformKit have no project dependencies, including Types, and own their capability inputs/outputs. App transports native device data; each calling Agent adapts it into ModelKit inputs. StorageAudio owns its own PCM contract.
+UI pages do not own model/device sessions. Long-lived work belongs to App lifecycle owners and runtime services. ActionRuntime is the shared execution foundation; Tools/ToolRuntime compatibility targets are retired; Gateway depends only on AgentCore and ActionRuntime, while concrete functions live in Actions. ModelKit and PlatformKit have no project dependencies, including Types, and own their capability inputs/outputs. App transports native device data; each calling Agent adapts it into ModelKit inputs. StorageAudio owns its own PCM contract.
 
 ## Conversation, settings and devices
 
@@ -107,7 +107,7 @@ Model invocation resolution failures (unknown Action/Tool alias or invalid param
 
 ✅ ADR0103 failure isolation refinement: retained Action reports preserve later exceptions; invocation/resource rejection is call-local; Tools distinguish execution and feedback failures, with joined cooperative deadlines and task-scoped cancellation. ❌ Uncooperative handlers and physical acceptance remain outstanding.
 
-✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); Tool stores optional Duration in its definition/registry and @Tool factories. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
+✅ Function-defined timeout takes precedence over Runtime defaults: Action keeps request-dependent budget resolvers (including NexArm); native projections retain the same constant/dynamic budgets and canonical definition. Unspecified Actions/Tools use30 seconds; invalid explicit declarations fail without fallback. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
 
 ✅ [ADR 0112: Gemma CoreAI chat](adr/0112-gemma-coreai-chat.md) replaces local Qwen/MLX with Gemma 4 E2B QAT CoreAI. iOS uses pinned h18p AOT resources; old Qwen downloads are incompatible. Shared package dependencies require OS 26; CoreAI execution requires OS 27. ✅ Mac real inference, cancellation and reload passed. ❌ Sustained device acceptance remains pending.
 
@@ -213,3 +213,21 @@ The [scenario flows](../MobileHarness/Agent-Driven-App.md#signal-and-effect-scen
 The same design separates external facts, internal Agent messages and internal runtime feedback under one envelope. Independent observation, system/capability changes and execution lifecycle supplement UI/conversation/collaboration. ✅ Typed origin admission and owner-fenced Tool feedback are implemented (ADR0149). ❌ Unified lifecycle/long-task contracts remain pending; host cleanup mechanisms remain App-owned.
 
 ✅ [ADR0149](adr/0149-signal-origin-and-tool-feedback.md) implements typed Signal origin and captured-owner returning Tool delivery with causal continuity. ❌ Original Action/activity roots, typed host commands and remaining business entry points await subsequent stages.
+
+✅ ADR0150 begins capability unification with one cooperative execution lifetime for both legacy executors. ❌ A shared business definition and dual ActionCall/ToolCall registration are not yet implemented. The adopted design separates protocol exposure from capability-owned scheduling and resources; configuration cannot bypass execution constraints.
+
+✅ ADR0151 consolidates all executable domains and runtime sources under Actions. Invocation protocols still retain their current definition/result APIs. ❌ Unified definition adapters and removal of compatibility imports remain pending.
+
+✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
+
+✅ ADR0153 adopts Domain.Module.function (directory, entry file/namespace, function) as the required capability address. ❌ Three-field contract/configuration/registration migration and cohesive entry splitting are pending; current runtime still uses two-field Action paths.
+
+✅ ADR0154 implements cohesive module entry files with one copy of each function and unchanged protocol behavior. File ownership is checked explicitly. ❌ Three-field path/configuration/registration migration remains outstanding.
+
+✅ ADR0155: scheduled Actions use immutable definition-owned serialization keys, independently of path/module names. Production preserves existing exclusion scopes; resource ownership and Agent permissions remain separate.
+
+❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
+
+✅ [ADR0156 — Three-level capability addresses](adr/0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; serialization/resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
+
+✅ [ADR0157 — Canonical executable definitions](adr/0157-canonical-executable-definitions.md): completes shared definition/outcome/execution, protocol projections, scheduled native routing, typed feedback and compatibility retirement. Remaining work is broader Agent-driven input/feature migration and physical acceptance.

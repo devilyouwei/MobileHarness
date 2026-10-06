@@ -62,3 +62,10 @@ Purpose: test cross-module history operations using the real journal and a contr
 ✅ ModelResourceInteractionWorkflowTests migrates resource admission/cancel/source/rollback regressions from UITests and adds cancelled-page-caller acceptance. Fixtures use the owning ModelResourcesOperating contract and no network/model weights. ❌ Native UI interaction remains separate.
 
 ✅ History fixtures now inject explicit deleteArchive operations; production legacy workflow cannot directly delete the journal. Archive/title regressions remain unchanged. ❌ Native confirmation and conversational deletion acceptance remain pending.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

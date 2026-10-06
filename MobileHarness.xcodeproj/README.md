@@ -85,3 +85,10 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ❌ The iOS simulator SDK lacks CoreAI; the external CoreAILM target cannot build there. build-ios.sh currently stops on this limitation. Independent UI tests run on Mac; a separate simulator assembly remains outstanding.
 
 ✅ Both App source phases include SpeechFailurePresentation; shared Storage/Agent/UI helpers remain package-owned. ❌ Simulator CoreAI availability and physical acceptance remain separate.
+
+✅ ADR0151: file references for former Tools sources now point into Actions, matching the shared package's single source ownership. The legacy navigator group is labeled ToolCall Entries; Swift package targets determine compilation.
+❌ Remove compatibility import targets after consumer migration; scheduled ToolCall and physical acceptance remain separate work.
+
+✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
+
+✅ ADR0154 implements cohesive module entry files with one copy of each function and unchanged protocol behavior. File ownership is checked explicitly. ❌ Three-field path/configuration/registration migration remains outstanding.

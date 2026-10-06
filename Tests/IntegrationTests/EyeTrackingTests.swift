@@ -3,8 +3,6 @@ import Actions
 import AgentCore
 import Foundation
 import Testing
-import ToolRuntime
-import Tools
 
 @testable import Agents
 
@@ -63,12 +61,13 @@ private func faceObservation(
 @Test(arguments: [[:], ["x": "nan", "y": "0"], ["x": "0", "y": "inf"], ["x": "1.1", "y": "0"]])
 func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
     let valid = ActionCall(
-        actionPath: .init(module: "UI", function: "moveEyes"), channel: "Gaze", parameters: ["x": "0", "y": "0"])
+        actionPath: .init(domain: "UI", module: "Gaze", function: "moveEyes"), channel: "Gaze",
+        parameters: ["x": "0", "y": "0"])
     let call = ActionCall(actionPath: valid.actionPath, channel: valid.channel, parameters: parameters)
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .actionCall(call))
-    await #expect(throws: UITools.GazeError.invalidTarget) {
-        try await UITools.moveEyes(invocation: uiToolInvocation(ActionInvocation(envelope: envelope))) { _, _ in
+    await #expect(throws: UIActions.GazeError.invalidTarget) {
+        try await UIActions.moveEyes(invocation: uiToolInvocation(ActionInvocation(envelope: envelope))) { _, _ in
             Issue.record("Invalid gaze reached presentation")
         }
     }
@@ -76,15 +75,16 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
 
 @Test func moveEyesAcceptsBoundaryAndPropagatesPresentationFailure() async throws {
     let call = ActionCall(
-        actionPath: .init(module: "UI", function: "moveEyes"), channel: "Gaze", parameters: ["x": "-1", "y": "1"])
+        actionPath: .init(domain: "UI", module: "Gaze", function: "moveEyes"), channel: "Gaze",
+        parameters: ["x": "-1", "y": "1"])
     let envelope = OutputEnvelope(
         source: .visionPerception,
         input: AgentInput(sessionID: UUID(), payload: .text("test")), output: .actionCall(call))
     let invocation = try ActionInvocation(envelope: envelope)
-    try await UITools.moveEyes(invocation: uiToolInvocation(invocation)) { target, _ in
+    try await UIActions.moveEyes(invocation: uiToolInvocation(invocation)) { target, _ in
         #expect(target.x == -1 && target.y == 1)
     }
     await #expect(throws: CancellationError.self) {
-        try await UITools.moveEyes(invocation: uiToolInvocation(invocation)) { _, _ in throw CancellationError() }
+        try await UIActions.moveEyes(invocation: uiToolInvocation(invocation)) { _, _ in throw CancellationError() }
     }
 }

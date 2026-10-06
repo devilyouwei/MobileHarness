@@ -10,7 +10,6 @@ import ModelKit
 import PlatformKit
 import Storage
 import StorageChat
-import Tools
 import UI
 
 /// Root-owned communication assembly, available before voice models are ready.

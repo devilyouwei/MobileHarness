@@ -3,7 +3,7 @@ import Foundation
 
 /// Camera-motion policy. Consumes published pose observations and, when enabled, emits one arm Tool.
 public actor PhotographerAgent: Agent {
-    private static let aimPermission = InternalTool(path: "Robot.aim", required: ["base", "pitch"])
+    private static let aimPermission = InternalTool(path: "NexArm.Tracking.aim", required: ["base", "pitch"])
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation

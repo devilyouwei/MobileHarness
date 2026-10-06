@@ -17,6 +17,7 @@ public enum ActionFeedback: Sendable { case none, failuresOnly, terminal }
 
 public enum AgentActionCompletion: Equatable, Sendable {
     case completed
+    case value(String)
     case report(AgentActionReport)
     case activityStarted(UUID)
     case activityStopped(UUID)

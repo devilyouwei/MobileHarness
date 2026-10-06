@@ -1,6 +1,6 @@
 # Output — Resolved Invocation Gateway
 
-Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter ChannelScheduler; ToolCalls execute through Tools/Runtime and return results through InputGateway. Alias binding belongs to Agents.
+Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter ChannelScheduler; ToolCalls execute through Actions/Runtime and return results through InputGateway. Alias binding belongs to Agents.
 
 - ✅ OutputGateway connects validation, routing, dispatch and the observation sink, with error propagation and cancellation/completion barriers.
 - ✅ Validation, Routing, Dispatch and Scheduling have separate responsibilities.
@@ -33,12 +33,12 @@ flowchart LR
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
-✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. VisionPerception skeletons use validated ToolCalls through Tools/Runtime; no UI payload bypass exists.
+✅ Generic runtime agent.finished joins source/input Actions and agent.error cancels them, matching existing assistant controls. VisionPerception skeletons use validated ToolCalls through Actions/Runtime; no UI payload bypass exists.
 
 
 ## Typed event path
 
-✅ `messaging(for:)` returns a port bound to the current source incarnation. It validates outbound JSON v5 permissions, payload schema/size, session, parent deadline and hop count before bounded direct InputGateway admission. Gateways have no message queue; Agents own pending input and any state replacement. Limits are 16 concurrent emissions per source; each schema is bounded. Gateway creates source IDs/sequences, and expired ports cannot publish after replacement.
+✅ `messaging(for:)` returns a port bound to the current source incarnation. It validates outbound JSON v6 permissions, payload schema/size, session, parent deadline and hop count before bounded direct InputGateway admission. Gateways have no message queue; Agents own pending input and any state replacement. Limits are 16 concurrent emissions per source; each schema is bounded. Gateway creates source IDs/sequences, and expired ports cannot publish after replacement.
 
 ```mermaid
 flowchart LR
@@ -49,7 +49,7 @@ flowchart LR
 
 The configured observer consumes only current speech state and has no unbounded queue. No recipients is an error unless a matching observer is registered. Event receipts report recipient admission, not Action or handler completion. ❌ Requests/replies and model-assisted routing are deferred.
 
-✅ Tool dispatch supports explicitly registered Void completion handlers. UI.showPose executes directly without Channel admission or ToolResult feedback; normal data tools continue returning through InputGateway.
+✅ Tool dispatch supports explicitly registered Void completion handlers. UI.Pose.showPose executes directly without Channel admission or ToolResult feedback; normal data tools continue returning through InputGateway.
 
 ✅ Typed event publication preserves the parent AgentTurn; Gateway does not interpret presentation policy.
 
@@ -112,3 +112,10 @@ The observation path neither injects a new Agent result nor invokes device recov
 ✅ ADR0140/ADR0141: ResourceCoordinator owns cancellation-independent bounded cleanup. Public resource state is unlocked/locked(owner), including transient use. Cleanup timeout fails only its requester; retained work automatically unlocks when it finishes. Stop errors after joined cleanup release occupancy. Execution permits invalidate stale inherited context. ❌ Physical stop acknowledgment remains outside this software contract.
 
 ✅ ADR0149: AgentMessaging constructs Agent-origin metadata; output envelopes retain input context. Returning Tools route Runtime-origin feedback through captured-owner delivery and preserve actual values/errors when delivery fails. ❌ Complete Action/activity original-root propagation remains pending.
+
+✅ ChannelScheduler fences execution by definition-owned serializationKey captured at admission, releasing only after joined cleanup. Existing FIFO, wait, capacity, feedback and resource policies remain intact.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

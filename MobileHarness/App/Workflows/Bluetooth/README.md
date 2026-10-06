@@ -59,7 +59,7 @@ stateDiagram-v2
 
 ✅ Agent finite actions use invocation-private report sinks. Stored child results cannot replace final failures/root descriptions. Business rejection cannot borrow another invocation's motor report or request Bluetooth recovery. Background/device cleanup and manual takeover remain explicit, distinct lifetime policies.
 
-✅ Robot.aim publishes one latest target after Gateway authorization. The continuous worker holds motors1–4 through the injected resource coordinator; startup is acknowledged after admission. WorkerID and initiating call origin belong to App execution observation only. Late worker failures reach home, including after native recovery changes generation; completed Tool results are not rewritten. Settings takeover bypasses the guard, suppresses new Photographer targets and clears old aims; fresh later input can resume. Gateway's Agent cleanup cannot stop Settings playback.
+✅ NexArm.Tracking.aim publishes one latest target after Gateway authorization. The continuous worker holds motors1–4 through the injected resource coordinator; startup is acknowledged after admission. WorkerID and initiating call origin belong to App execution observation only. Late worker failures reach home, including after native recovery changes generation; completed Tool results are not rewritten. Settings takeover bypasses the guard, suppresses new Photographer targets and clears old aims; fresh later input can resume. Gateway's Agent cleanup cannot stop Settings playback.
 
 ```mermaid
 flowchart LR

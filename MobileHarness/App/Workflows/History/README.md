@@ -13,7 +13,7 @@ flowchart LR
     Intent --> Input[InputGateway]
     Input --> Agent[ConversationMemory]
     Agent --> Output[OutputGateway]
-    Output --> Tool[UI.showHistory]
+    Output --> Tool[UI.HistoryPresentation.showHistory]
     Tool --> Adapter[HistoryPresentationAdapter]
     Adapter --> Journal[StorageChat]
     Adapter --> State[UI history state]
@@ -26,3 +26,7 @@ flowchart LR
 ✅ Confirmed deletion now invokes the required typed deleteArchive operation; the feature facade performs no journal deletion or snapshot refresh itself. Root transport executes at most two Agent-selected business calls, accepting the follow-up only after successful correlated Tool feedback. On failure/cancellation it sends a fresh cancel intent through InputGateway, joins cleanup and drains at most8 envelopes until the non-business acknowledgment crosses OutputGateway. Cancelled UI calls are explicitly retired; no device calls use this transport. Committed data is never rolled back.
 
 ❌ This is deterministic continuation only; no model replanning, deletion retry or navigation is added. Remaining title/archive operations retain the legacy journal dependency.
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

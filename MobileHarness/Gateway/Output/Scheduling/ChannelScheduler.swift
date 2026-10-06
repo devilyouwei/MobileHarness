@@ -2,13 +2,13 @@ import ActionRuntime
 import AgentCore
 import Foundation
 
-/// Task-local structured execution groups with process-wide module exclusion.
+/// Task-local structured execution groups with process-wide definition-owned serialization exclusion.
 public actor ChannelScheduler {
     struct InputKey: Hashable {
         let source: AgentID
         let inputID: UUID
     }
-    private enum Outcome: Sendable {
+    enum Outcome: Sendable {
         case success(ActionCompletion)
         case failure(any Error)
         func get() throws { if case .failure(let error) = self { throw error } }
@@ -17,6 +17,8 @@ public actor ChannelScheduler {
         var id: UUID { invocation.executionID }
         let sequence: UInt64
         let phase: Int
+        let serializationKey: String
+        let receipt: AsyncStream<Outcome>.Continuation?
         let kind: ActionDefinition.Kind
         let resources: Set<ResourceID>
         var path: ActionPath { invocation.call.actionPath }
@@ -89,7 +91,7 @@ public actor ChannelScheduler {
     private var channelCounts: [String: Int] = [:]
     private var isShutdown = false
     private var sequence: UInt64 = 0
-    private var busyModules: Set<String> = []
+    private var busySerializationKeys: Set<String> = []
     private var executionLedger = ActionExecutionLedger()
     private var executionObservers: [UUID: AsyncStream<ActionExecutionSnapshot>.Continuation] = [:]
     public enum ObservationError: Error { case capacityExceeded }
@@ -185,8 +187,12 @@ public actor ChannelScheduler {
     /// Returns after admission, never after execution. All dormant jobs count toward capacity.
     @discardableResult
     public func enqueue(invocation submitted: ScheduledAction) async throws -> UUID {
+        try await admit(submitted, receipt: nil)
+    }
+    private func admit(_ submitted: ScheduledAction, receipt: AsyncStream<Outcome>.Continuation?) async throws -> UUID {
         let invocation = try ScheduledAction(
-            envelope: submitted.envelope, owner: submitted.owner, feedback: submitted.feedback, lease: submitted.lease)
+            envelope: submitted.envelope, owner: submitted.owner, feedback: submitted.feedback, lease: submitted.lease,
+            context: submitted.execution.context)
         try Task.checkCancellation()
         guard !isShutdown else { throw ActionSchedulingError.shutdown }
         let definition = try registry.definition(for: invocation.call.actionPath)
@@ -216,7 +222,9 @@ public actor ChannelScheduler {
         sequence += 1
         state.phases[state.writePhase].lanes[channel, default: Channel()].queued.append(
             Job(
-                sequence: sequence, phase: state.writePhase, kind: definition.kind, resources: required,
+                sequence: sequence, phase: state.writePhase, serializationKey: definition.serializationKey,
+                receipt: receipt,
+                kind: definition.kind, resources: required,
                 invocation: invocation))
         executionLedger.admit(invocation, definition: definition)
         publishExecutions()
@@ -224,6 +232,48 @@ public actor ChannelScheduler {
         startEligibleChannels()
         return invocation.executionID
     }
+
+    /// One bounded child job outside XML waits, preserving the original execution context.
+    public func executeToolProjection(
+        _ envelope: OutputEnvelope, owner: ExecutionOwner,
+        channel: String, lease: ResourceLease?
+    ) async throws -> ActionCompletion {
+        guard case .toolCall(let tool) = envelope.output else { throw ActionExecutionError.invalidInvocation }
+        let parts = tool.toolPath.split(separator: ".").map(String.init)
+        guard parts.count == 3 else { throw ActionExecutionError.invalidInvocation }
+        let child = AgentInput(
+            sessionID: envelope.sessionID, payload: .event("tool.execution"),
+            metadata: envelope.inputMetadata, turn: envelope.turn)
+        let call = ActionCall(
+            actionPath: .init(domain: parts[0], module: parts[1], function: parts[2]),
+            channel: channel, parameters: tool.arguments)
+        let adapted = OutputEnvelope(
+            source: envelope.source, input: child, output: .actionCall(call), sequence: envelope.sequence)
+        let pair = AsyncStream<Outcome>.makeStream(bufferingPolicy: .bufferingOldest(1))
+        defer { pair.continuation.finish() }
+        return try await withTaskCancellationHandler {
+            do {
+                try await admit(
+                    ScheduledAction(
+                        envelope: adapted, owner: owner, lease: lease,
+                        context: envelope.executionContext), receipt: pair.continuation)
+                var iterator = pair.stream.makeAsyncIterator()
+                guard let result = await iterator.next() else { throw CancellationError() }
+                try await finish(inputID: child.id, source: envelope.source)
+                try Task.checkCancellation()
+                switch result {
+                case .success(let completion): return completion
+                case .failure(let error): throw error
+                }
+            } catch {
+                await cancel(inputID: child.id, source: envelope.source)
+                throw error
+            }
+        } onCancel: {
+            Task { await self.cancel(inputID: child.id, source: envelope.source) }
+        }
+    }
+
     public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) throws {
         let key = InputKey(source: envelope.source, inputID: envelope.inputID)
         if directive == .endWait, inputs[key] == nil { throw ActionSchedulingError.invalidSchedule }
@@ -341,10 +391,12 @@ public actor ChannelScheduler {
             }
         }
         for job in candidates.sorted(by: { $0.sequence < $1.sequence }) {
-            guard !busyModules.contains(job.path.module), let state = inputs[job.inputKey] else { continue }
+            guard !busySerializationKeys.contains(job.serializationKey), let state = inputs[job.inputKey] else {
+                continue
+            }
             let channel = job.invocation.call.channel
             state.phases[job.phase].lanes[channel]?.queued.removeFirst()
-            busyModules.insert(job.path.module)
+            busySerializationKeys.insert(job.serializationKey)
             let task = Task {
                 var outcome: Outcome
                 var started = false
@@ -393,7 +445,7 @@ public actor ChannelScheduler {
             state.phases[job.phase].lanes[job.invocation.call.channel]?.running?.job.id == job.id
         else { return }
         state.phases[job.phase].lanes[job.invocation.call.channel]?.running = nil
-        busyModules.remove(job.path.module)
+        busySerializationKeys.remove(job.serializationKey)
         decrementChannel(job.invocation.call.channel, by: 1)
         state.pending -= 1
         switch outcome {
@@ -439,6 +491,8 @@ public actor ChannelScheduler {
                 job.invocation, kind: job.kind, phase: error is CancellationError ? .cancelled : .failed,
                 effect: started ? .unknown : .notStarted)
         }
+        job.receipt?.yield(outcome)
+        job.receipt?.finish()
         finalizeIfReady(job.inputKey)
         startEligibleChannels()
         startResultDelivery()
@@ -462,6 +516,8 @@ public actor ChannelScheduler {
             for name in Array(state.phases[phase].lanes.keys) {
                 let queued = state.phases[phase].lanes[name]?.queued ?? []
                 for job in queued {
+                    job.receipt?.yield(.failure(CancellationError()))
+                    job.receipt?.finish()
                     executionTransition(job.id, to: .cancelled)
                     resultLedger.complete(job.invocation, status: .cancelled, effect: .notStarted, failure: .cancelled)
                     diagnostics.record(job.invocation, kind: job.kind, phase: .cancelled, effect: .notStarted)

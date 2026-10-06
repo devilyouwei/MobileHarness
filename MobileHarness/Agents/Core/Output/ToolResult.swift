@@ -1,11 +1,16 @@
 import Foundation
 
 public struct ToolResult: Equatable, Sendable {
+    public let completion: AgentActionCompletion?
     public let callID: UUID
     public let value: String
     public let isError: Bool
     public let failureCode: String?
-    public init(callID: UUID, value: String, isError: Bool = false, failureCode: String? = nil) {
+    public init(
+        callID: UUID, value: String, isError: Bool = false, failureCode: String? = nil,
+        completion: AgentActionCompletion? = nil
+    ) {
+        self.completion = completion
         self.callID = callID
         self.value = value
         self.isError = isError

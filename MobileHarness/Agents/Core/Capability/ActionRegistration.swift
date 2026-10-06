@@ -28,10 +28,10 @@ public struct InternalAction: Sendable {
     public let optionalParameters: Set<String>
 
     public init(
-        module: String, function: String, channel: String,
+        domain: String, module: String, function: String, channel: String,
         required: Set<String> = [], optional: Set<String> = []
     ) {
-        path = ActionPath(module: module, function: function)
+        path = ActionPath(domain: domain, module: module, function: function)
         self.channel = channel
         requiredParameters = required
         optionalParameters = optional

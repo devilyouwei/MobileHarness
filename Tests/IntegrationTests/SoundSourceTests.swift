@@ -1,10 +1,10 @@
+import ActionRuntime
 import AgentCore
 import Foundation
 import Gateway
 import ModelKit
 import PlatformKit
 import Testing
-import ToolRuntime
 
 @testable import Agents
 
@@ -269,7 +269,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
 @Test func soundSourceBroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline() async throws {
     let speechConfiguration = try AgentConfigurations.load(named: "SpeechPerception")
     let listenerData: [String: Any] = [
-        "version": 5, "id": "soundListener", "actions": [:], "tools": [],
+        "version": 6, "id": "soundListener", "actions": [:], "tools": [],
         "communication": [
             "inputs": [["contract": "sound.source", "version": 1, "kind": "observation"]],
             "subscriptions": [["contract": "sound.source", "source": "speechPerception", "topic": "sound.source"]],

@@ -6,8 +6,6 @@ import Foundation
 import Gateway
 import PlatformKit
 import Testing
-import ToolRuntime
-import Tools
 
 @Test func arrivalWinsWithoutStabilityAndStaleSamplesCannotComplete() throws {
     let start = ContinuousClock.now
@@ -85,17 +83,18 @@ import Tools
 
 private enum MacroFixture {
     @Action(
-        module: "Fixture", title: "Generated action", kind: .finite, completion: "Done",
+        domain: "Fixture", module: "Control", title: "Generated action", kind: .finite, completion: "Done",
+        serializationKey: "fixture.control",
         resources: { _ in [.init(rawValue: "fixture")] },
         timeout: { _ in try .init(expected: .zero, timeout: .milliseconds(30)) })
     public static func run() {}
-    @Tool(path: "Fixture.tool", title: "Generated tool", resources: [.init(rawValue: "fixture")])
+    @Tool(path: "Fixture.Control.tool", title: "Generated tool", resources: [.init(rawValue: "fixture")])
     public static func tool() {}
 }
 
 @Test func macroFactoriesPreserveTitlesResourcesAndTimeoutReportsThroughCleanup() async throws {
     let tool = MacroFixture.toolDefinition(handler: { _ in "ok" })
-    #expect(tool.path == "Fixture.tool" && tool.displayName == "Generated tool")
+    #expect(tool.path.description == "Fixture.Control.tool" && tool.displayName == "Generated tool")
     #expect(tool.resources == [.init(rawValue: "fixture")])
     let action = MacroFixture.runDefinition(completing: { invocation in
         do { try await Task.sleep(for: .seconds(10)) } catch {
@@ -108,8 +107,10 @@ private enum MacroFixture {
         }
         return .completed
     })
+    #expect(action.serializationKey == "fixture.control")
     let call = ActionCall(
-        actionPath: ActionPath(module: action.path.module, function: action.path.function), channel: "Fixture")
+        actionPath: ActionPath(domain: action.path.domain, module: action.path.module, function: action.path.function),
+        channel: "Fixture")
     #expect(action.displayName == "Generated action")
     #expect(try action.requiredResources(for: call) == [.init(rawValue: "fixture")])
     let invocation = ActionInvocation(
@@ -179,7 +180,9 @@ private enum MacroFixture {
     let input = AgentInput(sessionID: owner.sessionID, payload: .event("deadline"))
     for quick in [false, true] {
         let call = ActionCall(
-            actionPath: ActionPath(module: action.path.module, function: action.path.function), channel: "Fixture",
+            actionPath: ActionPath(
+                domain: action.path.domain, module: action.path.module, function: action.path.function),
+            channel: "Fixture",
             parameters: ["quick": String(quick)])
         let envelope = OutputEnvelope(source: .assistant, input: input, output: .actionCall(call))
         try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))

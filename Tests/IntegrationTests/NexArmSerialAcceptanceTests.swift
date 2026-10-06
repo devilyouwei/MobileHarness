@@ -9,8 +9,6 @@ import Gateway
 import ModelKit
 import Storage
 import Testing
-import ToolRuntime
-import Tools
 import UI
 
 @testable import PlatformKit
@@ -301,7 +299,7 @@ import UI
                 }
             }
             let records = await output.executionResults(source: .assistant).actions.records.filter {
-                $0.path.module == "NexArm"
+                $0.path.domain == "NexArm"
             }
             try #require(!records.isEmpty)
             for record in records {
@@ -351,7 +349,7 @@ import UI
         let input = InputGateway(manager: manager, policy: policy)
         let failures = SerialControlFailureProbe()
         let tools = try ToolRegistry(modules: [
-            RobotToolModule { base, pitch, invocation in
+            NexArmTrackingToolModule { base, pitch, invocation in
                 try await workflow.aim(
                     base: base, pitch: pitch,
                     origin: .init(
@@ -414,7 +412,7 @@ import UI
             if ProcessInfo.processInfo.environment["NEXARM_SERIAL_AIM_STRESS"] == "1" {
                 // Explicit Tool fixtures isolate publication rate from YOLO/Photographer policy.
                 // Centered observations still cross InputGateway and keep the real freshness guard active.
-                let permission = InternalTool(path: "Robot.aim", required: ["base", "pitch"])
+                let permission = InternalTool(path: "NexArm.Tracking.aim", required: ["base", "pitch"])
                 var sequence: UInt64 = 6
                 for phase in 0..<3 {
                     let count = phase == 1 ? 300 : 30

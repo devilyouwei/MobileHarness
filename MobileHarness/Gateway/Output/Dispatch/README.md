@@ -62,3 +62,12 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 
 ✅ ToolDispatcher uses module-internal deliverToolResult with the captured execution owner and original envelope. Source incarnation/session are fenced even if another Agent reuses the same ID/session. Causal root, parent inputID, turn, sequence and bounded hops survive feedback; execution may outlive admission, so feedback gets a fresh10-second admission deadline.
 ❌ No waiting feedback queue, durable transport or automatic effect replay is introduced. Delivery rejection stays distinct from Tool failure.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0157: ToolDispatcher applies definition-owned direct/scheduled policy. Scheduled native calls cross the same ChannelScheduler; direct calls resolve shared resource declarations before ResourceCoordinator. ToolExecutor adapts the shared outcome, and owner-fenced returning feedback preserves typed completion. ❌ No duplicate ActionResult or automatic model continuation is introduced.

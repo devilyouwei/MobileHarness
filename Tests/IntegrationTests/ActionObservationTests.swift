@@ -41,8 +41,8 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
 {
     let arm = ObservationGate()
     let speech = ObservationGate()
-    let armPath = ActionPath(module: "NexArm", function: "dance")
-    let speechPath = ActionPath(module: "Speech", function: "speak")
+    let armPath = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
+    let speechPath = ActionPath(domain: "Speech", module: "Playback", function: "speak")
     let registry = try ActionRegistry(definitions: [
         ActionDefinition(path: armPath, displayName: "测试动作", kind: .finite, completion: "Fixture gate.") { _ in
             await arm.wait()
@@ -79,7 +79,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
 
 @Test(.timeLimit(.minutes(1))) func actionObservationKeepsCancellingUntilCommittedHandlerJoins() async throws {
     let gate = ObservationGate()
-    let path = ActionPath(module: "NexArm", function: "dance")
+    let path = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
             ActionDefinition(path: path, displayName: "测试动作", kind: .finite, completion: "Committed fixture is joined.")
@@ -111,7 +111,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
 @Test func actionObservationRetainsActiveWorkBoundsHistoryAndIgnoresLateTransitions() {
     var ledger = ActionExecutionLedger(terminalCapacity: 2)
     let input = AgentInput(sessionID: UUID(), payload: .event("bounds"))
-    let path = ActionPath(module: "Fixture", function: "work")
+    let path = ActionPath(domain: "Fixture", module: "Control", function: "work")
     let active = observationCall(path, input: input, channel: "Robot")
     let definition = ActionDefinition(
         path: path, displayName: "测试动作", kind: .finite, completion: "Fixture completed.", handler: { _ in })
@@ -136,7 +136,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
 }
 
 @Test func actionObservationPublishesStructuredFailureAndRejectsExcessSubscribers() async throws {
-    let path = ActionPath(module: "NexArm", function: "dance")
+    let path = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
             ActionDefinition(path: path, displayName: "测试动作", kind: .finite, completion: "Failure fixture.") {
@@ -164,7 +164,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
 
 @Test @MainActor func unfamiliarActionDisplaysItsRegisteredNameThroughTheWholeObservationPath() async throws {
     // Explicit test-only behavior: no device, model or media access.
-    let path = ActionPath(module: "NewDomain", function: "newOperation")
+    let path = ActionPath(domain: "NewDomain", module: "Control", function: "newOperation")
     let registry = try ActionRegistry(definitions: [
         ActionDefinition(path: path, displayName: "新领域操作", kind: .finite, completion: "Fixture acknowledged.") { _ in }
     ])
@@ -214,7 +214,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
                 try ActionReport(entries: [.init(path: "motor", status: .failed, code: .handlerFailed)])
                     .recordingFailure(FixtureFailure.failed))
         })
-    let path = ActionPath(module: "Fixture", function: "failure")
+    let path = ActionPath(domain: "Fixture", module: "Control", function: "failure")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
             ActionDefinition(

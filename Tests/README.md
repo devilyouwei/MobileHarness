@@ -96,3 +96,9 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ IntegrationTests covers deterministic history mutation continuation through both Gateways and cancellation after commit; feature fixtures inject deletion explicitly. ❌ Physical UI behavior remains unverified.
 
 ✅ ADR0149 adds Signal provenance, returning Tool causal continuity and replacement-owner fencing regressions. ❌ Original-root Action/activity migration and native acceptance remain pending.
+
+✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
+
+✅ ADR0155 adds deterministic coverage for shared serialization keys across different paths/Channels, independent-key progress, rejected invalid registration and generated macro metadata.
+
+❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.

@@ -53,8 +53,8 @@ public actor ConversationMemoryAgent: Agent {
     private var processed = 0
     private var sequence: UInt64 = 0
     private var pending: (input: AgentInput, callID: UUID)?
-    private static let deletion = InternalTool(path: "History.delete", required: ["id"])
-    private static let presentation = InternalTool(path: "UI.showHistory")
+    private static let deletion = InternalTool(path: "History.Conversation.delete", required: ["id"])
+    private static let presentation = InternalTool(path: "UI.HistoryPresentation.showHistory")
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
         try capabilities.adding(internalTools: [presentation, deletion])
     }

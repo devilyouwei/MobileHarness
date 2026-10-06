@@ -2,7 +2,6 @@ import ActionRuntime
 import Actions
 import AppWorkflows
 import Foundation
-import ToolRuntime
 
 /// Host adaptation only; gesture/execution business policy remains in Actions.
 @MainActor
@@ -18,7 +17,7 @@ struct NexArmBehaviorAdapter {
                     inputID: invocation.context.inputID, callID: invocation.call.id)
             ) { [activity] failure in
                 await activity.recordFailure(
-                    title: "Robot.aim", source: failure.origin?.source ?? "持续控制", message: failure.message,
+                    title: "NexArm.Tracking.aim", source: failure.origin?.source ?? "持续控制", message: failure.message,
                     failureCode: failure.code,
                     context: .init(
                         workerID: failure.workerID, sessionID: failure.origin?.sessionID,

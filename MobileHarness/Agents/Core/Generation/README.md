@@ -9,7 +9,7 @@ Purpose: share incremental Agent-output parsing across Agents without depending 
 | Function Token protocol | A mixed stream of natural text characters and restricted XML syntax. Text is a first-class part of the protocol, not content outside it. A document root is not required. |
 | FunctionToken | An internal parsed event: `.text`, `.action`, `.boundary` or `.scheduling`. It is not a model tokenizer token, a network fragment or necessarily one character. |
 | FunctionTokenParser | Incrementally decodes UTF-8 and parses text, self-closing Action tags, paired Channel scopes and paired wait groups. It neither binds capabilities nor executes Actions. |
-| Action | A registered executable behavior, such as `Speech.speak` or `UI.express`. Its implementation owns parameter/value validation and behavior. |
+| Action | A registered executable behavior, such as `Speech.Playback.speak` or `UI.Expression.express`. Its implementation owns parameter/value validation and behavior. |
 | ActionCall | One resolved Action invocation: ActionPath, string parameters and effective channel. It is distinct from raw FunctionToken events and model-native ToolCall invocations. |
 | ToolCall | A separate native tool invocation resolved by ToolCallParser. It does not pass through XML parsing or Channel action queues. |
 
@@ -75,7 +75,7 @@ flowchart TD
     Tools --> Tool[Resolved ToolCall]
 ```
 
-For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression call to `UI.express`, then text-bearing calls to `Speech.speak` and `UI.print`. Assistant subsequently directs the speech text to SpeechSynthesisAgent and replaces the text-bearing call with `Speech.speak(audioID)` before output. Speech uses its default or explicit channel; the caption Tool has no channel. This illustrates why text is a Function Token even when it contains no XML.
+For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression call to `UI.Expression.express`, then text-bearing calls to `Speech.Playback.speak` and `UI.Caption.print`. Assistant subsequently directs the speech text to SpeechSynthesisAgent and replaces the text-bearing call with `Speech.Playback.speak(audioID)` before output. Speech uses its default or explicit channel; the caption Tool has no channel. This illustrates why text is a Function Token even when it contains no XML.
 
 ## Bounds, completion and failure
 

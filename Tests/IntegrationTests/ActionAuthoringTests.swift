@@ -14,7 +14,8 @@ private func authoringInvocation(_ parameters: [String: String]) -> ActionInvoca
     ActionInvocation(
         source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("test")),
         call: ActionCall(
-            actionPath: ActionPath(module: "Speech", function: "speak"), channel: "Voice", parameters: parameters))
+            actionPath: ActionPath(domain: "Speech", module: "Playback", function: "speak"), channel: "Voice",
+            parameters: parameters))
 }
 
 @Test func speechEntryRejectsInvalidTransportBeforeInvokingPlayback() async throws {

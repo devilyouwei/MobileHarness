@@ -1,12 +1,13 @@
 {
-  "version": 5,
+  "version": 6,
   "id": "assistant",
   "actions": {
     "Display": [
       {
         "alias": "express",
         "path": {
-          "module": "UI",
+          "domain": "UI",
+          "module": "Expression",
           "function": "express"
         },
         "parameters": [
@@ -28,7 +29,8 @@
       {
         "alias": "setExpression",
         "path": {
-          "module": "UI",
+          "domain": "UI",
+          "module": "Expression",
           "function": "setExpression"
         },
         "parameters": [
@@ -52,7 +54,8 @@
       {
         "alias": "shakeBase",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Motion",
           "function": "shakeBase"
         },
         "parameters": [
@@ -87,7 +90,8 @@
       {
         "alias": "waveWrist",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Gesture",
           "function": "waveWrist"
         },
         "parameters": [
@@ -121,7 +125,8 @@
       {
         "alias": "tiltWrist",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Gesture",
           "function": "tiltWrist"
         },
         "parameters": [
@@ -155,7 +160,8 @@
       {
         "alias": "lookAround",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Gesture",
           "function": "lookAround"
         },
         "parameters": [
@@ -189,7 +195,8 @@
       {
         "alias": "celebrate",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Gesture",
           "function": "celebrate"
         },
         "parameters": [
@@ -223,7 +230,8 @@
       {
         "alias": "dance",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Gesture",
           "function": "dance"
         },
         "parameters": [
@@ -257,7 +265,8 @@
       {
         "alias": "nodHead",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Gesture",
           "function": "nodHead"
         },
         "parameters": [
@@ -291,7 +300,8 @@
       {
         "alias": "shakeHead",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Gesture",
           "function": "shakeHead"
         },
         "parameters": [
@@ -325,7 +335,8 @@
       {
         "alias": "resetArm",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Motion",
           "function": "reset"
         },
         "parameters": [
@@ -352,7 +363,8 @@
       {
         "alias": "moveMotor",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Motion",
           "function": "moveMotor"
         },
         "parameters": [
@@ -393,7 +405,8 @@
       {
         "alias": "resetMotor",
         "path": {
-          "module": "NexArm",
+          "domain": "NexArm",
+          "module": "Motion",
           "function": "resetMotor"
         },
         "parameters": [
@@ -428,116 +441,158 @@
   },
   "tools": [
     {
-      "type": "function",
-      "function": {
-        "name": "runtimeInfo",
-        "description": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
-        },
-        "strict": true
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "Camera.open",
-        "description": "Enable foreground camera preview and vision processing. Requires camera permission and an available camera; completion confirms capture, not pose-model readiness.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
-        },
-        "strict": true
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "Camera.close",
-        "description": "Disable camera preview and vision processing, and wait for capture and vision cleanup.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
-        },
-        "strict": true
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "Camera.flip",
-        "description": "Switch the enabled foreground camera between front and rear lenses. Fails if disabled, busy or unavailable.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
-        },
-        "strict": true
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "History.list",
-        "description": "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "offset": {
-              "type": "string",
-              "description": "Decimal integer from 0 through 64, encoded as a string."
-            },
-            "limit": {
-              "type": "string",
-              "description": "Decimal integer from 1 through 5, encoded as a string."
-            }
+      "path": {
+        "domain": "System",
+        "module": "Runtime",
+        "function": "runtimeInfo"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "runtimeInfo",
+          "description": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
           },
-          "required": [
-            "offset",
-            "limit"
-          ],
-          "additionalProperties": false
-        },
-        "strict": true
+          "strict": true
+        }
       }
     },
     {
-      "type": "function",
-      "function": {
-        "name": "History.read",
-        "description": "Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "description": "Conversation UUID from History.list"
-            },
-            "offset": {
-              "type": "string",
-              "description": "Decimal integer from 0 through 256, encoded as a string."
-            },
-            "limit": {
-              "type": "string",
-              "description": "Decimal integer from 1 through 2, encoded as a string."
-            }
+      "path": {
+        "domain": "Camera",
+        "module": "Capture",
+        "function": "open"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Camera.open",
+          "description": "Enable foreground camera preview and vision processing. Requires camera permission and an available camera; completion confirms capture, not pose-model readiness.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
           },
-          "required": [
-            "id",
-            "offset",
-            "limit"
-          ],
-          "additionalProperties": false
-        },
-        "strict": true
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "Camera",
+        "module": "Capture",
+        "function": "close"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Camera.close",
+          "description": "Disable camera preview and vision processing, and wait for capture and vision cleanup.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "Camera",
+        "module": "Capture",
+        "function": "flip"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Camera.flip",
+          "description": "Switch the enabled foreground camera between front and rear lenses. Fails if disabled, busy or unavailable.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "History",
+        "module": "Conversation",
+        "function": "list"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "History.list",
+          "description": "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "string",
+                "description": "Decimal integer from 0 through 64, encoded as a string."
+              },
+              "limit": {
+                "type": "string",
+                "description": "Decimal integer from 1 through 5, encoded as a string."
+              }
+            },
+            "required": [
+              "offset",
+              "limit"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "History",
+        "module": "Conversation",
+        "function": "read"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "History.read",
+          "description": "Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Conversation UUID from History.list"
+              },
+              "offset": {
+                "type": "string",
+                "description": "Decimal integer from 0 through 256, encoded as a string."
+              },
+              "limit": {
+                "type": "string",
+                "description": "Decimal integer from 1 through 2, encoded as a string."
+              }
+            },
+            "required": [
+              "id",
+              "offset",
+              "limit"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
       }
     }
   ],

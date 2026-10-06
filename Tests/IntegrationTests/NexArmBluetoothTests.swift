@@ -8,8 +8,6 @@ import Gateway
 import ModelKit
 import Storage
 import Testing
-import ToolRuntime
-import Tools
 import UI
 
 @testable import AppBluetoothWorkflow
@@ -2173,7 +2171,7 @@ func bluetoothAssistantActionPreemptsTrackingAndKeepsQueuedActions(motor: Int) a
     let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: session)
     for target in [2000, 2100] {
         let call = ActionCall(
-            actionPath: ActionPath(module: "NexArm", function: "moveMotor"), channel: "Robot",
+            actionPath: ActionPath(domain: "NexArm", module: "Motion", function: "moveMotor"), channel: "Robot",
             parameters: ["motor": String(motor), "target": String(target)])
         _ = try await scheduler.enqueue(
             invocation: ScheduledAction(
@@ -2269,14 +2267,14 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
     try await manager.register(photographer, sessionID: session)
     try await photographer.start()
     let tools = try ToolRegistry(modules: [
-        RobotToolModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
+        NexArmTrackingToolModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
     ])
     let output = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: tools,
         actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })
     for sequence: UInt64 in 1...8 {
         let call = ToolCall(
-            toolPath: "Robot.aim", arguments: ["base": String(0.5 + Double(sequence) / 100), "pitch": "0.5"])
+            toolPath: "NexArm.Tracking.aim", arguments: ["base": String(0.5 + Double(sequence) / 100), "pitch": "0.5"])
         let result = try await output.dispatch(
             OutputEnvelope(
                 source: .photographer, input: AgentInput(sessionID: session, payload: .text("Test tracking intent")),
@@ -2521,8 +2519,8 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let releaseSpeech = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     var spoken: [String] = []
     var expressions = 0
-    let speechPath = ActionPath(module: "Speech", function: "speak")
-    let expressionPath = ActionPath(module: "UI", function: "setExpression")
+    let speechPath = ActionPath(domain: "Speech", module: "Playback", function: "speak")
+    let expressionPath = ActionPath(domain: "UI", module: "Expression", function: "setExpression")
     let registry = try ActionRegistry(
         definitions:
             NexArmBaseActionModule { count, invocation in
@@ -2552,9 +2550,9 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
         await input.deliverActionResult($0)
     }
     let tools = try ToolRegistry(modules: [
-        RobotToolModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
+        NexArmTrackingToolModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
     ])
-    try await tools.registerCompletion("UI.print") { _, _ in }
+    try await tools.registerCompletion("UI.Caption.print") { _, _ in }
     let output = OutputGateway(
         manager: manager, requests: input, tools: tools, actions: scheduler, actionFeedback: .terminal, sink: { _ in })
     let observer = Task { await workflow.run() }
@@ -2579,7 +2577,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     try await until(context: "reply admission and active robot write") {
         let records = await scheduler.executionSnapshot().records
         let writing = await link.observedCommands.count > observedBefore
-        return records.filter { $0.path.module == "NexArm" }.count == 2
+        return records.filter { $0.path.domain == "NexArm" }.count == 2
             && records.filter { $0.path == speechPath }.count == 2
             && spoken.count == 1 && expressions == 1 && writing
     }
@@ -2601,7 +2599,8 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let failedTool = try await output.execute(
         OutputEnvelope(
             source: .photographer, input: AgentInput(sessionID: session, payload: .text("Unavailable robot")),
-            output: .toolCall(ToolCall(toolPath: "Robot.aim", arguments: ["base": "0.5", "pitch": "0.5"])), sequence: 1)
+            output: .toolCall(ToolCall(toolPath: "NexArm.Tracking.aim", arguments: ["base": "0.5", "pitch": "0.5"])),
+            sequence: 1)
     )
     #expect(failedTool.isError && failedTool.tool?.isError == true)
     #expect(await assistant.status().lifecycle == .running)
@@ -2619,7 +2618,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     }
     let writesAfterRecovery = await link.writes
     #expect(spoken.count == 1 && expressions == 1)
-    let interrupted = await scheduler.executionSnapshot().records.filter { $0.path.module == "NexArm" }
+    let interrupted = await scheduler.executionSnapshot().records.filter { $0.path.domain == "NexArm" }
     #expect(interrupted.count == 2)
     let robotStopped = interrupted.allSatisfy { $0.phase == .failed }
     #expect(robotStopped)
@@ -2637,7 +2636,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
         $0.phase == .succeeded
     }
     #expect(otherSucceeded)
-    #expect(await assistant.actionResults().filter { $0.path.module == "NexArm" }.count == 2)
+    #expect(await assistant.actionResults().filter { $0.path.domain == "NexArm" }.count == 2)
     // A subsequent explicit command uses the replacement connection normally.
     try await workflow.shakeBase(cycles: 1)
     #expect(await link.writes > writesAfterRecovery)
@@ -2814,7 +2813,7 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     let owner = ExecutionOwner(
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
     let call = ActionCall(
-        actionPath: ActionPath(module: "NexArm", function: "shakeBase"), channel: "Robot",
+        actionPath: ActionPath(domain: "NexArm", module: "Motion", function: "shakeBase"), channel: "Robot",
         parameters: ["cycles": "1"])
     func invocation() throws -> ScheduledAction {
         try ScheduledAction(
@@ -2960,7 +2959,7 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
     workflow.connect(link.id)
     await workflow.waitUntilIdle()
     try await workflow.aim(base: -0.8, pitch: 0.5) { message in
-        await activity.recordFailure(title: "Robot.aim", source: "Fixture", message: message.message)
+        await activity.recordFailure(title: "NexArm.Tracking.aim", source: "Fixture", message: message.message)
     }
     try await until { await !link.liveCommands.isEmpty }
     await link.failLiveValidationOnce()
@@ -3059,7 +3058,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     let origin = NexArmControlOrigin(source: "Fixture", sessionID: UUID(), inputID: UUID(), callID: UUID())
     try await workflow.aim(base: -0.8, pitch: 0.5, origin: origin) { failure in
         await activity.recordFailure(
-            title: "Robot.aim", source: failure.origin?.source ?? "", message: failure.message,
+            title: "NexArm.Tracking.aim", source: failure.origin?.source ?? "", message: failure.message,
             failureCode: failure.code,
             context: .init(
                 workerID: failure.workerID, sessionID: failure.origin?.sessionID,

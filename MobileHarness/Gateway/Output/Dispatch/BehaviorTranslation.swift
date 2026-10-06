@@ -1,12 +1,12 @@
 import ActionRuntime
 import AgentCore
 import Foundation
-import ToolRuntime
 
 extension ActionCall {
     public var executionRequest: ActionRequest {
         .init(
-            actionPath: .init(module: actionPath.module, function: actionPath.function), channel: channel,
+            actionPath: .init(domain: actionPath.domain, module: actionPath.module, function: actionPath.function),
+            channel: channel,
             parameters: parameters)
     }
 }
@@ -24,7 +24,7 @@ extension OutputEnvelope {
 }
 extension ActionRegistry {
     public func definition(for path: ActionPath) throws -> ActionDefinition {
-        try definition(for: ActionIdentifier(module: path.module, function: path.function))
+        try definition(for: ActionIdentifier(domain: path.domain, module: path.module, function: path.function))
     }
     public func validate(capabilities: CapabilityRegistry) throws {
         for action in capabilities.actions { _ = try definition(for: action.path) }
@@ -40,6 +40,7 @@ extension ActionCompletion {
     var agentValue: AgentActionCompletion {
         switch self {
         case .completed: .completed
+        case .value(let value): .value(value)
         case .activityStarted(let id): .activityStarted(id)
         case .activityStopped(let id): .activityStopped(id)
         case .report(let report): .report(report.agentValue)

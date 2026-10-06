@@ -68,7 +68,7 @@ flowchart TD
 
 ## NexArm feedback execution — 2026-10-01
 
-✅ ApplicationRuntime binds `NexArm.reset` to BluetoothWorkflow.resetArm and other NexArm actions to the shared performer. No motion timing or arrival logic belongs in composition.
+✅ ApplicationRuntime binds `NexArm.Motion.reset` to BluetoothWorkflow.resetArm and other NexArm actions to the shared performer. No motion timing or arrival logic belongs in composition.
 
 ❌ Sustained real-device acceptance remains pending.
 
@@ -84,9 +84,9 @@ flowchart TD
 
 ✅ AppAssembly supplies the root CameraCoordinator to ApplicationRuntime; RuntimePresentation binds the CameraControlCapability required by BehaviorAssembly. It does not create a second camera owner.
 
-✅ Photographer policy and internal Tool coverage are assembled alongside existing Agents. Robot.aim binds the foreground Bluetooth workflow without adding AgentCore to BehaviorAssembly.
+✅ Photographer policy and internal Tool coverage are assembled alongside existing Agents. NexArm.Tracking.aim binds the foreground Bluetooth workflow without adding AgentCore to BehaviorAssembly.
 
-✅ ApplicationRuntime injects the Photographer factory into VisionRuntimeDependencies and grants Photographer motors1–5 only. Robot.aim binds NexArmBehaviorAdapter alongside existing gesture bindings.
+✅ ApplicationRuntime injects the Photographer factory into VisionRuntimeDependencies and grants Photographer motors1–5 only. NexArm.Tracking.aim binds NexArmBehaviorAdapter alongside existing gesture bindings.
 
 ✅ Composition injects Photographer control availability as a read-only MainActor BluetoothWorkflow snapshot; Agents imports no device SDK or App service.
 
@@ -113,7 +113,7 @@ flowchart TD
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
 
-✅ ADR0126 / ADR0139: ApplicationRuntime maps resource-busy/unavailable errors into Actions-owned execution failures at the injected Agent resource boundary, independently of native Bluetooth status/recovery. Robot.aim publishes without a second Tool fence; its continuous worker retains trusted owner/session cleanup. App configures Assistant-over-Photographer shared-writer takeover; Gateway implements generic arbitration only and PlatformKit contains no business priority or localized presentation.
+✅ ADR0126 / ADR0139: ApplicationRuntime maps resource-busy/unavailable errors into Actions-owned execution failures at the injected Agent resource boundary, independently of native Bluetooth status/recovery. NexArm.Tracking.aim publishes without a second Tool fence; its continuous worker retains trusted owner/session cleanup. App configures Assistant-over-Photographer shared-writer takeover; Gateway implements generic arbitration only and PlatformKit contains no business priority or localized presentation.
 
 ✅ ADR0127: Settings presets/reset/jog bypass the injected Agent motor guard. Resource cleanup is bound to `stopAgentActions`, preserving independent manual ownership; Photographer availability uses `trackingAvailable` to avoid new aim commands during manual takeover. Actions recipes and PlatformKit pacing remain shared. ❌ Physical-device acceptance remains pending.
 
@@ -136,3 +136,9 @@ flowchart TD
 ✅ ApplicationRuntime binds HistoryQueryService using its existing shared journal; App retains no history query policy. ✅ Composition now supplies a separate root memory session, history Agent/transport and scoped presentation adapter. ✅ Confirmed archive deletion now follows Agent-selected Tools and actual feedback; archive/title migration remains pending.
 
 ✅ Composition retains ModelResourceInteractionWorkflow and its passive ModelResourcesState separately, passing both explicitly to SettingsView. ❌ Resource controls are not yet routed through an Agent/Gateway.
+
+✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

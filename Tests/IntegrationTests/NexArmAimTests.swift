@@ -5,8 +5,6 @@ import Agents
 import Foundation
 import PlatformKit
 import Testing
-import ToolRuntime
-import Tools
 
 private func pose(
     noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,
@@ -139,8 +137,8 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
         Issue.record("Missing aim")
         return
     }
-    #expect(call.toolPath == "Robot.aim")
-    try await RobotTools.aim(
+    #expect(call.toolPath == "NexArm.Tracking.aim")
+    try await NexArmActions.aim(
         invocation: ToolInvocation(
             call: ToolRequest(toolPath: call.toolPath, arguments: call.arguments),
             context: ToolExecutionContext(
@@ -261,10 +259,10 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
-    let call = ToolCall(toolPath: "Robot.aim", arguments: ["base": "nan", "pitch": "0"])
+    let call = ToolCall(toolPath: "NexArm.Tracking.aim", arguments: ["base": "nan", "pitch": "0"])
     let envelope = OutputEnvelope(source: .photographer, input: input, output: .toolCall(call))
-    await #expect(throws: RobotTools.AimError.invalidAngle) {
-        try await RobotTools.aim(
+    await #expect(throws: NexArmActions.AimError.invalidAngle) {
+        try await NexArmActions.aim(
             invocation: ToolInvocation(
                 call: ToolRequest(toolPath: call.toolPath, arguments: call.arguments),
                 context: ToolExecutionContext(
@@ -374,9 +372,9 @@ private actor AimLink: NexArmWritableLink {
 }
 
 @Test func robotAimPublishesIntentWithoutHoldingTheWorkersMotorFence() async throws {
-    let module = RobotToolModule { _, _, _ in }
+    let module = NexArmTrackingToolModule { _, _, _ in }
     let registry = try ToolRegistry(modules: [module])
-    let resources = await registry.resources(for: "Robot.aim")
+    let resources = await registry.resources(for: "NexArm.Tracking.aim")
     #expect(resources.isEmpty)
 }
 

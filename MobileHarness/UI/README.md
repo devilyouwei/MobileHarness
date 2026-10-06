@@ -17,7 +17,7 @@ UI/
 
 UI is a separate SwiftPM target. Its only project dependencies are StorageChat (conversation record values). It does not import App, AppWorkflows, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit. Platform rendering content is supplied by App; no full service container is passed to a page.
 
-[Actions/UI](../Actions/UI/README.md) and [Tools/UI](../Tools/UI/README.md) declare executable behavior in their owning modules. They reach this UI module's state through App-bound handlers; their `UI.*` call paths are protocol names, independent of the Swift module name.
+[Actions/UI](../Actions/UI/README.md) and [Actions/UI](../Actions/UI/README.md) declare executable behavior in their owning modules. They reach this UI module's state through App-bound handlers; their `UI.*` call paths are protocol names, independent of the Swift module name.
 
 ```mermaid
 flowchart LR

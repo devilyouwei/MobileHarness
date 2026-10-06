@@ -1,10 +1,10 @@
+import ActionRuntime
+import Actions
 import AgentCore
 import Agents
 import Foundation
 import Gateway
 import Testing
-import ToolRuntime
-import Tools
 
 func communicationConfiguration(_ id: String, subscribes: Bool = false, publishes: Bool = false) throws
     -> AgentConfiguration
@@ -22,7 +22,7 @@ func communicationConfiguration(_ id: String, subscribes: Bool = false, publishe
     return try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 5, "id": id, "actions": [String: [String]](), "tools": [],
+            "version": 6, "id": id, "actions": [String: [String]](), "tools": [],
             "communication": communication,
         ]))
 }
@@ -253,7 +253,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
         try AgentConfiguration(
             contracts: AgentContracts.communication, data: JSONSerialization.data(withJSONObject: root))
     }
-    root["version"] = 5
+    root["version"] = 6
     root["communication"] = ["inputs": [], "subscriptions": [], "publications": [], "sends": [], "requests": []]
     #expect(throws: AgentConfigurationError.self) {
         try AgentConfiguration(
@@ -317,7 +317,7 @@ private func registeredFixtureConfiguration(
     try AgentConfiguration(
         contracts: contracts,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 5, "id": id, "actions": [String: [String]](), "tools": [],
+            "version": 6, "id": id, "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "fixture.custom", "version": 1, "kind": "observation"]],
                 "subscriptions": publishes

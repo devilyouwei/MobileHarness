@@ -14,13 +14,13 @@ flowchart LR
     Publisher --> Publication[OutputGateway / InputGateway]
     Publication --> Subscribers[Optional business subscribers]
     Observation --> Overlay[Up to six people / bounded display coordinates]
-    Overlay --> Generator[Code-owned UI.showPose permission]
+    Overlay --> Generator[Code-owned UI.Pose.showPose permission]
     Generator --> Output[Latest skeleton / gaze pair]
     Output --> Gateway[OutputGateway / ToolExecution]
-    Gateway --> Tool[UI.showPose completion-only Tool / injected presentation handler]
+    Gateway --> Tool[UI.Pose.showPose completion-only Tool / injected presentation handler]
 ```
 
-✅ VisionPerception.agent.json v5 contains communication policy and empty model catalogs. Code declares UI.showPose as an internal Tool with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), constructs a typed internal ToolCall and emits one ToolCall per result. Empty people clears the overlay. No direct UI call or per-frame agent.finished is emitted; moveEyes is a separate resolved ToolCall. The registered Void handler completes without ToolResult feedback.
+✅ VisionPerception.agent.json v5 contains communication policy and empty model catalogs. Code declares UI.Pose.showPose as an internal Tool with no Channel. Swift projects observations into PoseOverlay JSON (maximum 3000 bytes), constructs a typed internal ToolCall and emits one ToolCall per result. Empty people clears the overlay. No direct UI call or per-frame agent.finished is emitted; moveEyes is a separate resolved ToolCall. The registered Void handler completes without ToolResult feedback.
 
 ✅ Raw inputs have increasing sequence/timestamps and matching sessions. One worker processes a frame; every valid capture replaces the one latest pending frame independently of pixel changes. At worker start, expiry and capture-time cadence decide whether to infer that newest frame. Too-early frames are skipped without advancing the last inference timestamp; no older candidate is retained. Pause suspends dequeue, stop cancels/joins inference and suppresses late outputs. Shared observations retain up to 300 people independently of the six-person display limit.
 
@@ -176,7 +176,7 @@ flowchart TD
 
 ✅ 持久算法状态包含一份 4096 个 UInt8 的灰度参考、一份 4096 项 ROI 并集、最多六人的 COCO-17 快照及标量时间/计数；临时数组大小固定。除此之外，Agent 仍只有一项活动推理和一项最新等待输入，没有新增 worker、帧队列或完整图像历史。
 
-✅ 有效 Pose 与同帧统计一起生成 `UI.showPose`，沿 `OutputGateway → Tools/Runtime → App 会话/序号校验 → UI` 更新骨架和左上角统计。统计中的间隔是反馈更新后用于下一次检测的间隔，实际 FPS 另按至少一秒窗口统计；图像运动强度为 0...1，尚无参考时为空。过期结果不会触发这条输出路径。
+✅ 有效 Pose 与同帧统计一起生成 `UI.Pose.showPose`，沿 `OutputGateway → Actions/Runtime → App 会话/序号校验 → UI` 更新骨架和左上角统计。统计中的间隔是反馈更新后用于下一次检测的间隔，实际 FPS 另按至少一秒窗口统计；图像运动强度为 0...1，尚无参考时为空。过期结果不会触发这条输出路径。
 
 ❌ 真机参数、持续功耗/发热、严重裁剪或非均匀曝光、小目标在 64×64 采样下的敏感度仍需验证。六人之外的详细姿态运动、交叉人物身份关联、独立人脸检测、深度和热状态反馈尚未实现。机器人运动策略不属于本 Agent。
 
@@ -217,7 +217,7 @@ flowchart LR
     OG1 --> IG[InputGateway]
     IG -.-> Future[Optional business subscribers]
     Obs --> Projection[PoseOverlay: up to 6 people]
-    Projection -->|UI.showPose ToolCall| OG2[OutputGateway]
+    Projection -->|UI.Pose.showPose ToolCall| OG2[OutputGateway]
     OG2 --> TR[ToolExecution: completion-only]
     TR --> UI[MainActor overlay state]
 ```
@@ -240,9 +240,9 @@ x/y 是正向、未镜像图像的像素坐标，以左上角为原点，必须�
 
 people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye、leftEar、rightEar、leftShoulder、rightShoulder、leftElbow、rightElbow、leftWrist、rightWrist、leftHip、rightHip、leftKnee、rightKnee、leftAnkle、rightAnkle。左右以被识别者自身为准；显示投影保留相同顺序。
 
-### 显示数据：UI.showPose
+### 显示数据：UI.Pose.showPose
 
-代码内部权限产生 `ToolCall(id: UUID, toolPath: "UI.showPose", arguments: ["payload": String])`。payload 是以下 PoseOverlay 的 JSON 文本，最多 3000 UTF-8 字节；外层 arguments 的值仍是字符串。
+代码内部权限产生 `ToolCall(id: UUID, toolPath: "UI.Pose.showPose", arguments: ["payload": String])`。payload 是以下 PoseOverlay 的 JSON 文本，最多 3000 UTF-8 字节；外层 arguments 的值仍是字符串。
 
 ```json
 {"sequence":42,"timestamp":123.5,"rotation":1,"people":[]}
@@ -258,18 +258,18 @@ people 内关节点数组的下标 0...16 固定为：nose、leftEye、rightEye�
 | people | 从模型结果取前六人，按其置信排序；显示镜像和裁剪由预览层坐标转换处理。共享观测仍可保留最多 300 人。 |
 | statistics | 可选的同帧等待/推理/总延迟（ms）、实际 FPS、替换帧数、下一次检测间隔（ms）与图像运动强度（0...1）；无采集时间或参考时相应字段为空。 |
 
-Tool 经 `outputs → App transport pump → OutputGateway → Tools/Runtime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
+Tool 经 `outputs → App transport pump → OutputGateway → Actions/Runtime → MainActor handler` 覆盖骨架状态。无 Channel、无 Action 队列、无 ToolResult 回流；等待 handler 完成不等于等待屏幕绘制完成。外层 OutputEnvelope 用 inputID/sessionID 关联，Vision 的 envelope.sequence 和 payload.sequence 均为输入帧序号。
 
 ### 其他输出与 send 边界
 
 | 方向 | 数据标准与语义 |
 | --- | --- |
-| Tool 输出 | `UI.moveEyes`，无 Channel，`arguments["x"] / ["y"]` 为数值的十进制字符串，目标范围各为 -1...1；由 FaceGazeTracker 根据本帧脸部点位生成，未锁定目标时回中。它是显示方向，不是关节点像素坐标。与同一帧的 showPose ToolCall 组成可替换状态对。 |
+| Tool 输出 | `UI.Gaze.moveEyes`，无 Channel，`arguments["x"] / ["y"]` 为数值的十进制字符串，目标范围各为 -1...1；由 FaceGazeTracker 根据本帧脸部点位生成，未锁定目标时回中。它是显示方向，不是关节点像素坐标。与同一帧的 showPose ToolCall 组成可替换状态对。 |
 | control 输出 | 推理失败发 `control("agent.error: pose processing failed")` 并终止流；不发每帧 `agent.finished`。终态控制不能被后续骨架覆盖。 |
 | publish | `communication.publications` 仅有 `vision.pose`；typed payload、坐标单位、人数与容量按上文“共享感知数据”段落。该发布与骨架/眼睛 ToolCall 分离。 |
 | send | `communication.sends = []`，不向其他 Agent 定向发送消息；Photographer 通过静态订阅接收 `vision.pose`。 |
 
-JSON `actions / tools` 均为空；代码声明 UI.moveEyes 与 UI.showPose 的 InternalTool 权限（均无 Channel）。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
+JSON `actions / tools` 均为空；代码声明 UI.Gaze.moveEyes 与 UI.Pose.showPose 的 InternalTool 权限（均无 Channel）。❌ 摄影决策、机械控制与跟踪身份不在该 Agent 内实现。
 
 ## Eye attention policy
 
@@ -286,12 +286,12 @@ flowchart LR
     Lock --> Filter[Deadband / adaptive smoothing]
     Filter --> Resolve[Code-owned gaze ToolCall]
     Resolve --> Gateway[OutputGateway]
-    Gateway --> Tool[Tools/Runtime: UI.moveEyes validation]
+    Gateway --> Tool[Actions/Runtime: UI.Gaze.moveEyes validation]
     Tool --> Scene[Active camera session / sequence check]
     Scene --> Eyes[Native spring / stable eye shapes]
 ```
 
-✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v5. ❌ Activity/resource ownership is not introduced.
+✅ `runtimeCapabilities(_:)` now supplies the same model-plus-internal capability snapshot to the Agent initializer and App startup validation. It does not duplicate or broaden grants, call Actions directly, or change JSON v6. ❌ Activity/resource ownership is not introduced.
 
 ## Action runtime stage 2
 
@@ -320,3 +320,10 @@ flowchart LR
 ✅ Input ordering/session rejection uses generic CommunicationError.outOfOrder/scopeClosed at this receiving Agent and cadence helper. ImageInputError.invalidFrame validates transport geometry/storage only; the types no longer contain receiver policy. ❌ No cadence or output serialization behavior changes.
 
 ✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

@@ -9,7 +9,7 @@ Purpose: define executable values at the Agent boundary. ActionCall and ToolCall
 - ✅ `.control` carries runtime completion/error notifications and supports cancellation/playback barriers. It is not a model generation protocol.
 - ❌ Typed lifecycle notifications replacing control strings, durable ActionResult feedback, public ActionCall invocation IDs and priorities.
 
-ActionCall is a value type correlated with input through OutputEnvelope. ChannelScheduler allocates an internal UUID per admitted job; cross-process idempotent replay is not provided. ToolResult is shared by input/output contracts without introducing a dependency on Tools/Runtime.
+ActionCall is a value type correlated with input through OutputEnvelope. ChannelScheduler allocates an internal UUID per admitted job; cross-process idempotent replay is not provided. ToolResult is shared by input/output contracts without introducing a dependency on Actions/Runtime.
 
 ```mermaid
 flowchart LR
@@ -100,3 +100,9 @@ flowchart LR
 ✅ ADR0141: ResourceExecutionPermit is a generic Sendable validation capability bound to one actual execution. ResourceExecutionContext carries it beside owner/held IDs; App effects validate inherited authority rather than trusting IDs alone. Core contains no coordinator/device implementation or priority policy. ❌ Permits do not prove device availability or physical stop.
 
 ✅ ADR0149: OutputEnvelope retains immutable inputMetadata; returning Tool feedback preserves root, parent input, turn and hop context through Gateway. ❌ Original causal-root transport in ActionResult/ActivityEvent remains pending; no persisted/remote envelope format is added.
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ ADR0157: AgentActionCompletion.value is bounded to64 KiB UTF-8. Both ActionResult and returning ToolResult transport this same independent completion type; ToolResult retains its native string value/error fields. ❌ AgentCore imports no execution implementation and result receipt does not automatically resume reasoning.

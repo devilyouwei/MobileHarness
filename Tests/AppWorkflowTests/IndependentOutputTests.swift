@@ -19,7 +19,7 @@ private enum TrackingUnavailable: Error { case offline }
         stream.continuation.yield(
             OutputEnvelope(
                 source: .photographer, input: input,
-                output: .toolCall(ToolCall(toolPath: "Robot.aim")), sequence: sequence))
+                output: .toolCall(ToolCall(toolPath: "NexArm.Tracking.aim")), sequence: sequence))
     }
     stream.continuation.finish()
     let record = OutputRecord()
@@ -39,7 +39,7 @@ private enum TrackingUnavailable: Error { case offline }
     stream.continuation.yield(
         OutputEnvelope(
             source: .photographer, input: input,
-            output: .toolCall(ToolCall(toolPath: "Robot.aim"))))
+            output: .toolCall(ToolCall(toolPath: "NexArm.Tracking.aim"))))
     stream.continuation.finish()
     let record = OutputRecord()
     await #expect(throws: CancellationError.self) {

@@ -3,6 +3,7 @@ import Foundation
 public enum ActionStatus: String, Sendable { case succeeded, partialFailure, failed, cancelled }
 public enum ActionCompletion: Equatable, Sendable {
     case completed
+    case value(String)
     case report(ActionReport)
     case activityStarted(UUID)
     case activityStopped(UUID)

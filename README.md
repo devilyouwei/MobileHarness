@@ -154,3 +154,14 @@ Camera control Tools are registered as Camera.open, Camera.close and Camera.flip
 Sound direction: supported built-in microphone routes can provide FOA for SpeechPerception's dominant-direction calculation and sound.source broadcast. Unsupported or failed spatial startup is closed before mono retry; mono routes preserve speech recognition and report direction unavailable. Listening requires an actual validated PCM frame, and capture failures leave the listening presentation. Synthetic tests and builds do not establish physical angle accuracy; no consumer or presentation is connected yet.
 
 ✅ Settings → 音频识别 provides an explicit 10-second audio detection section with actual microphone/input mode, spatial support/fallback, level and current sound direction. The session reuses SpeechPerception/Gateway without starting conversation or robot consumers. See [ADR0128](docs/adr/0128-settings-audio-detection.md). ❌ Physical capture/coordinates remain unverified by synthetic tests.
+
+✅ Unified execution migration has started: Actions and Tools share cooperative deadline/cleanup lifetime. ❌ Unified capability registration and compatibility import removal remain pending; see [ADR0150](docs/adr/0150-unified-execution-lifetime.md).
+
+✅ Executable source directories are consolidated under Actions. Tools and ToolRuntime remain only as temporary Swift import shims; see [ADR0151](docs/adr/0151-consolidated-capability-sources.md). ❌ Unified capability definitions and dual-protocol registration remain pending.
+
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+
+
+✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+
+❌ Physical acceptance and additional business capability exposure are not established by this migration.

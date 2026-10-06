@@ -5,8 +5,8 @@ import PlatformKit
 
 /// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven gaze Tools.
 public actor VisionPerceptionAgent: Agent {
-    private static let gaze = InternalTool(path: "UI.moveEyes", required: ["x", "y"])
-    private static let overlay = InternalTool(path: "UI.showPose", required: ["payload"])
+    private static let gaze = InternalTool(path: "UI.Gaze.moveEyes", required: ["x", "y"])
+    private static let overlay = InternalTool(path: "UI.Pose.showPose", required: ["payload"])
     private var resultInbox = ActionResultInbox()
     public func actionResults() -> [ActionResult] { resultInbox.results }
     public nonisolated let descriptor: AgentDescriptor
@@ -303,8 +303,8 @@ public actor VisionPerceptionAgent: Agent {
         case .dropped(let replaced):
             // Only this Agent's replaceable UI state may be coalesced; never arbitrary device commands.
             switch replaced.output {
-            case .toolCall(let call) where call.toolPath == "UI.showPose": overlayReplacements += 1
-            case .toolCall(let call) where call.toolPath == "UI.moveEyes":
+            case .toolCall(let call) where call.toolPath == "UI.Pose.showPose": overlayReplacements += 1
+            case .toolCall(let call) where call.toolPath == "UI.Gaze.moveEyes":
                 gazeReplacements += 1
             default: throw HarnessError.queueFull
             }

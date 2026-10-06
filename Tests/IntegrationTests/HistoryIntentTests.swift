@@ -1,4 +1,5 @@
 import ActionRuntime
+import Actions
 import AgentCore
 import Agents
 import AppWorkflows
@@ -6,8 +7,6 @@ import Foundation
 import Gateway
 import StorageChat
 import Testing
-import ToolRuntime
-import Tools
 import UI
 
 private struct HistoryPresentationModule: ToolModule {
@@ -28,11 +27,11 @@ private func intentRuntime(
         contracts: AgentContracts.communication, externalSources: ["user", "runtime"],
         configurations: [AgentConfigurations.load(named: "ConversationMemory")])
     let input = InputGateway(manager: manager, policy: policy)
-    let definition = UITools.showHistoryDefinition(completing: { call, context in
-        try await UITools.showHistory(invocation: ToolInvocation(call: call, context: context), using: presentation)
+    let definition = UIActions.showHistoryDefinition(completing: { call, context in
+        try await UIActions.showHistory(invocation: ToolInvocation(call: call, context: context), using: presentation)
     })
-    let deletion = HistoryTools.deleteDefinition(handler: { call in
-        try await HistoryTools.delete(call: call, using: mutations)
+    let deletion = HistoryActions.deleteDefinition(handler: { call in
+        try await HistoryActions.delete(call: call, using: mutations)
     })
     let gateway = OutputGateway(
         manager: manager, requests: input,
@@ -126,7 +125,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
     let state = ConversationHistoryState()
     let adapter = HistoryPresentationAdapter(state: state, store: ConversationHistoryStore(), sessionID: UUID())
     let invocation = ToolInvocation(
-        call: ToolRequest(toolPath: "UI.showHistory"),
+        call: ToolRequest(toolPath: "UI.HistoryPresentation.showHistory"),
         context: ToolExecutionContext(source: "assistant", sessionID: UUID(), inputID: UUID()))
     await #expect(throws: (any Error).self) { try await adapter.showHistory(invocation: invocation) }
     #expect(state.archive == nil)
@@ -264,7 +263,7 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
         Issue.record("Expected presentation")
         return
     }
-    #expect(presentation.toolPath == "UI.showHistory")
+    #expect(presentation.toolPath == "UI.HistoryPresentation.showHistory")
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(AgentInput(sessionID: session, payload: payload))
     }
