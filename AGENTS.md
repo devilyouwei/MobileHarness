@@ -1,26 +1,69 @@
-# Repository instructions
+# Repository Instructions
 
-Read README.md, docs/Architecture.md and docs/Roadmap.md before architectural work. Preserve docs/Technical_Design.docx as the original design source.
-Use MobileHarness/README.md as the target technical plan. Migrate in stages; Implemented modules follow its section 37 layout, including Actions/Runtime, Tools/Runtime, Agents/Core, App/Composition/Lifecycle/Workflows/Adapters and UI; target mapping, documented exceptions and outstanding modules are listed in its Project Structure section. Keep tests under root Tests/ (and existing optional package tests); root Package.swift maps shared sources into independently tested targets. Do not recreate Packages/HarnessKit/Sources or duplicate sources.
+These instructions apply to all work in this repository.
 
-- Swift 6 language mode with Swift 6.4+ tooling; SwiftUI UI isolated to MainActor, runtime state isolated to actors.
-- Determine code ownership from the module/directory README before implementation. Action business behavior and action wrappers (including gestures, home/reset selection, motion shaping, composition and completion policy) belong in Actions. PlatformKit depends only on Types and is a foundational device SDK for connection, protocol/native command encoding, hardware limits and device feedback; it must not contain business actions, localized presentation, preferred-device ordering or application workflow policy. App owns lifecycle/adaptation and App/UI owns presentation. Update the owning README and boundary checks with migrations; do not retain superseded implementation descriptions as the current contract.
-- Keep modules acyclic. Agents/Core retains the independent AgentCore target and must not depend on UI, concrete agents, model engines, or device adapters.
-- ModelKit is an independent capability SDK (shared Types values are its only base target dependency): no dependency on AgentCore or business/platform modules. Consumers receive capability protocols only. Provider registration and default bindings belong to the internal ModelKitDefaults assembly; App supplies the resource root and obtains capabilities through ModelKitRuntime.ModelManager. Production uses one process-wide manager and one active operation per model; construction/registration require ModelAssembly SPI for internal assembly and isolated tests. Management depends only on ModelKit; concrete model SDKs belong in separate adapter targets.
-- Route all external inputs and tool results through InputGateway; all agent outputs through OutputGateway.
-- Every queue needs an explicit bound and overflow policy. Never silently discard device actions.
-- Demo behavior must be labeled. Do not claim real model/device functionality for a stub.
-- Use public platform APIs and capability/permission validation. Physical robot safety must not rely on iOS background execution.
-- Run ./scripts/check.sh and, when full Xcode is available, ./scripts/build-ios.sh. Report unavailable checks explicitly.
-- Do not commit secrets, local signing settings, model weights, or user media. No third-party dependency without a concrete integration need.
-- Update architecture decisions and roadmap when changing runtime contracts.
+## 1. Read and Maintain Documentation
 
-- Every directory touched in the migration must contain a README.md describing purpose, design goals, implemented items (✅), and outstanding items (❌). Update these README files whenever changing code, files, or directory layout. Do not create unused placeholder implementations.
+Read the relevant documentation before designing or implementing a change. Documentation has three distinct responsibilities:
 
-- Shared Agent output parsers belong in Agents/Core/Generation. Resolve aliases inside Agents; Gateway accepts resolved ActionCall/ToolCall. Tooling modules (parsers, schedulers, registries) require Mermaid design diagrams and design descriptions in their README.
+| Location | Responsibility |
+| --- | --- |
+| `docs/` | Requirements, plans, decisions, change history, and validation evidence. Follow `docs/README.md` for classification and placement. |
+| `MobileHarness/README.md` | Overall technical design: core modules, the complete framework, cross-module flows, data flow, and key architectural designs. |
+| Code-directory `README.md` files | Detailed technical design and implementation for the owning directory, with increasing detail at deeper levels. |
 
-- Before adding or editing a business Agent, read MobileHarness/Agents/README.md. Declare model-callable actions grouped by channel and native tools in its versioned <AgentName>.agent.json (JSON v5; see Agents/README.md). Fixed internal behavior and output permissions belong to Agent code; never duplicate the model-callable registration list in Swift. Internal calls still cross OutputGateway. Keep explicit implementation handlers in the composition root. Configuration errors must propagate without try! or fallback.
+- Keep documentation under `MobileHarness/` aligned with the latest code. Clearly distinguish implemented behavior (✅) from outstanding work (❌); remove superseded descriptions from the current design contract.
+- Every code directory, including nested directories, must have a `README.md` describing its purpose, design goals, current design and implementation, and outstanding work.
+- Each first-level module README must describe responsibilities and boundaries, direct upstream/downstream relationships and interfaces, internal submodule designs and relationships, data flow, and key technical decisions. Describe external relationships one level deep only.
+- Nested READMEs must focus on their own directory: interfaces, algorithms, state, lifecycle, failure handling, and constraints as applicable. Link to other documentation instead of duplicating it.
+- Update the overall design when a change affects module boundaries or cross-module flows. Update the relevant `docs/` documents when requirements, plans, decisions, or validation records change.
+- Keep historical evidence distinct from current implementation claims. Preserve `docs/Technical_Design.docx` as the original design source.
 
-- UI is an independent target with shared AgentCore/Storage domain values only (currently StorageChat for conversation records); no App, Agent, Gateway, Action/Tool, model or device service imports. AppWorkflows is a state-free facade over independent feature workflow targets that own settings/history/diagnostic effects; App composes typed operations and whole voice/camera endpoints. Long-lived runtime work must not depend on page lifetime.
+## 2. Keep Modules Independent and Responsibilities Clear
 
-- Actions/Runtime and Tools/Runtime (including their Contracts subdirectories) compile as independent ActionRuntime/ToolRuntime targets. Gateway may depend only on these execution targets and AgentCore; concrete catalogs/macros stay in Actions/Tools. BehaviorAssembly does not import AgentCore; Gateway validates startup coverage. Types is the independent shared-value leaf, organized by category (currently Types/Audio). Lifecycle receives role-specific runtime services rather than ApplicationRuntime.
+- First-level directories under `MobileHarness/` represent the application's core modules. Keep them highly decoupled, with explicit ownership and clear responsibilities.
+- ModelKit, PlatformKit, UI, and Storage are foundational capability modules. They must not depend on other project modules or own upper-layer business logic or application orchestration.
+- Use explicit module interfaces. Do not introduce circular dependencies, duplicate ownership, or reach into another module's implementation details.
+- Consult `MobileHarness/Agent-Driven-App.md`, `MobileHarness/README.md`, and the owning module README for dependency and flow design before choosing where code belongs.
+- Treat existing dependencies that conflict with these principles as outstanding migration work, not as precedent for new dependencies.
+
+## 3. Obtain Approval Before Adding Directories or Modules
+
+- Obtain explicit user approval before creating any new directory, including a new first-level module under `MobileHarness/`.
+- Prefer an existing module or directory whenever its responsibilities cover the change. Do not add a module merely to accommodate a new feature.
+- Before requesting approval, explain the proposed purpose and ownership, why existing directories cannot accommodate it, and its relationships with existing modules.
+
+## 4. Update Documentation Before Code
+
+- For every feature or fix, update the affected directory READMEs before editing code. Describe the intended changes to the relevant files, responsibilities, behavior, interfaces, and flows.
+- For changes spanning directories, update each owning README. Update module-level and overall design documents first when their boundaries or flows are affected.
+- Mark the intended implementation as pending until it is implemented. After implementation, reconcile the documentation with the actual result.
+- If the design changes during implementation, revise the documentation before continuing code changes.
+
+## 5. Reconcile Documentation and Remove Obsolete Code
+
+Before completing a code change:
+
+- Verify that affected documentation accurately describes the latest design, actual implementation, and remaining work.
+- Remove replaced code, redundant or duplicate implementations, and stale references within the scope of the change.
+- Do not leave old and new implementations side by side without a documented migration need. Record the reason and remaining cleanup in the owning README when transitional code must remain.
+
+## 6. Validate Changes and Report Evidence
+
+- Run checks appropriate to the change. For code changes, run `./scripts/check.sh` and, when full Xcode is available, `./scripts/build-ios.sh`. For documentation-only changes, verify accuracy, referenced paths, and diff formatting; builds are not required.
+- Add or update tests when behavior changes or a regression needs coverage. Test observable behavior and failure cases rather than duplicating implementation details.
+- Report what was verified, what failed, and what could not run. Do not describe unavailable checks as passing.
+- Distinguish build and automated-test results from real model, native UI, and physical-device acceptance. Label demo and stub behavior explicitly.
+
+## 7. Make Runtime and Failure Contracts Explicit
+
+- Define ownership, isolation, cancellation, cleanup, and completion semantics for asynchronous work. Long-lived work must have an owner independent of UI page lifetime.
+- Give every queue an explicit bound and overflow policy. Surface rejected or failed device actions; never silently discard them.
+- Propagate configuration and execution failures explicitly. Do not hide them with forced operations, fabricated success, or undocumented fallbacks.
+- Use public platform APIs and validate required capabilities and permissions. Physical-device safety must not depend on iOS background execution.
+
+## 8. Protect Repository Integrity
+
+- Keep changes focused on the requested task. Preserve unrelated working-tree changes and include only intended files in a commit.
+- Do not commit secrets, local signing settings, model weights, or user media.
+- Add third-party dependencies only for a concrete integration need; document their purpose and owning module.
