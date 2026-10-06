@@ -448,3 +448,9 @@ New fixtures cover strict v6 configuration, domain-specific permission identity,
 ✅ Final unsigned generic iOS device build passed; all six packaged Agent configurations match source. Changed Markdown local targets and diff whitespace passed. ❌ Required full-Xcode build-ios.sh stopped at the first simulator scheme because CoreAIShared could not resolve CoreAI; remaining schemes were not attempted. Original Technical_Design.docx remains unchanged. No installation, native/physical interaction or live-model acceptance was performed.
 
 Action/Tool source and implementation unification is complete. Remaining Agent-driven stages are Action/activity original-root propagation, typed host intent/control, remaining settings/device/business inputs and registered failure presentation, then bounded result-driven model continuation. Physical acceptance remains separate.
+
+## 2026-10-06 — Unified capability signed-device installation
+
+Source revision: b5888f8 on codex/agent-driven-app. ✅ The signed physical-device MobileHarness build succeeded with build number2026100601, using ignored local signing settings. The initial installation failed after the device connection closed unexpectedly; the retry succeeded. The connected iPhone17 Pro reports dev.mobileharness.app version0.1.0/build2026100601 installed. No signing configuration or device/user data was committed.
+
+❌ Startup validation is pending: iOS rejected the launch because the device was locked (FBSOpenApplicationErrorDomain code7). Installation alone does not establish successful startup, Agent configuration preparation, UI interaction or physical/model execution. The user was asked to unlock the phone before further runtime testing.
