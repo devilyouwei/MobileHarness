@@ -417,7 +417,7 @@ The design uses composition of common envelope, typed origin and domain payload 
 | Producer | `source` and optional `incarnation`; App input adapters assign external sources, and the runtime binds Agent identity. Model text cannot assign trusted identity or permissions. |
 | Time and order | `capturedAt` uses process uptime; `sequence` is producer-scoped; `deadline` uses `ContinuousClock`. These are process-local values, not wall-clock timestamps or a remote wire format. |
 | Causality | `rootID`, optional `parentID`, `hops`; forwarded messages preserve their root and identify their parent. Execution feedback also preserves its call/execution correlation and owning session. |
-| Content | `InputPayload` selects typed text, event, audio, image, Agent message, Tool result, Action result or activity feedback. A kind declaration alone does not implement a payload or adapter. |
+| Content | `InputPayload` selects typed text, event, audio, image, Agent message, Tool result, Action result, generation-round result or activity feedback. A kind declaration alone does not implement a payload or adapter. |
 | Domain message | `AgentMessage` carries immutable `Encodable & Sendable` content. Domain-owned schemas validate concrete type, fields, units, encoded size and freshness through `CommunicationContracts`. |
 
 #### Payload meaning
@@ -428,9 +428,51 @@ Origin describes who produced a Signal; the following categories describe what i
 | --- | --- | --- |
 | Intent / command | Human clicks, text requests, Agent-generated synthesis or cancellation | `.text`, `.event`, or registered `.observation(AgentMessage)` with command semantics |
 | Observation | Microphone/camera capture, perceived transcript, pose or sound direction; future device discovery facts | `.audio`, `.image`, registered `.observation(AgentMessage)` |
-| Execution feedback | Actual Tool/Action outcomes and activity lifecycle updates | `.toolResult`, `.actionResult`, `.activityEvent` |
+| Execution feedback | Actual Tool/Action outcomes, generation-round completion and activity lifecycle updates | `.toolResult`, `.actionResult`, `.roundResult`, `.activityEvent` |
 
-The existing name `observation` is a generic domain-message carrier and currently includes commands. `CommunicationContract.startsNewWork` distinguishes generated work from forwarded observations. New business intents must use domain-owned typed contracts registered through this mechanism; do not expand string-encoded `runtime.event` commands. History refresh, delete and cancel use typed `history.intent/1`; legacy history strings reject. Assistant cancellation uses typed `assistant.control/1`; lifecycle/capability fact schemas remain outstanding. Payload types belong to their domain, generic envelope/routing types to AgentCore, and native SDK values are converted by App adapters.
+The existing name `observation` is a generic domain-message carrier and currently includes commands. `CommunicationContract.startsNewWork` distinguishes generated work from forwarded observations. New business intents must use domain-owned typed contracts registered through this mechanism; do not expand string-encoded `runtime.event` commands. History refresh, delete and cancel use typed `history.intent/1`; legacy history strings reject. Assistant cancellation uses typed `assistant.control/1`; `app.environment/1` carries scene, device, navigation and capability facts. Payload types belong to their domain, generic envelope/routing types to AgentCore, and native SDK values are converted by App adapters.
+
+#### Implemented payload types and origins
+
+Origin and content are separate classifications, not an inheritance tree. `AgentInput` composes `InputMetadata` and `InputPayload`; `InputMetadata.origin` is `SignalOrigin.external`, `.agent` or `.runtime`. The current working implementation defines nine payload cases in [AgentInput.swift](Agents/Core/AgentInput.swift).
+
+| Payload | Meaning / contract | Current origin |
+| --- | --- | --- |
+| `.text(String)` | User text, `user.text` | External; supported input, but no production text-entry field |
+| `.event(String)` | Legacy host event, `runtime.event` | External; new business intents use typed messages |
+| `.audio(AudioInput)` | Captured microphone audio, `media.audio` | External |
+| `.image(ImageInput)` | Captured camera image, `media.image` | External |
+| `.observation(AgentMessage)` | Typed user/host intent, native fact, Agent observation or command; domain contract identifies meaning | External or internal Agent |
+| `.toolResult(ToolResult)` | Actual returning Tool outcome, `tool.result` | Internal Runtime |
+| `.actionResult(ActionResult)` | Actual Action outcome, `action.result` | Internal Runtime |
+| `.roundResult(GenerationRoundResult)` | Sealed generation-round completion, `generation.round.result` | Internal Runtime; current generation-round implementation |
+| `.activityEvent(ActivityEvent)` | Persistent activity lifecycle, `activity.event` | Internal Runtime admission supported; camera events remain local |
+
+`InputKind` also declares `video` and `binary`, but `InputPayload` has no corresponding cases or codecs. These are outstanding input kinds, not implemented Signal payloads. Public external admission rejects runtime feedback payloads; internal messages and feedback require their identity-bound Gateway paths. A source string such as `runtime` does not confer Runtime origin or execution authority.
+
+#### User clicks and business intent
+
+A business click becomes an External Signal when App converts it into a typed intent: **click → App intent adapter → InputGateway → owning Agent**. The Signal describes the requested operation, not the button or touch coordinates. There is no separate `.click` payload; intents use `.observation(AgentMessage)`.
+
+| Interaction | Signal representation | Owner |
+| --- | --- | --- |
+| History refresh, confirmed deletion, new conversation or summarization | `history.intent/1` | Memory |
+| Model download/removal, source/preferences submission, provider discovery/save | `model.resource.intent/1`, `provider.discovery/1`, `provider.settings/1` | ApplicationControl |
+| Device operation or application navigation | `app.interaction/1` | ApplicationControl |
+| Camera open/close, explicit facing switch or retry | `photography.camera/1` | Photographer |
+| Expand a row, scroll or edit an unsubmitted form draft | No Signal; local UI state | UI |
+
+Native permission dialogs, immediate safety fences and host lifecycle cleanup retain their own ownership. An OS or device notification becomes an External Signal only when an adapter actually admits it; not every native callback or UI change is an Agent input.
+
+#### Activity feedback and its producer
+
+`ActionResult` reports the completion boundary of one invocation. `ActivityEvent` reports a later lifecycle change of a continuing activity. It contains `activityID`, execution owner, causal identity, monotonic sequence and one of `started`, `stopped`, `failed` or `revoked` (activity authority revoked). It is not a generic progress percentage or a new user intent.
+
+For example, a camera-start invocation can finish once capture is running, while the capture activity continues. A later stop, capture failure or loss of its resource lease can produce a separate activity event. The lifecycle owner creates the event; the Gateway does not infer it from images or generate it automatically.
+
+✅ [CameraCoordinator.recordCapture](App/Lifecycle/CameraCoordinator.swift) currently creates and retains camera activity events, using the capture lease ID and a lease-scoped causal root. [InputGateway.deliverActivityEvent](Gateway/Input/InputGateway.swift) can wrap an event as Runtime-origin input and validate its owner, live Agent/session, contract and causal hop before delivery.
+
+❌ CameraCoordinator does not currently call that delivery API: its events remain local records, not delivered Agent Signals. Generic activity subscriptions, automatic producers and shared retry/progress transport remain outstanding. Completion-only presentation calls likewise do not automatically inject a returning Signal.
 
 App adapters bridge PlatformKit frames into AgentCore values and native-image attachments without adding model or device dependencies to AgentCore. Media are successive bounded inputs; attachment lifetime belongs to the capture/session owner.
 
@@ -468,8 +510,17 @@ Gateways perform bounded structured admission and metadata validation; their cro
 | `speechPerception` | Agent | `speech.partial`, `speech.final`, `speech.phase` | Runtime observer for admission/lifecycle coordination, without business UI mutation |
 | `visionPerception` | Agent | `vision.pose` | Declared business subscribers; independent native presentation calls carry gaze/skeleton updates |
 | `user` / trusted host `runtime` | External | `history.intent/1` | Memory: typed refresh/delete/cancel |
+| `speechPerception` | Agent | `sound.source/1` | Declared Agent subscribers or registered runtime observers; source facts are Agent-generated |
+| `assistant` | Agent | `speech.synthesize/1`, `speech.cancel/1` | SpeechSynthesis directed input |
+| `user` / trusted host `runtime` | External | `model.resource.intent/1` | ApplicationControl resource operations/preferences; host retirement remains External |
+| `model.resources` | External | `model.resource.state/1` | ApplicationControl sampled native resource invalidations |
+| `app.resources` | External | `model.resource.hostFailure/1` | ApplicationControl host admission/dispatch failure facts |
+| `user` | External | `provider.discovery/1`, `provider.settings/1`, `app.interaction/1` | ApplicationControl provider/device/navigation intents |
+| `app.environment` | External | `app.environment/1` | ApplicationControl sequenced scene/device/navigation/capability facts |
+| `user` / trusted host `runtime` | External | `photography.camera/1` | Photographer user intent or host cancellation |
+| `assistant` | Agent | `photography.camera/1` | Photographer directed camera request |
 | `runtime` | External host command | `assistant.control/1` (`cancelSession`) | Selected Assistant/session; typed host control |
-| `runtime` | Runtime feedback | `tool.result`, `action.result` | Captured execution owner through dedicated feedback admission |
+| `runtime` | Runtime feedback | `tool.result`, `action.result`, `generation.round.result` | Captured execution owner through dedicated feedback admission |
 | `runtime` | Runtime feedback API | `activity.event` | Supported owner-fenced admission; production camera currently retains local activity records |
 
 The literal source name `runtime` does not establish Runtime origin or feedback authority. Public host admission and dedicated execution-feedback admission enforce different permissions.

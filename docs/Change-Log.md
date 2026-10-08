@@ -2,6 +2,13 @@
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
+## 2026-10-08 — Signal classification documentation
+
+- Expanded the overall Signal contract with origin/payload comparison, typed user-click intent routes and current external/internal domain inputs. Signal uses composition rather than inheritance; host/native inputs remain External even within the App process.
+- Clarified camera activity production versus delivered Runtime feedback, missing video/binary payloads and current working generation-round feedback. No runtime code changed.
+- Verified definitions, domain adapters, receiving Agent configurations, camera event producer and Gateway feedback entry points. Documentation formatting and relative links checked; builds and physical acceptance are outside this documentation-only change.
+
+
 ## 2026-10-08 — Lower finalized user caption
 
 - Lowered only the finalized user-caption center by24 pt, including the compact-height minimum (60→84 pt). Listening/reply positions and animation remain unchanged.
