@@ -17,7 +17,9 @@ public struct ToolExecutor: Sendable {
         self.registry = registry
         self.timeout = timeout
     }
-    public func execute(_ call: ToolRequest, context: ActionExecutionContext) async throws -> ToolResponse? {
+    public func execute(_ call: ToolRequest, context: ActionExecutionContext, returning: Bool = false) async throws
+        -> ToolResponse?
+    {
         try Task.checkCancellation()
         guard let definition = await registry.handler(for: call.toolPath) else {
             return ToolResponse(
@@ -29,7 +31,10 @@ public struct ToolExecutor: Sendable {
                 FunctionInvocation(tool: call, context: context),
                 definition: definition.function, defaultTimeout: timeout)
             try Task.checkCancellation()
-            return try Self.response(completion, policy: definition.directResultPolicy, callID: call.id)
+            return try Self.response(
+                completion,
+                policy: returning || definition.feedbackPolicy == .observation
+                    ? .returning : definition.directResultPolicy, callID: call.id)
         } catch {
             try Task.checkCancellation()
             let report = FunctionExecutor.failureReport(for: error)

@@ -42,7 +42,7 @@ History output remains raw stored data. Preview uses the existing Agent configur
 
 ✅ ConversationHistoryWorkflow uses StorageChat record values only. Provider/resource settings persistence belongs to Actions; AppSettingsWorkflow has no Storage dependency. The remaining Bluetooth preference adapter is migration debt owned by AppBluetoothWorkflow.
 
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+✅ Bounded owned JPEG storage is implemented for photo observations (ADR0184). ❌ Galleries/video/semantic-memory stores remain planned.
 
 ## BluetoothWorkflow
 
@@ -281,3 +281,15 @@ flowchart LR
 ✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
 
 ✅ ADR0181: existing Settings target owns PhotographerIntentRuntime as bounded application transport; business camera selection lives in Photographer, not this facade. No new directory/target is required.
+
+
+## Independent protocol consumers — 2026-10-08
+
+✅ Implemented: IndependentOutputWorkflow.consumeGeneration demultiplexes generated output without awaiting protocol execution. Separate bounded Tool and Action consumers join at each round seal, final completion or cancellation; see Presentation/README.md.
+
+
+## History image thumbnails
+
+✅ Implemented: History adds a read-only photo loader, validates model-turn/attachment identity against the current archive and admits at most four active reads with explicit overflow and joined per-call cleanup. No mutation or model operation is added.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

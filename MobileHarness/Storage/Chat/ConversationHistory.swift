@@ -43,6 +43,36 @@ public struct ConversationToolCall: Codable, Sendable, Identifiable {
     }
 }
 
+public struct ConversationGenerationRound: Codable, Sendable, Identifiable {
+    public let id: UUID
+    public let resultsJSON: String
+    public init(id: UUID, resultsJSON: String) {
+        self.id = id
+        self.resultsJSON = resultsJSON
+    }
+}
+
+/// One model invocation, nested under the input that owns its execution lifecycle.
+public struct ConversationModelRequest: Codable, Sendable, Identifiable {
+    public let id: UUID
+    public let date: Date
+    public let input: String
+    public let requestJSON: String
+    public var firstTokenAt: Date?
+    public var fragments: [String] = []
+    public var toolCalls: [ConversationToolCall] = []
+    public var tokenUsage: ConversationTokenUsage?
+    public var state: ConversationRecord.State = .generating
+    public var finishReason: String?
+    public var error: String?
+    public init(id: UUID, input: String, requestJSON: String) {
+        self.id = id
+        date = Date()
+        self.input = input
+        self.requestJSON = requestJSON
+    }
+}
+
 public struct ConversationRecord: Codable, Sendable, Identifiable {
     public enum State: String, Codable, Sendable { case generating, completed, failed, cancelled, interrupted }
     public let id: UUID
@@ -53,6 +83,8 @@ public struct ConversationRecord: Codable, Sendable, Identifiable {
     public let maximumOutputTokens: Int?
     public let temperature: Double
     // Optional additions keep version-1 records readable without migration.
+    public var modelRequests: [ConversationModelRequest]?
+    public var generationRounds: [ConversationGenerationRound]?
     public var continuationRequests: [String]?
     public var toolDefinitions: [String]?
     public var toolCalls: [ConversationToolCall]?
@@ -138,6 +170,12 @@ public actor ConversationHistoryStore {
                 value.current.turns[index].state = .interrupted
                 value.current.turns[index].error =
                     "App stopped before generation completed; retained output may be partial."
+                for request in value.current.turns[index].modelRequests?.indices ?? 0..<0
+                where value.current.turns[index].modelRequests?[request].state == .generating {
+                    value.current.turns[index].modelRequests?[request].state = .interrupted
+                    let failure = value.current.turns[index].error
+                    value.current.turns[index].modelRequests?[request].error = failure
+                }
             }
         }
         loaded = true
@@ -218,6 +256,43 @@ public actor ConversationHistoryStore {
         try await commit(next, reserve: 32768)
     }
 
+    public func beginModelRequest(_ request: ConversationModelRequest, for id: UUID) async throws {
+        guard request.input.utf8.count <= 65_536, request.requestJSON.utf8.count <= 524_288 else {
+            throw ConversationHistoryError.invalidRecord
+        }
+        try await updateTurn(id) { turn in
+            var requests = turn.modelRequests ?? []
+            guard turn.state == .generating, requests.count < 4,
+                !requests.contains(where: { $0.id == request.id || $0.state == .generating })
+            else { throw ConversationHistoryError.invalidRecord }
+            requests.append(request)
+            turn.modelRequests = requests
+            return true
+        }
+    }
+
+    public func recordFirstToken(at date: Date, for id: UUID) async throws {
+        try await updateTurn(id) { turn in
+            guard let index = turn.modelRequests?.indices.last,
+                turn.modelRequests?[index].state == .generating,
+                turn.modelRequests?[index].firstTokenAt == nil
+            else { return false }
+            turn.modelRequests?[index].firstTokenAt = date
+            return true
+        }
+    }
+
+    public func finishModelRequest(_ id: UUID, reason: String?) async throws {
+        try await updateTurn(id) { turn in
+            guard let index = turn.modelRequests?.indices.last,
+                turn.modelRequests?[index].state == .generating
+            else { throw ConversationHistoryError.invalidRecord }
+            turn.modelRequests?[index].state = .completed
+            turn.modelRequests?[index].finishReason = reason
+            return true
+        }
+    }
+
     public func recordToolDefinitions(_ definitions: [String], for id: UUID) async throws {
         guard definitions.count <= 128, definitions.reduce(0, { $0 + $1.utf8.count }) <= 65536 else {
             throw ConversationHistoryError.capacityExceeded
@@ -240,17 +315,22 @@ public actor ConversationHistoryStore {
             }
             calls.append(call)
             turn.toolCalls = calls
+            if let index = turn.modelRequests?.indices.last {
+                turn.modelRequests?[index].toolCalls.append(call)
+            }
             return true
         }
     }
 
-    public func recordContinuationRequest(_ request: String, for id: UUID) async throws {
-        guard request.utf8.count <= 65_536 else { throw ConversationHistoryError.invalidRecord }
+    public func recordGenerationRound(_ round: ConversationGenerationRound, for id: UUID) async throws {
+        guard round.resultsJSON.utf8.count <= 262_144 else { throw ConversationHistoryError.invalidRecord }
         try await updateTurn(id, required: true) { turn in
-            var requests = turn.continuationRequests ?? []
-            guard requests.count < 3 else { throw ConversationHistoryError.invalidRecord }
-            requests.append(request)
-            turn.continuationRequests = requests
+            var rounds = turn.generationRounds ?? []
+            guard rounds.count < 4, !rounds.contains(where: { $0.id == round.id }) else {
+                throw ConversationHistoryError.invalidRecord
+            }
+            rounds.append(round)
+            turn.generationRounds = rounds
             return true
         }
     }
@@ -268,6 +348,13 @@ public actor ConversationHistoryStore {
             turn.toolCalls?[index].state = state
             turn.toolCalls?[index].output = output
             turn.toolCalls?[index].error = error.map { String($0.prefix(4096)) }
+            for request in turn.modelRequests?.indices ?? 0..<0 {
+                if let call = turn.modelRequests?[request].toolCalls.firstIndex(where: { $0.id == callID }),
+                    let outcome = turn.toolCalls?[index]
+                {
+                    turn.modelRequests?[request].toolCalls[call] = outcome
+                }
+            }
             return true
         }
     }
@@ -278,6 +365,7 @@ public actor ConversationHistoryStore {
         }
         try await updateTurn(id) {
             $0.tokenUsage = usage
+            if let index = $0.modelRequests?.indices.last { $0.modelRequests?[index].tokenUsage = usage }
             return true
         }
     }
@@ -295,6 +383,9 @@ public actor ConversationHistoryStore {
         }
         var next = value
         next.current.turns[index].fragments.append(delta)
+        if let request = next.current.turns[index].modelRequests?.indices.last {
+            next.current.turns[index].modelRequests?[request].fragments.append(delta)
+        }
         try await commit(next, reserve: 32768)
     }
 
@@ -311,6 +402,14 @@ public actor ConversationHistoryStore {
         next.current.turns[index].state = state
         next.current.turns[index].finishReason = reason
         next.current.turns[index].error = error.map { String($0.prefix(4096)) }
+        if let request = next.current.turns[index].modelRequests?.indices.last,
+            next.current.turns[index].modelRequests?[request].state == .generating
+        {
+            next.current.turns[index].modelRequests?[request].state = state
+            next.current.turns[index].modelRequests?[request].finishReason = reason
+            let failure = next.current.turns[index].error
+            next.current.turns[index].modelRequests?[request].error = failure
+        }
         do {
             try await commit(next)
         } catch {
@@ -319,6 +418,13 @@ public actor ConversationHistoryStore {
             readToken = ConversationReadToken(value: UUID())
             value.current.turns[index].state = .interrupted
             value.current.turns[index].error = "Terminal status could not be saved: \(error)"
+            if let request = value.current.turns[index].modelRequests?.indices.last,
+                value.current.turns[index].modelRequests?[request].state == .generating
+            {
+                value.current.turns[index].modelRequests?[request].state = .interrupted
+                let failure = value.current.turns[index].error
+                value.current.turns[index].modelRequests?[request].error = failure
+            }
             throw error
         }
     }

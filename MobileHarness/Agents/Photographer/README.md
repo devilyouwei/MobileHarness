@@ -21,7 +21,7 @@ flowchart LR
     Capture --> Output
 ```
 
-✅ JSON v6 subscribes to `vision.pose` from `visionPerception`, admits `photography.camera` and `tool.result`, and declares no model-callable Actions or Tools. Code grants internal `NexArm.Tracking.aim` and the four fixed Camera.Capture functions. The output stream holds 8 envelopes and rejects only the excess call when full; an aim is not replaced or dropped.
+✅ JSON v6 subscribes to `vision.pose` from `visionPerception`, admits `photography.camera` and `tool.result`, and declares no model-callable Actions or Tools. Code grants internal `NexArm.Tracking.aim` and the six fixed Camera.Capture control/disposition functions. The output stream holds 8 envelopes and rejects only the excess call when full; an aim is not replaced or dropped.
 
 ✅ The first person in the published array is the target. That array keeps VisionPerception's copy order. The current pose decoder sorts by detection score before the score is removed, but this Agent does not re-rank. The nose is the aim point when its confidence is at least 0.3 and it lies inside the image. Otherwise the point is the midpoint of joints that pass the same test. No such joint means no aim. `base` turns only the base and `pitch` tips only the wrist. Each command adds a limited step from the last command: a 4% dead zone, smoothing, and a capped rate so a person at the edge is followed without a full-frame snap. The first aim outside the dead zone is immediate. Later aims wait 0.2 seconds on the observation timestamp. A centered person, or an empty observation, emits nothing and does not return to center. Pause admits the observation and does not aim.
 
@@ -136,3 +136,7 @@ sequenceDiagram
 No new recording/still-capture implementation or physical tracking algorithm is introduced.
 
 ✅ Interaction refinement: PhotographerCameraWorkflow validates target-facing intent and pass facing into the flip Tool arguments under the existing one-request correlation/lifetime.
+
+## Photo save and ignore — ADR0185
+
+✅ PhotographerCameraWorkflow selects six camera/disposition functions. Save/ignore preserve optional photoID and one exact request/result correlation; PhotographerIntentRuntime returns native receipt data. Root UI and trusted Assistant inputs share this policy; no Photos, UIImage or storage access exists in the Agent.

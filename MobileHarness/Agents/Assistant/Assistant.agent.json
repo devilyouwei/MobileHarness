@@ -2,6 +2,63 @@
   "version": 6,
   "id": "assistant",
   "actions": {
+    "Camera": [
+      {
+        "alias": "takePhoto",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "takePhoto"
+        },
+        "parameters": [],
+        "examples": [
+          "<takePhoto/>"
+        ],
+        "doc": "On an explicit user request, take one photo using the current ready foreground camera. Capture, retain private App evidence and show the actual photo; this does not save to the system Photos library. Its execution observation supplies the photo to the next model round for visual understanding. Emit once, then wait for actual image feedback before describing it. Use savePhoto only on an explicit save request. Do not repeat capture merely to continue reasoning. Camera must be enabled and ready."
+      },
+      {
+        "alias": "savePhoto",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "savePhoto"
+        },
+        "parameters": [
+          {
+            "name": "photoID",
+            "valueType": "string",
+            "required": false,
+            "description": "Optional exact UUID from the photo result. Omit to operate on the currently displayed photo; never invent an ID.",
+            "constraints": "Valid UUID of the displayed photo only; omit for the current photo."
+          }
+        ],
+        "examples": [
+          "<savePhoto/>"
+        ],
+        "doc": "On an explicit user request, save the currently displayed captured photo to the system Photos library. Wait for the actual observation before confirming success; permission denial is a failure. Repeated saves of the same displayed photo do not create duplicates. This does not take another photo."
+      },
+      {
+        "alias": "ignorePhoto",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "ignorePhoto"
+        },
+        "parameters": [
+          {
+            "name": "photoID",
+            "valueType": "string",
+            "required": false,
+            "description": "Optional exact UUID from the photo result. Omit to operate on the currently displayed photo; never invent an ID.",
+            "constraints": "Valid UUID of the displayed photo only; omit for the current photo."
+          }
+        ],
+        "examples": [
+          "<ignorePhoto/>"
+        ],
+        "doc": "On a request to close, dismiss, ignore or discard the displayed photo, hide its thumbnail and preview without exporting to Photos. This does not close the camera, delete an existing album photo, or take another photo. Wait for the actual result before confirming."
+      }
+    ],
     "Display": [
       {
         "alias": "express",
@@ -519,11 +576,16 @@
             "properties": {
               "facing": {
                 "type": "string",
-                "enum": ["front", "back"],
+                "enum": [
+                  "front",
+                  "back"
+                ],
                 "description": "Target camera: front for selfies, back for the rear camera."
               }
             },
-            "required": ["facing"],
+            "required": [
+              "facing"
+            ],
             "additionalProperties": false
           },
           "strict": true
@@ -859,6 +921,11 @@
         "contract": "action.result",
         "version": 1,
         "kind": "actionResult"
+      },
+      {
+        "contract": "generation.round.result",
+        "version": 1,
+        "kind": "roundResult"
       }
     ],
     "subscriptions": [

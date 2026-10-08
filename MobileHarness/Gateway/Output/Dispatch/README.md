@@ -12,7 +12,7 @@ Update this README when dispatch behavior or contracts change.
 
 ## Queue and asynchronous processing contract
 
-ActionDispatcher forwards resolved calls to ChannelScheduler; the scheduler owns queue capacity, ordering and completion. ToolDispatcher deliberately bypasses Action lanes: await ToolExecutor; deliver returning-handler results through the module-internal owner-fenced InputGateway path only when the originating Agent accepts toolResult. Successful completion tools return nil; failed completion tools return an error ToolResponse without producing a ToolResult input. A rejected result delivery is retained in the execution result. Tools have no separate waiting queue or replay policy here. A dispatch caller that awaits each envelope serializes tool execution with later envelope dispatch, but already running Actions may continue.
+ActionDispatcher forwards resolved calls to ChannelScheduler; the scheduler owns queue capacity, ordering and completion. ToolDispatcher deliberately bypasses Action lanes: await ToolExecutor; deliver returning-handler results through the module-internal owner-fenced InputGateway path only when the originating Agent accepts toolResult. Outside generation rounds, successful completion tools return nil; failed completion tools return an error ToolResponse without producing a ToolResult input. A rejected result delivery is retained in the execution result. Tools have no waiting queue inside this dispatcher. App owns independent bounded Tool and Action consumers; native saturation cannot block Action admission. Tools use four-way execution, Actions preserve ordered admission, and round sealing joins both branches. No replay is introduced. Other deterministic callers retain their sequential dispatch contract.
 
 ```mermaid
 flowchart LR
@@ -25,7 +25,7 @@ flowchart LR
 
 Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
 
-✅ Completion-only tools are awaited directly and bypass Action lanes. No ToolResult is constructed/submitted on success; ordinary execution errors return correlated error ToolResponse values; cancellation of the calling task propagates. Data tools retain correlated result feedback. Cancellation is checked before execution and after the handler.
+✅ Outside generation rounds, completion-only tools are awaited directly and bypass Action lanes. No ToolResult is constructed/submitted on success; ordinary execution errors return correlated error ToolResponse values; cancellation of the calling task propagates. Data tools retain correlated result feedback. Cancellation is checked before execution and after the handler.
 
 ✅ Returning ToolResult inputs preserve the originating AgentTurn so continuation output cannot lose UI round association.
 
@@ -44,7 +44,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ Completion failures remain available as ToolResponse even when the source does not accept toolResult inputs. Rejected delivery is represented in the returned result; it cannot terminate the source Agent.
 
-Completion-only Tool errors remain execution outcomes and do not inject a new model-facing ToolResult; only returning Tools route data feedback.
+Outside generation rounds, completion-only Tool errors remain execution outcomes and do not inject a new model-facing ToolResult; only returning Tools route data feedback.
 
 ✅ Tool feedback delivery errors preserve the original value/isError/callID and add a separate bounded deliveryFailure. True task cancellation propagates. ❌ Feedback delivery does not roll back completed effects.
 
@@ -70,7 +70,7 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
-✅ ADR0157: ToolDispatcher applies definition-owned direct/scheduled policy. Scheduled native calls cross the same ChannelScheduler; direct calls resolve shared resource declarations before ResourceCoordinator. ToolExecutor adapts the shared outcome, and owner-fenced returning feedback preserves typed completion. ❌ No duplicate ActionResult or automatic model continuation is introduced.
+✅ ToolDispatcher directly coordinates shared resources and ToolExecutor execution. Generation-round calls always deliver terminal ToolResult; observation policy controls continuation in Assistant, independently of transport feedback.
 
 ✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
 
@@ -83,6 +83,18 @@ Completion-only Tool errors remain execution outcomes and do not inject a new mo
 
 ✅ Implemented: accepted device-control calls acknowledge submission only. Preset/jog native workers capture their own origin and report sink, retain one latest structured terminal failure, publish independent home issues and deliver a trusted ActionResult through InputGateway after non-cancellation failure. Root ApplicationControl accepts runtime-owned Action results into a bounded128-result inbox; environment context exposes the latest result summary. No accepted Tool receipt is rewritten, no movement replay, and no tolerance/arrival/timeout algorithm changes. Ordinary failure stops only its worker and keeps subsequent intents admissible. Diagnostic delivery rejection is reported separately.
 
-✅ ADR0181: InvocationSignalContext retains only the current OutputEnvelope during Tool dispatch, avoiding retention of original media attachments. Nested calls replace/restore task-local context; outside-invocation delegation rejects. Generic message delegation remains in OutputGateway, not Actions.
+✅ ADR0181: InvocationSignalContext retains only the current OutputEnvelope during actual Action/Tool execution, avoiding retention of original media attachments. Nested calls replace/restore task-local context; outside-invocation delegation rejects. Generic message delegation remains in OutputGateway, not Actions.
 
 Invocation context also captures the original ExecutionOwner incarnation, rejecting stopped/replaced sources rather than binding their replacement. Root output pumps are detached owned tasks so a long-lived service cannot inherit a caller’s invocation authority.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+
+
+## Independent protocol consumers — 2026-10-08
+
+✅ Implemented: App transport feeds ToolDispatcher and ActionDispatcher independently. Tools retain direct execution; Actions retain Channel/wait admission. The round seal reaches Gateway only after both transport consumers join; Gateway then joins Action execution/result delivery before acknowledging the merged round.

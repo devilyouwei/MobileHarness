@@ -14,6 +14,11 @@ struct CurrentChatCapability: ChatCapability {
             do { return await (try await models.get(.chat)).supportsToolCalls } catch { return false }
         }
     }
+    var supportsImages: Bool {
+        get async {
+            do { return await (try await models.get(.chat)).supportsImages } catch { return false }
+        }
+    }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         let provider = try await models.get(.chat)
         return try await provider.chat(request)

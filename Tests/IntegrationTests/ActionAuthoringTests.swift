@@ -71,7 +71,7 @@ private enum UnifiedAuthoringFixture {
     let definition = ActionBinding(
         function: UnifiedAuthoringFixture.sharedDefinition(completing: { invocation in
             .value(try ActionArguments(invocation.call.parameters).requiredString("value", maximumUTF8Bytes: 32))
-        }), protocols: [.action, .tool], executionPolicy: .scheduled(channel: "Fixture"), directResultPolicy: .returning
+        }), protocols: [.action, .tool], executionPolicy: .direct, directResultPolicy: .returning
     )
     let actionRegistry = try ActionRegistry(definitions: [definition])
     let nativeRegistry = try ToolRegistry(modules: [UnifiedAuthoringToolModule(definitions: [definition])])

@@ -23,7 +23,7 @@ public actor PhotographerIntentRuntime {
     private var trackingQueue: [OutputEnvelope] = []
     private struct Request {
         let id: UUID
-        let waiter: CheckedContinuation<Void, any Error>
+        let waiter: CheckedContinuation<String?, any Error>
         var inputID: UUID?
         var sessionID: UUID?
         var delivery: Task<Void, Never>?
@@ -76,20 +76,20 @@ public actor PhotographerIntentRuntime {
         }
         starting = nil
     }
-    public func perform(
+    @discardableResult public func perform(
         _ operation: PhotographerCameraIntent.Operation,
-        facing: PhotographerCameraIntent.Facing? = nil,
+        facing: PhotographerCameraIntent.Facing? = nil, photoID: UUID? = nil,
         delegate: (@Sendable (AgentMessage) async throws -> DeliveryReport)? = nil
-    ) async throws {
+    ) async throws -> String? {
         guard operation != .cancel else { throw CommunicationError.unauthorized }
         try Task.checkCancellation()
         try await prepare()
         try Task.checkCancellation()
         guard !closed else { throw CommunicationError.scopeClosed }
         guard request == nil else { throw CommunicationError.capacityExceeded }
-        let intent = PhotographerCameraIntent(operation, facing: facing)
+        let intent = PhotographerCameraIntent(operation, facing: facing, photoID: photoID)
         _ = try intent.message.validatedSize()
-        try await withTaskCancellationHandler {
+        return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { waiter in
                 request = Request(id: intent.requestID, waiter: waiter)
                 request?.delivery = Task {
@@ -182,7 +182,7 @@ public actor PhotographerIntentRuntime {
         if result.isError {
             active.waiter.resume(throwing: PhotographerIntentFailure.execution(result))
         } else {
-            active.waiter.resume()
+            active.waiter.resume(returning: result.tool?.value)
         }
     }
     private func cancel(_ id: UUID, failure: any Error) async {

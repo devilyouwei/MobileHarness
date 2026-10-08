@@ -187,30 +187,14 @@ flowchart LR
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
-## Scheduled native projection — ADR0157
 
-✅ Definition-owned scheduled ToolCalls enter this same scheduler as one child job outside model XML wait groups. The child scheduling ID is independent; the handler retains the original source/session/input/sequence/turn context. Existing64 task,16 Channel, per-Channel and cumulative job bounds apply. One bufferingOldest1 receipt per child stores its terminal outcome; no second delivery queue or duplicate ActionResult is created. The original native call receives its ToolResult through InputGateway.
+✅ Ordinary handler failure completes only its job, records the terminal cause in ActionResult and leaves later eligible work running. pre-admission errors and owner cancellation retain their scope.
 
-```mermaid
-flowchart LR
-    Native[Authorized native ToolCall] --> Policy[Scheduled definition / Channel]
-    Policy --> Child[Bounded child scope and single receipt]
-    Child --> Scheduler[Same serialization / resource fences]
-    Scheduler --> Handler[Canonical shared handler]
-    Handler --> Join[Join handler cleanup]
-    Join --> Receipt[Preserved completion]
-    Receipt --> Finish[Close child scope]
-    Finish --> Feedback[Original ToolResult]
-    Cancel[Caller cancellation] --> Cleanup[Cancel and join child]
-    Cleanup --> Finish
-```
+## Action/Tool generation rounds — ADR0183
 
-✅ Queued cancellation completes the receipt with cancellation without executing the job; running cancellation joins cleanup before returning. Serial keys remain held during cleanup. Child scope context adaptation is internal to Gateway; public ScheduledAction construction derives its context from the envelope.
 
-❌ Uncooperative handlers cannot be forcibly terminated, and software cleanup is not proof of physical stop.
+✅ ChannelScheduler uses envelope.schedulingID (roundID for generated work, inputID otherwise), joins every Action, and awaits scoped result delivery before round acknowledgment. Native Tool projection and its receipt queue are removed.
 
-✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
 
-✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
-
-✅ Ordinary handler failure completes only its job, records the terminal cause in ActionResult and leaves later eligible work running. Accepted native projection failures return the same structured report; pre-admission errors and owner cancellation retain their scope.
+✅ Photo Action delegation correction: bind InvocationSignalContext inside the actual scheduled Action worker, using its validated envelope/ExecutionOwner. Tools retain their current binding. Ownerless direct scheduler fixtures receive no authority; nested bindings restore automatically, and completion/feedback callbacks run outside the handler binding. No new module or media retention.

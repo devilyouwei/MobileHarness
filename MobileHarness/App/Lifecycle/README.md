@@ -154,3 +154,35 @@ flowchart LR
 ✅ Interaction refinement: CameraCoordinator selects requested front/back, keeps permission/busy/revision checks and joins reconciliation. VoiceSessionCoordinator retains final ASR text, marks it finalized and clears both captions only on an accepted newer turn or new voice-session start; stopping voice retains the current captions.
 
 ✅ Interaction cleanup: Removed unused CameraCoordinator CameraControlling conformance and direct toggle/switch entry points; CameraInteractionWorkflow is the sole manual camera command adapter. Same-facing completion uses existing revision/foreground/capture checks.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow admits Actions in order while executing up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: CameraCoordinator owns one photo task independent of UI page, guards foreground/capture/revision and joins cancellation. Store JPEG and a display preview, then await bounded UI animation completion. Durable capture remains when presentation fails.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+✅ Voice correction: keep microphone-frame admission closed across all ReAct rounds and playback; reject stale listening/hearing presentation while handling a turn. Resume only after terminal assistant.finished and joined effects. A failed reply ends its voice scope but retains the Assistant consumer and prepared models for explicit retry; eye taps remain available during photo presentation. Native capture remains allocated during a reply, with PCM discarded before recognition, rather than restarting capture between model rounds.
+
+## Photo save and ignore — ADR0185
+
+✅ CameraCoordinator retains (photoID, original StorageOwner) for the displayed capture. savePhoto freezes/validates the selected UUID, reads original JPEG and owns one cancellable/joined export Task; capture/export overlap fails busy. Confirmed album import sets savedPhotoID before returning, preventing duplicate writes while displayed. Ignore requires an acknowledged current thumbnail, hides it and clears its owner without exporting or deleting album data. Camera can be off; foreground is required. Scene/camera reconciliation cancels export and cleanup joins the OS transaction. Permission failure retains the thumbnail; committed exports remain real facts after cancellation. Private evidence remains bounded32 files/128MiB; deletion/gallery are outstanding.
+
+## Lens switch latency correction
+
+✅ Implemented: CameraCoordinator marks healthy flip revisions for native input replacement through the existing resource lease. Native completion restores preview and finishes the command without waiting for old inference/tracking teardown. A root-owned bounded CameraVisionRestartWorkflow cancels/joins old vision and keeps only the latest frame-stream intent; replacement starts only after old endpoint/Agent removal. Off/background/model maintenance invalidates and joins this worker. Failure stops capture and requires explicit retry; no success fallback.
+
+❌ Physical-device switch latency, repeated flips during inference and camera/voice coexistence remain unverified.
+
+
+## History image thumbnails
+
+✅ Implemented: CameraCoordinator receives the existing photo store from composition instead of creating its own instance. Exact source/session/input checks for live photo observations remain intact. History shares the store independently of camera capture/visibility lifetime.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

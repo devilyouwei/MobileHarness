@@ -112,6 +112,33 @@ See [App](../App/README.md), [Conversation](Conversation/README.md), [Camera](Ca
 
 ## Independent history presentation values
 
-✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; legacy continuation records remain readable and missing values stay empty. UI target has zero project dependencies.
 
 ✅ Interaction refinement: Conversation renders retained user text above eyes after recognition and assistant text below in different colors. Components expand two-axis gaze and morph love into two hearts without business ownership.
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Camera UI displays injected captured-photo values; no native capture, stores or model imports.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; Agent-routed photo export/ignore controls are implemented by ADR0185.
+
+
+## Per-request conversation history
+
+✅ Implemented: UI-owned history values mirror optional per-request evidence. ConversationHistoryPresentation flattens modelRequests for list/detail/export without Storage imports. ReACT items have a badge, orange text and an orange-tinted background. Legacy continuations are listed without storage explanations; missing per-request output/timing/status values stay empty. Model-round ID and original owning-input ID both remain available in details/export.
+
+❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
+
+
+## Empty history values
+
+✅ Implemented: removed legacy storage/missing-evidence explanations from user-facing history list/detail/export. Missing model text, usage, timing, finish reason and Tool outcome values remain empty. UI-only generationMetadataAvailable distinguishes legacy continuation rows so their missing date/state are blank rather than copied from the parent. Retain real request content, ReACT styling and actual execution failures. Presentation regressions cover empty values and absence of legacy wording.
+
+
+## History image thumbnails
+
+✅ Implemented: UI owns immutable image-reference values and receives bounded photo bytes through its existing history controls. Settings decodes bounded thumbnail/full-preview sizes with native UIKit thumbnail preparation, renders a gallery in actual sent context and opens a full-screen read-only preview on tap; it owns no file/store/camera/model object.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+✅ Implemented: UIKit prepares images asynchronously within the existing UI import boundary. Cancellation is checked after preparation; full-preview failures offer a concise retry. Prepared image dimensions remain bounded to320/2048 pixels.

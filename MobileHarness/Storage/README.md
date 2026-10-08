@@ -71,7 +71,7 @@ flowchart LR
 
 | Target / directory | Implemented contract |
 | --- | --- |
-| Storage core | Foundation-only actors/primitives; no project/product dependencies |
+| Storage core | Foundation-only actors/primitives and bounded owned JPEG files; no project/product dependencies |
 | `Chat/` / StorageChat | Raw conversation records, current/archive journal, atomic mutations and opaque read-token admission; depends only on Storage |
 | `Audio/` / StorageAudio | PCM values, reply/session-owned leases and single-use audio checkout; depends only on Storage |
 
@@ -90,13 +90,34 @@ Core never imports a domain or concrete business service. App owns settings/cred
 
 ✅ Bounded transient PCM, atomic documents/journal, confined files, explicit revisions/leases and neutral domain schemas. Consumer processing/presentation policy is outside Storage.
 
-❌ Persistent image/video/audio domains, semantic memory/retrieval/forgetting, reclaimable disk caches, cross-namespace budgets and cross-device/process synchronization are not implemented. MemoryLeaseStore is a cache primitive, not a semantic memory Agent. File-protection and locked-device acceptance remain separate.
+❌ Photo galleries/export, persistent video/audio domains, semantic memory/retrieval/forgetting, reclaimable disk caches, cross-namespace budgets and cross-device/process synchronization are not implemented. MemoryLeaseStore is a cache primitive, not a semantic memory Agent. File-protection and locked-device acceptance remain separate.
 
 See [Chat](Chat/README.md), [Audio](Audio/README.md), [Model management](../ModelKit/Management/README.md) and [Agent-driven architecture](../README.md).
 
 
-## Bounded native result continuation
+## Bounded registered-observation continuation
 
-✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
 
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+
+## Action/Tool generation rounds — ADR0183
+
+✅ Implemented: text/XML resolves to ActionCall; Assistant maps natural text to Speech playback and Display caption Actions. Only Actions enter Channel/wait. Native ToolCalls execute directly, with at most four concurrent calls and sixteen total per Assistant input. Registration declares recordOnly/observation independently of return values. Separate ActionResult/ToolResult feedback is correlated by call and round, merged in emission order after all calls settle, and only observation enables another model request. Four requests,120 generated calls,64 KiB feedback/transcript and a30-second joined input deadline bound the loop.
+
+✅ StorageChat persists optional bounded generationRounds and text/native continuation requests with metadata-only image descriptors; existing version-1 histories still decode. Execution evidence is distinct from raw model text.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../docs/adr/0183-generation-round-observations.md).
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: CapturedPhotoStore in this existing directory writes bounded JPEG files atomically with owner metadata, scopes reads by source/session/input, limits32 files/128MiB, rejects overflow without deleting photos, and never owns capture or inference.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.
+
+
+## History image thumbnails
+
+✅ Implemented: CapturedPhotoStore adds readForInput(id,source,input), a bounded read for archived references across session restarts. Missing indexed/file data returns nil; wrong source/input and corrupt lengths reject explicitly. Existing exact-owner read remains unchanged. Both APIs share the same bounded file-read helper; no photo eviction or new persisted schema is introduced.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

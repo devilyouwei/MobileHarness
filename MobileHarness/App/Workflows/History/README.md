@@ -44,6 +44,20 @@ flowchart LR
 
 ## Independent history presentation values
 
-✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; legacy continuation records remain readable and missing values stay empty. UI target has zero project dependencies.
 
 ✅ ADR0180: Memory / memory identity and MemoryHistoryIntent are used consistently in configuration, host transport, presentation source guards and regression fixtures; preserve history.intent/1 and runtime behavior. Enforce the two reorganized roles’ directory/actor/configuration naming and isolated business components.
+
+
+## Per-request conversation history
+
+✅ Implemented: The existing bounded Codable adapter carries optional modelRequests into UI-owned snapshots and preserves per-request timing, native context, output and identities. No model, mutation or Agent ownership moved to presentation. Compatibility with legacy optional fields is retained.
+
+❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
+
+
+## History image thumbnails
+
+✅ Implemented: ConversationHistoryWorkflow gains a required injected photo reader and imageData(photoID,turnID) control. It resolves the turn from the current UI archive, validates its referenced image and producing input, rejects forged references and more than four concurrent reads, checks cancellation before/after I/O and releases admission on every exit. A missing persisted image is nil; read/validation errors propagate. No photo cache or background task is added.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

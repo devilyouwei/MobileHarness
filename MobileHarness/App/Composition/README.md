@@ -50,7 +50,7 @@ flowchart TD
 
 ✅ ApplicationRuntime assembles LocalDocumentStore from Storage and ConversationHistoryStore from StorageChat. The physical journal URL, schema and single-owner lifetime are unchanged.
 
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+✅ Bounded owned JPEG storage is implemented for photo observations (ADR0184). ❌ Galleries/video/semantic-memory stores remain planned.
 
 ✅ BehaviorAssembly requires a typed `shakeBase` binding. The iPhone root binds BluetoothWorkflow; the Mac diagnostic binds USB. Both fail explicitly when unavailable.
 
@@ -208,3 +208,27 @@ flowchart TD
 ✅ ADR0181: compose one Photographer and dedicated root camera UUID; use its descriptor for capability coverage and root presentation authorization. Bind Assistant camera delegation after Gateways exist. Vision dependencies inject PhotographerIntentRuntime; no transient Photographer factory remains.
 
 ✅ Interaction refinement: Camera delegate and manual-control closures carries explicit front/back targets to Photographer; existing ownership and request cleanup remain.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow admits Actions in order while executing up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Wire capture observation reader into Assistant factory; shared camera owner supplies stored-image reads.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+## Photo save and ignore — ADR0185
+
+✅ AppAssembly forwards save/ignore with the tapped UUID through PhotographerIntentRuntime. ApplicationRuntime injects a returning camera delegation closure; current-photo semantics for omitted conversational IDs stay at the native endpoint. No UI/storage/Photos bypass.
+
+
+## History image thumbnails
+
+✅ Implemented: AppAssembly owns one CapturedPhotoStore at the existing CapturedPhotos path, inject it into CameraCoordinator and supply an Assistant-source/producing-input history loader. No new directory, path, module or dependency is added.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

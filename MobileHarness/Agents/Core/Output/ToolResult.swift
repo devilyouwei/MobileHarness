@@ -1,6 +1,7 @@
 import Foundation
 
 public struct ToolResult: Equatable, Sendable {
+    public let roundID: UUID?
     public let completion: AgentActionCompletion?
     public let callID: UUID
     public let value: String
@@ -8,8 +9,9 @@ public struct ToolResult: Equatable, Sendable {
     public let failureCode: String?
     public init(
         callID: UUID, value: String, isError: Bool = false, failureCode: String? = nil,
-        completion: AgentActionCompletion? = nil
+        completion: AgentActionCompletion? = nil, roundID: UUID? = nil
     ) {
+        self.roundID = roundID
         self.completion = completion
         self.callID = callID
         self.value = value

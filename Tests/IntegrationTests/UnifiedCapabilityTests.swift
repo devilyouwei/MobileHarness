@@ -137,7 +137,7 @@ private actor UnifiedReceiptAgent: Agent {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func nativeToolUsesSharedSchedulingAndJoinsCancellationCleanup() async throws {
+@Test(.timeLimit(.minutes(1))) func nativeToolUsesSharedResourcesAndJoinsCancellationCleanup() async throws {
     let started = UnifiedGate()
     let release = UnifiedGate()
     let nativeStarted = UnifiedGate()
@@ -147,7 +147,8 @@ private actor UnifiedReceiptAgent: Agent {
     let definition = ActionBinding(
         path: path, displayName: "Work", kind: .finite,
         completion: "Return after work or joined cleanup.", serializationKey: "fixture.work",
-        protocols: [.action, .tool], executionPolicy: .scheduled(channel: "native"), directResultPolicy: .returning,
+        protocols: [.action, .tool], executionPolicy: .direct, directResultPolicy: .returning,
+        resources: [.init(rawValue: "fixture.work")],
         completing: { invocation in
             let mode = invocation.call.parameters["mode"] ?? "missing"
             await log.record(mode + ":" + invocation.context.inputID.uuidString)
@@ -165,7 +166,10 @@ private actor UnifiedReceiptAgent: Agent {
             return .value(mode)
         })
     let module = UnifiedFixtureModule(definitions: [definition])
-    let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
+    let resources = try ResourceCoordinator(definitions: [
+        ResourceDefinition(id: .init(rawValue: "fixture.work"), allowedOwners: [.init(rawValue: "fixture")]) {}
+    ])
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]), resources: resources)
     let permissions = try CapabilityRegistry(
         tools: [ToolRegistration(alias: "run", path: path.description, requiredParameters: ["mode"])],
         internalActions: [
@@ -189,20 +193,24 @@ private actor UnifiedReceiptAgent: Agent {
                     channel: "main", parameters: ["mode": "first"])), sequence: 1))
     await started.wait()
     let native = AgentInput(sessionID: session, payload: .event("native"))
-    let observations = try await scheduler.observeExecutions()
     let call = ToolCall(toolPath: path.description, arguments: ["mode": "second"])
     let work = Task {
-        try await gateway.dispatch(
+        try await gateway.execute(
             .init(source: agent.descriptor.id, input: native, output: .toolCall(call), sequence: 2))
     }
-    for await snapshot in observations { if snapshot.records.count == 2 { break } }
+    let rejected = try await work.value
+    #expect(rejected.isError == true)
     #expect(await log.values == ["first:" + first.id.uuidString])
     await release.open()
-    let result = try await work.value
-    #expect(result?.completion == .value("second") && result?.callID == call.id)
+    try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
+    let result = try await gateway.dispatch(
+        .init(
+            source: agent.descriptor.id, input: native,
+            output: .toolCall(ToolCall(toolPath: path.description, arguments: call.arguments)), sequence: 2))
+    #expect(result?.completion == .value("second"))
     #expect(await log.values == ["first:" + first.id.uuidString, "second:" + native.id.uuidString])
     let receipts = await agent.receipts
-    #expect(receipts.count == 1 && receipts.first?.completion == .value("second"))
+    #expect(receipts.count == 1 && receipts.last?.completion == .value("second"))
     try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
     let held = AgentInput(sessionID: session, payload: .event("hold"))
     let cancellation = Task {
@@ -215,7 +223,7 @@ private actor UnifiedReceiptAgent: Agent {
     cancellation.cancel()
     await #expect(throws: CancellationError.self) { try await cancellation.value }
     await cleaned.wait()
-    #expect(await scheduler.executionSnapshot().records.last?.phase == .cancelled)
+    #expect(await scheduler.executionSnapshot().records.count == 1)
     #expect(await agent.receipts.count == 1)
     await gateway.shutdown()
 }
@@ -338,7 +346,7 @@ private struct PureFunctionFixture: CapabilityModule {
     #expect(await log.values == ["fixture", "fixture"])
 }
 
-@Test(arguments: [false, true]) func invocationFailurePreservesReportAndAllowsNextCall(_ scheduled: Bool) async throws {
+@Test func invocationFailurePreservesReportAndAllowsNextCall() async throws {
     let path = ActionIdentifier(domain: "Fixture", module: "Work", function: "run")
     let report = try ActionReport(entries: [
         .init(path: "step.motor1", status: .succeeded),
@@ -354,7 +362,7 @@ private struct PureFunctionFixture: CapabilityModule {
         })
     let binding = ActionBinding(
         function: function, protocols: [.action, .tool],
-        executionPolicy: scheduled ? .scheduled(channel: "native") : .direct,
+        executionPolicy: .direct,
         directResultPolicy: .returning)
     let module = UnifiedFixtureModule(definitions: [binding])
     let permissions = try CapabilityRegistry(

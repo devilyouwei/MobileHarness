@@ -113,3 +113,10 @@ Returning Tool feedback uses a fresh10-second admission deadline, preserved root
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
 ✅ ADR0163: ActionResult/ActivityEvent now preserve explicit initiating root/input/turn and advance hops once, with fresh bounded feedback admission. Invalid or exhausted hop contexts return closed before reception; owner fencing and existing capacity retry remain. Public external admission still rejects feedback payloads.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ Runtime-only roundResult admission preserves owner incarnation, session, turn, parent and root. External callers cannot forge generation feedback.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).

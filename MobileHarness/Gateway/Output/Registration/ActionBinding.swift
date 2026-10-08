@@ -9,11 +9,13 @@ public struct ActionBinding: Sendable {
         case scheduled(channel: String)
     }
     public enum CallProtocol: String, Sendable { case action, tool }
+    public enum FeedbackPolicy: String, Sendable { case recordOnly, observation }
     public enum DirectResultPolicy: Sendable { case completionOnly, returning }
     public typealias Kind = ActionFunction.Kind
     public let function: ActionFunction
     public let protocols: Set<CallProtocol>
     public let executionPolicy: ExecutionPolicy
+    public let feedbackPolicy: FeedbackPolicy
     public let directResultPolicy: DirectResultPolicy
     public var path: ActionIdentifier { function.path }
     public var displayName: String { function.displayName }
@@ -32,12 +34,13 @@ public struct ActionBinding: Sendable {
     public init(
         function: ActionFunction, protocols: Set<CallProtocol> = [.action],
         executionPolicy: ExecutionPolicy = .scheduled(channel: "main"),
-        directResultPolicy: DirectResultPolicy = .completionOnly
+        directResultPolicy: DirectResultPolicy = .completionOnly, feedbackPolicy: FeedbackPolicy = .recordOnly
     ) {
         self.function = function
         self.protocols = protocols
         self.executionPolicy = executionPolicy
         self.directResultPolicy = directResultPolicy
+        self.feedbackPolicy = feedbackPolicy
     }
     public func validate() throws {
         try function.validate()
@@ -49,12 +52,12 @@ public struct ActionBinding: Sendable {
     public func exposed(as protocols: Set<CallProtocol>, resultPolicy: DirectResultPolicy? = nil) -> Self {
         .init(
             function: function, protocols: protocols, executionPolicy: executionPolicy,
-            directResultPolicy: resultPolicy ?? directResultPolicy)
+            directResultPolicy: resultPolicy ?? directResultPolicy, feedbackPolicy: feedbackPolicy)
     }
     public init(
         path: ActionIdentifier, displayName: String, kind: Kind, completion: String, serializationKey: String? = nil,
         protocols: Set<CallProtocol> = [.action], executionPolicy: ExecutionPolicy = .scheduled(channel: "main"),
-        directResultPolicy: DirectResultPolicy = .completionOnly,
+        directResultPolicy: DirectResultPolicy = .completionOnly, feedbackPolicy: FeedbackPolicy = .recordOnly,
         resources: Set<ActionResource> = [], timeout: Duration? = nil,
         resolvingResources: (@Sendable (FunctionRequest) throws -> Set<ActionResource>)? = nil,
         estimatingDuration: (@Sendable (FunctionRequest) throws -> ActionExecutionBudget)? = nil,
@@ -63,7 +66,8 @@ public struct ActionBinding: Sendable {
         self.init(
             path: path, displayName: displayName, kind: kind, completion: completion,
             serializationKey: serializationKey, protocols: protocols, executionPolicy: executionPolicy,
-            directResultPolicy: directResultPolicy, resources: resources, timeout: timeout,
+            directResultPolicy: directResultPolicy, feedbackPolicy: feedbackPolicy, resources: resources,
+            timeout: timeout,
             resolvingResources: resolvingResources, estimatingDuration: estimatingDuration,
             completing: { invocation in
                 try await handler(invocation)
@@ -73,7 +77,7 @@ public struct ActionBinding: Sendable {
     public init(
         path: ActionIdentifier, displayName: String, kind: Kind, completion: String, serializationKey: String? = nil,
         protocols: Set<CallProtocol> = [.action], executionPolicy: ExecutionPolicy = .scheduled(channel: "main"),
-        directResultPolicy: DirectResultPolicy = .completionOnly,
+        directResultPolicy: DirectResultPolicy = .completionOnly, feedbackPolicy: FeedbackPolicy = .recordOnly,
         resources: Set<ActionResource> = [], timeout: Duration? = nil,
         resolvingResources: (@Sendable (FunctionRequest) throws -> Set<ActionResource>)? = nil,
         estimatingDuration: (@Sendable (FunctionRequest) throws -> ActionExecutionBudget)? = nil,
@@ -84,26 +88,31 @@ public struct ActionBinding: Sendable {
                 path: path, displayName: displayName, kind: kind, completion: completion,
                 serializationKey: serializationKey, resources: resources, timeout: timeout,
                 resolvingResources: resolvingResources, estimatingDuration: estimatingDuration, completing: completing),
-            protocols: protocols, executionPolicy: executionPolicy, directResultPolicy: directResultPolicy)
+            protocols: protocols, executionPolicy: executionPolicy, directResultPolicy: directResultPolicy,
+            feedbackPolicy: feedbackPolicy)
     }
     public init(
         path: String, displayName: String? = nil, resources: Set<ActionResource> = [], timeout: Duration? = nil,
+        feedbackPolicy: FeedbackPolicy = .recordOnly,
         handler: @escaping ActionValueHandler
     ) {
         self.init(
             path: Self.address(path), displayName: displayName ?? path, kind: .finite,
             completion: "Return after joined execution.", serializationKey: Self.address(path).domain,
-            protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning, resources: resources,
+            protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning,
+            feedbackPolicy: feedbackPolicy, resources: resources,
             timeout: timeout, completing: { .value(try await handler($0)) })
     }
     public init(
         path: String, displayName: String? = nil, resources: Set<ActionResource> = [], timeout: Duration? = nil,
+        feedbackPolicy: FeedbackPolicy = .recordOnly,
         completing: @escaping ActionHandler
     ) {
         self.init(
             path: Self.address(path), displayName: displayName ?? path, kind: .finite,
             completion: "Complete after joined execution.", serializationKey: Self.address(path).domain,
-            protocols: [.tool], executionPolicy: .direct, resources: resources, timeout: timeout, handler: completing)
+            protocols: [.tool], executionPolicy: .direct, feedbackPolicy: feedbackPolicy, resources: resources,
+            timeout: timeout, handler: completing)
     }
     private static func address(_ path: String) -> ActionIdentifier {
         let parts = path.split(separator: ".", omittingEmptySubsequences: false).map(String.init)

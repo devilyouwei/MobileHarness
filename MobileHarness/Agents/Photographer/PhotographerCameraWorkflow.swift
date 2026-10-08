@@ -9,8 +9,10 @@ struct PhotographerCameraWorkflow {
     }
     private var pending: Pending?
     private(set) var lastResult: ToolResult?
-    private static let permissions = ["open", "close", "flip", "retry"].map {
-        InternalTool(path: "Camera.Capture." + $0, required: $0 == "flip" ? ["facing"] : [])
+    private static let permissions = ["open", "close", "flip", "retry", "savePhoto", "ignorePhoto"].map {
+        InternalTool(
+            path: "Camera.Capture." + $0, required: $0 == "flip" ? ["facing"] : [],
+            optional: $0 == "savePhoto" || $0 == "ignorePhoto" ? ["photoID"] : [])
     }
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
         try capabilities.adding(internalTools: permissions)
@@ -58,7 +60,9 @@ struct PhotographerCameraWorkflow {
             else {
                 throw CommunicationError.invalidPayload
             }
-            let permitted = try permission.call(intent.facing.map { ["facing": $0.rawValue] } ?? [:])
+            var arguments = intent.facing.map { ["facing": $0.rawValue] } ?? [:]
+            if let id = intent.photoID { arguments["photoID"] = id.uuidString }
+            let permitted = try permission.call(arguments)
             let call = ToolCall(id: intent.requestID, toolPath: permitted.toolPath, arguments: permitted.arguments)
             pending = Pending(requestID: intent.requestID, input: input)
             return (.toolCall(call), input)

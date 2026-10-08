@@ -40,10 +40,8 @@ public actor ToolRegistry {
         let path =
             definition.path.domain.isEmpty && definition.path.module.isEmpty
             ? definition.path.function : definition.path.description
-        if case .scheduled(let channel) = definition.executionPolicy {
-            guard ActionIdentifier.validName(channel), definition.protocols.contains(.action) else {
-                throw ToolRegistrationError.invalidDefinition(path)
-            }
+        guard case .direct = definition.executionPolicy else {
+            throw ToolRegistrationError.invalidDefinition(path)
         }
         do { try definition.validate() } catch { throw ToolRegistrationError.invalidDefinition(path) }
         guard definition.protocols.contains(.tool) else { throw ToolRegistrationError.invalidDefinition(path) }
@@ -86,10 +84,12 @@ public actor ToolRegistry {
         guard let binding = definitions[path], let function = functions.find(binding.path) else { return nil }
         return ActionBinding(
             function: function, protocols: binding.protocols,
-            executionPolicy: binding.executionPolicy, directResultPolicy: binding.directResultPolicy)
+            executionPolicy: binding.executionPolicy, directResultPolicy: binding.directResultPolicy,
+            feedbackPolicy: binding.feedbackPolicy)
     }
     public func returnsResult(for path: String) -> Bool {
-        (definitions[path]?.directResultPolicy ?? .returning) == .returning
+        definitions[path]?.feedbackPolicy == .observation
+            || (definitions[path]?.directResultPolicy ?? .returning) == .returning
     }
     private static func request(_ call: ToolRequest) -> FunctionRequest {
         let parts = call.toolPath.split(separator: ".").map(String.init)

@@ -139,6 +139,11 @@
                     .accessibilityIdentifier("camera.poseStatistics")
                 }
             }
+            .overlay {
+                if let photo = camera.capturedPhoto {
+                    CapturedPhotoView(photo: photo, camera: camera, controls: controls).id(photo.id).ignoresSafeArea()
+                }
+            }
             .preferredColorScheme(.dark)
 
         }

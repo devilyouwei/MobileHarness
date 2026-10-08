@@ -104,3 +104,10 @@ flowchart LR
 ```
 
 ✅ ADR0149: origin is explicit metadata, separate from domain schema. OutputGateway constructs Agent-origin messages with a bound incarnation; public external admission rejects claimed Agent/Runtime origin and execution feedback payloads. Runtime execution feedback uses owner-scoped delivery. ❌ Legacy host runtime.event commands remain externally admitted until typed control migration.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ Runtime-only roundResult admission preserves owner incarnation, session, turn, parent and root. External callers cannot forge generation feedback.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).

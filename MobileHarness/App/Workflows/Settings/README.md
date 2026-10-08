@@ -219,3 +219,7 @@ CameraInteractionWorkflow forwards typed operations. Root UI requests use InputG
 Camera transport errors expose bounded producer descriptions for UI while retaining the complete execution outcome/report for callers. Closing transport cancels accepted work; it admits no new dispatch.
 
 ✅ Interaction refinement: Manual switch resolves the opposite of current facing before admission; PhotographerIntentRuntime carries that explicit facing through the existing bounded request slot.
+
+## Photo save and ignore — ADR0185
+
+✅ PhotographerIntentRuntime transports optional photoID and returns the actual bounded native value after execution and terminal acknowledgment. CameraInteractionWorkflow supplies save/ignore intents in its existing single command slot, rejects overlap and retains failures in photoMessage even with the camera off. It reports a committed album write honestly if later request completion fails. No UI page owns these operations.

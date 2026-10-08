@@ -270,7 +270,9 @@ struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionBinding] {
         ["express", "setExpression", "beginReplyTurn", "print"].map {
             ActionBinding(
-                path: ActionPath(domain: "UI", module: "Expression", function: $0), displayName: "测试动作",
+                path: ActionPath(
+                    domain: "UI", module: ["beginReplyTurn", "print"].contains($0) ? "Caption" : "Expression",
+                    function: $0), displayName: "测试动作",
                 kind: $0 == "express" ? .finite : .state,
                 completion: "Test presentation accepted.", handler: { _ in })
         } + [
@@ -279,6 +281,13 @@ struct NexArmAssistantUIModule: ActionModule {
                 kind: .finite,
                 completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") })
         ]
+            + ["takePhoto", "savePhoto", "ignorePhoto"].map {
+                ActionBinding(
+                    path: ActionPath(domain: "Camera", module: "Capture", function: $0),
+                    displayName: "Unavailable photo fixture", kind: .finite,
+                    completion: "No camera is bound in robot fixtures.",
+                    handler: { _ in throw CameraControlError.unavailable })
+            }
     }
 }
 

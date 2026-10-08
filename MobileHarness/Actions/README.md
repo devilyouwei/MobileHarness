@@ -125,3 +125,9 @@ See [Contracts](Contracts/README.md), [Agent-driven architecture](../README.md) 
 ✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
 
 ✅ Interaction refinement: Camera flip selects an explicit front/back target with validated required arguments and an injected typed capability; no toggle fallback.
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Camera.Capture.takePhoto returns validated JSON photo metadata after capture/save/presentation through the injected host. Calling protocol remains separate.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.

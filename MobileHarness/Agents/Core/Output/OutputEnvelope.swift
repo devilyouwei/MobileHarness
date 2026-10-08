@@ -8,8 +8,16 @@ public struct OutputEnvelope: Sendable {
     public let sessionID: UUID
     public let turn: AgentTurn?
     public let sequence: UInt64
+    public let roundID: UUID?
+    public let callID: UUID?
+    public var schedulingID: UUID { roundID ?? inputID }
     public let output: AgentOutput
-    public init(source: AgentID, input: AgentInput, output: AgentOutput, sequence: UInt64 = 0) {
+    public init(
+        source: AgentID, input: AgentInput, output: AgentOutput, sequence: UInt64 = 0, roundID: UUID? = nil,
+        callID: UUID? = nil
+    ) {
+        self.roundID = roundID
+        self.callID = callID
         self.inputMetadata = input.metadata
         self.turn = input.turn
         self.sequence = sequence

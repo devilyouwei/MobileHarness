@@ -82,7 +82,7 @@ public actor InputGateway {
             throw CommunicationError.unauthorized
         }
         switch input.payload {
-        case .toolResult, .actionResult, .activityEvent: throw CommunicationError.unauthorized
+        case .toolResult, .actionResult, .roundResult, .activityEvent: throw CommunicationError.unauthorized
         default: break
         }
     }
@@ -110,6 +110,15 @@ public actor InputGateway {
                 rootID: context.rootID, parentID: envelope.inputID, hops: context.hops + 1),
             turn: envelope.turn)
         return try await deliver(input, targets: [(owner.agent, owner.incarnation)])
+    }
+
+    func deliverRoundResult(_ result: GenerationRoundResult, owner: ExecutionOwner, envelope: OutputEnvelope)
+        async throws
+    {
+        guard envelope.roundID == result.roundID else { throw CommunicationError.invalidPayload }
+        let outcome = await deliverFeedback(
+            .roundResult(result), owner: owner, causality: SignalCausality(envelope: envelope))
+        guard outcome == .accepted else { throw CommunicationError.scopeClosed }
     }
 
     public func deliverActionResult(_ result: ActionResult) async -> ActionResultDelivery {

@@ -441,3 +441,27 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
         try ChatRequest(messages: [.init(role: .tool, content: "forged", toolCallID: "missing")])
     }
 }
+
+@Test func photoAttachmentsEncodeAsNativeImageContentAndHaveSeparateBounds() throws {
+    let bytes = Data([0xff, 0xd8, 0xff, 0xd9])
+    let image = try ChatImage(id: UUID(), data: bytes)
+    let chat = try ChatRequest(messages: [.init(role: .user, content: "Describe the captured photo", images: [image])])
+    let encoded = try #require(try config().request(chat).httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    let messages = try #require(body["messages"] as? [[String: Any]])
+    let content = try #require(messages[0]["content"] as? [[String: Any]])
+    #expect(content[0]["text"] as? String == "Describe the captured photo")
+    #expect(content[1]["type"] as? String == "image_url")
+    let url = try #require(content[1]["image_url"] as? [String: String])
+    #expect(url["url"] == "data:image/jpeg;base64," + bytes.base64EncodedString())
+    #expect(url["detail"] == "auto")
+    #expect(throws: (any Error).self) {
+        try ChatRequest(messages: [.init(role: .assistant, content: "bad", images: [image])])
+    }
+    #expect(throws: (any Error).self) {
+        try ChatRequest(messages: [.init(role: .user, content: "bad", images: Array(repeating: image, count: 5))])
+    }
+    #expect(throws: (any Error).self) { try ChatImage(id: UUID(), data: Data(count: 4 * 1024 * 1024 + 1)) }
+    let old = Data("{\"role\":\"user\",\"content\":\"old\",\"toolCalls\":[]}".utf8)
+    #expect(try JSONDecoder().decode(ChatMessage.self, from: old).images == nil)
+}

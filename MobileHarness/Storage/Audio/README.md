@@ -39,7 +39,7 @@ flowchart LR
 
 ✅ Audio remains a business storage domain compiled as StorageAudio. Generic streams and leases remain in the outer Storage core; sibling Chat compiles separately and introduces no Audio dependency.
 
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+✅ Bounded owned JPEG storage is implemented for photo observations (ADR0184). ❌ Galleries/video/semantic-memory stores remain planned.
 
 ✅ StorageAudio depends only on Storage. Callers convert Agent identity to its raw source string; the same source/session/input tuple still fences checkout, release and cancellation.
 

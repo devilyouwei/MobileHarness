@@ -2,12 +2,50 @@
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
+## 2026-10-09 — History image thumbnails
+
+- History details show images sent to the model as thumbnails in the actual context section; tapping opens a read-only full-screen preview. Legacy metadata-only image references remain readable, and missing photos stay blank without storage explanations.
+- Assistant writes structured imageReferences alongside exact request text/native calls; image bytes remain outside the JSON journal. Composition shares the existing photo store with camera and history. The history reader validates selected turn/reference ownership, reads by original producing input, admits at most four concurrent loads and propagates cancellation/failure.
+- UI bounds retained image data to4MiB, thumbnail decoding to320 pixels and preview decoding to2048 pixels. Tests cover structured/legacy metadata, deduplication, ownership, missing/corrupt references, failure, read bounds and cancellation. No new directory, module, dependency or storage path.
+- Build, test and installation evidence is recorded in Validation-History; native visual acceptance remains separate.
+
+## 2026-10-09 — Orange ReACT presentation
+
+- Changed ReACT badge tint, list text/background and detail input-label accent to orange. Layout, row ordering, recorded values and interaction are unchanged.
+- This is a color-only refinement; no new behavior tests were added. Repository/build/installation evidence is recorded in Validation-History.
+
+## 2026-10-09 — Empty values in conversation history
+
+- Removed legacy storage explanations from history lists, details and export. Missing model text, usage, first-token timing, finish reason and Tool outcomes are empty instead of synthetic placeholder text.
+- Legacy continuations no longer display copied parent time/state or execution errors. Actual stored request content, model output, ReACT styling and recorded failures remain available. Persistence is unchanged.
+- Removed the obsolete evidenceNote presentation field and retained a UI-only metadata-availability flag. Regression and build/install evidence is recorded in Validation-History.
+
+## 2026-10-08 — Conversation history per model request
+
+- Reordered details to current input, model text/native Tool Calls, generation evidence including first text-token arrival, actual context, then actual Tools. Removed inline raw sharing and the detail continuation section; retained one upper-right export.
+- Flattened model invocations into peer list items, with ReACT badge, purple text/background and actual fresh execution observations as input. Details/export retain both model-round and owning-input identities and distinguish model completion from owner/execution errors.
+- Added optional nested modelRequests evidence under the original input, preserving existing runtime/context ownership and v1 decoding. New records stop writing duplicate continuationRequests; legacy continuations explicitly disclose unavailable per-request outputs/timing/status. Attachment bytes remain excluded.
+- Final full checks and unsigned device-target compilation passed; Simulator remains blocked by the external CoreAI module. See [validation evidence](Validation-History.md#2026-10-08--per-request-conversation-history); native UI/live-provider/physical acceptance remains pending.
+
 ## 2026-10-08 — Signal classification documentation
 
 - Expanded the overall Signal contract with origin/payload comparison, typed user-click intent routes and current external/internal domain inputs. Signal uses composition rather than inheritance; host/native inputs remain External even within the App process.
 - Clarified camera activity production versus delivered Runtime feedback, missing video/binary payloads and current working generation-round feedback. No runtime code changed.
 - Verified definitions, domain adapters, receiving Agent configurations, camera event producer and Gateway feedback entry points. Documentation formatting and relative links checked; builds and physical acceptance are outside this documentation-only change.
 
+## 2026-10-08 — Assistant photo Action and image observation (ADR0184)
+
+- Assistant exposes Camera.Capture.takePhoto on Camera Channel, registered observation. It directly invokes the camera host, without Photographer delegation, to validate ActionResult plus optional native ToolResult through the existing sealed-round loop.
+- AppleCamera adds bounded joined JPEG capture; CameraCoordinator scopes capture/save/presentation to the originating invocation. Photos persist in a bounded owner-checked Storage store. The UI fades the complete image, shrinks it to the lower-right thumbnail and supports inspection; success waits for animation completion. Native shutter audio remains platform-owned.
+- ChatMessage supports bounded user-role image attachments. Cloud serialization emits text/image_url parts; current provider capability is explicit and Gemma rejects image chat. Assistant resolves only successful owned photo results and attaches bytes to its next request; history retains attachment metadata and omits bytes.
+- Synthetic Gateway/mixed-route, capture/read/provider failure, owned persistent storage, exact image JSON and legacy transcript regressions passed. See [ADR0184](adr/0184-assistant-photo-observation.md) and [validation history](Validation-History.md#2026-10-08--assistant-photo-observation-loop).
+
+## 2026-10-08 — Registered Action/Tool generation rounds (ADR0183)
+
+- Split text/XML Action dispatch from native Tool execution. Assistant text, captions and reply-turn start use Actions; native Tools bypass Channel/wait and run under a four-worker/sixteen-call input bound. Removed scheduled native projection and reject scheduled native bindings.
+- Host registration explicitly selects recordOnly/observation. Every initializer defaults recordOnly; value/void/error transport does not opt in to continuation. Both result types retain call/round correlation and join a full-round barrier before ordered merge, history evidence and another model request.
+- Added typed round sealing, causal feedback validation, bounded terminal delivery, cancellation/join ownership and execution-versus-delivery failure separation. Existing deterministic Agents retain native presentation routes. No new module, directory or dependency.
+- See [ADR0183](adr/0183-generation-round-observations.md) for ownership, limits, flow diagram and [validation history](Validation-History.md#2026-10-08--registered-actiontool-generation-rounds) for automated and device-target evidence.
 
 ## 2026-10-08 — Lower finalized user caption
 
@@ -198,3 +236,20 @@ ADR0175 final verification: full574 integration/47 workflow tests, unsigned iOS 
 ✅ ADR0177–0179 complete the existing-route migration: provider discovery policy moves to Actions; provider forms become passive and success/error projection uses registered functions; cloud native results continue under bounded correlated reasoning; device/navigation/camera human intents enter Agents and share canonical functions with model grants; current environment and resource/provider/device facts are queryable; UI no longer imports StorageChat. Manual motor workers retain their native arrival/tolerance/timeout behavior and report independent terminal failures through ActionResult. Assistant also has explicit model download/cancel grants.
 
 New photo/system pickers, generic progress/request-reply, provider-changing session handoff, the separate resource-state-store plan and remote/durable transport remain product extensions. Automated tests/builds do not establish live-provider, Keychain, camera/BLE gesture or hardware acceptance. Evidence is recorded in Validation-History.md.
+
+## 2026-10-08 — Photo overlay touch and voice recovery
+
+Thumbnail inspection uses a compact Button; the full fade/shrink layer passes touches through. ReAct keeps recognition admission closed, including stale perception presentation. Full reply/playback completion restores listening explicitly. Native output workers are scoped per input; a failed reply cancels/joins its work and retains the Assistant subscriber for retry. Regression tests cover cancelled worker joins, retry Tools and intermediate round seals. Native touch/model acceptance remains pending.
+
+## 2026-10-08 — Photo save and ignore
+
+Added current-photo save/ignore Actions and Photographer intents shared by UI and dialogue, actual receipt return and observation-based confirmation. Add-only native Photos import waits for OS completion and prevents duplicate saves while displayed. Thumbnail/fullscreen controls provide save and ignore without intercepting voice controls. Scheduled Actions now carry validated invocation-scoped delegation authority like Tools. See ADR0185 for ownership, cancellation and acceptance limits.
+
+
+## 2026-10-08 — Independent native Tool and text Action consumers
+
+Assistant now demultiplexes model protocol fields into bounded text/Action and native Tool workers. App output transport has independent consumers: four active Tools cannot block Action/wait admission, and Action preparation/admission cannot block native calls. Both branches close and join before the existing full-round result merge and downstream model continuation. Parser/dispatch failure cancels and joins siblings even while model output is open; cancellation, bounded rejection and failed-input recovery remain explicit. Shared device resources/deadlines are unchanged; generic Agent request/reply remains separate. No new directory, module or dependency. See ADR0183 and Validation-History for actual verification limits.
+
+## 2026-10-08 — Camera lens-switch latency
+
+Healthy front/back switching retains the capture session/output graph and resource lease instead of full teardown/reacquisition. Old perception is fenced immediately and replaced by a bounded root-owned worker after joined cleanup; native command acknowledgment no longer waits for that cleanup. Off/background/model maintenance still join retirement, and native failure is explicit. See [ADR0186](adr/0186-camera-lens-switch-lifetime.md); physical latency acceptance remains pending.

@@ -110,3 +110,7 @@ flowchart LR
 ✅ ADR0181: photography.camera/1 uses PhotographerCameraIntent operation/requestID with a512-byte bound and a fresh10-second routing deadline. It is a directed work command; trusted runtime cancellation is root-only. app.interaction removes camera and remains device/navigation only.
 
 ✅ Interaction refinement: PhotographerCameraIntent gains a finite Facing enum; flip requires facing, all other operations forbid it. The existing 512-byte bound remains.
+
+## Photo save and ignore — ADR0185
+
+✅ photography.camera/1 adds savePhoto/ignorePhoto with optional UUID photoID; IDs are forbidden on other operations and facing remains flip-only. Existing512-byte validation, root/Assistant provenance, one pending request and cancellation contracts remain. Old payloads decode without photoID.

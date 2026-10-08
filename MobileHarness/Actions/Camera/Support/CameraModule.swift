@@ -1,3 +1,4 @@
+import Foundation
 import FunctionContracts
 
 /// Host owns permission, capture leases and foreground lifecycle.
@@ -5,18 +6,61 @@ extension CameraActions {
     public enum Facing: String, Sendable { case front, back }
 }
 
+public struct CameraPhotoReceipt: Codable, Sendable, Equatable {
+    public let photoID: UUID
+    public let width: Int
+    public let height: Int
+    public let mimeType: String
+    public init(photoID: UUID, width: Int, height: Int, mimeType: String = "image/jpeg") throws {
+        guard width > 0, height > 0, width <= 4096, height <= 4096, mimeType == "image/jpeg" else {
+            throw CameraControlError.unavailable
+        }
+        self.photoID = photoID
+        self.width = width
+        self.height = height
+        self.mimeType = mimeType
+    }
+}
+
+public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
+    public enum State: String, Codable, Sendable { case saved, ignored }
+    public let photoID: UUID
+    public let state: State
+    public let alreadySaved: Bool
+    public init(photoID: UUID, state: State, alreadySaved: Bool = false) {
+        self.photoID = photoID
+        self.state = state
+        self.alreadySaved = alreadySaved
+    }
+}
+
 public protocol CameraControlCapability: Sendable {
+    func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
+    func ignorePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
+    func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt
+    func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
     func retry(invocation: any FunctionInput) async throws
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
 }
 
-public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailureProviding {
+public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailureProviding, LocalizedError {
     case notForeground
     case busy
     case disabled
     case permissionDenied
     case unavailable
+    case photoUnavailable
+    public var errorDescription: String? {
+        switch self {
+        case .notForeground: "请回到应用前台再操作"
+        case .busy: "照片或相机操作正在执行，请稍后重试"
+        case .disabled: "相机尚未开启"
+        case .permissionDenied: "未获得所需权限，请在系统设置中允许"
+        case .unavailable: "相机或照片能力暂不可用"
+        case .photoUnavailable: "这张照片已被忽略或替换，当前没有可操作的照片"
+        }
+    }
     public var executionFailureCode: ActionExecutionFailureCode {
         switch self {
         case .permissionDenied: .permissionDenied
@@ -24,6 +68,7 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
         case .busy: .init(rawValue: "busy")
         case .disabled: .init(rawValue: "disabled")
         case .unavailable: .init(rawValue: "unavailable")
+        case .photoUnavailable: .init(rawValue: "photoUnavailable")
         }
     }
 }
@@ -33,6 +78,15 @@ public struct CameraModule: CapabilityModule {
     public init(camera: any CameraControlCapability) { self.camera = camera }
     public var definitions: [ActionFunction] {
         [
+            CameraActions.savePhotoDefinition(completing: { [camera] invocation in
+                .value(try await CameraActions.savePhoto(invocation: invocation, using: camera))
+            }),
+            CameraActions.ignorePhotoDefinition(completing: { [camera] invocation in
+                .value(try await CameraActions.ignorePhoto(invocation: invocation, using: camera))
+            }),
+            CameraActions.takePhotoDefinition(completing: { [camera] invocation in
+                .value(try await CameraActions.takePhoto(invocation: invocation, using: camera))
+            }),
             CameraActions.retryDefinition(handler: { [camera] invocation in
                 try await CameraActions.retry(invocation: invocation, using: camera)
             }),
@@ -50,5 +104,17 @@ public struct CameraModule: CapabilityModule {
 }
 
 extension CameraControlCapability {
+    public func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func ignorePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data {
+        throw CameraControlError.unavailable
+    }
     public func retry(invocation: any FunctionInput) async throws { try await setEnabled(true, invocation: invocation) }
 }

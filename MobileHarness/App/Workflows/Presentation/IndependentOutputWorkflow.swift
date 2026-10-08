@@ -1,7 +1,117 @@
 import AgentCore
+import Foundation
 
 /// Consume an optional subscriber independently; failures are reported, never silently discarded.
 public enum IndependentOutputWorkflow {
+    /// Independent protocol consumers; only a round/input boundary joins both branches.
+    public static func consumeGeneration(
+        _ outputs: AsyncStream<OutputEnvelope>,
+        dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
+    ) async throws {
+        let reader = OutputStreamReader(outputs)
+        while true {
+            let tools = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+            let actions = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
+            let boundary = try await withThrowingTaskGroup(
+                of: BranchCompletion.self, returning: OutputEnvelope?.self
+            ) { group in
+                group.addTask {
+                    try await consumeTools(tools.stream, dispatch: dispatch)
+                    return .drained
+                }
+                group.addTask {
+                    for await envelope in actions.stream {
+                        try Task.checkCancellation()
+                        try await dispatch(envelope)
+                    }
+                    try Task.checkCancellation()
+                    return .drained
+                }
+                group.addTask {
+                    let boundary = try await reader.routeRound(tools: tools.continuation, actions: actions.continuation)
+                    return .boundary(boundary)
+                }
+                defer {
+                    group.cancelAll()
+                    tools.continuation.finish()
+                    actions.continuation.finish()
+                }
+                var boundary: OutputEnvelope?
+                var cancelling = false
+                while !group.isEmpty {
+                    do {
+                        guard let completion = try await group.next() else { break }
+                        if case .boundary(let envelope) = completion {
+                            boundary = envelope
+                            cancelling = envelope.map { isFailure($0.output) } ?? true
+                            if cancelling { group.cancelAll() }
+                            tools.continuation.finish()
+                            actions.continuation.finish()
+                        }
+                    } catch is CancellationError {
+                        if !cancelling { throw CancellationError() }
+                    }
+                }
+                try Task.checkCancellation()
+                return boundary
+            }
+            guard let boundary else { return }
+            try await dispatch(boundary)
+        }
+    }
+
+    private enum BranchCompletion: Sendable {
+        case drained
+        case boundary(OutputEnvelope?)
+    }
+
+    fileprivate static func isFailure(_ output: AgentOutput) -> Bool {
+        guard case .control(let value) = output else { return false }
+        return value.hasPrefix("assistant.error:") || value.hasPrefix("agent.error:")
+    }
+
+    private enum ToolCompletion: Sendable {
+        case next(OutputEnvelope?)
+        case executed
+    }
+
+    private static func consumeTools(
+        _ outputs: AsyncStream<OutputEnvelope>,
+        dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
+    ) async throws {
+        let reader = OutputStreamReader(outputs)
+        try await withThrowingTaskGroup(of: ToolCompletion.self) { group in
+            var active = 0
+            var reading = true
+            var closed = false
+            group.addTask { .next(try await reader.next()) }
+            defer { group.cancelAll() }
+            while let completion = try await group.next() {
+                switch completion {
+                case .next(let envelope):
+                    reading = false
+                    if let envelope {
+                        active += 1
+                        group.addTask {
+                            try Task.checkCancellation()
+                            try await dispatch(envelope)
+                            return .executed
+                        }
+                    } else {
+                        closed = true
+                    }
+                case .executed:
+                    active -= 1
+                }
+                if !closed, !reading, active < 4 {
+                    reading = true
+                    group.addTask { .next(try await reader.next()) }
+                }
+            }
+            try Task.checkCancellation()
+        }
+    }
+
     public static func consume(
         _ outputs: AsyncStream<OutputEnvelope>,
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void,
@@ -18,5 +128,68 @@ public enum IndependentOutputWorkflow {
             }
         }
         try Task.checkCancellation()
+    }
+}
+
+/// One transport reader only demultiplexes; protocol consumers never wait on each other's slots.
+private actor OutputStreamReader {
+    private var iterator: AsyncStream<OutputEnvelope>.Iterator?
+    private var inputID: UUID?
+    private var nativeCalls = 0
+
+    init(_ outputs: AsyncStream<OutputEnvelope>) { iterator = outputs.makeAsyncIterator() }
+
+    func next() async throws -> OutputEnvelope? {
+        guard var iterator = self.iterator else { throw HarnessError.invalidTransition }
+        self.iterator = nil
+        defer { self.iterator = iterator }
+        let envelope = await iterator.next(isolation: self)
+        try Task.checkCancellation()
+        return envelope
+    }
+
+    func routeRound(
+        tools: AsyncStream<OutputEnvelope>.Continuation,
+        actions: AsyncStream<OutputEnvelope>.Continuation
+    ) async throws -> OutputEnvelope? {
+        while let envelope = try await next() {
+            try Task.checkCancellation()
+            if let inputID {
+                guard inputID == envelope.inputID else { throw HarnessError.invalidTransition }
+            } else {
+                inputID = envelope.inputID
+                nativeCalls = 0
+            }
+            let terminal: Bool
+            if case .control(let value) = envelope.output {
+                terminal =
+                    IndependentOutputWorkflow.isFailure(envelope.output)
+                    || value == "assistant.finished" || value == "agent.finished"
+            } else {
+                terminal = false
+            }
+            if terminal {
+                inputID = nil
+                return envelope
+            }
+            if case .roundFinished = envelope.output { return envelope }
+            let native: Bool
+            switch envelope.output {
+            case .toolCall: native = envelope.roundID != nil
+            case .rejectedCall(let rejection): native = rejection.kind == .tool && envelope.roundID != nil
+            default: native = false
+            }
+            if native {
+                guard nativeCalls < 16 else { throw HarnessError.queueFull }
+                nativeCalls += 1
+            }
+            switch (native ? tools : actions).yield(envelope) {
+            case .enqueued: break
+            case .dropped, .terminated: throw HarnessError.queueFull
+            @unknown default: throw HarnessError.queueFull
+            }
+        }
+        try Task.checkCancellation()
+        return nil
     }
 }

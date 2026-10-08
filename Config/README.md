@@ -12,3 +12,7 @@ Purpose: own shared Xcode settings, local-signing templates and explicit metadat
 Weights are acquired in Settings through Management/ModelKitHub and installed in the sandbox. Separate Mac/comparison provisioning profiles are not App resource inputs. See [Management](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
 
 ✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.
+
+## Photo save and ignore — ADR0185
+
+✅ NSPhotoLibraryAddUsageDescription requests only adding explicitly saved photos. Camera purpose text covers user-requested still capture and sending a requested observation to the configured model service. No Photos read permission or album enumeration is added.

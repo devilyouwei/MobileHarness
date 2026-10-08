@@ -353,7 +353,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation and response policy; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs; Photographer owns camera control and tracking policy; Memory owns deterministic history intent and result-driven deletion. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
 
-**Behavior.** Actions owns protocol-neutral callable functions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall follows its binding's direct or scheduled policy. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
+**Behavior.** Actions owns protocol-neutral callable functions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
 **Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates reusable mechanisms from Chat and Audio domains. ModelKit, PlatformKit and StorageAudio own their separate capability/storage contracts.
 
@@ -619,7 +619,7 @@ Actions owns six business domains: UI, Speech, Camera, History, System and NexAr
 
 `@Action` produces one protocol-neutral `ActionFunction` with a `FunctionInput` handler, completion metadata, serialization key, resources and static/dynamic execution budgets. `ActionCompletion` carries a value, structured child report/terminal issue or declared completion/activity identity. FunctionRequest contains canonical address and parameters, without Channel, wait membership or a protocol discriminator. Opaque execution context and a host-supplied report sink preserve correlation without granting permission.
 
-App freezes one validated catalog (at most 32 supplied catalog modules and 256 functions) and creates `ActionBinding` values. Bindings independently select protocol availability, native direct/scheduled execution and native feedback policy. Unknown modules, duplicate addresses and invalid metadata fail startup. Neither protocol projection nor an Agent argument may weaken intrinsic constraints. Registration availability does not grant Agent permission.
+App freezes one validated catalog (at most 32 supplied catalog modules and 256 functions) and creates `ActionBinding` values. Bindings independently select protocol availability, direct native execution and native feedback policy. Unknown modules, duplicate addresses and invalid metadata fail startup. Neither protocol projection nor an Agent argument may weaken intrinsic constraints. Registration availability does not grant Agent permission.
 
 ```mermaid
 flowchart LR
@@ -644,7 +644,7 @@ FunctionContracts under Actions/Contracts is the independent input/metadata/outc
 | Agent declaration | Canonical address and independent grants | Text aliases/default Channels versus native names/schemas |
 | Model input | Selected capabilities | Action catalog in context prompt versus declarations in ChatRequest.tools |
 | Output parsing | Canonical address and validated parameters | Text tags become ActionCall; native events become ToolCall |
-| Execution | Resources, budgets, reports and joined cleanup | Channel/wait scheduling versus binding-selected direct/scheduled native policy |
+| Execution | Resources, budgets, reports and joined cleanup | Channel/wait scheduling versus direct native execution |
 | Feedback | Actual outcome and causal context | ActionResult versus ToolResponse/ToolResult and declared feedback policy |
 
 Agent JSON v6 uses three-field Action paths and native declarations shaped as `{path: {domain, module, function}, definition: ...}`. Only the native definition reaches the provider; its name is an Agent-local alias. Incompatible configuration versions fail explicitly. Text deltas pass through AgentGenerator and native events through ToolCallParser; both resolve inside Agents. Tool results never implicitly become executable markup. Unsupported providers receive no native declarations.
@@ -658,12 +658,12 @@ Returned values are limited to 64 KiB UTF-8 and reject explicitly before deliver
 | Dimension | ActionCall | ToolCall |
 | --- | --- | --- |
 | Resolution | Action path, arguments and effective Channel | Tool path and arguments |
-| Dispatch | OutputGateway → ChannelScheduler → CallRuntime → ExecutionRuntime | OutputGateway → ToolDispatcher → direct ToolExecutor or scheduled native projection → ExecutionRuntime |
-| Ordering | Task-local Channel FIFO and nested wait groups | Binding selects direct execution or an isolated scheduled child on its declared Channel |
+| Dispatch | OutputGateway → ChannelScheduler → CallRuntime → ExecutionRuntime | OutputGateway → ToolDispatcher → direct ToolExecutor → ExecutionRuntime |
+| Ordering | Task-local Channel FIFO and nested wait groups | Direct execution outside XML Channel/wait; Assistant host pump bounds concurrency |
 | Completion | Registered handler boundary plus task finish barrier | Returned value or completion-only, fixed at registration |
 | Feedback | Declared ActionResult; ActivityEvent has a separate producer-owned lifecycle | Returning ToolResult re-enters InputGateway |
 
-Both protocols execute the same function and preserve its resources, budgets and cleanup. A scheduled native call uses one isolated child scope outside model XML waits, with one admitted job and one bounded result receipt. Cancellation joins that child; native feedback produces one ToolResult and no duplicate ActionResult.
+Both protocols execute the same function and preserve resources, budgets and cleanup. Native calls bypass Channel/wait; Action and Tool terminal results remain separate until the Agent merges a sealed round.
 
 ```mermaid
 flowchart LR
@@ -1054,7 +1054,7 @@ Actions/Camera follows the domain root + Support layout and binds Camera.Capture
 
 ### Cloud native Tool generation
 
-Cloud ChatRequest carries JSON v6 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; Returning ToolResult enters InputGateway under the captured owner and causal context. Complete cloud native Tool results drive bounded continuation. Native Tool events on local Gemma 4 E2B remain unsupported; local text/Action generation is implemented.
+Cloud ChatRequest carries JSON v6 Tools separately from the Action prompt. The cloud adapter assembles bounded indexed SSE tool_calls, maps provider-safe names back to declarations, and emits complete ChatEvent.toolCall values. Assistant resolves them with AgentCore ToolCallParser and emits ToolCall through OutputGateway. Tool-only turns complete normally; Returning ToolResult enters InputGateway under the captured owner and causal context. Registered Action/Tool observations drive bounded continuation after a full-round barrier. Native Tool events on local Gemma 4 E2B remain unsupported; local text/Action generation is implemented.
 
 ### Signal and Effect Scenarios
 
@@ -1261,7 +1261,7 @@ System permission prompts still require user interaction. Presenting a picker do
 | Signal and host facts | ✅ Unified envelope/origins, schemas, causal results, typed history/resource/provider/device/navigation/camera input, sequenced scene/navigation/device facts | ❌ Additional sensor adapters and video/binary payload codecs |
 | Executable capabilities | ✅ Protocol-neutral Actions, shared execution, three-level addresses, explicit Action/Tool bindings and isolated errors | ❌ Physical acceptance of the expanded routes |
 | UI and history | ✅ Agent-selected queries/mutations, registered presentation/errors, shared navigation and camera/device functions | ❌ New system picker/photo-library capability and response correlation |
-| Conversation | ✅ Four-round bounded native Tool continuation, actual correlated results and exact continuation history; BLE discovery/connect grants | ❌ Generic domain request/reply and local-model native Tool support |
+| Conversation | ✅ Four-round policy-driven Action/Tool continuation, actual correlated results and exact continuation history; BLE discovery/connect grants | ❌ Generic domain request/reply and local-model native Tool support |
 | Execution lifecycle | ✅ Owned cancellation/join, causal ActionResult, independent manual-worker failure feedback and bounded result retention | ❌ General long-task progress/activity subscriptions |
 | Model/provider resources | ✅ Agent-routed commands/preferences/inventory/observations/errors and private provider transactions/presentation; current facts are model-readable | ❌ Model-initiated configuration changes with safe session handoff; native transfer/provider acceptance |
 | Decision context | ✅ Bounded root environment facts plus registered current inventory/provider/device reads | ❌ Full resource-state-store plan and push adapters |
@@ -1474,11 +1474,11 @@ sequenceDiagram
 ✅ Implemented: presentation-enabled provider intents select a second registered UI.ResourcePresentation.showProviderResult call after the business call, on success or failure. Headless requests retain one call. Private result lookup and revision/session fences prevent credentials in protocol payloads and stale form updates. One attempt only, no recursive presentation/replay; producer and presentation failure chains remain distinct. App injects the native UI endpoint; business functions remain independent of UI and call protocols.
 
 
-## Bounded native result continuation
+## Bounded registered-observation continuation
 
-✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
 
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
 
 
 ## Read-only model grants and shared capability facts
@@ -1497,7 +1497,7 @@ sequenceDiagram
 
 ## Independent history presentation values
 
-✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; legacy continuation records remain readable and missing values stay empty. UI target has zero project dependencies.
 
 
 ## Camera command entry
@@ -1556,7 +1556,7 @@ sequenceDiagram
     Input->>Root: Retain result without replay
 ```
 
-Tool continuation is distinct from scheduled Action result retention. A submitted native worker is not physically complete; its later failure does not rewrite the earlier admission acknowledgment. Native safety fences execute immediately in App before any fact delivery.
+Registration policy selects observation independently of Action/Tool protocol; both generated result routes join the same sealed-round barrier. A submitted native worker is not physically complete; its later failure does not rewrite the earlier admission acknowledgment. Native safety fences execute immediately in App before any fact delivery.
 
 
 ## Agent role organization
@@ -1579,3 +1579,46 @@ Tool continuation is distinct from scheduled Action result retention. A submitte
 ✅ Remaining application-operation domains are grouped in `Agents/ApplicationControl/`: model resources, Provider configuration, device/manual controls, navigation and environment facts. `ApplicationControlFunctions` owns fixed permissions; `ApplicationControlResourcePolicy` owns pure bounded decoding/classification; one actor retains shared transaction exclusion and correlated task state. `ApplicationControlIntentRuntime` is App-owned transport. Photographer and Memory retain their domains. Existing Signal schemas, Actions algorithms, queue bounds and native safety are preserved; terminal controls use application.control.finished/failed. ❌ Generic Assistant delegation to this role remains unimplemented.
 
 ✅ Interaction refinement: Camera.Capture.flip requires facing=front/back through Assistant → Photographer → native coordinator; user/assistant captions remain distinct within one turn. Existing ownership and Gateway flows are preserved.
+
+## Action/Tool generation rounds — ADR0183
+
+✅ Implemented: text/XML resolves to ActionCall; Assistant maps natural text to Speech playback and Display caption Actions. Only Actions enter Channel/wait. Native ToolCalls execute directly, with at most four concurrent calls and sixteen total per Assistant input. Registration declares recordOnly/observation independently of return values. Separate ActionResult/ToolResult feedback is correlated by call and round, merged in emission order after all calls settle, and only observation enables another model request. Four requests,120 generated calls,64 KiB feedback/transcript and a30-second joined input deadline bound the loop.
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../docs/adr/0183-generation-round-observations.md).
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Assistant owns the initial takePhoto observation loop directly; no Photographer delegation. Camera Action captures a JPEG, retains a bounded local photo and completes screenshot-style presentation. Correlated ActionResult contains photoID only; Assistant resolves that owned ID into a bounded multimodal next-round request. UI, PlatformKit, ModelKit and Storage remain independent.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+## Photo save and ignore — ADR0185
+
+✅ Photo disposition is Agent-driven: UI → typed Photographer intent → Gateways → Camera.Capture.savePhoto/ignorePhoto → native host; conversation → Assistant observation Action → authorized Photographer delegation → the same functions. App retains the exact displayed photo and private-storage owner; PlatformKit performs add-only system Photos import. Ignore hides display without exporting/deleting album data or cancelling ongoing understanding. See [ADR0185](../docs/adr/0185-photo-save-and-ignore.md).
+
+
+## Independent protocol consumers — 2026-10-08
+
+✅ Implemented: Assistant generation and App dispatch demultiplex native Tool and text/Action protocols into independent bounded consumers. Neither Tool concurrency saturation nor Action speech preparation blocks the other protocol. Each protocol retains its ordering/results; only the sealed-round barrier joins both before downstream continuation. Shared resources/deadlines remain unchanged.
+
+## Lens switch latency correction
+
+✅ Healthy lens flip no longer performs a full capture/resource/vision shutdown before restart. Implemented: keep the healthy native session and capture lease, atomically replace the camera input, acknowledge native switch separately from vision restart; retire old pose/gaze immediately and reattach perception after joined cleanup. Closing/background still joins all owners.
+
+❌ Physical-device switch latency, repeated flips during inference and camera/voice coexistence remain unverified.
+
+
+## Per-request conversation history
+
+✅ Implemented: Assistant → StorageChat → App Codable adaptation → UI history retains modelRequests under each original input. Each item records one model invocation and its own input, metadata-only context, output, native calls, timing and usage. UI presents these invocations as peer rows and marks observation-triggered continuations ReACT. Execution lifetime, cancellation and future-context selection remain owned by the original input; module dependencies are unchanged.
+
+❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
+
+
+## History image thumbnails
+
+✅ Implemented: App shares the existing CapturedPhotoStore between camera capture and read-only history. Assistant request JSON retains optional structured imageReferences (ID/MIME/byte count, no bytes). App history validates references against the displayed archive, reads the matching producing-input photo, and supplies bounded bytes through UI controls; UI renders thumbnails and a tap-to-open full-screen preview. Existing legacy metadata lines remain readable.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

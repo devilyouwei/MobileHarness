@@ -36,16 +36,16 @@ private actor StreamingSentenceChat: ChatCapability {
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("stream"))
     try await agent.receive(input)
-    var outputs = agent.outputs.makeAsyncIterator()
-    let earlySay = try #require(await outputs.next())
-    let earlyPrint = try #require(await outputs.next())
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    let earlySay = try #require(try await outputs.next())
+    let earlyPrint = try #require(try await outputs.next())
     #expect(
         await speechRequests.restored(earlySay.output)
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "你好👋！"])))
     #expect(normalizeToolID(earlyPrint.output) == expectedPrint("你好👋！"))
     try await model.finish()
     var remainder: [AgentOutput] = []
-    for _ in 0..<3 { remainder.append(try #require(await outputs.next()).output) }
+    for _ in 0..<3 { remainder.append(try #require(try await outputs.next()).output) }
     #expect(
         await speechRequests.restored(remainder) == [
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "下一句，尾巴"])),
@@ -62,14 +62,14 @@ private actor StreamingSentenceChat: ChatCapability {
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("stream"))
     try await agent.receive(input)
-    var outputs = agent.outputs.makeAsyncIterator()
-    _ = try #require(await outputs.next())
-    _ = try #require(await outputs.next())
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    _ = try #require(try await outputs.next())
+    _ = try #require(try await outputs.next())
     try await agent.receive(AssistantControl.cancelSession.input(sessionID: input.sessionID))
     let next = AgentInput(sessionID: UUID(), payload: .text("next"))
     try await agent.receive(next)
     for _ in 0..<3 {
-        let envelope = try #require(await outputs.next())
+        let envelope = try #require(try await outputs.next())
         #expect(envelope.inputID == next.id)
     }
     await agent.stop()
@@ -110,10 +110,10 @@ private struct ExcessiveSentencesChat: ChatCapability {
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("many")))
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     var tokens: [AgentOutput] = []
     for _ in 0..<120 {
-        let output = try #require(await outputs.next()).output
+        let output = try #require(try await outputs.next()).output
         guard output.kind == .actionCall || output.kind == .toolCall else {
             Issue.record("Expected admitted sentence function token")
             return
@@ -121,7 +121,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
         tokens.append(output)
     }
     #expect(tokens.count == 120)
-    let terminal = try #require(await outputs.next()).output
+    let terminal = try #require(try await outputs.next()).output
     guard case .control(let state) = terminal else {
         Issue.record("Expected explicit sentence limit failure")
         return
@@ -177,7 +177,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
     let events =
         try generator.append("<express emotion='thinking'/><channel.Speech>然后回答</channel.Speech>尾巴")
         + generator.finish()
-    let calls = events.compactMap(\.actionCall)
+    let calls = events.compactMap(\.actionCall).filter { $0.actionPath.module != "Caption" }
     #expect(calls.map { $0.actionPath.function } == ["speak", "express", "speak", "speak"])
     #expect(calls[0].parameters["text"] == "你好，先想一下")
     #expect(calls[2].channel == "Speech" && calls[2].parameters["text"] == "然后回答")

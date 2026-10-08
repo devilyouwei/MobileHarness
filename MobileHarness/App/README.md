@@ -167,3 +167,39 @@ See [Agent-driven architecture](../README.md), [Behavior assembly](Composition/B
 ✅ ADR0181: root PhotographerIntentRuntime owns lazy Photographer registration, one output consumer, one camera request and independent tracking dispatch. CameraInteractionWorkflow emits typed Photographer operations. VisionSession attaches/detaches tracking rather than constructing/removing Photographer. Native camera scopes remain unchanged.
 
 ✅ Interaction refinement: Camera target-facing passes through existing root delegation and native capture lifecycle. Accepted caption updates retain finalized user text above the eyes until the next turn, preserving stale-output fences.
+
+## Action/Tool generation rounds — ADR0183
+
+✅ Implemented: text/XML resolves to ActionCall; Assistant maps natural text to Speech playback and Display caption Actions. Only Actions enter Channel/wait. Native ToolCalls execute directly, with at most four concurrent calls and sixteen total per Assistant input. Registration declares recordOnly/observation independently of return values. Separate ActionResult/ToolResult feedback is correlated by call and round, merged in emission order after all calls settle, and only observation enables another model request. Four requests,120 generated calls,64 KiB feedback/transcript and a30-second joined input deadline bound the loop.
+
+✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow admits Actions in order while executing up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../docs/adr/0183-generation-round-observations.md).
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Direct Assistant camera capture endpoint plus owner-scoped image resolver; existing root Photographer operations unchanged.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+## Photo save and ignore — ADR0185
+
+✅ Root camera intent transport now covers photo save/ignore. UI forwards only typed intent; RuntimePresentation validates root Photographer or active Assistant delegation. CameraCoordinator owns one displayed photo/owner and one joined native export; album success and per-image duplicate prevention are native completion facts. Existing voice/ReAct ownership remains independent.
+
+
+## Independent protocol consumers — 2026-10-08
+
+✅ Implemented: Generation output transport splits Tool calls and Action/scheduling events into independent bounded consumers; VoiceSessionCoordinator retains ownership and the existing maximum five dispatch tasks. Round sealing joins both before Gateway acknowledgment.
+
+## Lens switch latency correction
+
+✅ Implemented: split native lens-switch acknowledgment from independent perception replacement while retaining foreground/revision/resource fences and fully joined off/background cleanup.
+
+❌ Physical-device switch latency, repeated flips during inference and camera/voice coexistence remain unverified.
+
+
+## History image thumbnails
+
+✅ Implemented: Composition shares one bounded photo store with CameraCoordinator and the history reader. History performs read-only adaptation/loads; camera lifetime and native effects are unchanged.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

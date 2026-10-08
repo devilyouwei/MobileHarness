@@ -14,28 +14,32 @@ Purpose: send user input to ChatCapability, maintain bounded history and interpr
 
 ```mermaid
 flowchart TD
-    Input[AgentInput] --> Queue[Bounded inbox and single worker]
-    Queue -->|Read records + token| History[Storage ConversationHistoryStore]
-    History --> Builder[Assistant ConversationContextBuilder]
-    Builder -->|Exact request + token| History
+    Input[AgentInput] --> Queue[Bounded inbox and single input worker]
+    Queue --> Builder[Conversation context and exact request]
+    Builder --> History[StorageChat journal]
     Builder --> Model[ChatCapability]
-    Queue --> Model
-    Model -->|Persist raw fragments before parsing| History
-    Model --> Parser[AgentGenerator]
-    Parser --> Events[Ordered Actions, Tools and wait boundaries]
-    Events --> Calls[Resolved ActionCall / ToolCall]
-    Events -->|beginWait / endWait in order| Stream
-    Calls -->|speech text| Synthesis[Directed SpeechSynthesisAgent]
-    Synthesis -->|admitted audioID| Playback[Speech.Playback.speak audioID]
-    Playback --> Stream
-    Queue --> Tool[Resolved ToolCall]
-    Calls --> Stream[Bounded OutputEnvelope stream]
-    Tool --> Stream
+    Model --> Reader[Transport field demultiplexer]
+    Reader -->|text delta| TextQueue[Bounded text fragments]
+    TextQueue --> Text[Text worker: persist / AgentGenerator / speech preparation]
+    Text -->|Action and wait events in order| Stream[Bounded OutputEnvelope transport]
+    Reader -->|complete native calls| NativeQueue[Bounded native calls]
+    NativeQueue --> Native[Native worker: ToolCallParser / history]
+    Native -->|ToolCall| Stream
+    Text --> Join[Join both generation workers]
+    Native --> Join
+    Join -->|roundFinished| Stream
+    Stream --> App[App independent protocol consumers]
+    App --> Gateway[Gateway: direct Tools / Channel Actions]
+    Gateway --> Feedback[Separate ActionResult and ToolResult]
+    Feedback --> Merge[Assistant: full-round merge and continuation]
+    Merge --> Model
     Cancel[Session cancellation] --> Queue
-    Cancel --> Parser
+    Cancel --> Reader
+    Cancel --> Text
+    Cancel --> Native
 ```
 
-Speech is a scheduled Action on its default or explicit Channel; captions are immediate Tools without a Channel and may update while speech is queued or playing. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
+Speech is a scheduled Action on its default or explicit Channel; captions are Display Actions without a Channel and may update while speech is queued or playing. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
 
 ## Configuration and initialization
 
@@ -79,7 +83,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ✅ JSON v6 subscribes to speech.final and user.text; final transcript uses the same conversation path as text. Inputs expire before dequeue, never during a started reply. Partial transcripts cannot enter Assistant.
 
-✅ JSON v6 also subscribes to speech.phase. Speech onset emits UI.Caption.beginReplyTurn once per turn as an immediate Tool, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
+✅ JSON v6 also subscribes to speech.phase. Speech onset emits UI.Caption.beginReplyTurn once per turn as an Display Action, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
 
 ✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Tool exists if onset was missed. Every output has a monotonically increasing source sequence; text/base expression survive normal reply completion until the next turn; finite expression overrides end after their performance.
 
@@ -128,10 +132,10 @@ flowchart LR
 | --- | --- | --- |
 | Agent 内部分段事件（尚未发送） | `Speech.Playback.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.Playback.speak(audioID)`。 |
 | Action | `Speech.Playback.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用该文本段的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
-| 无返回值 Tool | `UI.Caption.print`，无 Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
+| Action | `UI.Caption.print`，Display Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
 | finite Action | `express → UI.Expression.express / Display` | `parameters["emotion"]` 为非 clear 的合法表情；等待单次目标过渡和恢复当前基础表情。 |
 | state Action | `setExpression → UI.Expression.setExpression / Display` | 同一表情集合加 clear；提交持续基础表情，clear 清除；不等待渲染结束。 |
-| 无返回值 Tool | `UI.Caption.beginReplyTurn`，无 Channel | 无参数；有 AgentTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
+| Action | `UI.Caption.beginReplyTurn`，Display Channel | 无参数；有 AgentTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
 | 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。同时支持云端模型原生 Tool 调用。 |
 | control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
 | control | `agent.finished` | speaking 阶段的输入完成通知（初始化展示通过 Tool 执行），释放该输入的 Action 跟踪。 |
@@ -150,7 +154,7 @@ Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再
 | `speech.synthesize / 1 / observation` | `.speechSynthesis(SpeechSynthesisInput(audioID: UUID, text: String, locale: String))`；audioID 为每段新建的唯一句柄；text 为 Agent 分好的非空语义段，最多 2000 UTF-8 字节；locale 当前默认 `auto`，协议允许 `auto / zh-CN / en-US`。完整编码受 16 KiB 消息上限约束。 | 自然文本完成分段后立即提交；必须在回执中确认目标已接纳且无拒绝，才输出同一 audioID 的内部 Speech.Playback.speak(audioID) Action。合成与后续 Action 调度并行。 |
 | `speech.cancel / 1 / observation` | `.cancelSpeech(audioID: UUID)`；只带待取消的音频句柄，不携带文本或 PCM。 | 提交已接纳但 播放 Action 无法成功入队等清理场景发送；SpeechSynthesis 按发送方、session、父输入所有权校验，不能取消别的请求。当前清理发送失败被忽略，原始入队错误继续上抛。 |
 
-❌ 图像理解与 partial 驱动回答仍未实现。云端 Tool 增量由适配器聚合为完整调用。
+✅ 拍照 ActionResult 的图像附件可进入下一轮云端请求。❌ 通用图像输入和 partial 驱动回答仍未实现。云端 Tool 增量由适配器聚合为完整调用。
 
 ✅ express emits semantic eye emotions; Assistant.agent.json remains the production capability declaration. No emoji conversion is performed. setExpression(clear) clears the persistent base; express rejects clear. Three added values are angry/scared/playful; JSON schema is v5, with an additive parameter-domain extension.
 
@@ -189,13 +193,13 @@ flowchart LR
 
 ## Action runtime stage 2
 
-✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and returns without inference or output emission. actionResults() exposes bounded retained history. ❌ Automatic retry/replanning based on a result is not implemented.
+✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and correlates generated results with the active round. actionResults() exposes bounded retained history. ✅ Registered observation can continue the model; automatic effect replay is not implemented.
 
 ## Storage domain organization
 
 ✅ Assistant and title generation import StorageChat for conversation schemas/journal. Generic storage core no longer owns chat records; Agent behavior and persisted data remain unchanged.
 
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+✅ Bounded owned JPEG storage is implemented for photo observations (ADR0184). ❌ Galleries/video/semantic-memory stores remain planned.
 
 ## Supervised NexArm base Action
 
@@ -203,7 +207,7 @@ flowchart LR
 
 ✅ iPhone binds the verified BLE profile through AppWorkflows. ❌ Unattended model motion and verified hardware stop/watchdog are unavailable; disconnected devices fail explicitly. Generation completion is not motion completion. Use only explicitly requested supervised motions; never automatically retry failures.
 
-✅ shakeBase documentation now identifies phone Settings → Bluetooth Devices and foreground/posture requirements. iPhone has a real BLE workflow binding. Terminal ActionResults enter the existing bounded inbox, and UI shows workflow completion independently of model prose. ❌ Receipt-driven follow-up model generation and arbitrary robot Actions are not introduced.
+✅ shakeBase documentation now identifies phone Settings → Bluetooth Devices and foreground/posture requirements. iPhone has a real BLE workflow binding. Terminal ActionResults enter the existing bounded inbox, and UI shows workflow completion independently of model prose. ❌ Robot bindings remain recordOnly; arbitrary robot Actions are not introduced.
 
 ## NexArm entertainment skills (2026-09-30)
 
@@ -219,13 +223,13 @@ flowchart LR
 
 ✅ TiltWrist keeps ready height240mm with yaw±12° / roll±40° and its fixed return sequence; there is no extra260mm lift. ❌ Precise Cartesian positioning is not promised.
 
-## Action and Tool presentation boundary
+## Action and Action presentation boundary
 
-✅ beginReplyTurn and per-sentence print are code-owned immediate Tools; speech playback and model-selected expression remain scheduled Actions. Text mapping returns ordered GenerationEvents: speech Action followed by caption Tool. Captions append sentence chunks, never full accumulated replies, and do not inherit channel scopes. The same 120-call/256-output bounds cover both kinds. ✅ Cloud native Tools use the same declared registry and Gateway boundary.
+✅ beginReplyTurn and per-sentence print are code-owned Display Actions; speech playback and model-selected expression remain scheduled Actions. Text mapping returns ordered GenerationEvents: speech Action followed by caption Action. Captions append sentence chunks, never full accumulated replies, and use the Display Channel. The same 120-call/256-output bounds cover both kinds. ✅ Cloud native Tools use the same declared registry and Gateway boundary.
 
 ## Head gestures
 
-✅ JSON v6 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Tool presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.
+✅ JSON v6 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Action presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.
 
 ## NexArm feedback execution — 2026-10-01
 
@@ -259,7 +263,7 @@ flowchart LR
 Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
 
 ✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
-❌ Local native tools, result-driven model continuation, partial native tool-call transcripts and Responses API transport.
+❌ Local native tools, partial native tool-call transcripts and Responses API transport.
 
 ✅ Formatting now satisfies Swift 6.4 strict lint. Runtime behavior and Agent JSON permissions are unchanged.
 
@@ -267,7 +271,7 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ## Durable native Tool and usage diagnostics
 
-✅ Assistant saves actual Tool declarations before chat, and complete native calls before resolution, preserving provider ID, runtime UUID and argument JSON. Resolution/admission errors are recorded against the same call; App supplies the actual Gateway execution outcome. ChatEvent.usage is stored before final completion. Ordinary chat requests omit maximumOutputTokens. XML and native calls may coexist; fixed internal caption Tools are excluded from model-native call history.
+✅ Assistant saves actual Tool declarations before chat, and complete native calls before resolution, preserving provider ID, runtime UUID and argument JSON. Resolution/admission errors are recorded against the same call; App supplies the actual Gateway execution outcome. ChatEvent.usage is stored before final completion. Ordinary chat requests omit maximumOutputTokens. XML and native calls may coexist; fixed internal caption Actions are excluded from model-native call history.
 ✅ Complete native results drive bounded continuation. ❌ Incomplete native SSE calls remain unsupported; missing usage is not estimated.
 
 ✅ Unknown model-callable aliases and invalid invocation parameters emit rejectedCall and continue the same turn. Native Tool failures retain their durable failed Tool outcome and correlation ID. Rejections share the120-call limit; malformed markup, bounds and cancellation remain terminal. ❌ Automatic correction/retry is not implemented.
@@ -300,11 +304,11 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ✅ Implemented: move ConversationTitleGenerator to Memory without changing its inference algorithm or public namespace. Assistant owns conversation generation only.
 
 
-## Bounded native result continuation
+## Bounded registered-observation continuation
 
-✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
 
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
 
 
 ## Read-only model grants and shared capability facts
@@ -334,3 +338,39 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ✅ Assistant prompt shows a capability-derived concurrent expression/motion example with bare Action tags, without Channel wrappers or wait; sequential speech guidance remains separate.
 
 ✅ Interaction refinement: Assistant.agent.json Camera.flip declaration requires facing enum front/back and describes target selection rather than toggling.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ Assistant validates causal feedback, rejects stale/duplicate results, persists ordered execution evidence, pairs all native provider calls with native results, and sends Action observations as structured data. Failed observations do not replay effects.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Add Camera.Capture.takePhoto text Action on Camera, registered observation. Successful correlated results resolve photoID through injected owner-scoped reader; user-role image plus execution data drive the existing round barrier/loop. Failed capture remains data; unsupported image providers fail explicitly. History stores attachment metadata only, never base64 bytes.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+## Photo save and ignore — ADR0185
+
+✅ Camera Channel exposes savePhoto/ignorePhoto observation Actions. Optional UUID selects the current displayed photo; omitted ID means current at execution. Explicit save requests export to Photos; close/dismiss/discard requests hide the photo. Both delegate through Photographer and use actual receipts for the next reply. Only successful takePhoto attaches image bytes; disposition adds no image, no capture and no automatic replay.
+
+
+## Independent protocol consumers — 2026-10-08
+
+✅ Implemented: AssistantAgent.collect routes text fragments and complete native calls into separate structured workers. Text owns AgentGenerator, raw-text persistence and speech preparation; native calls own ToolCallParser, native history and Tool emission. Text backlog is bounded at8192 fragments/65536 UTF-8 bytes per round; native backlog at16 calls. Overflow fails explicitly. Both workers join before roundFinished; cancellation/failure closes streams, cancels siblings and joins cleanup. The transport reader is a structured child so parser failure wakes the owner even while model output is open. Shared call budgets are reserved synchronously before suspending. Merge order remains emitted call order; no global execution order is imposed across protocols.
+
+
+## Per-request conversation history
+
+✅ Implemented: AssistantAgent.swift begins a modelRequests entry immediately before every collect. The first entry contains user input; later entries contain only newly appended execution observations (plus photo metadata when applicable). Context records preserve native call/result correlation and omit image bytes. The transport reader timestamps the first nonempty text event before parsing/speech preparation; native complete-call events do not supply token timing. Requests complete after protocol workers join, while existing full-round execution barriers govern further model calls. The original input worker still owns deadlines, cancellation and terminal persistence. New records no longer duplicate continuationRequests.
+
+❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
+
+
+## History image thumbnails
+
+✅ Implemented: historyRequest encodes imageReferences (ID/MIME/byteCount) in metadata-only message JSON while preserving exact sent text/native correlation. Image bytes remain absent. The legacy diagnostic image line is readable for existing files; fresh structured requests do not append it to sent context text.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

@@ -354,7 +354,7 @@ func archiveCommitsBeforeTitleAndRejectsOverlappingPageOperations() async throws
         state: state, prepare: {}, refresh: { try await runtime.refresh() },
         deleteArchive: { try await runtime.deleteArchived($0) },
         startNew: { try await runtime.startNew() }, summarize: { try await runtime.summarize($0) },
-        previewOutput: { _ in "" })
+        previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
     await workflow.load()
     let old = try #require(state.archive?.current.id)
     var started = chat.started.stream.makeAsyncIterator()
@@ -389,7 +389,7 @@ func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry(
         state: state, prepare: {}, refresh: { try await runtime.refresh() },
         deleteArchive: { try await runtime.deleteArchived($0) },
         startNew: { try await runtime.startNew() }, summarize: { try await runtime.summarize($0) },
-        previewOutput: { _ in "" })
+        previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
     await workflow.load()
     var started = chat.started.stream.makeAsyncIterator()
     workflow.startNew()

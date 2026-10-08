@@ -112,6 +112,18 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
             "model": model,
             "messages": try chat.messages.map { message -> [String: Any] in
                 var value: [String: Any] = ["role": message.role.rawValue, "content": message.content]
+                if let images = message.images, !images.isEmpty {
+                    var parts: [[String: Any]] = [["type": "text", "text": message.content]]
+                    parts += images.map {
+                        [
+                            "type": "image_url",
+                            "image_url": [
+                                "url": "data:\($0.mimeType);base64,\($0.data.base64EncodedString())", "detail": "auto",
+                            ],
+                        ]
+                    }
+                    value["content"] = parts
+                }
                 if let id = message.toolCallID { value["tool_call_id"] = id }
                 if !message.toolCalls.isEmpty {
                     let names = Self.toolNames(chat.tools)

@@ -6,6 +6,12 @@ public enum CameraDirection: Sendable { case front, back }
 
 @MainActor @Observable
 public final class CameraState {
+    #if os(iOS)
+        public var capturedPhoto: CapturedPhotoPresentation?
+    #endif
+    public var photoBusy = false
+    public var photoMessage: String?
+    public var savedPhotoID: UUID?
     public var isEnabled = true
     public var facing: CameraDirection = .front
     public var isVisible = false
@@ -24,4 +30,6 @@ public protocol CameraControlling: AnyObject {
     func toggle()
     func switchCamera()
     func retry()
+    func savePhoto(_ id: UUID)
+    func ignorePhoto(_ id: UUID)
 }

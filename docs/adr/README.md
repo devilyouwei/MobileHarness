@@ -292,3 +292,11 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 
 
 ✅ [ApplicationControl service organization](0182-application-control-service-organization.md): ADR0182 implements canonical role-directory, identity and host-transport migration; existing business behavior retained. Validation is recorded separately.
+
+✅ [ADR0183](0183-generation-round-observations.md): implemented Action/Tool split, registered observations and full-round result merge; physical/model acceptance remains pending.
+
+✅ [ADR0184](0184-assistant-photo-observation.md): Assistant photo Action, screenshot presentation and multimodal observation loop.
+
+✅ [ADR0185](0185-photo-save-and-ignore.md): Agent-driven current-photo save to system Photos and ignore from UI/dialogue; physical acceptance remains pending.
+
+✅ [ADR0186](0186-camera-lens-switch-lifetime.md): healthy lens input replacement completes independently of joined perception retirement; physical latency acceptance remains pending.

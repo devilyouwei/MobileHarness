@@ -62,7 +62,7 @@ flowchart LR
 
 ✅ Boundary checks enforce Storage core exclusion of Audio/Chat, StorageChat → Storage dependency, Foundation/Storage-only chat imports and Storage directory READMEs. UI may use StorageChat values only.
 
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+❌ Bounded owned JPEG storage is implemented in ADR0184; galleries, video and semantic-memory stores remain planned.
 
 ✅ Tool authoring checks now recursively discover domain registrations, require each registered path to have one domain entry, keep registration in Support, and require directory READMEs. The existing unqualified `runtimeInfo` path is explicit. ❌ Source checks do not replace Swift semantic validation.
 
@@ -245,3 +245,11 @@ flowchart LR
 
 
 ✅ ADR0182: canonical applicationControl identity and role-directory packaging checks; existing resource/provider/device/navigation/failure regressions now exercise ApplicationControl. All concrete Agent configurations require canonical role directories; no root exception remains.
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: update canonical Camera.Capture inventory to include takePhoto while retaining exact directory/function ownership validation.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.
+
+✅ Ownership inventory update: add Camera.Capture.savePhoto/ignorePhoto to the existing boundary check; keep PlatformKit localization and module independence checks intact.

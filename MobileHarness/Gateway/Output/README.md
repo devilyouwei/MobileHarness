@@ -131,3 +131,16 @@ The observation path neither injects a new Agent result nor invokes device recov
 ✅ ADR0181: delegate(message, context, target) is available only during a bound direct Tool invocation. Exact source/session/input identity must match the task-local envelope; directed send declarations and the original causal metadata are preserved. Bound context is restored across nested dispatch.
 
 Invocation context also captures the original ExecutionOwner incarnation, rejecting stopped/replaced sources rather than binding their replacement. Root output pumps are detached owned tasks so a long-lived service cannot inherit a caller’s invocation authority.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+
+✅ Final identity hardening: reject a roundFinished payload whose roundID differs from its envelope before joining or acknowledging any scheduling scope.
+
+✅ Delivery hardening: native deliveryFailure must terminate the round while retaining the actual ToolResponse; never replace a completed effect with a fabricated handler-failure result.
+
+✅ Photo Action delegation correction: bind InvocationSignalContext inside the actual scheduled Action worker, using its validated envelope/ExecutionOwner. Tools retain their current binding. Ownerless direct scheduler fixtures receive no authority; nested bindings restore automatically, and completion/feedback callbacks run outside the handler binding. No new module or media retention.

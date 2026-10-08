@@ -32,6 +32,8 @@ final class ApplicationRuntime {
     let input: InputGateway
     let output: OutputGateway
     let presentation: RuntimePresentation
+    private let photoCamera: any CameraControlCapability
+    private let generationPolicies: GenerationPolicies
     let actions: ChannelScheduler
     let actionActivity: ActionActivityWorkflow
     let resources: ResourceCoordinator
@@ -89,6 +91,7 @@ final class ApplicationRuntime {
         resourceSnapshotAccepted: @escaping @MainActor () -> Void,
         summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String
     ) throws {
+        self.photoCamera = cameraControl
         let root = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         var directory = root.appendingPathComponent("MobileHarness/Conversations", isDirectory: true)
@@ -196,6 +199,9 @@ final class ApplicationRuntime {
             gesture: { request, invocation in try await robot.gesture(request, invocation) },
             shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) },
             aim: { base, pitch, invocation in try await robot.aim(base, pitch, invocation) })
+        generationPolicies = GenerationPolicies(
+            actions: behaviors.actionFeedbackPolicies.mapValues { $0 == .observation ? .observation : .recordOnly },
+            tools: behaviors.toolFeedbackPolicies.mapValues { $0 == .observation ? .observation : .recordOnly })
         try BehaviorCoverage.validate(
             actions: behaviors.actions, toolPaths: behaviors.toolPaths,
             capabilities: [
@@ -230,9 +236,9 @@ final class ApplicationRuntime {
                 Logger(subsystem: "dev.mobileharness", category: "Photographer").error("\(message, privacy: .private)")
             })
         photographerIntents = photography
-        presentation.cameraRequests = { operation, facing, invocation in
+        presentation.cameraRequests = { operation, facing, photoID, invocation in
             try await photography.perform(
-                operation, facing: facing,
+                operation, facing: facing, photoID: photoID,
                 delegate: { message in
                     try await gateway.delegate(message, context: invocation.context, to: .photographer)
                 })
@@ -266,8 +272,15 @@ final class ApplicationRuntime {
     var voiceDependencies: VoiceRuntimeDependencies {
         VoiceRuntimeDependencies(
             manager: manager, input: input, output: output, presentation: presentation, conversations: conversations,
-            makeAssistant: { [conversations] chat, modelName in
-                try AssistantAgent(chat: chat, conversations: conversations, modelName: modelName)
+            makeAssistant: { [conversations, generationPolicies, photoCamera] chat, modelName in
+                try AssistantAgent(
+                    chat: chat, conversations: conversations, modelName: modelName,
+                    generationPolicies: generationPolicies,
+                    photoObservation: { id, input in
+                        let data = try await photoCamera.readPhoto(
+                            id, source: "assistant", sessionID: input.sessionID, inputID: input.id)
+                        return try ChatImage(id: id, data: data)
+                    })
             },
             makeSynthesis: { try SpeechSynthesisAgent(synthesis: $0, store: $1) },
             makePerception: { try SpeechPerceptionAgent(recognition: $0, vad: $1, sessionID: $2) })

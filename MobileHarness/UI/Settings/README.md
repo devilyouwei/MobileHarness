@@ -34,7 +34,7 @@ App owns these state instances and injects workflows. UI imports Storage for rec
 
 ## Conversation history
 
-✅ Settings → 对话历史 replaces the former independent single-turn raw-output test. `ConversationHistoryWorkflow` reads the process-wide durable journal and updates `ConversationHistoryState`; `ConversationHistoryView` renders those values. It shows current and archived conversations; the current title is the latest user input, never a generated summary. Expanding a conversation shows each original input, exact received model text, state, finish reason, generation options, model label, actual request (including system prompt and prior context), and escaped fragments. Text/XML uses verbatim rendering and explicit export. Per-turn diagnostic export includes the exact request, raw model text, fragments, IDs/options and error status.
+✅ Settings → 对话历史 replaces the former independent single-turn raw-output test. `ConversationHistoryWorkflow` reads the process-wide durable journal and updates `ConversationHistoryState`; `ConversationHistoryView` renders those values. It shows current and archived conversations; the current title is the latest user input, never a generated summary. Expanding a conversation shows each model request, including peer ReACT continuations, with its current input, exact model text/native calls, state, finish reason, first text-token arrival, generation options, model label, actual context (including system prompt) and escaped fragments. Missing values in legacy records stay empty without storage explanations. Text/XML uses verbatim rendering and explicit export. Per-turn diagnostic export includes the exact request, raw model text, fragments, IDs/options and error status.
 
 ✅ The journal records real Assistant traffic before Action parsing. Parsing, provider, cancellation and interrupted-process failures retain received prefixes; a failure stops production generation, so the record does not claim an unseen suffix. Executed effects are not rolled back. Execution errors observed by the App output pump are saved after producer cleanup. No provider HTTP data, token IDs or hidden reasoning is available.
 
@@ -66,13 +66,13 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 
 ✅ Source location: `MobileHarness/UI/Settings`; compiled by `UI`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
 
-✅ History receives ConversationHistoryState and ConversationHistoryControlling. ConversationHistoryWorkflow owns store access, archive/title ordering, errors and parser previews; the page imports only Storage value types and never receives ChatCapability or ConversationHistoryStore.
+✅ History receives ConversationHistoryState and ConversationHistoryControlling. ConversationHistoryWorkflow owns store access, archive/title ordering, errors and parser previews; the page receives UI-owned history values and never receives ChatCapability or ConversationHistoryStore.
 
 ## Storage domain organization
 
 ✅ Conversation history views/state import StorageChat shared records. UI continues to receive operations through injected interfaces and never constructs a store.
 
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
+✅ Bounded owned JPEG storage is implemented for photo observations (ADR0184). ❌ Galleries/video/semantic-memory stores remain planned.
 
 ## Bluetooth — current state and explicit navigation (ADR0134 / ADR0138)
 
@@ -213,9 +213,39 @@ flowchart LR
 
 ## Independent history presentation values
 
-✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; legacy continuation records remain readable and missing values stay empty. UI target has zero project dependencies.
 
 
 ## Provider draft boundary
 
 ✅ Implemented: the cloud toggle edits a draft only. UI performs no installed-model check or extra refresh before save; the existing Actions-owned provider transaction validates its injected native binding before persistence or lifecycle fencing. An invalid local selection follows the registered provider error result and leaves the saved configuration intact.
+
+
+## Per-request conversation history
+
+✅ Implemented: ConversationHistoryState/Presentation/View display each model invocation in order as an individual row. Detail order is 用户本轮输入, 模型本轮输出 (text and native Tool Call input/output disclosures), 生成记录, actual context, actual Tools when declarations exist, then read-only parser preview/fragments. Generation records show the first nonempty text-token arrival timestamp and elapsed seconds from request start; unavailable native-only/legacy timing stays empty. Context preserves tool-role messages, call IDs, assistant native calls and metadata-only image descriptors. Sent declarations are visible even when there are no calls. ReACT input contains actual new execution observations. Inline raw export and the continuation section were removed; one upper-right export includes the complete per-request evidence. Legacy records retain available data and leave missing per-request output/usage/timing empty. Original owner generation/execution errors remain visible beside model completion. Details/export preserve model-round and owning-input identities.
+
+❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
+
+
+## Empty history values
+
+✅ Implemented: removed legacy storage/missing-evidence explanations from user-facing history list/detail/export. Missing model text, usage, timing, finish reason and Tool outcome values remain empty. UI-only generationMetadataAvailable distinguishes legacy continuation rows so their missing date/state are blank rather than copied from the parent. Retain real request content, ReACT styling and actual execution failures. Presentation regressions cover empty values and absence of legacy wording.
+
+
+## ReACT color
+
+✅ Implemented: ConversationHistoryView.swift uses orange for the ReACT badge, text and tinted row background, including the detail input label. Layout, history values and interaction remain unchanged.
+
+
+## History image thumbnails
+
+✅ Implemented: HistoryMessage gains optional imageReferences plus bounded legacy metadata extraction; HistoryTurn deduplicates up to four images across actual context. ConversationHistoryView displays context thumbnails directly above its message disclosures, with a tap-to-open full-screen preview and close control. Read tasks follow page cancellation, retain at most4MiB per image, decode thumbnails up to320 pixels and one preview up to2048 pixels, and offer a concise retry on actual read/decode failure. Missing images are blank, with no storage explanations. Legacy metadata lines are omitted from displayed message text when represented by image values.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+✅ Implemented: input captions also omit legacy image metadata lines when those references are represented by thumbnails; exact stored/exported context stays intact.
+
+✅ Implemented: UIKit prepares images asynchronously within the existing UI import boundary. Cancellation is checked after preparation; full-preview failures offer a concise retry. Prepared image dimensions remain bounded to320/2048 pixels.
+
+✅ Implemented: prepared images retain the source aspect ratio within their pixel bounds; gallery buttons crop to112×84 and full previews fit the available screen.

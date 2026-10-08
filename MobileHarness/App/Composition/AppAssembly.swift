@@ -176,9 +176,9 @@ final class AppAssembly {
     private func makeCameraControls() -> CameraInteractionWorkflow {
         CameraInteractionWorkflow(
             state: camera.state,
-            perform: { [weak self] intent, facing in
+            perform: { [weak self] intent, facing, photoID in
                 guard let self else { throw CancellationError() }
-                try await self.runtime().photographerIntents.perform(intent, facing: facing)
+                _ = try await self.runtime().photographerIntents.perform(intent, facing: facing, photoID: photoID)
             })
     }
     let navigation = NavigationState()
@@ -209,11 +209,13 @@ final class AppAssembly {
             return try LocalDocumentStore<BluetoothDeviceRecord>(
                 url: root.appendingPathComponent("MobileHarness/Bluetooth/device.json"), maximumBytes: 4096)
         })
+    @ObservationIgnored private let capturedPhotos = CapturedPhotoStore(
+        root: URL.applicationSupportDirectory.appendingPathComponent("MobileHarness/CapturedPhotos", isDirectory: true))
     @ObservationIgnored lazy var camera = makeCamera()
     private func makeCamera() -> CameraCoordinator {
         let device = cameraDevice
         return CameraCoordinator(
-            camera: device, state: CameraState(),
+            camera: device, state: CameraState(), photos: capturedPhotos,
             makeRuntime: { [weak self] in
                 guard let self else { throw CancellationError() }
                 return try self.runtime().cameraDependencies
@@ -256,7 +258,11 @@ final class AppAssembly {
             summarize: { [weak self] id in
                 guard let self else { throw CancellationError() }
                 try await self.runtime().historyIntents.summarize(id)
-            }, previewOutput: HistoryAgentAdapter.preview)
+            }, previewOutput: HistoryAgentAdapter.preview,
+            readPhoto: { [weak self] id, inputID in
+                guard let self else { throw CancellationError() }
+                return try await self.capturedPhotos.readForInput(id, source: "assistant", input: inputID)
+            })
     }
     private func makeHistoryChat() async throws -> any ChatCapability {
         try await settingsControls.restore()

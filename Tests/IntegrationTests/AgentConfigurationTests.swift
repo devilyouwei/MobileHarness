@@ -114,15 +114,17 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(config.agentID == .assistant)
     #expect(
         config.capabilities.actions.map(\.alias) == [
-            "express", "setExpression", "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance",
+            "takePhoto", "savePhoto", "ignorePhoto", "express", "setExpression", "shakeBase", "waveWrist", "tiltWrist",
+            "lookAround", "celebrate",
+            "dance",
             "nodHead",
             "shakeHead", "resetArm", "moveMotor", "resetMotor",
         ])
-    #expect(config.capabilities.channels == ["Display", "Robot", "Speech"])
+    #expect(config.capabilities.channels == ["Camera", "Display", "Robot", "Speech"])
     #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "System.Runtime.runtimeInfo")
     let agent = try AssistantAgent(chat: FixedTextChat())
     let registry = agent.descriptor.capabilities
-    #expect(registry.internalActions.count == 1 && registry.internalTools.count == 2)
+    #expect(registry.internalActions.count == 3 && registry.internalTools.isEmpty)
     #expect(
         registry.permits(
             ActionCall(
@@ -191,7 +193,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let registry = try AssistantAgent.runtimeCapabilities(config.capabilities)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
-    #expect(prompt.contains("AVAILABLE CHANNELS: Display, Robot, Speech"))
+    #expect(prompt.contains("AVAILABLE CHANNELS: Camera, Display, Robot, Speech"))
     #expect(prompt.contains("Action express: path=UI.Expression.express; default Channel=Display"))
     #expect(prompt.contains("Do not wrap Actions in Channel tags merely to name their default Channels"))
     let concurrent = "<express emotion=\"laugh\"/><dance cycles=\"1\"/>"
@@ -202,7 +204,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(concurrentEvents.compactMap(\.actionCall).map(\.channel) == ["Display", "Robot"])
     #expect(prompt.contains("Channel Speech — automatic audio playback"))
     #expect(prompt.contains("played on the independent Speech Channel"))
-    #expect(prompt.contains("<wait>I will finish speaking first.</wait><express emotion="))
+    #expect(prompt.contains("<wait>I will finish speaking first.</wait><takePhoto"))
     for text in [
         "Action say:", "Action print:", "playAudio", "audioID", "beginReplyTurn", "runtimeInfo", "not callable",
     ] {
@@ -212,7 +214,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     var generator = AgentGenerator(
         capabilities: registry, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
     let events = try generator.append("<wait>Hello.</wait><express emotion='smile'/>") + generator.finish()
-    #expect(events.compactMap(\.actionCall).map(\.actionPath.function) == ["speak", "express"])
+    #expect(events.compactMap(\.actionCall).map(\.actionPath.function) == ["speak", "print", "express"])
     #expect(events[0] == .scheduling(.beginWait))
     #expect(events[3] == .scheduling(.endWait))
 }

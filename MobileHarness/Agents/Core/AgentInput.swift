@@ -10,6 +10,7 @@ public enum InputPayload: Sendable {
     case event(String)
     case toolResult(ToolResult)
     case actionResult(ActionResult)
+    case roundResult(GenerationRoundResult)
     case activityEvent(ActivityEvent)
     case image(ImageInput)
     case audio(AudioInput)
@@ -23,6 +24,7 @@ public enum InputPayload: Sendable {
         case .event: .event
         case .toolResult: .toolResult
         case .actionResult: .actionResult
+        case .roundResult: .roundResult
         case .activityEvent: .activityEvent
         }
     }
@@ -84,6 +86,7 @@ public struct InputMetadata: Sendable {
         case .event: contract = "runtime.event"
         case .toolResult: contract = "tool.result"
         case .actionResult: contract = "action.result"
+        case .roundResult: contract = "generation.round.result"
         case .activityEvent: contract = "activity.event"
         case .audio:
             contract = "media.audio"

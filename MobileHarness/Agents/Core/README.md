@@ -109,3 +109,10 @@ Detailed bounds and algorithms belong to [Runtime](Runtime/README.md), [Capabili
 ✅ ADR0163 completes Action/activity causal transport. ❌ Typed replacement of remaining host event/control strings stays pending.
 
 ✅ ADR0163: Output contracts carry explicit SignalCausality for Action/activity feedback. Typed history content remains in the business Agents communication catalog rather than Core payload enums.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).

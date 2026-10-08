@@ -11,7 +11,7 @@ Purpose: share incremental Agent-output parsing across Agents without depending 
 | FunctionTokenParser | Incrementally decodes UTF-8 and parses text, self-closing Action tags, paired Channel scopes and paired wait groups. It neither binds capabilities nor executes Actions. |
 | Action | A registered executable behavior, such as `Speech.Playback.speak` or `UI.Expression.express`. Its implementation owns parameter/value validation and behavior. |
 | ActionCall | One resolved Action invocation: ActionPath, string parameters and effective channel. It is distinct from raw FunctionToken events and model-native ToolCall invocations. |
-| ToolCall | A separate native tool invocation resolved by ToolCallParser. It does not pass through XML parsing. Gateway bindings select direct execution or a scheduled native projection into the shared ChannelScheduler. |
+| ToolCall | A separate native tool invocation resolved by ToolCallParser. It does not pass through XML parsing. Native calls execute directly outside Channel/wait. |
 
 A model tokenizer may split one XML tag across many model tokens. Conversely, one received text fragment may contain several protocol events. Parsing handles arbitrary UTF-8 byte boundaries; `.text` event boundaries can depend on fragment delivery. SentenceFunctionBuffer subsequently forms text chunks for Action mapping. Do not assume one character, one model token, one parsed event and one Action call correspond one-to-one.
 
@@ -75,7 +75,7 @@ flowchart TD
     Tools --> Tool[Resolved ToolCall]
 ```
 
-For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression call to `UI.Expression.express`, then text-bearing calls to `Speech.Playback.speak` and `UI.Caption.print`. Assistant subsequently directs the speech text to SpeechSynthesisAgent and replaces the text-bearing call with `Speech.Playback.speak(audioID)` before output. Speech uses its default or explicit channel; the caption Tool has no channel. This illustrates why text is a Function Token even when it contains no XML.
+For `<express emotion="happy"/> Hello.`, AgentGenerator produces an expression call to `UI.Expression.express`, then text-bearing calls to `Speech.Playback.speak` and `UI.Caption.print`. Assistant subsequently directs the speech text to SpeechSynthesisAgent and replaces the text-bearing call with `Speech.Playback.speak(audioID)` before output. Speech uses its default or explicit channel; the caption Action uses Display. This illustrates why text is a Function Token even when it contains no XML.
 
 ## Bounds, completion and failure
 
@@ -103,7 +103,7 @@ Failure cannot roll back Actions already emitted and executed. If one append thr
 - ✅ AgentGenerator.swift: alias binding, effective channels and code-owned text mappings.
 - ✅ SentenceFunctionBuffer.swift: validated TextSegmentationPolicy and progressive multilingual sentence segmentation, including punctuation, quotes, decimals and abbreviations.
 - ✅ ToolCallParser.swift: complete native tool arguments and registered capability resolution.
-- ❌ Incremental native tool-argument assembly and full JSON Schema. ChatEvent currently exposes text/completion only; the existing /status tool route remains separate.
+- ✅ Cloud transport assembles bounded native argument fragments independently of this text parser and emits complete ChatEvent.toolCall values; ToolCallParser resolves those complete calls. ❌ Local native Tools and full JSON Schema remain unsupported.
 
 Update this README when changing syntax, names, bounds, ordering or completion/cancellation behavior.
 
@@ -149,7 +149,7 @@ flowchart LR
 
 ✅ `<wait>` and `</wait>` are exact, attribute-free paired tags; `<wait/>` is invalid and wait is reserved as a capability alias. The unified ChannelParser lexical stack rejects crossing scopes such as `<wait><channel.Speech></wait></channel.Speech>`. A Channel may surround a wait or be nested within it. Wait does not change the effective channel. begin/end flush preceding sentence text before emitting SchedulingDirective, preserving the lexical position of every action.
 
-✅ AgentGenerator append/finish now return `[GenerationEvent]` with `.action(ActionCall)`, `.tool(ToolCall)` and `.scheduling(SchedulingDirective)`. Consumers must forward the entire event sequence, not filter out directives. Natural text produces the code-owned mapped Action/Tool calls in callback order; speech is scheduled and caption append executes immediately. No special text-step type is needed. The parser limits 32 waits and combined depth 8; scheduled execution additionally validates balanced groups and bounds. Each Agent owns its parser; Gateway only receives resolved values and typed boundaries.
+✅ AgentGenerator append/finish now return `[GenerationEvent]` with `.action(ActionCall)`, `.tool(ToolCall)` and `.scheduling(SchedulingDirective)`. Consumers must forward the entire event sequence, not filter out directives. Natural text produces the code-owned mapped Action/Tool calls in callback order; Assistant maps both speech playback and caption append to scheduled Actions. No special text-step type is needed. The parser limits 32 waits and combined depth 8; scheduled execution additionally validates balanced groups and bounds. Each Agent owns its parser; Gateway only receives resolved values and typed boundaries.
 
 A wait waits for its parent's preceding work, executes internally by ordinary Channel rules, and releases its parent's continuation only once closed and all children complete. Nested waits apply the same rule locally. An open group may execute already received work. Completed XML is not physical completion; cancellation discards unfinished parsing state and Gateway cancels accepted work. Self-closing Actions never acquire paired start/stop semantics.
 
@@ -168,7 +168,7 @@ flowchart LR
 
 ## Action and Tool presentation boundary
 
-✅ TextMapping now returns ordered GenerationEvents containing ActionCalls or ToolCalls. Each chunk yields at most8 events and a generation at most120 calls. Assistant supplies a speech Action and append-caption Tool. Tool events retain unique call IDs but have no channel/wait membership. XML still resolves only model-declared Action aliases; native Tool parsing remains separate. ❌ The change does not invent XML Tool aliases or model-native transport.
+✅ TextMapping now returns ordered GenerationEvents containing ActionCalls or ToolCalls. Each chunk yields at most8 events and a generation at most120 calls. Assistant supplies a speech Action and append-caption Action. Tool events retain unique call IDs but have no channel/wait membership. XML still resolves only model-declared Action aliases; native Tool parsing remains separate. ❌ The change does not invent XML Tool aliases or model-native transport.
 
 ✅ Unknown Action aliases and invocation parameter validation emit ordered CallRejection events and continue generation; rejected calls count toward the120-call bound. Native Tool parsing still throws typed resolution errors for the consumer to convert. ❌ Malformed XML, forbidden Channels, cancellation and resource limits remain terminal.
 
@@ -181,3 +181,10 @@ flowchart LR
     Buffer --> Mapping[Agent-owned text mapping]
     Policy --> Trace[History preview: identical policy]
 ```
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).

@@ -105,6 +105,13 @@ flowchart LR
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
-✅ ADR0157: AgentActionCompletion.value is bounded to64 KiB UTF-8. Both ActionResult and returning ToolResult transport this same independent completion type; ToolResult retains its native string value/error fields. ❌ AgentCore imports no execution implementation and result receipt does not automatically resume reasoning.
+✅ ADR0157: AgentActionCompletion.value is bounded to64 KiB UTF-8. Both ActionResult and returning ToolResult transport this same independent completion type; ToolResult retains its native string value/error fields. ❌ AgentCore imports no execution implementation and receipt alone does not resume reasoning; a sealed round with registered observation does.
 
 ✅ ADR0163: SignalCausality captures inputID/rootID/hops/turn/output sequence without retaining payloads. ActionResult and ActivityEvent require explicit context; inputID/turn on ActionResult derive from it. Runtime feedback advances one hop, retains root/parent/turn and uses fresh bounded admission. No remote codec is implied.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ Envelopes and terminal results retain optional round/call identity. Typed roundFinished and roundResult separate round sealing from final conversation completion; bounded ledger delivery failure is explicit.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).

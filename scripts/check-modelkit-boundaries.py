@@ -320,7 +320,7 @@ entry_modules = {
            'Caption': {'print', 'setTranscript', 'finishTranscript', 'beginReplyTurn'},
            'VoiceState': {'setVoiceState'}, 'Pose': {'showPose'}, 'HistoryPresentation': {'showHistory'},
            'ResourcePresentation': {'showResources', 'showResourceFailure', 'showResourceOperationFailure', 'showResourcePreferenceFailure', 'showProviderResult'}},
-    'Speech': {'Playback': {'speak'}}, 'Camera': {'Capture': {'open', 'close', 'flip', 'retry'}},
+    'Speech': {'Playback': {'speak'}}, 'Camera': {'Capture': {'open', 'close', 'flip', 'retry', 'takePhoto', 'savePhoto', 'ignorePhoto'}},
     'History': {'Conversation': {'list', 'read', 'delete', 'startNew', 'summarize'}}, 'System': {'Device': {'control', 'readStatus', 'readEnvironment'}, 'Provider': {'discoverModels', 'restoreSettings', 'saveSettings', 'readSettings'}, 'Runtime': {'runtimeInfo'}, 'ModelResources': {'download', 'cancel', 'remove', 'configureSpeech', 'restoreSource', 'saveSource', 'snapshotResources'}},
     'NexArm': {'Motion': {'moveMotor', 'resetMotor', 'reset', 'shakeBase'},
                'Gesture': {'nodHead', 'shakeHead', 'waveWrist', 'tiltWrist', 'lookAround', 'celebrate', 'dance'},

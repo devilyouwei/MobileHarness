@@ -335,9 +335,8 @@ private actor Recorder {
 
 @Test func gatewayAccumulatesCompletionToolFailureAndContinuesOtherOutputs() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try RuntimeToolFixture()
     try await manager.register(agent)
-    _ = try await bindSpeechRequests(agent)
     try await manager.start(.assistant)
     let registry = ToolRegistry()
     try await registry.registerCompletion("UI.Caption.print") { _ in throw HarnessError.notRunning }
@@ -421,9 +420,8 @@ private actor Recorder {
 
 @Test func toolFeedbackRejectionPreservesSuccessfulExecutionValue() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(capacity: 1, chat: FixedTextChat())
+    let agent = try RuntimeToolFixture()
     try await manager.register(agent)
-    _ = try await bindSpeechRequests(agent)
     try await manager.start(.assistant)
     try await agent.pause()
     let input = AgentInput(sessionID: UUID(), payload: .text("occupied"))
@@ -702,4 +700,30 @@ private actor HeldSignalTool {
     #expect(await recorder.actions == 1)
     await gateway.shutdown()
     await manager.stopAll()
+}
+
+/// Deterministic native consumer for transport tests; independent of Assistant text expansion.
+private actor RuntimeToolFixture: Agent {
+    nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
+    nonisolated let descriptor: AgentDescriptor
+    init() throws {
+        descriptor = AgentDescriptor(
+            id: .assistant, name: "Native fixture", inputs: [.text, .toolResult],
+            outputs: [.actionCall, .toolCall, .control],
+            capabilities: try CapabilityRegistry(internalTools: [
+                InternalTool(path: "UI.Caption.print", required: ["text"]),
+                InternalTool(path: "UI.Caption.beginReplyTurn"),
+            ]))
+    }
+    private var lifecycle: AgentLifecycle = .registered
+    private var queued = 0
+    func start() { lifecycle = .running }
+    func pause() { lifecycle = .paused }
+    func resume() { lifecycle = .running }
+    func stop() { lifecycle = .stopped }
+    func status() -> AgentStatus { .init(lifecycle: lifecycle, queuedInputs: queued, processedInputs: 0) }
+    func receive(_ input: AgentInput) throws {
+        guard queued < 1 else { throw HarnessError.queueFull }
+        queued += 1
+    }
 }

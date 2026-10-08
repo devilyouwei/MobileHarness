@@ -49,6 +49,7 @@ public actor OutputGateway {
         let snapshot = failureSnapshot()
         for observer in failureObservers.values { observer.yield(snapshot) }
     }
+    private var roundFailures: [UUID: String] = [:]
     private var outputResults: [OutputExecutionResult] = []
     private var evictedOutputs: UInt64 = 0
     private let requests: InputGateway
@@ -83,7 +84,7 @@ public actor OutputGateway {
         self.observeEvent = observeEvent
         self.manager = manager
         self.tools = ToolDispatcher(
-            registry: tools, input: requests, resources: actions.resourceCoordinator, scheduler: actions)
+            registry: tools, input: requests, resources: actions.resourceCoordinator)
         self.actions = ActionDispatcher(executor: actions)
         self.sink = sink
     }
@@ -243,6 +244,7 @@ public actor OutputGateway {
     }
     public func shutdown() async {
         closed = true
+        roundFailures.removeAll()
         for observer in failureObservers.values { observer.finish() }
         failureObservers.removeAll()
         async let cancelled: Void = actions.shutdown()
@@ -285,6 +287,47 @@ public actor OutputGateway {
             }
             failure = String(
                 ((error as? any LocalizedError)?.errorDescription ?? String(describing: error)).prefix(512))
+        }
+        if let roundID = envelope.roundID, let failure {
+            guard roundFailures.count < 128 || roundFailures[roundID] != nil else { throw HarnessError.queueFull }
+            if code == .deliveryFailed {
+                roundFailures[roundID] = failure
+            } else if let callID = envelope.callID {
+                do {
+                    let owner = try await executionOwner(envelope)
+                    switch envelope.output {
+                    case .actionCall(let call):
+                        let report = try ActionReport(entries: [
+                            .init(
+                                path: call.actionPath.description, status: .failed, code: .handlerFailed,
+                                details: ["failureDescription": failure])
+                        ])
+                        let receipt = ActionResult(
+                            executionID: UUID(), owner: owner, path: call.actionPath,
+                            causality: SignalCausality(envelope: envelope), status: .failed, effect: .notStarted,
+                            completion: .report(report.agentValue), failure: .handlerFailed, callID: callID,
+                            roundID: roundID)
+                        guard await requests.deliverActionResult(receipt) == .accepted else {
+                            throw CommunicationError.scopeClosed
+                        }
+                    case .toolCall:
+                        _ = try await requests.deliverToolResult(
+                            .init(
+                                callID: callID, value: failure, isError: true,
+                                failureCode: code?.rawValue ?? "handlerFailed", roundID: roundID), owner: owner,
+                            envelope: envelope)
+                    default: break
+                    }
+                } catch {
+                    try Task.checkCancellation()
+                    roundFailures[roundID] = "Execution feedback failed: \(error)"
+                }
+            } else if case .rejectedCall = envelope.output {
+                // Parser-local rejections are already terminal observations in the Agent.
+            } else {
+                guard roundFailures.count < 128 || roundFailures[roundID] != nil else { throw HarnessError.queueFull }
+                roundFailures[roundID] = failure
+            }
         }
         let result = OutputExecutionResult(
             source: envelope.source, inputID: envelope.inputID,
@@ -343,7 +386,8 @@ public actor OutputGateway {
                 let lease = await resources?.lease(for: owner, resources: required)
                 try await actions.dispatch(
                     token, envelope: envelope, owner: owner,
-                    feedback: descriptor.inputs.contains(.actionResult) ? actionFeedback : .none, lease: lease)
+                    feedback: descriptor.inputs.contains(.actionResult)
+                        ? (envelope.roundID != nil ? .terminal : actionFeedback) : .none, lease: lease)
             } catch {
                 // Invocation/availability failures reject only this call. Lifecycle and
                 // structural scheduling failures still close the owning Action tree.
@@ -362,12 +406,31 @@ public actor OutputGateway {
             toolResult = try await InvocationSignalContext.$binding.withValue(.init(envelope: envelope, owner: owner)) {
                 try await tools.dispatch(call, envelope: envelope, owner: owner)
             }
+        case .roundFinished:
+            guard let roundID = envelope.roundID, case .roundFinished(let sealedID) = envelope.output,
+                sealedID == roundID
+            else {
+                throw CommunicationError.invalidPayload
+            }
+            let owner = try await executionOwner(envelope)
+            var failure = roundFailures.removeValue(forKey: roundID)
+            do {
+                try await actions.finish(envelope)
+                try await actions.executor.finishRoundDelivery(roundID)
+            } catch {
+                try Task.checkCancellation()
+                await actions.cancel(envelope)
+                failure = String(describing: error)
+            }
+            try await requests.deliverRoundResult(
+                .init(roundID: roundID, failure: failure), owner: owner, envelope: envelope)
         case .finish:
             do { try await actions.finish(envelope) } catch {
                 await actions.cancel(envelope)
                 throw error
             }
         case .cancel:
+            if let roundID = envelope.roundID { roundFailures[roundID] = nil }
             await actions.cancel(envelope)
         case .observe: break
         }

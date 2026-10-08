@@ -1,7 +1,48 @@
+import Foundation
 import FunctionContracts
 
 /// Camera.Capture function ownership; current invocation paths remain compatible.
 extension CameraActions {
+    @Action(domain: "Camera", module: "Capture", title: "savePhoto", serializationKey: "Camera", timeout: .seconds(60))
+    public static func savePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
+        -> String
+    {
+        let id = try selectedPhotoID(invocation)
+        try Task.checkCancellation()
+        return String(
+            decoding: try JSONEncoder().encode(await camera.savePhoto(id, invocation: invocation)), as: UTF8.self)
+    }
+
+    @Action(domain: "Camera", module: "Capture", title: "ignorePhoto", serializationKey: "Camera")
+    public static func ignorePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability)
+        async throws
+        -> String
+    {
+        let id = try selectedPhotoID(invocation)
+        try Task.checkCancellation()
+        return String(
+            decoding: try JSONEncoder().encode(await camera.ignorePhoto(id, invocation: invocation)), as: UTF8.self)
+    }
+
+    private static func selectedPhotoID(_ invocation: any FunctionInput) throws -> UUID? {
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys(["photoID"])
+        guard invocation.call.parameters["photoID"] != nil else { return nil }
+        let raw = try arguments.requiredString("photoID", maximumUTF8Bytes: 36)
+        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("photoID") }
+        return id
+    }
+
+    @Action(domain: "Camera", module: "Capture", title: "takePhoto", serializationKey: "Camera", timeout: .seconds(15))
+    public static func takePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
+        -> String
+    {
+        try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
+        try Task.checkCancellation()
+        let receipt = try await camera.takePhoto(invocation: invocation)
+        return String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
+    }
+
     @Action(domain: "Camera", module: "Capture", title: "retry", serializationKey: "Camera")
     public static func retry(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
         try ActionArguments(invocation.call.parameters).validateAllowedKeys([])

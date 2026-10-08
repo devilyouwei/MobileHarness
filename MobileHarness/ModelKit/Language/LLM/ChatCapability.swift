@@ -1,16 +1,35 @@
 import Foundation
 
+/// Bounded image bytes, independent of platform images and Agent storage.
+public struct ChatImage: Codable, Equatable, Sendable {
+    public let id: UUID
+    public let mimeType: String
+    public let data: Data
+    public init(id: UUID, mimeType: String = "image/jpeg", data: Data) throws {
+        guard ["image/jpeg", "image/png"].contains(mimeType), !data.isEmpty, data.count <= 4 * 1024 * 1024 else {
+            throw CapabilityError.invalidRequest("Image attachment exceeds limits or has unsupported MIME")
+        }
+        self.id = id
+        self.mimeType = mimeType
+        self.data = data
+    }
+}
+
 public struct ChatMessage: Codable, Equatable, Sendable {
     public enum Role: String, Codable, Sendable { case system, user, assistant, tool }
     public let role: Role
     public let content: String
     public let toolCalls: [ChatToolCall]
     public let toolCallID: String?
-    public init(role: Role, content: String, toolCalls: [ChatToolCall] = [], toolCallID: String? = nil) {
+    public let images: [ChatImage]?
+    public init(
+        role: Role, content: String, toolCalls: [ChatToolCall] = [], toolCallID: String? = nil, images: [ChatImage] = []
+    ) {
         self.role = role
         self.content = content
         self.toolCalls = toolCalls
         self.toolCallID = toolCallID
+        self.images = images.isEmpty ? nil : images
     }
 }
 
@@ -59,9 +78,19 @@ public struct ChatRequest: Sendable {
         var pending: Set<String> = []
         var callIDs: Set<String> = []
         var bytes = 0
+        var imageCount = 0
+        var imageBytes = 0
         guard messages.count <= 64 else { throw CapabilityError.invalidRequest("Chat transcript exceeds bounds") }
         for message in messages {
             bytes += message.content.utf8.count
+            if let images = message.images {
+                guard message.role == .user else { throw CapabilityError.invalidRequest("Images require user role") }
+                for image in images {
+                    _ = try ChatImage(id: image.id, mimeType: image.mimeType, data: image.data)
+                    imageCount += 1
+                    imageBytes += image.data.count
+                }
+            }
             if message.role == .tool {
                 guard message.toolCalls.isEmpty, let id = message.toolCallID, pending.remove(id) != nil else {
                     throw CapabilityError.invalidRequest("Uncorrelated tool result")
@@ -85,7 +114,7 @@ public struct ChatRequest: Sendable {
                 }
             }
         }
-        guard pending.isEmpty, bytes <= 65_536 else {
+        guard pending.isEmpty, bytes <= 65_536, imageCount <= 4, imageBytes <= 16 * 1024 * 1024 else {
             throw CapabilityError.invalidRequest("Incomplete or oversized tool transcript")
         }
         guard tools.count <= 128, Set(tools.map(\.name)).count == tools.count,
@@ -132,10 +161,12 @@ public enum ChatEvent: Equatable, Sendable {
 
 public protocol ChatCapability: Capability {
     var supportsToolCalls: Bool { get async }
+    var supportsImages: Bool { get async }
     /// Each call owns its generation state. History is supplied by the caller, never shared implicitly.
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent>
 }
 
 extension ChatCapability {
     public var supportsToolCalls: Bool { get async { false } }
+    public var supportsImages: Bool { get async { false } }
 }

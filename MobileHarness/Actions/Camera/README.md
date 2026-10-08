@@ -8,7 +8,7 @@ Purpose: expose explicit camera/vision controls through OutputGateway. Design go
 | Camera.Capture.close | No arguments; idempotently disable capture and vision |
 | Camera.Capture.flip | Required facing=front/back; select target lens, healthy same-target request is idempotent; disabled camera fails |
 
-✅ CaptureActions.swift owns @Action entries; Support/CameraModule.swift owns definitions, capability and errors. All entries check cancellation and reject unknown arguments before effects. Host registration retains completion-only native success without ToolResult or Action history. Host errors propagate.
+✅ CaptureActions.swift owns @Action entries; Support/CameraModule.swift owns definitions, capability and errors. All entries check cancellation and reject unknown arguments before effects. Host registration exposes the four controls as native observation calls; takePhoto is dual-protocol with observation and Assistant text exposure. Host errors propagate.
 
 ```mermaid
 flowchart LR
@@ -26,7 +26,7 @@ flowchart LR
 
 ✅ Camera function constraints claim no camera.capture lock: they request the single App camera owner to change intent; that owner alone acquires/renews/releases the lease. Taking another lease at Gateway would conflict with the active capture owner. Camera Actions imports only Foundation/FunctionContracts and gains no PlatformKit dependency.
 
-❌ Native model Tool event transport, background capture, forced interruption of native calls and physical-device acceptance are not added. Cancelling after an intent is accepted does not roll back that intent; scene shutdown still owns cleanup.
+❌ Background capture, forced termination of native callbacks and physical-device acceptance are not provided. Cancelling after an intent is accepted does not roll back that intent; scene shutdown still owns cleanup.
 
 ✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
 ✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
@@ -57,3 +57,13 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 ✅ ADR0181 host migration: function paths and native lifecycle remain unchanged; flip now requires explicit facing. The injected camera endpoint routes Assistant intent to Photographer, and applies only admitted Photographer effects. Functions remain unaware of Agent identity or delegation protocol.
 
 ✅ Interaction refinement: CaptureActions.flip validates required facing (front/back) and calls the typed target-selection endpoint; selecting the current lens is idempotent when capture is healthy.
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: CaptureActions.takePhoto validates no arguments and returns photoID/width/height/MIME from CameraControlCapability.takePhoto. Existing control endpoints stay unchanged. Photo observation reading validates originating source/session/input.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+## Photo save and ignore — ADR0185
+
+✅ Camera.Capture.savePhoto and ignorePhoto reject unknown parameters and malformed/oversized UUIDs before any effect. Optional photoID selects current when omitted; neutral CameraPhotoCommandReceipt encodes saved/ignored, actual UUID and alreadySaved. save has60s cooperative budget; ignore uses ordinary finite completion. Host registration chooses observation. Native permission, identity and export belong to the injected capability.

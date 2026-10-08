@@ -88,3 +88,11 @@ Native streams and command paths have domain-specific capacities and explicit ov
 ❌ Broader device integrations and sustained physical capture/coordinate/transport acceptance remain outstanding. Software cleanup cannot prove a physical robot stop, and physical safety cannot depend on iOS background execution.
 
 See [Actions/NexArm](../Actions/NexArm/README.md) and [App Bluetooth workflow](../App/Workflows/Bluetooth/README.md) for business behavior, recovery and manual-interaction policy.
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Vision adds bounded still-photo capture through public AVCapturePhotoOutput; session graph remains exclusively actor-owned.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; native add-only photo export is implemented by ADR0185.
+
+✅ Vision/ApplePhotoLibrary supplies add-only PhotoKit import with explicit permission and joined transaction completion. App selects the photo and owns lifecycle/idempotency; this foundational SDK gains no project dependency.

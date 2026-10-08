@@ -25,6 +25,7 @@ public actor OpenAIChat: ChatCapability {
 
     /// Configured, not a claim that the remote service or credentials have been probed.
     public var supportsToolCalls: Bool { true }
+    public var supportsImages: Bool { true }
 
     public var availability: CapabilityAvailability { .available }
 

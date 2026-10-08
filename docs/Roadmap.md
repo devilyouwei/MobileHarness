@@ -302,3 +302,9 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 
 ✅ [ApplicationControl service organization](adr/0182-application-control-service-organization.md): ADR0182 implements canonical role-directory, identity and host-transport migration; existing business behavior retained. Validation is recorded separately.
+
+✅ [ADR0183](adr/0183-generation-round-observations.md): implemented Action/Tool split, registered observations and full-round result merge; physical/model acceptance remains pending.
+
+✅ [ADR0184](adr/0184-assistant-photo-observation.md): Assistant photo Action, screenshot presentation and multimodal observation loop.
+
+✅ [ADR0185](adr/0185-photo-save-and-ignore.md): Agent-driven current-photo save to system Photos and ignore from UI/dialogue; physical acceptance remains pending.

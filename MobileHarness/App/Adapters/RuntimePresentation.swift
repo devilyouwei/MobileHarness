@@ -44,14 +44,14 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     var cameraRequests:
         (
             @MainActor @Sendable (
-                PhotographerCameraIntent.Operation, PhotographerCameraIntent.Facing?, any FunctionInput
-            ) async throws -> Void
+                PhotographerCameraIntent.Operation, PhotographerCameraIntent.Facing?, UUID?, any FunctionInput
+            ) async throws -> String?
         )?
     private func cameraOperation(
-        _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil,
+        _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil, photoID: UUID? = nil,
         invocation: any FunctionInput
     )
-        async throws
+        async throws -> String?
     {
         if invocation.context.source == "photographer" {
             if invocation.context.sessionID != rootSessionID {
@@ -65,29 +65,60 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
                 guard let facing else { throw CommunicationError.invalidPayload }
                 try await cameraControl.flip(facing, invocation: invocation)
             case .retry: try await cameraControl.retry(invocation: invocation)
+            case .savePhoto:
+                return String(
+                    decoding: try JSONEncoder().encode(await cameraControl.savePhoto(photoID, invocation: invocation)),
+                    as: UTF8.self)
+            case .ignorePhoto:
+                return String(
+                    decoding: try JSONEncoder().encode(
+                        await cameraControl.ignorePhoto(photoID, invocation: invocation)), as: UTF8.self)
             case .cancel: throw CommunicationError.unauthorized
             }
-            return
+            return nil
         }
         guard invocation.context.source == "assistant", let voice, let cameraRequests else {
             throw CommunicationError.unauthorized
         }
         try voice.validateCameraControl(invocation: invocation)
         do {
-            try await cameraRequests(
-                operation, facing.flatMap { PhotographerCameraIntent.Facing(rawValue: $0.rawValue) }, invocation)
+            return try await cameraRequests(
+                operation, facing.flatMap { PhotographerCameraIntent.Facing(rawValue: $0.rawValue) }, photoID,
+                invocation)
         } catch PhotographerIntentFailure.execution(let result) {
             if case .report(let report)? = result.tool?.completion { throw ActionReportedError(report) }
             throw PhotographerIntentFailure.execution(result)
         }
     }
+    func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+        guard let result = try await cameraOperation(.savePhoto, photoID: id, invocation: invocation) else {
+            throw CommunicationError.invalidPayload
+        }
+        return try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(result.utf8))
+    }
+    func ignorePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+        guard let result = try await cameraOperation(.ignorePhoto, photoID: id, invocation: invocation) else {
+            throw CommunicationError.invalidPayload
+        }
+        return try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(result.utf8))
+    }
+    func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
+        guard invocation.context.source == "assistant", let voice else { throw CommunicationError.unauthorized }
+        try voice.validateCameraControl(invocation: invocation)
+        return try await cameraControl.takePhoto(invocation: invocation)
+    }
+    func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data {
+        try await cameraControl.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
+    }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
-        try await cameraOperation(enabled ? .open : .close, invocation: invocation)
+        _ = try await cameraOperation(enabled ? .open : .close, invocation: invocation)
     }
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
-        try await cameraOperation(.flip, facing: facing, invocation: invocation)
+        _ = try await cameraOperation(.flip, facing: facing, invocation: invocation)
     }
-    func retry(invocation: any FunctionInput) async throws { try await cameraOperation(.retry, invocation: invocation) }
+    func retry(invocation: any FunctionInput) async throws {
+        _ = try await cameraOperation(.retry, invocation: invocation)
+    }
     private weak var voice: (any VoiceOutputHandling)?
     private weak var camera: (any CameraOutputHandling)?
     func bindVoice(_ value: any VoiceOutputHandling) throws {

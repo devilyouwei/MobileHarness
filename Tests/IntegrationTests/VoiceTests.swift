@@ -117,14 +117,13 @@ private func preparedSpeech(
                 try await playback.play(invocation) { audio, _ in
                     while let frame = try await audio.next() { await probe.played(frame) }
                 }
-            }
-        ]))
+            },
+            ActionPath(domain: "UI", module: "Caption", function: "print"): { invocation in
+                try await UIActions.print(invocation: invocation) { text, _ in await probe.displayed(text) }
+            },
+        ])
+    ) { await gateway.deliverActionResult($0) }
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.Caption.print") { invocation in
-        try await UIActions.print(invocation: invocation) { text, _ in
-            await probe.displayed(text)
-        }
-    }
     let response = OutputGateway(
         manager: manager, requests: gateway, tools: tools, actions: scheduler, policy: policy,
     ) { _ in }
@@ -148,8 +147,8 @@ private func preparedSpeech(
         if envelope.output == .control("assistant.finished") { break }
     }
     await agent.stop()
-    #expect(tokens == ["speak", "UI.Caption.print"])
-    #expect(await scheduler.executionSnapshot().records.allSatisfy { $0.path.domain == "Speech" })
+    #expect(tokens == ["speak", "print"])
+    #expect(await scheduler.executionSnapshot().records.map { $0.path.domain }.sorted() == ["Speech", "UI"])
     #expect(await probe.spokenText == ["固定回复"])
     #expect(await probe.displayedText == ["你好", "固定回复"])
     #expect(await probe.audio.count == 1)
@@ -573,7 +572,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func speechOnsetClearsAssistantPresentationOnlyThroughTools() async throws {
+@Test(.timeLimit(.minutes(1))) func speechOnsetClearsAssistantPresentationOnlyThroughActions() async throws {
     let session = UUID()
     let manager = AgentManager()
     let assistant = try AssistantAgent(chat: FixedTextChat(text: "must not generate"))
@@ -592,13 +591,15 @@ private actor EndpointVADSession: VoiceActivitySession {
         ])
     let input = InputGateway(manager: manager, policy: policy)
     let probe = VoiceProbe()
-    let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
+    let scheduler = ChannelScheduler(
+        registry: try testActionRegistry(handlers: [
+            .init(domain: "UI", module: "Caption", function: "beginReplyTurn"): { invocation in
+                try await UIActions.beginReplyTurn(invocation: invocation) { _ in
+                    await probe.displayed("reply and expression cleared atomically")
+                }
+            }
+        ]))
     let tools = ToolRegistry()
-    try await tools.registerCompletion("UI.Caption.beginReplyTurn") { invocation in
-        try await UIActions.beginReplyTurn(invocation: invocation) { _ in
-            await probe.displayed("reply and expression cleared atomically")
-        }
-    }
     let output = OutputGateway(
         manager: manager, requests: input, tools: tools,
         actions: scheduler, policy: policy, sink: { _ in })
@@ -614,7 +615,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     #expect(await probe.displayedText.isEmpty)
     var functions: [String] = []
     for await envelope in assistant.outputs {
-        if case .toolCall(let call) = envelope.output { functions.append(call.toolPath) }
+        if case .actionCall(let call) = envelope.output { functions.append(call.actionPath.description) }
         try await output.dispatch(envelope)
         if envelope.output == .control("agent.finished") { break }
     }

@@ -52,3 +52,17 @@ Sources compile once in the UI target; there is no App source membership for thi
 ## Camera command entry
 
 ✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: Add screenshot-style overlay: full photo fades in150ms, holds250ms, shrinks to bottom-right450ms, persists thumbnail and supports fullscreen inspection. UI reports animation completion with photo identity; reduced motion uses fade/direct thumbnail. New photos replace old; no unbounded gallery.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+✅ Thumbnail target state and animation-completed acknowledgment are distinct. Disappearance during shrink reports failure; inspect is enabled only after the completion callback. Stale callbacks acknowledge at most once.
+
+✅ Touch correction: CapturedPhotoView renders the whole fade/shrink layer without hit testing; only an independently positioned96×128 thumbnail Button accepts inspection taps after animation acknowledgment. No full-screen gesture may intercept conversation or interruption controls.
+
+## Photo save and ignore — ADR0185
+
+✅ Thumbnail inspection,44pt ignore and save controls remain confined to96×128. UI forwards the rendered UUID via CameraControlling; CameraState supplies export busy/message/savedPhotoID. Fullscreen inspection offers Save to Photos, Ignore and Return; changing/ignoring photo identity dismisses inspection. Animated image and messages pass touches through. Ignore removes the thumbnail; save retains it with confirmed status. Errors remain visible even with capture off. ❌ Native gesture/VoiceOver/Reduce Motion acceptance remains pending.

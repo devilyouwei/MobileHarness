@@ -109,8 +109,8 @@ private actor HistoryModel: ChatCapability {
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("请串行"))
     try await agent.receive(input)
-    var iterator = agent.outputs.makeAsyncIterator()
-    let output = try #require(await iterator.next())
+    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    let output = try #require(try await iterator.next())
     guard case .control(let message) = output.output else {
         Issue.record("Expected error")
         return
@@ -170,10 +170,10 @@ private actor HistoryModel: ChatCapability {
     let agent = try AssistantAgent(chat: model, conversations: restored)
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("continue")))
-    var iterator = agent.outputs.makeAsyncIterator()
-    let action = try #require(await iterator.next())
+    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    let action = try #require(try await iterator.next())
     #expect(action.output == .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
-    #expect(await iterator.next()?.output == .control("assistant.finished"))
+    #expect(try await iterator.next()?.output == .control("assistant.finished"))
     let request = try #require(await model.requests.first)
     #expect(request.messages.count == 4)
     #expect(request.messages[1].content == "previous user")
@@ -295,12 +295,12 @@ private struct NativeCameraHistoryChat: ChatCapability {
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("打开摄像头并微笑"))
     try await agent.receive(input)
-    var outputs = agent.outputs.makeAsyncIterator()
-    guard case .actionCall = await outputs.next()?.output else {
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    guard case .actionCall = try await outputs.next()?.output else {
         Issue.record("Missing XML action")
         return
     }
-    guard case .toolCall(let call) = await outputs.next()?.output else {
+    guard case .toolCall(let call) = try await outputs.next()?.output else {
         Issue.record("Missing native tool")
         return
     }
@@ -312,7 +312,7 @@ private struct NativeCameraHistoryChat: ChatCapability {
             metadata: InputMetadata(
                 payload: feedbackPayload, source: "runtime", origin: .runtime, rootID: input.metadata.rootID,
                 parentID: input.id)))
-    while let output = await outputs.next() { if output.output == .control("assistant.finished") { break } }
+    while let output = try await outputs.next() { if output.output == .control("assistant.finished") { break } }
     let record = try #require(try await store.snapshot().current.turns.first)
     #expect(record.state == .completed && record.finishReason == "stop")
     #expect(record.toolCalls?.first?.id == call.id)
@@ -395,8 +395,8 @@ extension ConversationHistoryStore {
         })
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("next")))
-    var iterator = agent.outputs.makeAsyncIterator()
-    guard case .control(let message) = await iterator.next()?.output else {
+    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    guard case .control(let message) = try await iterator.next()?.output else {
         Issue.record("Expected admission error")
         await agent.stop()
         return
@@ -417,8 +417,8 @@ extension ConversationHistoryStore {
     let agent = try AssistantAgent(chat: model, conversations: store)
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("next")))
-    var iterator = agent.outputs.makeAsyncIterator()
-    guard case .control(let message) = await iterator.next()?.output else {
+    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    guard case .control(let message) = try await iterator.next()?.output else {
         Issue.record("Expected persistence error")
         await agent.stop()
         return
@@ -427,4 +427,59 @@ extension ConversationHistoryStore {
     #expect(await model.requests.isEmpty)
     #expect(try await store.snapshot().current.turns.isEmpty)
     await agent.stop()
+}
+
+@Test func modelRequestJournalKeepsFirstTokenUsageAndLateOutcomesWithTheirRequest() async throws {
+    let store = ConversationHistoryStore()
+    let id = UUID()
+    _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
+    let first = ConversationModelRequest(id: UUID(), input: "question", requestJSON: "[]")
+    try await store.beginModelRequest(first, for: id)
+    let arrival = first.date.addingTimeInterval(0.125)
+    try await store.recordFirstToken(at: arrival, for: id)
+    try await store.recordFirstToken(at: arrival.addingTimeInterval(1), for: id)
+    try await store.append("first", to: id)
+    let call = ConversationToolCall(id: UUID(), providerID: "provider", name: "inspect", argumentsJSON: "{}")
+    try await store.recordToolCall(call, for: id)
+    try await store.recordTokenUsage(.init(input: 2, generated: 3, total: 5), for: id)
+    try await store.finishModelRequest(id, reason: "toolCalls")
+    try await store.beginModelRequest(.init(id: UUID(), input: "result", requestJSON: "[]"), for: id)
+    try await store.append("second", to: id)
+    try await store.recordTokenUsage(.init(input: 6, generated: 7, total: 13), for: id)
+    try await store.finishModelRequest(id, reason: "stop")
+    try await store.finish(id, state: .completed)
+    _ = try await store.startNew()
+    try await store.recordToolOutcome(call.id, for: id, state: .completed, output: "late result")
+    let record = try #require(try await store.snapshot().past.first?.turns.first)
+    let requests = try #require(record.modelRequests)
+    #expect(record.raw == "firstsecond" && requests.map { $0.fragments.joined() } == ["first", "second"])
+    #expect(requests[0].firstTokenAt == arrival && requests[1].firstTokenAt == nil)
+    #expect(requests[0].toolCalls.first?.output == "late result" && requests[1].toolCalls.isEmpty)
+    #expect(requests[0].tokenUsage?.total == 5 && requests[1].tokenUsage?.total == 13)
+}
+
+@Test func interruptedModelRequestsRetainPartialOutputAndRequestAdmissionIsBounded() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("history.json")
+    let store = try journal(at: url)
+    let id = UUID()
+    _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
+    for index in 0..<4 {
+        try await store.beginModelRequest(.init(id: UUID(), input: "round \(index)", requestJSON: "[]"), for: id)
+        if index == 3 {
+            try await store.append("partial", to: id)
+        } else {
+            try await store.finishModelRequest(id, reason: "toolCalls")
+        }
+    }
+    await #expect(throws: ConversationHistoryError.invalidRecord) {
+        try await store.beginModelRequest(.init(id: UUID(), input: "excess", requestJSON: "[]"), for: id)
+    }
+    let record = try #require(try await journal(at: url).snapshot().current.turns.first)
+    #expect(record.state == .interrupted && record.modelRequests?.last?.state == .interrupted)
+    #expect(record.modelRequests?.last?.fragments == ["partial"])
+    #expect(record.modelRequests?.first?.state == .completed)
+    try await store.finish(id, state: .cancelled)
+    #expect(try await store.snapshot().current.turns.first?.modelRequests?.last?.state == .cancelled)
 }

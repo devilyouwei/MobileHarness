@@ -28,7 +28,7 @@ private func generator() throws -> AgentGenerator {
     #expect(normalizeToolIDs(actual) == normalizeToolIDs(expected))
     #expect(
         expected.compactMap(\.actionCall).map(\.channel) == [
-            "Speech", "Speech", "Speech", "Display", "Speech", "Speech",
+            "Speech", "Display", "Speech", "Display", "Speech", "Display", "Speech", "Display", "Speech", "Display",
         ])
     #expect(expected[2].actionCall?.parameters["text"] == "你好 & 世界")
     #expect(expected[5].actionCall?.parameters["emotion"] == "a>b \"引号\"")
@@ -156,11 +156,11 @@ private struct MarkupChat: ChatCapability {
         chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"))
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("hello")))
     var calls: [ActionCall] = []
     for _ in 0..<6 {
-        let output = try #require(await outputs.next()).output
+        let output = try #require(try await outputs.next()).output
         if case .actionCall(let call) = output {
             calls.append(call)
         } else if case .toolCall(let tool) = output {
@@ -169,11 +169,11 @@ private struct MarkupChat: ChatCapability {
             #expect(output == .control("assistant.finished"))
         }
     }
-    #expect(calls.map(\.channel) == ["Speech", "Speech", "Speech"])
-    #expect(calls[1].actionPath.function == "express")
+    #expect(calls.map(\.channel) == ["Speech", "Display", "Speech", "Speech", "Display"])
+    #expect(calls[2].actionPath.function == "express")
     let result = ToolResult(callID: UUID(), value: "<express emotion='smile'/>")
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .toolResult(result)))
-    let literal = try #require(await outputs.next()).output
+    let literal = try #require(try await outputs.next()).output
     #expect(
         await speechRequests.restored(literal)
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "<express emotion='smile'/>"])))
@@ -184,9 +184,9 @@ private struct MarkupChat: ChatCapability {
     let agent = try AssistantAgent(chat: MarkupChat(markup: "<channel.Speech>未结束"))
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("hello")))
-    let output = try #require(await outputs.next()).output
+    let output = try #require(try await outputs.next()).output
     guard case .control(let state) = output else {
         Issue.record("Expected parse failure")
         await agent.stop()
@@ -196,7 +196,7 @@ private struct MarkupChat: ChatCapability {
     try await agent.receive(
         AgentInput(sessionID: UUID(), payload: .toolResult(ToolResult(callID: UUID(), value: "recovered"))))
     #expect(
-        await speechRequests.restored(try #require(await outputs.next()).output)
+        await speechRequests.restored(try #require(try await outputs.next()).output)
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "recovered"])))
     await agent.stop()
 }
@@ -222,7 +222,10 @@ private func generationTrace() throws -> GenerationTrace {
     #expect(trace.raw == fragments.joined())
     #expect(trace.fragments == fragments)
     #expect(normalizeToolIDs(trace.events) == normalizeToolIDs(calls))
-    #expect(trace.calls.map(\.channel) == ["Speech", "Speech", "Speech", "Speech"])
+    #expect(
+        trace.calls.filter { $0.actionPath.module != "Caption" }.map(\.channel) == [
+            "Speech", "Speech", "Speech", "Speech",
+        ])
     #expect(trace.parserError == nil)
     #expect(trace.finished)
 }
@@ -278,7 +281,7 @@ private func generationTrace() throws -> GenerationTrace {
         expected.filter { if case .scheduling = $0 { true } else { false } } == [
             .scheduling(.beginWait), .scheduling(.beginWait), .scheduling(.endWait), .scheduling(.endWait),
         ])
-    let calls = expected.compactMap(\.actionCall)
+    let calls = expected.compactMap(\.actionCall).filter { $0.actionPath.module != "Caption" }
     #expect(
         calls.map(\.channel) == [
             "Speech", "Speech", "Speech", "Speech", "Speech", "Speech",
@@ -336,7 +339,7 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("test")))
     var received: [AgentOutput] = []
-    for await envelope in agent.outputs {
+    for try await envelope in FixtureGenerationOutputs(agent: agent) {
         received.append(await probe.restored(envelope.output))
         if case .control = envelope.output { break }
     }

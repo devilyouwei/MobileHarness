@@ -17,16 +17,57 @@ public protocol ConversationHistoryControlling: AnyObject {
     func delete(_ id: UUID)
     func cancel()
     func preview(_ turn: HistoryTurn) -> String
+    func imageData(_ id: UUID, for turnID: UUID) async throws -> Data?
 }
 
 public struct HistoryMessage: Codable, Sendable, Equatable {
-    public enum Role: String, Codable, Sendable { case system, user, assistant }
+    public enum Role: String, Codable, Sendable { case system, user, assistant, tool }
     public let role: Role
     public let content: String
-    public init(role: Role, content: String) {
+    public let toolCalls: [HistoryNativeToolCall]?
+    public let toolCallID: String?
+    public let imageReferences: [HistoryImageReference]?
+    public init(role: Role, content: String, imageReferences: [HistoryImageReference] = []) {
         self.role = role
         self.content = content
+        toolCalls = nil
+        toolCallID = nil
+        self.imageReferences = imageReferences.isEmpty ? nil : imageReferences
     }
+}
+
+public struct HistoryImageReference: Codable, Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let mimeType: String
+    public let byteCount: Int
+    public init(id: UUID, mimeType: String, byteCount: Int) {
+        self.id = id
+        self.mimeType = mimeType
+        self.byteCount = byteCount
+    }
+    public var isValid: Bool {
+        ["image/jpeg", "image/png"].contains(mimeType) && byteCount > 0 && byteCount <= 4 * 1024 * 1024
+    }
+}
+
+public struct HistoryNativeToolCall: Codable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let argumentsJSON: String
+}
+
+public struct HistoryModelRequest: Codable, Sendable, Identifiable {
+    public let id: UUID
+    public let date: Date
+    public let input: String
+    public let requestJSON: String
+    public let firstTokenAt: Date?
+    public let fragments: [String]
+    public let toolCalls: [HistoryToolCall]
+    public let tokenUsage: HistoryTokenUsage?
+    public let state: HistoryTurn.State
+    public let finishReason: String?
+    public let error: String?
 }
 
 public struct HistoryTokenUsage: Codable, Sendable, Equatable {
@@ -69,6 +110,12 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public let maximumOutputTokens: Int?
     public let temperature: Double
     // Optional additions keep version-1 records readable without migration.
+    public let modelRequests: [HistoryModelRequest]?
+    public let firstTokenAt: Date?
+    public let requestJSON: String?
+    public let ownerInputID: UUID?
+    public let isReACT: Bool?
+    public let generationMetadataAvailable: Bool?
     public let continuationRequests: [String]?
     public let toolDefinitions: [String]?
     public let toolCalls: [HistoryToolCall]?

@@ -117,7 +117,7 @@ Source application failure is projected using the last confirmed view flags; err
 
 ## Independent history presentation values
 
-✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; legacy continuation records remain readable with explicit missing-evidence labels. UI target has zero project dependencies.
 
 
 ## Camera command entry
@@ -130,3 +130,36 @@ ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed 
 ✅ ADR0182: canonical applicationControl identity and role-directory packaging checks; existing resource/provider/device/navigation/failure regressions now exercise ApplicationControl. All concrete Agent configurations require canonical role directories; no root exception remains.
 
 ✅ Interaction refinement: Manual camera regression verifies explicit opposite-facing target under unchanged overlap/failure policy.
+
+✅ Regressions: generation round seals do not end an input; a failed input joins cancelled native work and a subsequent input can run native calls and finish through the same consumer. Native thumbnail hit testing requires device acceptance.
+
+## Photo save and ignore — ADR0185
+
+✅ Photo UI regression verifies exact tapped identity, single-slot overlap rejection, independent photo error state and retry through the injected Agent transport. Existing generation recovery/round-join coverage remains. ❌ Native UI hit testing is not covered by these fixtures.
+
+✅ Post-commit cancellation regression verifies the saved identity and honest confirmation survive a failed request acknowledgment, without retrying the export.
+
+
+## Independent protocol consumers — 2026-10-08
+
+✅ Implemented: IndependentOutputTests prove a fifth blocked Tool does not delay later Action/scheduling admission, slow Action admission does not delay Tools, round seals wait for both branches, cancellation/overflow joins admitted workers and dispatch failure wakes the owner while model output remains open.
+
+## Lens switch latency correction
+
+✅ Implemented: gate old pipeline cleanup and verify camera vision replacement returns immediately, coalesces pending lens intents, never overlaps old/new pipelines and shutdown rejects stale startup and joins cleanup.
+
+❌ Physical-device switch latency, repeated flips during inference and camera/voice coexistence remain unverified.
+
+
+## Per-request conversation history
+
+✅ Implemented: ConversationHistoryWorkflowTests verifies nested request evidence and native context survive the bounded StorageChat-to-UI Codable boundary.
+
+❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
+
+
+## History image thumbnails
+
+✅ Implemented: History workflow tests cover selected turn/reference ownership, missing files, reader failure, cancellation and four-read rejection without file/model/native I/O.
+
+❌ Native image/layout and live-model acceptance remain separate from automated verification.

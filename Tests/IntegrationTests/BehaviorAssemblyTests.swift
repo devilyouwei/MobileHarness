@@ -233,11 +233,11 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
     let envelope = behaviorInvocation("express").testEnvelope
     let open = try #require(
         try await executor.execute(ToolCall(toolPath: "Camera.Capture.open", arguments: [:]), envelope: envelope))
-    #expect(open.isError && open.value.contains("permissionDenied"))
+    #expect(open.isError && open.failureCode == .permissionDenied)
     let flip = try #require(
         try await executor.execute(
             ToolCall(toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]), envelope: envelope))
-    #expect(flip.isError && flip.value.contains("disabled"))
+    #expect(flip.isError && flip.failureCode?.rawValue == "disabled")
 }
 
 @Test func unifiedUIDomainBindsExpressionAndGazeWithoutChangingValidation() async throws {

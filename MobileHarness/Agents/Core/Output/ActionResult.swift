@@ -53,6 +53,8 @@ public struct ActionResult: Sendable, Equatable {
     public enum Effect: String, Sendable { case notStarted, contractCompleted, unknown }
     public enum Failure: String, Sendable { case handlerFailed, cancelled, resourceUnavailable }
 
+    public let callID: UUID?
+    public let roundID: UUID?
     public let executionID: UUID
     public let owner: ExecutionOwner
     public let causality: SignalCausality
@@ -70,8 +72,11 @@ public struct ActionResult: Sendable, Equatable {
 
     public init(
         executionID: UUID, owner: ExecutionOwner, path: ActionPath, causality: SignalCausality,
-        status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil
+        status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil,
+        callID: UUID? = nil, roundID: UUID? = nil
     ) {
+        self.callID = callID
+        self.roundID = roundID
         self.executionID = executionID
         self.owner = owner
         self.causality = causality

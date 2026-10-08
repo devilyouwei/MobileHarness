@@ -24,10 +24,10 @@ private actor ChatFixture: ChatCapability {
     }
 }
 
-private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator) async throws -> [OutputEnvelope] {
+private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) async throws -> [OutputEnvelope] {
     var turn: [OutputEnvelope] = []
     for _ in 0..<121 {
-        let envelope = try #require(await outputs.next())
+        let envelope = try #require(try await outputs.next())
         turn.append(envelope)
         if envelope.output == .control("assistant.finished") { return turn }
     }
@@ -40,7 +40,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     let agent = try AssistantAgent(chat: model)
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let session = UUID()
     let first = AgentInput(sessionID: session, payload: .text("hello"))
     try await agent.receive(first)
@@ -126,7 +126,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     try await agent.resume()
     let next = AgentInput(sessionID: UUID(), payload: .text("next"))
     try await agent.receive(next)
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let turn = try await completedTurn(&outputs)
     #expect(turn.allSatisfy { $0.inputID == next.id })
     #expect(
@@ -170,13 +170,13 @@ func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async 
     let agent = try AssistantAgent(chat: model)
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let sessionID = UUID()
     let failed = AgentInput(sessionID: sessionID, payload: .text("bad turn"))
     try await agent.receive(failed)
     var reported = false
     for _ in 0..<121 {
-        let output = try #require(await outputs.next())
+        let output = try #require(try await outputs.next())
         #expect(output.inputID == failed.id)
         #expect(output.output != .control("assistant.finished"))
         if case .control(let message) = output.output {
@@ -222,10 +222,10 @@ private struct LongReplyChat: ChatCapability {
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("A longer reply")))
     var captions = ""
-    for await envelope in agent.outputs {
+    for try await envelope in FixtureGenerationOutputs(agent: agent) {
         switch envelope.output {
-        case .toolCall(let call) where call.toolPath == "UI.Caption.print":
-            captions += call.arguments["text"] ?? ""
+        case .actionCall(let call) where call.actionPath.description == "UI.Caption.print":
+            captions += call.parameters["text"] ?? ""
         case .control(let message):
             #expect(message == "assistant.finished")
             await agent.stop()
@@ -241,7 +241,7 @@ func assistantCompletesTurnAfterRejectedAction(_ markup: String) async throws {
     let agent = try AssistantAgent(chat: MalformedChatFixture(markup))
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    var iterator = agent.outputs.makeAsyncIterator()
+    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("fixture")))
     let outputs = try await completedTurn(&iterator)
     #expect(outputs.contains { if case .rejectedCall = $0.output { true } else { false } })
@@ -268,7 +268,7 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
     let agent = try AssistantAgent(chat: RejectedToolChatFixture(name: "unknown", arguments: arguments))
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    var iterator = agent.outputs.makeAsyncIterator()
+    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("fixture")))
     let outputs = try await completedTurn(&iterator)
     let rejected = outputs.compactMap { envelope -> CallRejection? in
@@ -294,7 +294,7 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
     #expect(await agent.status().queuedInputs == 1)
     #expect(await agent.status().processedInputs == 0)
     try await agent.resume()
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let turn = try await completedTurn(&outputs)
     #expect(turn.allSatisfy { $0.inputID == retained.id })
     await agent.stop()
@@ -401,10 +401,10 @@ private actor ContinuationChatFixture: ChatCapability {
     try await agent.start()
     let original = AgentInput(sessionID: UUID(), payload: .text("Inspect runtime"))
     try await agent.receive(original)
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     var call: ToolCall?
     while call == nil {
-        let output = try #require(await outputs.next())
+        let output = try #require(try await outputs.next())
         if case .toolCall(let candidate) = output.output, candidate.toolPath == "System.Runtime.runtimeInfo" {
             call = candidate
         }
@@ -474,11 +474,11 @@ private actor RepeatedNativeChatFixture: ChatCapability {
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("repeat"))
     try await agent.receive(input)
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     var calls = 0
     var terminal: String?
     while terminal == nil {
-        let envelope = try #require(await outputs.next())
+        let envelope = try #require(try await outputs.next())
         if case .toolCall(let call) = envelope.output, call.toolPath == "System.Runtime.runtimeInfo" {
             calls += 1
             let payload = InputPayload.toolResult(.init(callID: call.id, value: "actual-\(calls)"))

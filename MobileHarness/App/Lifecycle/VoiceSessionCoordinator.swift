@@ -44,7 +44,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     private var speechTask: Task<Void, Never>?
     private var speechAudioStore: SpeechAudioStore?
     private var speech: SpeechPerceptionAgent?
-    private var responseTask: Task<Void, Error>?
+    private var responseTasks: [UUID: Task<Void, Error>] = [:]
     private var responses: OutputGateway?
     private var interruptionTask: Task<Void, Never>?
     private var routeTask: Task<Void, Never>?
@@ -106,10 +106,12 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             presentationPhase = .idle
             state.isReady = true
 
-            for await output in agent.outputs {
+            try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { @MainActor [self] output in
                 try Task.checkCancellation()
-                guard output.sessionID == voiceGeneration else { continue }
+                guard output.sessionID == voiceGeneration else { return }
                 do {
+                    guard responseTasks.count < 5 else { throw HarnessError.queueFull }
+                    let responseID = UUID()
                     let task = Task {
                         do {
                             let result = try await responses.execute(output)
@@ -141,13 +143,13 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                             throw error
                         }
                     }
-                    responseTask = task
+                    responseTasks[responseID] = task
+                    defer { responseTasks[responseID] = nil }
                     try await withTaskCancellationHandler {
                         try await task.value
                     } onCancel: {
                         task.cancel()
                     }
-                    responseTask = nil
                     if case .control("assistant.finished") = output.output,
                         let generation = voiceGeneration, output.sessionID == generation
                     {
@@ -391,7 +393,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         let previousRequests = requests
         let previousResponses = responses
         let previousAudioStore = speechAudioStore
-        let previousResponse = responseTask
+        let previousResponsesTasks = Array(responseTasks.values)
         resetExpression()
         voiceGeneration = nil
         conversationPresentation = ConversationPresentation()
@@ -422,7 +424,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                     AssistantControl.cancelSession.input(sessionID: oldGeneration), to: .assistant)
                 await previousAudioStore?.cancel(sessionID: oldGeneration)
                 await previousResponses?.cancel(sessionID: oldGeneration)
-                _ = try? await previousResponse?.value
+                for task in previousResponsesTasks { _ = try? await task.value }
             }
             if previousSpeech != nil { try? await previousManager?.remove(.speechPerception) }
         }
@@ -430,8 +432,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         captureTask = nil
         speechTask?.cancel()
         speechTask = nil
-        responseTask?.cancel()
-        responseTask = nil
+        for task in responseTasks.values { task.cancel() }
+        responseTasks.removeAll()
         interruptionTask?.cancel()
         interruptionTask = nil
         routeTask?.cancel()
@@ -458,8 +460,11 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         do { try await speech?.resumeListening() } catch is CancellationError { try Task.checkCancellation() } catch {
             await stopPerception(message: "语音识别恢复失败：\(error)")
         }
-        guard voiceGeneration == generation else { return }
+        guard voiceGeneration == generation, captureTask != nil else { return }
         handlingTurn = false
+        // Commit after resume acknowledgment; its emitted perception update may arrive while admission is closed.
+        presentationPhase = .listening
+        state.voiceStatus = "正在聆听 · 停顿后自动识别"
     }
     func play(audioID: UUID, invocation: any FunctionInput) async throws {
         guard let speechPlayback else { throw CommunicationError.scopeClosed }
@@ -555,6 +560,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
         // In-flight perception Tools cannot restore listening after capture admission has closed.
         guard captureTask != nil else { throw CancellationError() }
+        // A late perception update must not reopen listening between model rounds or during playback.
+        if handlingTurn, voiceState == .listening || voiceState == .hearing { return }
         if conversationPresentation.isCurrent(invocation.context), conversationPresentation.transcriptClosed,
             voiceState != .listening
         {
@@ -676,7 +683,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                 stopVoice(
                     message: "回复生成失败：" + String(state.dropFirst("assistant.error:".count)))
             }
-        case .actionCall, .scheduling, .rejectedCall: break
+        case .actionCall, .scheduling, .rejectedCall, .roundFinished: break
         }
     }
     private func record(_ text: String) {

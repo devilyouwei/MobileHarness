@@ -1,5 +1,6 @@
 #if os(iOS)
     import SwiftUI
+    import UIKit
 
     /// Durable records of actual Assistant requests. Viewing never executes stored markup.
     @MainActor
@@ -92,7 +93,7 @@
             VStack(alignment: .leading, spacing: 6) {
                 Text(verbatim: ConversationHistoryPresentation.title(conversation)).lineLimit(2)
                 Text(
-                    "\(conversation.turns.count) 轮 · \(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))"
+                    "\(ConversationHistoryPresentation.turns(conversation).count) 轮 · \(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))"
                 )
                 .font(.caption).foregroundStyle(.secondary)
             }
@@ -106,25 +107,36 @@
         let controls: any ConversationHistoryControlling
         var body: some View {
             List {
-                ForEach(conversation.turns) { turn in
+                ForEach(ConversationHistoryPresentation.turns(conversation)) { turn in
                     NavigationLink {
                         ConversationTurnDetail(turn: turn, controls: controls)
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(verbatim: turn.user).lineLimit(3)
-                            Text(verbatim: turn.outputSummary).lineLimit(3).foregroundStyle(.secondary)
-                            Text("\(turn.date.formatted()) · \(turn.state.rawValue)").font(.caption)
+                            if turn.isReACT == true {
+                                Text("ReACT").font(.caption2.bold())
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(.orange.opacity(0.15), in: Capsule())
+                            }
+                            Text(verbatim: turn.displayInput).lineLimit(3)
+                            Text(verbatim: turn.outputSummary).lineLimit(3)
+                                .foregroundStyle(turn.isReACT == true ? Color.orange : Color.secondary)
+                            Text([turn.dateReport, turn.stateReport].filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.caption)
                         }
                     }
+                    .listRowBackground(
+                        turn.isReACT == true
+                            ? Color.orange.opacity(0.08) : Color(uiColor: .secondarySystemGroupedBackground)
+                    )
+                    .foregroundStyle(turn.isReACT == true ? Color.orange : Color.primary)
                 }
             }
             .navigationTitle(String(ConversationHistoryPresentation.title(conversation).prefix(40)))
             .toolbar { ShareLink("导出", item: export) }
         }
         private var export: String {
-            conversation.turns.map { turn in
-                "USER\n\(turn.user)\n\nASSISTANT RAW\n\(turn.raw)\n\nTOOLS\n\(turn.toolReport)\n\nTOKENS: \(turn.tokenReport)\nSTATE: \(turn.state.rawValue)\nERROR: \(turn.error ?? "none")"
-            }.joined(separator: "\n\n---\n\n")
+            ConversationHistoryPresentation.turns(conversation).map { $0.diagnosticReport() }
+                .joined(separator: "\n\n---\n\n")
         }
     }
 
@@ -135,55 +147,68 @@
         @State private var interpretation = ""
         var body: some View {
             Form {
-                Section("用户原始输入") { selectable(turn.user) }
-                Section("模型原始输出") {
+                Section("用户本轮输入") {
+                    if turn.isReACT == true { Text("ReACT · 执行结果 / 观察输入").font(.caption).foregroundStyle(.orange) }
+                    selectable(turn.displayInput)
+                }
+                Section("模型本轮输出") {
                     selectable(turn.raw)
-                    ShareLink("导出原文", item: turn.raw)
-                }
-                Section("生成记录") {
-                    Text("请求：\(turn.id.uuidString)").font(.caption).textSelection(.enabled)
-                    Text("模型：\(turn.model)")
-                    Text("状态：\(turn.state.rawValue)；结束原因：\(turn.finishReason ?? "未收到")")
-                    Text("\(turn.raw.utf8.count) 字节 · \(turn.fragments.count) 分片")
-                    Text("temperature: \(turn.temperature)")
-                    Text(turn.tokenReport)
-                    if let error = turn.error { selectable(error) }
-                    if let error = turn.executionError { selectable("执行失败：" + error) }
-                }
-                if let calls = turn.toolCalls, !calls.isEmpty {
-                    Section("Tool Call 输入 / 输出") {
+                    if let calls = turn.toolCalls, !calls.isEmpty {
                         ForEach(calls) { call in
-                            DisclosureGroup("\(call.name) · \(call.state.rawValue)") {
+                            DisclosureGroup("Tool Call · \(call.name) · \(call.state.rawValue)") {
                                 selectable("模型调用 ID：" + call.providerID)
                                 selectable("执行调用 ID：" + call.id.uuidString)
                                 Text("输入参数").font(.caption)
                                 selectable(call.argumentsJSON)
                                 Text("输出结果").font(.caption)
-                                selectable(
-                                    call.output
-                                        ?? (call.state == .completed
-                                            ? "执行完成，无返回数据" : "未收到执行结果"))
+                                selectable(call.output ?? "")
                                 if let error = call.error { selectable("失败原因：" + error) }
                             }
                         }
                     }
-                    if let definitions = turn.toolDefinitions, !definitions.isEmpty {
-                        Section("实际发送的 Tool 声明") {
-                            ForEach(Array(definitions.enumerated()), id: \.offset) { index, definition in
-                                DisclosureGroup("Tool \(index + 1)") { selectable(definition) }
+                }
+                Section("生成记录") {
+                    Text("轮次：\(turn.generationMetadataAvailable == false ? "" : turn.id.uuidString)").font(.caption)
+                        .textSelection(.enabled)
+                    if let owner = turn.ownerInputID {
+                        Text("所属输入：\(owner.uuidString)").font(.caption).textSelection(.enabled)
+                    }
+                    Text("模型：\(turn.model)")
+                    Text(turn.firstTokenReport)
+                    Text("状态：\(turn.stateReport)；结束原因：\(turn.finishReason ?? "")")
+                    if turn.generationMetadataAvailable != false {
+                        Text("\(turn.raw.utf8.count) 字节 · \(turn.fragments.count) 分片")
+                    }
+                    Text("temperature: \(turn.temperature)")
+                    Text(turn.tokenReport)
+                    if let error = turn.error { selectable(error) }
+                    if let error = turn.executionError { selectable("执行失败：" + error) }
+                }
+                Section("实际发送的上下文（含系统提示词）") {
+                    if !turn.attachedImages.isEmpty {
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 12) {
+                                ForEach(turn.attachedImages) { reference in
+                                    HistoryImageThumbnail(reference: reference, turnID: turn.id, controls: controls)
+                                }
+                            }
+                        }
+                    }
+                    if turn.request.isEmpty, let json = turn.requestJSON { selectable(json) }
+                    ForEach(Array(turn.request.enumerated()), id: \.offset) { index, message in
+                        DisclosureGroup("\(index + 1). \(message.role.rawValue)") {
+                            selectable(message.displayContent)
+                            if let id = message.toolCallID { selectable("Tool Call ID：" + id) }
+                            ForEach(Array((message.toolCalls ?? []).enumerated()), id: \.offset) { _, call in
+                                selectable("Tool Call：\(call.name) · \(call.id)\n\(call.argumentsJSON)")
                             }
                         }
                     }
                 }
-                Section("实际发送的上下文（含系统提示词）") {
-                    ForEach(Array(turn.request.enumerated()), id: \.offset) { _, message in
-                        DisclosureGroup(message.role.rawValue) { selectable(message.content) }
-                    }
-                }
-                if let requests = turn.continuationRequests, !requests.isEmpty {
-                    Section("实际发送的后续请求") {
-                        ForEach(Array(requests.enumerated()), id: \.offset) { index, request in
-                            DisclosureGroup("后续请求 \(index + 1)") { selectable(request) }
+                if let definitions = turn.toolDefinitions, !definitions.isEmpty {
+                    Section("实际发送的 Tools") {
+                        ForEach(Array(definitions.enumerated()), id: \.offset) { index, definition in
+                            DisclosureGroup("Tool \(index + 1)") { selectable(definition) }
                         }
                     }
                 }
@@ -197,74 +222,124 @@
                 }
             }
             .navigationTitle("对话详情")
-            .toolbar { ShareLink("导出诊断记录", item: report) }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink("导出", item: turn.diagnosticReport(interpretation: interpretation))
+                }
+            }
             .task { interpretation = controls.preview(turn) }
         }
-        private var report: String {
-            let messages = turn.request.map { "[\($0.role.rawValue)]\n\($0.content)" }.joined(separator: "\n\n")
-            let fragments = turn.fragments.enumerated().map {
-                "\($0.offset + 1). \(String(reflecting: $0.element))"
-            }.joined(separator: "\n")
-            return """
-                Request: \(turn.id)
-                Model: \(turn.model)
-                Date: \(turn.date)
-                State: \(turn.state.rawValue); finish: \(turn.finishReason ?? "none")
-                Temperature: \(turn.temperature)
-                Tokens: \(turn.tokenReport)
-                Generation error: \(turn.error ?? "none")
-                Execution error: \(turn.executionError ?? "none")
-
-                ACTUAL REQUEST
-                \(messages)
-
-                ACTUAL TOOL DEFINITIONS
-                \((turn.toolDefinitions ?? []).joined(separator: "\n\n"))
-
-                TOOL CALL INPUT / OUTPUT
-                \(turn.toolReport)
-
-                RAW MODEL TEXT
-                \(turn.raw)
-
-                RECEIVED FRAGMENTS (escaped)
-                \(fragments)
-
-                CURRENT PARSER PREVIEW (not execution evidence)
-                \(interpretation)
-                """
-        }
-
         private func selectable(_ text: String) -> some View {
-            Text(verbatim: text.isEmpty ? "（空）" : text)
+            Text(verbatim: text)
                 .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
         }
     }
 
-    extension HistoryTurn {
-        fileprivate var outputSummary: String {
-            if !raw.isEmpty { return raw }
-            guard let calls = toolCalls, !calls.isEmpty else { return "（无模型输出）" }
-            return "Tool Call：" + calls.map(\.name).joined(separator: "、")
+    @MainActor
+    private struct HistoryImageThumbnail: View {
+        let reference: HistoryImageReference
+        let turnID: UUID
+        let controls: any ConversationHistoryControlling
+        @State private var data: Data?
+        @State private var thumbnail: UIImage?
+        @State private var failed = false
+        @State private var loading = true
+        @State private var retry = 0
+        @State private var inspecting = false
+
+        var body: some View {
+            Group {
+                if let thumbnail {
+                    Button {
+                        inspecting = true
+                    } label: {
+                        Image(uiImage: thumbnail).resizable().scaledToFill()
+                            .frame(width: 112, height: 84).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("查看发送给模型的图片")
+                    .accessibilityIdentifier("history.image.\(reference.id.uuidString)")
+                } else if loading {
+                    ProgressView().frame(width: 112, height: 84)
+                } else if failed {
+                    Button("重试图片", systemImage: "arrow.clockwise") { retry += 1 }
+                        .frame(width: 112, height: 84)
+                }
+            }
+            .task(id: retry) {
+                loading = true
+                failed = false
+                do {
+                    let bytes = try await controls.imageData(reference.id, for: turnID)
+                    try Task.checkCancellation()
+                    if let bytes {
+                        guard let image = await HistoryImageDecoder.decode(bytes, maximumPixelSize: 320) else {
+                            throw HistoryImageDecodeError.invalidImage
+                        }
+                        try Task.checkCancellation()
+                        data = bytes
+                        thumbnail = image
+                    }
+                } catch {
+                    if !Task.isCancelled { failed = true }
+                }
+                loading = false
+            }
+            .fullScreenCover(isPresented: $inspecting) {
+                ZStack(alignment: .topTrailing) {
+                    Color.black.ignoresSafeArea()
+                    if let data { HistoryImagePreview(data: data) }
+                    Button("关闭", systemImage: "xmark") { inspecting = false }
+                        .padding().foregroundStyle(.white)
+                        .background(.black.opacity(0.65), in: Capsule()).padding()
+                }
+            }
         }
-        fileprivate var tokenReport: String {
-            guard let usage = tokenUsage else { return "Token 用量：未提供" }
-            return "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
-        }
-        fileprivate var toolReport: String {
-            guard let calls = toolCalls else { return "未保存 Tool Call 数据" }
-            if calls.isEmpty { return "本轮无 Tool Call" }
-            return calls.map { call in
-                """
-                Name: \(call.name)
-                Provider ID: \(call.providerID); runtime ID: \(call.id)
-                State: \(call.state.rawValue)
-                Input: \(call.argumentsJSON)
-                Output: \(call.output ?? (call.state == .completed ? "Completed without return data" : "No execution result received"))
-                Error: \(call.error ?? "none")
-                """
-            }.joined(separator: "\n\n")
+
+    }
+
+    @MainActor
+    private struct HistoryImagePreview: View {
+        let data: Data
+        @State private var image: UIImage?
+        @State private var failed = false
+        @State private var retry = 0
+        var body: some View {
+            Group {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFit()
+                } else if failed {
+                    VStack {
+                        Text("图片无法打开")
+                        Button("重试", systemImage: "arrow.clockwise") { retry += 1 }
+                    }.foregroundStyle(.white)
+                } else {
+                    ProgressView().tint(.white)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task(id: retry) {
+                failed = false
+                let prepared = await HistoryImageDecoder.decode(data, maximumPixelSize: 2048)
+                guard !Task.isCancelled else { return }
+                image = prepared
+                failed = prepared == nil
+            }
         }
     }
+
+    @MainActor
+    private enum HistoryImageDecoder {
+        static func decode(_ data: Data, maximumPixelSize: Int) async -> UIImage? {
+            guard !Task.isCancelled, data.count <= 4 * 1024 * 1024, let image = UIImage(data: data) else { return nil }
+            let longestSide = max(image.size.width, image.size.height)
+            guard longestSide > 0 else { return nil }
+            let scale = min(1, CGFloat(maximumPixelSize) / longestSide)
+            let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            return await image.byPreparingThumbnail(ofSize: size)
+        }
+    }
+    private enum HistoryImageDecodeError: Error { case invalidImage }
 
 #endif

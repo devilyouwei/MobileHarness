@@ -3,6 +3,7 @@ import AgentCore
 /// Classifies the current AgentCore output without executing side effects.
 enum ExecutionRouter {
     enum Route {
+        case roundFinished
         case action(ActionCall)
         case tool(ToolCall)
         case scheduling(SchedulingDirective)
@@ -14,6 +15,7 @@ enum ExecutionRouter {
     static func route(_ output: AgentOutput) throws -> Route {
         switch output {
         case .rejectedCall(let rejection): throw rejection
+        case .roundFinished: .roundFinished
         case .actionCall(let token): .action(token)
         case .scheduling(let directive): .scheduling(directive)
         case .toolCall(let call): .tool(call)

@@ -197,3 +197,13 @@ ProviderIntentFailure carries the producer failureCode separately from the error
 ✅ ADR0181: RuntimePresentation accepts physical camera effects from Photographer in its root session or an active validated voice session. Assistant calls validate voice then delegate through the bound Gateway invocation Signal context; they do not directly mutate native capture. Retain complete nested Tool reports when returning failures to the original caller. No ApplicationControl camera exemption remains.
 
 ✅ Interaction refinement: RuntimePresentation forwardss explicit target facing through camera delegation and the typed native endpoint; no implicit toggling.
+
+## Assistant photo observation — ADR0184
+
+✅ Implemented: RuntimePresentation validates current Assistant voice scope then calls native photo endpoint directly. No generic delegation; CurrentChat forwards supportsImages.
+
+❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
+
+## Photo save and ignore — ADR0185
+
+✅ RuntimePresentation routes Assistant save/ignore through authorized Photographer messages, validates root/active voice scopes and decodes the actual returned receipt. Photographer executes the injected CameraControlCapability; no fabricated receipt or direct UI effect.

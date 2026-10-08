@@ -2550,6 +2550,9 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
                     handler: { _ in
                         await MainActor.run { expressions += 1 }
                     }),
+                ActionBinding(
+                    path: ActionPath(domain: "UI", module: "Caption", function: "print"),
+                    displayName: "Simulated captions", kind: .state, completion: "Accepted.", handler: { _ in }),
             ])
     let scheduler = ChannelScheduler(registry: registry, resources: try nexArmTestResources()) {
         await input.deliverActionResult($0)

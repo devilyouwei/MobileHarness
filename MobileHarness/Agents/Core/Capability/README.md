@@ -49,3 +49,10 @@ No Channel is implicitly main or blocking. DefaultChannel remains an internal ru
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
 ✅ CapabilityContextBuilder explicitly prefers default Channel routing and reserve Channel scopes for intentional overrides; different default Channels need no wrappers or wait for concurrent requests.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).

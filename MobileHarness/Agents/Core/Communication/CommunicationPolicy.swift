@@ -34,6 +34,7 @@ public struct CommunicationContracts: Sendable {
         CommunicationContract(name: "runtime.event", kind: .event),
         CommunicationContract(name: "tool.result", kind: .toolResult),
         CommunicationContract(name: "action.result", kind: .actionResult),
+        CommunicationContract(name: "generation.round.result", kind: .roundResult),
         CommunicationContract(name: "activity.event", kind: .activityEvent),
         CommunicationContract(name: "media.audio", kind: .audio),
         CommunicationContract(name: "media.image", kind: .image),

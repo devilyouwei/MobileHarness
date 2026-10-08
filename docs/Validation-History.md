@@ -2,6 +2,105 @@
 
 Purpose: preserve dated test, UI and packaging observations that were previously embedded in module READMEs. These are records of what was checked at the time, not current implementation contracts or substitutes for physical-device acceptance.
 
+## 2026-10-09 — History image thumbnails and iPhone installation
+
+- History details display up to four deduplicated images from the actual sent context, with tappable thumbnails and a full-screen preview. Both structured references and legacy metadata are recognized; missing files stay blank. The original producing input scopes archive reads across app sessions; active camera reads retain exact session ownership.
+- ✅ Required `./scripts/check.sh` passed:620 integration /65 workflow tests and all other targets, six Python checks, module boundaries, strict Swift formatting and three plutil checks. Focused image/history regressions also passed (7 presentation /47 integration /6 workflow tests). Logs: `/tmp/mobileharness-history-images-final-check.log`, `/tmp/mobileharness-history-images-tests.log`.
+- The initial check rejected a UI ImageIO import. Image preparation now uses the already permitted UIKit API; the final full check passed without relaxing module rules. A later iOS-only aspect-ratio refinement passed strict formatting and the final signed build; diff whitespace checks passed.
+- ❌ Required `./scripts/build-ios.sh` failed in external CoreAIShared because Simulator cannot resolve CoreAI. Log: `/tmp/mobileharness-history-images-ios.log`; no Simulator success is claimed.
+- ✅ Final signed generic iOS Debug build0.1.0/build2026100903 passed, including proportional thumbnail/full-preview preparation. Deep strict signature verification and all seven packaged Agent configuration checks passed. Log: `/tmp/mobileharness-history-images-device-delivery.log`.
+- ✅ Installed on the paired physical iPhone17 Pro without uninstalling the app; an independent app query confirmed0.1.0/build2026100903 and launch succeeded. Receipts: `/tmp/mobileharness-history-images-install.json`, `/tmp/mobileharness-history-images-installed-apps.json`, `/tmp/mobileharness-history-images-launch.json`.
+- ❌ Native thumbnail layout/tap/close and live-model image acceptance remain unverified. Automated fixtures, compilation, installation and launch do not establish those results.
+
+
+## 2026-10-09 — Orange ReACT styling and iPhone installation
+
+- Changed only five ReACT color references in ConversationHistoryView.swift: badge fill, output text, tinted row background, row foreground and detail input accent now use orange. Layout, data and interactions remain unchanged; no new behavior tests were added for this cosmetic change.
+- ✅ Strict formatting, diff whitespace, module/Python checks and separate plutil checks passed. Focused history regressions passed (4 presentation /11 integration /2 workflow tests). Log: `/tmp/mobileharness-react-orange-history-tests.log`.
+- ❌ Required full `./scripts/check.sh` completed with619 integration tests reporting13 issues in BLE regressions (business rejection/disconnection, aim worker/exclusion and foreground recovery timeout);62 workflow tests passed. These failures were reported without modifying unrelated BLE implementation or fixtures. Log: `/tmp/mobileharness-react-orange-check.log`.
+- ❌ Required `./scripts/build-ios.sh` remains blocked by external CoreAIShared's missing CoreAI Simulator module. Log: `/tmp/mobileharness-react-orange-ios.log`.
+- ✅ Signed generic iOS Debug build0.1.0/build2026100902 passed, followed by deep strict signature verification and all seven packaged Agent configuration checks. Log: `/tmp/mobileharness-react-orange-device.log`.
+- ✅ Installed on the paired physical iPhone17 Pro without uninstalling the app; independent installed-app query confirmed build2026100902 and launch succeeded. Receipts: `/tmp/mobileharness-react-orange-install.json`, `/tmp/mobileharness-react-orange-installed-apps.json`, `/tmp/mobileharness-react-orange-launch.json`.
+- ❌ On-device color/layout preference and native interaction acceptance still require user inspection; installation/launch alone does not verify appearance.
+
+
+## 2026-10-09 — Empty conversation history values
+
+- Removed legacy storage/missing-evidence explanations from user-facing history rows, details and exports. Missing text, token timing/usage, finish reason and Tool outputs remain blank. Legacy continuations retain their actual request data but do not display copied parent time/state/execution errors or synthetic model-round IDs. Actual recorded failures remain visible; the durable storage schema is unchanged.
+- ✅ Required full `./scripts/check.sh` passed, including619 integration /62 workflow tests, strict formatting, module boundaries, Python tests and plutil checks. Final refinements additionally passed the focused `history|legacyReACTRows` regressions (4 presentation /11 integration /2 workflow tests) and strict lint on the changed files. Diff whitespace checks passed.
+- ✅ Final signed generic iOS device build0.1.0/build2026100901 passed. Deep strict signature verification and all seven packaged Agent configuration checks passed. Build log: `/tmp/mobileharness-history-empty-device-final.log`.
+- ❌ Required `./scripts/build-ios.sh` still fails in external CoreAIShared because Simulator cannot resolve CoreAI. Log: `/tmp/mobileharness-history-empty-ios.log`; no Simulator success is claimed.
+- ✅ Installed on the paired physical iPhone17 Pro without uninstalling the app. Independent app query confirmed0.1.0/build2026100901, and launch succeeded. Receipts: `/tmp/mobileharness-history-empty-install.json`, `/tmp/mobileharness-history-empty-installed-apps.json`, `/tmp/mobileharness-history-empty-launch.json`. Installation/launch does not establish native layout or live-model acceptance.
+- Validation logs: `/tmp/mobileharness-history-empty-check.log`, `/tmp/mobileharness-history-empty-final-tests.log`. Native layout/touch/export and live-provider acceptance remain separate from compilation and synthetic tests.
+
+
+## 2026-10-08 — Conversation history iPhone installation
+
+- User requested physical-device installation of the updated conversation history. Built the current working tree as signed generic iOS Debug version0.1.0/build2026100812 using existing ignored local signing configuration and a command-line build-number override. No signing configuration was edited.
+- ✅ Signed build, deep strict signature verification and all seven source-matching packaged Agent configurations passed. Build log: `/tmp/mobileharness-history-signed-install-build.log`.
+- ✅ Installed `dev.mobileharness.app` on the paired physical iPhone17 Pro without uninstalling the existing app. Installation receipt: `/tmp/mobileharness-history-install.json`.
+- ✅ Independent installed-app query confirmed version0.1.0/build2026100812; process launch succeeded. Receipts: `/tmp/mobileharness-history-installed-apps.json`, `/tmp/mobileharness-history-launch.json`.
+- This follow-up supersedes the earlier per-request-history entry's not-installed status. ❌ Native history layout/expansion/export, live-provider timing/ReACT and physical-device functional acceptance remain unverified; installation and launch alone do not establish those results.
+
+
+## 2026-10-08 — Per-request conversation history
+
+- Scope: current-input/model-output detail order, native Tool Call disclosures beside text, one upper-right export, first text-token timestamp/latency, context before declarations, and separate tinted ReACT list rows. Optional nested modelRequests retains invocation-specific input/context/output/calls/usage/state while preserving original input ownership and legacy v1 decoding; image bytes remain excluded.
+- Final focused regression filter (`history|History|generationRound|modelRequestJournal|interruptedModelRequests|registeredMessagesRouteAndUseDeclaredDeadlinePolicy`) passed, including53 integration tests,5 presentation tests and3 history-workflow tests. Coverage includes Action/native/mixed continuation, exact fresh observations, native-only missing token timing, immutable first arrival, late archived outcomes, restart/cancellation, legacy evidence labeling, export/context and Codable adaptation.
+- Final `env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/check.sh` passed: module boundaries, Python checks, strict Swift formatting, automated suites (619 integration /62 workflow tests), and all three plutil checks. The first full run failed two200 ms communication-deadline assertions under concurrent builds; the unchanged assertions passed focused rerun and the final full run with no concurrent build. This does not establish a communication runtime fix.
+- Required `./scripts/build-ios.sh` was attempted and failed in external coreai-models/CoreAIShared because Simulator cannot resolve the CoreAI module. No Simulator success is claimed.
+- Final unsigned device-target build passed: `xcodebuild -project MobileHarness.xcodeproj -scheme MobileHarness -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`. This compiled all three modified history UI files and packaged MobileHarness.app; it was not installed on a phone.
+- Logs: `/tmp/mobileharness-history-final-tests.log`, `/tmp/mobileharness-history-final-check.log`, `/tmp/mobileharness-history-ios.log`, `/tmp/mobileharness-history-device-final.log`. These are local validation artifacts, not persisted device acceptance.
+- ❌ Native touch/layout/share interactions, live-provider timing/continuation and physical-device acceptance remain unverified. Legacy files never stored per-request output/timing; presentation explicitly identifies that limitation.
+
+
+## 2026-10-08 — Agent-driven photo save and ignore
+
+- ✅ Final ./scripts/check.sh passed:616 integration /59 workflow tests and all other targets, strict formatting, module boundaries, six Python checks and plist validation. New photo fixtures verify exact IDs, real Gateway root/Assistant routes and actual receipts, permission retry, repeated-save behavior, stale identity rejection, argument rejection before effects, UI overlap and honest post-commit failure status. Four disposition cases verify observation-based continuation without another photo/image. Native Photos/model effects are stubs in these tests.
+- ✅ Signed generic iOS Debug build2026100807 passed, including the final working-tree output consumer. Deep strict signature verification, all seven source-matching Agent resources and generated add-only Photos permission text passed. Documentation path and diff whitespace checks passed.
+- ❌ Required ./scripts/build-ios.sh failed at the existing Simulator CoreAIShared/CoreAI module dependency; later schemes did not run.
+- Initial checks rejected localized SDK presentation and the outdated function inventory; SDK failures became technical enums and the inventory was extended. An intermediate complete run failed missing photo registrations in robot-only fixtures, legacy failure-text assertions and Bluetooth timing failures under concurrent work, and a new parallel-output failure test did not complete. The fixtures use all three unavailable photo operations, error assertions use producer codes, and final output-consumer failure propagation/checks passed in the subsequent full run. An intermediate signed build was interrupted while sharing build state; the final signed build passed.
+- ❌ Physical installation was attempted but failed: paired iPhone17 Pro was unavailable and CoreDevice4016 could not acquire trusted connectivity/device-services assertions. Build2026100807 has not been installed or launched by this task. Reconnection/unlock is required.
+- ❌ Physical add-only permission/album contents, screenshot controls/fullscreen dismissal/voice coexistence, Reduce Motion/VoiceOver and configured-model dialogue acceptance remain pending.
+- Logs: /tmp/mh-photo-commands-final-focused.log, /tmp/mh-photo-commands-check-final.log (intermediate), /tmp/mh-photo-commands-check-complete.log (passing), /tmp/mh-photo-commands-ios.log, /tmp/mh-photo-commands-device-release.log and /tmp/mh-photo-commands-install.json/log.
+
+## 2026-10-08 — Photo touch and persistent voice recovery
+
+- ✅ ./scripts/check.sh passed:611 integration /52 workflow tests and all other targets, formatting, module boundaries, Python checks and plist validation. New regression verifies cancellation is joined before failed-input completion, and next-input native calls continue across two round seals through the same subscriber.
+- ✅ Targeted recovery regression and diff whitespace passed. Fixtures verify software lifecycle, not native gesture behavior or real photo understanding.
+- ❌ Required ./scripts/build-ios.sh failed at the existing Simulator CoreAIShared dependency, which cannot resolve CoreAI; later schemes did not run.
+- ✅ Signed generic iOS device build2026100806 passed, followed by deep strict signature and seven packaged Agent configuration checks. Installed on the paired iPhone17 Pro; independent app query confirmed0.1.0/build2026100806 and process launch succeeded.
+- ❌ Physical thumbnail touch/inspection/interruption, resumed microphone input and configured-model ReAct/photo acceptance require interactive phone verification. Installation and automated tests do not establish those results.
+- Logs: /tmp/mh-photo-touch-focused.log, /tmp/mh-photo-touch-check.log, /tmp/mh-photo-touch-ios.log, /tmp/mh-photo-touch-device.log, /tmp/mh-photo-touch-install.json/log, /tmp/mh-photo-touch-installed.json/log and /tmp/mh-photo-touch-launch.json/log.
+
+## 2026-10-08 — Assistant photo observation installed on iPhone
+
+- ✅ Signed generic iOS Debug build2026100805 passed using existing local signing configuration. Deep strict signature verification and all seven source-matching packaged Agent configurations passed.
+- ✅ Installed dev.mobileharness.app on the paired iPhone17 Pro without uninstalling the existing app. Independent installed-app query confirmed version0.1.0/build2026100805, replacing observed build2026100803.
+- ✅ Native process launch succeeded. No signing configuration, model weights, credentials or user media were changed.
+- ❌ Launch does not establish native photo capture/shutter/animation, orientation/mirroring/Reduce Motion, configured-model visual understanding or physical robot acceptance; those require interactive verification.
+- Logs: /tmp/mh-photo-signed-device.log, /tmp/mh-photo-install.log, /tmp/mh-photo-install.json, /tmp/mh-photo-installed-before.json, /tmp/mh-photo-installed-after.json, /tmp/mh-photo-launch.log and /tmp/mh-photo-launch.json.
+
+## 2026-10-08 — Assistant photo observation loop
+
+- ✅ Final ./scripts/check.sh passed:611 integration /51 workflow tests and all other targets, strict formatting, module boundaries, six Python checks and plist validation. Whitespace and local documentation links passed.
+- ✅ New regressions cover real Gateway ActionResult photo continuation, mixed native Tool pairing, actual image bytes only after round seal, owner-scoped photo read, failed capture/read and unsupported image provider without fabricated understanding/repeated effects, metadata-only continuation history, store restart/bounds, argument validation before capture and value completion. Cloud JSON tests verify text/image_url data URL, user role and attachment budgets, plus old transcript decoding. Model/camera endpoints are stubs; this verifies architecture and encoding, not visual understanding quality.
+- Intermediate checks caught the fixed Camera function inventory, new grant coverage in robot-only fixtures and outdated prompt assertions. Those were migrated explicitly; an existing Bluetooth permit timing test also failed once and passed isolated retry plus the final suite. An intermediate nested Testing require macro expansion was corrected.
+- ✅ Unsigned generic iOS Debug device build passed. Final native admission and animation-completion hardening also passed strict formatting and a separate final incremental device build.
+- ❌ ./scripts/build-ios.sh failed for Simulator at the existing external coreai-models/CoreAIShared dependency, which cannot resolve CoreAI; later schemes did not run.
+- ❌ No real photo capture, native shutter audio, UI animation/rotation/mirroring/Reduce Motion, configured cloud-model vision, phone installation or physical-device acceptance was performed. No credentials were read and no remote API was called.
+- Logs: /tmp/mh-photo-focused.log, /tmp/mh-photo-fixture-retry.log, /tmp/mh-photo-check.log, /tmp/mh-photo-ios.log, /tmp/mh-photo-device.log and /tmp/mh-photo-device-final.log.
+
+## 2026-10-08 — Registered Action/Tool generation rounds
+
+- ✅ Initial complete check passed:604 integration /51 workflow tests plus all other targets, formatting, boundaries, Python and plist checks. New tests exercise all three call combinations, recordOnly/observation, real void/failure completion, four-way native concurrency, full-round ordering, wait bypass, cancellation cleanup and native-call exhaustion using a stub model and real Gateways.
+- ✅ Additional round-seal identity regression passed; final suite adds explicit registration-default and failed terminal-delivery coverage. Final ./scripts/check.sh passed:607 integration /51 workflow tests and all other targets, strict Swift formatting, module boundaries, six Python checks and plist validation. Both new regressions passed.
+- A subsequent parallel full run failed two existing Bluetooth timing tests (manual nod arrival and foreground writer join). Both passed in isolated retry. An intermediate new-test compile failure referenced status instead of phase; the assertion was corrected. These intermediate failures are distinct from final validation.
+- ✅ Unsigned generic iOS Debug device-target compilation passed. Final incremental compilation also passed after registration and delivery hardening.
+- ❌ Required build-ios.sh failed for Simulator because the existing external coreai-models/CoreAIShared dependency cannot resolve CoreAI; later script schemes did not run. Device-target compilation is separate evidence.
+- ❌ No real provider, native UI, phone installation or physical-device acceptance occurred. Synthetic tests and compilation do not establish those outcomes.
+- Logs: /tmp/mh-check.log (initial), /tmp/mh-check-final.log (final), /tmp/mh-round-final.log, /tmp/mh-bluetooth-retry.log, /tmp/mh-ios.log and /tmp/mh-device-final.log.
+
 ## 2026-10-08 — Finalized user-caption position adjustment
 
 - ✅ `./scripts/check.sh` passed with the Xcode toolchain:597 integration /51 workflow tests, all other targets, strict formatting, boundaries, Python checks and plist validation. Diff whitespace passed.
@@ -702,3 +801,30 @@ Model download/cancel are explicitly granted; model removal/provider/source/bind
 ✅ Final error-chain follow-up: the complete589-integration/51-workflow check passed again after including all producer report entries, partial-failure status, execution failure and retained description in native model continuation data. The correlated-result fixture verifies these fields and that report text is not parsed as Actions.
 
 ✅ After the error-chain follow-up, the signed iPhone build and seven-config packaging check passed again, and the final binary was reinstalled as2026100801. Startup remains pending the requested phone unlock; installation is not startup or native-flow acceptance.
+
+
+## 2026-10-08 — Independent Tool and Action protocol consumers
+
+Scope: current working-tree Assistant model collection and App generation transport; injected models/dispatch gates only. No live provider call, installation, native UI, microphone/camera or physical-device acceptance.
+
+- ✅ Final focused regression run: 14 IntegrationTests (including parameterized Action/Tool/mixed-round policies and two isolated BLE fixtures) and6 AppWorkflowTests passed. Seven new regression tests cover saturated Tools versus later Action/wait admission, suspended Action versus Tools, full-round joining, cancellation, native overflow, dispatch failure while output stays open, native parsing during suspended speech preparation and malformed Action parsing while model output stays open (saturation/admission/barrier assertions share a test).
+- ✅ Final unsigned iOS device-target build passed with Xcode27 (`MobileHarness`, generic iOS, signing disabled). No install or physical execution was performed.
+- ✅ Boundary/resource checks, offline provisioning tests, Swift formatting and diff whitespace checks passed. Project, privacy and entitlement property lists were separately validated because failed full tests stop check.sh before its final plist step.
+- ❌ Required scripts/build-ios.sh failed in the Simulator target: external coreai-models/CoreAIShared cannot resolve CoreAI for arm64/x86_64 Simulator. The successful device-target build is separate evidence.
+- ❌ Full scripts/check.sh did not pass. First full run:616 IntegrationTests, one issue in bluetoothLatestSliderSupersedesPresetWhileOldAimCleanupIsJoining (`disconnected`);59 AppWorkflowTests passed. After adding the open-parser regression, second full run:617 IntegrationTests, three issues across bluetoothSettingsOverridesAgentMotionAndAimWithSharedRecipe (`disconnected`) and bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode (recovery predicate plus timeout);59 AppWorkflowTests passed. All new protocol tests passed in both applicable runs. The two disconnected fixtures passed in the final focused run; bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode also passed in isolation (15.229s). These full-run failures are not a passing full suite and have not been attributed to a physical Bluetooth fault.
+
+Implementation and queue/failure contracts: [ADR0183](adr/0183-generation-round-observations.md), [Assistant](../MobileHarness/Agents/Assistant/README.md#independent-protocol-consumers--2026-10-08), [App transport](../MobileHarness/App/Workflows/Presentation/README.md#independent-protocol-consumers--2026-10-08). No new directory/module/dependency or generic Agent request/reply transport was added. Existing downstream ReAct continuation consumes the full merged round after both protocols settle.
+
+## 2026-10-08 — Camera lens-switch lifetime
+
+Scope: healthy front/back camera input replacement and root-owned perception retirement; no live model or physical camera acceptance.
+
+- ✅ `./scripts/check.sh` passed:617 IntegrationTests and61 AppWorkflowTests, including two new gate-based perception replacement/shutdown regressions; remaining package suites, boundary/offline provisioning checks, Swift formatting and plist validation passed. Log: `/tmp/mh-camera-flip-check.log`.
+- ✅ Signed generic iOS device build passed with Xcode27 and version2026100808; signature verification and all seven packaged Agent configurations passed. Log: `/tmp/mh-camera-flip-device.log`.
+- ❌ Required `./scripts/build-ios.sh` failed at MobileHarnessSimulator because external CoreAIShared cannot resolve CoreAI for simulator architectures; later script schemes were not reached. Log: `/tmp/mh-camera-flip-simulator.log`.
+- ✅ Diff whitespace and new ADR local-reference checks passed. No new directory/module/dependency was added.
+- ❌ Physical iPhone17 Pro was unavailable in devicectl; version2026100808 was not installed. Native lens-switch duration, first-frame latency, repeated switches during pose inference and photo/voice coexistence remain unverified. Native acknowledgment timing is now logged, but no physical timing measurement is claimed.
+
+See [ADR0186](adr/0186-camera-lens-switch-lifetime.md). The healthy flip no longer waits for joined vision cleanup; off/background/model-maintenance cleanup still joins admitted work.
+
+✅ Installation follow-up: version2026100808 installed successfully on the physical iPhone17 Pro (`dev.mobileharness.app`); `/tmp/mh-camera-flip-install.json` records the receipt. ❌ Automatic launch was denied because the phone was locked (`FBSOpenApplicationErrorDomain`7); startup and physical lens-switch acceptance remain pending. See `/tmp/mh-camera-flip-launch.json`. This supersedes the earlier connection-unavailable installation status only.

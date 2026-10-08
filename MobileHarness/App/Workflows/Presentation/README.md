@@ -12,7 +12,7 @@ flowchart LR
 
 ❌ No device effects, synthetic progress or durable execution history.
 
-✅ IndependentOutputWorkflow consumes an optional subscriber sequentially through an injected Gateway dispatch. Ordinary failures are reported per envelope and consumption continues; cancellation propagates. It adds no queue or device ownership.
+✅ IndependentOutputWorkflow.consume handles deterministic optional subscribers sequentially through injected Gateway dispatch. Ordinary failures are reported per envelope and consumption continues; cancellation propagates. Generation uses the separate bounded protocol consumers described below. Neither entry owns device behavior.
 
 
 ✅ For a single handlerFailed report entry, ActionActivityPresentation displays the already-bounded captured failureDescription. Multi-child results keep their individual mapped codes; one shared description is not assigned to unrelated leaves.
@@ -49,3 +49,27 @@ Native Bluetooth diagnostics have a different subscriber/cache in AppBluetoothWo
 ✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
 
 ✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow demultiplexes output into independent bounded consumers, admits Actions in order and executes up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+
+✅ Recovery correction: consumeGeneration owns fresh bounded protocol consumers per round, retains native counts across all rounds of one input, and joins both at each seal. An assistant.error cancels/joins that input only and continues consuming future inputs; roundFinished joins work without ending the input or reopening voice admission.
+
+
+## Independent protocol consumers — 2026-10-08
+
+✅ Implemented: IndependentOutputWorkflow.consumeGeneration uses separate Tool (16 buffered envelopes, four concurrent executions) and Action/control (256 buffered envelopes, ordered admission) consumers per round. The producer never waits for a Tool slot or Action dispatch. Overflow rejects explicitly, without eviction/replay. Native count remains16 per input across rounds. roundFinished closes/drains both streams before dispatching the merge barrier; final completion does the same. assistant.error cancels/joins both workers before dispatching the error and accepting the next input. Unexpected stream closure and caller cancellation cancel/join accepted work. Dispatch failure wakes the owner and cancels/joins both consumers and the transport reader even while model output is open. A shared resource conflict remains legitimate execution waiting.
+
+✅ Tool consumption observes incoming envelopes and execution completions in the same structured task group. At most one pending read and four executions exist; a failed execution wakes the owner without requiring another envelope. The private stream reader preserves single-consumer iterator isolation.
+
+✅ Failure propagation verified during photo validation: native worker failure must wake the Tool consumer even while the producer remains open. Use one cancellable stream reader plus four dispatch workers, joined in the same task group; await reader/worker completions together rather than blocking the owner on a stream next. Preserve16 queued envelopes and independent Action admission.
+
+## Lens switch latency correction
+
+✅ CameraVisionRestartWorkflow.swift owns one root-owned retiring/current pipeline Task, one worker and one latest pending intent; replace cancels old admission and returns immediately, worker joins cleanup before starting newest intent, stop invalidates and joins both. No native or model dependency; injected start owns actual pipeline effect.
+
+❌ Physical-device switch latency, repeated flips during inference and camera/voice coexistence remain unverified.

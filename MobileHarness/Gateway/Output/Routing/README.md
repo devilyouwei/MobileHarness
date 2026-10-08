@@ -28,3 +28,10 @@ Update this README with changes to names, routing rules and ✅/❌ status.
 ✅ Action rejection routing raises a typed output failure outside Action cancellation handling. Gateway handles Tool rejection as a correlated error ToolResponse before routing; neither executes an invocation. ❌ No automatic retry.
 
 ✅ assistant.historyError control is a nonterminal output failure retained in execution results; it does not cancel Actions. ❌ No durable recovery.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).

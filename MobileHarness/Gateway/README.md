@@ -28,9 +28,9 @@ Signals use the common AgentInput envelope and typed provenance. Calls are Outpu
 
 ## Internal structure
 
-This diagram shows processing inside Gateway; scheduling applies to ActionCall and explicitly scheduled native bindings. Direct native calls use the shared executor without Channel admission.
+This diagram shows processing inside Gateway; scheduling applies only to ActionCall. Native Tool calls use the shared executor without Channel/wait admission.
 
-✅ [ActionCall / ToolCall routing](Output/Protocols/README.md#protocol-selection-one-function-two-call-paths) documents registration, Agent transport/parsing, Gateway dispatch, shared execution and result feedback. One callable function can use both protocols; ToolCall can also use shared scheduling.
+✅ [ActionCall / ToolCall routing](Output/Protocols/README.md#protocol-selection-one-function-two-call-paths) documents registration, Agent transport/parsing, Gateway dispatch, shared execution and result feedback. One callable function can use both protocols; native ToolCall always bypasses Channel/wait scheduling.
 
 ```mermaid
 flowchart TB
@@ -108,3 +108,13 @@ Details: [Input](Input/README.md), [Output](Output/README.md), [Runtime](Runtime
 ✅ Implemented: OutputGateway exposes a read-only returnsToolResult registration-policy query. Bounded history transport uses this protocol metadata to distinguish delivered returning-handler errors (Agent follow-up) from completion-only presentation failures (abort); it does not select business functions or effects.
 
 ✅ ADR0181: direct Tool dispatch binds its OutputEnvelope in a task-local invocation context. Host delegation validates FunctionInput context against that envelope and uses existing directed-message permission/incarnation/session/hop checks. No Action function imports Gateway or manufactures Agent provenance.
+
+## Action/Tool generation rounds — ADR0183
+
+✅ Implemented: text/XML resolves to ActionCall; Assistant maps natural text to Speech playback and Display caption Actions. Only Actions enter Channel/wait. Native ToolCalls execute directly, with at most four concurrent calls and sixteen total per Assistant input. Registration declares recordOnly/observation independently of return values. Separate ActionResult/ToolResult feedback is correlated by call and round, merged in emission order after all calls settle, and only observation enables another model request. Four requests,120 generated calls,64 KiB feedback/transcript and a30-second joined input deadline bound the loop.
+
+✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../docs/adr/0183-generation-round-observations.md).
+
+✅ Photo Action delegation correction: bind InvocationSignalContext inside the actual scheduled Action worker, using its validated envelope/ExecutionOwner. Tools retain their current binding. Ownerless direct scheduler fixtures receive no authority; nested bindings restore automatically, and completion/feedback callbacks run outside the handler binding. No new module or media retention.

@@ -217,3 +217,13 @@ Agent role organization: [ADR0180](adr/0180-memory-photographer-service-organiza
 
 
 ✅ [ApplicationControl service organization](adr/0182-application-control-service-organization.md): ADR0182 implements canonical role-directory, identity and host-transport migration; existing business behavior retained. Validation is recorded separately.
+
+✅ [ADR0183](adr/0183-generation-round-observations.md): implemented Action/Tool split, registered observations and full-round result merge; physical/model acceptance remains pending.
+
+✅ [ADR0184](adr/0184-assistant-photo-observation.md): Assistant photo Action, screenshot presentation and multimodal observation loop.
+
+✅ [ADR0185](adr/0185-photo-save-and-ignore.md): Agent-driven current-photo save to system Photos and ignore from UI/dialogue; physical acceptance remains pending.
+
+✅ [Independent Tool/Action consumer validation](Validation-History.md#2026-10-08--independent-tool-and-action-protocol-consumers) records focused regressions and unsigned iOS device build separately from full-run BLE fixture failures and the Simulator CoreAI dependency limit.
+
+✅ [ADR0186](adr/0186-camera-lens-switch-lifetime.md): healthy lens input replacement completes independently of joined perception retirement; physical latency acceptance remains pending.

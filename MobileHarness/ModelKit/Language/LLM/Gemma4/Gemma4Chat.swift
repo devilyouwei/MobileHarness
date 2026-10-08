@@ -98,6 +98,9 @@ public actor Gemma4Chat: ChatCapability {
     }
 
     static func validate(_ request: ChatRequest) throws {
+        guard request.messages.allSatisfy({ $0.images?.isEmpty ?? true }) else {
+            throw CapabilityError.invalidRequest("Local image understanding is unavailable")
+        }
         guard request.tools.isEmpty,
             request.messages.allSatisfy({ $0.role != .tool && $0.toolCalls.isEmpty && $0.toolCallID == nil })
         else {

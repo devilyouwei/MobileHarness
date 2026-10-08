@@ -33,7 +33,7 @@ This diagram summarizes responsibilities across App, Agents and Gateway; the par
 
 ## Dispatch and shared execution
 
-Call protocol and execution policy are separate choices. ActionCall uses ChannelScheduler. ToolCall uses ToolDispatcher, whose binding selects direct execution or a scheduled projection into the same ChannelScheduler. A scheduled ToolCall retains native call identity/result semantics; scheduling does not convert it into a text ActionCall.
+ActionCall uses ActionDispatcher and ChannelScheduler. ToolCall uses ToolDispatcher and ToolExecutor directly; registered native scheduling is rejected. Both paths retain shared resource coordination.
 
 ```mermaid
 flowchart TD
@@ -41,10 +41,7 @@ flowchart TD
     Kind -->|ActionCall| Action[ActionDispatcher]
     Kind -->|ToolCall| Tool[ToolDispatcher]
     Action --> Scheduler[ChannelScheduler and ActionExecutor]
-    Tool --> Policy{Binding executionPolicy}
-    Policy -->|direct| Direct[ToolExecutor]
-    Policy -->|scheduled channel| Projection[Scheduled native projection]
-    Projection --> Scheduler
+    Tool --> Direct[ToolExecutor]
     Scheduler --> Shared[Resource coordination and FunctionExecutor]
     Direct --> Shared
     Shared --> Handler[Same canonical ActionFunction handler]
@@ -65,8 +62,8 @@ Resource coordination wraps actual execution on both paths; shared function reso
 | Protocol availability | Host ActionBinding.protocols | Register action, tool or both views over the same function. |
 | Agent exposure and authorization | Agent JSON actions/tools and internal code permissions | Declare aliases, Channels or native schemas; validate allowed calls. |
 | Incoming protocol | Agent parser or fixed Agent output | Produce resolved ActionCall or ToolCall. |
-| Native execution route | ActionBinding.executionPolicy | Direct execution or shared scheduling with the registered Channel. ActionCall always follows scheduled admission. |
-| Feedback policy | Scheduled invocation feedback / native directResultPolicy | Deliver declared ActionResult or returning ToolResult through InputGateway. Completion-only native failures remain observable. |
+| Native execution route | ToolRegistry validates direct execution | Native calls bypass Channel/wait. ActionCall always follows scheduled admission. |
+| Feedback policy | ActionBinding.feedbackPolicy | recordOnly/observation controls generation continuation. Every generated call receives terminal feedback; deterministic transport retains its declared result policy. |
 
 Related ownership: [registration](../Registration/README.md), [dispatch](../Dispatch/README.md), [scheduling](../Scheduling/README.md) and [shared execution](../../Runtime/README.md).
 
@@ -84,7 +81,7 @@ flowchart LR
     Outcome --> Feedback[Native ToolResponse through Gateway]
 ```
 
-✅ Both adapters retain resources/budgets, report precedence, original execution context and joined cleanup. Native result policy belongs to the binding: returning success produces feedback, completion-only success does not, and failures remain explicit. Delivery failure is separate from committed effects. ToolCall may originate from model output or fixed internal Agent code.
+✅ Both adapters retain resources/budgets, report precedence, original execution context and joined cleanup. Outside generation rounds, native result policy belongs to the binding: returning success produces feedback, completion-only success does not, and failures remain explicit. Delivery failure is separate from committed effects. ToolCall may originate from model output or fixed internal Agent code.
 
 ✅ This folder is part of independent CallRuntime with sibling Registration; no AgentCore import. Agent envelope translation, trusted owner routing and InputGateway feedback admission remain in the orchestration target.
 
@@ -93,3 +90,10 @@ flowchart LR
 ✅ Handler exceptions normalize into shared reports with child entries, producer code and terminal cause. Native encoding preserves these fields; caller task cancellation still propagates after joined cleanup.
 
 ✅ Direct thrown errors preserve the existing bounded error-text value for native consumers, while completion carries the full shared report. Error text is a protocol projection rather than a replacement for structured execution results.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ ActionBinding owns feedbackPolicy; ToolRegistry rejects scheduled native bindings. ToolExecutor supplies terminal completion for void observation and for every generation-round native call. Legacy deterministic completion-only Tools preserve their transport contract.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).

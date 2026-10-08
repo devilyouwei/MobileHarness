@@ -25,11 +25,11 @@ struct ActionDispatcher: Sendable {
     }
 
     func finish(_ envelope: OutputEnvelope) async throws {
-        try await executor.finish(inputID: envelope.inputID, source: envelope.source)
+        try await executor.finish(inputID: envelope.schedulingID, source: envelope.source)
     }
 
     func cancel(_ envelope: OutputEnvelope) async {
-        await executor.cancel(inputID: envelope.inputID, source: envelope.source)
+        await executor.cancel(inputID: envelope.schedulingID, source: envelope.source)
     }
 
     func cancel(sessionID: UUID) async { await executor.cancel(sessionID: sessionID) }

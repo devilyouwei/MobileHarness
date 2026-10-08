@@ -68,8 +68,24 @@ flowchart LR
 ❌ Cross-process transactional reads and automatic admission retry are unsupported.
 
 
-## Bounded native result continuation
+## Bounded registered-observation continuation
 
-✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
 
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native request JSON and metadata-only image descriptors in modelRequests, with bounded records and unchanged v1 compatibility. Legacy continuationRequests remains decode-only. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+
+## Action/Tool generation rounds — ADR0183
+
+
+✅ StorageChat persists optional bounded generationRounds and text/native continuation requests with metadata-only image descriptors; existing version-1 histories still decode. Execution evidence is distinct from raw model text.
+
+❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+
+✅ ADR0184: multimodal continuation records explicitly retain photoID/MIME/byte count and omit attachment bytes; stored text/native messages retain their existing exact JSON. Future user turns do not implicitly reload prior photo bytes.
+
+
+## Per-request conversation history
+
+✅ Implemented: ConversationHistory.swift stores optional modelRequests (at most four) with round ID, start/first-text-token dates, current input, metadata-only exact request JSON, fragments, native calls/outcomes, provider usage and model terminal state. Request JSON is bounded to512 KiB to accommodate escaping of the64 KiB ChatRequest transcript; current input is bounded to64 KiB. Aggregate text/call and32 MiB document bounds still apply. Serialized mutations atomically update aggregate and request evidence; late outcomes update their original request, including archived records. Restart or failed terminal persistence marks unfinished requests interrupted. Model completion remains separate from execution/owner completion. No image bytes enter the journal. continuationRequests is decode-only legacy data; its writer was removed. Aggregate fields remain required by existing context/diagnostic consumers; removing them requires a separate consumer migration.
+
+❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.

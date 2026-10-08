@@ -1,6 +1,8 @@
 import Foundation
 import UI
 
+public enum HistoryImageLoadingError: Error { case invalidReference, busy, oversizedImage }
+
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
@@ -11,6 +13,8 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     private let startNewArchive: @MainActor () async throws -> Void
     private let summarizeArchive: @MainActor (UUID) async throws -> Void
     private let previewOutput: @MainActor (HistoryTurn) -> String
+    private let readPhoto: @MainActor (UUID, UUID) async throws -> Data?
+    private var photoReads: Set<UUID> = []
     private var loaded = false
     private var task: Task<Void, Never>?
     public init(
@@ -19,7 +23,8 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         deleteArchive: @escaping @MainActor (UUID) async throws -> Void,
         startNew: @escaping @MainActor () async throws -> Void,
         summarize: @escaping @MainActor (UUID) async throws -> Void,
-        previewOutput: @escaping @MainActor (HistoryTurn) -> String
+        previewOutput: @escaping @MainActor (HistoryTurn) -> String,
+        readPhoto: @escaping @MainActor (UUID, UUID) async throws -> Data?
     ) {
         self.deleteArchive = deleteArchive
         self.refresh = refresh
@@ -28,6 +33,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         self.startNewArchive = startNew
         self.summarizeArchive = summarize
         self.previewOutput = previewOutput
+        self.readPhoto = readPhoto
     }
     public func load() async {
         guard !state.isBusy else { return }
@@ -63,5 +69,24 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     }
     public func cancel() { task?.cancel() }
     public func waitUntilIdle() async { await task?.value }
+    public func imageData(_ id: UUID, for turnID: UUID) async throws -> Data? {
+        try Task.checkCancellation()
+        guard let archive = state.archive else { throw HistoryImageLoadingError.invalidReference }
+        let turn = ([archive.current] + archive.past).lazy
+            .flatMap { ConversationHistoryPresentation.turns($0) }.first { $0.id == turnID }
+        guard let turn, turn.attachedImages.contains(where: { $0.id == id }) else {
+            throw HistoryImageLoadingError.invalidReference
+        }
+        guard photoReads.count < 4 else { throw HistoryImageLoadingError.busy }
+        let token = UUID()
+        photoReads.insert(token)
+        defer { photoReads.remove(token) }
+        let data = try await readPhoto(id, turn.ownerInputID ?? turn.id)
+        try Task.checkCancellation()
+        guard data.map({ !$0.isEmpty && $0.count <= 4 * 1024 * 1024 }) ?? true else {
+            throw HistoryImageLoadingError.oversizedImage
+        }
+        return data
+    }
     public func preview(_ turn: HistoryTurn) -> String { previewOutput(turn) }
 }
