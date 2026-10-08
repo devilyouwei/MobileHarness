@@ -95,6 +95,15 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
         try values.encode(useCustomSynthesis, forKey: .useCustomSynthesis)
     }
 }
+/// Passive presentation snapshot; eligibility is supplied by the business layer.
+public struct ModelResourceViewSnapshot: Sendable {
+    public let items: [ModelResourceItem]
+    public let installedGroups: Set<ModelResourceGroup>
+    public init(items: [ModelResourceItem], installedGroups: Set<ModelResourceGroup> = []) {
+        self.items = items
+        self.installedGroups = installedGroups
+    }
+}
 public enum ModelResourceOperation: Sendable { case download, remove, cancel }
 
 @MainActor public protocol ModelResourcesControlling: AnyObject {
@@ -110,13 +119,33 @@ public enum ModelResourceOperation: Sendable { case download, remove, cancel }
     public var source = ModelResourceSourceDraft()
     public var items: [ModelResourceItem] = []
     public var installedGroups: Set<ModelResourceGroup> = []
-    public var error: String?
+    public var error: String? { didSet { refreshErrorGeneration = nil } }
+    private var refreshErrorGeneration: UInt64?
     public var saving = false
     public var installationNotice: String?
     public var hasRestored = false
     public var pending: [String: ModelResourceOperation] = [:]
     public var admitted: Set<String> = []
     public var cancelling: Set<String> = []
+    public private(set) var refreshGeneration: UInt64 = 0
+    @discardableResult public func beginRefresh() -> UInt64 {
+        refreshGeneration &+= 1
+        if refreshGeneration == 0 { refreshGeneration = 1 }
+        return refreshGeneration
+    }
+    public func applySnapshot(_ snapshot: ModelResourceViewSnapshot, generation: UInt64) -> Bool {
+        guard generation == refreshGeneration, generation > 0 else { return false }
+        items = snapshot.items
+        installedGroups = snapshot.installedGroups
+        if refreshErrorGeneration != nil { error = nil }
+        return true
+    }
+    public func applyRefreshFailure(_ message: String, generation: UInt64) -> Bool {
+        guard generation == refreshGeneration, generation > 0 else { return false }
+        error = message
+        refreshErrorGeneration = generation
+        return true
+    }
     public init() {}
     public func isDownloading(_ item: ModelResourceItem) -> Bool {
         pending[item.id] == .download || admitted.contains(item.id) || (item.active && item.activity != .deleting)

@@ -4,7 +4,7 @@
 
 | Area | Delivered scope |
 | --- | --- |
-| Agent runtime | Six business Agents, JSON v6 permissions, static communication and independent AgentCore. |
+| Agent runtime | Seven business Agents, JSON v6 permissions, static communication and independent AgentCore. |
 | Processing | Local speech/chat/pose capabilities, explicit cloud chat configuration and shared model management. |
 | Behavior | Shared callable Actions, scheduled/native protocols, nested wait, structured results and declared-resource coordination. |
 | Host | Independent UI, role-specific lifecycle dependencies, six feature workflows and typed App adapters. |
@@ -28,7 +28,7 @@ Foundational independence: UI currently imports StorageChat domain values. Remov
 | Direction | Boundary before implementation |
 | --- | --- |
 | [Resource 当前状态存取](Resource-State-Plan.md) | ❌ Storage 内存快照、Actions 类型化状态写入、App 实际效果/反馈适配及 Agent 读取；不包含执行阶段，lock 兜底另开 issue。 |
-| [Agent-driven app](../MobileHarness/README.md) | Active architecture and unified Signal contract; Storage cleanup, history Tools, refresh and confirmed deletion are implemented. Typed legacy intents, BLE Tools, archive/title and model continuation remain pending. |
+| [Agent-driven app](../MobileHarness/README.md) | Active architecture and unified Signal contract; Storage cleanup, history Tools, refresh and confirmed deletion are implemented. Unified lifecycle/capability facts, BLE Agent routes and model continuation remain pending. Archive/title is implemented in ADR0165. |
 | Additional media/semantic memory | Concrete consumers, retention/privacy/deletion and capacity policy. |
 | Richer model capabilities | Typed capability, real adapter need and explicit unsupported behavior. |
 | Local native Tool events and result-driven request/reply | Transport schemas, permission/identity, cancellation and feedback ownership. |
@@ -212,25 +212,25 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ [ADR0141](adr/0141-resource-control-ownership.md): public unlocked/locked(owner) replaces persistent faulted/recover. One occupancy authority includes transient writers, and revocable execution permits protect App effects. Cleanup timeout fails only its request; retained late cleanup automatically unlocks. Cancellation-independent acknowledgment remains. ❌ Physical camera-close/takeover timing and native uncooperative-I/O isolation acceptance remain pending.
 
-✅ [ADR0145](adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned ConversationMemory Agent and both Gateways, with bounded admission and joined cancellation. ✅ Confirmed deletion is also implemented. ❌ Archive/title, navigation, other UI intents and model continuation remain pending.
+✅ [ADR0145](adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned Memory Agent and both Gateways, with bounded admission and joined cancellation. ✅ Confirmed deletion, archive/title and selected device/navigation intents are implemented; Assistant supports bounded native Tool-result continuation. ❌ Structured memory/semantic recall and model-driven destructive history operations remain pending.
 
-✅ [ADR0146](adr/0146-model-resource-interaction-ownership.md): model-resource task/admission, source-save and voice-switch policy moved from UI into independent AppSettingsWorkflow. ❌ Resource Agent/Gateway registration, cloud-form coordination and shared draft-value migration remain pending.
+✅ [ADR0146](adr/0146-model-resource-interaction-ownership.md): model-resource task/admission, source-save and voice-switch policy moved from UI into independent AppSettingsWorkflow. ✅ Resource commands now route through ApplicationControl (ADR0166). ❌ Cloud-form coordination, shared draft values and resource context remain pending; source/preferences/state functions are implemented in ADR0168–0173.
 
-✅ [ADR0147](adr/0147-history-delete-result-continuation.md): the authoritative Agent-driven contract was revised before implementation; confirmed archive deletion now uses internal History.delete, correlated runtime feedback and success-only UI refresh. ❌ Archive/title, resource Agent routes and model continuation remain pending.
+✅ [ADR0147](adr/0147-history-delete-result-continuation.md): the authoritative Agent-driven contract was revised before implementation; confirmed archive deletion now uses internal History.delete, correlated runtime feedback and success-only UI refresh. ✅ Resource command routes are implemented in ADR0166; ❌ provider/shared-state routes and model continuation remain pending; resource preference/state/failure routes are implemented in ADR0168–0173.
 
-✅ [ADR0148](adr/0148-unified-signal-contract.md): the active Agent-driven architecture moved into MobileHarness and defines one Signal vocabulary using the existing AgentInput envelope. ❌ Typed legacy events, remaining UI/device routes and versioned remote/durable transport remain pending.
+✅ [ADR0148](adr/0148-unified-signal-contract.md): the active Agent-driven architecture moved into MobileHarness and defines one Signal vocabulary using the existing AgentInput envelope. ❌ Unified lifecycle/capability fact Signals, remaining UI/device routes and versioned remote/durable transport remain pending.
 
 ✅ Agent-driven scenario design now documents UI intent, conversation/perception and Agent collaboration with explicit result-to-effect boundaries. ❌ Registered failure presentation, asynchronous discovery contracts and bounded model continuation require staged implementation; diagrams are not feature-completion claims.
 
 ✅ Agent-driven scenario coverage now distinguishes six primary categories and external/Agent/runtime origins, with cross-cutting decisions, concurrency, triggers and recovery. ✅ Typed origin admission and Tool owner fencing are implemented in ADR0149. ❌ Unified lifecycle/capability Signals and common long-task feedback/cancellation remain unimplemented.
 
-✅ [ADR0149](adr/0149-signal-origin-and-tool-feedback.md): Signal origin and owner-fenced Tool feedback are implemented with preserved causal context and explicit delivery failures. ✅ ADR0163 completes Action/activity roots and typed history intent. ❌ Next stages: remaining typed host controls → history archive/title → Assistant continuation → settings/resources and device entry points. Each stage must reconcile actual code with the authoritative architecture and report remaining work.
+✅ [ADR0149](adr/0149-signal-origin-and-tool-feedback.md): Signal origin and owner-fenced Tool feedback are implemented with preserved causal context and explicit delivery failures. ✅ ADR0163 completes Action/activity roots and typed history intent. ❌ Next stages: unified lifecycle/capability facts → Assistant continuation → settings/resources and device entry points. Each stage must reconcile actual code with the authoritative architecture and report remaining work.
 
 ## Unified executable capabilities — completed consolidation
 
 ✅ ADR0150–0157: shared cooperative execution, one Actions source tree, six domain catalogs and cohesive entry files, explicit serialization keys, three-field paths and v6 native bindings, one canonical definition/outcome/handler, direct/scheduled adapters and retired Tools/ToolRuntime targets. Scheduled native calls preserve resource/serialization admission, original handler context, one typed feedback and joined cancellation.
 
-❌ Next Agent-driven stages: remaining typed host control producers, archive/title and settings/device entry points and registered failure presentation, then bounded result-driven model continuation. These are feature migration tasks rather than unfinished Action/Tool source consolidation. Physical/native/model acceptance remains separate from fixture and build evidence.
+❌ Next Agent-driven stages: unified lifecycle/capability fact Signals, settings/device entry points and registered failure presentation, then bounded result-driven model continuation. These are feature migration tasks rather than unfinished Action/Tool source consolidation. Physical/native/model acceptance remains separate from fixture and build evidence.
 
 ✅ [ADR0158 — Unified Action authoring](adr/0158-unified-action-authoring.md): one @Action attribute for all capabilities; model context supplies text actions and request tools supplies native declarations. Text tags and native events retain distinct ActionCall/ToolCall transports.
 
@@ -242,4 +242,63 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](adr/0162-invocation-failure-isolation.md).
 
-✅ [ADR0163 — Typed history and feedback causality](adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Remaining typed host controls, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.
+✅ [ADR0163 — Typed history and feedback causality](adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Unified lifecycle/capability fact Signals, resource/device Agent routes and bounded model continuation stay separate stages.
+
+✅ [ADR0164](adr/0164-typed-assistant-host-control.md): Assistant cancellation now uses typed external assistant.control/1; full/paused admission bypass and session-scoped cleanup are preserved. ❌ Next: settings/device routes, current resource state and bounded model continuation.
+
+✅ [ADR0165](adr/0165-agent-history-archive-and-title.md): archive/title sequencing crosses Memory and both Gateways; App facade holds no mutation/inference policy. ✅ Settings/model-resource, selected device/navigation routes, registered failure presentation and bounded native model continuation are implemented in ADR0166–0179. ❌ Next memory scope: structured short/long-term records and semantic recall.
+
+
+## Model resource command stage
+
+✅ Route Settings download/cancel/remove through ApplicationControl and both Gateways, preserving native admission/cleanup and page-independent ownership. ❌ Provider selection, model-callable resource exposure and shared-state context remain pending; source/preferences/progress/failure presentation is implemented in ADR0168–0173.
+
+
+## Speech binding stage (2026-10-07)
+
+✅ Speech model binding uses typed ApplicationControl intent and returning feedback (ADR0167). ✅ Source/preference validation and persistence moved into Actions in ADR0168. ❌ Provider selection and host error Signal/presentation remain; root observation and command failures are implemented in ADR0171/0172.
+
+
+## Resource preferences stage (2026-10-07)
+
+✅ Resource source/preference restore, validation and persistence are Actions-owned and Agent-routed (ADR0168). ✅ Installed-group eligibility and registered refresh presentation are implemented in ADR0169/0170. ❌ Provider settings and host error Signal/presentation remain next; Bluetooth/navigation and model continuation follow.
+
+
+## Resource inventory stage (2026-10-07)
+
+✅ Resource inventory queries and installed eligibility now belong to Agent/Actions (ADR0169). ✅ Refresh snapshot/query-failure effects are registered in ADR0170. ❌ Add observation-driven progress, migrate remaining error routes and provider settings, then continue device/navigation and model continuation work.
+
+✅ Resource refresh snapshot/query-failure presentation now crosses OutputGateway (ADR0170). ✅ Root-owned sampled resource invalidations reuse registered presentation (ADR0171). ❌ Next: remaining host/transport Signal/presentation, provider settings, Bluetooth/navigation and bounded model continuation. New LLM grants and physical acceptance remain separate.
+
+
+✅ ADR0174: recoverable resource admission/dispatch failures use a typed host Signal and one Agent-selected registered error function after original worker cleanup. No native retry or recursive presentation; startup/closed/capacity/in-flight diagnostic failures retain explicit infrastructure fallback. ❌ Provider settings, BLE/navigation Agent routes, shared context, bounded model continuation and native acceptance remain subsequent work.
+
+
+✅ ADR0175: Settings provider model discovery now uses opaque provider.discovery intents, ApplicationControl and System.Provider.discoverModels with session-bound one-use private staging. Query results/errors are bounded and credential-free. ❌ Provider restore/save/rollback, lifecycle switching and registered provider UI effects remain a later migration; real provider/Keychain/native acceptance remains separate.
+
+❌ Move existing provider model-family eligibility heuristics from the model SDK to Actions while preserving public discovery behavior. The current discovery-route migration leaves native decoding/network behavior unchanged.
+
+
+✅ ADR0176: provider restore/save now uses opaque provider.settings/1 intents and registered Provider functions. Actions owns business schema/store/migration and complete apply/rollback; App only stages/adapts and supplies native SDK, lifecycle and credential primitives. ❌ Registered provider UI effects, SDK model-family eligibility migration, model grants/shared context and native acceptance remain subsequent work.
+
+## Existing-route completion (2026-10-08)
+
+✅ ADR0177–0179 supersede earlier pending provider-form, registered provider presentation, UI/StorageChat separation, camera/Bluetooth/navigation input and native model-continuation entries. The existing manual resource commands, model-visible download/cancel commands and device/camera/navigation calls share canonical Actions and Gateway execution. Four model rounds,16 native calls and the existing joined deadline bound continuation; actual failures remain model data, with no runtime replay. Root sequenced environment facts and live read capabilities supply current context.
+
+❌ Further product/infrastructure work: system/photo pickers and response correlation; model-initiated provider/source/binding changes and model removal with safe active-session handoff; full Resource-State-Plan storage and effect-point writers; generic activity/progress/request-reply; added sensor adapters; local native Tool support; remote/versioned/durable transport. These are not established by this migration.
+
+❌ Acceptance: real provider/Keychain round trip, native touch/voice/camera, BLE discovery/reconnect/motor stop and physical arrival/failure behavior. Keep device execution supervised; existing simulator CoreAI dependency and intermittent BLE fixture failures must be reported with build/test evidence.
+
+
+## Memory and Photographer service extensions — ADR0180
+
+✅ Canonical Memory naming and co-located history/title components; Photographer keeps its full role, a separately test-covered tracking policy and camera open/close/flip/retry control (ADR0181). No new capabilities are implied by this refactor.
+
+❌ Next: design short/long-term memory schemas, typed CRUD/recall intents, registered storage functions and bounded extraction/consolidation/forgetting policy. Keep Assistant's prompt assembly distinct from memory management.
+
+❌ Next: design Photographer's still capture/video recording/movement planning/shoot-time interaction workflows, declared Signals and registered functions, with independent resource/cancellation/failure ownership and physical acceptance.
+
+✅ ApplicationControl now uses a canonical role directory and identity (ADR0182); no concrete business Agent remains at the Agents root.
+
+
+✅ [ApplicationControl service organization](adr/0182-application-control-service-organization.md): ADR0182 implements canonical role-directory, identity and host-transport migration; existing business behavior retained. Validation is recorded separately.

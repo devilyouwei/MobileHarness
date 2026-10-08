@@ -1,131 +1,79 @@
 #if os(iOS)
     import SwiftUI
 
-    /// First-level settings list; feature-specific forms live in their own destination.
-    @MainActor
-    public struct SettingsView: View {
-        @Bindable var settings: SettingsState
+    /// Native feature list. Route selection crosses the injected Agent intent interface.
+    @MainActor public struct SettingsView: View {
         let bluetooth: BluetoothSettingsState
-        let bluetoothControls: any BluetoothControlling
-        let history: ConversationHistoryState
-        let historyControls: any ConversationHistoryControlling
-        let modelResources: ModelResourcesState?
-        let modelResourceControls: (any ModelResourcesControlling)?
-        let audioDetection: AudioDetectionState?
-        let audioDetectionControls: (any AudioDetectionControlling)?
-        let save: () async -> Bool
-
-        public init(
-            settings: SettingsState, bluetooth: BluetoothSettingsState, bluetoothControls: any BluetoothControlling,
-            history: ConversationHistoryState,
-            historyControls: any ConversationHistoryControlling, modelResources: ModelResourcesState? = nil,
-            modelResourceControls: (any ModelResourcesControlling)? = nil,
-            audioDetection: AudioDetectionState? = nil,
-            audioDetectionControls: (any AudioDetectionControlling)? = nil,
-            save: @escaping () async -> Bool
-        ) {
-            self.settings = settings
+        let navigate: (AppDestination) -> Void
+        public init(bluetooth: BluetoothSettingsState, navigate: @escaping (AppDestination) -> Void) {
             self.bluetooth = bluetooth
-            self.bluetoothControls = bluetoothControls
-            self.history = history
-            self.historyControls = historyControls
-            self.modelResources = modelResources
-            self.modelResourceControls = modelResourceControls
-            self.audioDetection = audioDetection
-            self.audioDetectionControls = audioDetectionControls
-            self.save = save
+            self.navigate = navigate
         }
-
         public var body: some View {
             List {
                 Section("AI 模型") {
-                    if let modelResources, let modelResourceControls {
-                        NavigationLink {
-                            ModelResourcesView(
-                                state: modelResources, controls: modelResourceControls, group: .recognition,
-                                audioDetection: audioDetection,
-                                audioDetectionControls: audioDetectionControls)
-                        } label: {
-                            Label("音频识别", systemImage: "waveform")
-                        }
-                        .accessibilityIdentifier("settings.recognition.open")
-                        NavigationLink {
-                            ModelResourcesView(
-                                state: modelResources, controls: modelResourceControls, group: .synthesis)
-                        } label: {
-                            Label("语音合成", systemImage: "speaker.wave.2")
-                        }
-                        .accessibilityIdentifier("settings.synthesis.open")
-                    }
-                    NavigationLink {
-                        LanguageModelSettingsView(
-                            settings: settings, modelResources: modelResources,
-                            modelResourceControls: modelResourceControls, save: save)
-                    } label: {
-                        Label("大模型", systemImage: "brain")
-                    }
-                    .accessibilityIdentifier("settings.language.open")
-                    if let modelResources, let modelResourceControls {
-                        NavigationLink {
-                            ModelResourcesView(state: modelResources, controls: modelResourceControls, group: .vision)
-                        } label: {
-                            Label("视觉识别", systemImage: "viewfinder")
-                        }
-                        .accessibilityIdentifier("settings.vision.open")
-                    }
+                    destination(.recognition, title: "音频识别", icon: "waveform", identifier: "settings.recognition.open")
+                    destination(
+                        .synthesis, title: "语音合成", icon: "speaker.wave.2", identifier: "settings.synthesis.open")
+                    destination(.language, title: "大模型", icon: "brain", identifier: "settings.language.open")
+                    destination(.vision, title: "视觉识别", icon: "viewfinder", identifier: "settings.vision.open")
                 }
                 Section("外接设备") {
-                    NavigationLink {
-                        BluetoothSettingsView(state: bluetooth, controls: bluetoothControls)
-                    } label: {
-                        HStack {
-                            Label("蓝牙外设", systemImage: "antenna.radiowaves.left.and.right")
-                            Spacer()
-                            Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline)
-                        }
-                    }
-                    .accessibilityIdentifier("settings.bluetooth.open")
+                    destination(
+                        .bluetooth, title: "蓝牙外设", icon: "antenna.radiowaves.left.and.right",
+                        identifier: "settings.bluetooth.open")
                 }
                 Section("用户") {
-                    NavigationLink {
-                        ConversationHistoryView(state: history, controls: historyControls)
-                    } label: {
-                        Label("对话历史", systemImage: "clock.arrow.circlepath")
-                    }
-                    .accessibilityIdentifier("settings.conversation.history")
+                    destination(
+                        .history, title: "对话历史", icon: "clock.arrow.circlepath",
+                        identifier: "settings.conversation.history")
                 }
             }
-            .navigationTitle("设置")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.visible, for: .navigationBar)
-            .preferredColorScheme(.dark)
+            .navigationTitle("设置").navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar).preferredColorScheme(.dark)
+        }
+        private func destination(_ page: AppDestination, title: String, icon: String, identifier: String) -> some View {
+            Button {
+                navigate(page)
+            } label: {
+                HStack {
+                    Label(title, systemImage: icon)
+                    Spacer()
+                    if page == .bluetooth { Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline) }
+                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                }
+            }.accessibilityIdentifier(identifier)
         }
     }
 
     @MainActor
-    private struct LanguageModelSettingsView: View {
+    public struct LanguageModelSettingsView: View {
         @Bindable var settings: SettingsState
+        let settingsControls: any SettingsControlling
         let modelResources: ModelResourcesState?
         let modelResourceControls: (any ModelResourcesControlling)?
         let save: () async -> Bool
-        @State private var missingLocalModel = false
 
-        var body: some View {
+        public init(
+            settings: SettingsState, settingsControls: any SettingsControlling,
+            modelResources: ModelResourcesState?, modelResourceControls: (any ModelResourcesControlling)?,
+            save: @escaping () async -> Bool
+        ) {
+            self.settings = settings
+            self.settingsControls = settingsControls
+            self.modelResources = modelResources
+            self.modelResourceControls = modelResourceControls
+            self.save = save
+        }
+        public var body: some View {
             Form {
                 Section {
                     Toggle(
                         "使用云端大模型",
                         isOn: Binding(
                             get: { settings.isEnabled },
-                            set: { value in
-                                if !value, let modelResources,
-                                    !modelResources.installedGroups.contains(.language)
-                                {
-                                    missingLocalModel = true
-                                } else {
-                                    settings.isEnabled = value
-                                }
-                            })
+                            set: { settings.isEnabled = $0 }
+                        )
                     )
                     .accessibilityIdentifier("settings.cloud.enabled")
                 } footer: {
@@ -133,15 +81,24 @@
                 }
                 Section {
                     HStack {
-                        TextField("https://api.openai.com/v1", text: $settings.url)
-                            .keyboardType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .accessibilityLabel("云端模型 URL")
-                            .accessibilityIdentifier("settings.cloud.url")
+                        TextField(
+                            "https://api.openai.com/v1",
+                            text: Binding(
+                                get: { settings.url },
+                                set: {
+                                    settings.url = $0
+                                    settingsControls.credentialsChanged()
+                                })
+                        )
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityLabel("云端模型 URL")
+                        .accessibilityIdentifier("settings.cloud.url")
                         PasteButton(payloadType: String.self) { values in
                             if let value = values.first {
                                 settings.url = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                                settingsControls.credentialsChanged()
                             }
                         }
                         .labelStyle(.iconOnly)
@@ -149,21 +106,30 @@
                         .accessibilityIdentifier("settings.cloud.url.paste")
                     }
                     HStack {
-                        SecureField("API Key（可选）", text: $settings.key)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .privacySensitive()
-                            .accessibilityIdentifier("settings.cloud.key")
+                        SecureField(
+                            "API Key（可选）",
+                            text: Binding(
+                                get: { settings.key },
+                                set: {
+                                    settings.key = $0
+                                    settingsControls.credentialsChanged()
+                                })
+                        )
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .privacySensitive()
+                        .accessibilityIdentifier("settings.cloud.key")
                         PasteButton(payloadType: String.self) { values in
                             if let value = values.first {
                                 settings.key = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                                settingsControls.credentialsChanged()
                             }
                         }
                         .labelStyle(.iconOnly)
                         .accessibilityLabel("粘贴 Key")
                         .accessibilityIdentifier("settings.cloud.key.paste")
                     }
-                    Button(action: settings.loadModels) {
+                    Button(action: settingsControls.loadModels) {
                         HStack {
                             Text(settings.isLoading ? "正在加载模型…" : "加载模型")
                             Spacer()
@@ -208,13 +174,6 @@
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task {
-                            if !settings.isEnabled, let modelResources, let modelResourceControls {
-                                await modelResourceControls.refresh()
-                                guard modelResources.installedGroups.contains(.language) else {
-                                    missingLocalModel = true
-                                    return
-                                }
-                            }
                             _ = await save()
                         }
                     } label: {
@@ -229,12 +188,7 @@
                     .accessibilityIdentifier("settings.save")
                 }
             }
-            .alert("请先安装本地大模型", isPresented: $missingLocalModel) {
-                Button("知道了", role: .cancel) {}
-            } message: {
-                Text(ModelResourceGroup.language.installationMessage)
-            }
-            .onDisappear { settings.cancelDiscovery() }
+            .onDisappear { settingsControls.cancelDiscovery() }
         }
     }
 

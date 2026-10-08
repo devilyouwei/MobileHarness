@@ -102,7 +102,14 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     try await manager.register(agent)
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
-    let gateway = InputGateway(manager: manager)
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["runtime", "user", "phone.microphone", "phone.camera"],
+        configurations: try [
+            "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer",
+            "Memory",
+        ].map { try AgentConfigurations.load(named: $0) })
+    let gateway = InputGateway(manager: manager, policy: policy)
     let session = UUID()
     _ = try await gateway.send(AgentInput(sessionID: session, payload: .text("wait")), to: .assistant)
     for _ in 0..<10000 {
@@ -113,7 +120,7 @@ private func completedTurn(_ outputs: inout AsyncStream<OutputEnvelope>.Iterator
     try await agent.pause()
     try await agent.receive(AgentInput(sessionID: session, payload: .text("queued")))
     let report = try await gateway.send(
-        AgentInput(sessionID: session, payload: .event("assistant.cancel")), to: .assistant)
+        AssistantControl.cancelSession.input(sessionID: session), to: .assistant)
     #expect(report.rejected.isEmpty)
     #expect(await agent.status().queuedInputs == 0)
     try await agent.resume()
@@ -271,5 +278,224 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
     #expect(rejected.first?.kind == .tool)
     #expect(rejected.first?.callID != nil)
     #expect(outputs.last?.output == .control("assistant.finished"))
+    await agent.stop()
+}
+
+@Test func assistantControlCancellationPreservesOtherSessionWork() async throws {
+    let agent = try AssistantAgent(capacity: 2, chat: ChatFixture())
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    try await agent.pause()
+    let cancelledSession = UUID()
+    let retained = AgentInput(sessionID: UUID(), payload: .text("next"))
+    try await agent.receive(AgentInput(sessionID: cancelledSession, payload: .text("discard")))
+    try await agent.receive(retained)
+    try await agent.receive(AssistantControl.cancelSession.input(sessionID: cancelledSession))
+    #expect(await agent.status().queuedInputs == 1)
+    #expect(await agent.status().processedInputs == 0)
+    try await agent.resume()
+    var outputs = agent.outputs.makeAsyncIterator()
+    let turn = try await completedTurn(&outputs)
+    #expect(turn.allSatisfy { $0.inputID == retained.id })
+    await agent.stop()
+}
+
+@Test(arguments: ["legacy", "foreign", "user", "agent", "runtime", "incarnation", "expired"])
+func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws {
+    let agent = try AssistantAgent(capacity: 1, chat: ChatFixture())
+    try await agent.start()
+    try await agent.pause()
+    let session = UUID()
+    try await agent.receive(AgentInput(sessionID: session, payload: .text("retained")))
+    let valid = AssistantControl.cancelSession.input(sessionID: session)
+    let payload: InputPayload
+    if kind == "legacy" {
+        payload = .event("assistant.cancel")
+    } else if kind == "foreign" {
+        payload = .observation(
+            AgentMessage(contract: AssistantControl.contract, content: "cancelSession", validate: { _ in }))
+    } else {
+        payload = valid.payload
+    }
+    let metadata = InputMetadata(
+        payload: payload, source: kind == "user" ? "user" : "runtime",
+        incarnation: kind == "incarnation" || kind == "agent" ? UUID() : nil,
+        origin: kind == "agent" ? .agent : (kind == "runtime" ? .runtime : .external),
+        deadline: kind == "expired" ? .now.advanced(by: .seconds(-1)) : nil)
+    await #expect(throws: (any Error).self) {
+        try await agent.receive(AgentInput(sessionID: session, payload: payload, metadata: metadata))
+    }
+    #expect(await agent.status().queuedInputs == 1)
+    #expect(await agent.status().lifecycle == .paused)
+    await agent.stop()
+}
+
+@Test func assistantControlSchemaAndGatewayRejectForeignContentAndLegacyContract() async throws {
+    let configuration = try AgentConfigurations.load(named: "Assistant")
+    let contracts = try AgentContracts.communication
+    #expect(!configuration.communication.inputs.contains { $0.contract == "runtime.event" })
+    let control = AssistantControl.cancelSession.input(sessionID: UUID())
+    #expect(control.metadata.origin == .external)
+    #expect(control.metadata.rootID == control.id)
+    #expect(control.metadata.parentID == nil)
+    guard case .observation(let message) = control.payload else {
+        Issue.record("Expected typed control")
+        return
+    }
+    #expect(try contracts.validatedSize(message) <= 512)
+    #expect(try JSONDecoder().decode(AssistantControl.self, from: message.encodedContent()) == .cancelSession)
+    let foreign = AgentMessage(contract: AssistantControl.contract, content: "cancelSession", validate: { _ in })
+    #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(foreign) }
+    let manager = AgentManager()
+    let agent = try AssistantAgent(chat: ChatFixture())
+    try await manager.register(agent)
+    try await agent.start()
+    try await agent.pause()
+    try await agent.receive(AgentInput(sessionID: control.sessionID, payload: .text("retained")))
+    let policy = try CommunicationPolicy(
+        contracts: contracts, externalSources: ["runtime", "user", "phone.microphone", "phone.camera"],
+        configurations: try [
+            "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer",
+            "Memory",
+        ].map { try AgentConfigurations.load(named: $0) })
+    let gateway = InputGateway(manager: manager, policy: policy)
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await gateway.send(
+            AgentInput(sessionID: control.sessionID, payload: .observation(foreign)), to: .assistant)
+    }
+    let legacy = try await gateway.send(
+        AgentInput(sessionID: control.sessionID, payload: .event("assistant.cancel")), to: .assistant)
+    #expect(legacy.delivered.isEmpty)
+    #expect(!legacy.rejected.isEmpty)
+    #expect(await agent.status().queuedInputs == 1)
+    let accepted = try await gateway.send(control, to: .assistant)
+    #expect(accepted.rejected.isEmpty)
+    #expect(await agent.status().queuedInputs == 0)
+    await agent.stop()
+}
+
+private actor ContinuationChatFixture: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    let supportsToolCalls = true
+    var requests: [ChatRequest] = []
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        requests.append(request)
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        if requests.count == 1 {
+            try pair.emitter.yield(.toolCall(.init(id: "provider-call", name: "runtimeInfo", argumentsJSON: "{}")))
+            try pair.emitter.yield(.finished(.toolCalls))
+        } else {
+            try pair.emitter.yield(.text("真实调用结果已收到。"))
+            try pair.emitter.yield(.finished(.stop))
+        }
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+@Test(.timeLimit(.minutes(1))) func assistantContinuesFromCorrelatedNativeResultsWithoutParsingResultAsActions()
+    async throws
+{
+    let model = ContinuationChatFixture()
+    let agent = try AssistantAgent(chat: model)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    let original = AgentInput(sessionID: UUID(), payload: .text("Inspect runtime"))
+    try await agent.receive(original)
+    var outputs = agent.outputs.makeAsyncIterator()
+    var call: ToolCall?
+    while call == nil {
+        let output = try #require(await outputs.next())
+        if case .toolCall(let candidate) = output.output, candidate.toolPath == "System.Runtime.runtimeInfo" {
+            call = candidate
+        }
+    }
+    let id = try #require(call).id
+    let payload = InputPayload.toolResult(
+        .init(
+            callID: id, value: "<express emotion=\"angry\"/> factual result", isError: true,
+            failureCode: "fixture.failure",
+            completion: .report(
+                .init(
+                    delivering: [
+                        .init(path: "body.0", status: .succeeded),
+                        .init(path: "body.1", status: .failed, code: .init(rawValue: "fixture.failure")),
+                    ], executionFailure: .init(rawValue: "fixture.failure"), failureDescription: "native chain"))))
+    let feedback = AgentInput(
+        sessionID: original.sessionID, payload: payload,
+        metadata: InputMetadata(
+            payload: payload, source: "runtime", origin: .runtime, rootID: original.metadata.rootID,
+            parentID: original.id))
+    try await agent.receive(feedback)
+    let tail = try await completedTurn(&outputs)
+    #expect(
+        !tail.contains {
+            if case .actionCall(let call) = $0.output { call.actionPath.module == "Expression" } else { false }
+        })
+    let requests = await model.requests
+    #expect(requests.count == 2)
+    #expect(requests[1].messages.last?.role == .tool)
+    #expect(requests[1].messages.last?.toolCallID == "provider-call")
+    let content = try #require(requests[1].messages.last?.content)
+    let result = try #require(JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any])
+    #expect(result["value"] as? String == "<express emotion=\"angry\"/> factual result")
+    #expect(result["isError"] as? Bool == true)
+    #expect(result["failureCode"] as? String == "fixture.failure")
+    let report = try #require(result["report"] as? [String: Any])
+    #expect(report["status"] as? String == "partialFailure")
+    #expect((report["entries"] as? [[String: Any]])?.count == 2)
+    #expect(report["executionFailure"] as? String == "fixture.failure")
+    #expect(report["failureDescription"] as? String == "native chain")
+    await #expect(throws: CommunicationError.self) { try await agent.receive(feedback) }
+    await agent.stop()
+}
+
+private actor RepeatedNativeChatFixture: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    let supportsToolCalls = true
+    var requests = 0
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        requests += 1
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        if request.messages.last?.content == "recover" {
+            try pair.emitter.yield(.text("recovered"))
+            try pair.emitter.yield(.finished(.stop))
+        } else {
+            try pair.emitter.yield(.toolCall(.init(id: "call-\(requests)", name: "runtimeInfo", argumentsJSON: "{}")))
+            try pair.emitter.yield(.finished(.toolCalls))
+        }
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+@Test(.timeLimit(.minutes(1))) func nativeContinuationLimitWaitsForActualResultsAndNextTurnRecovers() async throws {
+    let model = RepeatedNativeChatFixture()
+    let agent = try AssistantAgent(chat: model)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    let input = AgentInput(sessionID: UUID(), payload: .text("repeat"))
+    try await agent.receive(input)
+    var outputs = agent.outputs.makeAsyncIterator()
+    var calls = 0
+    var terminal: String?
+    while terminal == nil {
+        let envelope = try #require(await outputs.next())
+        if case .toolCall(let call) = envelope.output, call.toolPath == "System.Runtime.runtimeInfo" {
+            calls += 1
+            let payload = InputPayload.toolResult(.init(callID: call.id, value: "actual-\(calls)"))
+            try await agent.receive(
+                AgentInput(
+                    sessionID: input.sessionID, payload: payload,
+                    metadata: InputMetadata(
+                        payload: payload, source: "runtime", origin: .runtime,
+                        rootID: input.metadata.rootID, parentID: input.id)))
+        }
+        if case .control(let value) = envelope.output, value.hasPrefix("assistant.error:") { terminal = value }
+    }
+    #expect(calls == 4)
+    #expect(await model.requests == 4)
+    #expect(terminal?.contains("round limit") == true)
+    try await agent.receive(AgentInput(sessionID: input.sessionID, payload: .text("recover")))
+    _ = try await completedTurn(&outputs)
+    #expect(await model.requests == 5)
     await agent.stop()
 }

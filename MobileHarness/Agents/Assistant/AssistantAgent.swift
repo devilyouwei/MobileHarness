@@ -28,6 +28,15 @@ public actor AssistantAgent: Agent {
     private let conversations: ConversationHistoryStore
     private let modelName: @Sendable () async throws -> String
     private var generationFinishReason: String?
+    private var nativeRound: [(UUID, ChatToolCall)] = []
+    private var nativeOwners: [UUID: (UUID, UUID, UUID)] = [:]
+    private var nativeResults: [UUID: ToolResult] = [:]
+    private var generationCalls = 0
+    private var nativeCalls = 0
+    private var nativeResultBytes = 0
+    private var retiredNativeCalls: [UUID] = []
+    private var nativeReceipts: Set<UUID> = []
+    private var nativeFeedbackFailure: String?
 
     public init(
         capacity: Int = 32, chat: any ChatCapability,
@@ -130,12 +139,61 @@ public actor AssistantAgent: Agent {
     public func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard descriptor.inputs.contains(input.payload.kind) else { throw HarnessError.unsupportedInput }
+        if case .event = input.payload { throw HarnessError.unsupportedInput }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if case .actionResult(let result) = input.payload {
             guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
                 result.owner.sessionID == input.sessionID
             else { throw CommunicationError.unauthorized }
             resultInbox.accept(result)
+            return
+        }
+        if case .toolResult(let result) = input.payload, let owner = nativeOwners[result.callID] {
+            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
+                input.sessionID == owner.1, input.metadata.parentID == owner.0,
+                input.metadata.rootID == owner.2, !nativeReceipts.contains(result.callID)
+            else {
+                throw CommunicationError.unauthorized
+            }
+            guard nativeResultBytes + result.value.utf8.count <= 65_536 else {
+                nativeFeedbackFailure = "Native feedback exceeds 64 KiB"
+                throw CommunicationError.invalidPayload
+            }
+            nativeReceipts.insert(result.callID)
+            nativeResultBytes += result.value.utf8.count
+            do {
+                try await conversations.recordToolOutcome(
+                    result.callID, for: owner.0,
+                    state: result.isError ? .failed : .completed, output: result.value,
+                    error: result.isError ? result.failureCode : nil)
+            } catch {
+                nativeFeedbackFailure = "Native outcome persistence failed"
+                throw error
+            }
+            guard activeInput?.id == owner.0 else { throw CommunicationError.unauthorized }
+            nativeResults[result.callID] = result
+            return
+        }
+        if case .toolResult(let result) = input.payload, retiredNativeCalls.contains(result.callID) {
+            throw CommunicationError.unauthorized
+        }
+        // Host control bypasses ordinary admission, including when the queue is full or paused.
+        if case .observation(let message) = input.payload, message.contract == AssistantControl.contract {
+            guard let control = message.assistantControl else { throw CommunicationError.invalidPayload }
+            guard input.metadata.contract == AssistantControl.contract, input.metadata.version == 1,
+                input.metadata.origin == .external, input.metadata.source == "runtime",
+                input.metadata.incarnation == nil
+            else { throw CommunicationError.unauthorized }
+            _ = try message.validatedSize()
+            switch control {
+            case .cancelSession:
+                queue.removeAll { $0.sessionID == input.sessionID }
+                if activeInput?.sessionID == input.sessionID {
+                    let task = worker
+                    task?.cancel()
+                    await task?.value
+                }
+            }
             return
         }
         if case .observation(let observation) = input.payload {
@@ -145,16 +203,6 @@ public actor AssistantAgent: Agent {
             default: throw HarnessError.unsupportedInput
             }
             _ = try observation.validatedSize()
-        }
-        // Control admission bypasses the ordinary queue, including when it is full or paused.
-        if case .event("assistant.cancel") = input.payload {
-            queue.removeAll { $0.sessionID == input.sessionID }
-            if activeInput?.sessionID == input.sessionID {
-                let task = worker
-                task?.cancel()
-                await task?.value
-            }
-            return
         }
         guard queue.count < capacity else { throw HarnessError.queueFull }
         if case .text(let text) = input.payload {
@@ -195,11 +243,7 @@ public actor AssistantAgent: Agent {
                 default: break
                 }
             // Unsupported input is rejected by the descriptor; receipts are handled before this switch.
-            case .image, .audio, .actionResult, .activityEvent: break
-            case .event(let event):
-                activeInput = input
-                worker = Task { await self.emitImmediate("事件：\(event)", for: input) }
-                return
+            case .image, .audio, .actionResult, .activityEvent, .event: break
             case .toolResult(let result):
                 activeInput = input
                 worker = Task { await self.emitImmediate(result.value, for: input) }
@@ -219,6 +263,15 @@ public actor AssistantAgent: Agent {
     private func generate(_ text: String, input: AgentInput, using chat: any ChatCapability) async {
         defer {
             activeInput = nil
+            retiredNativeCalls = Array((retiredNativeCalls + Array(nativeOwners.keys)).suffix(128))
+            nativeOwners.removeAll()
+            nativeResults.removeAll()
+            nativeRound.removeAll()
+            nativeReceipts.removeAll()
+            nativeFeedbackFailure = nil
+            generationCalls = 0
+            nativeCalls = 0
+            nativeResultBytes = 0
             worker = nil
             drain()
         }
@@ -257,7 +310,7 @@ public actor AssistantAgent: Agent {
                 context: InferenceContext(requestID: input.id, conversationID: input.sessionID),
                 temperature: record.temperature, tools: tools)
             _ = try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await self.collect(request, input: input, using: chat) }
+                group.addTask { try await self.continueGeneration(request, input: input, using: chat) }
                 group.addTask {
                     try await Task.sleep(for: .seconds(30))
                     throw CapabilityError.unavailable("Assistant generation timed out")
@@ -283,6 +336,66 @@ public actor AssistantAgent: Agent {
         }
     }
 
+    private func continueGeneration(_ initial: ChatRequest, input: AgentInput, using chat: any ChatCapability)
+        async throws -> String
+    {
+        var request = initial
+        for round in 0..<4 {
+            nativeRound = []
+            let text = try await collect(request, input: input, using: chat)
+            let calls = nativeRound
+            guard !calls.isEmpty else { return text }
+            while !calls.allSatisfy({ nativeResults[$0.0] != nil }) {
+                try Task.checkCancellation()
+                if let failure = nativeFeedbackFailure { throw CapabilityError.invalidRequest(failure) }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            guard round < 3 else { throw CapabilityError.invalidRequest("Model continuation round limit reached") }
+            var messages = request.messages
+            messages.append(ChatMessage(role: .assistant, content: text, toolCalls: calls.map { $0.1 }))
+            for (id, native) in calls {
+                guard let result = nativeResults.removeValue(forKey: id) else {
+                    throw CommunicationError.invalidPayload
+                }
+                nativeOwners[id] = nil
+                retiredNativeCalls = Array((retiredNativeCalls + [id]).suffix(128))
+                let content: String
+                if result.isError || result.failureCode != nil {
+                    var value: [String: Any] = ["isError": result.isError, "value": result.value]
+                    if let code = result.failureCode { value["failureCode"] = code }
+                    if case .report(let report) = result.completion {
+                        value["report"] =
+                            [
+                                "status": report.status.rawValue,
+                                "entries": report.entries.map { entry -> [String: Any] in
+                                    var leaf: [String: Any] = [
+                                        "path": entry.path, "status": entry.status.rawValue, "details": entry.details,
+                                    ]
+                                    if let code = entry.code { leaf["code"] = code.rawValue }
+                                    return leaf
+                                },
+                                "executionFailure": report.executionFailure?.rawValue ?? NSNull(),
+                                "failureDescription": report.failureDescription ?? NSNull(),
+                            ] as [String: Any]
+                    }
+                    content = String(
+                        decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+                        as: UTF8.self)
+                } else {
+                    content = result.value
+                }
+                messages.append(ChatMessage(role: .tool, content: content, toolCallID: native.id))
+            }
+            request = try ChatRequest(
+                messages: messages, context: initial.context,
+                maximumOutputTokens: initial.maximumOutputTokens, temperature: initial.temperature, tools: initial.tools
+            )
+            try await conversations.recordContinuationRequest(
+                String(decoding: JSONEncoder().encode(messages), as: UTF8.self), for: input.id)
+        }
+        throw CapabilityError.invalidRequest("Model continuation round limit reached")
+    }
+
     private func collect(_ request: ChatRequest, input: AgentInput, using chat: any ChatCapability) async throws
         -> String
     {
@@ -294,7 +407,9 @@ public actor AssistantAgent: Agent {
             var generator = AgentGenerator(
                 capabilities: descriptor.capabilities, textMapping: Self.mapText,
                 segmentation: try Self.textSegmentation)
-            var emittedCalls = 0
+            let startCalls = generationCalls
+            var emittedCalls = startCalls
+            defer { generationCalls = emittedCalls }
             for try await event in session.events {
                 try Task.checkCancellation()
                 if case .text(let delta) = event { try await conversations.append(delta, to: input.id) }
@@ -314,6 +429,12 @@ public actor AssistantAgent: Agent {
                         call = try ToolCallParser.parse(
                             id: callID, alias: native.name, argumentsJSON: Data(native.argumentsJSON.utf8),
                             capabilities: descriptor.capabilities)
+                        guard nativeCalls < 16, !nativeRound.contains(where: { $0.1.id == native.id }) else {
+                            throw GenerationError.limitExceeded
+                        }
+                        nativeCalls += 1
+                        nativeOwners[callID] = (input.id, input.sessionID, input.metadata.rootID)
+                        nativeRound.append((callID, native))
                         try await emitFunctions([.tool(call)], for: input, count: &emittedCalls)
                     } catch {
                         do {
@@ -347,7 +468,9 @@ public actor AssistantAgent: Agent {
                 throw CapabilityError.unavailable("LLM returned no completed answer")
             }
             try await emitFunctions(generator.finish(), for: input, count: &emittedCalls)
-            guard emittedCalls > 0 else { throw CapabilityError.unavailable("LLM returned no speakable answer") }
+            guard emittedCalls > startCalls else {
+                throw CapabilityError.unavailable("LLM returned no speakable answer")
+            }
             return text
         } onCancel: {
             session.cancel()

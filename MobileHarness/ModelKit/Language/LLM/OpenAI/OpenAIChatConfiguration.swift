@@ -83,23 +83,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         else {
             throw OpenAIChatError.invalidResponse
         }
-        return ids.filter { isLikelyChatModel($0) && seen.insert($0).inserted }
-    }
-
-    // /models has no standard capability field. Exclude known non-chat families while
-    // retaining opaque third-party deployment names; discovery is not a compatibility probe.
-    static func isLikelyChatModel(_ id: String) -> Bool {
-        let name = id.lowercased()
-        let excluded = [
-            "embedding", "embed-", "rerank", "moderation", "whisper", "tts", "transcribe",
-            "transcription", "realtime", "audio", "dall-e", "dalle", "image", "sora",
-            "stable-diffusion", "flux", "video", "davinci", "babbage", "gpt-3.5-turbo-instruct",
-            "deep-research", "computer-use", "codex",
-        ]
-        if excluded.contains(where: { name.contains($0) }) { return false }
-        return !["o1-pro", "o3-pro", "gpt-5-pro", "gpt-5.2-pro", "gpt-5.4-pro", "gpt-5.5-pro"].contains {
-            name == $0 || name.hasPrefix($0 + "-")
-        }
+        return ids.filter { seen.insert($0).inserted }
     }
 
     static func toolNames(_ tools: [ChatToolDefinition]) -> [String: String] {
@@ -126,7 +110,23 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         var body: [String: Any] = [
             "model": model,
-            "messages": chat.messages.map { ["role": $0.role.rawValue, "content": $0.content] },
+            "messages": try chat.messages.map { message -> [String: Any] in
+                var value: [String: Any] = ["role": message.role.rawValue, "content": message.content]
+                if let id = message.toolCallID { value["tool_call_id"] = id }
+                if !message.toolCalls.isEmpty {
+                    let names = Self.toolNames(chat.tools)
+                    value["tool_calls"] = try message.toolCalls.map { call -> [String: Any] in
+                        guard let name = names.first(where: { $0.value == call.name })?.key else {
+                            throw CapabilityError.invalidRequest("Undeclared transcript tool")
+                        }
+                        return [
+                            "id": call.id, "type": "function",
+                            "function": ["name": name, "arguments": call.argumentsJSON],
+                        ]
+                    }
+                }
+                return value
+            },
             "temperature": chat.temperature, "stream": true,
         ]
         body["stream_options"] = ["include_usage": true]

@@ -8,6 +8,8 @@ public protocol HistoryQueryCapability: Sendable {
 
 public protocol HistoryMutationCapability: Sendable {
     func deleteArchived(_ id: UUID) async throws
+    func startNew() async throws -> UUID?
+    func summarizeArchived(_ id: UUID) async throws
 }
 
 public struct HistoryModule: CapabilityModule {
@@ -19,6 +21,12 @@ public struct HistoryModule: CapabilityModule {
     }
     public var definitions: [ActionFunction] {
         [
+            HistoryActions.startNewDefinition(completing: { [mutations] invocation in
+                .value(try await HistoryActions.startNew(invocation: invocation, using: mutations))
+            }),
+            HistoryActions.summarizeDefinition(completing: { [mutations] invocation in
+                .value(try await HistoryActions.summarize(invocation: invocation, using: mutations))
+            }),
             HistoryActions.deleteDefinition(completing: { [mutations] invocation in
                 .value(try await HistoryActions.delete(invocation: invocation, using: mutations))
             }),

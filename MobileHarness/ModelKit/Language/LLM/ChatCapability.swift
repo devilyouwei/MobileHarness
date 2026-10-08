@@ -1,12 +1,16 @@
 import Foundation
 
-public struct ChatMessage: Equatable, Sendable {
-    public enum Role: String, Sendable { case system, user, assistant }
+public struct ChatMessage: Codable, Equatable, Sendable {
+    public enum Role: String, Codable, Sendable { case system, user, assistant, tool }
     public let role: Role
     public let content: String
-    public init(role: Role, content: String) {
+    public let toolCalls: [ChatToolCall]
+    public let toolCallID: String?
+    public init(role: Role, content: String, toolCalls: [ChatToolCall] = [], toolCallID: String? = nil) {
         self.role = role
         self.content = content
+        self.toolCalls = toolCalls
+        self.toolCallID = toolCallID
     }
 }
 
@@ -27,7 +31,7 @@ public struct ChatToolDefinition: Sendable {
     }
 }
 
-public struct ChatToolCall: Equatable, Sendable {
+public struct ChatToolCall: Codable, Equatable, Sendable {
     public let id: String
     public let name: String
     public let argumentsJSON: String
@@ -52,6 +56,38 @@ public struct ChatRequest: Sendable {
         guard !messages.isEmpty, maximumOutputTokens.map({ $0 > 0 }) ?? true, temperature.isFinite,
             (0...2).contains(temperature)
         else { throw CapabilityError.invalidRequest("Invalid chat messages or generation options") }
+        var pending: Set<String> = []
+        var callIDs: Set<String> = []
+        var bytes = 0
+        guard messages.count <= 64 else { throw CapabilityError.invalidRequest("Chat transcript exceeds bounds") }
+        for message in messages {
+            bytes += message.content.utf8.count
+            if message.role == .tool {
+                guard message.toolCalls.isEmpty, let id = message.toolCallID, pending.remove(id) != nil else {
+                    throw CapabilityError.invalidRequest("Uncorrelated tool result")
+                }
+                bytes += id.utf8.count
+            } else {
+                guard pending.isEmpty, message.toolCallID == nil,
+                    message.toolCalls.isEmpty || message.role == .assistant
+                else {
+                    throw CapabilityError.invalidRequest("Incomplete tool transcript")
+                }
+                for call in message.toolCalls {
+                    guard !call.id.isEmpty, call.id.utf8.count <= 512, !call.name.isEmpty,
+                        call.name.utf8.count <= 64, call.argumentsJSON.utf8.count <= 4096,
+                        callIDs.insert(call.id).inserted
+                    else {
+                        throw CapabilityError.invalidRequest("Invalid native call transcript")
+                    }
+                    pending.insert(call.id)
+                    bytes += call.id.utf8.count + call.name.utf8.count + call.argumentsJSON.utf8.count
+                }
+            }
+        }
+        guard pending.isEmpty, bytes <= 65_536 else {
+            throw CapabilityError.invalidRequest("Incomplete or oversized tool transcript")
+        }
         guard tools.count <= 128, Set(tools.map(\.name)).count == tools.count,
             tools.reduce(0, { $0 + $1.declaration.count }) <= 65536
         else { throw CapabilityError.invalidRequest("Tool declarations exceed limits or contain duplicates") }

@@ -104,3 +104,7 @@ Details: [Input](Input/README.md), [Output](Output/README.md), [Runtime](Runtime
 ✅ Invocation failure isolation preserves complete shared reports before protocol feedback. Ordinary handler failure cannot stop sibling or subsequent work; explicit cancellation and admission errors keep their existing scopes.
 
 ✅ ADR0163: scheduled/action and activity feedback retain initiating causality just like native feedback. Hop exhaustion closes delivery while retaining the actual effect/result. Typed history intent uses the existing external domain-schema admission path.
+
+✅ Implemented: OutputGateway exposes a read-only returnsToolResult registration-policy query. Bounded history transport uses this protocol metadata to distinguish delivered returning-handler errors (Agent follow-up) from completion-only presentation failures (abort); it does not select business functions or effects.
+
+✅ ADR0181: direct Tool dispatch binds its OutputEnvelope in a task-local invocation context. Host delegation validates FunctionInput context against that envelope and uses existing directed-message permission/incarnation/session/hop checks. No Action function imports Gateway or manufactures Agent provenance.

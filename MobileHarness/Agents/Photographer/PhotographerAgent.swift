@@ -1,25 +1,30 @@
 import AgentCore
 import Foundation
 
-/// Camera-motion policy. Consumes published pose observations and, when enabled, emits one arm Tool.
+/// Photographer business service entry point; tracking policy is a co-located component.
 public actor PhotographerAgent: Agent {
-    private static let aimPermission = InternalTool(path: "NexArm.Tracking.aim", required: ["base", "pitch"])
     public nonisolated let descriptor: AgentDescriptor
     public nonisolated let outputs: AsyncStream<OutputEnvelope>
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let sessionID: UUID
+    private var trackingSessionID: UUID?
+    private var camera = PhotographerCameraWorkflow()
     private let controlsArm: Bool
     private let controlAvailable: @Sendable () async -> Bool
     private var lifecycle: AgentLifecycle = .registered
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var lastPoseReceivedAt: ContinuousClock.Instant?
-    private var lastAim: (base: Double, pitch: Double, time: TimeInterval)?
-    private var filteredBase = 0.0
-    private var filteredPitch = 0.0
-    private var commandedBase = 0.0
-    private var commandedPitch = 0.0
+    private var tracking = PhotographerTrackingPolicy()
     private var processed = 0
+
+    private static let aimPermission = InternalTool(path: "NexArm.Tracking.aim", required: ["base", "pitch"])
+
+    // MARK: - Registration
+
+    public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
+        try PhotographerCameraWorkflow.runtimeCapabilities(capabilities).adding(internalTools: [aimPermission])
+    }
 
     public init(
         sessionID: UUID, configuration: AgentConfiguration? = nil, controlsArm: Bool = false,
@@ -30,9 +35,10 @@ public actor PhotographerAgent: Agent {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "Photographer",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.toolCall],
+            outputs: [.toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.sessionID = sessionID
+        trackingSessionID = sessionID
         self.controlsArm = controlsArm
         self.controlAvailable = controlAvailable
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
@@ -40,32 +46,32 @@ public actor PhotographerAgent: Agent {
         continuation = stream.continuation
     }
 
-    public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
-        try model.adding(internalTools: [aimPermission])
-    }
+    // MARK: - Lifecycle
 
     public func start() throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         lifecycle = .running
     }
+
     public func pause() throws {
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
         lastPoseReceivedAt = nil
-        resetTracking()
+        tracking.reset()
     }
+
     public func resume() throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
         lifecycle = .running
     }
+
     public func stop() async {
         lifecycle = .stopped
+        trackingSessionID = nil
+        camera.reset()
         lastPoseReceivedAt = nil
-        resetTracking()
+        tracking.reset()
         continuation.finish()
-    }
-    public func status() -> AgentStatus {
-        AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)
     }
 
     /// Read-only host signal for a usable tracking pose; sensor timestamps cannot extend freshness.
@@ -74,9 +80,55 @@ public actor PhotographerAgent: Agent {
         return ContinuousClock.now - lastPoseReceivedAt < maximumAge
     }
 
+    public func status() -> AgentStatus {
+        AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)
+    }
+
+    /// Trusted host attachment: exactly one vision scope, independent of root camera requests.
+    public func bindTracking(sessionID: UUID) throws {
+        guard lifecycle == .running else { throw HarnessError.notRunning }
+        guard trackingSessionID == nil || trackingSessionID == self.sessionID else {
+            throw CommunicationError.capacityExceeded
+        }
+        trackingSessionID = sessionID
+        lastSequence = nil
+        lastTimestamp = nil
+        lastPoseReceivedAt = nil
+        tracking.reset()
+    }
+    public func unbindTracking(sessionID: UUID) {
+        guard trackingSessionID == sessionID else { return }
+        trackingSessionID = nil
+        lastSequence = nil
+        lastTimestamp = nil
+        lastPoseReceivedAt = nil
+        tracking.reset()
+    }
+    public func cameraResult() -> ToolResult? { camera.lastResult }
+
+    // MARK: - Input processing
+
     public func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-        guard input.sessionID == sessionID else { throw CommunicationError.unauthorized }
+        if input.payload.kind == .toolResult
+            || {
+                if case .observation(let message) = input.payload { return message.photographerCamera != nil }
+                return false
+            }()
+        {
+            guard lifecycle == .running else { throw HarnessError.notRunning }
+            guard !input.metadata.expired else { throw CommunicationError.expired }
+            let (result, original) = try camera.receive(input, rootSessionID: sessionID)
+            do { try emit(result, input: original, sequence: input.metadata.sequence) } catch {
+                if case .toolCall(let call) = result { camera.retire(call.id) }
+                throw error
+            }
+            processed += 1
+            return
+        }
+        guard input.sessionID == trackingSessionID, input.metadata.source == AgentID.visionPerception.rawValue else {
+            throw CommunicationError.unauthorized
+        }
         guard case .pose(let pose)? = input.payload.perception else { throw HarnessError.unsupportedInput }
         do { try pose.validate() } catch { throw CommunicationError.invalidPayload }
         guard lastSequence.map({ pose.sequence > $0 }) ?? true,
@@ -84,9 +136,11 @@ public actor PhotographerAgent: Agent {
         else { throw CommunicationError.outOfOrder }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if let lastPoseReceivedAt, ContinuousClock.now - lastPoseReceivedAt >= .seconds(1) {
-            resetTracking()
+            tracking.reset()
         }
-        if let person = pose.people.first, aimPoint(person, width: pose.width, height: pose.height) != nil {
+        if let person = pose.people.first,
+            PhotographerTrackingPolicy.aimPoint(person, width: pose.width, height: pose.height) != nil
+        {
             lastPoseReceivedAt = .now
         }
         lastSequence = pose.sequence
@@ -94,88 +148,18 @@ public actor PhotographerAgent: Agent {
         processed += 1
         guard lifecycle == .running else { return }
         let available = await controlAvailable()
-        guard lifecycle == .running, lastSequence == pose.sequence else { return }
+        guard lifecycle == .running, trackingSessionID == input.sessionID, lastSequence == pose.sequence else { return }
         guard available else {
-            resetTracking()
+            tracking.reset()
             return
         }
-        guard let aim = nextAim(pose) else { return }
+        guard controlsArm, let aim = tracking.nextAim(pose) else { return }
         let call = try Self.aimPermission.call(["base": String(aim.base), "pitch": String(aim.pitch)])
         try emit(.toolCall(call), input: input, sequence: pose.sequence)
-        commandedBase = aim.base
-        commandedPitch = aim.pitch
-        lastAim = (aim.base, aim.pitch, pose.timestamp)
+        tracking.commit(base: aim.base, pitch: aim.pitch, timestamp: pose.timestamp)
     }
 
-    private func resetTracking() {
-        lastAim = nil
-        filteredBase = 0
-        filteredPitch = 0
-        commandedBase = 0
-        commandedPitch = 0
-    }
-
-    /// First published person. Nose at confidence ≥ 0.3 inside the image, otherwise the midpoint of such joints.
-    /// `base` turns the base; `pitch` tips the wrist. Both advance in limited steps from the last command.
-    private func nextAim(_ pose: PoseObservation) -> (base: Double, pitch: Double)? {
-        guard controlsArm, let person = pose.people.first else { return nil }
-        guard let point = aimPoint(person, width: pose.width, height: pose.height) else { return nil }
-        let errorX = point.x / Double(pose.width) - 0.5
-        let errorY = point.y / Double(pose.height) - 0.5
-        let baseError = track(&filteredBase, error: errorX)
-        let pitchError = track(&filteredPitch, error: errorY)
-        if let lastAim, pose.timestamp - lastAim.time < 0.2 { return nil }
-        let dt = lastAim.map { min(0.4, max(0.05, pose.timestamp - $0.time)) } ?? 0.2
-        let baseStep = rateStep(baseError, gain: 1.15, limit: 0.55, dt: dt)
-        let pitchStep = rateStep(pitchError, gain: 0.85, limit: 0.40, dt: dt)
-        guard abs(baseStep) >= 0.004 || abs(pitchStep) >= 0.004 else { return nil }
-        let base = min(1, max(-1, commandedBase + baseStep))
-        let pitch = min(0.7, max(-0.7, commandedPitch + pitchStep))
-        guard base != commandedBase || pitch != commandedPitch else { return nil }
-        return (base, pitch)
-    }
-
-    /// Soft dead zone, then a smoothed error. A direction change starts from half the new error.
-    private func track(_ filtered: inout Double, error: Double) -> Double {
-        let zone = 0.04
-        let magnitude = abs(error)
-        let shaped: Double
-        if magnitude <= zone {
-            shaped = 0
-        } else {
-            let extra = magnitude - zone
-            shaped = copysign(extra * min(1, extra / zone), error)
-        }
-        if shaped == 0 {
-            filtered = 0
-        } else if filtered * shaped < 0 {
-            filtered = shaped * 0.5
-        } else if filtered == 0 {
-            filtered = shaped
-        } else {
-            filtered += 0.55 * (shaped - filtered)
-        }
-        return filtered
-    }
-
-    private func rateStep(_ error: Double, gain: Double, limit: Double, dt: TimeInterval) -> Double {
-        let rate = min(limit, max(-limit, gain * error))
-        return rate * dt
-    }
-
-    private func aimPoint(_ person: [PoseObservation.Joint], width: Int, height: Int) -> (x: Double, y: Double)? {
-        func usable(_ joint: PoseObservation.Joint) -> Bool {
-            joint.confidence >= 0.3 && joint.x.isFinite && joint.y.isFinite && joint.x >= 0 && joint.y >= 0
-                && Double(joint.x) <= Double(width) && Double(joint.y) <= Double(height)
-        }
-        if usable(person[0]) { return (Double(person[0].x), Double(person[0].y)) }
-        let visible = person.filter(usable)
-        guard !visible.isEmpty else { return nil }
-        let count = Double(visible.count)
-        let x = visible.reduce(0.0) { $0 + Double($1.x) } / count
-        let y = visible.reduce(0.0) { $0 + Double($1.y) } / count
-        return (x, y)
-    }
+    // MARK: - Output admission
 
     private func emit(_ output: AgentOutput, input: AgentInput, sequence: UInt64) throws {
         switch continuation.yield(

@@ -30,14 +30,12 @@ final class VisionSession {
         try runtime.presentation.bindCamera(endpoint)
         defer { runtime.presentation.unbindCamera(endpoint) }
         let vision = try makeAgent(sessionID, configuration, mirroredGaze)
-        let photographer = try runtime.makePhotographer(sessionID)
         try await manager.register(vision, sessionID: sessionID)
-        var photographerRegistered = false
+        var trackingAttached = false
         do {
-            try await manager.register(photographer, sessionID: sessionID)
-            photographerRegistered = true
+            try await runtime.photographer.attachTracking(sessionID: sessionID)
+            trackingAttached = true
             try await vision.bind(responses.messaging(for: .visionPerception))
-            try await manager.start(.photographer)
             try await manager.start(.visionPerception)
             try await withThrowingTaskGroup(of: Bool.self) { group in
                 group.addTask {
@@ -70,31 +68,17 @@ final class VisionSession {
                     }
                     return false
                 }
-                group.addTask {
-                    // A rejected tracking call is local to Photographer, not a vision failure.
-                    try await IndependentOutputWorkflow.consume(
-                        photographer.outputs,
-                        dispatch: { envelope in
-                            _ = try await responses.execute(envelope)
-                        },
-                        rejected: { _, error in
-                            Logger(subsystem: "dev.mobileharness", category: "Tracking")
-                                .error("Tracking call rejected: \(String(describing: error), privacy: .private)")
-                        })
-                    // Completion of this independent subscriber must not terminate frame processing.
-                    return false
-                }
                 defer { group.cancelAll() }
                 while let endsVision = try await group.next() {
                     if endsVision { break }
                 }
             }
-            if photographerRegistered { try? await manager.remove(.photographer) }
+            if trackingAttached { await runtime.photographer.detachTracking(sessionID: sessionID) }
             try? await manager.remove(.visionPerception)
             await responses.cancel(sessionID: sessionID)
             try Task.checkCancellation()
         } catch {
-            if photographerRegistered { try? await manager.remove(.photographer) }
+            if trackingAttached { await runtime.photographer.detachTracking(sessionID: sessionID) }
             try? await manager.remove(.visionPerception)
             await responses.cancel(sessionID: sessionID)
             throw error

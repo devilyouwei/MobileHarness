@@ -119,6 +119,10 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         }
     }
 
+    func retry(invocation: any FunctionInput) async throws {
+        try Task.checkCancellation()
+        if state.needsSettings { retry() } else { try await setEnabled(true, invocation: invocation) }
+    }
     func retry() {
         failed = false
         state.message = nil

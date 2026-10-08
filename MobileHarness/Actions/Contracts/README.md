@@ -19,3 +19,5 @@ flowchart LR
 ✅ Actions can import this target without seeing Gateway/Runtime, ActionInvocation/ActionRequest scheduling adapters, Tool contracts or protocol bindings. Pure function constraints cannot be weakened by a call binding.
 
 ❌ Durable replay/codecs, generic typed JSON arguments and remaining feature Signal/continuation migration are separate work. Standard function input is not a replacement for Signal.
+
+✅ Implemented: ActionReport.empty provides an explicit empty validated value for attaching an actual worker exception without forced/fallible placeholder construction.

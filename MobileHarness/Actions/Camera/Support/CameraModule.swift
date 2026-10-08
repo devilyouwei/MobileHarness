@@ -3,6 +3,7 @@ import FunctionContracts
 /// Host owns permission, capture leases and foreground lifecycle.
 public protocol CameraControlCapability: Sendable {
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
+    func retry(invocation: any FunctionInput) async throws
     func flip(invocation: any FunctionInput) async throws
 }
 
@@ -28,6 +29,9 @@ public struct CameraModule: CapabilityModule {
     public init(camera: any CameraControlCapability) { self.camera = camera }
     public var definitions: [ActionFunction] {
         [
+            CameraActions.retryDefinition(handler: { [camera] invocation in
+                try await CameraActions.retry(invocation: invocation, using: camera)
+            }),
             CameraActions.openDefinition(handler: { [camera] invocation in
                 try await CameraActions.open(invocation: invocation, using: camera)
             }),
@@ -39,4 +43,8 @@ public struct CameraModule: CapabilityModule {
             }),
         ]
     }
+}
+
+extension CameraControlCapability {
+    public func retry(invocation: any FunctionInput) async throws { try await setEnabled(true, invocation: invocation) }
 }

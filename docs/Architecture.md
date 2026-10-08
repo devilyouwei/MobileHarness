@@ -39,7 +39,7 @@ UI pages do not own model/device sessions. Long-lived work belongs to App lifecy
 
 ## Conversation, settings and devices
 
-Conversation records persist locally across voice sessions and restarts. Assistant owns ten-round context selection and exact request assembly; Storage admits that request against an opaque read token. UI owns display-title defaults. SpeechSynthesis owns producer errors; StorageAudio validates PCM and retains audio, while App supplies localized failure wording after cleanup. New Conversation archives the current record before title generation; browsing history cannot replay behavior. Assistant exposes History.list/read as returning Tools backed by the same journal; bounded previews cross the existing Gateways. History load/refresh uses structured InputGateway intent, root-owned ConversationMemory and completion-only UI.showHistory through OutputGateway; a scoped adapter reads raw state. One refresh slot rejects overlap and joins cancellation before retry. Archive/title, navigation and model continuation remain later stages. Settings persist locally, credentials use the device Keychain, and App supplies provider/title/preview operations to narrow feature workflows.
+Conversation records persist locally across voice sessions and restarts. Assistant owns ten-round context selection and exact request assembly; Storage admits that request against an opaque read token. UI owns display-title defaults. SpeechSynthesis owns producer errors; StorageAudio validates PCM and retains audio, while App supplies localized failure wording after cleanup. New Conversation archives the current record before title generation; browsing history cannot replay behavior. Assistant exposes History.list/read as returning Tools backed by the same journal; bounded previews cross the existing Gateways. History refresh/delete/archive/title use typed InputGateway intent and root-owned Memory, which selects registered History.Conversation and UI.HistoryPresentation functions through OutputGateway. A scoped adapter projects raw records; the single-operation transport rejects overlap and joins cancellation before retry. MemoryHistoryWorkflow owns sequencing and ConversationTitleGenerator owns bounded title-only inference. Structured memory/semantic recall remain pending. Settings persist locally, credentials use the device Keychain, and App supplies narrow platform/presentation capabilities rather than history/title business decisions.
 
 The default pipeline uses local recognition, synthesis, pose and chat models. Explicit cloud configuration selects an OpenAI-compatible chat capability and sends its chat context to that provider; other perception/output remains local. Model configuration and resource acquisition share a process-wide manager.
 
@@ -67,7 +67,7 @@ Expression Actions have explicit lifetime contracts: UI.express awaits one targe
 
 ✅ First release bundles a versioned model catalog rather than inference artifacts; Settings requests download/removal through App into ModelKit Management. Management owns verification and safe mutation; App injects generic Storage primitives and the separate concrete ModelKitHub adapter, preserving Management’s ModelKit-only dependency. Resource admission spans quiescence/unload and disk deletion. Settings/history remain available without weights. See the [technical workflow](../MobileHarness/README.md#local-model-resource-acquisition-and-removal) and [Management current contract](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
 
-Conversation history now retains actual native Tool declarations/calls and App-observed Gateway outcomes separately from generation state. Optional usage values retain provider/backend input/generated/total token counts. UI reads StorageChat values only; no history replay is introduced. See [ADR0106](adr/0106-conversation-tool-diagnostics.md).
+Conversation history now retains actual native Tool declarations/calls and App-observed Gateway outcomes separately from generation state. Optional usage values retain provider/backend input/generated/total token counts. App adapts StorageChat records into independently owned UI values; no history replay is introduced. See [ADR0106](adr/0106-conversation-tool-diagnostics.md).
 
 ✅ Local-resource refinement: compact schema-v2 repository/selection declarations replace per-file links/hashes. ModelKitHub wraps swift-huggingface 0.9.0 outside Management; App injects it. Storage-backed receipts record actual installed files/sizes. ✅ HF native background transfers preserve generations/completed files and available resume data. ❌ Full iPhone/server-resume acceptance remains pending (ADR 0108). See [ADR0105](adr/0105-local-model-resource-management.md).
 
@@ -121,7 +121,7 @@ Adaptive image evidence is sampled/processed in VisionPerception using the exist
 
 ✅ Urgent YOLO detection now permits a zero scheduling interval. The single inference worker processes only the newest pending capture after the active call completes. Normal inference duration adds no scheduling floor; compute-dominated freshness pressure can temporarily impose a bounded cost floor. Camera close already clears skeleton and its statistics; no source-stall timer is added.
 
-✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI has zero project dependencies; AgentCore has zero project dependencies. See ADR0121.
 
 ✅ AgentCore/domain separation places pose and speech message values in Agents/Communication, application Agent names in Agents, and automatic speech guidance in Assistant. Core has zero project dependencies; scheduling completion requires explicit source. ✅ Generic message/schema registration, domain freshness policy, explicit host input adaptation and Agent-owned sample transport are implemented in stage 2. See [ADR0115](adr/0115-agentcore-domain-separation.md).
 
@@ -133,7 +133,7 @@ SpeechPerception keeps utterance coordination in one Agent actor. VAD score adap
 
 ✅ Types has been removed. AgentCore/Input owns AudioInput and ImageInput; UI/Camera owns PoseOverlay; VisionPerception owns its output payload. Capability and storage types remain in their owning SDKs. See [ADR0121](adr/0121-remove-shared-types.md).
 
-✅ [ADR0121](adr/0121-remove-shared-types.md): Types is deleted; AgentCore has zero project dependencies, UI depends only on StorageChat, and explicit Agent → Tool → App → UI adaptation preserves the pose wire format. ❌ Physical-device acceptance remains outstanding.
+✅ [ADR0121](adr/0121-remove-shared-types.md): Types is deleted; AgentCore has zero project dependencies, UI has zero project dependencies, and explicit Agent → Tool → App → UI adaptation preserves the pose wire format. ❌ Physical-device acceptance remains outstanding.
 
 ✅ ModelKit diagnostic cleanup: availability/errors provide typed capability outcomes and neutral diagnostic text; consumer layers own localized messages and recovery guidance. Native camera gray64 sampling remains in PlatformKit, with motion/cadence decisions in VisionPerception. ✅ Storage context/title/producer-error ownership is separated in [ADR0143](adr/0143-storage-consumer-policy-boundaries.md). ❌ Broader Agent-driven workflows remain planned.
 
@@ -202,7 +202,7 @@ flowchart LR
 
 ✅ Model-resource interaction policy now belongs to AppSettingsWorkflow: bounded admission, ordered cancellation, source save and preference rollback. UI receives passive state and typed controls; App supplies lifetime and injected Management endpoints. ❌ Resource Agent/Gateway routing and cloud SettingsState coordination remain pending (ADR0146).
 
-✅ ConversationMemory now selects confirmed archive deletion through History.delete and requests UI.showHistory only after correlated runtime success. Cancellation joins cleanup; committed storage changes remain durable. App transports the bounded chain rather than selecting the next operation. ❌ Model-driven destructive operations and archival/title migration remain pending (ADR0147).
+✅ Memory now selects confirmed archive deletion through History.delete and requests UI.showHistory only after correlated runtime success. Cancellation joins cleanup; committed storage changes remain durable. App transports the bounded chain rather than selecting the next operation. ✅ Archive/title sequencing is implemented in ADR0165 using registered History functions, preserving commit-before-inference and retry evidence. ❌ Model-driven destructive operations remain pending.
 
 ## Unified Signal contract
 
@@ -242,4 +242,55 @@ The same design separates external facts, internal Agent messages and internal r
 
 ✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](adr/0162-invocation-failure-isolation.md).
 
-✅ [ADR0163 — Typed history and feedback causality](adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Remaining typed host controls, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.
+✅ [ADR0163 — Typed history and feedback causality](adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Unified lifecycle/capability facts and resource/device Agent routes and bounded model continuation stay separate stages.
+
+
+## Resource command routing (ADR0166)
+
+Settings download, cancel and removal now enter ApplicationControl through typed model.resource.intent/1. Fixed internal System.ModelResources calls return through InputGateway; terminal controls cross OutputGateway. Download success means native admission. Source/preferences/status reads remain staged; no Assistant resource mutation permission is added.
+
+
+## Speech binding stage (2026-10-07)
+
+✅ ADR0167 routes actual speech model binding through ApplicationControl and both Gateways. A single configuration call rejects overlap; native lifecycle/Defaults adaptation retains prior behavior. Source persistence and installed-resource selection policy remain staged.
+
+
+## Resource preferences stage (2026-10-07)
+
+✅ ADR0168 moves source/preference transactions into Actions. Agent sequences returning preference JSON into speech binding; App supplies SDK/storage endpoints and view conversion. UI failure rollback/status polling cannot implicitly retry binding.
+
+
+## Resource inventory stage (2026-10-07)
+
+✅ ADR0169 routes resource inventory through typed ApplicationControl intent and returning System.ModelResources.snapshotResources. Actions validates bounded facts and supplies installed eligibility; App retains view/text conversion and generation-fenced UI assignment. Registered refresh snapshot/query-failure presentation is implemented in ADR0170; other settings presentation routes remain staged.
+
+✅ ADR0170 registers resource refresh snapshot/query-failure presentation. Agent selects shared inventory/presentation function, then failure presentation when needed; App adapts root session and passive revision only. Other settings error routes remain staged.
+
+✅ ADR0171: root foreground sampling emits changed/failed native resource Signals through InputGateway; ApplicationControl selects the same registered presentation functions used by manual refresh. Page polling is removed. Observation does not retry preference binding. Full shared state/native push and native acceptance remain outstanding.
+
+✅ ADR0172: download/cancel/removal failed feedback selects a registered operation-error function before failed termination. Presentation failure retains the original cause and never retries the command. Operation errors survive progress refresh; preference notices and unavailable-Gateway host errors remain staged.
+
+✅ ADR0173: preference-function failure codes select registered notices/source guidance, while binding-stage failures select execution error. Restore/save permits three calls; other requests retain two. The gate releases after failure presentation, and durable commits remain intact. Host fallback/provider/shared-state context and native acceptance remain outstanding.
+
+
+✅ ADR0174: recoverable resource admission/dispatch failures use a typed host Signal and one Agent-selected registered error function after original worker cleanup. No native retry or recursive presentation; startup/closed/capacity/in-flight diagnostic failures retain explicit infrastructure fallback. ❌ Provider settings, BLE/navigation Agent routes, shared context, bounded model continuation and native acceptance remain subsequent work.
+
+
+✅ ADR0175: Settings provider model discovery now uses opaque provider.discovery intents, ApplicationControl and System.Provider.discoverModels with session-bound one-use private staging. Query results/errors are bounded and credential-free. ❌ Provider restore/save/rollback, lifecycle switching and registered provider UI effects remain a later migration; real provider/Keychain/native acceptance remains separate.
+
+
+✅ ADR0176: provider restore/save now uses opaque provider.settings/1 intents and registered Provider functions. Actions owns business schema/store/migration and complete apply/rollback; App only stages/adapts and supplies native SDK, lifecycle and credential primitives. ❌ Registered provider UI effects, SDK model-family eligibility migration, model grants/shared context and native acceptance remain subsequent work.
+
+✅ ADR0177–0179: the current implementation in MobileHarness/README.md now includes registered provider form presentation, cloud native result continuation, Agent-routed device/navigation/camera controls and sequenced environment facts. All four foundational modules have no project dependencies. The separate Resource-State-Plan remains a future store/writer integration, and model configuration handoff/new picker/remote capabilities remain explicit extensions.
+
+
+## Photographer camera control
+
+✅ Photographer owns camera open/close/lens switch/retry through typed photography.camera Signals and existing Camera.Capture functions. Manual input enters InputGateway; Assistant camera Tools delegate through the Gateway-bound invocation with original identity/causality before Photographer executes the same function. Returned errors retain the complete producer report.
+
+The root service outlives preview. One attached vision session supplies pose tracking; closing capture retires/join-cleans that scope without stopping the camera-command Agent. Native camera permissions, leases, capture cleanup and immediate safety fencing remain App/PlatformKit responsibilities. ❌ Still capture, video recording and richer shooting interaction remain pending. See ADR0181.
+
+
+## ApplicationControl ownership — ADR0182
+
+✅ Remaining application operations belong to the canonical ApplicationControl service. Its directory owns actor/configuration, fixed function permissions and pure resource-result policy; App owns ApplicationControlIntentRuntime and injected native endpoints. Photographer and Memory retain their domains. Role identity/source/session guards and packaged resources migrate together; domain Signal schemas and Actions algorithms remain unchanged. Generic specialist delegation remains pending.

@@ -194,10 +194,6 @@
                 selectedSource =
                     state.source.endpoint == "https://huggingface.co"
                     ? "official" : (state.source.endpoint == "https://hf-mirror.com" ? "mirror" : "custom")
-                while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(1)) } catch { break }
-                    await controls.refresh()
-                }
             }
 
             if let error = state.error { Section { Text(error).foregroundStyle(.red) } }

@@ -46,7 +46,7 @@ extension ActionCompletion {
     }
 }
 extension ActionReport {
-    var agentValue: AgentActionReport {
+    public var agentValue: AgentActionReport {
         // The Action contract has already validated the same bounds as the delivery contract.
         AgentActionReport(
             delivering: entries.map {

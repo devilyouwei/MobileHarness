@@ -33,7 +33,7 @@ flowchart LR
     Output -->|observations / results| Input
 ```
 
-App owns composition and application/session lifetime. Read-only History.list/read Tools expose bounded local conversation previews to configured cloud chat; history load/refresh now crosses both Gateways through a deterministic ConversationMemory Agent. Remaining UI intents and model continuation are planned. ModelKit supplies processing, PlatformKit supplies device I/O, and UI receives state and typed operations. The [public architecture](docs/Architecture.md) and [concepts](docs/Concepts.md) explain these roles; the [technical design](MobileHarness/README.md) provides dependency maps and full technical flows.
+App owns composition and application/session lifetime. Read-only History.list/read Tools expose bounded local conversation previews to configured cloud chat; history load/refresh, confirmed deletion and archive/title operations cross both Gateways through a deterministic ConversationMemory Agent. Remaining UI intents and model continuation are planned. ModelKit supplies processing, PlatformKit supplies device I/O, and UI receives state and typed operations. The [public architecture](docs/Architecture.md) and [concepts](docs/Concepts.md) explain these roles; the [technical design](MobileHarness/README.md) provides dependency maps and full technical flows.
 
 General fast/slow orchestration, automatic compute escalation and unattended/background robot control are not implemented. Evidence for quality/performance is recorded separately in [validation documents](docs/README.md#experiments-tests-and-acceptance).
 

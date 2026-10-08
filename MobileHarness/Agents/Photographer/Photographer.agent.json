@@ -9,6 +9,16 @@
         "contract": "vision.pose",
         "version": 1,
         "kind": "observation"
+      },
+      {
+        "contract": "photography.camera",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
       }
     ],
     "subscriptions": [

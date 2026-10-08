@@ -16,7 +16,8 @@ flowchart LR
     UI[UI controls] --> Workflow[AppWorkflows]
     App[Composition] -. dependencies .-> Workflow
     Workflow --> State[UI state]
-    Workflow --> Store[Storage settings / conversation journal]
+    Workflow --> Intents[Injected Agent intents → Gateways → Actions]
+    Workflow --> Store[StorageChat record values / remaining BLE preference adapter]
     Workflow --> Models[ModelKit capability or Defaults configuration]
     Workflow --> Title[Agents title generator / parser preview]
     Workflow --> Device[PlatformKit diagnostic player]
@@ -24,12 +25,12 @@ flowchart LR
 
 | Workflow | Ownership and bound | Completion / cancellation |
 | --- | --- | --- |
-| SettingsWorkflow | Coalesced restore; one configuration mutation, reject overlapping save; model discovery bounded by provider adapter | Join App-injected change barrier, persist config, apply chat binding; restore prior config on application failure; credentials remain in Keychain via CloudSettingsStore |
-| ConversationHistoryWorkflow | One load or mutation operation; no backlog; shared journal is injected | Archive/reset commits before title inference; cancellation/failure retains archived data and retry state; cancelled operation retains admission until cleanup |
+| SettingsWorkflow | Up to32 coalesced restore waiters; one form save, reject overlaps; injected Agent operations | Await Agent-routed acknowledgment, cache confirmed form values; invalidate restore cache on failure. Actions owns persistence/application/rollback; App injects native primitives |
+| ConversationHistoryWorkflow | One load or mutation operation; no backlog; typed Agent operations are injected | Registered archive/reset commits before title inference; cancellation/failure retains archived data and retry state; cancelled operation retains admission until cleanup |
 | SpeechDiagnosticWorkflow | One synthesis/playback operation and one stop sequence; reject starts while active/stopping | Stop producer, join task, unload model, deactivate audio session; view never owns inference/player objects |
 | ChatDiagnosticWorkflow | Debug-only stateless operation, awaited by the diagnostic page task; no internal queue | Prepare injected ASR/chat capabilities, request a 32-token synthetic reply, cancel the inference session on exit; model residency stays with ModelManager |
 
-CloudSettingsStore.swift is the settings persistence adapter in this directory: current settings use a Storage document plus a Keychain credential reference. Its legacy reader is still required to migrate an existing all-in-Keychain record, verify the new document/credential and only then remove the old record. No code writes new records in the legacy format. The unused legacy writer and unused invalidURL case are removed.
+✅ Provider schema, document/credential-reference persistence and verified legacy migration belong to Actions/System/Support. The former CloudSettingsStore.swift is removed. SettingsWorkflow has no Storage dependency or transaction implementation; injected operations cross ApplicationControl and both Gateways. App supplies Keychain primitives and native SDK/lifecycle bindings. See [Settings design](Settings/README.md#provider-configuration-transactions).
 
 History output remains raw stored data. Preview uses the existing Agent configuration/parser but never dispatches Actions. Settings/history pages receive operation interfaces and state, not model managers or store instances. Diagnostic operations are explicitly selected test flows, not production Agent output. Chat diagnostics use the selected chat binding, which may be local or cloud; the historical launch flag/log markers remain compatible and do not prove which model was selected.
 
@@ -39,7 +40,7 @@ History output remains raw stored data. Preview uses the existing Agent configur
 
 ## Storage domain organization
 
-✅ ConversationHistoryWorkflow uses StorageChat; settings still use core LocalDocumentStore. AppWorkflows depends on both targets for their distinct roles.
+✅ ConversationHistoryWorkflow uses StorageChat record values only. Provider/resource settings persistence belongs to Actions; AppSettingsWorkflow has no Storage dependency. The remaining Bluetooth preference adapter is migration debt owned by AppBluetoothWorkflow.
 
 ❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
 
@@ -198,7 +199,7 @@ flowchart LR
 
 ✅ SpeechPlayback passes ActionExecutionContext.source directly into StorageAudio; no AgentID conversion or AgentCore import is required in that playback adapter.
 
-✅ Settings depends only on UI/Storage and History on UI/StorageChat plus AgentCore/Agents/Gateway/Actions/FunctionContracts/ExecutionRuntime/CallRuntime for its staged intent transport. Concrete provider and Agent parsing/title bindings live in App/Adapters. SpeechPlayback imports FunctionContracts and StorageAudio; presentation imports only execution/shared/UI values. Existing bounded operation policies and cancellation are unchanged.
+✅ Settings depends on UI/Storage with narrow AgentCore/Agents/Gateway resource transport; History on UI/StorageChat plus AgentCore/Agents/Gateway/Actions/FunctionContracts/ExecutionRuntime/CallRuntime for its staged intent transport. Concrete provider and Agent parsing/title bindings live in App/Adapters. SpeechPlayback imports FunctionContracts and StorageAudio; presentation imports only execution/shared/UI values. Existing bounded operation policies and cancellation are unchanged.
 
 ❌ The facade is not a service locator and owns no runtime state; independent multi-window arbitration remains future work.
 
@@ -206,7 +207,7 @@ flowchart LR
 
 ## Local model resources — current contract
 
-✅ ModelResourcesWorkflow is compiled inside existing AppSettingsWorkflow, with injected resource operations and source persistence; no seventh feature target or facade-owned runtime state was added.
+✅ ModelResourcesWorkflow is compiled inside existing AppSettingsWorkflow, with injected Agent resource operations and a view-value cache; no seventh feature target or facade-owned runtime state was added.
 
 ❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../../ModelKit/Management/README.md).
 
@@ -236,10 +237,47 @@ flowchart LR
 
 ❌ Background Bluetooth execution/state restoration and physical scene-lifetime acceptance remain outside the current [Bluetooth](Bluetooth/README.md) implementation.
 
-✅ History load/refresh crosses InputGateway → ConversationMemory → OutputGateway → UI.HistoryPresentation.showHistory. Its root-owned slot rejects overlap and joins cancelled Tool cleanup before retry. ✅ Confirmed deletion also crosses both Gateways. ❌ Archive/title migration remains pending; this is a documented History feature dependency exception.
+✅ History load/refresh crosses InputGateway → Memory → OutputGateway → UI.HistoryPresentation.showHistory. Its root-owned slot rejects overlap and joins cancelled Tool cleanup before retry. ✅ Confirmed deletion also crosses both Gateways. ❌ Archive/title migration remains pending; this is a documented History feature dependency exception.
 
-✅ ModelResourceInteractionWorkflow moves model-resource tasks/admission and preference coordination out of UI into existing AppSettingsWorkflow. Pending submission bound32 rejects overflow; cancel joins admission and page cancellation does not own admitted transfers. ❌ Resource Agent/Gateway routing and cloud-form coordination remain pending.
+✅ ModelResourceInteractionWorkflow moves model-resource tasks/admission and preference coordination out of UI into existing AppSettingsWorkflow. Pending submission bound32 rejects overflow; cancel joins admission and page cancellation does not own admitted transfers. ✅ Resource commands now use Agent/Gateway routing. ✅ Source/preferences/inventory and registered failure presentation are Agent-routed. ❌ View-draft/cloud-form coordination and shared resource context remain pending.
 
-✅ Confirmed history deletion leaves the legacy feature implementation: ConversationMemory selects History.Conversation.delete and success-only UI.HistoryPresentation.showHistory; transport carries up to2 calls and bounded cancellation cleanup. ❌ Archive/title and resource Agent routes remain pending.
+✅ Confirmed history deletion leaves the legacy feature implementation: Memory selects History.Conversation.delete and success-only UI.HistoryPresentation.showHistory; transport carries up to2 calls and bounded cancellation cleanup. ❌ Archive/title and resource Agent routes remain pending.
 
 ✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+
+✅ Implemented: history retains only operation admission, cancellation and UI adaptation; archive/title effects cross Memory and both Gateways.
+
+✅ Implemented: settings resource command effects use Agent/Gateway transport; source/preferences/inventory functions are Agent-routed. View-draft/provider coordination and shared resource context remain staged.
+
+
+✅ ADR0167: actual speech binding crosses ApplicationControl and both Gateways. Source persistence and prerequisite validation remain in Settings; after durable commit, application failure invalidates cache and propagates for explicit later restore/retry.
+
+
+✅ ADR0168: the resource facade owns only injected operations/view cache. Source transactions and installed prerequisites are Actions-owned; root transport joins at most two sequential calls. Error rollback/polling cannot retry native preference effects.
+
+
+✅ ADR0169: ModelResourcesWorkflow.refresh returns a passive view snapshot, including installed groups produced by Actions. Interaction generation-fences assignment and retains pending/cancel locks; it no longer decides installed eligibility.
+
+✅ ADR0170: resource refresh sends passive revision through injected operations and awaits Agent-selected UI presentation. Interaction keeps admission/draft/preference guards, but removes direct items/groups assignment; already-presented refresh errors are not overwritten.
+
+✅ ADR0171: ResourceObservationWorkflow.swift resides in the existing Settings directory. One worker, one fingerprint/error, one-second injected cadence, acknowledge-before-dedup, cancellation/join and bounded diagnostics. No business preference or model SDK processing.
+
+
+✅ ADR0172: Resource transport marks accepted operation-error presentation and preserves primary/secondary causes. Interaction recognizes the marker for command failure; local fallback remains for unavailable execution/transport.
+
+
+✅ ADR0173: Preference request transport allows three calls; other request types remain two. Interaction preserves confirmed flags and skips duplicate local presentation on an accepted marker.
+
+
+## Completion batch — provider presentation and capability policy
+
+✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsInteractionWorkflow in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
+
+✅ Implemented: presentation-enabled provider intents select a second registered UI.ResourcePresentation.showProviderResult call after the business call, on success or failure. Headless requests retain one call. Private result lookup and revision/session fences prevent credentials in protocol payloads and stale form updates. One attempt only, no recursive presentation/replay; producer and presentation failure chains remain distinct. App injects the native UI endpoint; business functions remain independent of UI and call protocols.
+
+
+## Independent history presentation values
+
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+
+✅ ADR0181: existing Settings target owns PhotographerIntentRuntime as bounded application transport; business camera selection lives in Photographer, not this facade. No new directory/target is required.

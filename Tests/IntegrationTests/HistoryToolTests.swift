@@ -126,7 +126,8 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
     let registry = try BehaviorAssembly(capabilityModules: [
         HistoryModule(
             history: HistoryQueryService(store: ConversationHistoryStore()),
-            mutations: HistoryMutationService(store: ConversationHistoryStore())
+            mutations: HistoryMutationService(
+                store: ConversationHistoryStore(), summarizeTitle: { _ in "Unused fixture title" })
         )
     ]).tools
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))

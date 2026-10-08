@@ -10,10 +10,11 @@ struct BehaviorProtocolBindings {
         switch group {
         case "UI.Expression", "Speech.Playback", "NexArm.Motion", "NexArm.Gesture":
             return ActionBinding(function: function)
-        case "History.Conversation", "System.Runtime":
+        case "History.Conversation", "System.Runtime", "System.ModelResources", "System.Provider",
+            "UI.ResourcePresentation", "Camera.Capture", "UI.Navigation", "System.Device":
             return ActionBinding(
                 function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
-        case "UI.Gaze", "UI.Caption", "UI.VoiceState", "UI.Pose", "UI.HistoryPresentation", "Camera.Capture",
+        case "UI.Gaze", "UI.Caption", "UI.VoiceState", "UI.Pose", "UI.HistoryPresentation",
             "NexArm.Tracking":
             return ActionBinding(function: function, protocols: [.tool], executionPolicy: .direct)
         default:

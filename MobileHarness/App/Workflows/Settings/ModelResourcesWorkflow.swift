@@ -1,105 +1,64 @@
 import Foundation
-import Storage
 import UI
 
+/// View facade; injected Agent operations own preference validation, persistence and model effects.
 @MainActor public final class ModelResourcesWorkflow: ModelResourcesOperating {
-    private let read: @MainActor () async throws -> [ModelResourceItem]
-    private let validate: @MainActor (ModelResourceSourceDraft) throws -> ModelResourceSourceDraft
+    private let read: @MainActor (UInt64?) async throws -> ModelResourceViewSnapshot
+    private let restoreOperation: @MainActor () async throws -> ModelResourceSourceDraft
+    private let saveOperation: @MainActor (ModelResourceSourceDraft) async throws -> ModelResourceSourceDraft
     private let downloadOperation: @MainActor (String, ModelResourceSourceDraft) async throws -> Void
     private let cancelOperation: @MainActor (String) async throws -> Void
     private let removeOperation: @MainActor (String) async throws -> Void
-    private let makeStore: @MainActor () throws -> LocalDocumentStore<ModelResourceSourceDraft>
-    private var cachedStore: LocalDocumentStore<ModelResourceSourceDraft>?
-    private func persistence() throws -> LocalDocumentStore<ModelResourceSourceDraft> {
-        if let cachedStore { return cachedStore }
-        let value = try makeStore()
-        cachedStore = value
-        return value
-    }
-    private let apply: @MainActor (ModelResourceSourceDraft) async -> Void
     private var saved: ModelResourceSourceDraft?
     private var changing = false
     private var restoration: Task<ModelResourceSourceDraft, Error>?
     private var restoreWaiters = 0
     public init(
-        store: @escaping @MainActor () throws -> LocalDocumentStore<ModelResourceSourceDraft>,
-        read: @escaping @MainActor () async throws -> [ModelResourceItem],
-        validate: @escaping @MainActor (ModelResourceSourceDraft) throws -> ModelResourceSourceDraft,
+        read: @escaping @MainActor (UInt64?) async throws -> ModelResourceViewSnapshot,
+        restore: @escaping @MainActor () async throws -> ModelResourceSourceDraft,
+        save: @escaping @MainActor (ModelResourceSourceDraft) async throws -> ModelResourceSourceDraft,
         download: @escaping @MainActor (String, ModelResourceSourceDraft) async throws -> Void,
         cancel: @escaping @MainActor (String) async throws -> Void,
-        remove: @escaping @MainActor (String) async throws -> Void,
-        apply: @escaping @MainActor (ModelResourceSourceDraft) async -> Void = { _ in }
+        remove: @escaping @MainActor (String) async throws -> Void
     ) {
-        self.apply = apply
-        self.makeStore = store
         self.read = read
-        self.validate = validate
+        restoreOperation = restore
+        saveOperation = save
         downloadOperation = download
         cancelOperation = cancel
         removeOperation = remove
     }
-    public func refresh() async throws -> [ModelResourceItem] {
-        let items = try await read()
-        if let saved, !changing {
-            let next = normalized(saved, items: items)
-            if next.useCustomRecognition != saved.useCustomRecognition
-                || next.useCustomSynthesis != saved.useCustomSynthesis
-            {
-                try await saveSource(next)
-            }
+    public func refresh(generation: UInt64? = nil) async throws -> ModelResourceViewSnapshot {
+        let items = try await read(generation)
+        if saved != nil, !changing {
+            saved = nil
+            _ = try await restoreSource()
         }
         return items
     }
-    private func normalized(_ source: ModelResourceSourceDraft, items: [ModelResourceItem]) -> ModelResourceSourceDraft
-    {
-        var source = source
-        if !ModelResourcePolicy.isInstalled(.recognition, in: items) { source.useCustomRecognition = false }
-        if !ModelResourcePolicy.isInstalled(.synthesis, in: items) { source.useCustomSynthesis = false }
-        return source
-    }
     public func restoreSource() async throws -> ModelResourceSourceDraft {
         if let saved { return saved }
-        guard restoreWaiters < 32 else { throw DocumentStorageError.conflict }
+        guard !changing, restoreWaiters < 32 else {
+            throw ApplicationControlIntentFailure.execution("资源配置正在读取或保存，请稍后重试")
+        }
         restoreWaiters += 1
         defer { restoreWaiters -= 1 }
         if let restoration { return try await restoration.value }
-        let task = Task { @MainActor in try await self.restoreInitialSource() }
+        let task = Task { @MainActor in try await self.restoreOperation() }
         restoration = task
         defer { restoration = nil }
-        return try await task.value
-    }
-    private func restoreInitialSource() async throws -> ModelResourceSourceDraft {
-        let record = try await persistence().load()
-        let value = record?.value ?? ModelResourceSourceDraft()
-        if let saved { return saved }
-        let validated = try validate(value)
-        let valid = normalized(validated, items: try await read())
-        if valid.allowsCellular != value.allowsCellular
-            || valid.useCustomRecognition != value.useCustomRecognition
-            || valid.useCustomSynthesis != value.useCustomSynthesis
-        {
-            try await persistence().save(valid, expecting: record?.revision)
-        }
-        await apply(valid)
-        saved = valid
-        return valid
+        let value = try await task.value
+        saved = value
+        return value
     }
     public func saveSource(_ source: ModelResourceSourceDraft) async throws {
-        guard !changing else { throw DocumentStorageError.conflict }
+        guard !changing, restoration == nil else {
+            throw ApplicationControlIntentFailure.execution("资源配置正在读取或保存，请稍后重试")
+        }
         changing = true
         defer { changing = false }
-        let value = try validate(source)
-        let items = try await read()
-        if value.useCustomRecognition && !ModelResourcePolicy.isInstalled(.recognition, in: items) {
-            throw ModelResourceSelectionError(group: .recognition)
-        }
-        if value.useCustomSynthesis && !ModelResourcePolicy.isInstalled(.synthesis, in: items) {
-            throw ModelResourceSelectionError(group: .synthesis)
-        }
-        let current = try await persistence().load()
-        try await persistence().save(value, expecting: current?.revision)
-        await apply(value)
-        saved = value
+        saved = nil
+        saved = try await saveOperation(source)
     }
     public func download(_ id: String) async throws {
         let source = try await restoreSource()
@@ -113,7 +72,7 @@ import UI
 }
 
 @MainActor public protocol ModelResourcesOperating: AnyObject {
-    func refresh() async throws -> [ModelResourceItem]
+    func refresh(generation: UInt64?) async throws -> ModelResourceViewSnapshot
     func restoreSource() async throws -> ModelResourceSourceDraft
     func saveSource(_ source: ModelResourceSourceDraft) async throws
     func download(_ id: String) async throws
@@ -125,18 +84,4 @@ public struct ModelResourceSelectionError: LocalizedError, Sendable {
     public let group: ModelResourceGroup
     public init(group: ModelResourceGroup) { self.group = group }
     public var errorDescription: String? { group.installationMessage }
-}
-
-/// Installation requirements are business policy, independent of page presentation.
-public enum ModelResourcePolicy {
-    public static func isInstalled(_ group: ModelResourceGroup, in items: [ModelResourceItem]) -> Bool {
-        let required: Set<String>
-        switch group {
-        case .recognition: required = ["nemotron"]
-        case .synthesis: required = ["moss-tts-nano"]
-        case .language: required = ["gemma4-e2b"]
-        case .vision: required = ["yolo26n-pose"]
-        }
-        return required.allSatisfy { id in items.contains { $0.id == id && $0.installed && !$0.active } }
-    }
 }

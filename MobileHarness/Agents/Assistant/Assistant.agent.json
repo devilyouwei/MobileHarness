@@ -594,6 +594,232 @@
           "strict": true
         }
       }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "ModelResources",
+        "function": "snapshotResources"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "ModelResources.snapshot",
+          "description": "Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Provider",
+        "function": "readSettings"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Provider.readSettings",
+          "description": "Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "UI",
+        "module": "Navigation",
+        "function": "open"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "App.openPage",
+          "description": "Open an existing app page through the same registered navigation function as a user tap. Completion confirms route commitment.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "destination": {
+                "type": "string",
+                "enum": [
+                  "home",
+                  "settings",
+                  "language",
+                  "recognition",
+                  "synthesis",
+                  "vision",
+                  "bluetooth",
+                  "history"
+                ]
+              }
+            },
+            "required": [
+              "destination"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Device",
+        "function": "readStatus"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Bluetooth.readStatus",
+          "description": "Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Device",
+        "function": "control"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Bluetooth.control",
+          "description": "Submit an explicit Bluetooth connection/discovery command. Accepted is not connected or physically completed. Read status to confirm actual state.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "scan",
+                  "stopScan",
+                  "connect",
+                  "reconnect",
+                  "disconnect",
+                  "forget",
+                  "refresh"
+                ]
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation"
+            ],
+            "additionalProperties": false
+          },
+          "strict": false
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Device",
+        "function": "readEnvironment"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "App.readEnvironment",
+          "description": "Read latest sequenced scene, navigation and device capability facts admitted by the root Agent. Facts are observations, not proof of physical completion.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "ModelResources",
+        "function": "download"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "ModelResources.download",
+          "description": "Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string"
+              },
+              "allowsCellular": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "endpoint",
+              "allowsCellular"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "ModelResources",
+        "function": "cancel"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "ModelResources.cancel",
+          "description": "Cancel and join an admitted model transfer. Failure is returned without replay.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
     }
   ],
   "communication": {
@@ -604,9 +830,9 @@
         "kind": "text"
       },
       {
-        "contract": "runtime.event",
+        "contract": "assistant.control",
         "version": 1,
-        "kind": "event"
+        "kind": "observation"
       },
       {
         "contract": "tool.result",
@@ -655,6 +881,10 @@
       {
         "contract": "speech.cancel",
         "target": "speechSynthesis"
+      },
+      {
+        "contract": "photography.camera",
+        "target": "photographer"
       }
     ]
   }

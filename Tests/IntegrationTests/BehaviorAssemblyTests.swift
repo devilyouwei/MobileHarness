@@ -11,8 +11,20 @@ import StorageChat
 import Testing
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
-    PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability
+    PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability
 {
+    func presentResources(_ inventory: ModelResourceInventory, generation: UInt64, invocation: any FunctionInput)
+        async throws
+    {}
+    func presentResourcePreferenceFailure(
+        _ reason: ResourcePreferenceFailureReason, message: String, invocation: any FunctionInput
+    ) async throws {
+        throw CancellationError()
+    }
+    func presentResourceOperationFailure(_ message: String, invocation: any FunctionInput) async throws {
+        throw CancellationError()
+    }
+    func presentResourceFailure(_ message: String, generation: UInt64, invocation: any FunctionInput) async throws {}
     func showHistory(invocation: any FunctionInput) async throws {}
     private(set) var cameraCalls: [String] = []
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
@@ -58,7 +70,12 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
         history: HistoryQueryService(store: ConversationHistoryStore()),
-        historyMutations: HistoryMutationService(store: ConversationHistoryStore()),
+        historyMutations: HistoryMutationService(
+            store: ConversationHistoryStore(), summarizeTitle: { _ in "Unused fixture title" }),
+        modelResources: UnusedModelResourceCapability(),
+        resourcePreferences: UnusedModelResourcePreferencesCapability(), resourceInventory: UnusedResourceInventory(),
+        resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
+        providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(),
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw ActionExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable")
@@ -71,8 +88,9 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
             PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
             AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
-            ConversationMemoryAgent.runtimeCapabilities(
-                AgentConfigurations.load(named: "ConversationMemory").capabilities),
+            try ApplicationControlAgent(sessionID: UUID()).descriptor.capabilities,
+            MemoryAgent.runtimeCapabilities(
+                AgentConfigurations.load(named: "Memory").capabilities),
         ])
     let executor = ActionExecutor(registry: assembly.actions)
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
@@ -224,4 +242,11 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
         ToolCall(toolPath: "UI.Gaze.moveEyes", arguments: ["x": "1.1", "y": "0"]), envelope: envelope)
     #expect(invalid?.isError == true && invalid?.failureCode == .invalidArguments)
     #expect(await endpoint.gaze == accepted)
+}
+
+struct UnusedDeviceControl: DeviceControlCapability {
+    func control(_ request: DeviceControlRequest, invocation: any FunctionInput) async throws {
+        throw DeviceControlError.unavailable
+    }
+    func readStatus() async throws -> String { throw DeviceControlError.unavailable }
 }

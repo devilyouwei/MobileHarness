@@ -69,3 +69,62 @@ Purpose: test cross-module history operations using the real journal and a contr
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ Implemented: facade tests verify preparation, typed operation forwarding, overlap rejection and joined cancellation; real archive/title durability/model tests move to IntegrationTests to cover both Gateways and Actions.
+
+
+✅ ADR0167: preference application failure propagates after commit; regression verifies durable preference remains, stale cache is invalidated and explicit restore retries once. Existing migration, installed-prerequisite and removal tests retain their behavior.
+
+
+✅ ADR0168: preference business tests moved into IntegrationTests; facade tests verify injected results, cache invalidation and refresh/removal reconciliation. Interaction regression prevents implicit retry during error rollback/status polling.
+
+Source application failure is projected using the last confirmed view flags; error handling/status polling cannot trigger another native binding. Explicit restore/save reopens preference reconciliation. This prevents a UI rollback read from becoming an implicit effect retry.
+
+
+✅ ADR0169: resource fixtures return supplied view snapshots. Eligibility checks moved to Action inventory regressions; existing admission, cancellation, source/pref failure and refresh behavior remain covered.
+
+✅ ADR0170: update resource fixtures for generation-aware presentation and test stale revision rejection/accepted failure without duplicate projection; command lock and preference failure regressions remain.
+
+✅ ADR0171: deterministic injected cadence tests cover unchanged suppression, change/failure/recovery, delivery retry, one worker across lifecycle changes, joined shutdown, passive error ownership and release of admitted UI locks after an acknowledged recovery snapshot. No real timer/native transfer acceptance is inferred.
+
+
+✅ ADR0172: Verify already-presented command failure is not overwritten by interaction projection and admission locks are released normally.
+
+
+✅ ADR0173: Verify acknowledged preference notices/errors are preserved while confirmed visible flags roll back; restore/download-source failures do not overwrite accepted state or trigger implicit retries.
+
+
+## Provider configuration transactions
+
+✅ Implemented: replace tests of App-owned provider persistence with injected SettingsWorkflow facade tests. Transaction-order regressions move to Actions integration fixtures, preserving prior observable ordering and rollback assertions.
+
+
+## Completion batch — provider presentation and capability policy
+
+✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsInteractionWorkflow in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
+
+✅ Implemented: presentation-enabled provider intents select a second registered UI.ResourcePresentation.showProviderResult call after the business call, on success or failure. Headless requests retain one call. Private result lookup and revision/session fences prevent credentials in protocol payloads and stale form updates. One attempt only, no recursive presentation/replay; producer and presentation failure chains remain distinct. App injects the native UI endpoint; business functions remain independent of UI and call protocols.
+
+
+## Typed device, navigation and environment entry points
+
+✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+
+✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+
+✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+
+## Independent history presentation values
+
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+
+
+## Camera command entry
+
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+
+ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed camera operations; preserve single-slot rejection and UI failure presentation.
+
+
+✅ ADR0182: canonical applicationControl identity and role-directory packaging checks; existing resource/provider/device/navigation/failure regressions now exercise ApplicationControl. All concrete Agent configurations require canonical role directories; no root exception remains.

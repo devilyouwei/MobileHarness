@@ -16,115 +16,44 @@ public struct CloudSettingsDraft: Sendable, Equatable {
 
 @MainActor
 public protocol SettingsOperating: AnyObject {
+    var presentsResults: Bool { get }
     func restore() async throws -> CloudSettingsDraft
     func discover(_ draft: CloudSettingsDraft) async throws -> [String]
     func save(_ draft: CloudSettingsDraft) async throws
 }
 
-/// Form editing and request presentation. Persistence and runtime switching are injected operations.
+@MainActor
+public protocol SettingsControlling: AnyObject {
+    func restore() async throws
+    func loadModels()
+    func save() async -> Bool
+    func cancelDiscovery()
+    func credentialsChanged()
+}
+
+/// Editable form values only. Execution and lifetime are supplied through SettingsControlling.
 @MainActor @Observable
 public final class SettingsState {
-    public var isEnabled = false {
-        didSet {
-            error = nil
-            notice = nil
-        }
-    }
-    public var url: String { didSet { if oldValue != url { invalidateModels() } } }
-    public var key = "" { didSet { if oldValue != key { invalidateModels() } } }
+    public var isEnabled: Bool
+    public var url: String { didSet { if oldValue != url { revision += 1 } } }
+    public var key: String { didSet { if oldValue != key { revision += 1 } } }
     public var selectedModel: String
-    public private(set) var models: [String] = []
-    public private(set) var isLoading = false
-    public private(set) var isSaving = false
-    public private(set) var error: String?
-    public private(set) var notice: String?
-    private let operations: any SettingsOperating
-    private let defaultModel: String
-    private var discovery: Task<Void, Never>?
-    private var revision = 0
-    private var restored = false
-
-    public init(operations: any SettingsOperating, initial: CloudSettingsDraft) {
-        self.operations = operations
-        defaultModel = initial.model
-        url = initial.url
-        selectedModel = initial.model
+    public var models: [String] = []
+    public var isLoading = false
+    public var isSaving = false
+    public var error: String?
+    public var notice: String?
+    public private(set) var revision: UInt64 = 0
+    public init(initial: CloudSettingsDraft) {
         isEnabled = initial.enabled
+        url = initial.url
         key = initial.key
+        selectedModel = initial.model
     }
     public var canLoad: Bool { !isLoading && !isSaving }
     public var canSave: Bool { !isLoading && !isSaving && (!isEnabled || !selectedModel.isEmpty) }
-    private var draft: CloudSettingsDraft {
-        .init(
-            enabled: isEnabled, url: url.trimmingCharacters(in: .whitespacesAndNewlines),
-            key: key.trimmingCharacters(in: .whitespacesAndNewlines), model: selectedModel)
-    }
-    public func restore() async throws {
-        guard !restored else { return }
-        let value = try await operations.restore()
-        // A coalesced restore must not overwrite edits after the first caller applied its result.
-        guard !restored else { return }
-        isEnabled = value.enabled
-        url = value.url
-        key = value.key
-        selectedModel = value.model.isEmpty ? defaultModel : value.model
-        models = value.model.isEmpty ? [] : [value.model]
-        restored = true
-    }
-    public func loadModels() {
-        guard canLoad else { return }
-        cancelDiscovery()
-        let current = revision
-        let value = draft
-        isLoading = true
-        error = nil
-        notice = nil
-        models = []
-        selectedModel = defaultModel
-        discovery = Task { [weak self, operations] in
-            do {
-                let result = try await operations.discover(value)
-                try Task.checkCancellation()
-                guard let self, self.revision == current else { return }
-                self.models = result
-                if !result.isEmpty && !result.contains(self.selectedModel) { self.selectedModel = "" }
-                self.isLoading = false
-                self.notice = result.isEmpty ? "此服务没有返回可识别的聊天模型" : "请选择用于对话的模型"
-            } catch {
-                guard let self, self.revision == current else { return }
-                self.isLoading = false
-                self.error = error.localizedDescription
-            }
-        }
-    }
-    public func save() async -> Bool {
-        guard canSave else { return false }
-        isSaving = true
-        error = nil
-        notice = nil
-        defer { isSaving = false }
-        do {
-            let value = draft
-            try await operations.save(value)
-            restored = true
-            notice = value.enabled ? "已保存，云端模型立即生效" : "已切换为本地模型"
-            return true
-        } catch {
-            self.error = error.localizedDescription
-            return false
-        }
-    }
-    public func cancelDiscovery() {
-        revision += 1
-        discovery?.cancel()
-        discovery = nil
-        isLoading = false
-    }
-    private func invalidateModels() {
-        cancelDiscovery()
-        models = []
-        selectedModel = defaultModel
-        error = nil
-        notice = nil
-    }
+    public func invalidateRevision() { revision += 1 }
 }
+
+extension SettingsOperating { public var presentsResults: Bool { false } }
+public protocol SettingsFailurePresenting: Error { var wasPresented: Bool { get } }

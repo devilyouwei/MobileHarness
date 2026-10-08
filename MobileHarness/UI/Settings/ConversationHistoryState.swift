@@ -1,10 +1,9 @@
 import Foundation
 import Observation
-import StorageChat
 
 @MainActor @Observable
 public final class ConversationHistoryState {
-    public var archive: ConversationArchive?
+    public var archive: HistorySnapshot?
     public var status: String?
     public var isBusy = false
     public init() {}
@@ -17,5 +16,94 @@ public protocol ConversationHistoryControlling: AnyObject {
     func summarize(_ id: UUID)
     func delete(_ id: UUID)
     func cancel()
-    func preview(_ turn: ConversationRecord) -> String
+    func preview(_ turn: HistoryTurn) -> String
+}
+
+public struct HistoryMessage: Codable, Sendable, Equatable {
+    public enum Role: String, Codable, Sendable { case system, user, assistant }
+    public let role: Role
+    public let content: String
+    public init(role: Role, content: String) {
+        self.role = role
+        self.content = content
+    }
+}
+
+public struct HistoryTokenUsage: Codable, Sendable, Equatable {
+    public let input: Int
+    public let generated: Int
+    public let total: Int
+    public init(input: Int, generated: Int, total: Int) {
+        self.input = input
+        self.generated = generated
+        self.total = total
+    }
+}
+
+public struct HistoryToolCall: Codable, Sendable, Identifiable {
+    public enum State: String, Codable, Sendable { case received, completed, failed, cancelled }
+    public let id: UUID
+    public let providerID: String
+    public let name: String
+    public let argumentsJSON: String
+    public var state: State = .received
+    public let output: String?
+    public let error: String?
+    public init(id: UUID, providerID: String, name: String, argumentsJSON: String) {
+        self.id = id
+        self.providerID = providerID
+        self.name = name
+        self.argumentsJSON = argumentsJSON
+        output = nil
+        error = nil
+    }
+}
+
+public struct HistoryTurn: Codable, Sendable, Identifiable {
+    public enum State: String, Codable, Sendable { case generating, completed, failed, cancelled, interrupted }
+    public let id: UUID
+    public let date: Date
+    public let user: String
+    public let request: [HistoryMessage]
+    public let model: String
+    public let maximumOutputTokens: Int?
+    public let temperature: Double
+    // Optional additions keep version-1 records readable without migration.
+    public let continuationRequests: [String]?
+    public let toolDefinitions: [String]?
+    public let toolCalls: [HistoryToolCall]?
+    public let tokenUsage: HistoryTokenUsage?
+    public var fragments: [String] = []
+    public var state: State = .generating
+    public let finishReason: String?
+    public let error: String?
+    public let executionError: String?
+    public var raw: String { fragments.joined() }
+}
+
+public struct HistoryConversation: Codable, Sendable, Identifiable {
+    public let id: UUID
+    public let createdAt: Date
+    public let archivedAt: Date?
+    public let summaryTitle: String?
+    public let titleError: String?
+    public var turns: [HistoryTurn] = []
+    public init() {
+        id = UUID()
+        createdAt = Date()
+        archivedAt = nil
+        summaryTitle = nil
+        titleError = nil
+    }
+}
+
+public struct HistorySnapshot: Codable, Sendable {
+    public let version: Int
+    public let current: HistoryConversation
+    public let past: [HistoryConversation]
+    public init() {
+        version = 1
+        current = HistoryConversation()
+        past = []
+    }
 }

@@ -3,6 +3,33 @@ import FunctionContracts
 
 /// History.Conversation function ownership; current invocation paths remain compatible.
 extension HistoryActions {
+    @Action(domain: "History", module: "Conversation", title: "startNew", serializationKey: "History")
+    public static func startNew(invocation: any FunctionInput, using history: any HistoryMutationCapability)
+        async throws -> String
+    {
+        try Task.checkCancellation()
+        try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
+        let archived = try await history.startNew()
+        try Task.checkCancellation()
+        return "{\"archived\":" + (archived.map { "\"" + $0.uuidString + "\"" } ?? "null") + "}"
+    }
+
+    @Action(
+        domain: "History", module: "Conversation", title: "summarize", serializationKey: "History",
+        timeout: .seconds(60))
+    public static func summarize(invocation: any FunctionInput, using history: any HistoryMutationCapability)
+        async throws -> String
+    {
+        try Task.checkCancellation()
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys(["id"])
+        let rawID = try arguments.requiredString("id", maximumUTF8Bytes: 36)
+        guard let id = UUID(uuidString: rawID) else { throw ActionArguments.ValidationError.invalidValue("id") }
+        try await history.summarizeArchived(id)
+        try Task.checkCancellation()
+        return "{\"summarized\":\"" + id.uuidString + "\"}"
+    }
+
     @Action(
         domain: "History", module: "Conversation", title: "delete", serializationKey: "History")
     public static func delete(invocation: any FunctionInput, using history: any HistoryMutationCapability) async throws

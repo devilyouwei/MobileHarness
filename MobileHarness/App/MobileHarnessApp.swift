@@ -14,13 +14,13 @@ struct MobileHarnessApp: App {
     private var camera: CameraCoordinator { assembly.camera }
     private var container: AppContainer? { assembly.container }
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showingSettings = false
+    private var showingSettings: Bool { !assembly.navigation.path.isEmpty }
     @State private var startupError: String?
     @State private var startupStatus = "正在准备…"
     @State private var startupAttempt = 0
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
+            NavigationStack(path: Binding(get: { assembly.navigation.path }, set: { assembly.navigation.path = $0 })) {
                 Group {
                     if isVisualPreview {
                         visualPreview
@@ -28,10 +28,10 @@ struct MobileHarnessApp: App {
                         startupContent
                     } else {
                         CameraConversationSurface(
-                            camera: camera.state, controls: camera,
+                            camera: camera.state, controls: assembly.cameraControls,
                             openSettings: {
                                 container?.lifecycle.stopVoice()
-                                showingSettings = true
+                                Task { await assembly.navigate(.settings) }
                             }
                         ) {
                             CameraPreviewAdapter(
@@ -44,29 +44,14 @@ struct MobileHarnessApp: App {
                 }
                 .navigationTitle("首页")
                 .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(isPresented: $showingSettings) {
-                    SettingsView(
-                        settings: assembly.settings, bluetooth: assembly.bluetooth.state,
-                        bluetoothControls: assembly.bluetooth, history: assembly.history.state,
-                        historyControls: assembly.history, modelResources: assembly.modelResources,
-                        modelResourceControls: assembly.modelResourceControls,
-                        audioDetection: container?.audioDetection.state,
-                        audioDetectionControls: container?.audioDetection
-                    ) {
-                        let applied = await assembly.settings.save()
-                        if applied, container == nil {
-                            startupError = nil
-                            startupStatus = "正在准备…"
-                            startupAttempt += 1
-                        }
-                        return applied
-                    }
+                .navigationDestination(for: AppDestination.self) { destination in destinationView(destination) }
 
-                }
             }
             .task {
                 if !isVisualPreview && !isDiagnostic {
                     assembly.bluetooth.setForeground(scenePhase != .background)
+                    assembly.setResourceObservationForeground(scenePhase == .active)
+                    assembly.reportEnvironment(.scene, value: String(describing: scenePhase))
                     await assembly.bluetooth.run()
                 }
             }
@@ -79,6 +64,9 @@ struct MobileHarnessApp: App {
             .onChange(of: showingSettings) { _, showing in
                 if !isVisualPreview && !isDiagnostic { camera.setForeground(scenePhase == .active && !showing) }
             }
+            .onChange(of: assembly.navigation.path) { _, path in
+                assembly.reportEnvironment(.navigation, value: path.map(\.rawValue).joined(separator: "/"))
+            }
             .onChange(of: keepsHomeScreenAwake, initial: true) { _, keepsAwake in
                 UIApplication.shared.isIdleTimerDisabled = keepsAwake
             }
@@ -86,6 +74,8 @@ struct MobileHarnessApp: App {
                 if !isVisualPreview && !isDiagnostic {
                     camera.setForeground(phase == .active && !showingSettings)
                     assembly.bluetooth.setForeground(phase != .background)
+                    assembly.setResourceObservationForeground(phase == .active)
+                    assembly.reportEnvironment(.scene, value: String(describing: phase))
                     if phase == .background { container?.lifecycle.stopVoice(message: "已进入后台，轻触重新开始") }
                     if phase != .active { container?.audioDetection.stop() }
                 }
@@ -97,6 +87,35 @@ struct MobileHarnessApp: App {
                 if !isVisualPreview { await prepare() }
             }
         }
+    }
+
+    @ViewBuilder private func destinationView(_ destination: AppDestination) -> some View {
+        switch destination {
+        case .settings:
+            SettingsView(bluetooth: assembly.bluetooth.state) { page in Task { await assembly.navigate(page) } }
+        case .language:
+            LanguageModelSettingsView(
+                settings: assembly.settings, settingsControls: assembly.settingsControls,
+                modelResources: assembly.modelResources, modelResourceControls: assembly.modelResourceControls,
+                save: saveSettings)
+        case .bluetooth: BluetoothSettingsView(state: assembly.bluetooth.state, controls: assembly.bluetoothControls)
+        case .history: ConversationHistoryView(state: assembly.history.state, controls: assembly.history)
+        case .recognition, .synthesis, .vision:
+            ModelResourcesView(
+                state: assembly.modelResources, controls: assembly.modelResourceControls,
+                group: destination == .recognition ? .recognition : (destination == .synthesis ? .synthesis : .vision),
+                audioDetection: destination == .recognition ? container?.audioDetection.state : nil,
+                audioDetectionControls: destination == .recognition ? container?.audioDetection : nil)
+        }
+    }
+    private func saveSettings() async -> Bool {
+        let applied = await assembly.settingsControls.save()
+        if applied, container == nil {
+            startupError = nil
+            startupStatus = "正在准备…"
+            startupAttempt += 1
+        }
+        return applied
     }
 
     private var keepsHomeScreenAwake: Bool {

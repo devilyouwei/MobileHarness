@@ -1,10 +1,10 @@
 import AgentCore
 import Agents
 import Foundation
-import StorageChat
+import UI
 
 enum HistoryAgentAdapter {
-    static func preview(_ turn: ConversationRecord) -> String {
+    static func preview(_ turn: HistoryTurn) -> String {
         do {
             let configuration = try AgentConfigurations.load(named: "Assistant")
             var trace = try GenerationTrace(

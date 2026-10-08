@@ -2,6 +2,49 @@
 
 Purpose: preserve dated test, UI and packaging observations that were previously embedded in module READMEs. These are records of what was checked at the time, not current implementation contracts or substitutes for physical-device acceptance.
 
+## 2026-10-08 — ApplicationControl signed iPhone installation
+
+- ✅ Signed Debug build of current working-tree implementation passed for paired physical iPhone 17 Pro; command-line CFBundleVersion override2026100802. Local signing settings remain ignored and unchanged.
+- ✅ Final App has seven byte-identical source Agent configurations, including ApplicationControl; package verification passed.
+- ✅ devicectl installed dev.mobileharness.app successfully without uninstalling the existing App.
+- ❌ Automatic foreground launch was denied because the device was locked (CoreDevice10002 / FBSOpenApplicationError7). No startup, native UI, live-model, camera or BLE/robot acceptance is established by this installation.
+
+Evidence: /tmp/application-control-signed-device.log, /tmp/application-control-device-install.log and /tmp/application-control-device-launch.log. No new code changes or commit were made for installation. The Assistant delegation diagram discussed afterwards remains a proposed design, not newly implemented code.
+
+## 2026-10-08 — ApplicationControl service organization (ADR0182)
+
+Scope: remaining application-operation service moved from root ResourceManagement to canonical ApplicationControl, with co-located function grants and pure resource-result policy; App transport, identities, session guards and packaging renamed together. Domain Signals and native Action algorithms are unchanged.
+
+- ✅ Final ./scripts/check.sh passed:596 IntegrationTests and51 AppWorkflowTests, all other package suites, six Python tests, boundary/naming checks, strict Swift formatting and plist validation. Initial lint rejected two longer renamed error lines; formatting corrected them before the successful full run. Opt-in real-model evaluation remains skipped.
+- ✅ Existing fixtures cover source/session fencing, duplicate/overflow rejection, resource/preference/Provider exclusion, result-driven presentation, cancellation/join, worker recovery and Photographer camera isolation. Fixtures are injected automated tests, not physical acceptance.
+- ❌ Required ./scripts/build-ios.sh failed at MobileHarnessSimulator: external CoreAIShared cannot resolve CoreAI for arm64/x86_64. The subsequent ModelKitRuntime, ModelKitNemotron and ModelKitSilero schemes were not reached.
+- ✅ Unsigned generic iOS device clean build passed with full Xcode using build/AgentStageDevice. Final packaged resources verify exactly seven byte-identical configurations, including ApplicationControl; no stale ResourceManagement config remains.
+- ✅212 Mermaid diagrams parsed with Mermaid11.17.2; local Markdown targets and git diff --check passed.
+- ❌ No sign/install/launch, native UI, real Provider/model or physical camera/BLE/robot acceptance performed in this stage.
+
+Logs: /tmp/application-control-check2.log, /tmp/application-control-ios-simulator.log, /tmp/application-control-ios-device.log and /tmp/application-control-mermaid-final.json. See [ADR0182](adr/0182-application-control-service-organization.md) and [role contract](../MobileHarness/Agents/ApplicationControl/README.md).
+
+## 2026-10-08 — Photographer camera ownership (ADR0181)
+
+Scope: root-owned Photographer camera command workflow, explicit vision attachment, bounded independent output dispatch, manual/Assistant delegation through existing Gateways/functions, and complete nested error reports. Native capture and motor algorithms are unchanged.
+
+- ✅ Final ./scripts/check.sh passed:596 IntegrationTests,51 AppWorkflowTests, all other package targets, six Python tests, boundary guards, formatting and metadata lint. Added shared camera function/recovery, overlap/joined cancellation, vision detach, bound Assistant delegation/full report and invalid scope/provenance/result regressions. Evidence: /tmp/photographer-camera-full-check3.log.
+- Earlier complete runs found two outdated synthetic fixture assumptions: one tracking input lacked visionPerception source and a direct ToolResult lacked runtime origin. Fixtures now represent the required producers; production validation was retained.
+- ✅ All210 source Mermaid diagrams parse; local Markdown links and diff checks pass. Evidence: /tmp/photographer-camera-mermaid-final.json.
+- ❌ ./scripts/build-ios.sh failed at MobileHarnessSimulator because external CoreAIShared cannot resolve CoreAI for Simulator arm64/x86_64; remaining schemes were not reached. Evidence: /tmp/photographer-camera-ios-simulator.log.
+- ✅ Generic unsigned iOS device build passed (/tmp/photographer-camera-ios-device.log); verify-app-agent-resources.py confirmed all seven final configurations match source. No real-model, native UI, installation, lens/camera or physical robot acceptance performed. CameraProbe and CameraBridge are injected test capabilities, not hardware or real speech/model acceptance.
+
+## 2026-10-08 — Memory and Photographer business service organization (ADR0180)
+
+Scope: canonical Memory directory/actor/configuration/live identity; focused MemoryHistoryWorkflow and PhotographerTrackingPolicy; unchanged history protocol, title inference, tracking thresholds/rates/limits and native motion execution. Photographer identity and full intended photography role are retained.
+
+- ✅ ./scripts/check.sh passed: 591 IntegrationTests, 51 AppWorkflowTests, other package targets, six Python tests, boundary checks, strict formatting and metadata lint. Configuration identity/mismatch and Memory overflow isolation regressions are included. Evidence: /tmp/memory-photographer-full-check.log.
+- ✅ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer generic-platform iOS MobileHarness Debug build with CODE_SIGNING_ALLOWED=NO passed. Evidence: /tmp/memory-photographer-ios-device.log.
+- ✅ verify-app-agent-resources.py checked seven byte-identical final app configurations in build/AgentStageDevice/Build/Products/Debug-iphoneos/MobileHarness.app. Canonical live identities include memory and photographer; no old ConversationMemory configuration remains.
+- ✅ 209 source Mermaid diagrams parsed with Mermaid 11.17.2; local Markdown file links resolved and diff whitespace checks passed. Evidence: /tmp/memory-photographer-mermaid-final.json.
+- ❌ Required build-ios.sh failed in MobileHarnessSimulator: external CoreAIShared cannot resolve CoreAI for Simulator arm64/x86_64. The remaining three schemes were not reached. Evidence: /tmp/memory-photographer-ios-simulator.log.
+- ❌ No device installation, native UI, real-model, camera recording/capture or physical robot acceptance was performed. Model evaluation remains opt-in/skipped. Structured short/long-term memory and richer shooting business remain unimplemented.
+
 ## 2026-10-06 — Bluetooth scene/retry fixes installed on iPhone, build 2026100601
 
 Latest source, including ADR0142 healthy background connection retention and fresh foreground retry episodes, compiled for the paired iPhone 17 Pro using existing signing configuration. Strict signature verification and all five packaged Agent configurations passed. Installation succeeded; an independent installed-app query confirmed dev.mobileharness.app version 0.1.0, build 2026100601, replacing the observed installed build 2026100505. Fresh process launch with terminate-existing succeeded.
@@ -518,3 +561,114 @@ Initial full runs encountered Bluetooth background cancellation and audio diagno
 ✅ All511 integration and37 workflow tests passed with check.sh, alongside independent targets, source boundaries, formatting and metadata. New regressions cover original root/parent/turn/sequence, fresh admission after an expired initiating deadline, invalid/exhausted Action/activity hops and typed history schema/legacy rejection. Existing history cancellation and NexArm behavior regressions passed. ✅ Unsigned generic-device build and six packaged Agent configurations passed. ✅ All196 MobileHarness Mermaid blocks parse. ❌ Required simulator build fails in external CoreAIShared because CoreAI is unavailable; later schemes were not attempted. No installation or physical acceptance performed.
 
 Commit audit after consolidating the technical design into MobileHarness/README.md: all191 current MobileHarness Mermaid blocks parse, local documentation links resolve and boundary checks pass. Runtime source remains the version covered by the511/37 test and unsigned-device build evidence above.
+
+## 2026-10-07 — ADR0164–0169 Agent business routes and resource inventory
+
+✅ check.sh passes all540 integration and36 workflow tests, independent targets, source boundaries, formatting and metadata checks. New stages cover typed Assistant host control, history archive/title sequencing, resource commands, speech binding, source/preference transactions and inventory queries. Inventory fixtures verify progress/failure preservation, shared installed prerequisites, invalid facts and whole-result bounds; a valid result above48 KiB crosses both Gateways intact, byte overflow fails locally and the next read succeeds. No model or native transfer is substituted for acceptance.
+
+✅ Full-Xcode unsigned generic iOS device build passes; all7 packaged Agent configurations match source. All194 current MobileHarness Mermaid diagrams parse;297 Markdown files under MobileHarness/docs have no missing local link paths; diff whitespace passes. ❌ Required build-ios.sh stops in external CoreAIShared on unresolved CoreAI simulator dependency; later schemes are not attempted. No phone installation, physical resource/background transfer, native UI, live model or hardware acceptance was performed. Registered resource presentation and observation-driven progress remain outstanding.
+
+## 2026-10-07 — ADR0170 registered resource refresh presentation
+
+✅ Current resource presentation regressions pass (7 tests): real ResourceManagement/Gateways/functions use controlled inventory and endpoint fixtures; verify one read, canonical result after state acceptance, >48 KiB result transport, query/presentation failure continuation, retained primary/secondary causes, unavailable failure handler, strict arguments and valid UTF-8 byte truncation for combining characters. All38 AppWorkflowTests pass, including passive revision fencing and no duplicate projection after accepted failure presentation. These fixtures do not certify native UI or live model behavior.
+
+✅ Source/target boundary, strict formatting and Python checks pass. Final unsigned generic iOS device build passes; all7 packaged Agent configurations match source. All197 MobileHarness Mermaid diagrams parse;298 local Markdown files have no missing link paths; diff whitespace passes.
+
+❌ Final check.sh integration run is not green:547 tests reported3 issues in bluetoothPassiveRefreshNeverBlocksManualResetOrIssuesQuery (canControl expectation and subsequent controlled-event timeout). Isolated repeat of this test passes. Earlier545-test runs failed12 BLE tests/39 issues, then2 BLE tests/4 issues; selected feedback/reconnect/slider tests pass independently and a later545-test full run passes before the final two failure-refinement tests were added. Failures vary between full runs. No Bluetooth source or tests were modified; a baseline/concurrency cause is not established, and full-suite stability remains outstanding. Passing a prior revision or isolated repeat is not a passing final suite.
+
+❌ Required build-ios.sh fails in external CoreAIShared on unresolved CoreAI simulator dependency; later schemes are not attempted. No phone installation, real-model, native resource transfer, physical device or native UI acceptance was performed. Remaining migrations: observation-driven progress, non-refresh command/preference/transport error presentation, provider settings, device/navigation intents and bounded model continuation.
+
+
+## 2026-10-07 — ADR0171 root resource state observations
+
+✅ Final check.sh passes: 550 integration tests, 43 App workflow tests and the other package suites, six Python tests, independent target/source boundary checks, strict Swift formatting and project/plist metadata checks. New deterministic fixtures cover sequenced native facts through both Gateways and registered presentation, failed facts without an inventory query, source/replay/invalid-input rejection, unchanged suppression, failure/recovery, delivery retry, one worker across foreground/background changes, joined shutdown and refresh-owned error/admission-lock recovery. These are controlled fixtures, not live SDK/UI/model acceptance.
+
+✅ Final full-Xcode unsigned generic iOS device build passes after the preparation gate refinement. All seven packaged Agent configurations match source. All 199 MobileHarness Mermaid diagrams parse; 299 Markdown files under MobileHarness/docs have no missing local link paths; diff whitespace passes.
+
+❌ Required build-ios.sh fails in external CoreAIShared because CoreAI cannot be resolved for the simulator; later schemes are not attempted. No installation, native UI, live model, physical resource download or background restoration acceptance was performed. Foreground one-second sampling emits invalidations, not native push or a unified shared resource-state store. Remaining migrations include non-refresh command/preference/transport error presentation, provider settings, Bluetooth/navigation intents, model-callable grants and bounded model continuation. Earlier ADR0170 intermittent full-suite failures remain historical evidence; the final ADR0171 suite passes.
+
+
+## 2026-10-07 — ADR0172 resource command failure presentation
+
+✅ New controlled regressions verify all three native command failures cross ResourceManagement and both Gateways into one registered operation-error presentation; no replay or recursive presentation, subsequent request recovery, primary/secondary cause retention, missing handler rejection, bounded strict arguments, readable error descriptions and interaction admission cleanup. The selected resource regression run passes 49 integration and 24 App workflow tests. These fixtures do not certify native UI/device/model behavior.
+
+✅ Full-Xcode unsigned generic iOS device build passes; all seven packaged Agent configurations match source. All 201 MobileHarness Mermaid diagrams parse; 300 Markdown files under MobileHarness/docs have no missing local link paths; diff whitespace passes.
+
+The first check.sh run passes source/target boundaries, six Python tests, strict Swift formatting, all 44 App workflow tests and other package suites, but the 554-test integration suite reports one caught disconnected error in bluetoothBackgroundCancelsRecoveryAndForegroundResumesWithoutOldAim. This unchanged test passes in an isolated repeat. No baseline/concurrency cause is established; an isolated pass does not make the full run green.
+
+❌ Required build-ios.sh fails in external CoreAIShared on unresolved CoreAI simulator dependency; later schemes are not attempted. No installation, live model, native UI, physical resource download or background restoration acceptance was performed. Preference/installed-prerequisite notices, unavailable-Gateway host error presentation, provider settings, device/navigation intentions and model continuation remain staged.
+
+
+❌ Final check.sh repeat is also not green: the 554-test integration suite reports four issues across bluetoothAssistantActionPreemptsTrackingAndKeepsQueuedActions (both motor cases catch disconnected) and bluetoothLatestCommunicationIssueClearsWhenFeedbackRecovers (issue expectation and timeout). Both tests pass together in an isolated repeat. All resource regressions, all 44 App workflow tests and other suites pass; source/target boundaries, Python and formatting pass. Project/plist metadata checks were run separately and pass, because check.sh stops before that final step on test failure. No Bluetooth implementation or test was modified; varying full-run failures remain an unresolved stability issue, not established evidence of their cause. No further full-suite retry was used to replace this final result.
+
+
+## 2026-10-07 — ADR0173 resource preference failure presentation
+
+✅ Selected preference regressions pass: 13 integration and 11 App workflow tests. Added fixtures verify exact producer codes through actual Gateway dispatch, source/missing-model notice selection, rejection of text-based classification, binding-stage execution reason, third-call presentation, durable commit preservation, missing/failed presentation without recursion and explicit later retry. Final gate regression runs both validation and post-commit binding failures while UI presentation is held; overlapping preference/configuration calls reject and the gate releases afterward. Workflow fixtures preserve acknowledged notices/errors while rolling back confirmed visible flags, without implicit binding retry. These fixtures do not certify native SDK/UI/model behavior.
+
+✅ Final full-Xcode unsigned generic iOS device build passes; all seven packaged Agent configurations match source. An initial device compilation found a shared guidance String inheriting App's default actor isolation while LocalizedError reads nonisolated; making this immutable constant explicitly nonisolated fixed that compilation. No UI mutation moved off MainActor. Final boundary audit, strict formatting, project/plist metadata and diff whitespace checks pass. All 203 MobileHarness Mermaid diagrams parse; 301 Markdown files under MobileHarness/docs have no missing local link paths.
+
+The first check.sh run passes boundaries, six Python tests, formatting, all 47 App workflow tests and other package suites, but the 560-test integration suite reports seven issues across bluetoothJoysticksAcceptOnlyNewInputAfterFailedWriteRecovery (unexpected disconnected instead of timeout, later wait issues), bluetoothLatestCommunicationIssueClearsWhenFeedbackRecovers and bluetoothLiveBackpressureDoesNotAccumulateCommandsAndResetPreemptsPreset (wait issues/timeouts). All three unchanged tests pass together in an isolated repeat. That isolated result does not make the full suite green; no baseline/concurrency cause is established.
+
+❌ Required build-ios.sh fails in external CoreAIShared on unresolved CoreAI simulator dependency; later schemes are not attempted. No installation, physical resource/background transfer, live model or native UI/device acceptance was performed. Host/admission/unavailable-presentation fallback migration, provider settings, shared resource context, device/navigation intentions and model continuation remain outstanding.
+
+
+✅ Final check.sh after the nonisolated guidance refinement and two-phase gate regression passes all 560 integration tests, all 47 App workflow tests and other package suites, boundaries, six Python tests, strict formatting and project/plist metadata checks. The final suite includes both validation-failure and binding-failure gate cases. This passing revision does not explain or erase the earlier varying full-run Bluetooth failures; stability investigation remains separate. No further code changed after this validation.
+
+
+## 2026-10-07 — Resource host-failure Signals (ADR0174)
+
+✅ Final ./scripts/check.sh passed: boundary checks, six Python tests, strict Swift formatting, package suites including 565 integration tests and 47 App workflow tests, and project/privacy/entitlement property lists. Focused resource selection passed 60 integration and 27 workflow tests. After preserving the acknowledged-presentation marker across diagnostic feedback failure, the full check passed again (565 integration /47 workflow), and the final six host regression tests passed, including the additional post-commit feedback-failure case. Focused strict formatting passed for the final test addition. New tests cover non-returning dispatch before effects, malformed preference feedback/gate cleanup, overlapping binding rejection, missing/failed diagnostic presentation without recursion, source/causal validation and UTF-8 bounds. The initial new fixture had an incorrect cancel argument label, corrected before passing checks.
+
+✅ Unsigned generic iOS device build passed with full Xcode using build/AgentStageDevice. Final app resource verification passed all seven Agent configurations. No signing, installation or physical acceptance was performed.
+
+✅ Current technical Mermaid validation passed 204 diagrams with Mermaid 11.17.2. Local documentation links passed across 302 Markdown files; diff whitespace checks passed.
+
+❌ Required ./scripts/build-ios.sh failed at MobileHarnessSimulator because external coreai-models/CoreAIShared cannot resolve CoreAI for simulator architectures. Later script schemes were not reached; this is not a simulator pass. Live model, native UI/resource-transfer behavior and physical BLE/robot acceptance remain unverified by synthetic tests or builds.
+
+
+## 2026-10-07 — Agent-routed provider model discovery (ADR0175)
+
+✅ Final ./scripts/check.sh passed: boundaries, six Python tests, strict recursive Swift formatting, package suites including574 integration and47 App workflow tests, and project/privacy/entitlement property lists. Eight provider tests cover real Agent/Gateway query transport, requestID-only call parameters, private error sanitization, one-use/session/expiry/capacity staging, malformed and oversized model lists, a valid256-model result and accepted-query ownership after page cancellation. Existing provider transaction/UI regressions also passed in the package suites. Early contract/wrapper compiler issues and a test trailing-closure lint issue were corrected before verification.
+
+The native discovery2048-ID/512-byte bounds are retained, with the common returning-result65536-byte bound. No real provider request or credential was used. Native SDK model-family heuristics remain explicitly outstanding migration work.
+
+An intermediate full check before the final compatibility bounds passed573 integration tests. The first SDK-aligned574-test run failed12 existing BLE tests with41 issues; each failed BLE test then passed individually. The final unchanged-code full run passed574 integration tests. The timing/failure cause was not established; isolated passes do not replace the recorded full-run failure.
+
+✅ Technical documentation Mermaid parsing passed205 diagrams (Mermaid11.17.2), local links passed across303 Markdown files, and diff whitespace checks passed.
+
+✅ Unsigned generic iOS device build passed during implementation; final source rebuild/resource verification is recorded below. ❌ Required ./scripts/build-ios.sh failed at MobileHarnessSimulator because external coreai-models/CoreAIShared could not resolve CoreAI for simulator architectures. Later script schemes were not reached. No signing, installation, live-provider/Keychain switching or native UI/physical acceptance was performed.
+
+✅ Final source unsigned iOS device rebuild succeeded; all seven packaged Agent configurations matched the repository. This remains compile/package evidence, not phone installation or provider acceptance.
+
+
+## 2026-10-08 — Agent-routed provider configuration transactions (ADR0176)
+
+✅ ./scripts/check.sh passed: boundaries, six Python tests, strict recursive Swift formatting, package suites including581 integration and47 App workflow tests, and project/privacy/entitlement property lists. Seven new provider configuration regressions cover real Agent/Gateway private-result transport, shared configuration exclusion/retirement, session/operation/capacity/expiry/one-use guards, prepare-before-effects, application failure rollback, independently joined rollback from an actually cancelled task, safe dual failure causes, legacy credential migration and document-revision cleanup. Form tests verify confirmed-label retention and explicit restore after failure. An initial local variable-shadowing compilation issue was fixed before passing validation.
+
+✅ Full-Xcode unsigned generic iOS device build succeeded; all seven packaged Agent configurations matched source. No signing or installation was performed. Final localized App error copy compiled in this build; the post-suite boundary retirement guard was checked separately. This does not establish live provider, Keychain, native UI or physical acceptance.
+
+✅ Mermaid11.17.2 parsed206 technical diagrams. Local documentation links passed across304 Markdown files; diff whitespace checks passed.
+
+❌ Required ./scripts/build-ios.sh failed at MobileHarnessSimulator: external coreai-models/CoreAIShared could not resolve CoreAI for simulator architectures. Later script schemes were not reached. Provider registered UI presentation, SDK model-family policy migration, model-callable grants/shared resource context and broader device/navigation intent migration remain outstanding.
+
+
+## 2026-10-08 — Existing-route completion batch (ADR0177–0179)
+
+✅ Final `./scripts/check.sh` passed: source/dependency/directory boundaries, six Python tests, strict recursive Swift formatting, all package suites including589 integration tests and51 App workflow tests, and project/privacy/entitlement property lists. Real-model evaluation is explicitly skipped. Added fixtures exercise real Agent/Gateway device and navigation calls, bounded ordered environment facts, independent runtime terminal results, camera overlap/recovery, latest manual motor intent/fencing, provider presentation and eligibility, complete native transcripts and correlated continuation. The fourth model round waits for already-issued actual results, reports its bound and accepts a subsequent turn; failed model Tool messages preserve error flags/codes and original values as data.
+
+Intermediate evidence is retained: the first broad run failed existing BLE timing fixtures and the earlier native camera-history test, which expected generation to finish without a real Tool receipt. That history fixture was updated for actual receipt-driven completion. A subsequent586-test run failed bluetoothReconnectDoesNotWaitForOldActionCompletionToShowConnected with disconnected; the isolated regression passed, and later full588/589-test runs passed. The underlying intermittent BLE fixture cause was not established. Initial targeted camera/environment tests exposed an incorrect default-state expectation and a leaked private transport error; the fixture and public error mapping were corrected.
+
+✅ Full-Xcode unsigned generic iOS device build passed. Final signed iPhone build passed with command-line build number2026100801; all seven packaged Agent configurations matched repository bytes. An interim packaging check correctly rejected an older Assistant JSON after the removal grant was revoked; rebuilding resolved it. Existing native NexArm tolerance/arrival/timeout algorithms were not modified. Manual reporting/admission and routing changed, so builds and simulated tests alone cannot establish physical equivalence.
+
+❌ Required `./scripts/build-ios.sh` failed at MobileHarnessSimulator because external coreai-models/CoreAIShared cannot resolve CoreAI for simulator architectures. Later script schemes were not reached. This is not reported as a successful simulator build.
+
+✅ Mermaid11.17.2 parsed207 diagrams; local references resolved across307 MobileHarness/docs Markdown files; diff formatting passed. No new directory or package dependency was introduced.
+
+✅ Version2026100801 installed on the connected physical iPhone17 Pro. ❌ Initial startup was rejected by iOS because the phone was locked; unlock/startup verification is pending. No live provider/Keychain round trip, native touch/voice/camera flow or physical BLE movement/stop/arrival acceptance has been established by this batch.
+
+Model download/cancel are explicitly granted; model removal/provider/source/binding changes remain ungranted pending safe active-session handoff. The native removal quiescence can join the calling voice runtime, so granting it directly would violate runtime isolation. Product additions and further transport/state-store work remain listed separately in Roadmap and the current implementation coverage.
+
+✅ Final error-chain follow-up: the complete589-integration/51-workflow check passed again after including all producer report entries, partial-failure status, execution failure and retained description in native model continuation data. The correlated-result fixture verifies these fields and that report text is not parsed as Actions.
+
+✅ After the error-chain follow-up, the signed iPhone build and seven-config packaging check passed again, and the final binary was reinstalled as2026100801. Startup remains pending the requested phone unlock; installation is not startup or native-flow acceptance.

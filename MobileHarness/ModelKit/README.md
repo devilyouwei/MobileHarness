@@ -160,4 +160,11 @@ Concrete SDK dependencies live in separate adapters/backends. Base ModelKit owns
 
 ✅ Independent ModelKit contracts, ModelKitRuntime management, ModelKitDefaults assembly and separate adapters/backends. Agent-specific preprocessing of transport values stays with callers; model-specific tensor/tokenizer work stays with adapters. Models have no business-call registration, Channel scheduling or Signal routing responsibility.
 
-❌ Model continuation belongs to Agents; measured cross-model budgets, unsupported capability providers and physical/model acceptance remain separate. See [Agent-driven architecture](../README.md) for business/capability boundaries.
+✅ Model continuation is Agent-owned. ❌ Measured cross-model budgets, unsupported capability providers and physical/model acceptance remain separate. See [Agent-driven architecture](../README.md) for business/capability boundaries.
+
+
+## Bounded native result continuation
+
+✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.

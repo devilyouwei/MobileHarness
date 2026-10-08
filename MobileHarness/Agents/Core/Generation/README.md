@@ -11,7 +11,7 @@ Purpose: share incremental Agent-output parsing across Agents without depending 
 | FunctionTokenParser | Incrementally decodes UTF-8 and parses text, self-closing Action tags, paired Channel scopes and paired wait groups. It neither binds capabilities nor executes Actions. |
 | Action | A registered executable behavior, such as `Speech.Playback.speak` or `UI.Expression.express`. Its implementation owns parameter/value validation and behavior. |
 | ActionCall | One resolved Action invocation: ActionPath, string parameters and effective channel. It is distinct from raw FunctionToken events and model-native ToolCall invocations. |
-| ToolCall | A separate native tool invocation resolved by ToolCallParser. It does not pass through XML parsing or Channel action queues. |
+| ToolCall | A separate native tool invocation resolved by ToolCallParser. It does not pass through XML parsing. Gateway bindings select direct execution or a scheduled native projection into the shared ChannelScheduler. |
 
 A model tokenizer may split one XML tag across many model tokens. Conversely, one received text fragment may contain several protocol events. Parsing handles arbitrary UTF-8 byte boundaries; `.text` event boundaries can depend on fragment delivery. SentenceFunctionBuffer subsequently forms text chunks for Action mapping. Do not assume one character, one model token, one parsed event and one Action call correspond one-to-one.
 
@@ -48,7 +48,7 @@ Each generation owns one parser, one bounded unified Channel/wait scope stack an
 1. Incrementally decode UTF-8 and retain only incomplete byte/entity/tag state and pending text.
 2. Parse completed tags; update ChannelParser scopes and emit text, Action, scope-boundary or scheduling events in order.
 3. AgentGenerator accumulates text in SentenceFunctionBuffer. At sentence or protocol boundaries, flush text and invoke the Agent-owned text callback.
-4. Resolve explicit Action aliases and parameters through CapabilityRegistry. Return ordered GenerationEvents (resolved Actions, immediate Tools and scheduling directives) to the Agent for its bounded output stream.
+4. Resolve explicit Action aliases and parameters through CapabilityRegistry. Return ordered GenerationEvents (resolved ActionCalls, native ToolCalls and scheduling directives) to the Agent for its bounded output stream.
 5. On normal termination, call `finish` to flush valid remaining text and reject incomplete syntax. On cancellation, discard state instead of flushing partial output.
 
 ```mermaid

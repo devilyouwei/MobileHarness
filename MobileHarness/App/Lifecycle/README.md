@@ -7,7 +7,7 @@ Purpose: coordinate voice and camera runtime scopes. Design goals: preserve admi
 | VoiceSessionCoordinator.swift | Voice Agents, capture/output tasks, session/turn checks, actual playback, the voice-scope PCM cache and cleanup; receives VoiceRuntimeDependencies, capabilities, audio service and ConversationState |
 | AudioDetectionSession.swift | Isolated microphone/source-only Agent session, Gateway pumps, native-fact/UI projection and joined shutdown |
 | CameraCoordinator.swift | Permission/foreground/user intent, native camera start/stop and one vision task; receives AppleCamera, CameraState and a vision-session factory |
-| VisionSession.swift | One VisionPerception Agent incarnation, frame admission and output consumption through Gateways; receives VisionRuntimeDependencies and an injected Agent factory |
+| VisionSession.swift | One VisionPerception Agent incarnation, frame admission and output consumption through Gateways; receives VisionRuntimeDependencies, the injected vision factory and root Photographer transport |
 
 ✅ VoiceSessionCoordinator enters listening only after AppleAudioIO confirms actual PCM delivery. A failed capture or unexpectedly ended stream clears the microphone spectrum and enters the failed presentation phase, retaining the existing independent Assistant/Synthesis scope. Closing capture admission also rejects in-flight voice-state Tools so they cannot restore listening after failure. Generation checks after asynchronous capture shutdown prevent old failures from changing a replacement session. ❌ Physical microphone restart and spatial/camera/playback coexistence still require device acceptance.
 
@@ -60,15 +60,15 @@ flowchart LR
 
 ✅ CameraCoordinator implements explicit setEnabled/flip Tool controls. Foreground and idle-worker admission are required; overlap fails busy, flip while disabled fails. Completion waits for reconciliation and checks revision, permission and capture state. Scene/UI supersession fails cancellation; close joins capture release and vision cleanup. VoiceSessionCoordinator validates Assistant source and active voice session. ❌ Open capture does not prove pose inference readiness; admitted intent is not rolled back on caller cancellation.
 
-✅ VisionSession registers Photographer alongside the injected vision Agent, dispatches both output streams, and removes both during joined session cleanup.
+✅ VisionSession registers VisionPerception and attaches its UUID to root-owned Photographer. Joined cleanup detaches tracking and removes VisionPerception; root camera control remains alive.
 
-✅ Photographer construction is injected from composition. VisionSession tracks successful registration and cleans up its own Agents after partial activation failure; it never removes a pre-existing Photographer after registration rejection.
+✅ PhotographerIntentRuntime is injected from composition. VisionSession tracks successful attachment and cleans up only its own vision/attached tracking scope after partial activation failure.
 
 ✅ VisionSession treats tracking outputs as an independent subscriber. Each failed Tool is retained by the independent OutputGateway failure observer for the home scheduling issue list and does not stop frames, VisionPerception or showPose. Subscriber completion does not end the camera task group; cancellation still joins both producers. ❌ Physical tracking acceptance remains pending.
 
 ✅ Voice and vision consumers use nonfatal Gateway execution outcomes. SpeechPerception failure stops only its capture worker and own actor, preserving Assistant/SpeechSynthesis lifetime; session/user cancellation retains full cleanup.
 
-✅ Vision failure updates only visionStatus and stops its frame admission; Photographer remains independently registered until explicit camera session cancellation. Capture/recognition failure does not cancel Assistant or Synthesis.
+✅ Vision failure updates only visionStatus and stops its frame admission; Photographer remains root-owned after camera session cancellation; only that tracking scope retires. Capture/recognition failure does not cancel Assistant or Synthesis.
 
 ✅ Assistant terminal failure leaves independently registered perception/synthesis alive; the host lifetime waits for explicit cancellation before full cleanup. Its idle wait has no producer and an explicit capacity1. Recognition resume failure stops only recognition/capture.
 
@@ -139,3 +139,14 @@ flowchart LR
 ✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
 
 ✅ ADR0163: host camera activity events carry an explicit lease-scoped causal root shared across that activity's states. No Agent input exists on the current host camera route; Agent-controlled camera entry migration remains pending. Capture/renewal/cleanup algorithms are unchanged.
+
+✅ Implemented: VoiceSessionCoordinator replaces the assistant.cancel string with AssistantControl.cancelSession.input(sessionID:). Producer shutdown, audio cancellation and OutputGateway join ordering remain unchanged.
+
+✅ ADR0171: scene activity controls resource observation independently of voice/camera. Background invalidates old resource presentation and cancels sampling; reactivation waits for the existing worker to finish before another starts. SDK background downloads remain independent.
+
+
+## Camera command entry
+
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+
+✅ ADR0181: VisionSession owns VisionPerception only and attaches one vision UUID to the root Photographer transport. Cleanup detaches/reset tracking, joins its worker and cancels that vision session without stopping Photographer or its root camera command. Voice camera validation allows only active-session Assistant or authorized Photographer delegated work. Native camera algorithms remain unchanged.

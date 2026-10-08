@@ -50,7 +50,7 @@ ChatCapability is a required dependency; tests inject FixedTextChat from Integra
 1. `receive` checks lifecycle and payload, appends an input, and starts draining when running.
 2. Pausing stops admission-to-execution transitions, but does not cancel an already running generation. Resume drains queued inputs.
 3. Generation consumes Chat events, parses them and emits resolved output envelopes. The output stream buffers 256 envelopes with `bufferingOldest`; the consumer is App's VoiceSessionCoordinator. Failed yields mark the Agent failed, clear the inbox, cancel generation and close the stream. This plain AsyncStream does not transmit a thrown error; the coordinator checks final Agent status.
-4. `assistant.cancel` bypasses the inbox, even when full or paused, removes the selected session's waiting inputs and awaits cancellation of its active worker. Stop clears waiting inputs and joins the worker before closing outputs; durable history is retained.
+4. `assistant.control/1` cancelSession bypasses the inbox, even when full or paused, removes the selected session's waiting inputs and awaits cancellation of its active worker. Stop clears waiting inputs and joins the worker before closing outputs; durable history is retained.
 
 Successful outputs already consumed are not rolled back. There is no automatic retry, durable inbox or priority scheduling. FIFO uses Array append/removeFirst; removal shifts remaining entries, with cost bounded by the configured capacity.
 
@@ -64,7 +64,9 @@ flowchart LR
     Out -->|App transport pump| Gateway[OutputGateway validation]
     Gateway --> Runtime[Action / Tool runtime]
     Runtime --> UI[Expression Action and UI Tools via injected handlers]
-    Cancel[Cancel or stop] -->|clear and join| Chat
+    InputGateway -->|assistant.control| Cancel[Validate external host control]
+    Cancel -->|selected session clear and join| Chat
+    Stop[Agent stop] -->|all inputs clear and join| Chat
 ```
 
 ✅ The algorithm above describes the current implementation.
@@ -91,17 +93,17 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 | 静态订阅 | `user.text / 1 / text` | `user / user.text` | `.text(String)`，最多 4096 UTF-8 字节；普通文本进入 Chat，精确等于 `/status` 时调用 runtimeInfo。当前 App 没有文本输入框，这是已支持的协议入口。 |
 | 静态订阅 | `speech.final / 1 / observation` | `speechPerception / speech.final` | `.observation(.transcript(text, final: true))`，非空、最多 4096 UTF-8 字节；与文本走同一处理路径。 |
 | 静态订阅 | `speech.phase / 1 / observation` | `speechPerception / speech.phase` | `.observation(.speechPhase(phase))`；仅 `speaking` 触发本轮 beginReplyTurn，其他阶段不产生业务输出，也不调用 Chat。 |
-| 运行时定向输入，无静态订阅 | `runtime.event / 1 / event` | 默认 source 为 `runtime`，直接指定目标 `assistant` | `.event("assistant.cancel")` 绕过普通队列，清理指定 session 的等待输入/历史并取消其活动生成；其他事件按转义文本输出 `事件：…`，不调用 Chat。 |
+| 宿主定向控制，无静态订阅 | `assistant.control / 1 / observation` | external origin，source 为 `runtime`，定向 `assistant` | `AssistantControl.cancelSession`，最多512编码字节；绕过满或暂停队列，移除指定 session 等待输入并取消、等待该 session 的活动生成。保留持久历史和其他会话。 |
 | Tool 定向回流，无静态订阅 | `tool.result / 1 / toolResult` | ToolDispatcher 经 InputGateway 回送原 Agent/session，默认 source 为 `runtime` | `.toolResult(ToolResult(callID: UUID, value: String, isError: Bool))`；当前按 value 输出转义文本，不依据 isError 分支或继续调用 Chat。 |
 
-事件入口 Gateway 限制 16 KiB；即时输出（事件前缀加正文或 ToolResult.value）另外限制 2000 UTF-8 字节，超限输出 assistant.error。不接收 raw audio、image、speech.partial 或 vision.pose。
+控制输入有效期10秒；ToolResult.value 即时输出限制2000 UTF-8字节，超限输出 assistant.error。旧 runtime.event 不再接纳。不接收 raw audio、image、speech.partial 或 vision.pose。
 
 ```mermaid
 flowchart LR
     User["user.text / user"] --> IG[InputGateway]
     Speech["SpeechPerception: speech.final / speech.phase"] --> OG1[OutputGateway]
     OG1 --> IG
-    Runtime["runtime.event: directed"] --> IG
+    Runtime["assistant.control: external host"] --> IG
     IG --> A[Assistant]
     A -->|ordinary text or final| Chat[ChatCapability]
     Chat -->|text deltas| Parser[AgentGenerator]
@@ -181,7 +183,7 @@ flowchart LR
     End --> Journal
 ```
 
-✅ ConversationTitleGenerator generates titles from bounded excerpts as non-executable metadata. Its request is separate from Assistant conversation context and carries no Action instruction list. ❌ Storing raw responses does not guarantee that GPT-4.1 follows wait instructions or that Actions completed successfully; generation and execution status are distinct.
+✅ Memory owns ConversationTitleGenerator, which generates titles from bounded excerpts as non-executable metadata. Its request is separate from Assistant conversation context and carries no Action instruction list. ❌ Storing raw responses does not guarantee that GPT-4.1 follows wait instructions or that Actions completed successfully; generation and execution status are distinct.
 
 ✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
@@ -266,7 +268,7 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ## Durable native Tool and usage diagnostics
 
 ✅ Assistant saves actual Tool declarations before chat, and complete native calls before resolution, preserving provider ID, runtime UUID and argument JSON. Resolution/admission errors are recorded against the same call; App supplies the actual Gateway execution outcome. ChatEvent.usage is stored before final completion. Ordinary chat requests omit maximumOutputTokens. XML and native calls may coexist; fixed internal caption Tools are excluded from model-native call history.
-❌ Partial native SSE calls and automatic result-driven continuation remain unsupported; missing usage is not estimated.
+✅ Complete native results drive bounded continuation. ❌ Incomplete native SSE calls remain unsupported; missing usage is not estimated.
 
 ✅ Unknown model-callable aliases and invalid invocation parameters emit rejectedCall and continue the same turn. Native Tool failures retain their durable failed Tool outcome and correlation ID. Rejections share the120-call limit; malformed markup, bounds and cancellation remain terminal. ❌ Automatic correction/retry is not implemented.
 
@@ -284,7 +286,7 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ❌ Retrieval-based context and automatic conflict retry are not implemented.
 
-✅ JSON v6 declares History.Conversation.list/read with required string pagination parameters. Cloud complete native calls reach bounded read-only history previews. Returned data uses the existing escaped ToolResult path, not Action parsing. ❌ Local native calls, full history search/export and result-driven model continuation remain unsupported.
+✅ JSON v6 declares History.Conversation.list/read with required string pagination parameters. Cloud complete native calls reach bounded read-only history previews. Returned data uses the existing escaped ToolResult path, not Action parsing. ❌ Local native calls and full history search/export remain unsupported. ✅ Complete cloud native results drive bounded continuation.
 
 ✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
 
@@ -292,3 +294,39 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ Implemented: accept typed assistant.control/1 from the external runtime host only, before ordinary observation and inbox processing. Reject malformed/foreign content, wrong provenance and expired controls without mutation. Remove runtime.event input and event echo behavior; preserve selected-session cancellation, full/paused bypass and joined worker cleanup.
+
+✅ Implemented: move ConversationTitleGenerator to Memory without changing its inference algorithm or public namespace. Assistant owns conversation generation only.
+
+
+## Bounded native result continuation
+
+✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+
+
+## Read-only model grants and shared capability facts
+
+✅ Implemented: Assistant JSON explicitly grants System.ModelResources.snapshotResources and System.Provider.readSettings as native read-only tools. The same canonical functions used by deterministic/manual routes return the current shared inventory and a confirmed cloud-enabled/model summary. Provider summary excludes endpoint/key and never restores or changes a binding; unavailable/unconfirmed state fails explicitly. LLM configuration mutations remain staged-secret human operations. These tools query current facts rather than fixed runtimeInfo text and can feed bounded model continuation.
+
+
+## Typed device, navigation and environment entry points
+
+✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+
+✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+
+✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+
+## Model resource command grants
+
+✅ Implemented: Assistant has grants for the existing canonical download/cancel functions with bounded model ID, explicit HTTPS source and boolean cellular arguments. Manual and native model calls share execution and native transfer ownership; download acknowledges admission only and cancel awaits cleanup. Model removal is not granted: its native quiescence can join the calling voice runtime, so removal needs the same explicit session-handoff design as provider changes. No configuration or provider mutation grant is implied. Model feedback reports errors as data and never automatically replays a transfer.
+
+✅ Implemented bound regression: the fourth model round must await its already-issued native calls before reporting the round limit, preserve actual outcomes, and admit a subsequent input. It must not start a fifth request or fabricate completion for outstanding work.
+
+✅ Implemented failure-data correction: native continuation Tool messages wrap failed outcomes as bounded JSON containing isError, failureCode and the exact value. Successful values remain unchanged. Error metadata is model data and is never passed through Action parsing.
+
+✅ Implemented error-chain preservation: failed native continuation messages must also include any producer report, with every child outcome, execution failure and retained description. Preserve partial failure; a scalar error message must not replace the structured chain. The existing transcript byte bound rejects oversized data.

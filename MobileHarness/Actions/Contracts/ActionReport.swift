@@ -62,6 +62,7 @@ public struct ActionReport: Equatable, Sendable {
         }
         return .handlerFailed
     }
+    public static var empty: Self { Self(validatedEntries: []) }
     public init(entries: [Entry]) throws {
         guard entries.count <= 256 else { throw ValidationError.capacity }
         guard entries.allSatisfy({ !$0.path.isEmpty && $0.path.utf8.count <= 128 }) else {

@@ -1,21 +1,34 @@
+import Actions
+import AppWorkflows
 import Foundation
+import FunctionContracts
 import ModelKitRuntime
 import UI
 
 enum SettingsModelResourcesAdapter {
-    static func validate(_ draft: ModelResourceSourceDraft) throws -> ModelResourceSourceDraft {
+    nonisolated static let invalidSourceMessage = "请填写 HTTPS 域名，不包含路径、查询参数或账号密码"
+    static func validatePreferences(_ draft: ModelResourcePreferences) throws -> ModelResourcePreferences {
         do {
             let source = try ModelDownloadSource(endpoint: draft.endpoint, allowsCellular: true)
-            return ModelResourceSourceDraft(
+            return ModelResourcePreferences(
                 endpoint: source.endpoint, allowsCellular: source.allowsCellular,
                 useCustomRecognition: draft.useCustomRecognition, useCustomSynthesis: draft.useCustomSynthesis)
-        } catch { throw SourceError() }
+        } catch { throw ModelResourcePreferenceError.invalidSource }
+    }
+    static func preferenceFailure(_ message: String) -> any Error {
+        if message.contains("resource.selection.recognition") {
+            return ModelResourceSelectionError(group: .recognition)
+        }
+        if message.contains("resource.selection.synthesis") { return ModelResourceSelectionError(group: .synthesis) }
+        if message.contains("resource.source.invalid") { return SourceError() }
+        return ApplicationControlIntentFailure.execution(message)
     }
     private struct SourceError: LocalizedError {
-        var errorDescription: String? { "请填写 HTTPS 域名，不包含路径、查询参数或账号密码" }
+        var errorDescription: String? { SettingsModelResourcesAdapter.invalidSourceMessage }
     }
-    static func items(_ manager: ModelManager) async throws -> [ModelResourceItem] {
-        try await manager.artifactSnapshots().map { snapshot in
+    static func items(_ raw: String) throws -> ModelResourceViewSnapshot {
+        let inventory = try ModelResourceInventory.decode(raw)
+        let items = inventory.items.map { snapshot in
             let status: String
             switch snapshot.phase {
             case .notInstalled: status = "未下载"
@@ -27,9 +40,9 @@ enum SettingsModelResourcesAdapter {
             case .failed: status = "失败，可重试或删除修复"
             }
             return ModelResourceItem(
-                id: snapshot.artifact.id, name: snapshot.artifact.name, status: status,
-                bytes: snapshot.artifact.downloadBytes,
-                progress: min(1, Double(snapshot.completedBytes) / Double(max(1, snapshot.artifact.downloadBytes))),
+                id: snapshot.id, name: snapshot.name, status: status,
+                bytes: snapshot.bytes,
+                progress: snapshot.progress,
                 installed: snapshot.phase == .installed,
                 active: [.queued, .downloading, .verifying, .deleting].contains(snapshot.phase),
                 failure: snapshot.failure.map {
@@ -48,9 +61,9 @@ enum SettingsModelResourcesAdapter {
                         return "下载未完成，可继续下载或删除修复。错误：\($0.prefix(160))"
                     }
                 },
-                revision: snapshot.artifact.revision,
-                installedBytes: snapshot.installedBytes ?? snapshot.artifact.installedBytes,
-                license: snapshot.artifact.license,
+                revision: snapshot.revision,
+                installedBytes: snapshot.installedBytes,
+                license: snapshot.license,
                 activity: {
                     switch snapshot.phase {
                     case .queued: return .queued
@@ -60,6 +73,144 @@ enum SettingsModelResourcesAdapter {
                     default: return nil
                     }
                 }())
+        }
+        let groups = try inventory.installedGroups.map { group in
+            guard let value = ModelResourceGroup(rawValue: group.rawValue) else {
+                throw ResourceInventoryError.invalidSnapshot
+            }
+            return value
+        }
+        return ModelResourceViewSnapshot(items: items, installedGroups: Set(groups))
+    }
+}
+
+/// Native SDK adaptation only; Agent/functions select commands and source inputs.
+@MainActor final class ModelResourceCapabilityAdapter: ModelResourceCapability, ModelResourceInventoryCapability {
+    private let manager: @MainActor () async throws -> ModelManager
+    private var speechPreference: [Bool]?
+    private let bindSpeech: @MainActor (Bool, Bool) async throws -> Void
+    private let quiesce: @MainActor (String) async -> Void
+    init(
+        manager: @escaping @MainActor () async throws -> ModelManager,
+        quiesce: @escaping @MainActor (String) async -> Void,
+        bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void
+    ) {
+        self.manager = manager
+        self.quiesce = quiesce
+        self.bindSpeech = bindSpeech
+    }
+    func snapshotResources() async throws -> [ModelResourceFact] {
+        let manager = try await manager()
+        let snapshots = try await manager.artifactSnapshots()
+        guard snapshots.count <= 64 else { throw ResourceInventoryError.capacityExceeded }
+        return try snapshots.map { snapshot in
+            guard let phase = ModelResourceFact.Phase(rawValue: snapshot.phase.rawValue) else {
+                throw ResourceInventoryError.invalidSnapshot
+            }
+            return ModelResourceFact(
+                id: snapshot.artifact.id, name: snapshot.artifact.name, revision: snapshot.artifact.revision,
+                license: snapshot.artifact.license, bytes: snapshot.artifact.downloadBytes,
+                installedBytes: snapshot.installedBytes ?? snapshot.artifact.installedBytes,
+                completedBytes: snapshot.completedBytes, phase: phase, failure: snapshot.failure)
+        }
+    }
+    func observationFingerprint() async throws -> String {
+        try Task.checkCancellation()
+        let facts = try await snapshotResources()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(facts)
+        guard data.count <= 65_536 else { throw ResourceInventoryError.capacityExceeded }
+        try Task.checkCancellation()
+        return String(decoding: data, as: UTF8.self)
+    }
+    func configureSpeech(recognition: Bool, synthesis: Bool) async throws {
+        let preference = [recognition, synthesis]
+        guard speechPreference != preference else { return }
+        try await bindSpeech(recognition, synthesis)
+        speechPreference = preference
+    }
+    func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws {
+        let manager = try await manager()
+        try await manager.downloadArtifact(
+            id, source: ModelDownloadSource(endpoint: endpoint, allowsCellular: allowsCellular))
+    }
+    func cancel(_ id: String) async throws {
+        let manager = try await manager()
+        try await manager.cancelArtifact(id)
+    }
+    func remove(_ id: String) async throws {
+        let manager = try await manager()
+        try await manager.removeArtifact(id) { [quiesce] in await quiesce(id) }
+    }
+}
+
+/// Root-scoped presentation adaptation; every production call is dispatched by OutputGateway.
+@MainActor final class ResourcePresentationAdapter: ResourcePresentationCapability {
+    private let state: ModelResourcesState
+    private let sessionID: UUID
+    private let acknowledge: @MainActor () -> Void
+    private let provider: ProviderPresentationAdapter
+    private let navigation: NavigationState
+    init(
+        state: ModelResourcesState, sessionID: UUID, provider: ProviderPresentationAdapter, navigation: NavigationState,
+        acknowledge: @escaping @MainActor () -> Void
+    ) {
+        self.state = state
+        self.sessionID = sessionID
+        self.acknowledge = acknowledge
+        self.provider = provider
+        self.navigation = navigation
+    }
+    func navigate(_ destination: String, invocation: any FunctionInput) async throws {
+        guard invocation.context.sessionID == sessionID || invocation.context.source == "assistant" else {
+            throw ResourcePresentationError.staleGeneration
+        }
+        guard destination == "home" || AppDestination(rawValue: destination) != nil else {
+            throw ResourcePresentationError.invalidGeneration
+        }
+        navigation.show(AppDestination(rawValue: destination))
+    }
+    func presentProviderResult(requestID: UUID, failureCode: String?, invocation: any FunctionInput) async throws {
+        try await provider.present(requestID, failureCode: failureCode, invocation: invocation)
+    }
+    func presentResources(
+        _ inventory: ModelResourceInventory, generation: UInt64, invocation: any FunctionInput
+    ) async throws {
+        try Task.checkCancellation()
+        guard invocation.context.sessionID == sessionID, generation == state.refreshGeneration else {
+            throw ResourcePresentationError.staleGeneration
+        }
+        let value = try SettingsModelResourcesAdapter.items(inventory.encoded())
+        guard state.applySnapshot(value, generation: generation) else {
+            throw ResourcePresentationError.staleGeneration
+        }
+        acknowledge()
+    }
+    func presentResourcePreferenceFailure(
+        _ reason: ResourcePreferenceFailureReason, message: String, invocation: any FunctionInput
+    ) async throws {
+        try Task.checkCancellation()
+        guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
+        switch reason {
+        case .recognitionRequired, .synthesisRequired:
+            state.installationNotice =
+                (reason == .recognitionRequired ? ModelResourceGroup.recognition : .synthesis).installationMessage
+            state.error = nil
+        case .invalidSource: state.error = SettingsModelResourcesAdapter.invalidSourceMessage
+        case .execution: state.error = message
+        }
+    }
+    func presentResourceOperationFailure(_ message: String, invocation: any FunctionInput) async throws {
+        try Task.checkCancellation()
+        guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
+        state.error = message
+    }
+    func presentResourceFailure(_ message: String, generation: UInt64, invocation: any FunctionInput) async throws {
+        try Task.checkCancellation()
+        guard invocation.context.sessionID == sessionID, state.applyRefreshFailure(message, generation: generation)
+        else {
+            throw ResourcePresentationError.staleGeneration
         }
     }
 }

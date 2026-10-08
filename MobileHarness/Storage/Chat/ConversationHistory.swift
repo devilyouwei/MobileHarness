@@ -53,6 +53,7 @@ public struct ConversationRecord: Codable, Sendable, Identifiable {
     public let maximumOutputTokens: Int?
     public let temperature: Double
     // Optional additions keep version-1 records readable without migration.
+    public var continuationRequests: [String]?
     public var toolDefinitions: [String]?
     public var toolCalls: [ConversationToolCall]?
     public var tokenUsage: ConversationTokenUsage?
@@ -239,6 +240,17 @@ public actor ConversationHistoryStore {
             }
             calls.append(call)
             turn.toolCalls = calls
+            return true
+        }
+    }
+
+    public func recordContinuationRequest(_ request: String, for id: UUID) async throws {
+        guard request.utf8.count <= 65_536 else { throw ConversationHistoryError.invalidRecord }
+        try await updateTurn(id, required: true) { turn in
+            var requests = turn.continuationRequests ?? []
+            guard requests.count < 3 else { throw ConversationHistoryError.invalidRecord }
+            requests.append(request)
+            turn.continuationRequests = requests
             return true
         }
     }

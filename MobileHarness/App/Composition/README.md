@@ -28,7 +28,7 @@ flowchart TD
     Runtime --> Camera
 ```
 
-✅ Same journal for Assistant/history; same voice-scope PCM store for synthesis/playback; process-wide ModelManager remains owned by ModelKitDefaults. Model weights never enter UI. The settings form necessarily holds its editable credential draft; CloudSettingsStore owns Keychain persistence and no credential is written into the settings document.
+✅ Same journal for Assistant/history; same voice-scope PCM store for synthesis/playback; process-wide ModelManager remains owned by ModelKitDefaults. Model weights never enter UI. The settings form necessarily holds its editable credential draft; Actions owns credential-reference persistence/migration through injected App Keychain primitives; no credential is written into the settings document or Agent transport.
 
 ❌ Multiple independently active window runtimes and model/provider hot replacement outside the existing chat configuration workflow.
 
@@ -86,7 +86,7 @@ flowchart TD
 
 ✅ Photographer policy and internal Tool coverage are assembled alongside existing Agents. NexArm.Tracking.aim binds the foreground Bluetooth workflow without adding AgentCore to BehaviorAssembly.
 
-✅ ApplicationRuntime injects the Photographer factory into VisionRuntimeDependencies and grants Photographer motors1–5 only. NexArm.Tracking.aim binds NexArmBehaviorAdapter alongside existing gesture bindings.
+✅ ApplicationRuntime injects the root PhotographerIntentRuntime into VisionRuntimeDependencies and grants Photographer motors1–5 only. NexArm.Tracking.aim binds NexArmBehaviorAdapter alongside existing gesture bindings.
 
 ✅ Composition injects Photographer control availability as a read-only MainActor BluetoothWorkflow snapshot; Agents imports no device SDK or App service.
 
@@ -129,11 +129,11 @@ flowchart TD
 
 ## Tracking freshness and takeover — ADR0139
 
-✅ All six NexArm resources share nexarm.writer executionGroup. Host policy explicitly permits Assistant to preempt Photographer; reverse, equal-owner and unknown-owner conflicts reject. Cleanup uses stopAgentActions and preserves Settings ownership. The Photographer factory binds a weak read-only hasFreshPose query into BluetoothWorkflow, avoiding a retained Agent cycle; default production freshness is one second. Generic Gateway contains no concrete identities/device policy.
+✅ All six NexArm resources share nexarm.writer executionGroup. Host policy explicitly permits Assistant to preempt Photographer; reverse, equal-owner and unknown-owner conflicts reject. Cleanup uses stopAgentActions and preserves Settings ownership. The root Photographer binding supplies a weak read-only hasFreshPose query into BluetoothWorkflow, avoiding a retained Agent cycle; default production freshness is one second. Generic Gateway contains no concrete identities/device policy.
 
 ❌ Physical interruption and camera/Bluetooth coexistence acceptance remain pending.
 
-✅ ApplicationRuntime binds HistoryQueryService using its existing shared journal; App retains no history query policy. ✅ Composition now supplies a separate root memory session, history Agent/transport and scoped presentation adapter. ✅ Confirmed archive deletion now follows Agent-selected Tools and actual feedback; archive/title migration remains pending.
+✅ ApplicationRuntime binds HistoryQueryService using its existing shared journal; App retains no history query policy. ✅ Composition now supplies a separate root memory session, history Agent/transport and scoped presentation adapter. ✅ Confirmed archive deletion now follows Agent-selected Tools and actual feedback; archive/title now uses the same Agent-selected function/result route.
 
 ✅ Composition retains ModelResourceInteractionWorkflow and its passive ModelResourcesState separately, passing both explicitly to SettingsView. ❌ Resource controls are not yet routed through an Agent/Gateway.
 
@@ -146,3 +146,63 @@ flowchart TD
 ✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
 
 ✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+✅ Implemented: bind lazy title computation to the shared HistoryMutationService, delegating only the bounded title algorithm to Memory helper. Inject prepare/startNew/summarize operations into the history facade; remove its journal and title-generation callbacks.
+
+✅ Implemented: assemble a seventh business Agent, fixed root resource session and bound command transport. Lazy ModelResourceCapabilityAdapter preserves ModelKit admission/cancel/remove and quiescence callbacks. Settings download/cancel/remove callbacks emit typed Agent intent; no direct manager mutation remains in those callbacks.
+
+
+✅ ADR0167: Settings preference application emits configureSpeech through ApplicationControlIntentRuntime. Lifecycle barriers and native Defaults binding are injected into the existing adapter; App no longer decides whether the preference command should run.
+
+
+✅ ADR0168: required ModelResourcePreferencesCapability joins composition; restore/save callbacks send typed intent and decode successful results for UI. Store construction and native installed/validation endpoints are injected into Actions; no direct preference read/write remains in App.
+
+
+✅ ADR0169: one native resource adapter supplies management and inventory interfaces. UI refresh binding calls ApplicationControlIntentRuntime.inventory, with no direct native snapshot query. Preference prerequisite snapshots remain separately injected native facts.
+
+✅ ADR0170: inject the existing resource state and native inventory capability into root ResourcePresentationAdapter/ResourcePresentationModule. Generation-bearing reads invoke ApplicationControlIntentRuntime.presentInventory; query-only reads retain inventory().
+
+✅ ADR0171: ApplicationRuntime owns observer and resource transport, injects fact/read, sequenced delivery, revision invalidation and host failure reporting. AppAssembly starts observation only after preparation and forwards active/background changes. No page owns the loop.
+
+
+✅ ADR0174 packaging: existing Agents package discovers ResourceHostFailure.swift in Communication; the Xcode navigator references that source. Root communication policy admits app.resources with the typed contract, without adding a target or model grant.
+
+
+## Provider discovery
+
+✅ Implemented: root assembly constructs ProviderDiscoveryRequests with the native SDK adapter, injects its capability into the production catalog and stages form values with the resource root session. Only requestID enters the Gateway. Provider source file navigator references use existing groups/package discovery; no new directory, target, configuration file or dependency.
+
+
+## Provider configuration transactions
+
+✅ Implemented: ApplicationRuntime constructs Actions ProviderSettingsService/Store/Requests using SDK/lifecycle callbacks and native credential adapter, includes the two functions in frozen registration, stages root-session drafts and takes/discards private result slots. AppAssembly injects begin/end barriers and intent closures. Existing Xcode navigator groups are reused; the new native adapter is added to App sources.
+
+
+## Completion batch — provider presentation and capability policy
+
+✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsInteractionWorkflow in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
+
+✅ Implemented: presentation-enabled provider intents select a second registered UI.ResourcePresentation.showProviderResult call after the business call, on success or failure. Headless requests retain one call. Private result lookup and revision/session fences prevent credentials in protocol payloads and stale form updates. One attempt only, no recursive presentation/replay; producer and presentation failure chains remain distinct. App injects the native UI endpoint; business functions remain independent of UI and call protocols.
+
+
+## Typed device, navigation and environment entry points
+
+✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+
+✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+
+✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+
+## Camera command entry
+
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+
+
+## Manual worker terminal feedback
+
+✅ Implemented: accepted device-control calls acknowledge submission only. Preset/jog native workers capture their own origin and report sink, retain one latest structured terminal failure, publish independent home issues and deliver a trusted ActionResult through InputGateway after non-cancellation failure. Root ApplicationControl accepts runtime-owned Action results into a bounded128-result inbox; environment context exposes the latest result summary. No accepted Tool receipt is rewritten, no movement replay, and no tolerance/arrival/timeout algorithm changes. Ordinary failure stops only its worker and keeps subsequent intents admissible. Diagnostic delivery rejection is reported separately.
+
+✅ ADR0180: Memory / memory identity and MemoryHistoryIntent are used consistently in configuration, host transport, presentation source guards and regression fixtures; preserve history.intent/1 and runtime behavior. Enforce the two reorganized roles’ directory/actor/configuration naming and isolated business components.
+
+✅ ADR0181: compose one Photographer and dedicated root camera UUID; use its descriptor for capability coverage and root presentation authorization. Bind Assistant camera delegation after Gateways exist. Vision dependencies inject PhotographerIntentRuntime; no transient Photographer factory remains.

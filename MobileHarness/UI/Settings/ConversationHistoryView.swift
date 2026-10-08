@@ -1,5 +1,4 @@
 #if os(iOS)
-    import StorageChat
     import SwiftUI
 
     /// Durable records of actual Assistant requests. Viewing never executes stored markup.
@@ -8,7 +7,7 @@
         @Bindable var state: ConversationHistoryState
         let controls: any ConversationHistoryControlling
         @Environment(\.scenePhase) private var scenePhase
-        @State private var deleting: StoredConversation?
+        @State private var deleting: HistoryConversation?
         public init(state: ConversationHistoryState, controls: any ConversationHistoryControlling) {
             self.state = state
             self.controls = controls
@@ -89,7 +88,7 @@
             }
         }
 
-        private func row(_ conversation: StoredConversation) -> some View {
+        private func row(_ conversation: HistoryConversation) -> some View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(verbatim: ConversationHistoryPresentation.title(conversation)).lineLimit(2)
                 Text(
@@ -103,7 +102,7 @@
 
     @MainActor
     private struct ConversationHistoryDetail: View {
-        let conversation: StoredConversation
+        let conversation: HistoryConversation
         let controls: any ConversationHistoryControlling
         var body: some View {
             List {
@@ -131,7 +130,7 @@
 
     @MainActor
     private struct ConversationTurnDetail: View {
-        let turn: ConversationRecord
+        let turn: HistoryTurn
         let controls: any ConversationHistoryControlling
         @State private var interpretation = ""
         var body: some View {
@@ -179,6 +178,13 @@
                 Section("实际发送的上下文（含系统提示词）") {
                     ForEach(Array(turn.request.enumerated()), id: \.offset) { _, message in
                         DisclosureGroup(message.role.rawValue) { selectable(message.content) }
+                    }
+                }
+                if let requests = turn.continuationRequests, !requests.isEmpty {
+                    Section("实际发送的后续请求") {
+                        ForEach(Array(requests.enumerated()), id: \.offset) { index, request in
+                            DisclosureGroup("后续请求 \(index + 1)") { selectable(request) }
+                        }
                     }
                 }
                 Section("解析预览（按当前协议，未执行）") { selectable(interpretation) }
@@ -235,7 +241,7 @@
         }
     }
 
-    extension ConversationRecord {
+    extension HistoryTurn {
         fileprivate var outputSummary: String {
             if !raw.isEmpty { return raw }
             guard let calls = toolCalls, !calls.isEmpty else { return "（无模型输出）" }

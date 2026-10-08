@@ -153,11 +153,11 @@ flowchart LR
 
 ✅ Boundary checks require the History domain to retain Tools-owned queries, injected StorageChat and independent BehaviorAssembly/ToolRuntime contracts. ❌ Static checks do not establish provider invocation quality.
 
-✅ Boundary validation permits the documented AppHistoryWorkflow Agent/Gateway/Tool transport dependencies and separately enforces transport, legacy workflow and presentation-adapter imports. ConversationMemory may import only AgentCore/Foundation; UI and AgentCore remain independent. Final-app resource validation discovers all six Agent JSON resources. ❌ Physical UI intent acceptance is separate.
+✅ Boundary validation permits the documented AppHistoryWorkflow Agent/Gateway/Tool transport dependencies and separately enforces transport, legacy workflow and presentation-adapter imports. Memory may import only AgentCore/Foundation; UI and AgentCore remain independent. Final-app resource validation discovers all six Agent JSON resources. ❌ Physical UI intent acceptance is separate.
 
-✅ Boundary checks reject resource Task/effect implementations and installation policy in UI.ModelResourcesState, and keep effect tests under AppWorkflowTests. ❌ Agent-based resource admission remains future work.
+✅ Boundary checks reject resource Task/effect implementations and installation policy in UI.ModelResourcesState, and keep effect tests under AppWorkflowTests. ✅ Resource admission uses ApplicationControl and both Gateways.
 
-✅ Boundary checks prohibit direct journal deletion in the legacy history workflow; ConversationMemory remains AgentCore/Foundation-only. ❌ Native UI confirmation acceptance remains separate.
+✅ Boundary checks prohibit direct journal deletion in the legacy history workflow; Memory remains AgentCore/Foundation-only. ❌ Native UI confirmation acceptance remains separate.
 
 ✅ ADR0149 boundary checks prevent returning Tool feedback from reverting to public external admission and require retained output input context. ❌ These source checks do not establish runtime or physical correctness; regression tests validate delivery behavior.
 
@@ -184,3 +184,64 @@ flowchart LR
 ✅ ADR0161: checks enforce FunctionContracts/ExecutionRuntime/CallRuntime target separation, Actions import isolation, standard input without Channel, removed aliases and unique shared-source ownership. ❌ Static checks cannot establish physical/model acceptance.
 
 ✅ ADR0163 checks keep history intent outside Core business enums, reject legacy history string parsing and require scheduled result context capture at the Gateway ledger boundary.
+
+✅ Implemented: boundary checks recognize five History functions and the computation-only Memory title helper. The actor remains Core-only; helper cannot mutate the journal or execute effects, and history facade cannot archive, save titles or invoke inference.
+
+✅ Implemented: boundary checks include System.ModelResources, the canonical ApplicationControl role-directory actor/JSON, the narrow settings transport dependency exception and absence of direct manager command mutations in UI operation bindings. Packaged configuration verification includes seven Agent resources.
+
+
+✅ ADR0167: boundary checks require Agent-routed preference application, Core-only ApplicationControl actor imports and the fourth System.ModelResources function. Native lifecycle/Defaults bindings remain composition-owned.
+
+
+✅ ADR0168: checks permit Storage only in the owned resource preference service, reject facade persistence/normalization and require Agent preference routing. Six source/binding/native functions retain canonical three-level paths.
+
+
+✅ ADR0169: boundary checks require Agent inventory routing, the seventh System.ModelResources function and removal of ModelResourcePolicy from Settings effects. Inventory facts remain protocol-neutral and UI receives passive values.
+
+✅ ADR0170: boundary audit recognizes UI.ResourcePresentation entries and production presentInventory binding; require no direct items/groups assignment in resource interaction.
+
+✅ ADR0171: boundary audit recognizes a pure injected ResourceObservationWorkflow and prohibits polling/refresh loops in resource UI; root source/lifecycle bindings remain explicit.
+
+
+✅ ADR0172: Boundary catalog audit includes the new pure UI.ResourcePresentation operation-error function; existing module profile is retained.
+
+
+✅ ADR0173: Catalog audit includes showResourcePreferenceFailure. No generic runtime business-code handling or new dependency.
+
+
+✅ Provider discovery boundary update: System.Provider.discoverModels joins the cohesive directory/module/function catalog. The boundary checker continues to forbid SDK/UI/protocol imports inside Actions and allows no new module directory.
+
+
+## Provider configuration transactions
+
+✅ Implemented: boundary rules add System.Provider restoreSettings/saveSettings, remove AppSettingsWorkflow Storage dependency and forbid the retired CloudSettingsStore/prepare transaction implementation in App workflows. Strict module independence remains.
+
+❌ Pending: validate registered provider result presentation and passive SettingsState, plus native discovery policy retirement.
+
+
+## Read-only model grants and shared capability facts
+
+❌ Pending: Assistant JSON explicitly grants System.ModelResources.snapshotResources and System.Provider.readSettings as native read-only tools. The same canonical functions used by deterministic/manual routes return the current shared inventory and a confirmed cloud-enabled/model summary. Provider summary excludes endpoint/key and never restores or changes a binding; unavailable/unconfirmed state fails explicitly. LLM configuration mutations remain staged-secret human operations. These tools query current facts rather than fixed runtimeInfo text and can feed bounded model continuation.
+
+
+## Typed device, navigation and environment entry points
+
+❌ Pending: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+
+❌ Pending: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+
+❌ Pending: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+
+## Independent history presentation values
+
+❌ Pending: remove the final UI → StorageChat project dependency. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+
+✅ ADR0180: Memory / memory identity and MemoryHistoryIntent are used consistently in configuration, host transport, presentation source guards and regression fixtures; preserve history.intent/1 and runtime behavior. Enforce the two reorganized roles’ directory/actor/configuration naming and isolated business components.
+
+✅ ADR0180: boundary checks require every directory-owned Agent configuration to match its directory, actor filename/type and lowerCamelCase identity. Root ApplicationControl remains an explicitly documented migration exception; removed ConversationMemory aliases are rejected in current Swift/JSON.
+
+✅ ADR0181: boundary checks require composition-injected root Photographer transport rather than a transient lifecycle factory; camera grants are absent from ApplicationControl.
+
+
+✅ ADR0182: canonical applicationControl identity and role-directory packaging checks; existing resource/provider/device/navigation/failure regressions now exercise ApplicationControl. All concrete Agent configurations require canonical role directories; no root exception remains.

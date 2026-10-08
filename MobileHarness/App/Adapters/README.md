@@ -59,7 +59,7 @@ flowchart LR
 
 ## Local model resources — current contract
 
-✅ ModelArtifactStorageAdapter bridges generic Storage into Management. Installed status compares the local receipt and actual file sizes; installed byte totals come from the receipt. SettingsModelResourcesAdapter maps Management snapshots into UI values and validates Nemotron hardware compatibility. Download SDK calls belong to ModelKitHub; App composes that adapter. ❌ Full iPhone acceptance remains pending.
+✅ ModelArtifactStorageAdapter bridges generic Storage into Management. Installed status compares the local receipt and actual file sizes; installed byte totals come from the receipt. ModelResourceCapabilityAdapter maps Management snapshots into neutral inventory facts and validates Nemotron hardware compatibility. SettingsModelResourcesAdapter converts successful Actions inventory JSON into UI values. Download SDK calls belong to ModelKitHub; App composes that adapter. ❌ Full iPhone acceptance remains pending.
 
 ✅ SettingsModelResourcesAdapter 将资源阶段映射为 UI 独立的 queued/downloading/installing/deleting 值，提供实际下载进度；UI 不接触 ModelKit 类型。❌ 原生 iOS 展示验证仍需完整 Xcode/设备。
 
@@ -114,3 +114,84 @@ flowchart LR
 ✅ ADR0160: callable functions and shared producer failures are independent of call protocols. This directory consumes the appropriate pure function/shared invocation or registration adapter at its existing boundary; host profiles own protocol selection. ❌ Broader feature Signal migration and physical acceptance remain separate.
 
 ✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+✅ Implemented: ModelResourceCapabilityAdapter translates protocol-neutral id/source inputs into ModelKit operations using the same process-wide artifact manager and joined quiescence callback. No business selection, queue or UI draft import.
+
+
+✅ ADR0167: the native resource adapter suppresses unchanged binding tuples and updates its cache only after successful injected binding. Composition supplies lifecycle begin/end and ModelKitDefaults adaptation; the adapter never chooses or persists preferences.
+
+
+✅ ADR0168: native preference validation converts protocol-neutral durable values using ModelDownloadSource. Stable invocation error markers become existing localized source/installation notices; registered failure presentation remains pending.
+
+
+✅ ADR0169: the native adapter maps SDK phases/metadata into neutral facts, rejects unknown phases and oversized item count. The view adapter decodes canonical inventory, preserves phase/failure wording and maps precomputed group identifiers to UI values.
+
+The inventory capability returns raw neutral facts. The snapshotResources function computes installed groups during callable execution and includes them in canonical JSON; the native adapter does not compute eligibility.
+
+✅ ADR0170: ResourcePresentationAdapter in SettingsModelResourcesAdapter.swift validates root session and passive UI revision before mapping inventory or committing failure text. It owns no queue, native query or business decision.
+
+✅ ADR0171: native adapter produces a stable sorted-key bounded fingerprint of neutral facts, without installed eligibility decisions. ResourcePresentationAdapter acknowledges accepted snapshots to the existing interaction coordinator; native input source is explicitly declared.
+
+
+✅ ADR0172: ResourcePresentationAdapter adds session-checked operation failure commitment, independent of snapshot generation. It preserves passive refresh-error ownership rules; no native command retry.
+
+
+✅ ADR0173: ResourcePresentationAdapter gains root-session checked preference error/notice commitment. recognition/synthesis map to existing UI messages, invalidSource to source guidance, execution to bounded diagnostic text. No business classification from message text on the registered path.
+
+ADR0173 localization detail: registered and legacy-fallback source guidance reuse one adapter-owned message; native business validation is not duplicated.
+
+ADR0173 concurrency detail: shared source guidance is an immutable nonisolated String so LocalizedError can read it outside the default App actor; all UI commitment remains MainActor-isolated.
+
+
+## Resource host-failure Signal — ADR0174
+
+✅ MediaInputAdapter admits app.resources alongside model.resources in the root communication policy. Host transport facts use the typed model.resource.hostFailure/1 schema and retain original request correlation through parentID. Existing session-checked resource presentation endpoints handle the Agent-selected function without new native behavior or text classification. Diagnostic admission/cleanup belongs to Workflows/Settings/README.md.
+
+
+## Provider discovery
+
+✅ Implemented: SettingsProviderAdapter injects discovery transport into existing SettingsProviderOperations. Native discoverModels accepts neutral Actions configuration and uses the unchanged provider SDK query. It maps HTTP status/configuration/cancellation/unknown transport failures into credential-free errors; localized display remains at the settings boundary. No direct SDK query remains in the injected UI operation.
+
+ProviderIntentFailure carries the producer failureCode separately from the error chain. The adapter localizes exact configuration/model-list/capacity/expired-request codes and bounded HTTP status codes, without interpreting credential-bearing SDK text.
+
+
+## Provider configuration transactions
+
+✅ Implemented: SettingsCredentialAdapter.swift exposes raw Keychain legacy/key bytes, insert/delete operations and unchanged service/accessibility identifiers. Actions owns decoding, reference replacement and migration order. SettingsProviderAdapter prepares neutral provider values and supplies SDK apply/barrier callbacks; injected UI operations only use intent transport. Safe provider transaction codes localize at this boundary; raw credentials/SDK error strings never reach runtime records.
+
+
+## Completion batch — provider presentation and capability policy
+
+✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsInteractionWorkflow in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
+
+✅ Implemented: presentation-enabled provider intents select a second registered UI.ResourcePresentation.showProviderResult call after the business call, on success or failure. Headless requests retain one call. Private result lookup and revision/session fences prevent credentials in protocol payloads and stale form updates. One attempt only, no recursive presentation/replay; producer and presentation failure chains remain distinct. App injects the native UI endpoint; business functions remain independent of UI and call protocols.
+
+
+## Typed device, navigation and environment entry points
+
+✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+
+✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+
+✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+
+## Independent history presentation values
+
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+
+
+## Camera command entry
+
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+
+
+## Manual worker terminal feedback
+
+✅ Implemented: accepted device-control calls acknowledge submission only. Preset/jog native workers capture their own origin and report sink, retain one latest structured terminal failure, publish independent home issues and deliver a trusted ActionResult through InputGateway after non-cancellation failure. Root ApplicationControl accepts runtime-owned Action results into a bounded128-result inbox; environment context exposes the latest result summary. No accepted Tool receipt is rewritten, no movement replay, and no tolerance/arrival/timeout algorithm changes. Ordinary failure stops only its worker and keeps subsequent intents admissible. Diagnostic delivery rejection is reported separately.
+
+✅ Manual terminal feedback preserves partial failure when the original report includes successful children; environment summaries retain execution-level failure codes alongside all child entries.
+
+✅ Implemented admission hardening: the native device endpoint validates its existing foreground, connection and worker admission conditions before accepting scan/connect/reconnect/preset/jog. Rejected void UI commands must become explicit call errors, without changing native recovery/motion algorithms. Device facts include the current native issue. Motor arguments reject unrelated preset fields.
+
+✅ ADR0181: RuntimePresentation accepts physical camera effects from Photographer in its root session or an active validated voice session. Assistant calls validate voice then delegate through the bound Gateway invocation Signal context; they do not directly mutate native capture. Retain complete nested Tool reports when returning failures to the original caller. No ApplicationControl camera exemption remains.

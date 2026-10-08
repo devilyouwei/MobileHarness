@@ -422,7 +422,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             await previousSpeechTask?.value
             if let oldGeneration, let previousRequests {
                 _ = try? await previousRequests.send(
-                    AgentInput(sessionID: oldGeneration, payload: .event("assistant.cancel")), to: .assistant)
+                    AssistantControl.cancelSession.input(sessionID: oldGeneration), to: .assistant)
                 await previousAudioStore?.cancel(sessionID: oldGeneration)
                 await previousResponses?.cancel(sessionID: oldGeneration)
                 _ = try? await previousResponse?.value
@@ -518,7 +518,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
 
     func validateCameraControl(invocation: any FunctionInput) throws {
         try Task.checkCancellation()
-        guard invocation.context.source == AgentID.assistant.rawValue,
+        guard [AgentID.assistant.rawValue, AgentID.photographer.rawValue].contains(invocation.context.source),
             accepts(session: invocation.context.sessionID)
         else { throw CancellationError() }
     }

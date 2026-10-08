@@ -65,7 +65,7 @@ private actor StreamingSentenceChat: ChatCapability {
     var outputs = agent.outputs.makeAsyncIterator()
     _ = try #require(await outputs.next())
     _ = try #require(await outputs.next())
-    try await agent.receive(AgentInput(sessionID: input.sessionID, payload: .event("assistant.cancel")))
+    try await agent.receive(AssistantControl.cancelSession.input(sessionID: input.sessionID))
     let next = AgentInput(sessionID: UUID(), payload: .text("next"))
     try await agent.receive(next)
     for _ in 0..<3 {

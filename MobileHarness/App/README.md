@@ -6,7 +6,7 @@ Design goals: explicit role-specific dependencies, one process-wide model manage
 
 ## Upstream and downstream
 
-Arrows show runtime input/effects; dashed arrows show construction or injection. Remaining feature workflows are explicitly staged paths, not completed Agent routing.
+Arrows show runtime input/effects; dashed arrows show construction or injection. Native lifecycle and diagnostic workflows retain explicit host ownership.
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,7 @@ flowchart LR
     Endpoints -->|Scoped accepted state| State[UI presentation state]
     State --> UI
     Endpoints -->|Native effect| Platform
-    Adapter -->|Staged settings / device / diagnostic operations| Workflows[Feature workflows / lifecycle owners]
+    Adapter -->|Native lifecycle / diagnostic operations| Workflows[Feature workflows / lifecycle owners]
     Workflows --> State
     Workflows --> Services[Storage / model / platform capabilities]
     Root[App composition] -.-> Agents
@@ -29,7 +29,7 @@ flowchart LR
     Root -.-> Services
 ```
 
-Agent-selected business effects always cross OutputGateway; input adaptation and runtime observations are not alternative permission paths. Local UI drafts remain in UI. Settings, archive/title, manual-device and diagnostic routes retain documented host ownership until migrated.
+Agent-selected business effects always cross OutputGateway; input adaptation and runtime observations are not alternative permission paths. Local UI drafts remain in UI. Settings and manual-device commands are Agent-routed; native diagnostics and immediate safety fences remain host mechanisms.
 
 ## Internal structure
 
@@ -100,10 +100,68 @@ Native download background handling is separate from voice/device lifetime. App 
 
 ## Implementation status
 
-✅ Root assembly, one frozen function store with explicit protocol bindings, role-specific lifecycle injection, six workflow targets and root-owned runtime observations. History refresh/confirmed deletion uses ConversationMemory through both Gateways.
+✅ Root assembly, one frozen function store with explicit protocol bindings, role-specific lifecycle injection, six workflow targets and root-owned runtime observations. History refresh/confirmed deletion uses Memory through both Gateways.
 
 ✅ Voice/camera and Bluetooth observation lifetimes survive page navigation as specified. Home keep-awake is foreground/page-scoped; model switches preserve the shared journal. Debug preview/diagnostic behavior is labeled and gated.
 
-❌ Remaining settings, archive/title, resource and device business routes still need Agent/typed-Signal migration. Independent multi-window namespaces, background supervision and forced interruption of non-cooperative handlers are not implemented. Device/model acceptance is separate from build results.
+❌ Remaining settings/provider, resource host error presentation and device business routes still need Agent/typed-Signal migration. Independent multi-window namespaces, background supervision and forced interruption of non-cooperative handlers are not implemented. Device/model acceptance is separate from build results.
 
 See [Agent-driven architecture](../README.md), [Behavior assembly](Composition/Behaviors/README.md) and the owning lifecycle/workflow READMEs for detailed limits and platform policies.
+
+✅ Implemented: voice lifecycle cancellation emits typed AssistantControl through the existing InputGateway path; App retains immediate capture shutdown and session cleanup ownership.
+
+✅ Implemented: history facade delegates all mutation operations to typed root Agent transport. Composition injects shared journal and lazy title-only computation; no App archival/title persistence policy remains.
+
+✅ Implemented: composition creates root ApplicationControl/ApplicationControlIntentRuntime and injects command operations into the existing settings workflow. Lifecycle/native maintenance remains host-owned; admitted operations survive page cancellation.
+
+
+✅ ADR0167: actual speech model binding is Agent-routed; App supplies lifecycle/native endpoints. Source persistence and installation validation remain staged Settings policy. Committed preference application failures are visible and retryable through explicit restore.
+
+
+✅ ADR0168: App constructs the preference service and supplies the trusted store URL, SDK validator and installed-ID snapshot. It translates Agent results into view drafts/notices; no source transaction or binding sequence remains in composition.
+
+
+✅ ADR0169: resource refresh now sends Agent intent; composition injects raw native inventory capability. App converts canonical inventory to view values and localized text. Registered refresh snapshot/query-failure effects are implemented in ADR0170; remaining preference/transport error presentation is outstanding.
+
+✅ ADR0170: inject resource presentation into canonical catalog and root runtime. Production refresh binding requests Agent-selected presentation; interaction no longer assigns queried items/groups or duplicates already-presented refresh errors. Remaining host failure projection is explicitly staged.
+
+✅ ADR0171: root ownership adds a bounded resource observation worker independent of page lifetime. Input facts use a declared external source and sequenced typed Signal; background suspends samples without cancelling native transfers.
+
+
+✅ ADR0172: Root operation-error endpoint validates session and mutates passive error state. Interaction suppresses local duplicate only after successful registered presentation; native algorithms and cancellation ordering remain unchanged.
+
+
+✅ ADR0173: Root adapter localizes Agent-selected preference reason into existing notice/error state. Workflow rollback still restores confirmed flags; acknowledged presentation prevents duplicate local assignment. Legacy text classification remains unavailable-transport fallback only.
+
+
+## Resource host-failure Signal — ADR0174
+
+✅ Root-owned ApplicationControlIntentRuntime joins a failed original request before submitting one fresh host-failure Signal. ApplicationControl selects the registered error function; acknowledgment marks the original failure as presented, preserving its cause. One diagnostic slot has no queue and uses the existing request budget. Startup/closed/cancellation/capacity failure, occupied diagnostic/error-presentation slots and unavailable infrastructure retain explicit local fallback. No original effect retry or runtime restart. Detailed cleanup/call limits belong to Workflows/Settings/README.md.
+
+
+## Provider discovery
+
+✅ Implemented: ApplicationRuntime stages provider discovery in the injected Actions request store, submits the opaque intent to its existing resource root transport and discards unclaimed staging on success/failure. UI model selection and late-result revision handling stay in the existing form. Provider restore/save/rollback now belongs to Actions and Agent-selected functions; the workflow is a form facade.
+
+
+## Provider configuration transactions
+
+✅ Implemented: Provider business transactions/schema move from SettingsWorkflow/CloudSettingsStore to Actions/System/Support. App injects native credential/SDK/lifecycle primitives, stages private drafts and adapts acknowledged results. SettingsWorkflow becomes a bounded injected form facade; it has no Storage or provider prepare/apply call. Native credential primitives remain App-owned adaptation, not business policy.
+
+
+## Completion batch — provider presentation and capability policy
+
+✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsInteractionWorkflow in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
+
+✅ Implemented: presentation-enabled provider intents select a second registered UI.ResourcePresentation.showProviderResult call after the business call, on success or failure. Headless requests retain one call. Private result lookup and revision/session fences prevent credentials in protocol payloads and stale form updates. One attempt only, no recursive presentation/replay; producer and presentation failure chains remain distinct. App injects the native UI endpoint; business functions remain independent of UI and call protocols.
+
+
+## Typed device, navigation and environment entry points
+
+✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+
+✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+
+✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+✅ ADR0181: root PhotographerIntentRuntime owns lazy Photographer registration, one output consumer, one camera request and independent tracking dispatch. CameraInteractionWorkflow emits typed Photographer operations. VisionSession attaches/detaches tracking rather than constructing/removing Photographer. Native camera scopes remain unchanged.

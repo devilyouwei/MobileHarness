@@ -321,7 +321,7 @@ private func runNexArmAssistantMarkup(
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
         externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
-        configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception"].map {
+        configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer"].map {
             try AgentConfigurations.load(named: $0)
         })
     let input = InputGateway(manager: manager, policy: policy)

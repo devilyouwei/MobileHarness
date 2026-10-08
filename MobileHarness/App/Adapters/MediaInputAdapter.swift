@@ -4,7 +4,10 @@ import Foundation
 
 /// The host owns device source names and media admission deadlines.
 enum MediaInputAdapter {
-    static let externalSources: Set<String> = ["user", "runtime", "phone.microphone", "phone.camera"]
+    static let externalSources: Set<String> = [
+        "user", "runtime", "phone.microphone", "phone.camera", ModelResourceObservation.source,
+        ModelResourceHostFailure.source, AppEnvironmentFact.source,
+    ]
     static func audio(_ audio: AudioInput, sessionID: UUID) -> AgentInput {
         let id = UUID()
         let payload = InputPayload.audio(audio)

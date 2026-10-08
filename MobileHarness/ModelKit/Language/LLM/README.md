@@ -30,7 +30,7 @@ flowchart LR
 Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
 
 ✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
-❌ Local native tools, result-driven model continuation, partial native tool-call transcripts and Responses API transport.
+✅ Provider-neutral complete Tool transcripts are supported for bounded Agent-owned continuation. ❌ Local native tools, incomplete native transcripts and Responses API transport remain unsupported.
 
 ✅ Chat capability declarations now use member-level public access per strict Swift formatting. No capability semantics changed.
 
@@ -38,3 +38,10 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ✅ ChatEvent.usage(ChatTokenUsage) reports nonnegative input/generated/total counts before the consumer's terminal finished event. Cloud counts come from provider usage; Gemma 4 E2B counts come from the actual template tokens and backend generation, including a consumed stop token. No AgentCore or Storage types enter ModelKit.
 ❌ Providers may omit usage, and failed/cancelled generations may have no final counts; callers must not estimate or substitute zero.
+
+
+## Bounded native result continuation
+
+✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.

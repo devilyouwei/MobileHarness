@@ -11,7 +11,7 @@ Arrows show capability calls/data movement; they are not Signal transport. App i
 ```mermaid
 flowchart LR
     App[App composition / settings / resource adapters] --> Core[Storage core mechanisms]
-    Agents[Assistant / ConversationMemory] --> Chat[StorageChat records and journal]
+    Agents[Assistant / Memory] --> Chat[StorageChat records and journal]
     Functions[Actions/History via injected capabilities] --> HistoryHost[App history endpoint]
     HistoryHost --> Chat
     Chat --> Core
@@ -20,10 +20,11 @@ flowchart LR
     Audio --> Core
     Core --> Memory[Bounded process memory]
     Core --> Files[Confined files / atomic documents]
-    Chat -->|Display record values only| UI[UI]
+    Chat -->|Record values| Adapter[App history adapter]
+    Adapter -->|UI-owned view values| UI[UI]
 ```
 
-Agents may read/write foundational stores directly for context and internal cache work. Complete exposed history operations use registered functions and Gateway feedback. UI imports record values without acquiring a journal service. Storage never delivers Agent messages.
+Agents may read/write foundational stores directly for context and internal cache work. Complete exposed history operations use registered functions and Gateway feedback. UI imports no Storage target; App copies records into independently owned presentation values. Storage never delivers Agent messages.
 
 ## Internal structure
 
@@ -92,3 +93,10 @@ Core never imports a domain or concrete business service. App owns settings/cred
 ❌ Persistent image/video/audio domains, semantic memory/retrieval/forgetting, reclaimable disk caches, cross-namespace budgets and cross-device/process synchronization are not implemented. MemoryLeaseStore is a cache primitive, not a semantic memory Agent. File-protection and locked-device acceptance remain separate.
 
 See [Chat](Chat/README.md), [Audio](Audio/README.md), [Model management](../ModelKit/Management/README.md) and [Agent-driven architecture](../README.md).
+
+
+## Bounded native result continuation
+
+✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.

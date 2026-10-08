@@ -41,9 +41,9 @@ flowchart LR
 
 Protocol reference: [official OpenAI Chat API](https://developers.openai.com/api/reference/resources/chat).
 
-✅ OpenAIChatConfiguration.models performs GET /models with optional authentication for explicit user selection: 30-second timeout, no redirects/cache/cookies, 1 MiB response, at most 2048 IDs of at most 512 bytes, deduplicated in server order. Discovery errors are sanitized. App stores nonsecret configuration through Storage and credentials in Keychain and applies it through Defaults.configureChat without restart. ❌ A listed model is not guaranteed to support chat; generation errors remain explicit.
+✅ OpenAIChatConfiguration.models performs GET /models with optional authentication for explicit user selection: 30-second timeout, no redirects/cache/cookies, 1 MiB response, at most 2048 IDs of at most 512 bytes, deduplicated in server order. Discovery errors are sanitized. Actions owns nonsecret configuration persistence through Storage and credential references; App injects Keychain primitives and Defaults.configureChat application without restart. The SDK owns no settings transaction. ❌ A listed model is not guaranteed to support chat; generation errors remain explicit.
 
-✅ Empty credentials omit Authorization for both discovery and chat. Blank endpoint text resolves to https://api.openai.com/v1; HTTPS validation remains enforced. Discovery excludes known embedding, reranking, moderation, media, legacy completion and specialized non-chat families. Standard /models objects do not expose capabilities, so name-based filtering is heuristic: unknown third-party deployment names remain available. ❌ Discovery does not prove provider compatibility. See [official model objects](https://developers.openai.com/api/reference/resources/models).
+✅ Empty credentials omit Authorization for both discovery and chat. Blank endpoint text resolves to https://api.openai.com/v1; HTTPS validation remains enforced. Discovery validates raw model IDs without business filtering. Actions owns the app chat-family eligibility heuristic. ❌ Discovery does not prove provider compatibility. See [official model objects](https://developers.openai.com/api/reference/resources/models).
 
 ✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
@@ -64,8 +64,8 @@ flowchart LR
 
 Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
 
-✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
-❌ Local native tools, result-driven model continuation, partial native tool-call transcripts and Responses API transport.
+✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Complete returning native results drive bounded Agent continuation as data; completion-only Tools produce no result.
+✅ Provider-neutral complete Tool transcripts are supported for bounded Agent-owned continuation. ❌ Local native tools, incomplete native transcripts and Responses API transport remain unsupported.
 
 ✅ SSE decoding and request declarations satisfy Swift 6.4 strict formatting; provider behavior is unchanged.
 
@@ -73,3 +73,14 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 
 ✅ Requests ask for stream_options.include_usage. The adapter continues reading after the terminal choice through trailing usage until [DONE] or clean EOF; it holds the finished event until the stream is drained and the lease released. Only usage may follow a terminal choice. Complete tool calls retain their existing validation/dispatch boundary. prompt_tokens/completion_tokens/total_tokens become provider-neutral ChatEvent.usage; invalid/duplicate usage fails explicitly. Missing usage is allowed and never fabricated.
 ❌ Real third-party support for include_usage remains an acceptance item; no fallback request or retry is added.
+
+✅ Provider discovery execution is now called through the host-injected Actions capability and an opaque Agent intent; HTTP decoding/cancellation bounds remain unchanged. ✅ Model-family filtering has moved to Actions ProviderModelList; decodeModels only validates and deduplicates raw IDs.
+
+✅ Implemented: native discovery decoding returns all valid unique IDs without isLikelyChatModel. Actions owns eligibility; HTTP and malformed-response bounds remain native.
+
+
+## Bounded native result continuation
+
+✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.

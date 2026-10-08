@@ -6,7 +6,7 @@ import sys
 root = pathlib.Path(__file__).resolve().parent.parent
 app = pathlib.Path(sys.argv[1])
 bundle = app / 'HarnessKit_Agents.bundle'
-expected = {p.name: p for p in (root / 'MobileHarness/Agents').glob('*/*.agent.json')}
+expected = {p.name: p for p in (root / 'MobileHarness/Agents').rglob('*.agent.json')}
 actual = {p.name: p for p in bundle.glob('*.agent.json')}
 if set(expected) != set(actual):
     raise SystemExit(f'Agent package mismatch: missing={sorted(set(expected)-set(actual))}, stale={sorted(set(actual)-set(expected))}')

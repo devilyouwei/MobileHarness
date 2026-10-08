@@ -273,6 +273,12 @@ private struct NativeCameraHistoryChat: ChatCapability {
         #expect(request.maximumOutputTokens == nil)
         #expect(request.tools.contains { $0.name == "Camera.open" })
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        if request.messages.last?.role == .tool {
+            try pair.emitter.yield(.text("<express emotion=\"smile\"/>"))
+            try pair.emitter.yield(.finished(.stop))
+            pair.emitter.finish()
+            return pair.session
+        }
         try pair.emitter.yield(.text("<express emotion=\"smile\"/>"))
         try pair.emitter.yield(
             .toolCall(ChatToolCall(id: "cloud-camera", name: "Camera.open", argumentsJSON: "{}")))
@@ -299,12 +305,19 @@ private struct NativeCameraHistoryChat: ChatCapability {
         return
     }
     #expect(call.toolPath == "Camera.Capture.open")
-    #expect(await outputs.next()?.output == .control("assistant.finished"))
+    let feedbackPayload = InputPayload.toolResult(.init(callID: call.id, value: "completed"))
+    try await agent.receive(
+        AgentInput(
+            sessionID: input.sessionID, payload: feedbackPayload,
+            metadata: InputMetadata(
+                payload: feedbackPayload, source: "runtime", origin: .runtime, rootID: input.metadata.rootID,
+                parentID: input.id)))
+    while let output = await outputs.next() { if output.output == .control("assistant.finished") { break } }
     let record = try #require(try await store.snapshot().current.turns.first)
-    #expect(record.state == .completed && record.finishReason == "toolCalls")
+    #expect(record.state == .completed && record.finishReason == "stop")
     #expect(record.toolCalls?.first?.id == call.id)
     #expect(record.toolCalls?.first?.providerID == "cloud-camera")
-    #expect(record.toolCalls?.first?.state == .received)
+    #expect(record.toolCalls?.first?.state == .completed)
     #expect(record.tokenUsage?.generated == 20)
     #expect(record.toolDefinitions?.contains { $0.contains("Camera.open") } == true)
     await agent.stop()

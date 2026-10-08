@@ -254,4 +254,41 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 
 ✅ ADR0162: invocation-local failures preserve structured reports and terminal causes across both call protocols; explicit cancellation and admission scopes remain unchanged. See [decision](0162-invocation-failure-isolation.md).
 
-✅ [ADR0163 — Typed history and feedback causality](0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Remaining typed host controls, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.
+✅ [ADR0163 — Typed history and feedback causality](0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Unified lifecycle/capability fact Signals, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.
+
+✅ [ADR0164 — Typed Assistant host control](0164-typed-assistant-host-control.md): assistant.control/1 replaces the host cancellation string; runtime.event permission is removed from Assistant. ❌ Unified lifecycle/capability facts remain pending.
+
+✅ [ADR0165 — Agent-selected archive and title](0165-agent-history-archive-and-title.md): deterministic history archive/title sequencing and Gateway effects replace direct workflow mutations. ❌ Conversational mutations and general model continuation remain pending.
+
+- [ADR0166 — Agent-routed model resource commands](0166-agent-model-resource-commands.md): bounded native admission/cancel/remove through both Gateways.
+
+- [ADR0167 — Agent-routed speech model binding](0167-agent-speech-model-binding.md): explicit application failure and durable preference retry.
+
+- [ADR0168 — Agent-owned resource preference transactions](0168-agent-resource-preferences.md): two-call source/binding sequence and durable preference ownership.
+
+- [ADR0169 — Agent-routed resource inventory](0169-agent-resource-inventory.md): bounded query results and shared installed prerequisites.
+
+- [ADR0170 — resource refresh presentation](0170-agent-resource-refresh-presentation.md): ✅ Agent-selected, revision-fenced resource snapshot/query-failure presentation; other settings paths remain staged.
+
+- [ADR0171 — root resource observations](0171-root-resource-state-observations.md): ✅ Sequenced native invalidations and page-independent sampled presentation; native push/shared state remain outstanding.
+
+- [ADR0172 — resource command failures](0172-agent-resource-command-failures.md): ✅ Agent-selected operation-error presentation; preference/transport routes remain staged.
+
+- [ADR0173 — resource preference failures](0173-agent-resource-preference-failures.md): ✅ Agent-selected notices/error presentation, exact failure codes and per-request call bounds; host fallback remains staged.
+
+- [ADR0174 — Resource host failure Signals](0174-resource-host-failure-signals.md): ✅ Recoverable transport diagnostics through Agent-selected presentation; infrastructure fallback remains explicit.
+
+- [ADR0175 — Agent-routed provider model discovery](0175-agent-provider-model-discovery.md): ✅ Credential-free discovery intents and bounded canonical queries; transactions/presentation remain pending.
+
+- [ADR0176 — Provider configuration transactions](0176-agent-provider-configuration-transactions.md): ✅ Agent-selected restore/save, private credentials/results and Actions-owned apply/rollback. Registered provider UI effects are implemented in ADR0177; native acceptance remains pending.
+
+- [ADR0177 — Provider presentation and policy](0177-agent-provider-presentation-and-policy.md): passive provider form, Actions eligibility and registered result/error commitment.
+- [ADR0178 — Bounded native continuation](0178-bounded-native-result-continuation.md): correlated native results, four model rounds, actual error data and exact request history.
+- [ADR0179 — Device/navigation/environment](0179-typed-device-navigation-environment.md): shared manual/model functions, sequenced root facts, independent manual terminal results and zero-dependency UI values.
+
+- [ADR0180 — Memory and Photographer business services](0180-memory-photographer-service-organization.md): canonical Memory naming and focused Photographer/Memory business components; implemented; checks/device build passed, Simulator dependency blocked.
+
+- [ADR0181 — Photographer camera control](0181-photographer-camera-control.md): camera ownership, bounded root service and authorized model delegation; checks/device build passed, Simulator dependency blocked.
+
+
+✅ [ApplicationControl service organization](0182-application-control-service-organization.md): ADR0182 implements canonical role-directory, identity and host-transport migration; existing business behavior retained. Validation is recorded separately.

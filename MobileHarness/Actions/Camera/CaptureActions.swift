@@ -2,6 +2,12 @@ import FunctionContracts
 
 /// Camera.Capture function ownership; current invocation paths remain compatible.
 extension CameraActions {
+    @Action(domain: "Camera", module: "Capture", title: "retry", serializationKey: "Camera")
+    public static func retry(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
+        try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
+        try Task.checkCancellation()
+        try await camera.retry(invocation: invocation)
+    }
     @Action(
         domain: "Camera", module: "Capture", title: "open", serializationKey: "Camera")
     public static func open(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {

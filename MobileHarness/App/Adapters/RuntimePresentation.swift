@@ -1,5 +1,7 @@
 import Actions
 import AgentCore
+import Agents
+import AppWorkflows
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -34,17 +36,44 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     PosePresentationCapability, CameraControlCapability
 {
     private let cameraControl: any CameraControlCapability
-    init(cameraControl: any CameraControlCapability) { self.cameraControl = cameraControl }
+    private let rootSessionID: UUID
+    init(cameraControl: any CameraControlCapability, rootSessionID: UUID) {
+        self.cameraControl = cameraControl
+        self.rootSessionID = rootSessionID
+    }
+    var cameraRequests:
+        (@MainActor @Sendable (PhotographerCameraIntent.Operation, any FunctionInput) async throws -> Void)?
+    private func cameraOperation(_ operation: PhotographerCameraIntent.Operation, invocation: any FunctionInput)
+        async throws
+    {
+        if invocation.context.source == "photographer" {
+            if invocation.context.sessionID != rootSessionID {
+                guard let voice else { throw CommunicationError.scopeClosed }
+                try voice.validateCameraControl(invocation: invocation)
+            }
+            switch operation {
+            case .open: try await cameraControl.setEnabled(true, invocation: invocation)
+            case .close: try await cameraControl.setEnabled(false, invocation: invocation)
+            case .flip: try await cameraControl.flip(invocation: invocation)
+            case .retry: try await cameraControl.retry(invocation: invocation)
+            case .cancel: throw CommunicationError.unauthorized
+            }
+            return
+        }
+        guard invocation.context.source == "assistant", let voice, let cameraRequests else {
+            throw CommunicationError.unauthorized
+        }
+        try voice.validateCameraControl(invocation: invocation)
+        do { try await cameraRequests(operation, invocation) } catch PhotographerIntentFailure.execution(let result) {
+            if case .report(let report)? = result.tool?.completion { throw ActionReportedError(report) }
+            throw PhotographerIntentFailure.execution(result)
+        }
+    }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
-        try voice.validateCameraControl(invocation: invocation)
-        try await cameraControl.setEnabled(enabled, invocation: invocation)
+        try await cameraOperation(enabled ? .open : .close, invocation: invocation)
     }
-    func flip(invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
-        try voice.validateCameraControl(invocation: invocation)
-        try await cameraControl.flip(invocation: invocation)
-    }
+    func flip(invocation: any FunctionInput) async throws { try await cameraOperation(.flip, invocation: invocation) }
+    func retry(invocation: any FunctionInput) async throws { try await cameraOperation(.retry, invocation: invocation) }
     private weak var voice: (any VoiceOutputHandling)?
     private weak var camera: (any CameraOutputHandling)?
     func bindVoice(_ value: any VoiceOutputHandling) throws {

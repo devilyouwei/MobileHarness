@@ -1,0 +1,22 @@
+{
+  "version": 6,
+  "id": "applicationControl",
+  "actions": {},
+  "tools": [],
+  "communication": {
+    "inputs": [
+      {"contract":"action.result","version":1,"kind":"actionResult"},
+      {"contract":"app.environment","version":1,"kind":"observation"},
+      {"contract":"app.interaction","version":1,"kind":"observation"},
+      {"contract": "provider.settings", "version": 1, "kind": "observation"},
+      {"contract": "provider.discovery", "version": 1, "kind": "observation"},
+      {"contract": "model.resource.hostFailure", "version": 1, "kind": "observation"},
+      {"contract": "model.resource.state", "version": 1, "kind": "observation"},
+      {"contract": "model.resource.intent", "version": 1, "kind": "observation"},
+      {"contract": "tool.result", "version": 1, "kind": "toolResult"}
+    ],
+    "subscriptions": [],
+    "publications": [],
+    "sends": []
+  }
+}

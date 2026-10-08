@@ -106,7 +106,7 @@ private func preparedSpeech(
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
         externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
-        configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis"].map {
+        configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer"].map {
             try AgentConfigurations.load(named: $0)
         })
     let gateway = InputGateway(manager: manager, policy: policy)
@@ -432,7 +432,8 @@ private actor EndpointVADSession: VoiceActivitySession {
         externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
         configurations: [
             AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
-            AgentConfigurations.load(named: "SpeechSynthesis"),
+            AgentConfigurations.load(named: "SpeechSynthesis"), AgentConfigurations.load(named: "VisionPerception"),
+            AgentConfigurations.load(named: "Photographer"),
         ])
     let session = UUID()
     let manager = AgentManager()
@@ -586,7 +587,8 @@ private actor EndpointVADSession: VoiceActivitySession {
         externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
         configurations: [
             AgentConfigurations.load(named: "Assistant"), AgentConfigurations.load(named: "SpeechPerception"),
-            AgentConfigurations.load(named: "SpeechSynthesis"),
+            AgentConfigurations.load(named: "SpeechSynthesis"), AgentConfigurations.load(named: "VisionPerception"),
+            AgentConfigurations.load(named: "Photographer"),
         ])
     let input = InputGateway(manager: manager, policy: policy)
     let probe = VoiceProbe()

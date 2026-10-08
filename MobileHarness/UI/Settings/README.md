@@ -165,8 +165,57 @@ flowchart LR
 
 ✅ ADR0133: Bluetooth lists use explicit borderless button behavior to isolate operation taps within native List rows. Recovery-success copy distinguishes restored connectivity from unverified movement. No Action failure or resource policy is added to Settings. ❌ Device touch/layout verification remains pending.
 
-✅ ConversationHistoryPresentation centralizes current/archived title rules and localized defaults; record schemas remain in StorageChat. ❌ History operations still use the existing workflow pending Agent migration.
+✅ ConversationHistoryPresentation centralizes current/archived title rules and localized defaults; record schemas remain in StorageChat. ✅ History operations enter Memory through the existing injected workflow.
 
 ✅ ADR0146: ModelResourcesState owns no Task, effect service or asynchronous operation implementation. Views receive required ModelResourcesControlling with typed download/remove/cancel intent. InstalledGroups and pending/admitted/cancelling snapshots come from AppSettingsWorkflow; UI retains status wording, form edits and confirmation. Installation policy/error and resource operation service contracts moved out of UI.
 
-❌ Cloud SettingsState coordination, page-visible resource polling/endpoint debounce and shared draft/catalog-value extraction remain pending. This stage does not add model-callable resource Tools.
+✅ Cloud SettingsState is passive; SettingsInteractionWorkflow owns bounded form admission. Resource observation is root-owned, while page draft debounce remains local input adaptation. Resource inventory and download/cancel have explicit model grants.
+
+
+✅ ADR0169: ModelResourceViewSnapshot holds items and supplied installedGroups. ModelResourceGroup.modelIDs describes visual grouping, including optional VAD; it does not determine whether custom recognition can be enabled.
+
+✅ ADR0170: beginRefresh advances passive revision; applySnapshot/applyRefreshFailure require its current revision. MainActor assignment is atomic; stale revisions are explicitly rejected. Existing presentation values and command/draft fields remain.
+
+✅ ADR0171: Per-page one-second polling is removed. applyRefreshFailure records refresh ownership; direct error assignment clears that tag. applySnapshot clears its owned refresh error but preserves unrelated command/preference error. No timer or Agent dependency is added.
+
+
+✅ ADR0172: App operation-error endpoint assigns existing error state, clearing refresh ownership. Later snapshots clear only refresh-owned errors. Completion-order operation errors need no refresh generation.
+
+
+✅ ADR0173: Missing-model presentation uses installationNotice and clears error; ordinary preference failures use error and survive progress refresh. UI confirmed-flag rollback remains App coordination, not durable rollback.
+
+
+## Provider discovery
+
+✅ Provider discovery migration: injected discover follows the Agent/Gateway function route while SettingsState retains form drafting, request/loading presentation and revision-based cancellation of late display. Query results contain model IDs only. Provider persistence/model switching use registered transaction functions; registered UI effects remain outstanding.
+
+
+## Provider configuration transactions
+
+✅ Implemented: injected restore/save now complete Agent-selected provider transactions. Form drafting, late-result revisions, loading/save presentation and confirmed model label stay unchanged. Credentials arrive only through the private host value path after requestID acknowledgment. Provider UI effects remain staged.
+
+
+## Completion batch — provider presentation and capability policy
+
+✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsInteractionWorkflow in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
+
+✅ Implemented: presentation-enabled provider intents select a second registered UI.ResourcePresentation.showProviderResult call after the business call, on success or failure. Headless requests retain one call. Private result lookup and revision/session fences prevent credentials in protocol payloads and stale form updates. One attempt only, no recursive presentation/replay; producer and presentation failure chains remain distinct. App injects the native UI endpoint; business functions remain independent of UI and call protocols.
+
+
+## Typed device, navigation and environment entry points
+
+✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+
+✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+
+✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+
+## Independent history presentation values
+
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+
+
+## Provider draft boundary
+
+✅ Implemented: the cloud toggle edits a draft only. UI performs no installed-model check or extra refresh before save; the existing Actions-owned provider transaction validates its injected native binding before persistence or lifecycle fencing. An invalid local selection follows the registered provider error result and leaves the saved configuration intact.

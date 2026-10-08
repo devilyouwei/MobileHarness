@@ -2227,7 +2227,10 @@ func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async th
     try await until { !workflow.state.nearby.isEmpty }
     workflow.connect(link.id)
     await workflow.waitUntilIdle()
-    try await photographer.receive(AgentInput(sessionID: session, payload: payload))
+    try await photographer.receive(
+        AgentInput(
+            sessionID: session, payload: payload,
+            metadata: InputMetadata(payload: payload, source: "visionPerception")))
     await link.blockLiveEnd()
     try await workflow.aim(base: -0.8, pitch: 0.4)
     try await until { await !link.liveCommands.isEmpty }
@@ -3252,4 +3255,24 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     await workflow.waitUntilIdle()
     observer.cancel()
     await observer.value
+}
+
+@Test @MainActor func callableDeviceAdmissionRejectsBackgroundAndUnknownDeviceWithoutEffects() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    #expect(throws: DeviceControlError.unavailable) {
+        try workflow.validateControlAdmission(.init(operation: .connect, id: UUID().uuidString))
+    }
+    workflow.setForeground(false)
+    #expect(throws: NexArmExecutionError.background) {
+        try workflow.validateControlAdmission(.init(operation: .scan))
+    }
+    #expect(await link.connects == 0)
+    await workflow.waitUntilIdle()
+    workflow.setForeground(true)
+    try workflow.validateControlAdmission(.init(operation: .scan))
+    workflow.disconnect()
+    await workflow.waitUntilIdle()
 }

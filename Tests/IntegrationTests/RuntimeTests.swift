@@ -30,7 +30,8 @@ import Testing
     try await agent.start()
     for _ in 0..<129 {
         if await agent.status().lifecycle == .failed { break }
-        try await agent.receive(AgentInput(sessionID: UUID(), payload: .event("test")))
+        try await agent.receive(
+            AgentInput(sessionID: UUID(), payload: .toolResult(ToolResult(callID: UUID(), value: "test"))))
         try await Task.sleep(for: .milliseconds(2))
     }
     #expect(await agent.status().lifecycle == .failed)

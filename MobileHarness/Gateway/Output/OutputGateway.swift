@@ -101,6 +101,33 @@ public actor OutputGateway {
         _ observation: AgentMessage, parent: AgentInput, source: AgentID,
         incarnation: UUID, target: AgentID?
     ) async throws -> DeliveryReport {
+        try await emit(
+            observation, inputID: parent.id, sessionID: parent.sessionID,
+            metadata: parent.metadata, turn: parent.turn, source: source, incarnation: incarnation, target: target)
+    }
+
+    /// Delegate only from the currently bound invocation, preserving original causal routing data.
+    public func delegate(_ message: AgentMessage, context: ActionExecutionContext, to target: AgentID) async throws
+        -> DeliveryReport
+    {
+        guard let binding = InvocationSignalContext.binding else { throw CommunicationError.unauthorized }
+        let envelope = binding.envelope
+        guard
+            envelope.source.rawValue == context.source, envelope.sessionID == context.sessionID,
+            envelope.inputID == context.inputID, envelope.sequence == context.sequence,
+            envelope.turn?.id == context.correlationID, envelope.turn?.ordinal == context.ordinal
+        else { throw CommunicationError.unauthorized }
+        let incarnation = binding.owner.incarnation
+        return try await emit(
+            message, inputID: envelope.inputID, sessionID: envelope.sessionID,
+            metadata: envelope.inputMetadata, turn: envelope.turn, source: envelope.source,
+            incarnation: incarnation, target: target)
+    }
+
+    private func emit(
+        _ observation: AgentMessage, inputID: UUID, sessionID: UUID,
+        metadata: InputMetadata, turn: AgentTurn?, source: AgentID, incarnation: UUID, target: AgentID?
+    ) async throws -> DeliveryReport {
         try Task.checkCancellation()
         guard let policy, let declaration = policy.agents[source] else {
             throw CommunicationError.unauthorized
@@ -108,7 +135,7 @@ public actor OutputGateway {
         guard emitting[source, default: 0] < 16 else { throw CommunicationError.capacityExceeded }
         emitting[source, default: 0] += 1
         defer { emitting[source, default: 1] -= 1 }
-        try await manager.validate(source, incarnation: incarnation, sessionID: parent.sessionID)
+        try await manager.validate(source, incarnation: incarnation, sessionID: sessionID)
         _ = try policy.contracts.validatedSize(observation)
         guard let contract = policy.contracts[observation.contract] else {
             throw CommunicationError.unsupportedContract
@@ -127,20 +154,20 @@ public actor OutputGateway {
         // These commands are newly produced work, not forwarded sensor observations. Their
         // admission deadline starts now; the accepted input may outlive its original routing TTL.
         let generatedCommand = contract.startsNewWork
-        guard (0..<8).contains(parent.metadata.hops) else { throw CommunicationError.hopLimitExceeded }
-        guard generatedCommand || !parent.metadata.expired else { throw CommunicationError.expired }
+        guard (0..<8).contains(metadata.hops) else { throw CommunicationError.hopLimitExceeded }
+        guard generatedCommand || !metadata.expired else { throw CommunicationError.expired }
         sequences[source, default: 0] += 1
         let payload = InputPayload.observation(observation)
         let input = AgentInput(
-            sessionID: parent.sessionID, payload: payload,
+            sessionID: sessionID, payload: payload,
             metadata: InputMetadata(
                 payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
-                capturedAt: parent.metadata.capturedAt, sequence: sequences[source]!, rootID: parent.metadata.rootID,
-                parentID: parent.id, hops: parent.metadata.hops + 1,
+                capturedAt: metadata.capturedAt, sequence: sequences[source]!, rootID: metadata.rootID,
+                parentID: inputID, hops: metadata.hops + 1,
                 deadline: min(
-                    generatedCommand ? .now.advanced(by: .seconds(contract.lifetime)) : parent.metadata.deadline,
+                    generatedCommand ? .now.advanced(by: .seconds(contract.lifetime)) : metadata.deadline,
                     .now.advanced(by: .seconds(contract.lifetime)))),
-            turn: parent.turn)
+            turn: turn)
         let destinations = target.map { [$0] } ?? policy.destinations(for: input)
         let observed = target == nil && observedContracts.contains(observation.contract) && observeEvent != nil
         guard !destinations.isEmpty || observed else { throw CommunicationError.noRecipients }
@@ -222,6 +249,11 @@ public actor OutputGateway {
         await resources?.shutdown()
         await cancelled
         await manager.removeStopObserver(lifecycleObserverID)
+    }
+
+    /// Registration metadata for bounded consumers; does not authorize or execute a call.
+    public func returnsToolResult(for call: ToolCall) async -> Bool {
+        await tools.registry.returnsResult(for: call.toolPath)
     }
 
     /// Production consumers isolate ordinary output failures; explicit cancellation still joins cleanup.
@@ -326,7 +358,10 @@ public actor OutputGateway {
                 throw error
             }
         case .tool(let call):
-            toolResult = try await tools.dispatch(call, envelope: envelope, owner: executionOwner(envelope))
+            let owner = try await executionOwner(envelope)
+            toolResult = try await InvocationSignalContext.$binding.withValue(.init(envelope: envelope, owner: owner)) {
+                try await tools.dispatch(call, envelope: envelope, owner: owner)
+            }
         case .finish:
             do { try await actions.finish(envelope) } catch {
                 await actions.cancel(envelope)

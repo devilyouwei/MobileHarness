@@ -5,7 +5,7 @@ import Gateway
 
 /// Root-owned bounded transport. Agents select calls; this host only executes correlated outputs.
 public actor HistoryIntentRuntime {
-    public nonisolated let agent: ConversationMemoryAgent
+    public nonisolated let agent: MemoryAgent
     private let manager: AgentManager
     private let input: InputGateway
     private let output: OutputGateway
@@ -14,7 +14,7 @@ public actor HistoryIntentRuntime {
     private var busy = false
     public init(
         sessionID: UUID, manager: AgentManager, input: InputGateway, output: OutputGateway,
-        agent: ConversationMemoryAgent
+        agent: MemoryAgent
     ) {
         self.sessionID = sessionID
         self.manager = manager
@@ -22,38 +22,63 @@ public actor HistoryIntentRuntime {
         self.output = output
         self.agent = agent
     }
+    public func startNew() async throws { try await run(.startNew) }
+    public func summarize(_ id: UUID) async throws { try await run(.summarize(id)) }
     public func refresh() async throws { try await run(.refresh) }
     public func deleteArchived(_ id: UUID) async throws { try await run(.delete(id)) }
-    private func run(_ intent: ConversationMemoryIntent) async throws {
+    private func run(_ intent: MemoryHistoryIntent) async throws {
         guard !busy else { throw CommunicationError.capacityExceeded }
         busy = true
         defer { busy = false }
         try Task.checkCancellation()
         if !started {
             try await manager.register(agent, sessionID: sessionID)
-            try await manager.start(.conversationMemory)
+            try await manager.start(.memory)
             started = true
         }
         try Task.checkCancellation()
         let request = intent.input(sessionID: sessionID)
-        let receipt = try await input.send(request, to: .conversationMemory)
+        let receipt = try await input.send(request, to: .memory)
         guard receipt.rejected.isEmpty else {
             try Task.checkCancellation()
             throw CommunicationError.invalidPayload
         }
         do {
             // This is a bounded transport contract, not host-selected business behavior.
-            let steps = if case .delete = intent { 2 } else { 1 }
+            let extended: Bool
+            switch intent {
+            case .startNew, .summarize: extended = true
+            default: extended = false
+            }
+            let steps = extended ? 6 : (intent == .refresh ? 1 : 2)
+            var handlerFailure: String?
             for _ in 0..<steps {
                 guard let envelope = await read(request.id) else { throw CancellationError() }
                 try Task.checkCancellation()
+                let returning: Bool
+                if case .toolCall(let call) = envelope.output {
+                    returning = await output.returnsToolResult(for: call)
+                } else {
+                    returning = false
+                }
                 let result = try await output.execute(envelope)
                 try Task.checkCancellation()
-                guard !result.isError else {
+                if extended {
+                    if let failure = result.failure { throw HistoryIntentFailure.execution(failure) }
+                    if let tool = result.tool, tool.isError {
+                        guard returning else { throw HistoryIntentFailure.execution(tool.value) }
+                        handlerFailure = tool.value
+                    }
+                    if case .control("history.finished") = envelope.output { return }
+                    if case .control("history.failed") = envelope.output {
+                        throw HistoryIntentFailure.execution(handlerFailure ?? "History operation failed")
+                    }
+                } else if result.isError {
                     throw HistoryIntentFailure.execution(
                         result.failure ?? result.tool?.value ?? "History execution failed")
                 }
             }
+            if extended { throw HistoryIntentFailure.execution("History sequence exceeded output bound") }
         } catch {
             // The Tool has joined. Cleanup is independent of page cancellation and drains
             // any buffered follow-up before its acknowledgment, retaining admission until done.
@@ -74,8 +99,8 @@ public actor HistoryIntentRuntime {
         return await reader.value
     }
     private func cancelAndDrain(_ requestID: UUID) async throws {
-        let cancellation = ConversationMemoryIntent.cancel(requestID).input(sessionID: sessionID)
-        let receipt = try await input.send(cancellation, to: .conversationMemory)
+        let cancellation = MemoryHistoryIntent.cancel(requestID).input(sessionID: sessionID)
+        let receipt = try await input.send(cancellation, to: .memory)
         guard receipt.rejected.isEmpty else { throw HistoryIntentFailure.execution("History cleanup rejected") }
         // One active request, at most eight retained outputs. No device calls are admitted here.
         for _ in 0..<8 {

@@ -54,13 +54,14 @@ let package = Package(
             dependencies: ["Actions", "FunctionContracts", "ExecutionRuntime", "CallRuntime"],
             path: "MobileHarness/App/Composition/Behaviors", exclude: ["README.md"]),
         .target(
-            name: "UI", dependencies: ["StorageChat"], path: "MobileHarness/UI",
+            name: "UI", dependencies: [], path: "MobileHarness/UI",
             exclude: [
                 "README.md", "Camera/README.md", "Components/README.md", "Conversation/README.md",
                 "Settings/README.md", "Diagnostics/README.md",
             ]),
         .target(
-            name: "AppSettingsWorkflow", dependencies: ["UI", "Storage"], path: "MobileHarness/App/Workflows/Settings",
+            name: "AppSettingsWorkflow", dependencies: ["UI", "AgentCore", "Agents", "Gateway"],
+            path: "MobileHarness/App/Workflows/Settings",
             exclude: ["README.md"]),
         .target(
             name: "AppHistoryWorkflow",
@@ -134,7 +135,8 @@ let package = Package(
                 "Output/Resources/README.md", "Output/Results/README.md", "README.md",
             ]),
         .target(
-            name: "Actions", dependencies: ["FunctionContracts", "PlatformKit", "BehaviorDefinitions", "StorageChat"],
+            name: "Actions",
+            dependencies: ["FunctionContracts", "PlatformKit", "BehaviorDefinitions", "StorageChat", "Storage"],
             path: "MobileHarness/Actions",
             exclude: [
                 "Contracts", "Camera/README.md", "Camera/Support/README.md", "History/README.md",
@@ -149,7 +151,8 @@ let package = Package(
             exclude: [
                 "Core", "Communication/README.md", "SpeechSynthesis/README.md", "Assistant/README.md",
                 "SpeechPerception/README.md",
-                "VisionPerception/README.md", "Photographer/README.md", "ConversationMemory/README.md", "README.md",
+                "VisionPerception/README.md", "Photographer/README.md", "Memory/README.md",
+                "ApplicationControl/README.md", "README.md",
             ],
             resources: [
                 .process("Assistant/Assistant.agent.json"),
@@ -157,7 +160,8 @@ let package = Package(
                 .process("SpeechPerception/SpeechPerception.agent.json"),
                 .process("VisionPerception/VisionPerception.agent.json"),
                 .process("Photographer/Photographer.agent.json"),
-                .process("ConversationMemory/ConversationMemory.agent.json"),
+                .process("Memory/Memory.agent.json"),
+                .process("ApplicationControl/ApplicationControl.agent.json"),
             ]),
         .target(
             name: "Storage", path: "MobileHarness/Storage",

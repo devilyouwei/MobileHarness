@@ -98,7 +98,9 @@ public actor Gemma4Chat: ChatCapability {
     }
 
     static func validate(_ request: ChatRequest) throws {
-        guard request.tools.isEmpty else {
+        guard request.tools.isEmpty,
+            request.messages.allSatisfy({ $0.role != .tool && $0.toolCalls.isEmpty && $0.toolCallID == nil })
+        else {
             throw CapabilityError.invalidRequest("Local native tool calls are unavailable")
         }
         guard request.messages.count <= 64,

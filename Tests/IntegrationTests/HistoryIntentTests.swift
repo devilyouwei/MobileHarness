@@ -7,6 +7,8 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import ModelKit
+import Storage
 import StorageChat
 import Testing
 import UI
@@ -16,6 +18,8 @@ private struct HistoryPresentationModule: ToolModule {
 }
 
 private struct UnusedHistoryMutation: HistoryMutationCapability {
+    func startNew() async throws -> UUID? { throw CommunicationError.unsupportedContract }
+    func summarizeArchived(_ id: UUID) async throws { throw CommunicationError.unsupportedContract }
     func deleteArchived(_ id: UUID) async throws { throw CommunicationError.unsupportedContract }
 }
 private func intentRuntime(
@@ -27,7 +31,7 @@ private func intentRuntime(
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, externalSources: ["user", "runtime"],
-        configurations: [AgentConfigurations.load(named: "ConversationMemory")])
+        configurations: [AgentConfigurations.load(named: "Memory")])
     let input = InputGateway(manager: manager, policy: policy)
     let definition = ActionBinding(
         function: UIActions.showHistoryDefinition(handler: { invocation in
@@ -37,13 +41,23 @@ private func intentRuntime(
         function: HistoryActions.deleteDefinition(completing: { invocation in
             .value(try await HistoryActions.delete(invocation: invocation, using: mutations))
         }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+    let archive = ActionBinding(
+        function: HistoryActions.startNewDefinition(completing: { invocation in
+            .value(try await HistoryActions.startNew(invocation: invocation, using: mutations))
+        }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+    let title = ActionBinding(
+        function: HistoryActions.summarizeDefinition(completing: { invocation in
+            .value(try await HistoryActions.summarize(invocation: invocation, using: mutations))
+        }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
     let gateway = OutputGateway(
         manager: manager, requests: input,
-        tools: try ToolRegistry(modules: [HistoryPresentationModule(definitions: [definition, deletion])]),
+        tools: try ToolRegistry(modules: [
+            HistoryPresentationModule(definitions: [definition, deletion, archive, title])
+        ]),
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
     return try HistoryIntentRuntime(
         sessionID: sessionID, manager: manager, input: input, output: gateway,
-        agent: ConversationMemoryAgent(sessionID: sessionID))
+        agent: MemoryAgent(sessionID: sessionID))
 }
 
 @Test @MainActor func historyRefreshTravelsThroughBothGatewaysWithoutVoiceOrModels() async throws {
@@ -106,7 +120,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
 
 @Test func memoryAgentRejectsUnknownIntentsAndBoundsPendingOutputs() async throws {
     let session = UUID()
-    let agent = try ConversationMemoryAgent(sessionID: session)
+    let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
@@ -115,11 +129,11 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
                 metadata: InputMetadata(payload: .event("history.delete"), source: "user")))
     }
     await #expect(throws: CommunicationError.invalidPayload) {
-        try await agent.receive(ConversationMemoryIntent.refresh.input(sessionID: UUID()))
+        try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: UUID()))
     }
-    for _ in 0..<8 { try await agent.receive(ConversationMemoryIntent.refresh.input(sessionID: session)) }
+    for _ in 0..<8 { try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session)) }
     await #expect(throws: CommunicationError.capacityExceeded) {
-        try await agent.receive(ConversationMemoryIntent.refresh.input(sessionID: session))
+        try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session))
     }
     #expect(await agent.status().lifecycle == .failed)
     await agent.stop()
@@ -152,7 +166,7 @@ private func archivedHistory(_ store: ConversationHistoryStore) async throws -> 
     let runtime = try intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
-        mutations: HistoryMutationService(store: store))
+        mutations: HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" }))
     try await runtime.refresh()
     #expect(state.archive?.past.count == 1)
     try await runtime.deleteArchived(id)
@@ -170,7 +184,7 @@ private func archivedHistory(_ store: ConversationHistoryStore) async throws -> 
     let runtime = try intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
-        mutations: HistoryMutationService(store: store))
+        mutations: HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" }))
     let currentID = try await store.snapshot().current.id
     await #expect(throws: HistoryIntentFailure.self) { try await runtime.deleteArchived(currentID) }
     #expect(state.archive == nil)
@@ -184,7 +198,11 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
     nonisolated let cancelled = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     private let mutations: HistoryMutationService
     private var release: CheckedContinuation<Void, Never>?
-    init(store: ConversationHistoryStore) { mutations = HistoryMutationService(store: store) }
+    init(store: ConversationHistoryStore) {
+        mutations = HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" })
+    }
+    func startNew() async throws -> UUID? { try await mutations.startNew() }
+    func summarizeArchived(_ id: UUID) async throws { try await mutations.summarizeArchived(id) }
     func deleteArchived(_ id: UUID) async throws {
         try await mutations.deleteArchived(id)
         await withTaskCancellationHandler {
@@ -232,9 +250,9 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
 @Test(.timeLimit(.minutes(1))) func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() async throws
 {
     let session = UUID()
-    let agent = try ConversationMemoryAgent(sessionID: session)
+    let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
-    try await agent.receive(ConversationMemoryIntent.delete(UUID()).input(sessionID: session))
+    try await agent.receive(MemoryHistoryIntent.delete(UUID()).input(sessionID: session))
     var reader = agent.outputs.makeAsyncIterator()
     let envelope = try #require(await reader.next())
     guard case .toolCall(let call) = envelope.output else {
@@ -249,7 +267,7 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
                 metadata: InputMetadata(payload: cancelPayload, source: "user")))
     }
     await #expect(throws: CommunicationError.capacityExceeded) {
-        try await agent.receive(ConversationMemoryIntent.refresh.input(sessionID: session))
+        try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session))
     }
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
@@ -277,10 +295,10 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
 @Test func typedHistorySchemaRejectsForeignContentAndLegacyStringIntent() async throws {
     let contracts = try AgentContracts.communication
     let invalid = AgentMessage(
-        contract: ConversationMemoryIntent.contract, content: "history.refresh", validate: { _ in })
+        contract: MemoryHistoryIntent.contract, content: "history.refresh", validate: { _ in })
     #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(invalid) }
     let session = UUID()
-    let agent = try ConversationMemoryAgent(sessionID: session)
+    let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
     let payload = InputPayload.event("history.refresh")
     await #expect(throws: CommunicationError.invalidPayload) {
@@ -290,4 +308,254 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
                 metadata: .init(payload: payload, source: "user")))
     }
     await agent.stop()
+}
+
+private actor ControlledTitle: ChatCapability {
+    nonisolated var availability: CapabilityAvailability { .available }
+    nonisolated let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private var emitter: InferenceEmitter<ChatEvent>?
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        emitter = pair.emitter
+        started.continuation.yield(())
+        return pair.session
+    }
+    func finish(_ title: String) throws {
+        try emitter?.yield(.text(title))
+        try emitter?.yield(.finished(.stop))
+        emitter?.finish()
+    }
+}
+
+private func completedConversation() async throws -> ConversationHistoryStore {
+    let store = ConversationHistoryStore()
+    let id = UUID()
+    let read = try await store.readCurrent()
+    _ = try await store.begin(
+        id: id, user: "原始用户输入", request: [.init(role: .user, content: "原始用户输入")],
+        expecting: read.token, model: "test-model")
+    try await store.append("<wait>原始模型输出</wait>", to: id)
+    try await store.finish(id, state: .completed, reason: "stop")
+    return store
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func archiveCommitsBeforeTitleAndRejectsOverlappingPageOperations() async throws {
+    let store = try await completedConversation()
+    let state = ConversationHistoryState()
+    let chat = ControlledTitle()
+    let session = UUID()
+    let runtime = try intentRuntime(
+        sessionID: session,
+        presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
+        mutations: HistoryMutationService(
+            store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }))
+    let workflow = ConversationHistoryWorkflow(
+        state: state, prepare: {}, refresh: { try await runtime.refresh() },
+        deleteArchive: { try await runtime.deleteArchived($0) },
+        startNew: { try await runtime.startNew() }, summarize: { try await runtime.summarize($0) },
+        previewOutput: { _ in "" })
+    await workflow.load()
+    let old = try #require(state.archive?.current.id)
+    var started = chat.started.stream.makeAsyncIterator()
+    workflow.startNew()
+    await started.next()
+    #expect(state.isBusy)
+    let during = try await store.snapshot()
+    #expect(during.current.turns.isEmpty && during.current.id != old)
+    #expect(during.past.first?.id == old && during.past.first?.summaryTitle == nil)
+    workflow.startNew()
+    workflow.delete(old)
+    try await chat.finish("对话标题")
+    await workflow.waitUntilIdle()
+    let finished = try await store.snapshot()
+    #expect(!state.isBusy && finished.past.count == 1)
+    #expect(finished.past.first?.summaryTitle == "对话标题")
+    #expect(finished.past.first?.turns.first?.raw == "<wait>原始模型输出</wait>")
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry() async throws {
+    let store = try await completedConversation()
+    let chat = ControlledTitle()
+    let state = ConversationHistoryState()
+    let session = UUID()
+    let runtime = try intentRuntime(
+        sessionID: session,
+        presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
+        mutations: HistoryMutationService(
+            store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }))
+    let workflow = ConversationHistoryWorkflow(
+        state: state, prepare: {}, refresh: { try await runtime.refresh() },
+        deleteArchive: { try await runtime.deleteArchived($0) },
+        startNew: { try await runtime.startNew() }, summarize: { try await runtime.summarize($0) },
+        previewOutput: { _ in "" })
+    await workflow.load()
+    var started = chat.started.stream.makeAsyncIterator()
+    workflow.startNew()
+    await started.next()
+    workflow.cancel()
+    #expect(state.isBusy)  // Admission stays closed until the existing operation has cleaned up.
+    await workflow.waitUntilIdle()
+    let archived = try #require(try await store.snapshot().past.first)
+    #expect(!state.isBusy && archived.summaryTitle == nil && archived.titleError != nil)
+    #expect(archived.turns.first?.user == "原始用户输入")
+    workflow.summarize(archived.id)
+    await started.next()
+    try await chat.finish("重新生成的标题")
+    await workflow.waitUntilIdle()
+    #expect(try await store.snapshot().past.first?.summaryTitle == "重新生成的标题")
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
+    async throws
+{
+    let store = ConversationHistoryStore()
+    let current = try await store.snapshot().current.id
+    let state = ConversationHistoryState()
+    let session = UUID()
+    let runtime = try intentRuntime(
+        sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
+        mutations: HistoryMutationService(
+            store: store,
+            summarizeTitle: { _ in
+                Issue.record("Empty history must not infer a title")
+                return "Unexpected"
+            }))
+    try await runtime.startNew()
+    #expect(state.archive?.current.id == current)
+    #expect(state.archive?.past.isEmpty == true)
+    try await runtime.refresh()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func titleFailureRefreshesRetryStateAndAllowsNewAttempt() async throws {
+    let store = ConversationHistoryStore()
+    let id = try await archivedHistory(store)
+    let state = ConversationHistoryState()
+    let chat = ControlledTitle()
+    let session = UUID()
+    let runtime = try intentRuntime(
+        sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
+        mutations: HistoryMutationService(
+            store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }))
+    var started = chat.started.stream.makeAsyncIterator()
+    let first = Task { try await runtime.summarize(id) }
+    await started.next()
+    try await chat.finish("<express emotion=\"happy\"/>")
+    await #expect(throws: HistoryIntentFailure.self) { try await first.value }
+    #expect(state.archive?.past.first?.summaryTitle == nil)
+    #expect(state.archive?.past.first?.titleError != nil)
+    let retry = Task { try await runtime.summarize(id) }
+    await started.next()
+    try await chat.finish("Conversation title")
+    try await retry.value
+    #expect(state.archive?.past.first?.summaryTitle == "Conversation title")
+    #expect(state.archive?.past.first?.titleError == nil)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws
+{
+    let store = ConversationHistoryStore()
+    let session = UUID()
+    let state = ConversationHistoryState()
+    let runtime = try intentRuntime(
+        sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
+        mutations: HistoryMutationService(
+            store: store,
+            summarizeTitle: { _ in
+                Issue.record("Invalid archive must not infer a title")
+                return "Unexpected"
+            }))
+    let current = try await store.snapshot().current.id
+    await #expect(throws: HistoryIntentFailure.self) { try await runtime.summarize(current) }
+    await #expect(throws: HistoryIntentFailure.self) { try await runtime.summarize(UUID()) }
+    try await runtime.refresh()
+    #expect(state.archive?.current.id == current && state.archive?.past.isEmpty == true)
+}
+
+private struct FailedArchivePresentation: HistoryPresentationCapability {
+    func showHistory(invocation: any FunctionInput) async throws { throw CommunicationError.scopeClosed }
+}
+@Test(.timeLimit(.minutes(1))) func archivePresentationFailureStopsTitleWithoutRollingBackTheCommit() async throws {
+    let store = try await completedConversation()
+    let old = try await store.snapshot().current.id
+    let runtime = try intentRuntime(
+        sessionID: UUID(), presentation: FailedArchivePresentation(),
+        mutations: HistoryMutationService(
+            store: store,
+            summarizeTitle: { _ in
+                Issue.record("Failed initial presentation must abort before title")
+                return "Unexpected"
+            }))
+    await #expect(throws: HistoryIntentFailure.self) { try await runtime.startNew() }
+    let snapshot = try await store.snapshot()
+    #expect(snapshot.current.id != old && snapshot.past.first?.id == old)
+    #expect(snapshot.past.first?.summaryTitle == nil)
+}
+
+@Test func titleInferenceAndRetryPersistenceFailuresPreserveBothCauses() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let document = try LocalDocumentStore<ConversationArchive>(
+        url: directory.appendingPathComponent("history.json"), maximumBytes: ConversationHistoryStore.maximumBytes)
+    let store = ConversationHistoryStore(document: document)
+    let id = try await archivedHistory(store)
+    let service = HistoryMutationService(
+        store: store,
+        summarizeTitle: { _ in
+            try FileManager.default.removeItem(at: directory)
+            throw CommunicationError.scopeClosed
+        })
+    do {
+        try await service.summarizeArchived(id)
+        Issue.record("Must report failed inference and failed retry write")
+    } catch let error as ActionReportedError {
+        #expect(error.actionReport.entries.map(\.path) == ["title", "retryState"])
+        #expect(error.actionReport.entries.allSatisfy { $0.status == .failed })
+        #expect(error.actionReport.entries.first?.details["failureDescription"]?.contains("scopeClosed") == true)
+        #expect(error.actionReport.entries.last?.details["failureDescription"] != nil)
+    }
+    #expect(try await store.snapshot().past.first?.id == id)
+}
+
+@Test func memoryAndPhotographerHaveCanonicalIndependentRoleIdentities() throws {
+    let memory = try AgentConfigurations.load(named: "Memory")
+    let photographer = try AgentConfigurations.load(named: "Photographer")
+    #expect(memory.agentID == .memory)
+    #expect(photographer.agentID == .photographer)
+    #expect(try MemoryAgent(sessionID: UUID()).descriptor.name == "Memory")
+    #expect(try PhotographerAgent(sessionID: UUID()).descriptor.name == "Photographer")
+    #expect(throws: AgentConfigurationError.identityMismatch) {
+        try MemoryAgent(sessionID: UUID(), configuration: photographer)
+    }
+    #expect(throws: AgentConfigurationError.identityMismatch) {
+        try PhotographerAgent(sessionID: UUID(), configuration: memory)
+    }
+}
+
+@Test func memoryOverflowRetainsAcceptedOutputsAndFailsOnlyItsActor() async throws {
+    let session = UUID()
+    let memory = try MemoryAgent(sessionID: session)
+    let photographer = try PhotographerAgent(sessionID: session)
+    try await memory.start()
+    try await photographer.start()
+    var accepted: [UUID] = []
+    for _ in 0..<8 {
+        let input = MemoryHistoryIntent.refresh.input(sessionID: session)
+        accepted.append(input.id)
+        try await memory.receive(input)
+    }
+    await #expect(throws: CommunicationError.capacityExceeded) {
+        try await memory.receive(MemoryHistoryIntent.refresh.input(sessionID: session))
+    }
+    #expect(await memory.status().lifecycle == .failed)
+    #expect(await memory.status().processedInputs == 8)
+    #expect(await photographer.status().lifecycle == .running)
+    var retained: [UUID] = []
+    for await envelope in memory.outputs {
+        #expect(envelope.source == .memory)
+        retained.append(envelope.inputID)
+    }
+    #expect(retained == accepted)
+    await photographer.stop()
 }

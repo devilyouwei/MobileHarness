@@ -40,10 +40,25 @@ public struct NexArmControlFailure: Sendable {
     public let origin: NexArmControlOrigin?
     public let code: String
     public let message: String
+    public var report: ActionReport? = nil
 }
 
 @MainActor
 public final class BluetoothWorkflow: BluetoothControlling {
+    public private(set) var lastManualFailure: NexArmControlFailure?
+    public var manualOrigin: NexArmControlOrigin?
+    public var manualFailureReporter: (@Sendable (NexArmControlFailure) async -> Void)?
+    private func reportManualFailure(
+        _ error: any Error, workerID: UUID, origin: NexArmControlOrigin?,
+        reporter: (@Sendable (NexArmControlFailure) async -> Void)?
+    ) async {
+        let report = (error as? any ActionReportProviding)?.actionReport ?? ActionReport.empty.recordingFailure(error)
+        let failure = NexArmControlFailure(
+            workerID: workerID, origin: origin, code: ActionReport.code(for: error).rawValue,
+            message: Self.message(error), report: report)
+        lastManualFailure = failure
+        if let reporter { await reporter(failure) }
+    }
     public let state: BluetoothSettingsState
     private let link: any NexArmBluetoothLink
     private let makeStore: @Sendable () throws -> LocalDocumentStore<BluetoothDeviceRecord>
@@ -219,6 +234,33 @@ public final class BluetoothWorkflow: BluetoothControlling {
             foreground, reconnectEnabled, recovery == nil, cleanup == nil
         {
             requestRecovery(recoveryCause, snapshot: value)
+        }
+    }
+    /// Mirror native admission before a callable endpoint reports acceptance; UI protocol methods remain unchanged.
+    public func validateControlAdmission(_ request: DeviceControlRequest) throws {
+        switch request.operation {
+        case .scan:
+            guard foreground else { throw NexArmExecutionError.background }
+            guard !state.recoveryStage.busy, operation == nil, cleanup == nil, state.phase != .connected else {
+                throw NexArmExecutionError.busy
+            }
+        case .connect, .reconnect:
+            guard foreground else { throw NexArmExecutionError.background }
+            guard recovery == nil, cleanup == nil, operation == nil, controller == nil else {
+                throw NexArmExecutionError.busy
+            }
+            guard let id = request.id.flatMap(UUID.init(uuidString:)),
+                state.nearby.contains(where: { $0.id == id }) || state.remembered?.id == id || state.selected?.id == id
+            else { throw DeviceControlError.unavailable }
+        case .preset:
+            guard foreground else { throw NexArmExecutionError.background }
+            guard suspension == nil, state.canControl else { throw NexArmExecutionError.controlNotReady }
+        case .motorVelocity:
+            if request.value != 0 {
+                guard foreground else { throw NexArmExecutionError.background }
+                guard suspension == nil, state.canControl else { throw NexArmExecutionError.controlNotReady }
+            }
+        default: break
         }
     }
     public func openPage() {
@@ -732,6 +774,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 if intent != manualRevision { continue }
                 guard !Task.isCancelled, foreground, state.canControl, let controller else { return }
                 let connectedGeneration = generation
+                let origin = manualOrigin
+                let reporter = manualFailureReporter
                 let playback = Task {
                     let gesture: NexArmGesture?
                     switch action {
@@ -766,7 +810,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 case .success: break
                 case .failure(let error):
                     if pendingArmAction == nil, !Task.isCancelled, !(error is CancellationError) {
-                        // Manual failures end this playback only; the next intent remains admissible.
+                        // Record this worker failure independently, then admit the next intent.
+                        await reportManualFailure(error, workerID: intent, origin: origin, reporter: reporter)
                         continue
                     }
                 }
@@ -825,6 +870,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
         let connectedGeneration = generation
         motion?.cancel()
         state.jogging = true
+        let origin = manualOrigin
+        let reporter = manualFailureReporter
         liveTask = Task {
             var failed = false
             let operation: @Sendable () async -> Void = { @MainActor [self] in
@@ -891,7 +938,9 @@ public final class BluetoothWorkflow: BluetoothControlling {
                     }
                 } catch {
                     failed = !(error is CancellationError)
-                    // A manual loop error has no Agent result or Bluetooth diagnostic side effect.
+                    if failed {
+                        await reportManualFailure(error, workerID: revision, origin: origin, reporter: reporter)
+                    }
                 }
                 if let session { await link.endLiveControl(session) }
             }

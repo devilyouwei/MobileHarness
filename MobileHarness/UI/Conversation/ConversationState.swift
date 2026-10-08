@@ -26,3 +26,18 @@ public final class ConversationState {
     public var isVoiceActive = false
     public init() {}
 }
+
+public enum AppDestination: String, Hashable, Sendable {
+    case settings, language, recognition, synthesis, vision, bluetooth, history
+}
+@MainActor @Observable public final class NavigationState {
+    public var path: [AppDestination] = []
+    public init() {}
+    public func show(_ destination: AppDestination?) {
+        guard let destination else {
+            path = []
+            return
+        }
+        path = destination == .settings ? [.settings] : [.settings, destination]
+    }
+}

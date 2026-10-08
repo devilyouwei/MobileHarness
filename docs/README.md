@@ -14,9 +14,9 @@
 | [Platform boundaries](Platform-Boundaries.md) | Foreground/device capabilities and physical-control constraints. |
 | [Roadmap](Roadmap.md) | Current delivery priorities, unimplemented directions and acceptance work. |
 | [History mutation continuation](adr/0147-history-delete-result-continuation.md) | ✅ Confirmed deletion, correlated feedback and cancellation cleanup; model continuation pending. |
-| [Model resource UI boundary](adr/0146-model-resource-interaction-ownership.md) | ✅ Resource interaction ownership moved to feature workflow; Agent routing pending. |
-| [History refresh intent](adr/0145-history-refresh-agent-intent.md) | ✅ Deterministic memory Agent and scoped presentation; mutations remain pending. |
-| [Shared history Tools](adr/0144-read-only-history-tools.md) | ✅ Read-only model-callable history previews; History refresh intent is implemented; mutations and model continuation remain pending. |
+| [Model resource UI boundary](adr/0146-model-resource-interaction-ownership.md) | ✅ Resource interaction ownership moved to feature workflow; commands, preferences, inventory and presentation now route through ResourceManagement (ADR0166–0171). |
+| [History refresh intent](adr/0145-history-refresh-agent-intent.md) | ✅ Deterministic memory Agent and scoped presentation; archive/title also implemented in ADR0165. |
+| [Shared history Tools](adr/0144-read-only-history-tools.md) | ✅ Read-only model-callable history previews; History refresh/deletion/archive/title are implemented; model continuation remains pending. |
 | [Storage consumer policy](adr/0143-storage-consumer-policy-boundaries.md) | ✅ First Agent-driven migration stage: context, title and producer-error ownership. |
 | [Photographer proposal](Photographer-Proposal.md) | Proposed camera composition/motion behavior; not an implemented Agent. |
 | [Resource 状态计划](Resource-State-Plan.md) | ❌ 当前 UI/App/设备状态的快速存取与 Agent 上下文接入计划；lock 兜底另行处理。 |
@@ -186,3 +186,34 @@ Put changes/rationale in the change log or an ADR. Put experimental measurements
 ✅ [ADR0161 — Gateway execution and isolated function contracts](adr/0161-gateway-execution-and-function-contracts.md).
 
 ✅ [ADR0163 — Typed history and feedback causality](adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Remaining typed host controls, archive/title, resource/device Agent routes and bounded model continuation stay separate stages.
+
+✅ ADR0166 records Agent-routed model resource commands; source/preferences/state migration remains outstanding.
+
+✅ ADR0167 records actual speech binding through the resource Agent; source persistence/selection policy remains staged.
+
+✅ ADR0168 records Agent-owned source/preferences transactions; the view draft is separate from the durable Action value.
+
+✅ ADR0169 records Agent-routed resource inventory; registered UI effects and automatic observations remain outstanding.
+
+- [ADR0170 — resource refresh presentation](adr/0170-agent-resource-refresh-presentation.md): ✅ Agent-selected, revision-fenced resource snapshot/query-failure presentation; other settings paths remain staged.
+
+- [ADR0171 — root resource observations](adr/0171-root-resource-state-observations.md): ✅ Sequenced native invalidations and page-independent sampled presentation; native push/shared state remain outstanding.
+
+- [ADR0172 — resource command failures](adr/0172-agent-resource-command-failures.md): ✅ Agent-selected operation-error presentation; preference/transport routes remain staged.
+
+- [ADR0173 — resource preference failures](adr/0173-agent-resource-preference-failures.md): ✅ Agent-selected notices/error presentation, exact failure codes and per-request call bounds; host fallback remains staged.
+
+- [ADR0174 — Resource host failure Signals](adr/0174-resource-host-failure-signals.md): ✅ Recoverable transport diagnostics through Agent-selected presentation; infrastructure fallback remains explicit.
+
+- [ADR0175 — Agent-routed provider model discovery](adr/0175-agent-provider-model-discovery.md): ✅ Credential-free discovery intents and bounded canonical queries; transactions/presentation remain pending.
+
+- [ADR0176 — Provider configuration transactions](adr/0176-agent-provider-configuration-transactions.md): ✅ Agent-selected restore/save, private credentials/results and Actions-owned apply/rollback. Registered provider UI effects/native acceptance remain pending.
+
+Current existing-route migration: [provider presentation](adr/0177-agent-provider-presentation-and-policy.md), [bounded native continuation](adr/0178-bounded-native-result-continuation.md) and [device/navigation/environment](adr/0179-typed-device-navigation-environment.md). See [Roadmap](Roadmap.md#existing-route-completion-2026-10-08) for remaining extensions and [validation history](Validation-History.md) for acceptance limits.
+
+Agent role organization: [ADR0180](adr/0180-memory-photographer-service-organization.md) records implemented Memory naming and Photographer business components; checks/device build passed, Simulator dependency blocked.
+
+[Photographer camera control](adr/0181-photographer-camera-control.md) records the implemented migration of manual/model camera operations and its validation limits.
+
+
+✅ [ApplicationControl service organization](adr/0182-application-control-service-organization.md): ADR0182 implements canonical role-directory, identity and host-transport migration; existing business behavior retained. Validation is recorded separately.

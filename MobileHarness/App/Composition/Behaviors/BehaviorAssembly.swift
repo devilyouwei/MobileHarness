@@ -16,6 +16,11 @@ public struct BehaviorAssembly: Sendable {
         pose: any PosePresentationCapability,
         historyPresentation: any HistoryPresentationCapability, camera: any CameraControlCapability,
         history: any HistoryQueryCapability, historyMutations: any HistoryMutationCapability,
+        modelResources: any ModelResourceCapability, resourcePreferences: any ModelResourcePreferencesCapability,
+        resourceInventory: any ModelResourceInventoryCapability,
+        resourcePresentation: any ResourcePresentationCapability,
+        providerDiscovery: any ProviderDiscoveryCapability,
+        providerSettings: any ProviderSettingsCapability, device: any DeviceControlCapability,
         gesture: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void,
         shakeBase: @escaping @Sendable (Int, any FunctionInput) async throws -> Void,
         aim: @escaping @Sendable (Double, Double, any FunctionInput) async throws -> Void
@@ -23,7 +28,11 @@ public struct BehaviorAssembly: Sendable {
         let modules = CapabilityModules.builtIn(
             presentation: presentation, playback: playback, pose: pose,
             historyPresentation: historyPresentation, camera: camera,
-            history: history, historyMutations: historyMutations, gesture: gesture, shakeBase: shakeBase, aim: aim)
+            history: history, historyMutations: historyMutations, modelResources: modelResources,
+            resourcePreferences: resourcePreferences, resourceInventory: resourceInventory,
+            resourcePresentation: resourcePresentation, providerDiscovery: providerDiscovery,
+            providerSettings: providerSettings, device: device, gesture: gesture,
+            shakeBase: shakeBase, aim: aim)
         try self.init(capabilityModules: modules)
     }
 

@@ -11,46 +11,55 @@ import UI
     private var admitted: Set<String> = [] { didSet { state.admitted = admitted } }
     private var cancelling: Set<String> = [] { didSet { state.cancelling = cancelling } }
     private var requests: [String: Task<Void, Error>] = [:]
-    private var refreshGeneration: UInt64 = 0
+    private var confirmedSource: ModelResourceSourceDraft?
+    private var preferenceFailed = false
     private let operations: any ModelResourcesOperating
     public init(state: ModelResourcesState, operations: any ModelResourcesOperating) {
         self.state = state
         self.operations = operations
     }
+    private func restoreConfirmedSource() async throws -> ModelResourceSourceDraft {
+        let value = try await operations.restoreSource()
+        confirmedSource = value
+        preferenceFailed = false
+        return value
+    }
     public func restore() async {
         do {
-            state.source = try await operations.restoreSource()
+            state.source = try await restoreConfirmedSource()
             state.hasRestored = true
             await refresh()
-        } catch { state.error = error.localizedDescription }
+        } catch {
+            preferenceFailed = true
+            recordCommandFailure(error)
+        }
     }
     public func refresh() async {
-        refreshGeneration &+= 1
-        let generation = refreshGeneration
+        let generation = state.beginRefresh()
         do {
-            let updated = try await operations.refresh()
-            guard generation == refreshGeneration else { return }
-            state.items = updated
-            state.installedGroups = Set(
-                ModelResourceGroup.allCases.filter { ModelResourcePolicy.isInstalled($0, in: updated) })
-            if !state.saving {
-                let saved = try await operations.restoreSource()
+            _ = try await operations.refresh(generation: generation)
+            guard generation == state.refreshGeneration else { return }
+            if !state.saving, !preferenceFailed {
+                let saved = try await restoreConfirmedSource()
                 state.source.useCustomRecognition = saved.useCustomRecognition
                 state.source.useCustomSynthesis = saved.useCustomSynthesis
             }
-            admitted.subtract(updated.map(\.id))
+
         } catch {
-            guard generation == refreshGeneration else { return }
+            guard generation == state.refreshGeneration else { return }
+            preferenceFailed = true
+            if case ApplicationControlIntentFailure.presented = error { return }
             state.error = error.localizedDescription
         }
     }
+    public func acceptPresentedSnapshot() { admitted.subtract(state.items.map(\.id)) }
     public func saveSource() async {
         guard !state.saving else { return }
         state.saving = true
         defer { state.saving = false }
         do {
             try await operations.saveSource(state.source)
-            state.source = try await operations.restoreSource()
+            state.source = try await restoreConfirmedSource()
             state.error = nil
         } catch { await handleSaveFailure(error) }
     }
@@ -61,7 +70,7 @@ import UI
         defer { state.saving = false }
         let endpoint = state.source.endpoint
         do {
-            var draft = try await operations.restoreSource()
+            var draft = try await restoreConfirmedSource()
             if draft.endpoint == endpoint && draft.allowsCellular {
                 state.error = nil
                 return true
@@ -69,23 +78,25 @@ import UI
             draft.endpoint = endpoint
             draft.allowsCellular = true
             try await operations.saveSource(draft)
-            let saved = try await operations.restoreSource()
+            let saved = try await restoreConfirmedSource()
             if state.source.endpoint == endpoint { state.source.endpoint = saved.endpoint }
             state.source.allowsCellular = true
             state.error = nil
             return true
         } catch {
-            state.error = error.localizedDescription
+            preferenceFailed = true
+            recordCommandFailure(error)
             return false
         }
     }
     private func handleSaveFailure(_ failure: any Error) async {
-        state.error = failure.localizedDescription
+        preferenceFailed = true
+        recordCommandFailure(failure)
         if failure is ModelResourceSelectionError {
             state.installationNotice = failure.localizedDescription
             state.error = nil
         }
-        if let saved = try? await operations.restoreSource() {
+        if let saved = confirmedSource {
             state.source.useCustomRecognition = saved.useCustomRecognition
             state.source.useCustomSynthesis = saved.useCustomSynthesis
         }
@@ -96,7 +107,7 @@ import UI
         defer { state.saving = false }
         do {
             // A voice switch must not save or validate an unfinished download-domain edit.
-            var draft = try await operations.restoreSource()
+            var draft = try await restoreConfirmedSource()
             if group == .recognition {
                 draft.useCustomRecognition = enabled
                 state.source.useCustomRecognition = enabled
@@ -105,11 +116,15 @@ import UI
                 state.source.useCustomSynthesis = enabled
             }
             try await operations.saveSource(draft)
-            let saved = try await operations.restoreSource()
+            let saved = try await restoreConfirmedSource()
             state.source.useCustomRecognition = saved.useCustomRecognition
             state.source.useCustomSynthesis = saved.useCustomSynthesis
             state.error = nil
         } catch { await handleSaveFailure(error) }
+    }
+    private func recordCommandFailure(_ error: any Error) {
+        if case ApplicationControlIntentFailure.presented = error { return }
+        state.error = error.localizedDescription
     }
     private func isDownloading(_ item: ModelResourceItem) -> Bool {
         pending[item.id] == .download || admitted.contains(item.id) || (item.active && item.activity != .deleting)
@@ -137,7 +152,7 @@ import UI
                 state.error = nil
                 await refresh()
             } catch {
-                state.error = error.localizedDescription
+                recordCommandFailure(error)
                 if admissionCompleted { admitted.insert(id) }
             }
             return
@@ -159,7 +174,7 @@ import UI
         case .cancel: return
         }
         pending[id] = command
-        refreshGeneration &+= 1
+        state.beginRefresh()
         state.error = nil
         let request = Task { @MainActor in
             switch command {
@@ -180,6 +195,6 @@ import UI
                 if command == .download, pending[id] == .download { admitted.insert(id) }
                 await refresh()
             }
-        } catch { state.error = error.localizedDescription }
+        } catch { recordCommandFailure(error) }
     }
 }

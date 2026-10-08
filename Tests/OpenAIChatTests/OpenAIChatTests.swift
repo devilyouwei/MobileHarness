@@ -305,7 +305,7 @@ private final class ModelListProtocol: URLProtocol, @unchecked Sendable {
     }
 }
 
-@Test func chatDiscoveryFiltersSpecializedModelsButKeepsThirdPartyChatNames() throws {
+@Test func nativeDiscoveryReturnsRawModelsWithoutBusinessEligibility() throws {
     let allowed = ["gpt-4o-mini", "gpt-4.1", "o3-mini", "deepseek-chat", "Qwen3-Instruct", "my-deployment"]
     let excluded = [
         "text-embedding-3-small", "tts-1", "whisper-1", "gpt-4o-transcribe", "gpt-realtime",
@@ -313,7 +313,7 @@ private final class ModelListProtocol: URLProtocol, @unchecked Sendable {
         "gpt-3.5-turbo-instruct", "o3-deep-research", "gpt-5-pro", "gpt-5.3-codex",
     ]
     let data = try JSONSerialization.data(withJSONObject: ["data": (allowed + excluded + allowed).map { ["id": $0] }])
-    #expect(try OpenAIChatConfiguration.decodeModels(data) == allowed)
+    #expect(try OpenAIChatConfiguration.decodeModels(data) == allowed + excluded)
 }
 
 private final class AnonymousModelListProtocol: URLProtocol, @unchecked Sendable {
@@ -415,4 +415,29 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
     for try await event in session.events { events.append(event) }
     #expect(events == [.text("Hi"), .usage(try ChatTokenUsage(input: 12, generated: 4, total: 16)), .finished(.stop)])
     await manager.shutdown()
+}
+
+@Test func nativeContinuationSerializesMatchingAliasesAndToolReceipt() throws {
+    let declaration = try ChatToolDefinition(
+        declaration: Data(
+            #"{"type":"function","function":{"name":"Read.State","parameters":{"type":"object","properties":{},"required":[]}}}"#
+                .utf8))
+    let request = try ChatRequest(
+        messages: [
+            .init(role: .user, content: "Read state"),
+            .init(
+                role: .assistant, content: "", toolCalls: [.init(id: "call-1", name: "Read.State", argumentsJSON: "{}")]
+            ),
+            .init(role: .tool, content: "actual state", toolCallID: "call-1"),
+        ], tools: [declaration])
+    let data = try #require(config().request(request).httpBody)
+    let body = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let messages = try #require(body["messages"] as? [[String: Any]])
+    let calls = try #require(messages[1]["tool_calls"] as? [[String: Any]])
+    let function = try #require(calls[0]["function"] as? [String: Any])
+    #expect(function["name"] as? String == "Read_State_0")
+    #expect(messages[2]["tool_call_id"] as? String == "call-1")
+    #expect(throws: CapabilityError.self) {
+        try ChatRequest(messages: [.init(role: .tool, content: "forged", toolCallID: "missing")])
+    }
 }
