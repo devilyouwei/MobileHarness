@@ -98,6 +98,13 @@ public actor AssistantAgent: Agent {
         lines.append(
             "All natural text is automatically converted to audio and played on the independent \(speechChannel) Channel by default. Audio playback may run in parallel with Actions on other Channels. Use wait whenever speech must finish before an Action starts."
         )
+        if registry.actions.contains(where: { $0.alias == "express" && $0.defaultChannel == "Display" }),
+            registry.actions.contains(where: { $0.alias == "dance" && $0.defaultChannel == "Robot" })
+        {
+            lines.append(
+                "Concurrent expression-and-dance example: <express emotion=\"laugh\"/><dance cycles=\"1\"/>. These Actions already route to Display and Robot respectively. Do not add Channel wrappers or wait groups for this concurrent request. Emit only the requested Actions; do not repeat an Action merely to demonstrate its Channel."
+            )
+        }
         lines.append("Channel \(speechChannel) — automatic audio playback")
         lines.append(
             "When the user asks for sequential behavior, encode the order with wait groups. To speak first and then act, put the entire spoken text inside <wait>...</wait> and put the Action after </wait>. Merely writing text before an Action does NOT wait for audio playback. Putting both inside the same wait does NOT make them sequential. Use consecutive wait groups for consecutive steps."

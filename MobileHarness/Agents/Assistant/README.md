@@ -330,3 +330,7 @@ Declarations: at most 128, 64 KiB total. Cloud function names use a request-loca
 ✅ Implemented failure-data correction: native continuation Tool messages wrap failed outcomes as bounded JSON containing isError, failureCode and the exact value. Successful values remain unchanged. Error metadata is model data and is never passed through Action parsing.
 
 ✅ Implemented error-chain preservation: failed native continuation messages must also include any producer report, with every child outcome, execution failure and retained description. Preserve partial failure; a scalar error message must not replace the structured chain. The existing transcript byte bound rejects oversized data.
+
+✅ Assistant prompt shows a capability-derived concurrent expression/motion example with bare Action tags, without Channel wrappers or wait; sequential speech guidance remains separate.
+
+✅ Interaction refinement: Assistant.agent.json Camera.flip declaration requires facing enum front/back and describes target selection rather than toggling.

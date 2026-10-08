@@ -107,7 +107,7 @@ Future capture, recording and shoot-time interaction policy belongs in focused c
 
 ## Camera control service — ADR0181
 
-✅ PhotographerCameraWorkflow selects existing Camera.Capture.open/close/flip/retry and tracks one correlated pending call/result. PhotographerCameraIntent contains a finite operation and opaque request UUID; cancellation is a trusted root host command. External user commands require the root session; Agent commands require trusted Assistant provenance. Results require runtime provenance, exact call ID and original session. Last feedback retains the complete bounded ToolResult. Output overflow rejects only the current command and rolls back its pending slot.
+✅ PhotographerCameraWorkflow selects existing Camera.Capture.open/close/flip/retry and tracks one correlated pending call/result. PhotographerCameraIntent contains a finite operation, explicit front/back facing for flip, and opaque request UUID; cancellation is a trusted root host command. External user commands require the root session; Agent commands require trusted Assistant provenance. Results require runtime provenance, exact call ID and original session. Last feedback retains the complete bounded ToolResult. Output overflow rejects only the current command and rolls back its pending slot.
 
 The actor outlives capture. Bind/unbind exactly one vision UUID; reset ordering/freshness/tracking state between sessions and reject retired poses. Root camera work and attached pose work remain distinct scopes. Root registration is unscoped in AgentManager but actor admission is explicit. Stop clears both domains and closes outputs.
 
@@ -134,3 +134,5 @@ sequenceDiagram
 ```
 
 No new recording/still-capture implementation or physical tracking algorithm is introduced.
+
+✅ Interaction refinement: PhotographerCameraWorkflow validates target-facing intent and pass facing into the flip Tool arguments under the existing one-request correlation/lifetime.

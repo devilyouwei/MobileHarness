@@ -176,9 +176,9 @@ final class AppAssembly {
     private func makeCameraControls() -> CameraInteractionWorkflow {
         CameraInteractionWorkflow(
             state: camera.state,
-            perform: { [weak self] intent in
+            perform: { [weak self] intent, facing in
                 guard let self else { throw CancellationError() }
-                try await self.runtime().photographerIntents.perform(intent)
+                try await self.runtime().photographerIntents.perform(intent, facing: facing)
             })
     }
     let navigation = NavigationState()

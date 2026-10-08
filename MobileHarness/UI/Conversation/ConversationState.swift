@@ -12,6 +12,7 @@ public enum EyeExpression: String, CaseIterable, Sendable {
 public final class ConversationState {
     public var voicePhase: VoicePhase = .loading
     public var liveTranscript = ""
+    public var transcriptFinalized = false
     public var assistantReply = ""
     public var expression: EyeExpression?
     /// Display transaction identity only; App owns the waiting operation.
@@ -25,6 +26,12 @@ public final class ConversationState {
     public var voiceStatus = "点击麦克风开始持续对话"
     public var isVoiceActive = false
     public init() {}
+    public func resetCaptions() {
+        liveTranscript = ""
+        transcriptFinalized = false
+        assistantReply = ""
+    }
+    public func finishUserTranscript() { transcriptFinalized = true }
 }
 
 public enum AppDestination: String, Hashable, Sendable {

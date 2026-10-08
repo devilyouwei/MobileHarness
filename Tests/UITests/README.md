@@ -51,3 +51,5 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ## Independent history presentation values
 
 ✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+
+✅ Interaction refinement: ConversationState regressions verify finalized user text persists beside streamed assistant text and resets together on next turn.

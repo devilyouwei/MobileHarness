@@ -24,6 +24,7 @@ private actor CaptionEndpoint {
     var policy = ConversationPresentation()
     var reply = ""
     var transcript = ""
+    var transcriptFinalized = false
     func begin(_ invocation: any FunctionInput) {
         if policy.accept(invocation.context, update: .beginReply) { reply = "" }
     }
@@ -34,7 +35,7 @@ private actor CaptionEndpoint {
         if policy.accept(invocation.context, update: .transcript) { transcript = text }
     }
     func close(_ invocation: any FunctionInput) {
-        if policy.accept(invocation.context, update: .finishTranscript) { transcript = "" }
+        if policy.accept(invocation.context, update: .finishTranscript) { transcriptFinalized = true }
     }
 }
 
@@ -78,6 +79,7 @@ private actor CaptionEndpoint {
             "setTranscript", text: "迟到的结果",
             source: .speechPerception, sequence: 5)
     ) { await endpoint.replace($0, $1) }
-    #expect(await endpoint.transcript.isEmpty)
+    #expect(await endpoint.transcript == "你好世界")
+    #expect(await endpoint.transcriptFinalized)
     #expect(await endpoint.reply == "第一句。第二句。")
 }

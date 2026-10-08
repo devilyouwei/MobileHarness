@@ -2,6 +2,36 @@
 
 Purpose: preserve dated test, UI and packaging observations that were previously embedded in module READMEs. These are records of what was checked at the time, not current implementation contracts or substitutes for physical-device acceptance.
 
+## 2026-10-08 — Finalized user-caption position adjustment
+
+- ✅ `./scripts/check.sh` passed with the Xcode toolchain:597 integration /51 workflow tests, all other targets, strict formatting, boundaries, Python checks and plist validation. Diff whitespace passed.
+- ✅ Signed generic iOS Debug build2026100804 passed using existing configuration. Deep strict signature verification and seven packaged Agent configuration checks passed.
+- ❌ Physical-device destination build could not select the paired iPhone17 Pro because it was unavailable. Installation/launch have not occurred for this build; reconnection is required.
+- ❌ Required build-ios.sh remains blocked on simulator CoreAI module resolution. Physical caption-position acceptance remains pending.
+- Logs: `/tmp/mobileharness-caption-lower-check.log`, `/tmp/mobileharness-caption-lower-generic-device.log`, `/tmp/mobileharness-caption-lower-device.log` and `/tmp/mobileharness-caption-lower-ios.log`.
+
+## 2026-10-08 — Companion refinements signed iPhone installation
+
+- ✅ Signed Debug build of the current working tree passed for paired iPhone 17 Pro using existing local signing configuration and command-line build number2026100803. Deep strict signature verification and seven packaged Agent configuration checks passed.
+- ✅ devicectl installed dev.mobileharness.app successfully without uninstalling the existing App; installed-app query confirmed version0.1.0/build2026100803.
+- ❌ Automatic launch was denied because the phone was locked (CoreDevice10002 / FBSOpenApplicationError7). The user must unlock and open the App. Installation does not establish native caption/heart/gaze layout, live-model instruction following or physical camera/robot acceptance.
+- Evidence: `/tmp/mobileharness-interaction-signed-device.log`, `/tmp/mobileharness-interaction-install.log` and `/tmp/mobileharness-interaction-launch.log`. No signing configuration or source code was changed for this installation.
+
+## 2026-10-08 — Camera target and companion presentation refinements
+
+- ✅ Final Xcode-toolchain `./scripts/check.sh` passed: boundary checks, six Python tests, strict Swift formatting, all Swift test targets (597 integration,51 workflow and14 UI-state tests) and plist validation. Regressions verify required front/back arguments, no effects for invalid arguments, explicit manual/delegated targets, preserved failure/cancellation behavior, final ASR caption before sealing, late-partial rejection and caption retention/reset. `git diff --check` passed.
+- ✅ Unsigned generic iOS device-target Debug build passed via `xcodebuild -project MobileHarness.xcodeproj -scheme MobileHarness -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`. Final App resource verification found seven source-matching Agent configurations, including the updated Camera.flip schema.
+- ❌ Required `./scripts/build-ios.sh` failed at MobileHarnessSimulator because external coreai-models/CoreAIShared cannot resolve CoreAI for simulator; later script schemes did not run. Device-target compilation above is separate evidence, not simulator success.
+- Initial test-count assertions and device compilation failures (closure signature and ambiguous facing type) were corrected before final passing checks/build. Logs: `/tmp/mobileharness-interaction-refinements-verified-check.log`, `/tmp/mobileharness-interaction-refinements-final-device.log`, `/tmp/mobileharness-interaction-refinements-ios.log`.
+- ❌ No phone installation, live-provider instruction-following, native layout/VoiceOver/Reduce Motion, physical front/back capture or face-following/heart animation acceptance was performed. Device compilation and synthetic tests do not establish those outcomes.
+
+## 2026-10-08 — Default Channel prompt guidance
+
+- ✅ With `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`, `./scripts/check.sh` passed: boundaries, six Python tests, strict Swift lint, package tests (596 integration and 51 workflow tests), and plist validation. The prompt regression verified bare express/dance routing to Display/Robot with no scheduling boundaries. `git diff --check` passed.
+- ❌ `./scripts/build-ios.sh` failed on MobileHarnessSimulator because external coreai-models/CoreAIShared cannot resolve CoreAI for simulator; later schemes did not run. No iPhone build/installation was performed for this change.
+- Initial default-CLT check failed on compiler/SDK mismatch; sandboxed Xcode attempts could not write caches. The successful full check and simulator failure above used Xcode with cache access.
+- ❌ Live-provider output, native UI and physical expression/robot concurrency remain unverified; synthetic parsing does not measure instruction following.
+
 ## 2026-10-08 — ApplicationControl signed iPhone installation
 
 - ✅ Signed Debug build of current working-tree implementation passed for paired physical iPhone 17 Pro; command-line CFBundleVersion override2026100802. Local signing settings remain ignored and unchanged.

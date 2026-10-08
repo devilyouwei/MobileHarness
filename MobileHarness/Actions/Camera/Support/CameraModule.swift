@@ -1,10 +1,14 @@
 import FunctionContracts
 
 /// Host owns permission, capture leases and foreground lifecycle.
+extension CameraActions {
+    public enum Facing: String, Sendable { case front, back }
+}
+
 public protocol CameraControlCapability: Sendable {
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
     func retry(invocation: any FunctionInput) async throws
-    func flip(invocation: any FunctionInput) async throws
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
 }
 
 public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailureProviding {

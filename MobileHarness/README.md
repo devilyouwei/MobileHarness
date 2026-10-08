@@ -736,12 +736,12 @@ sequenceDiagram
 
 | Boundary | Recognition caption | Reply / expression |
 | --- | --- | --- |
-| Confirmed new utterance | Latest partial replaces the preview | Assistant clears once through `beginReplyTurn` |
+| Confirmed new utterance | Clear the preceding user caption on an accepted newer turn, then display partials below eyes | Clear preceding reply on the same accepted newer turn; beginReplyTurn starts this reply once |
 | Endpoint reached, ASR pending | Preserve the preview | Await the reply |
-| Final or empty recognition | `finishTranscript` clears and seals | Produce a reply or return to listening |
-| Response and playback | Remains sealed | Append reply; speaking follows actual playback |
-| Reply completed | Empty | Retain until the next utterance |
-| Stop, background or failure | Clear and invalidate the session | Clear and invalidate the session |
+| Final or empty recognition | Final setTranscript replaces text; finishTranscript seals it. Nonempty text moves above eyes; empty text clears | Produce a reply below eyes or return to listening |
+| Response and playback | Retain sealed user text above eyes in cyan | Append lavender reply below eyes; speaking follows actual playback |
+| Reply completed | Retain until next utterance | Retain until next utterance |
+| Stop, background or failure | Retain displayed text and invalidate session updates | Retain displayed text and invalidate session updates |
 
 SpeechPerception owns recognition captions and voice phase presentation; Assistant owns reply captions, expression and atomic reply-turn start; VisionPerception owns pose/gaze presentation requests. All Agent-selected changes use permitted Actions or Tools. App may reset state for user/OS lifecycle and may present actual device telemetry through its adapters.
 
@@ -1526,3 +1526,5 @@ Tool continuation is distinct from scheduled Action result retention. A submitte
 ### ApplicationControl business service — ADR0182
 
 ✅ Remaining application-operation domains are grouped in `Agents/ApplicationControl/`: model resources, Provider configuration, device/manual controls, navigation and environment facts. `ApplicationControlFunctions` owns fixed permissions; `ApplicationControlResourcePolicy` owns pure bounded decoding/classification; one actor retains shared transaction exclusion and correlated task state. `ApplicationControlIntentRuntime` is App-owned transport. Photographer and Memory retain their domains. Existing Signal schemas, Actions algorithms, queue bounds and native safety are preserved; terminal controls use application.control.finished/failed. ❌ Generic Assistant delegation to this role remains unimplemented.
+
+✅ Interaction refinement: Camera.Capture.flip requires facing=front/back through Assistant → Photographer → native coordinator; user/assistant captions remain distinct within one turn. Existing ownership and Gateway flows are preserved.

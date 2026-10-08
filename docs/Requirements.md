@@ -18,6 +18,9 @@ MobileHarness connects perception, cognition and behavior in one Apple-native ap
 
 ## Behavioral requirements
 
+- Camera lens selection specifies front or back; selecting the current healthy lens is idempotent. Manual switching resolves an explicit opposite-lens target.
+- Completed ASR captions remain above the eyes while assistant captions stream below. User and assistant use distinct colors and accessibility labels; the next turn clears both. Reduce Motion disables the travel animation.
+- Eye gaze follows both horizontal and vertical targets, with less vertical displacement. The love expression displays two heart-shaped eyes.
 - User/OS stop, interruption and session replacement coordinate cancellation and cleanup; stale sessions cannot update current output.
 - Speech, UI and device effects require explicit authorization and registered behavior; messages do not bypass execution permissions.
 - Failures, unavailable capabilities and capacity exhaustion are explicit. Device actions are not silently discarded or replayed.

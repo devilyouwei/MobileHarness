@@ -39,8 +39,8 @@
                 }
                 .scaleEffect(x: 1, y: blink)
                 .offset(
-                    x: min(1, max(-1, gaze.width)) * faceWidth * 0.085,
-                    y: min(1, max(-1, gaze.height)) * faceWidth * 0.055 + (reduceMotion ? 0 : sin(time * 1.6) * 2)
+                    x: min(1, max(-1, gaze.width)) * faceWidth * 0.14,
+                    y: min(1, max(-1, gaze.height)) * faceWidth * 0.09 + (reduceMotion ? 0 : sin(time * 1.6) * 2)
                 )
                 .opacity(phase == .idle || phase == .failed ? 0.48 : 1)
                 .scaleEffect(phase == .loading ? 0.88 + 0.04 * sin(time * 2) : 1)
@@ -73,13 +73,13 @@
         }
 
         private func eye(pose: EyePose, mirrored: Bool) -> some View {
-            EyeSilhouette(smile: pose.smile, slant: pose.slant)
-                .fill(Color(red: 0.08, green: 0.62, blue: 1))
+            EyeSilhouette(smile: pose.smile, slant: pose.slant, heart: pose.heart)
+                .fill(renderedExpression == .love ? Color.pink : Color(red: 0.08, green: 0.62, blue: 1))
                 .frame(width: faceWidth * 0.21, height: faceWidth * 0.25)
                 .scaleEffect(x: (mirrored ? -1 : 1) * pose.width, y: pose.openness)
                 .rotationEffect(.degrees(pose.tilt * (mirrored ? -1 : 1)))
                 .offset(x: pose.x * faceWidth, y: pose.y * faceWidth)
-                .shadow(color: .blue.opacity(0.65), radius: 14)
+                .shadow(color: (renderedExpression == .love ? Color.pink : Color.blue).opacity(0.65), radius: 14)
                 .shadow(color: .cyan.opacity(0.28), radius: 4)
             // Expression animation is owned by the acknowledged transaction above.
         }
@@ -87,6 +87,7 @@
 
     /// Add expressions by describing the same two shapes, not swapping assets or view branches.
     nonisolated private struct EyePose: Equatable {
+        var heart = 0.0
         var smile = 0.0
         var slant = 0.0
         var openness = 1.0
@@ -119,7 +120,7 @@
                 let eye = Self(slant: -0.7, openness: 0.72, tilt: 7, y: 0.025)
                 return (eye, eye)
             case .love:
-                let eye = Self(smile: 0.9, openness: 0.8, width: 1.06, tilt: -9)
+                let eye = Self(heart: 1, width: 1.06)
                 return (eye, eye)
             case .angry:
                 let eye = Self(slant: 0.85, openness: 0.8, tilt: -3)
@@ -139,11 +140,13 @@
     nonisolated private struct EyeSilhouette: Shape {
         var smile: Double
         var slant: Double
-        var animatableData: AnimatablePair<Double, Double> {
-            get { AnimatablePair(smile, slant) }
+        var heart: Double
+        var animatableData: AnimatablePair<AnimatablePair<Double, Double>, Double> {
+            get { AnimatablePair(AnimatablePair(smile, slant), heart) }
             set {
-                smile = newValue.first
-                slant = newValue.second
+                smile = newValue.first.first
+                slant = newValue.first.second
+                heart = newValue.second
             }
         }
 
@@ -151,16 +154,27 @@
             func p(_ x: Double, _ y: Double) -> CGPoint {
                 CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height)
             }
+            // Blend matching cubic segments so love retains the same animated shape identity.
+            func blend(_ x: Double, _ y: Double, _ heartX: Double, _ heartY: Double) -> CGPoint {
+                let fraction = min(1, max(0, heart))
+                return p(x + (heartX - x) * fraction, y + (heartY - y) * fraction)
+            }
             var path = Path()
-            path.move(to: p(0, 0.32 + 0.24 * smile))
+            path.move(to: blend(0, 0.32 + 0.24 * smile, 0.5, 0.22))
             path.addCurve(
-                to: p(1, 0.32 + 0.24 * smile + 0.24 * slant),
-                control1: p(0, -0.1 + 0.18 * smile), control2: p(1, -0.1 + 0.18 * smile + 0.3 * slant))
-            path.addCurve(to: p(1, 0.72 + 0.08 * smile), control1: p(1, 0.5), control2: p(1, 0.66))
+                to: blend(1, 0.32 + 0.24 * smile + 0.24 * slant, 1, 0.4),
+                control1: blend(0, -0.1 + 0.18 * smile, 0.65, -0.12),
+                control2: blend(1, -0.1 + 0.18 * smile + 0.3 * slant, 1, -0.02))
             path.addCurve(
-                to: p(0, 0.72 + 0.08 * smile),
-                control1: p(1, 1.1 - 0.85 * smile), control2: p(0, 1.1 - 0.85 * smile))
-            path.addCurve(to: p(0, 0.32 + 0.24 * smile), control1: p(0, 0.66), control2: p(0, 0.5))
+                to: blend(1, 0.72 + 0.08 * smile, 0.5, 1),
+                control1: blend(1, 0.5, 1, 0.64), control2: blend(1, 0.66, 0.7, 0.82))
+            path.addCurve(
+                to: blend(0, 0.72 + 0.08 * smile, 0, 0.4),
+                control1: blend(1, 1.1 - 0.85 * smile, 0.3, 0.82),
+                control2: blend(0, 1.1 - 0.85 * smile, 0, 0.64))
+            path.addCurve(
+                to: blend(0, 0.32 + 0.24 * smile, 0.5, 0.22),
+                control1: blend(0, 0.66, 0, -0.02), control2: blend(0, 0.5, 0.35, -0.12))
             path.closeSubpath()
             return path
         }

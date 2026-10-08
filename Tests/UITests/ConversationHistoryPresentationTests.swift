@@ -24,3 +24,19 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     }
     return try JSONDecoder().decode(HistoryConversation.self, from: JSONSerialization.data(withJSONObject: value))
 }
+
+@Test @MainActor func conversationRetainsFinalizedUserCaptionAlongsideReplyUntilNextTurn() {
+    let state = ConversationState()
+    state.liveTranscript = "请一边跳舞一边做表情"
+    state.finishUserTranscript()
+    state.assistantReply = "好的，"
+    state.assistantReply += "开始吧。"
+    #expect(state.liveTranscript == "请一边跳舞一边做表情")
+    #expect(state.transcriptFinalized)
+    #expect(state.assistantReply == "好的，开始吧。")
+    state.resetCaptions()
+    #expect(state.liveTranscript.isEmpty && state.assistantReply.isEmpty)
+    #expect(!state.transcriptFinalized)
+    state.liveTranscript = "下一轮"
+    #expect(state.liveTranscript == "下一轮")
+}

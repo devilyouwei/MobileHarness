@@ -2,6 +2,24 @@
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
+## 2026-10-08 — Lower finalized user caption
+
+- Lowered only the finalized user-caption center by24 pt, including the compact-height minimum (60→84 pt). Listening/reply positions and animation remain unchanged.
+- Full checks and signed generic iOS build2026100804 passed. Paired-phone installation is pending reconnection; see validation history.
+
+## 2026-10-08 — Explicit camera targets and companion presentation
+
+- Camera.Capture.flip now requires facing=front/back across Assistant native declarations, Photographer intents, shared function validation and typed native capability. Healthy same-facing requests do not restart capture; manual switching resolves the opposite target before admission. Removed obsolete direct coordinator toggle/switch entry points.
+- ASR emits its final bounded caption before sealing it. User text moves above the eyes and remains beside the streaming reply until the next accepted turn; stopping voice retains displayed text. Cyan user and lavender assistant captions have distinct accessibility labels, with reduced-motion support and existing freshness fences.
+- Gaze displacement increases to horizontal14%/vertical9% of face width. Love morphs both stable eye shapes into pink hearts using matching cubic segments and existing animation-completion acknowledgment.
+- Tests cover target/argument validation, delegated target preservation, final-caption ordering, caption retention/reset and manual facing selection. Validation and acceptance limits are recorded in [validation history](Validation-History.md#2026-10-08--camera-target-and-companion-presentation-refinements).
+
+## 2026-10-08 — Prefer default Action Channels in model prompts
+
+- CapabilityContextBuilder explicitly prefers bare Action tags on their declared default Channels. Channel scopes are reserved for intentional routing overrides; concurrent work on different defaults needs no scopes or wait groups.
+- Assistant adds a concurrent expression/dance example and discourages duplicate Actions emitted only to demonstrate routing. Parser support and scheduling semantics remain unchanged.
+- Prompt regression checks the guidance and verifies two bare Actions route to Display/Robot without scheduling boundaries. Full checks passed (596 integration /51 workflow tests); simulator build is blocked by external CoreAI. Live-model instruction following remains unverified. See [validation history](Validation-History.md#2026-10-08--default-channel-prompt-guidance).
+
 ## 2026-10-08 — ApplicationControl business service (ADR0182)
 
 - Replaced the root ResourceManagement actor/configuration/identity with directory-owned ApplicationControl; no compatibility alias remains.

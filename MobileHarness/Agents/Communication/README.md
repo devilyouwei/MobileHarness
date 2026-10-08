@@ -108,3 +108,5 @@ flowchart LR
 ✅ ADR0180: Memory / memory identity and MemoryHistoryIntent are used consistently in configuration, host transport, presentation source guards and regression fixtures; preserve history.intent/1 and runtime behavior. Enforce the two reorganized roles’ directory/actor/configuration naming and isolated business components.
 
 ✅ ADR0181: photography.camera/1 uses PhotographerCameraIntent operation/requestID with a512-byte bound and a fresh10-second routing deadline. It is a directed work command; trusted runtime cancellation is root-only. app.interaction removes camera and remains device/navigation only.
+
+✅ Interaction refinement: PhotographerCameraIntent gains a finite Facing enum; flip requires facing, all other operations forbid it. The existing 512-byte bound remains.

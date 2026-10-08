@@ -13,7 +13,7 @@ import UI
 
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
 @MainActor
-final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraControlCapability {
+final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
     static let captureResource = ResourceID(rawValue: "camera.capture")
     static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
     private let captureOwner: ExecutionOwner
@@ -58,22 +58,6 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         state.visionMessage = "姿态模型已停用，可在设置中重新下载"
     }
 
-    func toggle() {
-        state.isEnabled.toggle()
-        failed = false
-        state.message = nil
-        state.needsSettings = false
-        reconcile()
-    }
-
-    func switchCamera() {
-        guard state.isEnabled, !state.isBusy else { return }
-        failed = false
-        state.facing = state.facing == .front ? .back : .front
-        state.message = nil
-        reconcile()
-    }
-
     /// Tool calls reject overlap rather than replacing another command's intent.
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
@@ -95,12 +79,21 @@ final class CameraCoordinator: CameraControlling, CameraOutputHandling, CameraCo
         try await finishCameraControl(enabled: enabled)
     }
 
-    func flip(invocation: any FunctionInput) async throws {
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
         guard foreground else { throw CameraControlError.notForeground }
         guard worker == nil else { throw CameraControlError.busy }
         guard state.isEnabled else { throw CameraControlError.disabled }
-        switchCamera()
+        let target: CameraDirection = facing == .front ? .front : .back
+        if state.facing == target, state.isVisible {
+            try await finishCameraControl(enabled: true)
+            return
+        }
+        state.facing = target
+        failed = false
+        state.message = nil
+        state.needsSettings = false
+        reconcile()
         try await finishCameraControl(enabled: true)
     }
 

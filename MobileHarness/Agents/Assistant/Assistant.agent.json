@@ -513,11 +513,17 @@
         "type": "function",
         "function": {
           "name": "Camera.flip",
-          "description": "Switch the enabled foreground camera between front and rear lenses. Fails if disabled, busy or unavailable.",
+          "description": "Select the requested front or back lens of the enabled foreground camera. Already selecting that lens leaves it unchanged. Fails if disabled, busy or unavailable.",
           "parameters": {
             "type": "object",
-            "properties": {},
-            "required": [],
+            "properties": {
+              "facing": {
+                "type": "string",
+                "enum": ["front", "back"],
+                "description": "Target camera: front for selfies, back for the rear camera."
+              }
+            },
+            "required": ["facing"],
             "additionalProperties": false
           },
           "strict": true

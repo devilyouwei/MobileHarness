@@ -128,3 +128,5 @@ ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed 
 
 
 ✅ ADR0182: canonical applicationControl identity and role-directory packaging checks; existing resource/provider/device/navigation/failure regressions now exercise ApplicationControl. All concrete Agent configurations require canonical role directories; no root exception remains.
+
+✅ Interaction refinement: Manual camera regression verifies explicit opposite-facing target under unchanged overlap/failure policy.

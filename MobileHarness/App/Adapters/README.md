@@ -195,3 +195,5 @@ ProviderIntentFailure carries the producer failureCode separately from the error
 ✅ Implemented admission hardening: the native device endpoint validates its existing foreground, connection and worker admission conditions before accepting scan/connect/reconnect/preset/jog. Rejected void UI commands must become explicit call errors, without changing native recovery/motion algorithms. Device facts include the current native issue. Motor arguments reject unrelated preset fields.
 
 ✅ ADR0181: RuntimePresentation accepts physical camera effects from Photographer in its root session or an active validated voice session. Assistant calls validate voice then delegate through the bound Gateway invocation Signal context; they do not directly mutate native capture. Retain complete nested Tool reports when returning failures to the original caller. No ApplicationControl camera exemption remains.
+
+✅ Interaction refinement: RuntimePresentation forwardss explicit target facing through camera delegation and the typed native endpoint; no implicit toggling.

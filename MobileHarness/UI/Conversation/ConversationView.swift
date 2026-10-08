@@ -51,17 +51,37 @@
                     .accessibilityHint("轻点眼睛区域。再次轻点会停止录音和语音播放。")
                     .position(x: geometry.size.width / 2, y: geometry.size.height * 0.40)
 
+                    if !state.liveTranscript.isEmpty {
+                        FadingCaption(text: state.liveTranscript, reduceMotion: reduceMotion, color: .cyan)
+                            .accessibilityLabel("用户输入：" + state.liveTranscript)
+                            .frame(
+                                width: min(geometry.size.width - 56, 440), height: min(100, geometry.size.height * 0.16)
+                            )
+                            .position(
+                                x: geometry.size.width / 2,
+                                y: state.transcriptFinalized
+                                    ? max(84, geometry.size.height * 0.40 - diameter * 0.5 - 31)
+                                    : geometry.size.height - (activity.items.isEmpty ? 120 : 240)
+                            )
+                            .animation(
+                                reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.9),
+                                value: state.transcriptFinalized)
+                    }
+
                     VStack(spacing: 20) {
                         if state.voicePhase == .failed {
                             Text(state.voiceStatus)
                                 .font(.callout).foregroundStyle(.white.opacity(0.72))
                                 .multilineTextAlignment(.center)
                         } else if !state.assistantReply.isEmpty {
-                            FadingCaption(text: state.assistantReply, reduceMotion: reduceMotion)
-                                .id("assistant")
-                        } else if !state.liveTranscript.isEmpty {
-                            FadingCaption(text: state.liveTranscript, reduceMotion: reduceMotion)
-                                .id("transcript")
+                            FadingCaption(
+                                text: state.assistantReply, reduceMotion: reduceMotion,
+                                color: Color(red: 0.83, green: 0.74, blue: 1)
+                            )
+                            .accessibilityLabel("assistant 回复：" + state.assistantReply)
+                            .id("assistant")
+                        } else if !state.liveTranscript.isEmpty && !state.transcriptFinalized {
+                            Color.clear
                         } else {
                             Text(hint)
                                 .font(.subheadline).tracking(1)

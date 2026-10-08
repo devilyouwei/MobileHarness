@@ -273,5 +273,7 @@ struct UnusedCameraControl: CameraControlCapability {
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         throw CameraControlError.unavailable
     }
-    func flip(invocation: any FunctionInput) async throws { throw CameraControlError.unavailable }
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        throw CameraControlError.unavailable
+    }
 }

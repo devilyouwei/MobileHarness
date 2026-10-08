@@ -113,3 +113,5 @@ See [App](../App/README.md), [Conversation](Conversation/README.md), [Camera](Ca
 ## Independent history presentation values
 
 ✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Optional exact continuation requests are visible in history details. UI target has zero project dependencies.
+
+✅ Interaction refinement: Conversation renders retained user text above eyes after recognition and assistant text below in different colors. Components expand two-axis gaze and morph love into two hearts without business ownership.

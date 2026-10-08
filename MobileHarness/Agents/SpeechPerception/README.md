@@ -23,7 +23,7 @@ flowchart LR
 
 ✅ Accepted input kinds derive from the JSON v6 communication snapshot; Swift retains handlers, not a duplicate production input registry.
 
-✅ Code declares UI.Caption.setTranscript as an internal Tool without a Channel. Each preview publishes its shared observation and emits a resolved caption ToolCall containing the last 320 characters. Recognition completion emits UI.Caption.finishTranscript before publishing final (also clears empty turns). No XML parsing of recognized text is needed: typed InternalTool calls carry the code-owned permission. App awaits each completion-only Tool handler before consuming the following agent.finished control; these UI updates never enter Action scheduling.
+✅ Code declares UI.Caption.setTranscript as an internal Tool without a Channel. Each preview publishes its shared observation and emits a resolved caption ToolCall containing the last 320 characters. Recognition completion emits the final bounded setTranscript (explicitly empty for empty recognition), then finishTranscript before publishing final. App retains nonempty sealed text until the next turn. No XML parsing of recognized text is needed: typed InternalTool calls carry the code-owned permission. App awaits each completion-only Tool handler before consuming the following agent.finished control; these UI updates never enter Action scheduling.
 
 ✅ The output stream holds at most 32 envelopes; overflow fails the session rather than silently dropping ToolCalls. App drains it serially through OutputGateway, awaiting each Tool handler. Stop cancels perception work, closes/drains output, cancels session Actions, and the App rejects stale-session presentation. Partial/final observations remain available to subscribers independently of UI Tools.
 ❌ Sustained device caption timing and overload acceptance remain unverified.
@@ -90,7 +90,7 @@ flowchart LR
 | 内部 Tool 路径（无 Channel） | 参数结构 | 触发与语义 |
 | --- | --- | --- |
 | `UI.Caption.setTranscript` | `["text": String]`；handler 上限 4096 UTF-8 字节 | 预览先发布 partial，再发 ToolCall；当前投影保留最后 320 个字符。空串清空预览，但不封闭轮次。 |
-| `UI.Caption.finishTranscript` | `[:]` | 识别结束（包括空结果）清空并封闭本轮识别字幕，拒绝迟到的旧 partial；随后才发布非空 final。 |
+| `UI.Caption.finishTranscript` | `[:]` | 识别结束（包括空结果）封闭本轮识别字幕；此前 setTranscript 已替换为最终文本，非空字幕保留到下一轮，拒绝迟到的旧 partial；随后才发布非空 final。 |
 | `UI.VoiceState.setVoiceState` | `["state": "hearing"或"processing"或"listening"]` | speaking 映射 hearing，processing 同名，listening/empty 映射 listening；只改展示，不启动/停止设备。 |
 | control | `agent.finished` | 每次上述展示更新后发出，保留输入完成协议；前面的 Tool handler 已由串行输出处理等待完成，不创建 UI Action。 |
 | control | `agent.error: speech perception failed: …` | 感知失败尝试发出并关闭流；32 项输出缓冲满时不能保证错误消息入队，failed 状态仍可查询。 |
@@ -174,3 +174,5 @@ flowchart LR
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ Interaction refinement: finishUtterance emits the final bounded transcript (including explicit empty text) before finishTranscript seals it. App retains nonempty finalized text through the reply; next turn clears it. No shared transcript payload or output capacity changes.

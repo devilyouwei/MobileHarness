@@ -40,7 +40,7 @@ The host currently binds expression functions as scheduled Action calls and the 
 | --- | --- | --- |
 | UI.Caption.print | Append one reply sentence/chunk exactly once per accepted output sequence | Nonblank text, <=2000 UTF-8 bytes; preserves whitespace |
 | UI.Caption.setTranscript | Replace the entire recognition preview; empty clears | Text <=4096 UTF-8 bytes; SpeechPerception sends its current preview tail, never an append delta |
-| UI.Caption.finishTranscript | Clear and close this turn's transcript | No arguments; late partials cannot reopen it |
+| UI.Caption.finishTranscript | Retain and seal this turn's transcript | No arguments; late partials cannot reopen it |
 | UI.Caption.beginReplyTurn | Clear reply and expression once per turn | No arguments; recognition preview remains independent |
 | UI.VoiceState.setVoiceState | Replace listening/hearing/processing phase | Required state; no microphone admission effect |
 | UI.Gaze.moveEyes | Replace current gaze target | Finite x/y in [-1,1]; negative left/up |
@@ -112,3 +112,5 @@ flowchart TD
 ✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
 
 ✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
+
+✅ Interaction refinement: finishTranscript seals the caption against late partials, retaining text for the current turn; next-turn clearing is owned by App.

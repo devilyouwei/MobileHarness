@@ -12,6 +12,7 @@ import Testing
 private actor CameraProbe {
     var operations: [PhotographerCameraIntent.Operation] = []
     var sources: [String] = []
+    var facings: [String] = []
     var failFlip = true
     var held = false
     private var release: CheckedContinuation<Void, Never>?
@@ -22,9 +23,10 @@ private actor CameraProbe {
         release?.resume()
         release = nil
     }
-    func perform(_ operation: PhotographerCameraIntent.Operation, source: String) async throws {
+    func perform(_ operation: PhotographerCameraIntent.Operation, source: String, facing: String?) async throws {
         operations.append(operation)
         sources.append(source)
+        if let facing { facings.append(facing) }
         if held {
             held = false
             await withTaskCancellationHandler {
@@ -62,12 +64,17 @@ private actor CameraBridge: CameraControlCapability {
         try await perform(enabled ? .open : .close, invocation: invocation)
     }
     func retry(invocation: any FunctionInput) async throws { try await perform(.retry, invocation: invocation) }
-    func flip(invocation: any FunctionInput) async throws { try await perform(.flip, invocation: invocation) }
-    private func perform(_ operation: PhotographerCameraIntent.Operation, invocation: any FunctionInput) async throws {
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        try await perform(.flip, facing: facing, invocation: invocation)
+    }
+    private func perform(
+        _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil,
+        invocation: any FunctionInput
+    ) async throws {
         if invocation.context.source == "assistant", let runtime, let gateway {
             do {
                 try await runtime.perform(
-                    operation,
+                    operation, facing: facing.flatMap { PhotographerCameraIntent.Facing(rawValue: $0.rawValue) },
                     delegate: { message in
                         try await gateway.delegate(message, context: invocation.context, to: .photographer)
                     })
@@ -77,7 +84,7 @@ private actor CameraBridge: CameraControlCapability {
             }
         } else {
             guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
-            try await probe.perform(operation, source: invocation.context.source)
+            try await probe.perform(operation, source: invocation.context.source, facing: facing?.rawValue)
         }
     }
 }
@@ -137,7 +144,7 @@ private struct CameraFixture {
 {
     let f = try await CameraFixture()
     try await f.runtime.perform(.open)
-    await #expect(throws: PhotographerIntentFailure.self) { try await f.runtime.perform(.flip) }
+    await #expect(throws: PhotographerIntentFailure.self) { try await f.runtime.perform(.flip, facing: .back) }
     let feedback = try #require(await f.runtime.agent.cameraResult())
     #expect(feedback.isError)
     #expect(feedback.failureCode == "camera.unavailable")
@@ -147,10 +154,11 @@ private struct CameraFixture {
     }
     #expect(report.entries.map(\.path) == ["prepare", "switch"])
     #expect(report.entries.last?.details["cause"] == "test device failure")
-    try await f.runtime.perform(.flip)
+    try await f.runtime.perform(.flip, facing: .front)
     try await f.runtime.perform(.retry)
     try await f.runtime.perform(.close)
     #expect(await f.probe.operations == [.open, .flip, .flip, .retry, .close])
+    #expect(await f.probe.facings == ["back", "front"])
     #expect(await f.probe.sources.allSatisfy { $0 == "photographer" })
     await f.runtime.shutdown()
 }
@@ -200,9 +208,10 @@ private struct CameraFixture {
     let result = try await f.gateway.execute(
         OutputEnvelope(
             source: .assistant, input: parent,
-            output: .toolCall(ToolCall(toolPath: "Camera.Capture.flip", arguments: [:]))))
+            output: .toolCall(ToolCall(toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]))))
     #expect(result.isError)
     #expect(result.tool?.failureCode?.rawValue == "camera.unavailable")
+    #expect(await f.probe.facings == ["back"])
     guard case .report(let report)? = result.tool?.completion else {
         Issue.record("Missing delegated failure report")
         return
@@ -259,4 +268,16 @@ private struct CameraFixture {
     try await agent.receive(PhotographerCameraIntent(.close).input(sessionID: root))
     #expect(await agent.status().lifecycle == .running)
     await agent.stop()
+}
+
+@Test func photographerCameraFacingIsRequiredOnlyForFlip() throws {
+    for facing in [PhotographerCameraIntent.Facing.front, .back] {
+        _ = try PhotographerCameraIntent(.flip, facing: facing).message.validatedSize()
+        #expect(throws: CommunicationError.invalidPayload) {
+            try PhotographerCameraIntent(.open, facing: facing).message.validatedSize()
+        }
+    }
+    #expect(throws: CommunicationError.invalidPayload) {
+        try PhotographerCameraIntent(.flip).message.validatedSize()
+    }
 }

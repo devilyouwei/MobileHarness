@@ -453,7 +453,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     }
     try await tools.registerCompletion("UI.Caption.finishTranscript") { invocation in
         try await UIActions.finishTranscript(invocation: invocation) { _ in
-            await captions.displayed("")
+            await captions.displayed("sealed")
         }
     }
     try await tools.registerCompletion("UI.Caption.setTranscript") { invocation in
@@ -509,8 +509,8 @@ private actor EndpointVADSession: VoiceActivitySession {
     try await outputTask.value
     let displayed = await captions.displayedText
     #expect(displayed.contains("partial"))
-    #expect(displayed.last == "")
-    #expect(displayed.filter { $0.isEmpty }.count == 1)
+    #expect(Array(displayed.suffix(2)) == ["你好", "sealed"])
+    #expect(!displayed.contains(""))
     await scheduler.shutdown()
     await #expect(throws: HarnessError.notRunning) {
         try await speech.receive(

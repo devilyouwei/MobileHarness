@@ -30,8 +30,10 @@ extension CameraActions {
         domain: "Camera", module: "Capture", title: "flip", serializationKey: "Camera")
     public static func flip(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
         try Task.checkCancellation()
-        try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
-        try await camera.flip(invocation: invocation)
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys(["facing"])
+        let facing = try arguments.requiredEnum("facing", as: CameraActions.Facing.self)
+        try await camera.flip(facing, invocation: invocation)
         try Task.checkCancellation()
     }
 }

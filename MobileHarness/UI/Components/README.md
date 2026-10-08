@@ -22,9 +22,9 @@ flowchart LR
     State --> Bands[VoiceBars 数值频谱]
 ```
 
-✅ 双眼各占 faceWidth 的 21%，眼间净距 19%，高度 25%；上限和位置由页面决定。所有表情共享形状身份与路径拓扑，切换只更新笑弧、斜率、开合、宽度、旋转和位移，不替换图片或 emoji，也不创建表演队列。
+✅ 双眼各占 faceWidth 的 21%，眼间净距 19%，高度 25%；上限和位置由页面决定。所有表情共享形状身份与路径拓扑，切换只更新笑弧、斜率、爱心轮廓、开合、宽度、旋转、颜色和位移，不替换图片或 emoji，也不创建表演队列。
 
-✅ clear、smile、happy、laugh、thinking、surprised、sad、love、angry、scared、playful 均有参数定义。表情使用 0.65 秒、阻尼 1 的显式 spring transaction，覆盖双眼所有 pose 属性；transaction removed 回执携带 UI 请求 ID；gaze 使用水平 8.5% / 垂直 5.5% faceWidth 位移及 0.32 秒、阻尼 0.86 的 spring。眨眼/呼吸独立，时间线至多 60 Hz，非活跃场景暂停。
+✅ clear、smile、happy、laugh、thinking、surprised、sad、love、angry、scared、playful 均有参数定义。表情使用 0.65 秒、阻尼 1 的显式 spring transaction，覆盖双眼所有 pose 属性；transaction removed 回执携带 UI 请求 ID；gaze 使用水平 14% / 垂直 9% faceWidth 位移及 0.32 秒、阻尼 0.86 的 spring。眨眼/呼吸独立，时间线至多 60 Hz，非活跃场景暂停。
 
 ✅ VoiceBars 绘制 32 个输入频段，不自行做 FFT。生产值来自 PlatformKit/App 的真实音频分析；视觉预览显式提供模拟数值。底部青蓝条向上，回应紫色条沿估算的岛底弧线向下；166 × 62 pt Canvas 留出转角空间，内部轮廓宽 126 pt，基线 y=24，沿两端法线绘制渐短频段。只使用公开安全区几何，不修改系统灵动岛。
 
@@ -39,3 +39,5 @@ flowchart LR
 ✅ CompanionEyes reports transaction completion and active renderer availability; disappearance/inactive scenes cancel App waits. Reduce Motion uses a 0.2-second easeInOut transaction with the same acknowledgment. No fixed sleep or view-owned performance queue.
 
 ✅ A one-shot performance includes a 6% eye emphasis and return, so performing the same emotion as the base still has an animated endpoint; persistent base setting never adds this emphasis.
+
+✅ Interaction refinement: FadingCaption accepts a color. CompanionEyes increases gaze to horizontal14%/vertical9% faceWidth; EyeSilhouette adds an animatable heart parameter with stable cubic-path topology, producing two pink hearts for love and preserving acknowledgment/reduced-motion behavior.

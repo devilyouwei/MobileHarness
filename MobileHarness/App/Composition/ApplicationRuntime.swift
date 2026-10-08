@@ -230,9 +230,9 @@ final class ApplicationRuntime {
                 Logger(subsystem: "dev.mobileharness", category: "Photographer").error("\(message, privacy: .private)")
             })
         photographerIntents = photography
-        presentation.cameraRequests = { operation, invocation in
+        presentation.cameraRequests = { operation, facing, invocation in
             try await photography.perform(
-                operation,
+                operation, facing: facing,
                 delegate: { message in
                     try await gateway.delegate(message, context: invocation.context, to: .photographer)
                 })

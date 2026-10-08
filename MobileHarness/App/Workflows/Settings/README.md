@@ -217,3 +217,5 @@ Resource facade overlap errors now use the owning facade/transport error instead
 CameraInteractionWorkflow forwards typed operations. Root UI requests use InputGateway; delegated model calls use the live, bound Assistant messaging authority through OutputGateway. Returning camera failures retain OutputExecutionResult and complete producer reports. Error paths release the request slot and leave later commands and perception admissible. ApplicationControlIntentRuntime retains device/navigation only.
 
 Camera transport errors expose bounded producer descriptions for UI while retaining the complete execution outcome/report for callers. Closing transport cancels accepted work; it admits no new dispatch.
+
+✅ Interaction refinement: Manual switch resolves the opposite of current facing before admission; PhotographerIntentRuntime carries that explicit facing through the existing bounded request slot.

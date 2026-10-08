@@ -78,6 +78,7 @@ public actor PhotographerIntentRuntime {
     }
     public func perform(
         _ operation: PhotographerCameraIntent.Operation,
+        facing: PhotographerCameraIntent.Facing? = nil,
         delegate: (@Sendable (AgentMessage) async throws -> DeliveryReport)? = nil
     ) async throws {
         guard operation != .cancel else { throw CommunicationError.unauthorized }
@@ -86,7 +87,8 @@ public actor PhotographerIntentRuntime {
         try Task.checkCancellation()
         guard !closed else { throw CommunicationError.scopeClosed }
         guard request == nil else { throw CommunicationError.capacityExceeded }
-        let intent = PhotographerCameraIntent(operation)
+        let intent = PhotographerCameraIntent(operation, facing: facing)
+        _ = try intent.message.validatedSize()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { waiter in
                 request = Request(id: intent.requestID, waiter: waiter)

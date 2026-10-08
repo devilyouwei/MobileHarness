@@ -6,6 +6,7 @@
     struct FadingCaption: View {
         let text: String
         let reduceMotion: Bool
+        var color: Color = .white
         @State private var characters: [Character] = []
         @State private var arrivals: [Date] = []
         @State private var animating = false
@@ -18,7 +19,7 @@
                         characters.indices.reduce(Text("")) { result, index in
                             let age = timeline.date.timeIntervalSince(arrivals[index])
                             let opacity = reduceMotion ? 1 : min(1, max(0.1, age / 0.4))
-                            return result + Text(String(characters[index])).foregroundColor(.white.opacity(opacity))
+                            return result + Text(String(characters[index])).foregroundColor(color.opacity(opacity))
                         }
                         .font(.system(.title3, design: .default, weight: .medium))
                         .multilineTextAlignment(.center).lineSpacing(7)

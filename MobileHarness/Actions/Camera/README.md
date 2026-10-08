@@ -6,7 +6,7 @@ Purpose: expose explicit camera/vision controls through OutputGateway. Design go
 | --- | --- |
 | Camera.Capture.open | No arguments; idempotently enable capture and vision intent |
 | Camera.Capture.close | No arguments; idempotently disable capture and vision |
-| Camera.Capture.flip | No arguments; switch front/rear lens; disabled camera fails |
+| Camera.Capture.flip | Required facing=front/back; select target lens, healthy same-target request is idempotent; disabled camera fails |
 
 ✅ CaptureActions.swift owns @Action entries; Support/CameraModule.swift owns definitions, capability and errors. All entries check cancellation and reject unknown arguments before effects. Host registration retains completion-only native success without ToolResult or Action history. Host errors propagate.
 
@@ -54,4 +54,6 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 
 ✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
-✅ ADR0181 host migration: functions/arguments/native semantics remain unchanged. The injected camera endpoint routes Assistant intent to Photographer, and applies only admitted Photographer effects. Functions remain unaware of Agent identity or delegation protocol.
+✅ ADR0181 host migration: function paths and native lifecycle remain unchanged; flip now requires explicit facing. The injected camera endpoint routes Assistant intent to Photographer, and applies only admitted Photographer effects. Functions remain unaware of Agent identity or delegation protocol.
+
+✅ Interaction refinement: CaptureActions.flip validates required facing (front/back) and calls the typed target-selection endpoint; selecting the current lens is idempotent when capture is healthy.

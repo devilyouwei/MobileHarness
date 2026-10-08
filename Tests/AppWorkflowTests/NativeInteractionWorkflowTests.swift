@@ -6,6 +6,7 @@ import UI
 
 @MainActor private final class HeldInteraction {
     var calls: [AppInteractionIntent] = []
+    var cameraFacings: [PhotographerCameraIntent.Facing?] = []
     var cameraCalls: [PhotographerCameraIntent.Operation] = []
     var pending: CheckedContinuation<Void, any Error>?
     let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -14,8 +15,11 @@ import UI
         calls.append(intent)
         try await wait()
     }
-    func performCamera(_ operation: PhotographerCameraIntent.Operation) async throws {
+    func performCamera(_ operation: PhotographerCameraIntent.Operation, facing: PhotographerCameraIntent.Facing?)
+        async throws
+    {
         cameraCalls.append(operation)
+        cameraFacings.append(facing)
         try await wait()
     }
     private func wait() async throws {
@@ -61,7 +65,7 @@ import UI
     let host = HeldInteraction()
     let state = CameraState()
     state.isEnabled = false
-    let controls = CameraInteractionWorkflow(state: state, perform: { try await host.performCamera($0) })
+    let controls = CameraInteractionWorkflow(state: state, perform: { try await host.performCamera($0, facing: $1) })
     var started = host.started.stream.makeAsyncIterator()
     controls.toggle()
     await started.next()
@@ -73,4 +77,11 @@ import UI
     controls.retry()
     await controls.waitUntilIdle()
     #expect(host.cameraCalls == [.open, .retry])
+    state.isEnabled = true
+    controls.switchCamera()
+    await controls.waitUntilIdle()
+    state.facing = .back
+    controls.switchCamera()
+    await controls.waitUntilIdle()
+    #expect(host.cameraFacings == [nil, nil, .back, .front])
 }

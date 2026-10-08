@@ -357,6 +357,7 @@ public actor SpeechPerceptionAgent: Agent {
         try await transition(to: .processing, input: input)
         let text = try await recognitionTurn.finish()
         try Task.checkCancellation()
+        try emit(.toolCall(Self.transcript.call(["text": String(text.suffix(320))])), input: input)
         try emit(.toolCall(Self.finishTranscript.call([:])), input: input)
         try emit(.control("agent.finished"), input: input)
         if text.isEmpty {

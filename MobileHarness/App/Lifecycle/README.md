@@ -58,7 +58,7 @@ flowchart LR
 
 ✅ ADR0098: RuntimeDependencies supplies immutable voice/vision/camera service slices instead of ApplicationRuntime. Composition injects Agent factories; registration, input/output pumps, barriers and cleanup remain owned here.
 
-✅ CameraCoordinator implements explicit setEnabled/flip Tool controls. Foreground and idle-worker admission are required; overlap fails busy, flip while disabled fails. Completion waits for reconciliation and checks revision, permission and capture state. Scene/UI supersession fails cancellation; close joins capture release and vision cleanup. VoiceSessionCoordinator validates Assistant source and active voice session. ❌ Open capture does not prove pose inference readiness; admitted intent is not rolled back on caller cancellation.
+✅ CameraCoordinator implements explicit setEnabled/retry/flip(CameraActions.Facing) controls. Flip selects front/back; healthy same-target selection completes without restarting capture. Foreground and idle-worker admission are required; overlap fails busy, flip while disabled fails. Completion waits for reconciliation and checks revision, permission and capture state. Scene/UI supersession fails cancellation; close joins capture release and vision cleanup. VoiceSessionCoordinator validates Assistant source and active voice session. ❌ Open capture does not prove pose inference readiness; admitted intent is not rolled back on caller cancellation.
 
 ✅ VisionSession registers VisionPerception and attaches its UUID to root-owned Photographer. Joined cleanup detaches tracking and removes VisionPerception; root camera control remains alive.
 
@@ -150,3 +150,7 @@ flowchart LR
 ✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
 ✅ ADR0181: VisionSession owns VisionPerception only and attaches one vision UUID to the root Photographer transport. Cleanup detaches/reset tracking, joins its worker and cancels that vision session without stopping Photographer or its root camera command. Voice camera validation allows only active-session Assistant or authorized Photographer delegated work. Native camera algorithms remain unchanged.
+
+✅ Interaction refinement: CameraCoordinator selects requested front/back, keeps permission/busy/revision checks and joins reconciliation. VoiceSessionCoordinator retains final ASR text, marks it finalized and clears both captions only on an accepted newer turn or new voice-session start; stopping voice retains the current captions.
+
+✅ Interaction cleanup: Removed unused CameraCoordinator CameraControlling conformance and direct toggle/switch entry points; CameraInteractionWorkflow is the sole manual camera command adapter. Same-facing completion uses existing revision/foreground/capture checks.

@@ -47,3 +47,5 @@ No Channel is implicitly main or blocking. DefaultChannel remains an internal ru
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+✅ CapabilityContextBuilder explicitly prefers default Channel routing and reserve Channel scopes for intentional overrides; different default Channels need no wrappers or wait for concurrent requests.

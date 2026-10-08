@@ -2,7 +2,7 @@
 
 Purpose: bind explicit entries to the host camera capability. Design goals: required typed injection, no discovery and no owned device/session state.
 
-✅ CameraModule supplies three protocol-neutral ActionFunctions; host registration selects completion-only native feedback. CameraControlCapability exposes setEnabled and flip with opaque FunctionInput correlation. CameraControlError reports foreground, busy, disabled, permission and availability failures. No queue or platform dependency.
+✅ CameraModule supplies four protocol-neutral ActionFunctions; host registration selects completion-only native feedback. CameraControlCapability exposes setEnabled, retry and flip(CameraActions.Facing) with opaque FunctionInput correlation. CameraControlError reports foreground, busy, disabled, permission and availability failures. No queue or platform dependency.
 
 ```mermaid
 flowchart LR
@@ -32,3 +32,5 @@ flowchart LR
 ## Camera command entry
 
 ✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+
+✅ Interaction refinement: CameraControlCapability.flip receives CameraActions.Facing; CameraModule retains existing function registration and error/completion contracts.

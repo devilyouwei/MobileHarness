@@ -30,7 +30,9 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         cameraCalls.append(enabled ? "open" : "close")
     }
-    func flip(invocation: any FunctionInput) async throws { cameraCalls.append("flip") }
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        cameraCalls.append("flip:" + facing.rawValue)
+    }
     private(set) var emotion: UIActions.Emotion?
     private(set) var gaze: UIActions.Gaze?
     private(set) var pose: PoseOverlay?
@@ -184,16 +186,28 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let envelope = behaviorInvocation("express").testEnvelope
     for name in ["open", "close", "flip"] {
         let result = try await executor.execute(
-            ToolCall(toolPath: "Camera.Capture." + name, arguments: [:]), envelope: envelope)
+            ToolCall(toolPath: "Camera.Capture." + name, arguments: name == "flip" ? ["facing": "front"] : [:]),
+            envelope: envelope)
         #expect(result == nil)
     }
-    #expect(await endpoint.cameraCalls == ["open", "close", "flip"])
+    #expect(await endpoint.cameraCalls == ["open", "close", "flip:front"])
     let invalid = try #require(
         try await executor.execute(
             ToolCall(toolPath: "Camera.Capture.flip", arguments: ["unexpected": "yes"]), envelope: envelope))
     #expect(invalid.isError)
     #expect(invalid.value.contains("invalidKeys"))
-    #expect(await endpoint.cameraCalls.count == 3)
+    for arguments in [[:], ["facing": "rear"], ["facing": ""], ["facing": "Front"]] {
+        let rejected = try #require(
+            try await executor.execute(
+                ToolCall(toolPath: "Camera.Capture.flip", arguments: arguments), envelope: envelope))
+        #expect(rejected.isError)
+    }
+    #expect(await endpoint.cameraCalls == ["open", "close", "flip:front"])
+    _ = try await executor.execute(
+        ToolCall(toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]), envelope: envelope)
+    #expect(await endpoint.cameraCalls.last == "flip:back")
+
+    #expect(await endpoint.cameraCalls.count == 4)
     let cancelled = Task {
         try Task.checkCancellation()
         try await Task.sleep(for: .seconds(30))
@@ -201,14 +215,16 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     }
     cancelled.cancel()
     await #expect(throws: CancellationError.self) { try await cancelled.value }
-    #expect(await endpoint.cameraCalls.count == 3)
+    #expect(await endpoint.cameraCalls.count == 4)
 }
 
 private struct UnavailableCameraEndpoint: CameraControlCapability {
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         throw CameraControlError.permissionDenied
     }
-    func flip(invocation: any FunctionInput) async throws { throw CameraControlError.disabled }
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        throw CameraControlError.disabled
+    }
 }
 
 @Test func cameraToolsRecordHostFailureWithoutSuccessFeedback() async throws {
@@ -219,7 +235,8 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
         try await executor.execute(ToolCall(toolPath: "Camera.Capture.open", arguments: [:]), envelope: envelope))
     #expect(open.isError && open.value.contains("permissionDenied"))
     let flip = try #require(
-        try await executor.execute(ToolCall(toolPath: "Camera.Capture.flip", arguments: [:]), envelope: envelope))
+        try await executor.execute(
+            ToolCall(toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]), envelope: envelope))
     #expect(flip.isError && flip.value.contains("disabled"))
 }
 

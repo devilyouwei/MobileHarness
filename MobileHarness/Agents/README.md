@@ -356,3 +356,5 @@ The extraction preserves all current capacity, cancellation, freshness, ordered 
 ## ApplicationControl organization — ADR0182
 
 ✅ ApplicationControl consolidates remaining application-operation domains with a fixed function catalog and pure resource-result policy. Its single actor retains shared transaction exclusion and correlation state. The App transport is ApplicationControlIntentRuntime; no compatibility identity remains. See [role design](ApplicationControl/README.md). Broader semantic delegation and physical acceptance remain pending.
+
+✅ Interaction refinement: Camera intent carries a validated optional facing, required only for flip; Photographer forwards it to Camera.Capture.flip, while Assistant native schema requires front/back.

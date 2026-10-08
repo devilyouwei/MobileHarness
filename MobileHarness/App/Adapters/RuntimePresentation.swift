@@ -42,8 +42,15 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         self.rootSessionID = rootSessionID
     }
     var cameraRequests:
-        (@MainActor @Sendable (PhotographerCameraIntent.Operation, any FunctionInput) async throws -> Void)?
-    private func cameraOperation(_ operation: PhotographerCameraIntent.Operation, invocation: any FunctionInput)
+        (
+            @MainActor @Sendable (
+                PhotographerCameraIntent.Operation, PhotographerCameraIntent.Facing?, any FunctionInput
+            ) async throws -> Void
+        )?
+    private func cameraOperation(
+        _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil,
+        invocation: any FunctionInput
+    )
         async throws
     {
         if invocation.context.source == "photographer" {
@@ -54,7 +61,9 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
             switch operation {
             case .open: try await cameraControl.setEnabled(true, invocation: invocation)
             case .close: try await cameraControl.setEnabled(false, invocation: invocation)
-            case .flip: try await cameraControl.flip(invocation: invocation)
+            case .flip:
+                guard let facing else { throw CommunicationError.invalidPayload }
+                try await cameraControl.flip(facing, invocation: invocation)
             case .retry: try await cameraControl.retry(invocation: invocation)
             case .cancel: throw CommunicationError.unauthorized
             }
@@ -64,7 +73,10 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
             throw CommunicationError.unauthorized
         }
         try voice.validateCameraControl(invocation: invocation)
-        do { try await cameraRequests(operation, invocation) } catch PhotographerIntentFailure.execution(let result) {
+        do {
+            try await cameraRequests(
+                operation, facing.flatMap { PhotographerCameraIntent.Facing(rawValue: $0.rawValue) }, invocation)
+        } catch PhotographerIntentFailure.execution(let result) {
             if case .report(let report)? = result.tool?.completion { throw ActionReportedError(report) }
             throw PhotographerIntentFailure.execution(result)
         }
@@ -72,7 +84,9 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         try await cameraOperation(enabled ? .open : .close, invocation: invocation)
     }
-    func flip(invocation: any FunctionInput) async throws { try await cameraOperation(.flip, invocation: invocation) }
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        try await cameraOperation(.flip, facing: facing, invocation: invocation)
+    }
     func retry(invocation: any FunctionInput) async throws { try await cameraOperation(.retry, invocation: invocation) }
     private weak var voice: (any VoiceOutputHandling)?
     private weak var camera: (any CameraOutputHandling)?

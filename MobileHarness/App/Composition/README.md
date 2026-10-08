@@ -206,3 +206,5 @@ flowchart TD
 ✅ ADR0180: Memory / memory identity and MemoryHistoryIntent are used consistently in configuration, host transport, presentation source guards and regression fixtures; preserve history.intent/1 and runtime behavior. Enforce the two reorganized roles’ directory/actor/configuration naming and isolated business components.
 
 ✅ ADR0181: compose one Photographer and dedicated root camera UUID; use its descriptor for capability coverage and root presentation authorization. Bind Assistant camera delegation after Gateways exist. Vision dependencies inject PhotographerIntentRuntime; no transient Photographer factory remains.
+
+✅ Interaction refinement: Camera delegate and manual-control closures carries explicit front/back targets to Photographer; existing ownership and request cleanup remain.

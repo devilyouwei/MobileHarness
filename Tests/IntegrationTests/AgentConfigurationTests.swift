@@ -193,6 +193,13 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
     #expect(prompt.contains("AVAILABLE CHANNELS: Display, Robot, Speech"))
     #expect(prompt.contains("Action express: path=UI.Expression.express; default Channel=Display"))
+    #expect(prompt.contains("Do not wrap Actions in Channel tags merely to name their default Channels"))
+    let concurrent = "<express emotion=\"laugh\"/><dance cycles=\"1\"/>"
+    #expect(prompt.contains("Concurrent expression-and-dance example: " + concurrent))
+    var concurrentGenerator = AgentGenerator(capabilities: registry)
+    let concurrentEvents = try concurrentGenerator.append(concurrent) + concurrentGenerator.finish()
+    #expect(concurrentEvents.count == 2)
+    #expect(concurrentEvents.compactMap(\.actionCall).map(\.channel) == ["Display", "Robot"])
     #expect(prompt.contains("Channel Speech — automatic audio playback"))
     #expect(prompt.contains("played on the independent Speech Channel"))
     #expect(prompt.contains("<wait>I will finish speaking first.</wait><express emotion="))
