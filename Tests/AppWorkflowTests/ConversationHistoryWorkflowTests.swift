@@ -1,8 +1,92 @@
+import AgentCore
+import Agents
 import AppWorkflows
 import Foundation
 import StorageChat
 import Testing
 import UI
+
+@Test @MainActor func specialistHistoryGroupsInputsAndReACTByTaskWithoutArchiveSummaries() async throws {
+    let session = UUID()
+    let scope = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: session)
+    let other = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: session)
+    let store = ConversationHistoryStore()
+    var context = AgentContext(agentID: .photographer, scopeID: session, state: PhotographerContextState())
+    try context.tasks.register(scope)
+    try context.tasks.register(other)
+    context.state.taskViews = [
+        scope.id: AgentTaskView(
+            scope: scope, content: try AgentTaskContent(text: "照片已保存", stage: .completed), terminal: true),
+        other.id: AgentTaskView(
+            scope: other, content: try AgentTaskContent(text: "另一任务", stage: .waitingUser, interactionID: UUID())),
+    ]
+    try context.tasks.report(
+        try AgentTaskContent(text: "照片已保存").signal(.result, scope: scope, status: .succeeded), agent: .photographer)
+    let ids = [UUID(), UUID(), UUID(), UUID()]
+    for (index, id) in ids.enumerated() {
+        let read = try await store.readCurrent()
+        _ = try await store.begin(
+            id: id, user: ["帮我拍照", "另一任务", "保存照片", "旧记录"][index], request: [], expecting: read.token, model: "fixture")
+        try await store.beginModelRequest(ConversationModelRequest(id: UUID(), input: "输入", requestJSON: "[]"), for: id)
+        try await store.append("回复", to: id)
+        try await store.finishModelRequest(id, reason: "stop")
+        if index == 0 {
+            try await store.beginModelRequest(
+                ConversationModelRequest(id: UUID(), input: "拍照结果", requestJSON: "[]"), for: id)
+            try await store.append("是否保存", to: id)
+            try await store.finishModelRequest(id, reason: "stop")
+        }
+        try await store.finish(id, state: .completed)
+        if index < 3 {
+            let task = index == 1 ? other : scope
+            let signal = try AgentTaskContent(text: index == 0 ? "帮我拍照" : "补充输入").signal(
+                index == 2 ? .input : .request, scope: task)
+            let input = try AgentInput(
+                id: id, sessionID: session, payload: .observation(signal.message()), taskScope: task)
+            try context.append(
+                AgentContext<PhotographerContextState>.Record(
+                    taskID: index == 0 ? input.id : task.id, kind: signal.contract,
+                    data: JSONEncoder().encode(SignalEvidence(input))))
+        }
+    }
+    context.state.history = try await store.snapshot()
+    var archived = context.state.history.current
+    archived.turns = Array(archived.turns.prefix(2))
+    context.state.history.past = [archived]
+    context.state.history.current.turns = Array(context.state.history.current.turns.suffix(2))
+    let snapshot = try HistoryPresentationAdapter.taskSnapshot(context)
+    #expect(snapshot.tasks.count == 3)
+    let photo = try #require(snapshot.tasks.first { $0.id == scope.id })
+    #expect(photo.title == "帮我拍照" && photo.status == "已完成" && photo.isAssociated)
+    #expect(photo.turns.count == 3 && photo.turns[1].isReACT == true)
+    #expect(Set(photo.turns.compactMap(\.ownerInputID)) == [ids[0], ids[2]])
+    let waiting = try #require(snapshot.tasks.first { $0.id == other.id })
+    #expect(waiting.status == "等待用户" && waiting.turns.count == 1)
+    let legacy = try #require(snapshot.tasks.first { $0.id == ids[3] })
+    #expect(!legacy.isAssociated && legacy.title == "旧记录")
+    #expect(snapshot.archive.current.turns.count == 2 && snapshot.archive.past[0].turns.count == 2)
+}
+
+@Test @MainActor func specialistHistoryRetainsTasksWithoutModelRequestsAndRecoveryStatus() throws {
+    let scope = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: UUID())
+    var context = AgentContext(agentID: .photographer, scopeID: scope.sessionID, state: PhotographerContextState())
+    try context.tasks.register(scope)
+    context.state.taskViews = [
+        scope.id: AgentTaskView(
+            scope: scope, content: try AgentTaskContent(text: "等待确认", stage: .waitingUser, interactionID: UUID()))
+    ]
+    var cancelled = context
+    try cancelled.tasks.report(
+        try AgentTaskContent(text: "已取消").signal(.result, scope: scope, status: .cancelled), agent: .photographer)
+    #expect(try HistoryPresentationAdapter.taskSnapshot(cancelled).tasks[0].status == "已取消")
+    context.tasks.recover()
+    let snapshot = try HistoryPresentationAdapter.taskSnapshot(context)
+    #expect(snapshot.tasks.count == 1 && snapshot.tasks[0].turns.isEmpty)
+    #expect(snapshot.tasks[0].status == "已中断")
+    #expect(snapshot.tasks[0].createdAt == nil)
+    #expect(ConversationHistoryState().groupsByTask == false)
+    #expect(ConversationHistoryState(allowsMutations: false, groupsByTask: true).groupsByTask)
+}
 
 @Test @MainActor func failedHistoryLoadDoesNotCreateAnEphemeralStore() async {
     let state = ConversationHistoryState()
@@ -62,7 +146,8 @@ import UI
         id: UUID(), input: "result",
         requestJSON: "[{\"role\":\"tool\",\"content\":\"result\",\"toolCallID\":\"provider\"}]")
     try await store.beginModelRequest(request, for: id)
-    try await store.recordFirstToken(at: request.date.addingTimeInterval(0.25), for: id)
+    try await store.recordModelTiming(
+        startedAt: request.date, firstTokenAt: request.date.addingTimeInterval(0.25), latency: 0.25, for: id)
     try await store.append("observed", to: id)
     try await store.finishModelRequest(id, reason: "stop")
     try await store.finish(id, state: .completed)
@@ -70,6 +155,7 @@ import UI
     let value = try #require(snapshot.current.turns.first?.modelRequests?.first)
     #expect(value.id == request.id && value.requestJSON == request.requestJSON)
     #expect(value.fragments == ["observed"] && value.firstTokenAt == request.date.addingTimeInterval(0.25))
+    #expect(value.modelRequestStartedAt == request.date && value.firstTokenLatency == 0.25)
     #expect(ConversationHistoryPresentation.turns(snapshot.current).first?.request.last?.toolCallID == "provider")
 }
 
@@ -165,4 +251,42 @@ private enum HistoryPhotoFixtureError: Error { case failed }
     for waiter in pending.dropFirst() { waiter.resume(returning: Data([1])) }
     for read in reads.dropFirst() { #expect(try await read.value == Data([1])) }
     #expect(try await replacement.value == Data([1]))
+}
+
+@Test @MainActor func agentHistoryDestinationsKeepStateAndMutationAuthoritySeparate() async {
+    let first = ConversationHistoryState(title: "Assistant")
+    let second = ConversationHistoryState(title: "Photographer", allowsMutations: false)
+    var reads = 0
+    var mutations = 0
+    let workflow = ConversationHistoryWorkflow(
+        state: second, prepare: {},
+        refresh: {
+            reads += 1
+            second.archive = HistorySnapshot()
+        },
+        deleteArchive: { _ in mutations += 1 }, startNew: { mutations += 1 },
+        summarize: { _ in mutations += 1 }, previewOutput: { _ in "photo preview" }, readPhoto: { _, _ in nil })
+    let destination = HistoryAgentDestination(
+        id: "photographer", name: "Photographer", summary: "拍摄", state: second, controls: workflow)
+    await destination.controls.load()
+    destination.controls.startNew()
+    destination.controls.delete(UUID())
+    destination.controls.summarize(UUID())
+    await workflow.waitUntilIdle()
+    #expect(reads == 1 && mutations == 0)
+    #expect(first.archive == nil && second.archive != nil)
+    #expect(destination.state.title == "Photographer")
+}
+
+@Test @MainActor func failedSpecialistHistoryReadPreservesOtherAgentSnapshot() async {
+    let assistant = ConversationHistoryState(title: "Assistant")
+    assistant.archive = HistorySnapshot()
+    let specialist = ConversationHistoryState(title: "Memory", allowsMutations: false)
+    let workflow = ConversationHistoryWorkflow(
+        state: specialist, prepare: {}, refresh: { throw HistoryPhotoFixtureError.failed },
+        deleteArchive: { _ in }, startNew: {}, summarize: { _ in }, previewOutput: { _ in "" },
+        readPhoto: { _, _ in nil })
+    await workflow.load()
+    #expect(specialist.archive == nil && specialist.status != nil)
+    #expect(assistant.archive != nil && assistant.status == nil)
 }

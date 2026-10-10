@@ -15,7 +15,7 @@ flowchart LR
 
 ✅ BehaviorAssembly freezes the catalog once, creates FunctionRegistry and supplies it to both registration views. Canonical execution/resource/budget metadata always comes from that store. Explicit protocol-module injection remains for isolated hosts; duplicate functions or missing implementations fail without fallback.
 
-✅ BehaviorProtocolBindings owns grouped host profiles and rejects unknown modules. Existing expression/speech/motion/gesture scheduling, returning history/system calls and completion-only presentation/camera/tracking calls are preserved. Agent aliases/exposure lists remain in Agent JSON/code.
+✅ BehaviorProtocolBindings owns grouped host profiles and rejects unknown modules. Existing expression/speech/motion/gesture scheduling, returning history/system calls and completion-only presentation/tracking calls and value-returning camera calls are preserved. Agent aliases/exposure lists remain in Agent JSON/code.
 
 ✅ This target depends on Actions, FunctionContracts, ExecutionRuntime and CallRuntime only. Gateway's AgentCore-dependent orchestration is not imported. Business functions and injected endpoints accept standard FunctionInput, not scheduling/native invocations.
 
@@ -62,7 +62,7 @@ ProviderModule combines discovery/restore/save/read under one injected module. D
 
 ✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
 
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Photographer scheduled camera Actions use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
 
 
 ## Typed device, navigation and environment entry points
@@ -78,7 +78,7 @@ ProviderModule combines discovery/restore/save/read under one injected module. D
 
 ✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow admits Actions in order while executing up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
 
 ## Assistant photo observation — ADR0184
 
@@ -89,3 +89,14 @@ ProviderModule combines discovery/restore/save/read under one injected module. D
 ## Photo save and ignore — ADR0185
 
 ✅ takePhoto/savePhoto/ignorePhoto have Action and Tool host registrations with observation feedback. Assistant exposes text Actions; Photographer uses internal Tools. save/ignore receipts return actual state and identity, including alreadySaved; other Camera functions retain native registration.
+
+
+
+✅ Speech.Listening.update is an internal SpeechPerception function with injected native execution; Chat Agents report reply facts and have no listening grant. See [overall architecture](../../../README.md).
+
+✅ Camera model exposure: Photographer declares openCamera/closeCamera/flipCamera/retryCamera alongside takePhoto/savePhoto/ignorePhoto as scheduled Camera Actions; no camera native Tool is exposed to the model. Host binds the canonical camera functions to both protocols only for explicit fixed UI transaction reuse. Model camera Actions keep observed owner-directed results and same-Channel ordering/wait groups.
+
+✅ Navigation entry separation: UI.Navigation.open remains a callable function and gains scheduled Action projection alongside its existing direct Tool projection. ApplicationControl exposes openPage as a model Action. Local button navigation calls the same UI NavigationState.show directly; Agent output continues through Gateway authorization and App presentation scope validation.
+
+
+✅ Implemented: bind System.Device.readEnvironment to both scheduled Action and fixed returning Tool protocols with observation feedback. Assistant registers only the Action; other role/private fixed callers retain their own Tool grants. The canonical function and environment snapshot owner remain unchanged.

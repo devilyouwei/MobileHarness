@@ -66,7 +66,10 @@ actor ObservationRecorder: Agent {
     ]
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"], configurations: configurations)
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ], configurations: configurations)
     let manager = AgentManager()
     let source = ObservationRecorder(id: "producer")
     let consumer = ObservationRecorder(id: "consumer")
@@ -76,13 +79,13 @@ actor ObservationRecorder: Agent {
         try await manager.register(agent, sessionID: session)
         await agent.start()
     }
-    let input = InputGateway(manager: manager, policy: policy)
+    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let output = OutputGateway(
         manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
     let port = try await output.messaging(for: source.descriptor.id)
     let parent = AgentInput(sessionID: session, payload: .text("source"))
-    let published = try await port.publish(.transcript("hello", final: true), parent: parent)
-    #expect(published.delivered == [consumer.descriptor.id])
+    try await port.publish(.transcript("hello", final: true), parent: parent)
+    await input.flushPublications()
     #expect(await consumer.inputs.first?.metadata.origin == .agent)
     #expect(await direct.inputs.isEmpty)
     let sent = try await port.send(.transcript("direct", final: true), parent: parent, to: direct.descriptor.id)
@@ -90,9 +93,7 @@ actor ObservationRecorder: Agent {
     await #expect(throws: CommunicationError.unauthorized) {
         try await port.send(.transcript("forbidden", final: true), parent: parent, to: consumer.descriptor.id)
     }
-    await #expect(throws: CommunicationError.noRecipients) {
-        try await port.publish(.transcript("preview", final: false), parent: parent)
-    }
+    try await port.publish(.transcript("preview", final: false), parent: parent)
     try await manager.remove(source.descriptor.id)
     await #expect(throws: CommunicationError.staleIncarnation) {
         try await port.publish(.transcript("stale", final: true), parent: parent)
@@ -105,7 +106,10 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
 {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
         configurations: [
             communicationConfiguration("producer", publishes: true),
             communicationConfiguration("consumer", subscribes: true), communicationConfiguration("direct"),
@@ -119,7 +123,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
         try await manager.register(agent, sessionID: session)
         await agent.start()
     }
-    let input = InputGateway(manager: manager, policy: policy)
+    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let output = OutputGateway(manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
     return (manager, input, output, try await output.messaging(for: source.descriptor.id), direct, session)
 }
@@ -219,7 +223,10 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
 @Test func publicationReportsReceiverRejectionIndependently() async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
         configurations: [
             communicationConfiguration("producer", publishes: true), communicationConfiguration("direct"),
             communicationConfiguration("good", subscribes: true), communicationConfiguration("full", subscribes: true),
@@ -233,13 +240,14 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
         try await manager.register(agent, sessionID: session)
         await agent.start()
     }
-    let input = InputGateway(manager: manager, policy: policy)
+    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let output = OutputGateway(manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
     let port = try await output.messaging(for: source.descriptor.id)
-    let report = try await port.publish(
+    try await port.publish(
         .transcript("hello", final: true), parent: AgentInput(sessionID: session, payload: .text("parent")))
-    #expect(report.delivered == [good.descriptor.id])
-    #expect(report.rejected[full.descriptor.id] == String(describing: HarnessError.queueFull))
+    await input.flushPublications()
+    #expect(await good.inputs.count == 1)
+    #expect(await full.inputs.isEmpty)
     await manager.stopAll()
     await output.shutdown()
 }
@@ -264,14 +272,17 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     #expect(throws: CommunicationError.unauthorized) {
         try CommunicationPolicy(
             contracts: AgentContracts.communication,
-            externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
+            externalSources: [
+                "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+                "app.environment",
+            ],
             configurations: [communicationConfiguration("receiver", subscribes: true)])
     }
 }
 
 @Test func gatewayRejectsMismatchedMetadataAndForgedInternalSource() async throws {
     let manager = AgentManager()
-    let gateway = InputGateway(manager: manager)
+    let gateway = InputGateway(manager: manager, allowsExternalSend: true)
     let input = AgentInput(
         sessionID: UUID(), payload: .text("hello"), metadata: InputMetadata(payload: .event("wrong kind")))
     await #expect(throws: CommunicationError.invalidPayload) { try await gateway.send(input, to: .assistant) }
@@ -302,7 +313,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
 
 private struct RegisteredFixtureMessage: Codable, Sendable, Equatable { let value: Int }
 private func registeredFixtureContract(
-    lifetime: TimeInterval = 0.2, startsNewWork: Bool = false, maximumBytes: Int = 64
+    lifetime: TimeInterval = 2, startsNewWork: Bool = false, maximumBytes: Int = 64
 ) -> CommunicationContract {
     CommunicationContract(
         name: "fixture.custom", kind: .observation, lifetime: lifetime, maximumBytes: maximumBytes,
@@ -346,7 +357,7 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
         try await manager.register(agent, sessionID: session)
         await agent.start()
     }
-    let gateway = InputGateway(manager: manager, policy: policy)
+    let gateway = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let output = OutputGateway(
         manager: manager, requests: gateway, tools: ToolRegistry(), policy: policy, sink: { _ in })
     let port = try await output.messaging(for: producer.descriptor.id)
@@ -354,16 +365,16 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     let expired = AgentInput(
         sessionID: session, payload: payload,
         metadata: InputMetadata(payload: payload, deadline: .now.advanced(by: .seconds(-1))))
+    let admittedAfter = ContinuousClock.now
     let content = RegisteredFixtureMessage(value: 7)
     let message = AgentMessage(contract: "fixture.custom", content: content, validate: { _ in })
     if startsNewWork {
-        let report = try await port.publish(message, parent: expired)
-        #expect(report.delivered == [receiver.descriptor.id])
+        try await port.publish(message, parent: expired)
     } else {
         await #expect(throws: CommunicationError.expired) { try await port.publish(message, parent: expired) }
-        let report = try await port.publish(message, parent: AgentInput(sessionID: session, payload: payload))
-        #expect(report.delivered == [receiver.descriptor.id])
+        try await port.publish(message, parent: AgentInput(sessionID: session, payload: payload))
     }
+    await gateway.flushPublications()
     let delivered = try #require(await receiver.inputs.first)
     guard case .observation(let received) = delivered.payload else {
         Issue.record("Missing generic message")
@@ -371,8 +382,9 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     }
     #expect(received.content(as: RegisteredFixtureMessage.self) == content)
     #expect(received.perception == nil)
-    let remaining = ContinuousClock.now.duration(to: delivered.metadata.deadline)
-    #expect(remaining > .zero && remaining <= .milliseconds(200))
+    // Check the assigned deadline, independent of how long a loaded test executor takes to resume.
+    #expect(delivered.metadata.deadline > admittedAfter)
+    #expect(delivered.metadata.deadline <= ContinuousClock.now.advanced(by: .seconds(2)))
     await manager.stopAll()
 }
 
@@ -402,4 +414,223 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     #expect(throws: CommunicationError.invalidPayload) {
         try CommunicationContracts(additional: [CommunicationContract(name: "fixture.custom", kind: .observation)])
     }
+}
+
+@Test(.timeLimit(.minutes(1))) func publicationReturnsBeforeSubscribersFinishAndShutdownJoinsDelivery() async throws {
+    let session = UUID()
+    let manager = AgentManager()
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: ["user"],
+        configurations: [
+            communicationConfiguration("producer", publishes: true),
+            communicationConfiguration("consumer", subscribes: true), communicationConfiguration("direct"),
+        ])
+    let source = ObservationRecorder(id: "producer")
+    let receiver = ObservationRecorder(id: "consumer", blockText: "blocked")
+    for agent in [source, receiver] {
+        try await manager.register(agent, sessionID: session)
+        await agent.start()
+    }
+    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    let output = OutputGateway(manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    let port = try await output.messaging(for: source.descriptor.id)
+    let started = ContinuousClock.now
+    try await port.publish(
+        .transcript("blocked", final: true), parent: AgentInput(sessionID: session, payload: .text("parent")))
+    #expect(started.duration(to: .now) < .seconds(2))
+    var admissions = receiver.admissions.stream.makeAsyncIterator()
+    #expect(await admissions.next() != nil)
+    #expect(await receiver.inputs.isEmpty)
+    // A missing subscriber is a valid publication; no receipt or producer-history feedback appears.
+    try await port.publish(
+        .transcript("partial", final: false), parent: AgentInput(sessionID: session, payload: .text("parent")))
+    #expect(await port.history.snapshot().isEmpty)
+    await output.shutdown()
+    #expect(await source.status().lifecycle == .running)
+    #expect(await receiver.inputs.isEmpty)
+    await manager.stopAll()
+}
+
+@Test func signalLogPublicationRecordsBranchesWithoutPublisherAcknowledgment() async throws {
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["producer"],
+        configurations: [
+            communicationConfiguration("consumer", subscribes: true),
+            communicationConfiguration("reject", subscribes: true),
+        ])
+    let manager = AgentManager()
+    let consumer = ObservationRecorder(id: "consumer")
+    let rejected = ObservationRecorder(id: "reject", reject: true)
+    for agent in [consumer, rejected] {
+        try await manager.register(agent)
+        await agent.start()
+    }
+    let gateway = InputGateway(manager: manager, policy: policy)
+    let payload = InputPayload.observation(.transcript("hello", final: true))
+    let input = AgentInput(
+        sessionID: UUID(), payload: payload, metadata: InputMetadata(payload: payload, source: "producer"))
+    try await gateway.publish(input)
+    await gateway.flushPublications()
+    var iterator = try await gateway.observeSignals().makeAsyncIterator()
+    let snapshot = try #require(await iterator.next())
+    let record = try #require(snapshot.records.first)
+    #expect(snapshot.records.count == 1)
+    #expect(record.id == input.id && record.mode == .publish && record.phase == .partial)
+    #expect(record.branches.first { $0.target.rawValue == "consumer" }?.phase == .accepted)
+    #expect(record.branches.first { $0.target.rawValue == "reject" }?.reason == "queueFull")
+    #expect(await consumer.inputs.count == 1)
+    await gateway.shutdown()
+    _ = await iterator.next()
+    #expect(await iterator.next() == nil)
+}
+
+@Test func signalLogBoundsHistoryAndAggregatesOnlyMatchingOutcomes() async throws {
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["producer"],
+        configurations: [communicationConfiguration("consumer")])
+    let gateway = InputGateway(manager: AgentManager(), policy: policy, signalAggregation: { _ in true })
+    let session = UUID()
+    for _ in 0..<10 {
+        let payload = InputPayload.observation(.transcript("partial", final: false))
+        try await gateway.publish(
+            .init(sessionID: session, payload: payload, metadata: .init(payload: payload, source: "producer")))
+    }
+    var iterator = try await gateway.observeSignals().makeAsyncIterator()
+    let aggregate = try #require(await iterator.next())
+    #expect(aggregate.records.count == 1)
+    #expect(aggregate.records.first?.count == 10)
+    #expect(aggregate.records.first?.phase == .unobserved)
+    for _ in 0..<270 {
+        let payload = InputPayload.observation(.transcript("partial", final: false))
+        try await gateway.publish(
+            .init(sessionID: UUID(), payload: payload, metadata: .init(payload: payload, source: "producer")))
+    }
+    let bounded = try #require(await iterator.next())
+    #expect(bounded.records.count == 256 && bounded.evictedCount == 15)
+    await gateway.shutdown()
+}
+
+@Test func signalLogDroppedPublicationRetainsFailureWithoutBackpressureResponse() async throws {
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["producer"],
+        configurations: [communicationConfiguration("consumer", subscribes: true)])
+    let manager = AgentManager()
+    let consumer = ObservationRecorder(id: "consumer", blockText: "block")
+    try await manager.register(consumer)
+    await consumer.start()
+    let gateway = InputGateway(manager: manager, policy: policy)
+    for _ in 0..<129 {
+        let payload = InputPayload.observation(.transcript("block", final: true))
+        try await gateway.publish(
+            .init(sessionID: UUID(), payload: payload, metadata: .init(payload: payload, source: "producer")))
+    }
+    var iterator = try await gateway.observeSignals().makeAsyncIterator()
+    let snapshot = try #require(await iterator.next())
+    #expect(snapshot.records.contains { $0.phase == .dropped })
+    await gateway.shutdown()
+}
+
+@Test func taskObservationIgnoresOrdinaryTrafficAndRetainsIndependentHistory() async throws {
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["producer"],
+        configurations: [communicationConfiguration("consumer")])
+    let gateway = InputGateway(manager: AgentManager(), policy: policy)
+    var observation = try await gateway.observeTasks().makeAsyncIterator()
+    #expect(await observation.next()?.revision == 0)
+    for _ in 0..<300 {
+        let payload = InputPayload.observation(.transcript("partial", final: false))
+        try await gateway.publish(
+            .init(sessionID: UUID(), payload: payload, metadata: .init(payload: payload, source: "producer")))
+    }
+    var afterTraffic = try await gateway.observeTasks().makeAsyncIterator()
+    let quiet = try #require(await afterTraffic.next())
+    #expect(quiet.revision == 0 && quiet.records.isEmpty && quiet.evictedCount == 0)
+    // A pending observer must not receive a media/ordinary update, even at shutdown.
+    await gateway.shutdown()
+    #expect(await observation.next() == nil)
+    #expect(await afterTraffic.next() == nil)
+}
+
+@Test(.timeLimit(.minutes(1)), arguments: [false, true])
+func publicationDoesNotWaitForAppObserverOrTurnItsFailureIntoAReceipt(blocking: Bool) async throws {
+    let session = UUID()
+    let manager = AgentManager()
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["user"],
+        configurations: [
+            communicationConfiguration("producer", publishes: true),
+            communicationConfiguration("consumer", subscribes: true),
+            communicationConfiguration("direct"),
+        ])
+    let producer = ObservationRecorder(id: "producer")
+    let consumer = ObservationRecorder(id: "consumer")
+    for agent in [producer, consumer] {
+        try await manager.register(agent, sessionID: session)
+        await agent.start()
+    }
+    let observed = AsyncStream<UUID>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let input = InputGateway(manager: manager, policy: policy)
+    let output = OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
+        observedContracts: ["speech.final"],
+        observeEvent: { value in
+            observed.continuation.yield(value.id)
+            if blocking { try await Task.sleep(for: .seconds(30)) }
+            throw HarnessError.queueFull
+        }, sink: { _ in })
+    let port = try await output.messaging(for: producer.descriptor.id)
+    let start = ContinuousClock.now
+    try await port.publish(
+        .transcript("hello", final: true),
+        parent: AgentInput(sessionID: session, payload: .text("parent")))
+    #expect(start.duration(to: .now) < .seconds(2))
+    var observations = observed.stream.makeAsyncIterator()
+    #expect(await observations.next() != nil)
+    var admissions = consumer.admissions.stream.makeAsyncIterator()
+    #expect(await admissions.next() != nil)
+    #expect(await port.history.snapshot().isEmpty)
+    #expect(await producer.inputs.isEmpty)
+    await output.shutdown()
+    await manager.stopAll()
+}
+
+@Test(.timeLimit(.minutes(1))) func publicationOverflowDoesNotWaitForDiagnosticCallbacks() async throws {
+    let session = UUID()
+    let manager = AgentManager()
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["user"],
+        configurations: [
+            communicationConfiguration("producer", publishes: true),
+            communicationConfiguration("direct"),
+        ])
+    let producer = ObservationRecorder(id: "producer")
+    try await manager.register(producer, sessionID: session)
+    await producer.start()
+    let input = InputGateway(
+        manager: manager, policy: policy,
+        publicationFailure: { _, _, _ in
+            Issue.record("Overflow diagnostics must not call back into the publisher path")
+        })
+    let output = OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
+        observedContracts: ["speech.partial"],
+        observeEvent: { _ in
+            try await Task.sleep(for: .seconds(30))
+        }, sink: { _ in })
+    let port = try await output.messaging(for: producer.descriptor.id)
+    let observations = try await input.observeSignals()
+    let start = ContinuousClock.now
+    for _ in 0..<129 {
+        try await port.publish(
+            .transcript("preview", final: false),
+            parent: AgentInput(sessionID: session, payload: .text("parent")))
+    }
+    #expect(start.duration(to: .now) < .seconds(2))
+    var snapshots = observations.makeAsyncIterator()
+    let latest = try #require(await snapshots.next())
+    #expect(latest.records.last?.phase == .dropped)
+    #expect(await port.history.snapshot().isEmpty)
+    await output.shutdown()
+    await manager.stopAll()
 }

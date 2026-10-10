@@ -115,7 +115,7 @@ private actor HistoryModel: ChatCapability {
         Issue.record("Expected error")
         return
     }
-    #expect(message.hasPrefix("assistant.error:"))
+    #expect(message.hasPrefix("agent.error:"))
     let turn = try #require(try await store.snapshot().current.turns.first)
     #expect(turn.user == "请串行" && turn.raw == "<wait/>" && turn.state == .failed)
     #expect(turn.error != nil)
@@ -173,7 +173,7 @@ private actor HistoryModel: ChatCapability {
     var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let action = try #require(try await iterator.next())
     #expect(action.output == .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
-    #expect(try await iterator.next()?.output == .control("assistant.finished"))
+    #expect(try await iterator.next()?.output == .control("agent.finished"))
     let request = try #require(await model.requests.first)
     #expect(request.messages.count == 4)
     #expect(request.messages[1].content == "previous user")
@@ -266,12 +266,12 @@ private actor HistoryModel: ChatCapability {
     #expect(restored.toolCalls == nil && restored.toolDefinitions == nil && restored.tokenUsage == nil)
 }
 
-private struct NativeCameraHistoryChat: ChatCapability {
+private struct NativeRuntimeHistoryChat: ChatCapability {
     var availability: CapabilityAvailability { .available }
     var supportsToolCalls: Bool { true }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
         #expect(request.maximumOutputTokens == nil)
-        #expect(request.tools.contains { $0.name == "Camera.open" })
+        #expect(request.tools.contains { $0.name == "runtimeInfo" })
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         if request.messages.last?.role == .tool {
             try pair.emitter.yield(.text("<express emotion=\"smile\"/>"))
@@ -281,7 +281,7 @@ private struct NativeCameraHistoryChat: ChatCapability {
         }
         try pair.emitter.yield(.text("<express emotion=\"smile\"/>"))
         try pair.emitter.yield(
-            .toolCall(ChatToolCall(id: "cloud-camera", name: "Camera.open", argumentsJSON: "{}")))
+            .toolCall(ChatToolCall(id: "cloud-runtime", name: "runtimeInfo", argumentsJSON: "{}")))
         try pair.emitter.yield(.usage(try ChatTokenUsage(input: 100, generated: 20, total: 120)))
         try pair.emitter.yield(.finished(.toolCalls))
         pair.emitter.finish()
@@ -291,20 +291,26 @@ private struct NativeCameraHistoryChat: ChatCapability {
 
 @Test func assistantJournalsMixedActionNativeToolAndUsageWithRuntimeCorrelation() async throws {
     let store = ConversationHistoryStore()
-    let agent = try AssistantAgent(chat: NativeCameraHistoryChat(), conversations: store)
+    let agent = try FixtureNativeAgent(chat: NativeRuntimeHistoryChat(), conversations: store)
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("打开摄像头并微笑"))
     try await agent.receive(input)
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
-    guard case .actionCall = try await outputs.next()?.output else {
-        Issue.record("Missing XML action")
-        return
+    var observedAction = false
+    var native: ToolCall?
+    while !observedAction || native == nil {
+        let output = try #require(try await outputs.next())
+        switch output.output {
+        case .actionCall: observedAction = true
+        case .toolCall(let call): native = call
+        default:
+            Issue.record("Unexpected generation output: \(output.output)")
+            await agent.stop()
+            return
+        }
     }
-    guard case .toolCall(let call) = try await outputs.next()?.output else {
-        Issue.record("Missing native tool")
-        return
-    }
-    #expect(call.toolPath == "Camera.Capture.open")
+    let call = try #require(native)
+    #expect(call.toolPath == "System.Runtime.runtimeInfo")
     let feedbackPayload = InputPayload.toolResult(.init(callID: call.id, value: "completed"))
     try await agent.receive(
         AgentInput(
@@ -312,14 +318,21 @@ private struct NativeCameraHistoryChat: ChatCapability {
             metadata: InputMetadata(
                 payload: feedbackPayload, source: "runtime", origin: .runtime, rootID: input.metadata.rootID,
                 parentID: input.id)))
-    while let output = try await outputs.next() { if output.output == .control("assistant.finished") { break } }
+    while let output = try await outputs.next() { if output.output == .control("agent.finished") { break } }
     let record = try #require(try await store.snapshot().current.turns.first)
     #expect(record.state == .completed && record.finishReason == "stop")
     #expect(record.toolCalls?.first?.id == call.id)
-    #expect(record.toolCalls?.first?.providerID == "cloud-camera")
+    #expect(record.toolCalls?.first?.providerID == "cloud-runtime")
     #expect(record.toolCalls?.first?.state == .completed)
     #expect(record.tokenUsage?.generated == 20)
-    #expect(record.toolDefinitions?.contains { $0.contains("Camera.open") } == true)
+    #expect(record.toolDefinitions?.contains { $0.contains("runtimeInfo") } == true)
+    let conversation = try await store.snapshot().current
+    let actionOnly = AssistantContextState.buildChatMessages(
+        system: "actions", user: "next", conversation: conversation)
+    #expect(actionOnly.allSatisfy { $0.role != .tool && $0.toolCalls.isEmpty })
+    #expect(actionOnly.contains { $0.content.contains("Historical execution observation: runtimeInfo") })
+    #expect(try ChatRequest(messages: actionOnly).tools.isEmpty)
+
     await agent.stop()
 }
 
@@ -401,31 +414,30 @@ extension ConversationHistoryStore {
         await agent.stop()
         return
     }
-    #expect(message.hasPrefix("assistant.error:"))
+    #expect(message.hasPrefix("agent.error:"))
     #expect(await model.requests.isEmpty)
     #expect(try await store.snapshot().current.turns.isEmpty)
     await agent.stop()
 }
 
 @Test func assistantPersistenceFailureDoesNotCallModel() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let store = ConversationHistoryStore(
-        document: try LocalDocumentStore(
-            url: directory.appendingPathComponent("history.json"), maximumBytes: 128))
+    let store = ConversationHistoryStore()
+    let repository = AgentContextRepository(
+        agent: .assistant, scope: UUID(), state: AssistantContextState(),
+        persistence: AgentContextPersistence(
+            load: { nil },
+            commit: { context, _ in
+                if !context.records.isEmpty { throw DocumentStorageError.capacityExceeded }
+            }))
     let model = HistoryModel("should not run")
-    let agent = try AssistantAgent(chat: model, conversations: store)
+    let agent = try AssistantAgent(chat: model, conversations: store, context: repository)
     try await agent.start()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("next")))
-    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
-    guard case .control(let message) = try await iterator.next()?.output else {
-        Issue.record("Expected persistence error")
-        await agent.stop()
-        return
+    await #expect(throws: DocumentStorageError.capacityExceeded) {
+        try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("next")))
     }
-    #expect(message.hasPrefix("assistant.error:"))
     #expect(await model.requests.isEmpty)
     #expect(try await store.snapshot().current.turns.isEmpty)
+    #expect(try await repository.snapshot().records.isEmpty)
     await agent.stop()
 }
 
@@ -436,8 +448,9 @@ extension ConversationHistoryStore {
     let first = ConversationModelRequest(id: UUID(), input: "question", requestJSON: "[]")
     try await store.beginModelRequest(first, for: id)
     let arrival = first.date.addingTimeInterval(0.125)
-    try await store.recordFirstToken(at: arrival, for: id)
-    try await store.recordFirstToken(at: arrival.addingTimeInterval(1), for: id)
+    try await store.recordModelTiming(startedAt: first.date, firstTokenAt: arrival, latency: 0.125, for: id)
+    try await store.recordModelTiming(
+        startedAt: first.date, firstTokenAt: arrival.addingTimeInterval(1), latency: 1.125, for: id)
     try await store.append("first", to: id)
     let call = ConversationToolCall(id: UUID(), providerID: "provider", name: "inspect", argumentsJSON: "{}")
     try await store.recordToolCall(call, for: id)
@@ -482,4 +495,25 @@ extension ConversationHistoryStore {
     #expect(record.modelRequests?.first?.state == .completed)
     try await store.finish(id, state: .cancelled)
     #expect(try await store.snapshot().current.turns.first?.modelRequests?.last?.state == .cancelled)
+}
+
+@Test func requestInterfaceTimingIsImmutableAndPersistsSeparatelyFromAdmissionDate() async throws {
+    let store = ConversationHistoryStore()
+    let read = try await store.readCurrent()
+    let id = UUID()
+    _ = try await store.begin(id: id, user: "hello", request: [], expecting: read.token, model: "stub")
+    try await store.beginModelRequest(.init(id: UUID(), input: "hello", requestJSON: "[]"), for: id)
+    let start = Date(timeIntervalSinceReferenceDate: 100)
+    let first = start.addingTimeInterval(0.2)
+    try await store.recordModelTiming(startedAt: start, firstTokenAt: first, latency: 0.2, for: id)
+    try await store.recordModelTiming(startedAt: first, firstTokenAt: first, latency: 0, for: id)
+    let request = try #require(try await store.snapshot().current.turns.first?.modelRequests?.first)
+    #expect(request.modelRequestStartedAt == start && request.firstTokenAt == first)
+    #expect(request.firstTokenLatency == 0.2 && request.date != start)
+    let encoded = try JSONEncoder().encode(request)
+    let decoded = try JSONDecoder().decode(ConversationModelRequest.self, from: encoded)
+    #expect(decoded.firstTokenLatency == 0.2 && decoded.modelRequestStartedAt == start)
+    await #expect(throws: ConversationHistoryError.invalidRecord) {
+        try await store.recordModelTiming(startedAt: start, firstTokenAt: first, latency: -1, for: id)
+    }
 }

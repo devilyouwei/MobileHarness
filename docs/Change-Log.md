@@ -2,6 +2,51 @@
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
+## 2026-10-09 — Execution log tabs and causal visualization
+
+- Split the home execution sheet into Action(default), Signal, Task and runtime tabs, with Agent/status filters. Home and Action share internal-action visibility; caption/listening maintenance is hidden by default except failures. Scheduled Action execution remains separate from Tools and transport messages.
+- Added neutral bounded Signal observations in Core and InputGateway: one row with subscriber branches, explicit publish/send/feedback modes, partial acceptance, rejection, suppression, loss and no-subscriber outcomes. High-frequency media/perception telemetry aggregates matching outcomes within one-second windows, without retaining media payloads or changing communication acknowledgments.
+- Root presentation projects accepted public task reports into bounded parent/child timelines. Admission never completes a task; playback completion cannot replace waiting-user state. Details link related Signals, Actions and existing task-scoped model/ReACT/Tool history.
+- Runtime displays lifecycle changes and infrastructure errors. Originating input IDs allow the same Signal/Action failure to be associated without hiding unrelated errors that share wording. No new directory/module/dependency or writable context was added.
+- See [Validation-History](Validation-History.md) for automated/build evidence and physical/UI acceptance limits.
+
+## 2026-10-09 — Camera-command delegation and concurrent admission
+
+- Corrected task communication declarations: new delegation uses kind=request, authorized task kinds/targets are enumerated, and internal speech/telemetry grants do not expose unsupported model publication. Invalid XML/native communication is associated through the complete model catalog and receives bounded corrective feedback. Successful admission remains distinct from task completion; post-validation persistence/uncertain delivery failures remain terminal without automatic replay.
+- ApplicationControl, Memory and Photographer serialize short fixed-state/context admission through a bounded FIFO gate instead of rejecting overlapping actor entry while a commit is suspended. Cancellation and stop release waiting callers; actual business queue bounds are unchanged.
+- Production composition injects configured model labels into all four interactive histories. Existing phone contexts and historical records are preserved.
+- Regression evidence and physical installation are recorded in [Validation-History](Validation-History.md). Synthetic camera/model tests do not establish physical runtime acceptance.
+
+## 2026-10-09 - Shared Agent source hierarchy
+
+- Consolidated reusable sources under Agents/Support/Core, Communication, Chat and Context. Core remains the independent Foundation-only AgentCore framework; business role schemas/policies/workflows stay in their role directories. Configuration loading joins Communication; model communication adaptation joins Chat.
+- Relocated64 Swift files without changing their bytes, public declarations, schemas, grants, bounds or runtime behavior. Updated Package paths, exclusions, complete Xcode source groups, current documentation links and static import/path guards. No new target or dependency.
+- See [ADR0189](adr/0189-agent-support-hierarchy.md) and [validation](Validation-History.md); real-model/native-UI/device acceptance is unaffected.
+
+## 2026-10-09 - Default entry and specialist task ownership
+
+- Assistant now owns basic interaction and authorized task coordination. Photographer, Memory and ApplicationControl own their model capabilities, private durable histories and domain functions; deterministic UI workflows retain their original safety/confirmation semantics.
+- Native/XML sends and fixed UI routing emit existing communication Actions/task Signals. Child execution results return to the actual executor; admission receipts, parent committed evidence and final task reports are separate boundaries. Removed the old function-delegation proxy/TaskLocal and Assistant-private Chat loop.
+- Shared Support composition supplies one-round inference and bounded continuation; each role supplies preprocessing, schema, builder and grants. App owns stable interaction consumers independently of microphone and page lifetime. Task-scoped questions preserve speech-onset/text-admission and exact artifact identity.
+- Explicit schema migration rejects partial/null/unsupported context. Cancellation joins owned work, including failed child cancellation delivery; queue expiry reports failure; restart interrupts without replay. No new directory, target or third-party dependency; Settings/History reuse the existing AppPresentationWorkflow consumer.
+- Final repository checks passed (641 IntegrationTests/65 AppWorkflowTests plus remaining suites); unsigned iOS device build passed. Simulator remains blocked by external CoreAI. See [ADR0188](adr/0188-specialist-task-ownership.md) and [Validation-History](Validation-History.md) for evidence and remaining real-model/native-UI/device acceptance.
+
+## 2026-10-09 - Agent business source audit
+
+- Implemented: standardized role actor/Processing layout, shared atomic Signal evidence commits, consolidated single-owner helpers and business Signal domain files, moved configuration loading into Support, and cleaned Xcode source references. Full repository checks and unsigned iOS device build passed; simulator remains blocked by external CoreAI. Preserve role policies and execution contracts; no new directory, target or dependency.
+
+## 2026-10-09 - Agent shared component organization
+
+- User-approved Support directory for shared Chat/context/storage adapters in the existing Agents target; Foundation-only AgentDecisionContext moves into AgentCore Runtime. Role policies remain in their existing directories, with no duplicate definitions, new target or dependency.
+
+## 2026-10-09 — Agent composition and owned ReACT
+
+- Migrated seven Agents to explicit preprocessing, structured context and context builders, retaining current business roles. Foundation-only Core owns bounded inboxes, batches, round/budget/task contracts; Agents owns atomic Storage adaptation and shared Chat capability/context drivers.
+- Communication now leaves the Agent output stream as authorized Actions with distinct owner-directed admission receipts. Producer consumers bind actor/incarnation; task grants, parent/child reports, cancellation and runtime-stop cleanup preserve task ownership and causal identity.
+- Assistant executes one model round per worker and queues ready continuation with user inputs. Exact native call/result pairs, independent task history and cumulative budgets survive interleaving. Legacy history imports once, uses one writable context façade, and deletion removes associated closed-task evidence atomically.
+- Recognition advances independently of reply source/task/decision. Listening follows actual playback with atomic utterance/playback admission and350ms tail cleanup. Current Photographer remains deterministic; photography LLM, active input focus and final role redistribution belong to phase two.
+- No new directory, module or third-party dependency. Tests and build limits are recorded in [Validation-History](Validation-History.md); contract is [ADR0187](adr/0187-agent-composition-and-react.md).
+
 ## 2026-10-09 — History image thumbnails
 
 - History details show images sent to the model as thumbnails in the actual context section; tapping opens a read-only full-screen preview. Legacy metadata-only image references remain readable, and missing photos stay blank without storage explanations.
@@ -171,21 +216,17 @@ Fixed the MOSS editor's stale task comparison, which resolved to SwiftUI's task 
 
 Build, test and installation observations are recorded in [Validation-History](Validation-History.md).
 
-
 ## 2026-10-07 — Resource command Agent
 
 Added typed resource commands, deterministic root ResourceManagement, pure System.ModelResources functions and bounded32-request transport. SDK adaptation reuses the process-wide manager; returning feedback and host retirement isolate invocation failures. Download success represents admission. No new directory, target, model instance or Assistant mutation exposure.
-
 
 ## Speech binding stage (2026-10-07)
 
 ✅ ADR0167 adds Agent-routed speech binding, strict booleans, configuration overlap rejection and invocation-local feedback. Preference application failures propagate after durable commit; cache invalidation allows explicit restore/retry. Native unchanged-preference suppression and lifecycle barriers are preserved.
 
-
 ## Resource preferences stage (2026-10-07)
 
 ✅ ADR0168 adds protocol-neutral durable preferences, legacy migration, installed-prerequisite validation and revision-checked source writes. ResourceManagement selects a bounded two-call sequence; Settings becomes an injected view facade. Failed preference application preserves durable commit and disables implicit effect retries during UI rollback/polling.
-
 
 ## Resource inventory stage (2026-10-07)
 
@@ -197,13 +238,11 @@ Added typed resource commands, deterministic root ResourceManagement, pure Syste
 
 ADR0170 validation: resource regressions/workflows, boundaries and unsigned device build pass. Final full suite still has an intermittent BLE readiness/timeout failure; simulator dependency and physical acceptance remain outstanding. See Validation-History.md for revision-scoped evidence.
 
-
 ## Resource observations stage (2026-10-07)
 
 ✅ ADR0171 adds the root-owned foreground resource sampler and typed model.resource.state/1 Signal. ResourceManagement selects the existing presentation functions for changed/failed facts. The page refresh loop is removed; accepted snapshots release existing UI admission bookkeeping, and recovery clears only refresh-owned errors. No foundational SDK, Action execution algorithm, directory or model grant changes.
 
 Validation and outstanding native/shared-state acceptance are recorded in Validation-History.md.
-
 
 ## Resource command failure stage (2026-10-07)
 
@@ -211,23 +250,19 @@ Validation and outstanding native/shared-state acceptance are recorded in Valida
 
 Validation is recorded in Validation-History.md.
 
-
 ## Resource preference failure stage (2026-10-07)
 
 ✅ ADR0173 introduces exact producer failure codes, Agent-selected preference notice/error presentation and a shared terminal-failure identity set. Per-request transport allows three calls only for preference restore/save; other limits stay two. Preference/configuration exclusion remains held through error presentation. Confirmed visible flags roll back without overwriting accepted notices/errors or retrying binding; durable commits survive later binding/presentation failures. Native algorithms and protocol-neutral Actions remain intact. Host fallback/provider/shared-state and native acceptance remain outstanding.
 
 Validation is recorded in Validation-History.md.
 
-
 ✅ ADR0174: recoverable resource admission/dispatch failures use a typed host Signal and one Agent-selected registered error function after original worker cleanup. No native retry or recursive presentation; startup/closed/capacity/in-flight diagnostic failures retain explicit infrastructure fallback. ❌ Provider settings, BLE/navigation Agent routes, shared context, bounded model continuation and native acceptance remain subsequent work.
 
 ADR0174 validation: final full checks (565 integration /47 workflow), unsigned iOS device build and seven packaged Agent configurations passed. Required simulator script remains blocked by CoreAI; no install/native acceptance. See Validation-History.md.
 
-
 ✅ ADR0175: Settings provider model discovery now uses opaque provider.discovery intents, ResourceManagement and System.Provider.discoverModels with session-bound one-use private staging. Query results/errors are bounded and credential-free. ❌ Provider restore/save/rollback, lifecycle switching and registered provider UI effects remain a later migration; real provider/Keychain/native acceptance remains separate.
 
 ADR0175 final verification: full574 integration/47 workflow tests, unsigned iOS device build, seven packaged configurations,205 Mermaid diagrams and303-file local link audit passed. Intermediate12-test/41-issue BLE failure and per-test passes are preserved in Validation-History.md; simulator remains blocked by CoreAI. No installation or real provider call.
-
 
 ✅ ADR0176: provider restore/save now uses opaque provider.settings/1 intents and registered Provider functions. Actions owns business schema/store/migration and complete apply/rollback; App only stages/adapts and supplies native SDK, lifecycle and credential primitives. ❌ Registered provider UI effects, SDK model-family eligibility migration, model grants/shared context and native acceptance remain subsequent work.
 
@@ -245,7 +280,6 @@ Thumbnail inspection uses a compact Button; the full fade/shrink layer passes to
 
 Added current-photo save/ignore Actions and Photographer intents shared by UI and dialogue, actual receipt return and observation-based confirmation. Add-only native Photos import waits for OS completion and prevents duplicate saves while displayed. Thumbnail/fullscreen controls provide save and ignore without intercepting voice controls. Scheduled Actions now carry validated invocation-scoped delegation authority like Tools. See ADR0185 for ownership, cancellation and acceptance limits.
 
-
 ## 2026-10-08 — Independent native Tool and text Action consumers
 
 Assistant now demultiplexes model protocol fields into bounded text/Action and native Tool workers. App output transport has independent consumers: four active Tools cannot block Action/wait admission, and Action preparation/admission cannot block native calls. Both branches close and join before the existing full-round result merge and downstream model continuation. Parser/dispatch failure cancels and joins siblings even while model output is open; cancellation, bounded rejection and failed-input recovery remain explicit. Shared device resources/deadlines are unchanged; generic Agent request/reply remains separate. No new directory, module or dependency. See ADR0183 and Validation-History for actual verification limits.
@@ -253,3 +287,70 @@ Assistant now demultiplexes model protocol fields into bounded text/Action and n
 ## 2026-10-08 — Camera lens-switch latency
 
 Healthy front/back switching retains the capture session/output graph and resource lease instead of full teardown/reacquisition. Old perception is fenced immediately and replaced by a bounded root-owned worker after joined cleanup; native command acknowledgment no longer waits for that cleanup. Off/background/model maintenance still join retirement, and native failure is explicit. See [ADR0186](adr/0186-camera-lens-switch-lifetime.md); physical latency acceptance remains pending.
+
+✅ Phase two specialist ownership implementation: [ADR0188](adr/0188-specialist-task-ownership.md). Implemented; real-model/native-UI/physical-device acceptance pending.
+
+
+## 2026-10-09 — Per-Agent conversation history navigation
+
+History now opens a four-Agent picker, followed by each owner’s current/past conversation lists and existing detailed request/output/tool/usage/image views. App reads specialist archives from their live context repositories without starting a model or copying journals. Assistant mutation intents remain unchanged; specialist records are read-only. Stream-processing context without chat records is excluded. Automated and build evidence is recorded separately in Validation-History.
+
+### 2026-10-09 — Assistant listening authority and one-way publication
+
+- Assistant exclusively owns user consent/reply holds through fixed internal Speech.Listening.update. Child Agents report task state; App executes native capture/playback barriers and SpeechPerception executes admission.
+- External inputs and perception observations publish one-way without recipient acknowledgments. send retains directed admission receipts; Gateway owns bounded fan-out/diagnostics/shutdown.
+- Queue/ASR/VAD errors report through agent.error then reset the damaged utterance and continue. UI result loss/camera cancellation waits are bounded; never replay effects or infer device stop.
+- Documentation and contracts: [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md). Real-device acoustics/native UI remain separate acceptance work.
+
+
+## 2026-10-09 — SpeechPerception listening authority
+
+Moved session listening consent and deterministic gate/recovery policy from Assistant into resident SpeechPerception. Four interactive Chat workers publish bounded revisioned reply occupancy, retaining actual task identities; generic streaming busy is excluded. SpeechPerception gates final ASR before publication and emits its own registered listening Action. App keeps native startup, capture epochs, confirmed-utterance/playback/tail barriers and revision-fenced native termination reports; Assistant listening Action/state and App orphan timer were removed. No new directory, module or dependency. Physical acceptance remains separate from automated validation; see Validation-History.
+
+## 2026-10-09 — Assistant mechanical-arm Action ownership
+
+The 11 unchanged Robot gesture/motor Action declarations now belong exclusively to Assistant; duplicate model permissions were removed from Photographer and ApplicationControl. Capability summaries keep ordinary arm interaction at the main Agent. App grants Assistant the shared motor writer and joined tracking takeover, while retaining fixed settings operations and internal photographic tracking. Role/prompt, actual executor/result routing and Bluetooth recovery fixtures cover the new ownership; no directory, dependency or native motion algorithm was added. Validation is recorded separately in Validation-History.
+
+## 2026-10-09 — Shared mechanical-arm Action registration correction
+
+Restored ApplicationControl Robot registrations for Settings command tests alongside Assistant basic interaction. Action-to-Agent registration is many-to-many; responsibility and required execution semantics determine each role’s Action/Tool permissions. Shared functions execute directly under the actual requesting Agent, without forced delegation for reuse. Photographer remains camera-only for model Actions. This supersedes the exclusive-registration policy in the preceding entry; resource exclusion and native motion implementations are unchanged.
+
+## 2026-10-09 — Photographer Camera Actions and startup lifecycle races
+
+Device context evidence showed camera open followed by three repeated back-lens calls exhausting the four-request budget, plus plain photo questions incorrectly completed without progress. Photographer now exposes all seven camera operations as scheduled Actions, with canonical structured preparation receipts and explicit active-task/photo-question reporting instructions. Same-round camera preparation/capture executes in order and joins feedback. Interactive scene changes await child registration through the root runtime, preventing early unknownAgent lookups. Fixed UI single-command Tool permissions, native safety and four-request budgets remain unchanged. Live-model/device acceptance remains separate from automated evidence.
+
+## 2026-10-09 — Frontend and Agent backend separation
+
+Local navigation now updates UI state synchronously; page visibility, system-settings opening and native stop fencing run immediately outside the business command queue. Typed camera/history/provider/resource/device data requests publish directly to their owning Agent subscriptions. Removed Assistant typed-UI subscriptions, relay hooks and fixed task-construction path; conversational delegation and scoped task inputs remain. Callable UI functions are retained, including scheduled openPage, sharing the local navigation presentation method with actual-producer/task authorization. Existing stored tasks are preserved; no directory or dependency was added.
+
+
+## 2026-10-10 — Home execution log simplification
+
+Home history now contains Action / Task / Agent. Removed Signal rows, passive UI storage, branch expansion and related Signal navigation. Root presentation observes only independently bounded task protocol snapshots, so ordinary audio/recognition/environment traffic never invalidates home log state or evicts task traces. Task admission/completion, related Action/history navigation, Agent lifecycle/errors and scheduler-driven popup remain. General Gateway Signal diagnostics remain outside the home UI. No directory, dependency or device-data change. Build/test evidence and native performance limits are recorded in Validation-History.
+
+
+## 2026-10-10 — Provider-interface first-text timing
+
+Conversation request TTFT now uses provider-side sampling: OpenAI HTTP invocation to the first nonempty decoded text delta, before stream buffering/Agent consumption. Optional per-request ChatTiming retains monotonic elapsed time and timestamps; Gemma uses native generation invocation. Context/history stores exact evidence rather than consumer arrival, and the old timing writer is removed. Details/export expose actual model request start and interface latency; legacy timestamps remain labeled without inferred interface duration. ASR, TTS, persistence and UI rendering are excluded. Streaming persistence behavior is unchanged; no live API request or dependency/directory change. Validation and physical latency limits are recorded separately.
+
+
+## 2026-10-10 — Recognition subtitle rollover
+
+Fixed new ASR previews inheriting the previous finalized upper-slot flag and reply text. VoiceSessionCoordinator now uses the shared accepted-update projection to reset both captions and transcriptFinalized when recognition identity advances. Same-turn partials retain the lower slot until finishTranscript; late/duplicate/closed updates cannot clear newer state. Agent task and playback ownership remain unchanged; no recognition/model or animation delay is added. Native layout and real ASR acceptance remain separate from regressions/build evidence.
+
+
+## 2026-10-10 — Responses transport and Assistant Action-only calls
+
+✅ Implemented: replace cloud Chat Completions with Responses streaming, reuse resource-owned HTTP sessions, remove Assistant native Tools and duplicate /status handling, preserve old history as inert evidence. Full repository checks and unsigned iOS device build passed; the required Simulator build remains blocked by external CoreAI. Offline regressions cover protocol/cancellation/reuse, Action-only Assistant and legacy-history compatibility. Real-provider latency, installation and physical acceptance remain separate; see Validation-History.
+
+
+## 2026-10-10 — Responses assistant-history HTTP400 fix
+
+- Prior assistant history now uses output_text with annotations=[]; system/user input_text and native call/result pairing are retained. Add request regressions for ordinary multi-turn history and assistant text accompanying function calls.
+- A temporary user-authorized credential reproduced the official GPT-4.1 invalid_value error at input[2].content[0]. Corrected protocol and actual compiled Swift adapter probes completed successfully. Credentials are absent from repository/test fixtures; live evidence and device installation are recorded separately in Validation-History.md.
+
+
+## 2026-10-10 — Specialist history grouped by task
+
+- Settings history retains Assistant conversations/archives; Photographer, Memory and ApplicationControl show task-scoped input/model records, status and export. Original task-request titles replace conversation-summary headings.
+- Read-only App projection uses one immutable Agent context snapshot, task scope and retained input evidence; related inputs/ReACT remain together across old conversation archives. Missing associations are separately labeled and missing dates remain empty. No context mutation, model summarization or second history store is introduced. Validation evidence is recorded in Validation-History.md.

@@ -33,16 +33,27 @@ private actor ObservationPresentation: ResourcePresentationCapability {
         failures.append(message)
     }
 }
+private func waitForResourceFacts(_ runtime: ApplicationControlIntentRuntime, processed: Int) async throws {
+    for _ in 0..<300 {
+        let status = await runtime.agent.status()
+        if status.processedInputs >= processed, status.queuedInputs == 0 { return }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    Issue.record("Resource fact did not finish independent processing")
+}
 @Test func nativeResourceObservationsReuseRegisteredActionsAndFailedFactsDoNotQuery() async throws {
     let inventory = ObservationInventory()
     let presentation = ObservationPresentation()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
     try await runtime.observe(.changed(generation: 1), sequence: 1)
+    try await waitForResourceFacts(runtime, processed: 2)
     try await runtime.observe(.failed(generation: 2, message: "native sampling failed"), sequence: 2)
+    try await waitForResourceFacts(runtime, processed: 4)
     #expect(await inventory.reads == 1)
     #expect(await presentation.failures == ["native sampling failed"])
     await inventory.setProgress(80)
     try await runtime.observe(.changed(generation: 3), sequence: 3)
+    try await waitForResourceFacts(runtime, processed: 6)
     #expect(await presentation.progress == [0.1, 0.8])
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
@@ -52,10 +63,10 @@ private actor ObservationPresentation: ResourcePresentationCapability {
     let presentation = ObservationPresentation()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
     try await runtime.observe(.changed(generation: 1), sequence: 1)
-    await #expect(throws: ApplicationControlIntentFailure.self) {
-        try await runtime.observe(.changed(generation: 2), sequence: 1)
-    }
+    try await waitForResourceFacts(runtime, processed: 2)
+    try await runtime.observe(.changed(generation: 2), sequence: 1)
     try await runtime.observe(.changed(generation: 3), sequence: 2)
+    try await waitForResourceFacts(runtime, processed: 4)
     #expect(await inventory.reads == 2)
     await runtime.shutdown()
     let session = UUID()

@@ -1,10 +1,135 @@
 {
   "version": 6,
   "id": "photographer",
-  "actions": {},
+  "actions": {
+    "Camera": [
+      {
+        "alias": "flipCamera",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "flip"
+        },
+        "parameters": [
+          {
+            "name": "facing",
+            "valueType": "string",
+            "required": true,
+            "description": "Requested front or back lens.",
+            "constraints": "front or back; change only when requested."
+          }
+        ],
+        "examples": [
+          "<flipCamera facing=\"back\"/>"
+        ],
+        "doc": "Select the requested front or back lens of the enabled foreground camera. Already selecting that lens leaves it unchanged. Fails if disabled, busy or unavailable. Schedule on Camera; successful completion is execution feedback. Do not repeat a successful command to continue reasoning."
+      },
+      {
+        "alias": "closeCamera",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "close"
+        },
+        "parameters": [],
+        "examples": [
+          "<closeCamera/>"
+        ],
+        "doc": "Disable camera preview and vision processing, and wait for capture and vision cleanup. Schedule on Camera; successful completion is execution feedback. Do not repeat a successful command to continue reasoning."
+      },
+      {
+        "alias": "openCamera",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "open"
+        },
+        "parameters": [],
+        "examples": [
+          "<openCamera/>"
+        ],
+        "doc": "Enable foreground camera preview and vision processing. Requires camera permission and an available camera; completion confirms capture, not pose-model readiness. Schedule on Camera; successful completion is execution feedback. Do not repeat a successful command to continue reasoning."
+      },
+      {
+        "alias": "takePhoto",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "takePhoto"
+        },
+        "parameters": [],
+        "examples": [
+          "<takePhoto/>"
+        ],
+        "doc": "On an explicit user request, take one photo using the current ready foreground camera. Capture, retain private App evidence and show the actual photo; this does not save to the system Photos library. Its execution observation supplies the photo to the next model round for visual understanding. Emit once, then wait for actual image feedback before describing it. Use savePhoto only on an explicit save request. Do not repeat capture merely to continue reasoning. Camera must be enabled and ready."
+      },
+      {
+        "alias": "savePhoto",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "savePhoto"
+        },
+        "parameters": [
+          {
+            "name": "photoID",
+            "valueType": "string",
+            "required": true,
+            "description": "Exact captured photo UUID.",
+            "constraints": "A photoID from actual capture feedback."
+          }
+        ],
+        "examples": [
+          "<savePhoto photoID=\"captured-photo-uuid\"/>"
+        ],
+        "doc": "On an explicit user request, save the currently displayed captured photo to the system Photos library. Wait for the actual observation before confirming success; permission denial is a failure. Repeated saves of the same displayed photo do not create duplicates. This does not take another photo."
+      },
+      {
+        "alias": "ignorePhoto",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "ignorePhoto"
+        },
+        "parameters": [
+          {
+            "name": "photoID",
+            "valueType": "string",
+            "required": true,
+            "description": "Exact captured photo UUID.",
+            "constraints": "A photoID from actual capture feedback."
+          }
+        ],
+        "examples": [
+          "<ignorePhoto photoID=\"captured-photo-uuid\"/>"
+        ],
+        "doc": "On a request to close, dismiss, ignore or discard the displayed photo, hide its thumbnail and preview without exporting to Photos. This does not close the camera, delete an existing album photo, or take another photo. Wait for the actual result before confirming."
+      },
+      {
+        "alias": "retryCamera",
+        "path": {
+          "domain": "Camera",
+          "module": "Capture",
+          "function": "retry"
+        },
+        "parameters": [],
+        "examples": [
+          "<retryCamera/>"
+        ],
+        "doc": "Explicitly retry a failed foreground camera operation. Wait for execution feedback; do not automatically repeat failed work."
+      }
+    ],
+    "Speech": [],
+    "Display": []
+  },
   "tools": [],
   "communication": {
     "inputs": [
+      {
+        "contract": "camera.state",
+        "version": 1,
+        "kind": "observation"
+      },
       {
         "contract": "vision.pose",
         "version": 1,
@@ -19,16 +144,95 @@
         "contract": "tool.result",
         "version": 1,
         "kind": "toolResult"
+      },
+      {
+        "contract": "task.request",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.input",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.progress",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.result",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.cancel",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
+      },
+      {
+        "contract": "generation.round.result",
+        "version": 1,
+        "kind": "roundResult"
+      },
+      {
+        "contract": "communication.receipt",
+        "version": 1,
+        "kind": "communicationReceipt"
+      },
+      {
+        "contract": "user.text",
+        "version": 1,
+        "kind": "text"
       }
     ],
     "subscriptions": [
       {
+        "contract": "camera.state",
+        "source": "phone.camera",
+        "topic": "camera.state"
+      },
+      {
         "contract": "vision.pose",
         "source": "visionPerception",
         "topic": "vision.pose"
+      },
+      {
+        "contract": "photography.camera",
+        "source": "runtime",
+        "topic": "photography.camera"
+      },
+      {
+        "contract": "photography.camera",
+        "source": "user",
+        "topic": "photography.camera"
       }
     ],
-    "publications": [],
-    "sends": []
+    "publications": [
+      "interaction.replyActivity"
+    ],
+    "sends": [
+      {
+        "contract": "task.progress",
+        "target": "assistant"
+      },
+      {
+        "contract": "task.result",
+        "target": "assistant"
+      },
+      {
+        "contract": "speech.synthesize",
+        "target": "speechSynthesis"
+      },
+      {
+        "contract": "speech.cancel",
+        "target": "speechSynthesis"
+      }
+    ]
   }
 }

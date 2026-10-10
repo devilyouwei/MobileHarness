@@ -51,30 +51,42 @@ extension CameraActions {
     }
     @Action(
         domain: "Camera", module: "Capture", title: "open", serializationKey: "Camera")
-    public static func open(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
+    public static func open(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
+        -> String
+    {
         try Task.checkCancellation()
         try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
         try await camera.setEnabled(true, invocation: invocation)
         try Task.checkCancellation()
+        return String(
+            decoding: try JSONEncoder().encode(CameraCommandReceipt(operation: "open", enabled: true)), as: UTF8.self)
     }
 
     @Action(
         domain: "Camera", module: "Capture", title: "close", serializationKey: "Camera")
-    public static func close(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
+    public static func close(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
+        -> String
+    {
         try Task.checkCancellation()
         try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
         try await camera.setEnabled(false, invocation: invocation)
         try Task.checkCancellation()
+        return String(
+            decoding: try JSONEncoder().encode(CameraCommandReceipt(operation: "close", enabled: false)), as: UTF8.self)
     }
 
     @Action(
         domain: "Camera", module: "Capture", title: "flip", serializationKey: "Camera")
-    public static func flip(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
+    public static func flip(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
+        -> String
+    {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["facing"])
         let facing = try arguments.requiredEnum("facing", as: CameraActions.Facing.self)
         try await camera.flip(facing, invocation: invocation)
         try Task.checkCancellation()
+        return String(
+            decoding: try JSONEncoder().encode(CameraCommandReceipt(operation: "flip", facing: facing)), as: UTF8.self)
     }
 }

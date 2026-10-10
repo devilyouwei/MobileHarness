@@ -44,21 +44,29 @@ import UI
     let host = HeldInteraction()
     let state = BluetoothSettingsState()
     var fences = 0
+    var pageVisibility: [Bool] = []
+    var openedSettings = 0
     let controls = BluetoothInteractionWorkflow(
         state: state, initialFence: UUID(),
         fenceStop: {
             fences += 1
             return UUID()
-        }, perform: { try await host.perform($0) })
+        }, pageVisibility: { pageVisibility.append($0) }, openSettings: { openedSettings += 1 },
+        perform: { try await host.perform($0) })
     var started = host.started.stream.makeAsyncIterator()
     controls.scan()
     await started.next()
+    controls.openPage()
+    controls.closePage()
+    controls.openSystemSettings()
+    #expect(pageVisibility == [true, false] && openedSettings == 1)
+    #expect(host.calls.count == 1)
     for value in [0.1, 0.5, 0.9] { controls.setMotorVelocity(id: 1, value: value) }
     controls.stopMotorControl()
     host.finish(throwing: CancellationError())
     await controls.waitUntilIdle()
-    #expect(fences == 1)
-    #expect(host.calls.map { $0.parameters["operation"] } == ["scan", "stopMotorControl"])
+    #expect(fences == 2)
+    #expect(host.calls.map { $0.parameters["operation"] } == ["scan"])
     #expect(state.error == nil)
     controls.setMotorVelocity(id: 1, value: 0.5)
     await controls.waitUntilIdle()

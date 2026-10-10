@@ -1,6 +1,6 @@
 # AppSettingsWorkflow
 
-Settings feature adapters and bounded UI request coordination. Resource business effects belong to ApplicationControl and Actions; this target imports UI/Storage and uses AgentCore/Agents/Gateway in ApplicationControlIntentRuntime for resource/provider query transport. No concrete callable or model SDK import is permitted.
+Settings feature adapters and bounded UI request coordination. Resource business effects belong to ApplicationControl and Actions; this target imports UI and uses AgentCore/Agents/Gateway/AppPresentationWorkflow in ApplicationControlIntentRuntime for resource/provider query transport. No concrete callable or model SDK import is permitted.
 
 ## Upstream and downstream
 
@@ -206,13 +206,13 @@ Resource facade overlap errors now use the owning facade/transport error instead
 
 ## Camera command entry
 
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
 ✅ Implemented validation fix: environment/interaction public entry points expose ApplicationControlIntentFailure for transport rejection instead of leaking the private TransportFailure. Environment bounds are validated before admission, preserving CommunicationError for malformed facts.
 
 ## Photographer transport — ADR0181
 
-✅ PhotographerIntentRuntime lazily registers one root-owned Photographer, consumes its stream once and dispatches camera and tracking independently. One camera request rejects overlap; output8 plus one tracking worker and8 queued tracking calls are bounded. Tracking overflow rejects the excess call with an explicit report callback; detach intentionally cancels/joins all work for the retired vision scope. Camera cancellation cancels/joins its function before an admitted root cancel Signal retires business state. No accepted command replay. Shutdown joins camera/tracking/pump before registration removal.
+✅ PhotographerIntentRuntime lazily registers one root-owned Photographer, consumes its stream once and dispatches camera and tracking independently. One camera request rejects overlap; output256 plus one tracking worker and8 queued tracking calls are bounded. Tracking overflow rejects the excess call with an explicit report callback; detach intentionally cancels/joins all work for the retired vision scope. Camera cancellation cancels/joins its function before an admitted root cancel Signal retires business state. No accepted command replay. Shutdown joins camera/tracking/pump before registration removal.
 
 CameraInteractionWorkflow forwards typed operations. Root UI requests use InputGateway; delegated model calls use the live, bound Assistant messaging authority through OutputGateway. Returning camera failures retain OutputExecutionResult and complete producer reports. Error paths release the request slot and leave later commands and perception admissible. ApplicationControlIntentRuntime retains device/navigation only.
 
@@ -223,3 +223,39 @@ Camera transport errors expose bounded producer descriptions for UI while retain
 ## Photo save and ignore — ADR0185
 
 ✅ PhotographerIntentRuntime transports optional photoID and returns the actual bounded native value after execution and terminal acknowledgment. CameraInteractionWorkflow supplies save/ignore intents in its existing single command slot, rejects overlap and retains failures in photoMessage even with the camera off. It reports a committed album write honestly if later request completion fails. No UI page owns these operations.
+
+✅ ADR0187: bind every output consumer to the registered Agent actor and its incarnation before reading output. Stopped or replaced producers cannot execute using a new registration.
+
+## Phase two implementation contract - ADR0188
+
+✅ Implemented. Assistant is the persistent default user-entry Agent and delegates photography, history and application operations through authorized communication Actions and existing task Signals. Typed UI inputs use deterministic routing; model requests use the same output and function execution path. Execution results return to the real task executor.
+
+Support owns the reusable one-round Chat worker, native/XML communication adaptation and reply mapping, with injected identity, context and policies. Each business Agent owns independent durable history, preprocessing, capabilities and task completion. No new directory, target, dependency, Core role policy or delegation runtime is introduced.
+
+App owns registration, transport, stable interaction lifetime and native presentation authorization. Microphone capture is a separate lifetime. Delivery acceptance, child completion and native effects remain distinct. Pending questions and artifact references are bounded and task-scoped; deletion retains existing trusted UI confirmation. Storage failures terminate dependent processing, cancellation joins owned workers, and restart interrupts without replay.
+
+See `docs/adr/0188-specialist-task-ownership.md` for migration, capacity and validation contracts.
+
+The existing AppPresentationWorkflow dependency supplies the shared bounded independent output consumer to AgentInteractionRuntime and the specialist transports; it owns transport mechanics, not settings decisions. No new target or third-party dependency.
+
+
+## One-way publication and listening admission correction
+
+✅ Implemented: UI intents publish externally, then await independent business outputs. Loss is bounded by owned120-second result watchdogs; canceled camera requests wait at most2seconds for acknowledgment and explicitly report unconfirmed cleanup. No effect is retried or fabricated.
+
+✅ Implemented: one-way external intent loss is bounded by a 120-second business-result watchdog, owned and joined by the existing operation. Camera cancellation acknowledgment waits at most two seconds and reports unconfirmed cleanup; it never fabricates device stop or replays work. Listening Action completion means policy accepted; microphone model preparation remains the owned startup task and is cancellable by user-off.
+
+✅ Implemented: correlated admission errors finish the rejected UI request without publishing retirement for work that was never accepted; this prevents housekeeping from contending with the next real request. Actual execution failures retain retirement cleanup.
+
+✅ Device regression fix: AgentInteractionRuntime owns startup-aware interactive lifecycle transitions. It awaits child preparation, then pauses/resumes the registered interactive roles; startup errors propagate without manufacturing unknownAgent failures.
+
+✅ Frontend/backend separation: ApplicationControlIntentRuntime and PhotographerIntentRuntime publish typed data commands directly to production owner subscriptions. Removed userEntry relay hooks; fixed operation bounds, business-result watchdogs and error handling remain. Pure page operations use immediate host callbacks.
+
+✅ Immediate page cleanup: BluetoothInteractionWorkflow invokes injected page visibility/system-settings callbacks synchronously, outside its bounded business command queue. stopMotorControl uses the existing immediate native stop fence and sends no redundant backend request; scanning/connect/disconnect/device data operations retain direct ApplicationControl transport.
+
+✅ Publication audit correction: publish validates its own payload/source and submits bounded one-way work, never awaiting subscriber or App observer completion and never returning recipient errors. Observer work shares bounded Gateway publication lifetime; overflow is diagnostic loss without publisher acknowledgment. Environment facts bypass request/result waiters and emit no completion acknowledgment; ApplicationControl errors still flow through its independent output consumer. Directed send retains correlated admission receipt (not task completion). Explicit UI data-operation result waits remain business completion contracts, not publish receipts.
+
+✅ Resource-fact extension of the same audit: model-resource observations are also one-way facts. Their registered presentation functions and runtime feedback execute under the root-owned ApplicationControl consumer independently of request slots. Sampling never retries because the subscriber rejected or its presentation failed. Tests await observable business state, not a publication receipt.
+
+
+✅ Camera perception/context change (2026-10-10): PhotographerIntentRuntime.observeCamera prepares the resident Photographer then publishes camera.state without a request waiter or completion acknowledgment. Camera facts do not use the one-slot UI command transaction, tracking queue or model worker.

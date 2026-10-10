@@ -17,6 +17,8 @@ struct MemoryHistoryWorkflow {
         try capabilities.adding(internalTools: [presentation, deletion, archive, title])
     }
 
+    var pendingRequestIDs: [UUID] { pending.map { [$0.callID] } ?? [] }
+
     mutating func reset() { pending = nil }
 
     mutating func receive(_ input: AgentInput) throws -> [StepOutput] {
@@ -88,23 +90,31 @@ struct MemoryHistoryWorkflow {
             pending = nil
             outputs.append(StepOutput(output: .control("history.cancelled"), input: input))
         case .refresh:
-            guard input.metadata.source == "user" else { throw CommunicationError.invalidPayload }
+            guard input.metadata.source == "user" || AgentFixedTaskInput.isTrusted(input) else {
+                throw CommunicationError.invalidPayload
+            }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
             outputs.append(StepOutput(output: .toolCall(try Self.presentation.call([:])), input: input))
         case .startNew:
-            guard input.metadata.source == "user" else { throw CommunicationError.invalidPayload }
+            guard input.metadata.source == "user" || AgentFixedTaskInput.isTrusted(input) else {
+                throw CommunicationError.invalidPayload
+            }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
             let call = try Self.archive.call([:])
             pending = (input, call.id, .archive)
             outputs.append(StepOutput(output: .toolCall(call), input: input))
         case .summarize(let id):
-            guard input.metadata.source == "user" else { throw CommunicationError.invalidPayload }
+            guard input.metadata.source == "user" || AgentFixedTaskInput.isTrusted(input) else {
+                throw CommunicationError.invalidPayload
+            }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
             let call = try Self.title.call(["id": id.uuidString])
             pending = (input, call.id, .title)
             outputs.append(StepOutput(output: .toolCall(call), input: input))
         case .delete(let id):
-            guard input.metadata.source == "user" else { throw CommunicationError.invalidPayload }
+            guard input.metadata.source == "user" || AgentFixedTaskInput.isTrusted(input) else {
+                throw CommunicationError.invalidPayload
+            }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
             let call = try Self.deletion.call(["id": id.uuidString])
             pending = (input, call.id, .deletion)

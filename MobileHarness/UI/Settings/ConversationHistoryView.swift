@@ -2,72 +2,148 @@
     import SwiftUI
     import UIKit
 
-    /// Durable records of actual Assistant requests. Viewing never executes stored markup.
+    /// Agent selection followed by isolated durable request history.
     @MainActor
     public struct ConversationHistoryView: View {
         @Bindable var state: ConversationHistoryState
         let controls: any ConversationHistoryControlling
-        @Environment(\.scenePhase) private var scenePhase
-        @State private var deleting: HistoryConversation?
         public init(state: ConversationHistoryState, controls: any ConversationHistoryControlling) {
             self.state = state
             self.controls = controls
         }
 
         public var body: some View {
+            if controls.agents.isEmpty {
+                AgentConversationHistoryList(state: state, controls: controls)
+            } else {
+                List(controls.agents) { agent in
+                    NavigationLink {
+                        AgentConversationHistoryList(state: agent.state, controls: agent.controls)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(agent.name)
+                            Text(agent.summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("history.agent.\(agent.id)")
+                }
+                .navigationTitle("对话历史")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.visible, for: .navigationBar)
+            }
+        }
+    }
+
+    /// Task-scoped read-only projection using the owning Agent's existing history and controls.
+    @MainActor
+    public struct TaskConversationHistoryView: View {
+        @Bindable private var state: ConversationHistoryState
+        private let controls: any ConversationHistoryControlling
+        private let inputIDs: Set<UUID>
+        public init(state: ConversationHistoryState, controls: any ConversationHistoryControlling, inputIDs: Set<UUID>)
+        {
+            self.state = state
+            self.controls = controls
+            self.inputIDs = inputIDs
+        }
+        private var turns: [HistoryTurn] {
+            guard let archive = state.archive else { return [] }
+            return ([archive.current] + archive.past).flatMap {
+                ConversationHistoryPresentation.turns($0, inputIDs: inputIDs)
+            }
+        }
+        public var body: some View {
             List {
-                if let status = state.status {
-                    Section { Text(status).foregroundStyle(.secondary).textSelection(.enabled) }
-                }
-                Section {
-                    if let current = state.archive?.current {
-                        if current.turns.isEmpty {
-                            Text("尚无对话，返回首页开始聊天。").foregroundStyle(.secondary)
-                        } else {
-                            NavigationLink {
-                                ConversationHistoryDetail(conversation: current, controls: controls)
-                            } label: {
-                                row(current)
-                            }
-                        }
-                        Button("开始新对话", systemImage: "square.and.pencil") { controls.startNew() }
-                            .disabled(state.isBusy || current.turns.isEmpty)
-                            .accessibilityIdentifier("history.new")
-                    } else if state.status == nil {
-                        ProgressView("加载对话…")
-                    } else {
-                        Button("重试加载") { Task { await controls.load() } }
-                    }
-                } header: {
-                    Text("当前对话")
-                } footer: {
-                    Text("开始新对话后，当前对话会移至历史记录。")
-                }
-                Section {
-                    if state.archive?.past.isEmpty == true { Text("暂无历史对话").foregroundStyle(.secondary) }
-                    ForEach(state.archive?.past ?? []) { conversation in
-                        NavigationLink {
-                            ConversationHistoryDetail(conversation: conversation, controls: controls)
-                        } label: {
-                            row(conversation)
-                        }
-                        .swipeActions {
-                            Button("删除", role: .destructive) { deleting = conversation }
-                        }
-                        if conversation.summaryTitle == nil {
-                            Button("重新生成标题") { controls.summarize(conversation.id) }.disabled(state.isBusy)
-                            if let error = conversation.titleError {
-                                Text("标题生成失败：\(error)").font(.caption).foregroundStyle(.secondary)
-                            }
+                if let status = state.status { Text(status).foregroundStyle(.secondary) }
+                ForEach(turns) { turn in
+                    NavigationLink {
+                        ConversationTurnDetail(turn: turn, controls: controls)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            if turn.isReACT == true { Text("ReACT").font(.caption).foregroundStyle(.orange) }
+                            Text(turn.displayInput).lineLimit(3)
+                            Text(turn.outputSummary).lineLimit(3).foregroundStyle(.secondary)
+                            Text(turn.dateReport).font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                } header: {
-                    Text("过去的对话")
-                } footer: {
-                    Text("对话历史仅保存在此设备。")
+                }
+                if turns.isEmpty && !state.isBusy { Text("暂无匹配的模型记录，关联输入可能已超出保留范围").foregroundStyle(.secondary) }
+            }
+            .navigationTitle("模型与 Tool 记录")
+            .task { await controls.load() }
+        }
+    }
+
+    @MainActor
+    private struct AgentConversationHistoryList: View {
+        @Bindable var state: ConversationHistoryState
+        let controls: any ConversationHistoryControlling
+        @Environment(\.scenePhase) private var scenePhase
+        @State private var deleting: HistoryConversation?
+        var body: some View {
+            Group {
+                if state.groupsByTask {
+                    SpecialistTaskHistoryList(state: state, controls: controls)
+                } else {
+                    List {
+                        if let status = state.status {
+                            Section { Text(status).foregroundStyle(.secondary).textSelection(.enabled) }
+                        }
+                        Section {
+                            if let current = state.archive?.current {
+                                if current.turns.isEmpty {
+                                    Text("此 Agent 尚无对话记录。").foregroundStyle(.secondary)
+                                } else {
+                                    NavigationLink {
+                                        ConversationHistoryDetail(conversation: current, controls: controls)
+                                    } label: {
+                                        row(current)
+                                    }
+                                }
+                                if state.allowsMutations {
+                                    Button("开始新对话", systemImage: "square.and.pencil") { controls.startNew() }
+                                        .disabled(state.isBusy || current.turns.isEmpty)
+                                        .accessibilityIdentifier("history.new")
+                                }
+                            } else if state.status == nil {
+                                ProgressView("加载对话…")
+                            } else {
+                                Button("重试加载") { Task { await controls.load() } }
+                            }
+                        } header: {
+                            Text("当前对话")
+                        } footer: {
+                            Text(state.allowsMutations ? "开始新对话后，当前对话会移至历史记录。" : "此 Agent 的记录可查看和导出。")
+                        }
+                        Section {
+                            if state.archive?.past.isEmpty == true { Text("暂无历史对话").foregroundStyle(.secondary) }
+                            ForEach(state.archive?.past ?? []) { conversation in
+                                NavigationLink {
+                                    ConversationHistoryDetail(conversation: conversation, controls: controls)
+                                } label: {
+                                    row(conversation)
+                                }
+                                .swipeActions {
+                                    if state.allowsMutations {
+                                        Button("删除", role: .destructive) { deleting = conversation }
+                                    }
+                                }
+                                if state.allowsMutations, conversation.summaryTitle == nil {
+                                    Button("重新生成标题") { controls.summarize(conversation.id) }.disabled(state.isBusy)
+                                    if let error = conversation.titleError {
+                                        Text("标题生成失败：\(error)").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        } header: {
+                            Text("过去的对话")
+                        } footer: {
+                            Text("对话历史仅保存在此设备。")
+                        }
+                    }
                 }
             }
-            .navigationTitle("对话历史")
+            .navigationTitle(state.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .task { await controls.load() }
@@ -102,12 +178,85 @@
     }
 
     @MainActor
-    private struct ConversationHistoryDetail: View {
-        let conversation: HistoryConversation
+    private struct SpecialistTaskHistoryList: View {
+        @Bindable var state: ConversationHistoryState
         let controls: any ConversationHistoryControlling
         var body: some View {
             List {
-                ForEach(ConversationHistoryPresentation.turns(conversation)) { turn in
+                if let status = state.status {
+                    Section {
+                        Text(status).foregroundStyle(.secondary)
+                        Button("重试加载") { Task { await controls.load() } }
+                    }
+                }
+                Section("任务") {
+                    ForEach(state.tasks.filter(\.isAssociated)) { task in row(task) }
+                    if state.tasks.isEmpty {
+                        if state.isBusy {
+                            ProgressView("加载任务…")
+                        } else if state.status == nil {
+                            Text("暂无任务记录").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                let unassociated = state.tasks.filter { !$0.isAssociated }
+                if !unassociated.isEmpty {
+                    Section("未关联任务的记录") {
+                        ForEach(unassociated) { task in row(task) }
+                    }
+                }
+            }
+        }
+        private func row(_ task: HistoryTask) -> some View {
+            NavigationLink {
+                ConversationHistoryDetail(task: task, controls: controls)
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(verbatim: task.title).lineLimit(2)
+                    Text(
+                        [
+                            task.status, "\(task.turns.count) 轮",
+                            task.createdAt?.formatted(date: .abbreviated, time: .shortened) ?? "",
+                        ]
+                        .filter { !$0.isEmpty }.joined(separator: " · ")
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier("history.task.\(task.id)")
+        }
+    }
+
+    @MainActor
+    private struct ConversationHistoryDetail: View {
+        let turns: [HistoryTurn]
+        let title: String
+        let task: HistoryTask?
+        let controls: any ConversationHistoryControlling
+        init(conversation: HistoryConversation, controls: any ConversationHistoryControlling) {
+            turns = ConversationHistoryPresentation.turns(conversation)
+            title = ConversationHistoryPresentation.title(conversation)
+            task = nil
+            self.controls = controls
+        }
+        init(task: HistoryTask, controls: any ConversationHistoryControlling) {
+            turns = task.turns
+            title = task.title
+            self.task = task
+            self.controls = controls
+        }
+        var body: some View {
+            List {
+                if let task {
+                    Section(task.isAssociated ? "任务信息" : "记录信息") {
+                        Text(task.status)
+                        Text(task.createdAt?.formatted(date: .abbreviated, time: .shortened) ?? "")
+                        Text("\(task.isAssociated ? "任务 ID" : "输入 ID")：\(task.id)").font(.caption).textSelection(
+                            .enabled)
+                    }
+                    if turns.isEmpty { Text("此任务暂无模型对话记录").foregroundStyle(.secondary) }
+                }
+                ForEach(turns) { turn in
                     NavigationLink {
                         ConversationTurnDetail(turn: turn, controls: controls)
                     } label: {
@@ -131,11 +280,14 @@
                     .foregroundStyle(turn.isReACT == true ? Color.orange : Color.primary)
                 }
             }
-            .navigationTitle(String(ConversationHistoryPresentation.title(conversation).prefix(40)))
+            .navigationTitle(String(title.prefix(40)))
             .toolbar { ShareLink("导出", item: export) }
         }
         private var export: String {
-            ConversationHistoryPresentation.turns(conversation).map { $0.diagnosticReport() }
+            (task.map {
+                "\($0.isAssociated ? "任务" : "记录")：\($0.title)\n\($0.isAssociated ? "任务 ID" : "输入 ID")：\($0.id)\n状态：\($0.status)\n\n"
+            } ?? "")
+                + turns.map { $0.diagnosticReport() }
                 .joined(separator: "\n\n---\n\n")
         }
     }
@@ -145,6 +297,7 @@
         let turn: HistoryTurn
         let controls: any ConversationHistoryControlling
         @State private var interpretation = ""
+        @State private var generationInfoExpanded = false
         var body: some View {
             Form {
                 Section("用户本轮输入") {
@@ -167,23 +320,6 @@
                         }
                     }
                 }
-                Section("生成记录") {
-                    Text("轮次：\(turn.generationMetadataAvailable == false ? "" : turn.id.uuidString)").font(.caption)
-                        .textSelection(.enabled)
-                    if let owner = turn.ownerInputID {
-                        Text("所属输入：\(owner.uuidString)").font(.caption).textSelection(.enabled)
-                    }
-                    Text("模型：\(turn.model)")
-                    Text(turn.firstTokenReport)
-                    Text("状态：\(turn.stateReport)；结束原因：\(turn.finishReason ?? "")")
-                    if turn.generationMetadataAvailable != false {
-                        Text("\(turn.raw.utf8.count) 字节 · \(turn.fragments.count) 分片")
-                    }
-                    Text("temperature: \(turn.temperature)")
-                    Text(turn.tokenReport)
-                    if let error = turn.error { selectable(error) }
-                    if let error = turn.executionError { selectable("执行失败：" + error) }
-                }
                 Section("实际发送的上下文（含系统提示词）") {
                     if !turn.attachedImages.isEmpty {
                         ScrollView(.horizontal) {
@@ -195,8 +331,8 @@
                         }
                     }
                     if turn.request.isEmpty, let json = turn.requestJSON { selectable(json) }
-                    ForEach(Array(turn.request.enumerated()), id: \.offset) { index, message in
-                        DisclosureGroup("\(index + 1). \(message.role.rawValue)") {
+                    ForEach(Array(turn.request.enumerated()), id: \.offset) { _, message in
+                        DisclosureGroup(message.role.rawValue) {
                             selectable(message.displayContent)
                             if let id = message.toolCallID { selectable("Tool Call ID：" + id) }
                             ForEach(Array((message.toolCalls ?? []).enumerated()), id: \.offset) { _, call in
@@ -218,6 +354,25 @@
                         selectable(
                             turn.fragments.enumerated().map { "\($0.offset + 1). \(String(reflecting: $0.element))" }
                                 .joined(separator: "\n"))
+                    }
+                }
+                if turn.error != nil || turn.executionError != nil {
+                    Section("异常信息") {
+                        if let error = turn.error { selectable(error) }
+                        if let error = turn.executionError { selectable("执行失败：" + error) }
+                    }
+                }
+                Section {
+                    DisclosureGroup("生成信息", isExpanded: $generationInfoExpanded) {
+                        Text("轮次：\(turn.generationMetadataAvailable == false ? "" : turn.id.uuidString)")
+                            .font(.caption).textSelection(.enabled)
+                        Text("所属输入：\(turn.ownerInputID?.uuidString ?? "")")
+                            .font(.caption).textSelection(.enabled)
+                        Text("模型：\(turn.model)")
+                        Text(turn.firstTokenReport)
+                        Text("状态：\(turn.stateReport)；结束原因：\(turn.finishReason ?? "")")
+                        Text("temperature: \(turn.temperature)")
+                        Text(turn.tokenReport)
                     }
                 }
             }

@@ -146,8 +146,10 @@ public actor ChannelScheduler {
         while true {
             try Task.checkCancellation()
             let records = resultLedger.snapshot().filter { $0.result?.roundID == roundID }
-            guard !records.contains(where: { [.closed, .expired, .exhausted].contains($0.state) }) else {
-                throw CommunicationError.scopeClosed
+            if let failed = records.first(where: { [.closed, .expired, .exhausted].contains($0.state) }) {
+                throw ActionSchedulingError.resultDeliveryFailed(
+                    executionID: failed.executionID.uuidString,
+                    path: failed.result?.path.description ?? "unknown", state: failed.state.rawValue)
             }
             if !records.contains(where: { $0.state == .pending || $0.state == .reserved }) { return }
             try await Task.sleep(for: .milliseconds(10))
@@ -378,17 +380,14 @@ public actor ChannelScheduler {
                     started = true
                     self.executionTransition(job.id, to: .running)
                     self.diagnostics.record(job.invocation, kind: job.kind, phase: .started, effect: .unknown)
-                    let binding = job.invocation.owner.map {
-                        InvocationSignalContext.Binding(envelope: job.invocation.envelope, owner: $0)
-                    }
-                    let completion = try await InvocationSignalContext.$binding.withValue(binding) {
-                        if !job.resources.isEmpty, let resources {
-                            let executor = ActionExecutor(registry: registry)
-                            return try await resources.run(
-                                resources: job.resources, owner: job.invocation.owner, lease: job.invocation.lease
-                            ) { try await executor.execute(job.invocation.execution) }
-                        }
-                        return try await ActionExecutor(registry: registry).execute(job.invocation.execution)
+                    let completion: ActionCompletion
+                    if !job.resources.isEmpty, let resources {
+                        let executor = ActionExecutor(registry: registry)
+                        completion = try await resources.run(
+                            resources: job.resources, owner: job.invocation.owner, lease: job.invocation.lease
+                        ) { try await executor.execute(job.invocation.execution) }
+                    } else {
+                        completion = try await ActionExecutor(registry: registry).execute(job.invocation.execution)
                     }
                     try Task.checkCancellation()
                     outcome = .success(completion)

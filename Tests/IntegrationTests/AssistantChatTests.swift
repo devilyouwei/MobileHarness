@@ -29,7 +29,11 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     for _ in 0..<121 {
         let envelope = try #require(try await outputs.next())
         turn.append(envelope)
-        if envelope.output == .control("assistant.finished") { return turn }
+        if case .control(let state) = envelope.output,
+            state == "agent.finished" || state.hasPrefix("agent.error:")
+        {
+            return turn
+        }
     }
     Issue.record("Assistant exceeded its per-turn event budget")
     return turn
@@ -50,14 +54,14 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
         await speechRequests.restored(answer.map(\.output)) == [
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "模型回答"])),
             expectedPrint("模型回答"),
-            .control("assistant.finished"),
+            .control("agent.finished"),
         ])
     try await agent.receive(AgentInput(sessionID: session, payload: .text("continue")))
     _ = try await completedTurn(&outputs)
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("new")))
     _ = try await completedTurn(&outputs)
     let requests = await model.requests
-    #expect(requests.count == 3)
+    try #require(requests.count == 3)
     #expect(requests[1].messages.contains(.init(role: .assistant, content: "模型回答")))
     #expect(requests[2].messages.count == 6)
     #expect(requests[0].context.requestID == first.id)
@@ -67,10 +71,8 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
         #expect(request.maximumOutputTokens == nil)
         let system = try #require(request.messages.first)
         #expect(system.role == .system)
-        #expect(
-            system.content
-                == (try AssistantAgent.systemPrompt(
-                    capabilities: configuration.capabilities)))
+        #expect(system.content.contains("You are a voice assistant on a phone."))
+        #expect(system.content.contains(AgentCapabilityCatalog.summary))
         #expect(!system.content.contains("Tool Call"))
         for tool in configuration.capabilities.tools {
             #expect(!system.content.contains(tool.alias))
@@ -104,14 +106,14 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     try await agent.start()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["runtime", "user", "phone.microphone", "phone.camera"],
-        configurations: try [
-            "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer",
-            "Memory",
-        ].map { try AgentConfigurations.load(named: $0) })
+        externalSources: [
+            "runtime", "user", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
+        configurations: AgentConfigurations.all())
     let gateway = InputGateway(manager: manager, policy: policy)
     let session = UUID()
-    _ = try await gateway.send(AgentInput(sessionID: session, payload: .text("wait")), to: .assistant)
+    try await gateway.publish(AgentInput(sessionID: session, payload: .text("wait")))
     for _ in 0..<10000 {
         if await model.pending != nil { break }
         await Task.yield()
@@ -119,14 +121,19 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     _ = try #require(await model.pending)
     try await agent.pause()
     try await agent.receive(AgentInput(sessionID: session, payload: .text("queued")))
-    let report = try await gateway.send(
-        AssistantControl.cancelSession.input(sessionID: session), to: .assistant)
-    #expect(report.rejected.isEmpty)
+    try await gateway.publish(AssistantControl.cancelSession.input(sessionID: session))
+    await gateway.flushPublications()
     #expect(await agent.status().queuedInputs == 0)
     try await agent.resume()
     let next = AgentInput(sessionID: UUID(), payload: .text("next"))
     try await agent.receive(next)
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    let cancelledTurn = try await completedTurn(&outputs)
+    #expect(
+        cancelledTurn.contains {
+            if case .control(let value) = $0.output { return value.contains("inference suspended") }
+            return false
+        })
     let turn = try await completedTurn(&outputs)
     #expect(turn.allSatisfy { $0.inputID == next.id })
     #expect(
@@ -178,9 +185,9 @@ func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async 
     for _ in 0..<121 {
         let output = try #require(try await outputs.next())
         #expect(output.inputID == failed.id)
-        #expect(output.output != .control("assistant.finished"))
+        #expect(output.output != .control("agent.finished"))
         if case .control(let message) = output.output {
-            #expect(message.hasPrefix("assistant.error:"))
+            #expect(message.hasPrefix("agent.error:"))
             reported = true
             break
         }
@@ -196,7 +203,7 @@ func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async 
             $0 == .actionCall(expectedActionCall(name: "say", parameters: ["text": "Recovered."]))
         })
     let requests = await model.requests
-    #expect(requests.count == 2)
+    try #require(requests.count == 2)
     #expect(requests[1].messages.count == 2)
     #expect(!requests[1].messages.contains { $0.content == "bad turn" })
     await agent.stop()
@@ -227,7 +234,7 @@ private struct LongReplyChat: ChatCapability {
         case .actionCall(let call) where call.actionPath.description == "UI.Caption.print":
             captions += call.parameters["text"] ?? ""
         case .control(let message):
-            #expect(message == "assistant.finished")
+            #expect(message == "agent.finished")
             await agent.stop()
         default: break
         }
@@ -245,7 +252,7 @@ func assistantCompletesTurnAfterRejectedAction(_ markup: String) async throws {
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("fixture")))
     let outputs = try await completedTurn(&iterator)
     #expect(outputs.contains { if case .rejectedCall = $0.output { true } else { false } })
-    #expect(outputs.last?.output == .control("assistant.finished"))
+    #expect(outputs.last?.output == .control("agent.finished"))
     await agent.stop()
 }
 
@@ -253,14 +260,46 @@ private struct RejectedToolChatFixture: ChatCapability {
     let availability: CapabilityAvailability = .available
     let name: String
     let arguments: String
+    var emitsText = true
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         try pair.emitter.yield(.toolCall(ChatToolCall(id: "fixture", name: name, argumentsJSON: arguments)))
-        try pair.emitter.yield(.text("Continued."))
+        if emitsText { try pair.emitter.yield(.text("Continued.")) }
         try pair.emitter.yield(.finished(.stop))
         pair.emitter.finish()
         return pair.session
     }
+}
+
+@Test(.timeLimit(.minutes(1))) func rejectedNativeOutcomeWriteFailureTerminatesBeforeOutput() async throws {
+    let repository = AgentContextRepository(
+        agent: .assistant, scope: UUID(), state: AssistantContextState(),
+        persistence: .init(
+            load: { nil },
+            commit: { context, _ in
+                if context.state.history.current.turns.flatMap({ $0.toolCalls ?? [] }).contains(where: {
+                    $0.state == .failed
+                }) {
+                    throw CommunicationError.invalidPayload
+                }
+            }))
+    let agent = try AssistantAgent(
+        chat: RejectedToolChatFixture(name: "unknown", arguments: "{}", emitsText: false), context: repository)
+    try await agent.start()
+    var iterator = agent.outputs.makeAsyncIterator()
+    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("fixture")))
+    var outputs: [AgentOutput] = []
+    while let output = await iterator.next() {
+        outputs.append(output.output)
+        if case .control(let message) = output.output, message.hasPrefix("agent.error:") { break }
+    }
+    #expect(
+        outputs.contains { if case .control(let message) = $0 { message.hasPrefix("agent.error:") } else { false } }
+    )
+    #expect(!outputs.contains { if case .rejectedCall = $0 { true } else { false } })
+    #expect(!outputs.contains { if case .toolCall = $0 { true } else { false } })
+    #expect(try await repository.snapshot().state.history.current.turns.last?.state == .failed)
+    await agent.stop()
 }
 
 @Test(arguments: ["{}", "{invalid"])
@@ -277,7 +316,7 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
     #expect(rejected.count == 1)
     #expect(rejected.first?.kind == .tool)
     #expect(rejected.first?.callID != nil)
-    #expect(outputs.last?.output == .control("assistant.finished"))
+    #expect(outputs.last?.output == .control("agent.finished"))
     await agent.stop()
 }
 
@@ -353,12 +392,13 @@ func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws 
     try await agent.pause()
     try await agent.receive(AgentInput(sessionID: control.sessionID, payload: .text("retained")))
     let policy = try CommunicationPolicy(
-        contracts: contracts, externalSources: ["runtime", "user", "phone.microphone", "phone.camera"],
-        configurations: try [
-            "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer",
-            "Memory",
-        ].map { try AgentConfigurations.load(named: $0) })
-    let gateway = InputGateway(manager: manager, policy: policy)
+        contracts: contracts,
+        externalSources: [
+            "runtime", "user", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
+        configurations: AgentConfigurations.all())
+    let gateway = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     await #expect(throws: CommunicationError.invalidPayload) {
         try await gateway.send(
             AgentInput(sessionID: control.sessionID, payload: .observation(foreign)), to: .assistant)
@@ -396,7 +436,7 @@ private actor ContinuationChatFixture: ChatCapability {
     async throws
 {
     let model = ContinuationChatFixture()
-    let agent = try AssistantAgent(chat: model)
+    let agent = try FixtureNativeAgent(chat: model)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     let original = AgentInput(sessionID: UUID(), payload: .text("Inspect runtime"))
@@ -432,7 +472,7 @@ private actor ContinuationChatFixture: ChatCapability {
             if case .actionCall(let call) = $0.output { call.actionPath.module == "Expression" } else { false }
         })
     let requests = await model.requests
-    #expect(requests.count == 2)
+    try #require(requests.count == 2)
     #expect(requests[1].messages.last?.role == .tool)
     #expect(requests[1].messages.last?.toolCallID == "provider-call")
     let content = try #require(requests[1].messages.last?.content)
@@ -469,7 +509,7 @@ private actor RepeatedNativeChatFixture: ChatCapability {
 }
 @Test(.timeLimit(.minutes(1))) func nativeContinuationLimitWaitsForActualResultsAndNextTurnRecovers() async throws {
     let model = RepeatedNativeChatFixture()
-    let agent = try AssistantAgent(chat: model)
+    let agent = try FixtureNativeAgent(chat: model)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     let input = AgentInput(sessionID: UUID(), payload: .text("repeat"))
@@ -489,7 +529,7 @@ private actor RepeatedNativeChatFixture: ChatCapability {
                         payload: payload, source: "runtime", origin: .runtime,
                         rootID: input.metadata.rootID, parentID: input.id)))
         }
-        if case .control(let value) = envelope.output, value.hasPrefix("assistant.error:") { terminal = value }
+        if case .control(let value) = envelope.output, value.hasPrefix("agent.error:") { terminal = value }
     }
     #expect(calls == 4)
     #expect(await model.requests == 4)

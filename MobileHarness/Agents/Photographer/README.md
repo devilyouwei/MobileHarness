@@ -1,142 +1,115 @@
-# Photographer
+# Photographer - Photography tasks and tracking
 
-Photographer is the application's photographer Agent: its intended business scope combines video recording, still photography, camera movement and interaction with the user during a shoot. It owns photographic intent and shooting decisions, using perception Signals and registered Actions through the Gateways. ✅ The current implementation owns camera open/close/front-rear switch/retry decisions and selects arm aim targets from shared pose observations. ❌ Video recording, still capture, broader shooting/movement policy and shoot-time dialogue are not yet implemented; the name expresses the full role rather than only today's tracking function. See [ADR 0102](../../../docs/adr/0102-photographer-aim.md).
+## 函数与通信注册清单
 
-Current design goals: select registered camera operations, consume VisionPerception observations and emit bounded NexArm.Tracking.aim calls; pose inference and skeleton rendering retain their existing owners.
+✅ 以下为当前实现的完整注册清单。模型权限来源：[配置文件](Photographer.agent.json)；内部权限来源见各行链接。参数后缀 `?` 表示可选，`—` 表示无参数或无 Channel。
 
-## Upstream and downstream
+模型 Action 通过 Action call 调度；模型 Tool 通过原生函数调用取得结果。InternalAction / InternalTool 是代码固定流程的权限，不会自动进入模型函数目录。同一函数跨 Agent 注册，或在同一 Agent 同时提供模型入口与内部入口，属于授权复用；模型 Action 和模型 Tool 不重复注册同一路径。
 
-```mermaid
-flowchart LR
-    Vision[VisionPerception vision.pose] --> Input[InputGateway]
-    Human[Root user camera intent] --> Input
-    Assistant[Authorized Assistant delegation] --> Output[OutputGateway]
-    Output --> Input
-    Input --> Role[Photographer domain admission]
-    Role --> Tracking[First-person tracking policy]
-    Tracking --> Aim[NexArm.Tracking.aim]
-    Role --> Camera[Camera command and result workflow]
-    Camera --> Capture[Camera.Capture functions]
-    Aim --> Output
-    Capture --> Output
-```
+### 模型可调用函数
 
-✅ JSON v6 subscribes to `vision.pose` from `visionPerception`, admits `photography.camera` and `tool.result`, and declares no model-callable Actions or Tools. Code grants internal `NexArm.Tracking.aim` and the six fixed Camera.Capture control/disposition functions. The output stream holds 8 envelopes and rejects only the excess call when full; an aim is not replaced or dropped.
+| 类型 | 模型名称 | 函数路径 | 默认 Channel | 参数 / 约束 | 函数说明 |
+| --- | --- | --- | --- | --- | --- |
+| Action | `flipCamera` | `Camera.Capture.flip` | Camera | `facing: string` — front or back; change only when requested. | Select the requested front or back lens of the enabled foreground camera. Already selecting that lens leaves it unchanged. Fails if disabled, busy or unavailable. Schedule on Camera; successful completion is execution feedback. Do not repeat a successful command to continue reasoning. |
+| Action | `closeCamera` | `Camera.Capture.close` | Camera | — | Disable camera preview and vision processing, and wait for capture and vision cleanup. Schedule on Camera; successful completion is execution feedback. Do not repeat a successful command to continue reasoning. |
+| Action | `openCamera` | `Camera.Capture.open` | Camera | — | Enable foreground camera preview and vision processing. Requires camera permission and an available camera; completion confirms capture, not pose-model readiness. Schedule on Camera; successful completion is execution feedback. Do not repeat a successful command to continue reasoning. |
+| Action | `takePhoto` | `Camera.Capture.takePhoto` | Camera | — | On an explicit user request, take one photo using the current ready foreground camera. Capture, retain private App evidence and show the actual photo; this does not save to the system Photos library. Its execution observation supplies the photo to the next model round for visual understanding. Emit once, then wait for actual image feedback before describing it. Use savePhoto only on an explicit save request. Do not repeat capture merely to continue reasoning. Camera must be enabled and ready. |
+| Action | `savePhoto` | `Camera.Capture.savePhoto` | Camera | `photoID: string` — A photoID from actual capture feedback. | On an explicit user request, save the currently displayed captured photo to the system Photos library. Wait for the actual observation before confirming success; permission denial is a failure. Repeated saves of the same displayed photo do not create duplicates. This does not take another photo. |
+| Action | `ignorePhoto` | `Camera.Capture.ignorePhoto` | Camera | `photoID: string` — A photoID from actual capture feedback. | On a request to close, dismiss, ignore or discard the displayed photo, hide its thumbnail and preview without exporting to Photos. This does not close the camera, delete an existing album photo, or take another photo. Wait for the actual result before confirming. |
+| Action | `retryCamera` | `Camera.Capture.retry` | Camera | — | Explicitly retry a failed foreground camera operation. Wait for execution feedback; do not automatically repeat failed work. |
+| Action（动态通信目录） | `send` | `Agent.Communication.send` | Communication | `target`, `kind`, `content`, `taskID?`, `artifactID?` | 授权目标：assistant；kind：progress, result。request 创建任务时不传 taskID，其他类型要求已有 taskID。由 [AgentCommunicationAdapter.swift](../Support/Chat/AgentCommunicationAdapter.swift) 根据 task.* send 权限生成；不是 Tool。 |
 
-✅ The first person in the published array is the target. That array keeps VisionPerception's copy order. The current pose decoder sorts by detection score before the score is removed, but this Agent does not re-rank. The nose is the aim point when its confidence is at least 0.3 and it lies inside the image. Otherwise the point is the midpoint of joints that pass the same test. No such joint means no aim. `base` turns only the base and `pitch` tips only the wrist. Each command adds a limited step from the last command: a 4% dead zone, smoothing, and a capped rate so a person at the edge is followed without a full-frame snap. The first aim outside the dead zone is immediate. Later aims wait 0.2 seconds on the observation timestamp. A centered person, or an empty observation, emits nothing and does not return to center. Pause admits the observation and does not aim.
 
-✅ App composition supplies one root-owned Photographer with controlsArm true. VisionSession attaches its vision UUID; PhotographerIntentRuntime dispatches camera and tracking independently through OutputGateway. Intent dispatch has no transient motor fence; App's worker holds motors1–4 through ResourceCoordinator (ADR0126). NexArmBehaviorAdapter binds the foreground Bluetooth workflow. Missing/unready/background failure is an independent tracking warning; vision continues. ❌ Wi-Fi and physical tracking acceptance remain pending.
+### 代码固定流程的内部函数
 
-## 输入、订阅与输出契约
+| 类型 | 函数路径 | Channel | 参数 | 函数说明 | 注册来源 |
+| --- | --- | --- | --- | --- | --- |
+| InternalAction | `UI.Caption.beginReplyTurn` | Display | — | 开始本轮回复字幕展示。 | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
+| InternalAction | `Speech.Playback.speak` | Speech | `audioID` | 播放当前真实输出 Agent 所有的 audioID；进入串行 Speech Channel，不因子 Agent 回复而取消父 Agent 播放。 | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
+| InternalAction | `UI.Caption.print` | Display | `text` | 将回复文本输出到字幕；保持真实输出 Agent 和任务归属。 | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
+| InternalTool | `NexArm.Tracking.aim` | — | `base`, `pitch` | 确定性追踪使用 base/pitch 目标；要求机械臂控制可用和有效的新姿态，不向摄影模型开放机械臂动作。 | [PhotographerAgent.swift](PhotographerAgent.swift) |
+| InternalTool | `Camera.Capture.open` | — | — | 固定相机事务：开启摄像头。 | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
+| InternalTool | `Camera.Capture.close` | — | — | 固定相机事务：关闭摄像头并等待清理。 | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
+| InternalTool | `Camera.Capture.flip` | — | `facing` | 固定相机事务：切换到指定 facing。 | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
+| InternalTool | `Camera.Capture.retry` | — | — | 固定相机事务：显式重试失败操作。 | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
+| InternalTool | `Camera.Capture.savePhoto` | — | `photoID?` | 固定相机事务：保存指定或可信 UI 当前选择的照片。 | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
+| InternalTool | `Camera.Capture.ignorePhoto` | — | `photoID?` | 固定相机事务：忽略指定或可信 UI 当前选择的照片。 | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
 
-| 方向 | 数据标准与边界 |
+
+模型 savePhoto / ignorePhoto 必须携带任务所属的 photoID；内部固定流程允许省略 photoID，使用可信 UI 当前选择。内部 aim 只供确定性追踪，不扩展摄影模型的机械臂权限。
+
+### 通信输出权限
+
+这些是 CommunicationAction 的授权契约，不是额外的原生 Tool。publish 单向广播，不等待接收方回包，不因接收方拒绝/错误影响发送方；send 返回接纳回执，接纳与任务完成分别记录。模型 send 仅暴露上述 task.* 权限；语音合成、取消及事实广播由代码固定流程发出。
+
+| 方式 | 契约 | 目标 | 用途 |
+| --- | --- | --- | --- |
+| publish | `interaction.replyActivity` | 订阅者 | 广播回复活动及任务占用事实，供聆听策略判断。 |
+| send | `task.progress` | `assistant` | 报告任务进度或等待用户信息，保持任务开放。 |
+| send | `task.result` | `assistant` | 报告任务最终成功、失败或取消。 |
+| send | `speech.synthesize` | `speechSynthesis` | 提交文本合成请求；原输出 Agent 负责播放。 |
+| send | `speech.cancel` | `speechSynthesis` | 取消对应合成工作。 |
+
+
+
+Purpose: Photography tasks and tracking. Design goal: role-owned decisions with explicit permissions and shared, bounded execution mechanics.
+
+Photographer owns natural-language photography decisions, capture observation/understanding, save/ignore/reshoot, camera controls and photography tracking. It combines its independent Chat worker with existing deterministic camera and tracking policies.
+
+| File | Responsibility |
 | --- | --- |
-| 输入 | 静态订阅 `vision.pose / 1 / observation`，source `visionPerception`，topic `vision.pose`。payload 为 `PoseObservation`。session 必须匹配当前绑定的视觉会话；pose.validate() 校验尺寸、17 关节及有限值后，sequence 严格递增，timestamp 不倒退；过期输入拒绝。这不是图像，也不运行 `PoseCapability`。 |
-| 输出 | `controlsArm == true` 且通过节流时发出 `ToolCall`，路径 `NexArm.Tracking.aim`，参数 `base` / `pitch` 为十进制弧度字符串。完成语义在 Tool：发送函数返回，不进 Channel，不写夹爪，不等关节到位。 |
-| 相机输入/反馈 | photography.camera/1：root user 或已授权 Assistant；只接受固定 operation/requestID。tool.result/1：runtime 来源、pending callID 和原始 session 全部匹配。 |
-| 相机输出 | 内部 Camera.Capture.open/close/flip/retry ToolCall；反馈后发出完成/失败 control，取消需 root host Signal 并确认。完整结果保留为只读 cameraResult。 |
-| publish | 无。 |
-| send | 无。 |
+| PhotographerAgent.swift | Role lifecycle, fixed camera/tracking decisions, independent Chat composition and one output relay. |
+| PhotographerProcessing.swift | State/preprocessing/builder, scoped photo observations and artifact validation. |
+| PhotographerCameraWorkflow.swift | One correlated fixed camera transaction; no native effects. |
+| PhotographerTrackingPolicy.swift | Pose selection, filtering and accepted-target policy; no I/O. |
+| Photographer.agent.json | Seven scheduled Camera Actions, private reply grants and directed task/synthesis communication. |
 
-❌ 构图、跟踪身份、腕部行程补偿和真机运动验收未实现。发出的包只表示蓝牙链路收下了指令。
+A TaskRequest invokes the injected ChatCapability under the Photographer identity. Capture ActionResult returns only here; after the round barrier, the role resolves its actual capture reference into an image observation. The image reader is injected and validates source/session/producing input. Questions report TaskProgress including exact artifactID; Assistant activates one prepared reply, then forwards the later user input to this same task. Capture and disposition use canonical Camera functions directly, without an Assistant native proxy.
 
-✅ App reports rejected tracking Tools independently. Offline/unready robot failures do not terminate vision or skeleton rendering. No failed device call is silently treated as successful.
+Context: private conversation, camera request/tracking scope, task views and photoID -> producing-input references. Capture metadata32 retires terminal-task references only; active-task references are retained. Task model save/ignore requires a capture recorded in that same task, never a generated/foreign UUID. Trusted UI disposition retains explicit user-selected image handling.
 
-✅ Photographer checks an injected read-only controlAvailable capability before emitting NexArm.Tracking.aim. Offline/control-unready poses are consumed without a command; lastAim is reset so reconnection uses a fresh pose. Device effects still cross OutputGateway and resource/connection guards protect a disconnect race.
+Fixed camera commands have one slot; tracking has one attached perception scope and rejects stale/foreign poses. Output capacity defaults256 and can be explicitly bounded for isolated hosts; overflow does not advance an accepted target. Native camera/album/resource safety belongs to App/PlatformKit. No raw JPEG/frame persists in Agent context.
 
-✅ Output overflow rejects only the current unaccepted aim; Photographer remains running and queued accepted calls are retained.
+Upstream: Assistant task Signals and VisionPerception poses. Downstream: camera/reply Actions, the internal tracking Tool and task/synthesis communication; injected ChatCapability/image reader/repository.
 
-✅ Tracking accumulation advances only after output admission; an overflow cannot advance an unsent target. Control-unavailable input resets filters and accumulation; fresh poses resume with bounded steps. Dead-zone hold and axis saturation emit no redundant command. Offline gating and independent failure scopes remain intact.
+## Processing and state
 
-✅ PoseObservation is owned by Agents/Communication; association and robot-selection business policy remain here. Concrete AgentID constants are compiled in the business Agents target.
+Implemented: admitted Signal -> role preprocessing -> atomic structured context -> selected immutable batch -> role/context adapter -> fixed decision or shared one-round Chat worker -> Action output -> directed runtime feedback. Model XML communication and fixed framework communication use the same CommunicationAction transport. Receipt means admission, not task completion. Only explicit TaskProgress/TaskResult update a requester.
 
-✅ Photographer extracts the business PerceptionMessage.pose from generic AgentMessage. Shared pose validation still precedes indexing; no robot behavior changes are made.
+The role owns its context repository and schema; it does not read a parent's private inference history. Chat evidence preserves actual requests, native call/result pairs, usage and failures. Media bytes stay in bounded runtime stores; context keeps authorized references. Legacy business documents without Chat fields migrate once; partial/null/unsupported Chat fields fail. Write failure prevents dependent output. Restart interrupts unfinished work and never replays effects.
 
-## Tracking freshness and takeover — ADR0139
+Model decisions have one worker, FIFO inbox32 plus one reserved continuation, output256, four requests, sixteen native calls, cumulative execution30 seconds and queue expiry60 seconds. Fixed intent admission does not wait for model loading or inference. Task views retain256 identities, at most32 live; terminal retention may retire old identities. Communication has16 pending outputs/four runtime deliveries. All overflow rejects explicitly.
 
-✅ hasFreshPose is a read-only host query. Validated, nonexpired, ordered observations with a usable first-person aim point update ContinuousClock reception time, including centered targets that emit no Tool. Empty/no-visible-target observations do not renew freshness; future sensor timestamps cannot prolong it. Production expires after one second. Pause/stop deny freshness and clear accumulation. Fresh input after a one-second gap resets previous filters/targets before selecting a new step.
+Pause cancels/joins inference and records cancelled decisions; resume admits future work without replay. Stop joins the Chat worker and relay. App owns registration/consumption independently of UI pages and microphone capture. Cancellation/target loss ends the correlated task; partial native effects remain actual facts. Existing platform safety is independent of Agent inference.
 
-✅ Composition binds this query to the App tracking writer. Source silence exits/join-cleans the writer and releases motor use without a new Tool, whole-Agent cancellation or Bluetooth recovery. Camera shutdown independently removes the vision session and closes its resources. Assistant's authorized NexArm executions can preempt Photographer through host-configured ResourceCoordinator policy; Photographer cannot preempt Assistant. Later tracking requires fresh usable input and ordinary control availability.
+## Development standard
 
-```mermaid
-flowchart LR
-    Pose[InputGateway admitted usable pose] --> Time[Agent monotonic freshness]
-    Time --> Query[App query / one-second expiry]
-    Query -->|stale or stopped| Join[Exit writer / end live session / join]
-    Join --> Release[Release motor use / clear old target]
-    Assistant[Authorized Assistant Action] --> Policy[Configured resource takeover]
-    Policy --> Join
-    Release --> Action[Assistant execution or later fresh tracking]
-```
+Use the same source template: Interface; State and dependencies; Registration; Lifecycle; Input processing; Output; Context; Observability. Keep schemas, preprocessing, builders and permissions in the role directory. Register every emitted function and communication contract explicitly; fixed and model calls reuse the canonical Action implementation. Core has no role/model/storage dependencies; Support adapts shared capabilities, not domain effects.
 
-❌ Physical takeover timing/stop acceptance remains pending.
+Automated tests and builds are recorded in [validation](../../../docs/Validation-History.md). Real model, native UI, acoustic and physical-device acceptance remain outstanding. See [ADR0188](../../../docs/adr/0188-specialist-task-ownership.md).
 
-✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+✅ Implemented: business admission failures on validated external Signals emit correlated agent.error through the normal output stream before rejection. Authentication failures do not emit effects. This is an independent error observation, not a publication receipt; waiting UI operations consume it without waiting for the result watchdog.
 
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
+✅ Production Chat processing publishes revisioned interaction.replyActivity occupancy through the output stream. This reports only interactive reply work, not deterministic/background busy, and grants no listening Action or microphone ownership. SpeechPerception consumes the full bounded snapshot.
 
-❌ Physical acceptance and additional business capability exposure are not established by this migration.
 
-## Internal service structure
 
-✅ PhotographerAgent.swift retains input/session/lifecycle/freshness checks, injected control availability and bounded output. PhotographerTrackingPolicy.swift owns first-person aim selection, dead zone, smoothing, rate/axis limits and commanded-target state. Proposal and admission commit remain separate so output overflow cannot advance the commanded target. Pause/stop, stale pose and unavailable control reset the same tracking state as before. No still-capture or recording implementation is added; existing preview camera controls are now selected by the camera workflow.
+✅ Fixed state/context admission uses AgentAdmissionGate with32 FIFO waiters. Concurrent actor entry waits for the current short transaction; only an actually full waiting queue rejects capacityExceeded. Cancellation removes waiting admission; stop closes it. Model inference and device work never hold this gate, and existing business-call limits remain unchanged.
 
-```mermaid
-flowchart TB
-    Config[Photographer.agent.json] --> Actor[PhotographerAgent]
-    Input[Validated pose Signal] --> Actor
-    Actor --> Freshness[Monotonic freshness and sequence]
-    Actor --> Policy[PhotographerTrackingPolicy]
-    Policy --> Proposal[Bounded aim proposal]
-    Proposal --> Output[Actor output admission]
-    Output --> Commit[Commit commanded target only after admission]
-    Output --> Gateway[OutputGateway NexArm tracking function]
-```
 
-Future capture, recording and shoot-time interaction policy belongs in focused components of this role. Perception remains upstream; device execution and resource scheduling stay outside the Agent.
+✅ Robot Action ownership correction: Robot Channel/model NexArm motion registrations are removed. Retain camera/capture/save/ignore and the code-owned internal NexArm.Tracking.aim used only by deterministic photographic tracking. No model gesture/motor-move permissions remain.
 
-✅ Xcode displays the actor, configuration, README and co-located business components under their owning role; Memory title computation appears under Memory rather than Assistant. SwiftPM remains the compilation/resource owner.
+✅ Device regression fix: Photographer prompts require one capture after successful preparation, no unrequested/repeated lens switches, and explicit task.progress with exact photo/task identity for save/ignore questions. A question must not be reported as completed. Photo observations include a concrete authorized progress example; no automatic intent guessing or global photo ownership is introduced.
 
-## Extension boundaries
+✅ Camera model exposure: Photographer declares openCamera/closeCamera/flipCamera/retryCamera alongside takePhoto/savePhoto/ignorePhoto as scheduled Camera Actions; no camera native Tool is exposed to the model. Host binds the canonical camera functions to both protocols only for explicit fixed UI transaction reuse. Model camera Actions keep observed owner-directed results and same-Channel ordering/wait groups.
 
-- Add capture, recording, movement and shoot-time interaction as focused business components in this role, preserving one clear owner for each state machine. These components are currently unimplemented.
-- Consume typed perception/user Signals through InputGateway; emit registered camera, device and presentation calls through OutputGateway. Shared functions do not move photographic decisions into the application-control role.
-- Keep inference, target selection, runtime resource arbitration and native motion execution distinct. New asynchronous work requires explicit owner, bounds, cancellation and completion; native safety remains independent of page/Agent lifetime.
-- Retain complete execution failures and correlate feedback to the owning shoot/request. A failed device call must not terminate unrelated perception or the shared runtime.
+✅ Frontend/backend separation: Photographer subscribes directly to user/runtime photography.camera data commands. Fixed UI camera operations create no Assistant tasks; conversational photography still uses task scopes, observed camera Actions and same-task follow-up.
 
-## Camera control service — ADR0181
 
-✅ PhotographerCameraWorkflow selects existing Camera.Capture.open/close/flip/retry and tracks one correlated pending call/result. PhotographerCameraIntent contains a finite operation, explicit front/back facing for flip, and opaque request UUID; cancellation is a trusted root host command. External user commands require the root session; Agent commands require trusted Assistant provenance. Results require runtime provenance, exact call ID and original session. Last feedback retains the complete bounded ToolResult. Output overflow rejects only the current command and rolls back its pending slot.
+✅ Camera perception/context change (2026-10-10): PhotographerProcessing adds CameraStateObservation storage, revision/source/session validation and a pure model-context projection of camera facts and current photography phase. PhotographerAgent consumes passive state while running/paused without Chat admission or output. Recovered snapshots are cleared; older revisions within the root session reject without mutation. Task phase projects existing work, task views and task-owned capture references (preparing, awaitingFeedback, reviewingPhoto, waitingUser, cancelling and terminal states), rather than maintaining duplicate task state. Model context is rebuilt before every provider request; unknown camera state remains explicit.
 
-The actor outlives capture. Bind/unbind exactly one vision UUID; reset ordering/freshness/tracking state between sessions and reject retired poses. Root camera work and attached pose work remain distinct scopes. Root registration is unscoped in AgentManager but actor admission is explicit. Stop clears both domains and closes outputs.
+Camera observations retain one latest snapshot (2048-byte contract,512-byte native failure text), not per-sample history. State observation is accepted while paused; it does not queue model work. App samples foreground changes every100ms, so the model sees latest admitted facts, not a synchronous native readiness guarantee. Missing/recovered state is unknown, and Actions retain native validation. UDP-like publication loss is not acknowledged or retried because of receiver rejection; subsequent changed snapshots may update state. ❌ Native UI/capture/save/cancellation and live-model acceptance remain pending.
 
-```mermaid
-sequenceDiagram
-    participant Human
-    participant Assistant
-    participant Gateway
-    participant Photographer
-    participant Functions as Camera functions
-    participant Native as Native camera owner
-    Human->>Gateway: user photography.camera Signal
-    Assistant->>Gateway: registered camera call
-    Gateway->>Gateway: bound invocation delegates Agent Signal
-    Gateway->>Photographer: admitted camera intent
-    Photographer->>Gateway: canonical Camera.Capture call
-    Gateway->>Functions: invoke shared function
-    Functions->>Native: capture operation
-    Native-->>Gateway: joined success or complete failure
-    Gateway->>Photographer: correlated ToolResult
-    Photographer-->>Gateway: terminal acknowledgment
-    Gateway-->>Human: completion or failure
-    Gateway-->>Assistant: original native Tool outcome
-```
 
-No new recording/still-capture implementation or physical tracking algorithm is introduced.
-
-✅ Interaction refinement: PhotographerCameraWorkflow validates target-facing intent and pass facing into the flip Tool arguments under the existing one-request correlation/lifetime.
-
-## Photo save and ignore — ADR0185
-
-✅ PhotographerCameraWorkflow selects six camera/disposition functions. Save/ignore preserve optional photoID and one exact request/result correlation; PhotographerIntentRuntime returns native receipt data. Root UI and trusted Assistant inputs share this policy; no Photos, UIImage or storage access exists in the Agent.
+✅ Send Action-only audit (2026-10-10): remove automatic Agent.send native Tool declarations and the per-role exposesNativeCommunicationTools switch. Every role keeps authorized send Action declarations, target/kind/parameter documentation and receipt/task ownership contracts. Existing business Tools and historical native call/result evidence remain unchanged. Reject an explicit communication Tool registration instead of silently exposing it. Regression tests check all seven effective model catalogs and task request/progress/input/result flows using Action-call send, including roles with business Tools.

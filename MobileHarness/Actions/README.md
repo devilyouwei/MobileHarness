@@ -131,3 +131,7 @@ See [Contracts](Contracts/README.md), [Agent-driven architecture](../README.md) 
 ✅ Implemented: Camera.Capture.takePhoto returns validated JSON photo metadata after capture/save/presentation through the injected host. Calling protocol remains separate.
 
 ❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.
+
+
+
+✅ Speech.Listening.update is an internal SpeechPerception function with injected native execution; Chat Agents report reply facts and have no listening grant. See [overall architecture](../README.md).

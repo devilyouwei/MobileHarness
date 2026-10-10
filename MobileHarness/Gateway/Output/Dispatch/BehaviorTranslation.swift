@@ -16,7 +16,8 @@ extension OutputEnvelope {
     public var executionContext: ActionExecutionContext {
         .init(
             source: source.rawValue, sessionID: sessionID, inputID: inputID, sequence: sequence,
-            correlationID: turn?.id, ordinal: turn?.ordinal)
+            correlationID: turn?.id, ordinal: turn?.ordinal, decisionID: roundID, taskID: taskScope?.id,
+            taskExecutor: taskScope?.executor.rawValue)
     }
 
 }

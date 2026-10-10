@@ -31,7 +31,7 @@ struct MobileHarnessApp: App {
                             camera: camera.state, controls: assembly.cameraControls,
                             openSettings: {
                                 container?.lifecycle.stopVoice()
-                                Task { await assembly.navigate(.settings) }
+                                assembly.navigate(.settings)
                             }
                         ) {
                             CameraPreviewAdapter(
@@ -76,12 +76,13 @@ struct MobileHarnessApp: App {
                     assembly.bluetooth.setForeground(phase != .background)
                     assembly.setResourceObservationForeground(phase == .active)
                     assembly.reportEnvironment(.scene, value: String(describing: phase))
+                    if phase == .background || phase == .active { assembly.setAgentForeground(phase == .active) }
                     if phase == .background { container?.lifecycle.stopVoice(message: "已进入后台，轻触重新开始") }
                     if phase != .active { container?.audioDetection.stop() }
                 }
             }
             .task(id: container.map { ObjectIdentifier($0) }) {
-                if let container, !isDiagnostic { await container.lifecycle.run() }
+                if let container, !isDiagnostic { container.startInteraction() }
             }
             .task(id: startupAttempt) {
                 if !isVisualPreview { await prepare() }
@@ -92,7 +93,7 @@ struct MobileHarnessApp: App {
     @ViewBuilder private func destinationView(_ destination: AppDestination) -> some View {
         switch destination {
         case .settings:
-            SettingsView(bluetooth: assembly.bluetooth.state) { page in Task { await assembly.navigate(page) } }
+            SettingsView(bluetooth: assembly.bluetooth.state) { page in assembly.navigate(page) }
         case .language:
             LanguageModelSettingsView(
                 settings: assembly.settings, settingsControls: assembly.settingsControls,
@@ -193,7 +194,15 @@ struct MobileHarnessApp: App {
         } else {
             ConversationView(
                 state: container.conversation, activity: container.actionActivity,
-                toggleVoice: container.lifecycle.toggleVoice)
+                toggleVoice: container.lifecycle.toggleVoice,
+                taskHistory: { agentID, inputIDs in
+                    guard let destination = assembly.history.agents.first(where: { $0.id == agentID }) else {
+                        return nil
+                    }
+                    return AnyView(
+                        TaskConversationHistoryView(
+                            state: destination.state, controls: destination.controls, inputIDs: inputIDs))
+                })
         }
     }
 

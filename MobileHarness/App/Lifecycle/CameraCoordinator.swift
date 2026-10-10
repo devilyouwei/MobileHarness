@@ -180,7 +180,11 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
             }
         }
         photoTask = task
-        defer { photoTask = nil }
+        state.photoBusy = true
+        defer {
+            photoTask = nil
+            state.photoBusy = false
+        }
         return try await withTaskCancellationHandler {
             let result = try await task.value
             try Task.checkCancellation()

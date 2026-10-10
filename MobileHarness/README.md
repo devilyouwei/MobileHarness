@@ -1,7 +1,6 @@
 # MobileHarness Technical Design
 
 MobileHarness is an Apple-native multimodal Agent system inspired by biology. **Every input is a Signal, and every output is an Action.** Multiple Agents work together to understand Signals and decide what to do next. Gateway carries Signals and coordinates authorized Action execution. Action results return through InputGateway as new Signals, closing the loop so Agents can keep reasoning and acting.
-
 ![Signal, Cognition and Action form a counterclockwise triangular feedback loop.](agent-loop.svg)
 
 This technical document has three parts:
@@ -131,7 +130,7 @@ Agents choose business policy; Actions implements the callable operations select
 | Capture admission, immediate stop, permission enforcement and cleanup | App lifetime owner → scoped native/runtime capability | Immediate host mechanisms must not await inference; business-relevant facts use declared Signals in live scopes. |
 | Scrolling, focus and unsubmitted drafts | UI-local presentation | No business Signal until a submitted operation or declared business gesture. |
 
-The target does not permit Agents to import UI or mutate its state. App supplies presentation endpoints to Actions. Existing direct settings/device workflows are declared implementation gaps rather than additional target business routes.
+The target does not permit Agents to import UI or mutate its state. App supplies presentation endpoints to Actions. Local frontend interactions and immediate native lifecycle cleanup are intentional host/UI routes; backend data requests subscribe directly at the owning Agent.
 
 ### Compilation dependencies
 
@@ -286,8 +285,8 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, FunctionContracts |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
 | `UI/` | UI | None |
-| `Agents/Core/` | AgentCore | None |
-| `Agents/` excluding `Core/` | Agents | AgentCore, ModelKit, PlatformKit, StorageChat, StorageAudio |
+| `Agents/Support/Core/` | AgentCore | None |
+| `Agents/` excluding `Support/Core/` | Agents | AgentCore, ModelKit, PlatformKit, Storage, StorageChat, StorageAudio |
 | `Gateway/` excluding Runtime/Registration/Protocols | Gateway | AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime |
 | `Actions/Contracts/` | FunctionContracts | None |
 | `Gateway/Runtime/` | ExecutionRuntime | FunctionContracts |
@@ -336,7 +335,7 @@ This section is an architectural directory. It describes why each module exists 
 | [App](App/README.md) | Assemble concrete capabilities and coordinate application, voice and camera lifetime. | Adapts modules and owns workflows; does not absorb Agent, Action or device business rules. | The organism coordinating its organs. |
 | [UI](UI/README.md) | Render conversation, camera, settings and diagnostics; convert gestures into typed operations. | MainActor presentation only; pages do not own long-lived model/device sessions. | Face and interaction surface. |
 | [Agents](Agents/README.md) | Interpret observations, use processing/storage capabilities and select permitted outputs. | Cognitive state and policy; executable effects always cross OutputGateway. | Specialized brain regions. |
-| [AgentCore](Agents/Core/README.md) | Define Agent identity, input/output, capability, communication and lifecycle contracts. | Stable independent vocabulary; no concrete cognition or host services. | Organization of the nervous system. |
+| [AgentCore](Agents/Support/Core/README.md) | Define Agent identity, input/output, capability, communication and lifecycle contracts. | Stable independent vocabulary; no concrete cognition or host services. | Organization of the nervous system. |
 | [Gateway](Gateway/README.md) | Validate input/output, route messages, schedule Actions and coordinate results/resources. | Coordination only; no inference or domain behavior implementation. | Neural pathways and motor coordination. |
 | [Actions](Actions/README.md) | Implement callable UI, speech, camera, history, system and NexArm behavior. | Owns business parameters and completion policy; knows no calling protocol and consumes foundational/injected capabilities. | Learned behavior. |
 | [FunctionContracts](Actions/Contracts/README.md) | Define standard function inputs, outputs and constraints. | No runtime, Channel or calling protocol dependency. | Shared function contracts. |
@@ -351,7 +350,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **App.** [Composition](App/Composition/README.md) builds the graph and validates registrations. [Lifecycle](App/Lifecycle/README.md) owns long-running voice/camera work and cleanup. [Workflows](App/Workflows/README.md) is a state-free facade over independent Settings, History, Bluetooth, Speech, Presentation and Diagnostics targets. [Adapters](App/Adapters/README.md) translate module contracts to host capabilities.
 
-**Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation and response policy; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs; Photographer owns camera control and tracking policy; Memory owns deterministic history intent and result-driven deletion. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
+**Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation, response policy and model-callable mechanical-arm Actions; SpeechPerception owns VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs; Photographer owns photography reasoning, camera/disposition and tracking policy; Memory owns history reasoning and confirmed deterministic transactions. Assistant delegates specialist work; each interactive role retains independent context. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
 
 **Behavior.** Actions owns protocol-neutral callable functions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
@@ -401,7 +400,7 @@ Origin and payload meaning are independent dimensions. All origins share the `Ag
 | Origin | Examples | Authority |
 | --- | --- | --- |
 | External | Human interaction, native capture/device facts, OS lifecycle and permission changes, future remote inputs | App adapters bind source identity and adapt validated native inputs. |
-| Internal / Agent | Published observations, directed commands and declared domain replies | Identity-bound AgentMessaging binds a live Agent source through both Gateways. |
+| Internal / Agent | Published observations, directed commands and declared domain replies | CommunicationAction travels through an output consumer bound to the actual Agent actor/incarnation and both Gateways. |
 | Internal / Runtime | Actual execution feedback; future common progress/cancellation and declared runtime timer contracts | The owning execution/runtime producer binds operation identity and feedback authority. |
 
 “External” means outside the Agent system, even when UI or a native SDK runs in the same process. A hardware notification is an external fact; the executor's correlated interpretation of an operation outcome is internal feedback. Both can exist, with distinct contracts and deduplication rules. Model inference returns stay local unless explicitly communicated.
@@ -434,7 +433,7 @@ The existing name `observation` is a generic domain-message carrier and currentl
 
 #### Implemented payload types and origins
 
-Origin and content are separate classifications, not an inheritance tree. `AgentInput` composes `InputMetadata` and `InputPayload`; `InputMetadata.origin` is `SignalOrigin.external`, `.agent` or `.runtime`. The current working implementation defines nine payload cases in [AgentInput.swift](Agents/Core/AgentInput.swift).
+Origin and content are separate classifications, not an inheritance tree. `AgentInput` composes `InputMetadata` and `InputPayload`; `InputMetadata.origin` is `SignalOrigin.external`, `.agent` or `.runtime`. The current working implementation defines nine payload cases in [AgentInput.swift](Agents/Support/Core/AgentInput.swift).
 
 | Payload | Meaning / contract | Current origin |
 | --- | --- | --- |
@@ -487,7 +486,7 @@ Communication covers external input, Agent publications and directed messages, r
 flowchart TD
     Config[Agent JSON v6] --> Policy[Immutable communication policy]
     External[App: user / microphone / camera / runtime] --> Input[InputGateway]
-    Sender[AgentMessaging bound to sender identity] --> Output[OutputGateway]
+    Sender[CommunicationAction from bound output producer] --> Output[OutputGateway]
     Output -->|Validated internal event| Input
     Tool[Returning ToolResult] --> Input
     Runtime[ActionResult / ActivityEvent] --> Input
@@ -497,7 +496,7 @@ flowchart TD
 
 JSON declares supported inputs, exact subscriptions, publications and directed sends. Supporting a contract does not create a subscription. Broadcast target selection uses subscriptions; directed delivery still validates source, target, contract and session. There are no dynamic listeners, wildcards or implicit fallback recipients.
 
-Gateways perform bounded structured admission and metadata validation; their cross-actor calls are asynchronous and await per-target admission. Agent inboxes own pending work. Gateway has no independent message bus, persistent worker or delivery FIFO. A delivery receipt means the target accepted the input, not that inference or an effect completed. Discrete messages and device Actions are never silently replaced; only explicitly declared latest-state paths may coalesce.
+Gateways validate metadata and bound transport. publish submits one-way fan-out and never waits for per-target acknowledgment; no subscribers or overflow may lose the Signal, with failures reported independently. Gateway owns and joins bounded publication tasks but has no independent bus, retry or delivery FIFO. Internal send returns an admission receipt, separate from task/effect completion. Agents own business ordering/fusion/replacement and errors; device Action failures remain explicit.
 
 #### Current signal routes
 
@@ -509,15 +508,15 @@ Gateways perform bounded structured admission and metadata validation; their cro
 | `speechPerception` | Agent | `speech.final`, `speech.phase` | Assistant subscription |
 | `speechPerception` | Agent | `speech.partial`, `speech.final`, `speech.phase` | Runtime observer for admission/lifecycle coordination, without business UI mutation |
 | `visionPerception` | Agent | `vision.pose` | Declared business subscribers; independent native presentation calls carry gaze/skeleton updates |
-| `user` / trusted host `runtime` | External | `history.intent/1` | Memory: typed refresh/delete/cancel |
+| `user` / trusted host `runtime` | External | `history.intent/1` | User subscribes at Assistant then delegates to Memory; runtime cancel subscribes at Memory |
 | `speechPerception` | Agent | `sound.source/1` | Declared Agent subscribers or registered runtime observers; source facts are Agent-generated |
 | `assistant` | Agent | `speech.synthesize/1`, `speech.cancel/1` | SpeechSynthesis directed input |
-| `user` / trusted host `runtime` | External | `model.resource.intent/1` | ApplicationControl resource operations/preferences; host retirement remains External |
+| `user` / trusted host `runtime` | External | `model.resource.intent/1` | User subscribes at Assistant then delegates to ApplicationControl; host retirement subscribes at ApplicationControl |
 | `model.resources` | External | `model.resource.state/1` | ApplicationControl sampled native resource invalidations |
 | `app.resources` | External | `model.resource.hostFailure/1` | ApplicationControl host admission/dispatch failure facts |
-| `user` | External | `provider.discovery/1`, `provider.settings/1`, `app.interaction/1` | ApplicationControl provider/device/navigation intents |
+| `user` | External | `provider.discovery/1`, `provider.settings/1`, `app.interaction/1` | Assistant subscription, then delegated ApplicationControl task |
 | `app.environment` | External | `app.environment/1` | ApplicationControl sequenced scene/device/navigation/capability facts |
-| `user` / trusted host `runtime` | External | `photography.camera/1` | Photographer user intent or host cancellation |
+| `user` / trusted host `runtime` | External | `photography.camera/1` | User subscribes at Assistant then delegates to Photographer; host cancellation subscribes at Photographer |
 | `assistant` | Agent | `photography.camera/1` | Photographer directed camera request |
 | `runtime` | External host command | `assistant.control/1` (`cancelSession`) | Selected Assistant/session; typed host control |
 | `runtime` | Runtime feedback | `tool.result`, `action.result`, `generation.round.result` | Captured execution owner through dedicated feedback admission |
@@ -525,13 +524,13 @@ Gateways perform bounded structured admission and metadata validation; their cro
 
 The literal source name `runtime` does not establish Runtime origin or feedback authority. Public host admission and dedicated execution-feedback admission enforce different permissions.
 
-Assistant sends directed `speech.synthesize` and `speech.cancel` messages to SpeechSynthesis. A publication with no Agent recipient fails unless a registered runtime observer accepts that contract. Agent messaging, Tool return and runtime Action feedback all re-enter through validated InputGateway paths, while retaining their distinct permissions and completion semantics.
+Assistant sends directed `speech.synthesize` and `speech.cancel` messages to SpeechSynthesis. A publication without Agent recipients is ordinary loss and never creates a receipt. Agent messaging, Tool return and runtime Action feedback all re-enter through validated InputGateway paths, while retaining their distinct permissions and completion semantics.
 
 ### Communication and execution contract ownership
 
-Domain ownership: Agents/Communication owns PoseObservation, SpeechPhase, SpeechSynthesisInput and MemoryHistoryIntent, Agents owns built-in identity constants, and Assistant owns automatic speech prompt policy. AgentCore has zero project dependencies; scheduler source identity is explicit. The communication contract provides generic message/schema registration. The business catalog owns domain expiry; App owns device-source/media expiry; VisionPerception owns sampling.
+Domain ownership: Agents/Support/Communication owns PoseObservation, SpeechPhase, SpeechSynthesisInput and MemoryHistoryIntent, Agents owns built-in identity constants, and Assistant owns automatic speech prompt policy. AgentCore has zero project dependencies; scheduler source identity is explicit. The communication contract provides generic message/schema registration. The business catalog owns domain expiry; App owns device-source/media expiry; VisionPerception owns sampling.
 
-Core communication has one generic typed-message container and one immutable schema registry. Application schemas/identities are grouped in Agents/Communication/AgentContracts.swift, Agent-domain speech/pose values in Agents/Communication and image inputs in Agents/Core/Input/ImageInput.swift and presentation values in UI/Camera/PoseOverlay.swift, and native source/deadline conversion in App/Adapters/MediaInputAdapter.swift. AgentTurn is a generic interaction identity.
+Core communication has one generic typed-message container and one immutable schema registry. Application schemas/identities are grouped in Agents/Support/Communication/AgentContracts.swift, Agent-domain speech/pose values in Agents/Support/Communication and image inputs in Agents/Support/Core/Input/ImageInput.swift and presentation values in UI/Camera/PoseOverlay.swift, and native source/deadline conversion in App/Adapters/MediaInputAdapter.swift. AgentTurn is a generic interaction identity.
 
 Neutral contract boundary: concrete resource names belong to App; reports carry bounded producer-owned details/error identifiers; text soft limits belong to the consuming Agent.
 
@@ -541,7 +540,7 @@ FunctionContracts owns generic function resource identifiers and bounded report/
 
 #### Routing and authorization
 
-External Signals enter through App → InputGateway. Agent messages use AgentMessaging → OutputGateway → InputGateway. Agent-driven business effects, including UI changes, use Agent → OutputGateway → registered Action/Tool → capability endpoint; actual returning feedback enters InputGateway again.
+External Signals enter through App → InputGateway. Agent messages use outputs CommunicationAction → bound consumer → OutputGateway → InputGateway. Agent-driven business effects, including UI changes, use Agent → OutputGateway → registered Action/Tool → capability endpoint; actual returning feedback enters InputGateway again.
 
 Each Agent declares model-callable Actions/Tools and communication permissions in JSON v6. Fixed internal behavior and output permissions belong to Agent code. App binds concrete handlers; Gateway validates coverage and authorization. Runtime control notices describe protocol completion/failure, not unregistered business effects.
 
@@ -871,7 +870,7 @@ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Enc
 
 Photographer consumes validated `vision.pose` through InputGateway and emits internal `NexArm.Tracking.aim` through OutputGateway. Its JSON v6 contains the subscription and empty model-callable catalogs; fixed internal permission and target-selection policy stay in Agent code. The output buffer holds eight calls and fails explicitly on overflow.
 
-NexArmActions validates intent arguments; Gateway authorizes source/session and Tool permission. The App worker holds motors1–4 through ResourceCoordinator, with monotonic usable-pose freshness from Photographer; one second without fresh input joins/releases the writer. App groups all six motors under nexarm.writer and explicitly allows Assistant to preempt Photographer after joined cleanup, including disjoint motor5/6 actions. Queued same-owner Actions survive the takeover gate; no scheduler/session cancellation or radio recovery occurs. VisionSession camera closure removes its owned work; old targets never replay. Actions owns mapping/motion, PlatformKit native encoding; return is target admission, not physical arrival.
+NexArmActions validates intent arguments; Gateway authorizes source/session and Tool permission. The App worker holds motors1–4 through ResourceCoordinator, with monotonic usable-pose freshness from Photographer; one second without fresh input joins/releases the writer. App groups all six motors under nexarm.writer and explicitly allows Assistant interaction Actions and fixed ApplicationControl operations to preempt Photographer after joined cleanup, including disjoint motor5/6 actions. Queued same-owner Actions survive the takeover gate; no scheduler/session cancellation or radio recovery occurs. VisionSession camera closure removes its owned work; old targets never replay. Actions owns mapping/motion, PlatformKit native encoding; return is target admission, not physical arrival.
 
 Vision and Photographer outputs have independent failure scopes: offline tracking is reported without stopping pose/skeleton effects. BLE connected state is distinct from verified control availability. Read-only query timeouts keep the link connected and quarantine further exchanges until App reconnects the link. Final App resource validation requires all seven Agent JSON files.
 
@@ -1050,7 +1049,7 @@ SwiftUI state is MainActor-isolated. Runtime services, Agents, stores, managers 
 
 Every queue or active-call pool has an explicit capacity and overflow rule in its owning module README. Cancellation is cooperative and propagates through structured tasks. Unowned detached work, guessed success, silent device-action loss and unbounded retries are outside the architecture. Cancellation-independent cleanup may use an explicitly owned task, as in HistoryIntentRuntime, only with bounded retained work and a joined cleanup boundary before admission/resources are released.
 
-Actions/Camera follows the domain root + Support layout and binds Camera.Capture.open/close/flip through a required CameraControlCapability. App validates the active Assistant session and retains single-owner permission/foreground/capture-lease policy; completion confirms capture reconciliation or close cleanup, not pose readiness. Camera control completion is independent of native model Tool event transport.
+Actions/Camera follows the domain root + Support layout and binds Camera.Capture.open/close/flip through a required CameraControlCapability. App validates the real Photographer and active root/task scope and retains single-owner permission/foreground/capture-lease policy; completion confirms capture reconciliation or close cleanup, not pose readiness. Camera control completion is independent of native model Tool event transport.
 
 ### Cloud native Tool generation
 
@@ -1127,7 +1126,7 @@ flowchart TB
     App -->|Text intent Signal| Input
     Input -->|Captured media| Perception[Perception Agent]
     Perception <-->|Recognition / perception capability| Model[ModelKit]
-    Perception -->|Typed observation via AgentMessaging| Output[OutputGateway]
+    Perception -->|Typed observation via CommunicationAction| Output[OutputGateway]
     Output -->|Validated transcript / observation Signal| Input
     Input -->|Intent / recognized content / feedback| Business[Business Agent]
     Business <-->|Context and decision computation| Model
@@ -1157,12 +1156,12 @@ sequenceDiagram
     participant B as Consumer Agent
     participant Effects as Actions / Tools
     participant UI
-    A->>Output: AgentMessaging.send / publish + causal parent
+    A->>Output: CommunicationAction send / publish + causal parent
     Output->>Output: Validate source, schema and communication permission
     Output->>Input: Signal with bound source and causal metadata
     Input->>B: Validate target/session and admit
     Input-->>Output: Per-target admission report
-    Output-->>A: DeliveryReport, not processing completion
+    Output-->>A: Correlated receipt Signal, not processing completion
     B->>B: Process typed content
     opt Explicit domain reply is declared
         B->>Output: Send typed result message to A
@@ -1268,7 +1267,7 @@ System permission prompts still require user interaction. Presenting a picker do
 | Foundational independence | ✅ UI, ModelKit, PlatformKit and Storage have no project dependencies | None |
 | Transport evolution | ✅ Process-local admission and bounded domain content | ❌ Remote authentication/codecs, version migration, durable replay and dynamic subscriptions |
 
-Current Gateway limits include 128 active admissions, 16 recipients per operation, 256 active branches, 8 MiB observation reservations and at most 8 causal hops. Agent inbox/output limits are role-specific. See [InputGateway](Gateway/Input/README.md) and [communication policy](Agents/Core/Communication/README.md). AgentMessage encoding is not serialization of the whole Signal envelope.
+Current Gateway limits include 128 active admissions, 16 recipients per operation, 256 active branches, 8 MiB observation reservations and at most 8 causal hops. Agent inbox/output limits are role-specific. See [InputGateway](Gateway/Input/README.md) and [communication policy](Agents/Support/Core/Communication/README.md). AgentMessage encoding is not serialization of the whole Signal envelope.
 
 ✅ Typed Assistant host control: the Assistant host cancellation string is replaced with typed `assistant.control/1` (`cancelSession`). App sends an external, host-bound Signal through InputGateway; Assistant validates domain content and host provenance before bypassing its inbox and joining only the selected session worker. Assistant runtime.event permission is removed; arbitrary event strings are not business input. No queue, LLM call, effect rollback or cleanup-order change is introduced.
 
@@ -1476,9 +1475,9 @@ sequenceDiagram
 
 ## Bounded registered-observation continuation
 
-✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and thirty seconds cumulative execution with sixty seconds per queue wait; each worker owns one decision round. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
 
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Photographer scheduled camera Actions use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
 
 
 ## Read-only model grants and shared capability facts
@@ -1502,7 +1501,7 @@ sequenceDiagram
 
 ## Camera command entry
 
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
 
 ## Manual worker terminal feedback
@@ -1550,7 +1549,7 @@ sequenceDiagram
     Output->>Input: Actual execution feedback
     Input->>Assistant: Owner-fenced result
     Assistant->>Model: Bounded native result continuation
-    Note over Assistant,Model: Four rounds, sixteen native calls, one joined deadline
+    Note over Assistant,Model: Four requests, sixteen native calls, cumulative execution budget
     Native->>App: Later manual worker failure
     App->>Input: Independent trusted ActionResult
     Input->>Root: Retain result without replay
@@ -1576,27 +1575,27 @@ Registration policy selects observation independently of Action/Tool protocol; b
 
 ### ApplicationControl business service — ADR0182
 
-✅ Remaining application-operation domains are grouped in `Agents/ApplicationControl/`: model resources, Provider configuration, device/manual controls, navigation and environment facts. `ApplicationControlFunctions` owns fixed permissions; `ApplicationControlResourcePolicy` owns pure bounded decoding/classification; one actor retains shared transaction exclusion and correlated task state. `ApplicationControlIntentRuntime` is App-owned transport. Photographer and Memory retain their domains. Existing Signal schemas, Actions algorithms, queue bounds and native safety are preserved; terminal controls use application.control.finished/failed. ❌ Generic Assistant delegation to this role remains unimplemented.
+✅ Remaining application-operation domains are grouped in `Agents/ApplicationControl/`: model resources, Provider configuration, device/manual controls, navigation and environment facts. `ApplicationControlProcessing` owns fixed permissions and pure bounded decoding/classification; one actor retains shared transaction exclusion and correlated task state. `ApplicationControlIntentRuntime` is App-owned transport. Photographer and Memory retain their domains. Existing Signal schemas, Actions algorithms, queue bounds and native safety are preserved; terminal controls use application.control.finished/failed. ✅ Assistant delegates typed and natural tasks to this role through communication Actions.
 
 ✅ Interaction refinement: Camera.Capture.flip requires facing=front/back through Assistant → Photographer → native coordinator; user/assistant captions remain distinct within one turn. Existing ownership and Gateway flows are preserved.
 
 ## Action/Tool generation rounds — ADR0183
 
-✅ Implemented: text/XML resolves to ActionCall; Assistant maps natural text to Speech playback and Display caption Actions. Only Actions enter Channel/wait. Native ToolCalls execute directly, with at most four concurrent calls and sixteen total per Assistant input. Registration declares recordOnly/observation independently of return values. Separate ActionResult/ToolResult feedback is correlated by call and round, merged in emission order after all calls settle, and only observation enables another model request. Four requests,120 generated calls,64 KiB feedback/transcript and a30-second joined input deadline bound the loop.
+✅ Implemented: text/XML resolves to ActionCall; Assistant maps natural text to Speech playback and Display caption Actions. Only Actions enter Channel/wait. Native ToolCalls execute directly, with at most four concurrent calls and sixteen total per Assistant input. Registration declares recordOnly/observation independently of return values. Separate ActionResult/ToolResult feedback is correlated by call and round, merged in emission order after all calls settle, and only observation enables another model request. Four requests,120 generated calls,64 KiB feedback/transcript and thirty-second cumulative execution budget plus sixty-second queue waits bound the task.
 
-✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+✅ AgentCore owns neutral policies/envelopes; the owning role selects continuation policy through the shared Chat worker; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; Action-call task delegation and specialist loops are implemented. See [ADR0183](../docs/adr/0183-generation-round-observations.md).
 
 ## Assistant photo observation — ADR0184
 
-✅ Implemented: Assistant owns the initial takePhoto observation loop directly; no Photographer delegation. Camera Action captures a JPEG, retains a bounded local photo and completes screenshot-style presentation. Correlated ActionResult contains photoID only; Assistant resolves that owned ID into a bounded multimodal next-round request. UI, PlatformKit, ModelKit and Storage remain independent.
+✅ Implemented: Photographer owns the takePhoto observation loop and its private multimodal context; Assistant delegates with a task Signal. Camera Action captures a JPEG, retains a bounded local photo and completes screenshot-style presentation. Correlated ActionResult contains photoID only; Photographer resolves its owned ID into a bounded multimodal next-round request. UI, PlatformKit, ModelKit and Storage remain independent.
 
 ❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
 
 ## Photo save and ignore — ADR0185
 
-✅ Photo disposition is Agent-driven: UI → typed Photographer intent → Gateways → Camera.Capture.savePhoto/ignorePhoto → native host; conversation → Assistant observation Action → authorized Photographer delegation → the same functions. App retains the exact displayed photo and private-storage owner; PlatformKit performs add-only system Photos import. Ignore hides display without exporting/deleting album data or cancelling ongoing understanding. See [ADR0185](../docs/adr/0185-photo-save-and-ignore.md).
+✅ Photo disposition is Agent-driven: UI → typed Photographer intent → Gateways → Camera.Capture.savePhoto/ignorePhoto → native host; conversation → Assistant task Signal → Photographer observation/disposition Action → the same functions. App retains the exact displayed photo and private-storage owner; PlatformKit performs add-only system Photos import. Ignore hides display without exporting/deleting album data or cancelling ongoing understanding. See [ADR0185](../docs/adr/0185-photo-save-and-ignore.md).
 
 
 ## Independent protocol consumers — 2026-10-08
@@ -1622,3 +1621,88 @@ Registration policy selects observation independently of Action/Tool protocol; b
 ✅ Implemented: App shares the existing CapturedPhotoStore between camera capture and read-only history. Assistant request JSON retains optional structured imageReferences (ID/MIME/byte count, no bytes). App history validates references against the displayed archive, reads the matching producing-input photo, and supplies bounded bytes through UI controls; UI renders thumbnails and a tap-to-open full-screen preview. Existing legacy metadata lines remain readable.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+跨模块流：外部 Signal → Gateway 接纳 → Agent 自有预处理/Context/Builder → 确定性处理或 ModelKit 能力 → 函数/通信 Action → Gateway 执行 → 定向结果 Signal。Storage、ModelKit、PlatformKit、UI 继续只提供基础能力；App 装配持久化适配、权限、真实播放与输出运输。Core 保持 Foundation-only，Agent 层依赖 Storage 的通用文档，共享适配位于经用户批准的 Agents/Support，不引入新编译模块或第三方依赖。
+
+父子任务的父身份不改变执行归属；Assistant 不复制子 Agent 内部推理。共享 Chat 驱动可被其他 Agent 组合，Photographer 已组合独立摄影 Chat 上下文，并保留确定性相机/追踪流程；后续输入由 Assistant 定向发送。
+
+设计与阶段边界见 [ADR0187](../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../docs/Validation-History.md)。
+
+✅ Shared-component organization: the user-approved Agents/Support directory groups Chat and Storage adapters inside the existing Agents target; Foundation-only AgentDecisionContext moves into AgentCore Runtime. No new compiled module or dependency.
+
+Implemented business-source audit: Agents uses one role-file standard; shared business adaptations remain in Support, related Signal schemas group in Communication, and Core alone is framework infrastructure. Evidence-commit duplication and single-owner helper fragments are consolidated without role redistribution or protocol changes. See Agents/README.md for the file standard.
+
+## Phase two implementation contract - ADR0188
+
+✅ Implemented. Assistant is the persistent default user-entry Agent and delegates photography, history and application operations through authorized communication Actions and existing task Signals. Typed UI inputs use deterministic routing; model requests use the same output and function execution path. Execution results return to the real task executor.
+
+Support owns the reusable one-round Chat worker, Action-call communication adaptation and reply mapping, with injected identity, context and policies. Each business Agent owns independent durable history, preprocessing, capabilities and task completion. No new directory, target, dependency, Core role policy or delegation runtime is introduced.
+
+App owns registration, transport, stable interaction lifetime and native presentation authorization. Microphone capture is a separate lifetime. Delivery acceptance, child completion and native effects remain distinct. Pending questions and artifact references are bounded and task-scoped; deletion retains existing trusted UI confirmation. Storage failures terminate dependent processing, cancellation joins owned workers, and restart interrupts without replay.
+
+See [ADR0188](../docs/adr/0188-specialist-task-ownership.md) for migration, capacity and validation contracts.
+
+## Shared Agent source hierarchy - ADR0189
+
+✅ Implemented source migration: shared Agent components consolidate under Agents/Support. Support/Core remains the independent Foundation-only AgentCore target; Support/Communication owns business Signal schemas and bundled catalog loading; Support/Chat owns injected Chat workers/adapters; Support/Context owns atomic context/Storage adaptation. Seven role directories keep business schemas, preprocessing, policies and workflows. Package paths, Xcode navigator groups and static boundary paths must move together; target names, dependencies and runtime contracts remain unchanged.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories use read-only task lists with original request titles, terminal/waiting status and task-scoped model detail/export. App projects task/input membership from the same immutable Agent context snapshot; ReACT and later task inputs remain together across old archives. Missing associations remain separate and missing dates remain empty. No specialist summary/archive mutation is exposed. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+
+## One-way publication and listening admission correction
+
+## Listening policy ownership
+
+✅ SpeechPerception is the resident listening authority. User eye taps publish speech.listening; interactive Chat workers publish revisioned interaction.replyActivity occupancy. SpeechPerception closes new-utterance admission before final ASR publication and emits internal Speech.Listening.update; App executes capture and confirmed-utterance/playback/350ms tail barriers. User-off stops physical capture, while reply pause suppresses recognition admission. Native capture termination publishes revision-fenced speech.captureEnded; recoverable ASR/VAD/queue failures keep consent and capture alive. One-way publish has no subscriber receipt; send retains directed admission. See [ADR0190](../docs/adr/0190-assistant-listening-and-one-way-publication.md).
+
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
+
+
+✅ Execution-log tabs: App projects scheduler Action snapshots, task-only Gateway snapshots and Agent lifecycle/errors into Action / Task / Agent. Ordinary Signal traffic never invalidates the home log. Observation never supplies publisher acknowledgments or changes processing decisions.
+
+
+
+✅ Shared Action registration: Action implementations support many-to-many Agent registration. ApplicationControl registers the 11 Robot Actions for Settings command tests. Assistant retains basic interaction registration; Photographer retains camera-only model permissions. Each role calls canonical functions under its own identity; no inter-Agent delegation is needed to reuse an Action.
+
+✅ Device regression fix: Interactive scene transitions join root/child startup before lifecycle lookup. Camera functions return actual structured command acknowledgments. Delegated Chat requests identify the active task and photography questions use explicit waiting-user reports with capture references; budgets, executor-directed feedback and native safety remain unchanged.
+
+✅ Frontend/backend separation: UI owns local presentation and interaction. App owns immediate native lifecycle cleanup. Typed backend requests publish directly to exact business-owner subscriptions; conversation alone enters Assistant. Agent-selected UI effects still use authorized callable functions over shared UI methods. See the routing table below; no touch-to-task relay remains.
+
+| Frontend operation | Runtime route | Task creation |
+| --- | --- | --- |
+| Page navigation, dialogs, draft edits, selection and log filtering | UI state and injected local presentation methods | None |
+| Page visibility/system settings/native stop cleanup | Immediate App lifecycle endpoint | None |
+| History/provider/resource/camera/device data request | External publish → exact owning Agent subscription → registered function/result | None |
+| User text/ASR request | Assistant reasoning → direct Action or explicit specialist communication | Only when delegated |
+| Agent-selected UI presentation/navigation | Authorized Action → App endpoint → shared UI state | Uses its existing task/session |
+
+Existing task/history records remain intact; the change prevents new touch operations from creating artificial delegation records. Read-only environment facts can still observe committed UI state without replaying presentation.
+
+
+✅ Home-log simplification: retain Action / Task / Agent only. Removed the Signal UI model, collection and subscription. InputGateway exposes independently bounded task-only snapshots (256 records, shared eight-observer limit, latest-one buffering), updated only for task protocol events; media and ordinary Signals never invalidate home state or evict task traces. Presentation retains task admission/completion semantics, related Action/history identities, Agent lifecycle and independent errors. General Signal diagnostics remain available outside the home UI. Native performance acceptance is separate.
+
+
+## Responses and Action-only Assistant migration
+
+✅ Implemented: Cloud Chat uses the Responses-only streaming protocol, while preserving the provider-neutral ChatCapability. Assistant exposes only scheduled Action calls, including directed send and readEnvironment; historical native-call evidence remains readable. Network sessions belong to model residency, are reused between requests and are released on unload/shutdown.
+
+✅ Reply ownership: caption focus is independent of authorized playback lifetime. Assistant and specialist replies use the existing process-wide Speech serialization key; switching caption producer never cancels another producer. Explicit task/session cancellation and Gateway capability authorization still apply. Delegation prompts emit only send, leaving user-facing replies to the specialist. Paused ApplicationControl accepts environment facts and correlated feedback, while fresh business commands require running. Round delivery errors retain execution ID/path/state rather than conflating transport failure with scope closure. ❌ The reported device scopeClosed incident has not been reproduced; physical playback and lifetime acceptance remain pending.
+
+✅ Publication audit correction: publish validates its own payload/source and submits bounded one-way work, never awaiting subscriber or App observer completion and never returning recipient errors. Observer work shares bounded Gateway publication lifetime; overflow is diagnostic loss without publisher acknowledgment. Environment facts bypass request/result waiters and emit no completion acknowledgment; ApplicationControl errors still flow through its independent output consumer. Directed send retains correlated admission receipt (not task completion). Explicit UI data-operation result waits remain business completion contracts, not publish receipts.
+
+
+✅ Camera perception/context change (2026-10-10): App publishes revisioned camera.state facts from actual CameraCoordinator presentation/native state; Photographer stores the latest snapshot and injects it into each model request, including queued ReACT continuations. State observation is one-way and never invokes a model or changes devices. Execution results remain owner-directed and distinct from global state.
+
+
+✅ Directed model communication is Action-only for every Agent: send is exposed through the authorized XML Action catalog, never automatically as Agent.send in model tools. Existing role-owned business Tools and internal fixed communication Actions retain their execution/receipt contracts.

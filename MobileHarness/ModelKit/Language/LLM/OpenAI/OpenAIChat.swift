@@ -5,13 +5,13 @@ import Synchronization
 /// OpenAI-compatible text chat; the consumer contract is identical to local chat.
 public actor OpenAIChat: ChatCapability {
     private let configuration: OpenAIChatConfiguration
-    private let resource: ModelResource<Void>
-    private let sessionConfiguration: @Sendable () -> URLSessionConfiguration
+    private let resource: ModelResource<ChatNetworkSession>
 
     public init(context: ModelContext, configuration: OpenAIChatConfiguration) throws {
         self.configuration = configuration
-        resource = try context.resource {}
-        sessionConfiguration = { .ephemeral }
+        resource = try context.resource {
+            ChatNetworkSession(configuration: .ephemeral, timeout: configuration.timeout)
+        }
     }
 
     init(
@@ -19,8 +19,9 @@ public actor OpenAIChat: ChatCapability {
         sessionConfiguration: @escaping @Sendable () -> URLSessionConfiguration
     ) throws {
         self.configuration = configuration
-        resource = try context.resource {}
-        self.sessionConfiguration = sessionConfiguration
+        resource = try context.resource {
+            ChatNetworkSession(configuration: sessionConfiguration(), timeout: configuration.timeout)
+        }
     }
 
     /// Configured, not a claim that the remote service or credentials have been probed.
@@ -40,17 +41,15 @@ public actor OpenAIChat: ChatCapability {
                 if case .finished = reason { return }
                 control.cancel()
             })
-        let settings = sessionConfiguration()
-        settings.timeoutIntervalForResource = configuration.timeout
-        settings.httpCookieStorage = nil
-        settings.urlCache = nil
-        let network = URLSession(configuration: settings, delegate: NoRedirects(), delegateQueue: nil)
+        let network = lease.model.session
         let resource = resource
         let emitter = pair.emitter
         let task = Task {
             do {
                 try Task.checkCancellation()
+                request.timing?.start()
                 let (bytes, response) = try await network.bytes(for: http)
+                control.installHTTP(bytes.task)
                 guard let response = response as? HTTPURLResponse else { throw OpenAIChatError.invalidResponse }
                 guard (200..<300).contains(response.statusCode) else {
                     throw OpenAIChatError.httpStatus(response.statusCode)
@@ -63,18 +62,17 @@ public actor OpenAIChat: ChatCapability {
                 for try await byte in bytes {
                     try Task.checkCancellation()
                     for event in try decoder.consume(byte) {
+                        if case .text(let delta) = event { request.timing?.recordText(delta) }
                         if case .finished = event { finish = event } else { try emitter.yield(event) }
                     }
-                    if decoder.done { break }
                 }
                 guard let finish else { throw OpenAIChatError.truncatedStream }
                 try Task.checkCancellation()
-                network.invalidateAndCancel()
                 await resource.release(lease.id)
                 try emitter.yield(finish)
                 emitter.finish()
             } catch {
-                network.invalidateAndCancel()
+                control.cancelHTTP()
                 await resource.release(lease.id)
                 if Task.isCancelled || error is CancellationError {
                     emitter.fail(CancellationError())
@@ -102,6 +100,7 @@ private final class RequestControl: Sendable {
     private struct State {
         var cancelled = false
         var task: Task<Void, Never>?
+        var http: URLSessionTask?
     }
     private let state = Mutex(State())
     func install(_ task: Task<Void, Never>) {
@@ -111,11 +110,32 @@ private final class RequestControl: Sendable {
         }
         if cancelled { task.cancel() }
     }
+    func installHTTP(_ task: URLSessionTask) {
+        let cancelled = state.withLock {
+            $0.http = task
+            return $0.cancelled
+        }
+        if cancelled { task.cancel() }
+    }
+    func cancelHTTP() { state.withLock { $0.http }?.cancel() }
     func cancel() {
         let task = state.withLock {
             $0.cancelled = true
             return $0.task
         }
         task?.cancel()
+        cancelHTTP()
     }
+}
+
+/// Resource residency owns connection reuse and final teardown, independently of any request.
+private final class ChatNetworkSession: Sendable {
+    let session: URLSession
+    init(configuration: URLSessionConfiguration, timeout: TimeInterval) {
+        configuration.timeoutIntervalForResource = timeout
+        configuration.httpCookieStorage = nil
+        configuration.urlCache = nil
+        session = URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
+    }
+    deinit { session.invalidateAndCancel() }
 }

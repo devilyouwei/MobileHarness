@@ -19,7 +19,8 @@ public enum CapabilityModules {
         [
             UIModule(expression: presentation, pose: pose, updates: presentation, history: historyPresentation),
             ResourcePresentationModule(inventory: resourceInventory, presentation: resourcePresentation),
-            SpeechModule(playback: playback), CameraModule(camera: camera),
+            SpeechModule(playback: playback, listening: playback as? any SpeechListeningCapability),
+            CameraModule(camera: camera),
             HistoryModule(history: history, mutations: historyMutations), SystemModule(),
             ModelResourcesModule(
                 resources: modelResources, preferences: resourcePreferences, inventory: resourceInventory),

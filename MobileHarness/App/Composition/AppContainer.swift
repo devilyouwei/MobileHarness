@@ -11,6 +11,11 @@ import UIKit
 @MainActor
 final class AppContainer {
     private var memoryWarnings: Task<Void, Never>?
+    private var interactionLifetime: Task<Void, Never>?
+    func startInteraction() {
+        guard interactionLifetime == nil else { return }
+        interactionLifetime = Task { [lifecycle] in await lifecycle.run() }
+    }
     let lifecycle: VoiceSessionCoordinator
     let conversation: ConversationState
     let actionActivity: ActionActivityState
@@ -30,7 +35,10 @@ final class AppContainer {
         }
     #endif
 
-    deinit { memoryWarnings?.cancel() }
+    deinit {
+        memoryWarnings?.cancel()
+        interactionLifetime?.cancel()
+    }
 
     init(
         resources: URL, runtime: ApplicationRuntime, modelName: @escaping @Sendable () async throws -> String,
@@ -62,15 +70,14 @@ final class AppContainer {
         try Task.checkCancellation()
         let state = ConversationState()
         let lifecycle = VoiceSessionCoordinator(
-            runtime: runtime.voiceDependencies, state: state, modelName: modelName,
+            runtime: runtime.voiceDependencies, state: state,
             audio: AppleAudioIO(), recognition: recognition, synthesis: synthesis,
             prepareRecognition: {
                 // Reload only resources evicted after startup; get/load reuse resident weights.
                 try await models.warmup(.recognition)
-                try await models.warmup(.chat)
                 try await models.warmup(.voiceActivity)
                 try await models.warmup(.synthesis)
-            }, voiceActivity: vad, chat: chat)
+            }, voiceActivity: vad)
         self.lifecycle = lifecycle
         let audioDetection = AudioDetectionWorkflow(
             state: AudioDetectionState(),

@@ -69,7 +69,7 @@ Provider result limits preserve the existing SDK2048-ID/512-byte contract, with 
 
 ## Read-only model grants and shared capability facts
 
-✅ Implemented: Assistant JSON explicitly grants System.ModelResources.snapshotResources and System.Provider.readSettings as native read-only tools. The same canonical functions used by deterministic/manual routes return the current shared inventory and a confirmed cloud-enabled/model summary. Provider summary excludes endpoint/key and never restores or changes a binding; unavailable/unconfirmed state fails explicitly. LLM configuration mutations remain staged-secret human operations. These tools query current facts rather than fixed runtimeInfo text and can feed bounded model continuation.
+✅ Implemented: ApplicationControl JSON explicitly grants System.ModelResources.snapshotResources and System.Provider.readSettings as native read-only tools; Assistant delegates these specialist queries and exposes no Tools. The same canonical functions used by deterministic/manual routes return the current shared inventory and a confirmed cloud-enabled/model summary. Provider summary excludes endpoint/key and never restores or changes a binding; unavailable/unconfirmed state fails explicitly. LLM configuration mutations remain staged-secret human operations. These tools query current facts rather than fixed runtimeInfo text and can feed bounded model continuation.
 
 
 ## Typed device, navigation and environment entry points
@@ -83,6 +83,6 @@ Provider result limits preserve the existing SDK2048-ID/512-byte contract, with 
 
 ## Model resource command grants
 
-✅ Implemented: Assistant has grants for the existing canonical download/cancel functions with bounded model ID, explicit HTTPS source and boolean cellular arguments. Manual and native model calls share execution and native transfer ownership; download acknowledges admission only and cancel awaits cleanup. Model removal is not granted: its native quiescence can join the calling voice runtime, so removal needs the same explicit session-handoff design as provider changes. No configuration or provider mutation grant is implied. Model feedback reports errors as data and never automatically replays a transfer.
+✅ Implemented: ApplicationControl has grants for the existing canonical download/cancel functions with bounded model ID, explicit HTTPS source and boolean cellular arguments. Manual and native model calls share execution and native transfer ownership; download acknowledges admission only and cancel awaits cleanup. Model removal is not granted: its native quiescence can join the calling voice runtime, so removal needs the same explicit session-handoff design as provider changes. No configuration or provider mutation grant is implied. Model feedback reports errors as data and never automatically replays a transfer.
 
 ✅ Implemented admission hardening: the native device endpoint validates its existing foreground, connection and worker admission conditions before accepting scan/connect/reconnect/preset/jog. Rejected void UI commands must become explicit call errors, without changing native recovery/motion algorithms. Device facts include the current native issue. Motor arguments reject unrelated preset fields.

@@ -3,14 +3,52 @@ import Observation
 
 @MainActor @Observable
 public final class ConversationHistoryState {
+    public let title: String
+    public let allowsMutations: Bool
+    public let groupsByTask: Bool
     public var archive: HistorySnapshot?
+    public var tasks: [HistoryTask] = []
     public var status: String?
     public var isBusy = false
-    public init() {}
+    public init(title: String = "对话历史", allowsMutations: Bool = true, groupsByTask: Bool = false) {
+        self.title = title
+        self.allowsMutations = allowsMutations
+        self.groupsByTask = groupsByTask
+    }
+}
+
+/// Immutable task projection; identity and membership are resolved by App from Agent context.
+public struct HistoryTask: Identifiable, Sendable {
+    public let id: UUID
+    public let title: String
+    public let status: String
+    public let createdAt: Date?
+    public let isAssociated: Bool
+    public let turns: [HistoryTurn]
+    public init(
+        id: UUID, title: String, status: String, createdAt: Date?, isAssociated: Bool, turns: [HistoryTurn]
+    ) {
+        self.id = id
+        self.title = title
+        self.status = status
+        self.createdAt = createdAt
+        self.isAssociated = isAssociated
+        self.turns = turns
+    }
+}
+
+public struct HistoryAgentSnapshot: Sendable {
+    public let archive: HistorySnapshot
+    public let tasks: [HistoryTask]
+    public init(archive: HistorySnapshot, tasks: [HistoryTask]) {
+        self.archive = archive
+        self.tasks = tasks
+    }
 }
 
 @MainActor
 public protocol ConversationHistoryControlling: AnyObject {
+    var agents: [HistoryAgentDestination] { get }
     func load() async
     func startNew()
     func summarize(_ id: UUID)
@@ -61,6 +99,8 @@ public struct HistoryModelRequest: Codable, Sendable, Identifiable {
     public let date: Date
     public let input: String
     public let requestJSON: String
+    public let modelRequestStartedAt: Date?
+    public let firstTokenLatency: Double?
     public let firstTokenAt: Date?
     public let fragments: [String]
     public let toolCalls: [HistoryToolCall]
@@ -125,6 +165,8 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public let finishReason: String?
     public let error: String?
     public let executionError: String?
+    public var modelRequestStartedAt: Date?
+    public var firstTokenLatency: Double?
     public var raw: String { fragments.joined() }
 }
 
@@ -153,4 +195,28 @@ public struct HistorySnapshot: Codable, Sendable {
         current = HistoryConversation()
         past = []
     }
+}
+
+/// UI-owned navigation values; repositories and Agent implementations stay in App.
+@MainActor
+public struct HistoryAgentDestination: Identifiable {
+    public let id: String
+    public let name: String
+    public let summary: String
+    public let state: ConversationHistoryState
+    public let controls: any ConversationHistoryControlling
+    public init(
+        id: String, name: String, summary: String, state: ConversationHistoryState,
+        controls: any ConversationHistoryControlling
+    ) {
+        self.id = id
+        self.name = name
+        self.summary = summary
+        self.state = state
+        self.controls = controls
+    }
+}
+
+extension ConversationHistoryControlling {
+    public var agents: [HistoryAgentDestination] { [] }
 }

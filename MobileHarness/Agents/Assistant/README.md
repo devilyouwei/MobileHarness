@@ -1,376 +1,119 @@
-# Assistant — Stateful Conversation Agent
+# Assistant - Default user entry and delegation
 
-Purpose: send user input to ChatCapability, maintain bounded history and interpret generated output inside the Agent. Its local registry controls available capabilities; Gateway receives resolved calls.
+## 函数与通信注册清单
 
-- ✅ AssistantAgent actor: 32 waiting inputs, 256 output envelopes and one generation worker; overflow fails explicitly.
-- ✅ Assistant.agent.json v5 exposes express and setExpression under Display, six NexArm actions under Robot and declares the empty Speech group. Code owns reply initialization, speech synthesis/audioID playback and caption permissions.
-- ✅ Each turn owns AgentGenerator state. Natural text uses Assistant.mapText; explicit XML resolves only JSON Actions. Channel scopes override defaults without moving wait boundaries.
-- ✅ CapabilityContextBuilder includes JSON Action aliases/docs/parameters/examples only. Speech behavior is an English Agent-owned instruction; internal methods and native Tools never enter system context.
-- ✅ express performs smile, happy, laugh, thinking, surprised, sad, love, angry, scared or playful once and awaits restoration. setExpression accepts those values plus clear for the persistent base. Both control UI presentation only.
-- ✅ /status resolves runtimeInfo. Tool results and event descriptions are escaped before text interpretation.
-- ✅ Limits: 4 KiB user text, provider-default output token budget, 30 s generation deadline and at most 120 generated Action/Tool calls. Current-conversation context is loaded from the shared journal: the last ten completed user/assistant rounds, preserving exact model text. Failed/cancelled turns remain visible but are excluded from future model context.
-- ✅ Cancellation bypasses full/paused inbox admission, joins the worker and discards incomplete parsing state.
-- ❌ Local native Tool deltas, durable inbox/runtime checkpoints, restart and long-running background execution. Cloud ChatCapability produces complete native Tool calls; Assistant resolves them through the shared ToolCallParser before OutputGateway dispatch.
+✅ 以下为当前实现的完整注册清单。模型权限来源：[配置文件](Assistant.agent.json)；内部权限来源见各行链接。参数后缀 `?` 表示可选，`—` 表示无参数或无 Channel。
 
-```mermaid
-flowchart TD
-    Input[AgentInput] --> Queue[Bounded inbox and single input worker]
-    Queue --> Builder[Conversation context and exact request]
-    Builder --> History[StorageChat journal]
-    Builder --> Model[ChatCapability]
-    Model --> Reader[Transport field demultiplexer]
-    Reader -->|text delta| TextQueue[Bounded text fragments]
-    TextQueue --> Text[Text worker: persist / AgentGenerator / speech preparation]
-    Text -->|Action and wait events in order| Stream[Bounded OutputEnvelope transport]
-    Reader -->|complete native calls| NativeQueue[Bounded native calls]
-    NativeQueue --> Native[Native worker: ToolCallParser / history]
-    Native -->|ToolCall| Stream
-    Text --> Join[Join both generation workers]
-    Native --> Join
-    Join -->|roundFinished| Stream
-    Stream --> App[App independent protocol consumers]
-    App --> Gateway[Gateway: direct Tools / Channel Actions]
-    Gateway --> Feedback[Separate ActionResult and ToolResult]
-    Feedback --> Merge[Assistant: full-round merge and continuation]
-    Merge --> Model
-    Cancel[Session cancellation] --> Queue
-    Cancel --> Reader
-    Cancel --> Text
-    Cancel --> Native
-```
+模型 Action 通过 Action call 调度；模型 Tool 通过原生函数调用取得结果。InternalAction / InternalTool 是代码固定流程的权限，不会自动进入模型函数目录。同一函数跨 Agent 注册，或在同一 Agent 同时提供模型入口与内部入口，属于授权复用；模型 Action 和模型 Tool 不重复注册同一路径。
 
-Speech is a scheduled Action on its default or explicit Channel; captions are Display Actions without a Channel and may update while speech is queued or playing. Consecutive wait groups serialize stages; each wait retains ordinary Channel scheduling internally. Runtime notifications are not model-authored.
+### 模型可调用函数
 
-## Configuration and initialization
-
-Follow the [Agent standard](../README.md). AgentConfigurations validates JSON v6 id=assistant. Assistant adds its fixed internal permissions to the immutable descriptor; these are not configuration fallbacks. Invalid configuration throws before registration. Hot reload is unsupported.
-
-ChatCapability is a required dependency; tests inject FixedTextChat from IntegrationTests. Configuration/request validation does not guarantee real-model protocol compliance. Update this README with changes and retain ✅/❌ status distinctions.
-
-## Queue and asynchronous processing contract
-
-`AssistantAgent` owns its FIFO inbox and generation worker inside an actor. InputGateway produces `AgentInput`; `drain()` consumes it. The default inbox holds 32 waiting inputs, excluding the active input. Admission rejects excess work with `queueFull`; it does not suspend until space appears. Text input is limited to 4096 UTF-8 bytes. A single generation worker preserves input processing order; actor reentrancy does not permit a second worker.
-
-1. `receive` checks lifecycle and payload, appends an input, and starts draining when running.
-2. Pausing stops admission-to-execution transitions, but does not cancel an already running generation. Resume drains queued inputs.
-3. Generation consumes Chat events, parses them and emits resolved output envelopes. The output stream buffers 256 envelopes with `bufferingOldest`; the consumer is App's VoiceSessionCoordinator. Failed yields mark the Agent failed, clear the inbox, cancel generation and close the stream. This plain AsyncStream does not transmit a thrown error; the coordinator checks final Agent status.
-4. `assistant.control/1` cancelSession bypasses the inbox, even when full or paused, removes the selected session's waiting inputs and awaits cancellation of its active worker. Stop clears waiting inputs and joins the worker before closing outputs; durable history is retained.
-
-Successful outputs already consumed are not rolled back. There is no automatic retry, durable inbox or priority scheduling. FIFO uses Array append/removeFirst; removal shifts remaining entries, with cost bounded by the configured capacity.
-
-```mermaid
-flowchart LR
-    InputGateway -->|receive| Inbox[32 waiting inputs]
-    Inbox -->|one worker| Chat[Chat and parser]
-    Chat -->|yield| Out[256 output envelopes]
-    Chat -->|speech text| Synth[Directed synthesis through both Gateways]
-    Synth -->|audioID admitted| Out
-    Out -->|App transport pump| Gateway[OutputGateway validation]
-    Gateway --> Runtime[Action / Tool runtime]
-    Runtime --> UI[Expression Action and UI Tools via injected handlers]
-    InputGateway -->|assistant.control| Cancel[Validate external host control]
-    Cancel -->|selected session clear and join| Chat
-    Stop[Agent stop] -->|all inputs clear and join| Chat
-```
-
-✅ The algorithm above describes the current implementation.
-
-Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
-
-✅ New image payloads remain unsupported by Assistant and are rejected by its descriptor; VisionPerception owns camera input.
+| 类型 | 模型名称 | 函数路径 | 默认 Channel | 参数 / 约束 | 函数说明 |
+| --- | --- | --- | --- | --- | --- |
+| Action | `express` | `UI.Expression.express` | Display | `emotion: string` — Exactly one of: smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear is invalid; use setExpression for persistent state or clearing. | Perform one eye expression, awaiting its transition and return to the current base expression. Each call is a fresh performance. Does not change captions or speech. |
+| Action | `setExpression` | `UI.Expression.setExpression` | Display | `emotion: string` — Exactly one of: clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful. clear resets the base to neutral. | Set the persistent base eye expression until replaced, cleared or reset on new user speech. Completes on state acceptance, not animation completion. Repeating the same emotion is idempotent. |
+| Action | `shakeBase` | `NexArm.Motion.shakeBase` | Robot | `cycles: integer` — Integer 1 through 3 only.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `waveWrist` | `NexArm.Gesture.waveWrist` | Robot | `count: integer` — Integer 1 through 3. No default.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `tiltWrist` | `NexArm.Gesture.tiltWrist` | Robot | `direction: string` — Exactly left or right.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `lookAround` | `NexArm.Gesture.lookAround` | Robot | `cycles: integer` — Integer 1 through 3. No default.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `celebrate` | `NexArm.Gesture.celebrate` | Robot | `cycles: integer` — Integer 1 through 3. No default.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `dance` | `NexArm.Gesture.dance` | Robot | `cycles: integer` — Integer 1 through 3. No default.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `nodHead` | `NexArm.Gesture.nodHead` | Robot | `cycles: integer` — Integer 1 through 3 only; no default.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Compose home, sweeps and return using only motor4. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `shakeHead` | `NexArm.Gesture.shakeHead` | Robot | `cycles: integer` — Integer 1 through 3 only; no default.<br>`speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Compose home, sweeps and return using only motor5. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `resetArm` | `NexArm.Motion.reset` | Robot | `speed?: integer` — Native motor speed, 1–1400; default1400.<br>`acceleration?: integer` — Native acceleration register value, 1–254; default30. | Reset motors1–5 only; do not command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `moveMotor` | `NexArm.Motion.moveMotor` | Robot | `motor: integer` — Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.<br>`target: integer` — Native encoder target, restricted to configured motor limits.<br>`speed?: integer` — Native speed1–1400, default1400.<br>`acceleration?: integer` — Native acceleration1–254, default30. | Move only the explicitly selected motor to its native encoder target. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `resetMotor` | `NexArm.Motion.resetMotor` | Robot | `motor: integer` — Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.<br>`speed?: integer` — Native speed1–1400, default1400.<br>`acceleration?: integer` — Native acceleration1–254, default30. | Reset only the selected motor to its configured home; motor6 requires an explicitly configured home. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
+| Action | `readEnvironment` | `System.Device.readEnvironment` | System | — | Read the latest admitted scene, navigation and device capability facts only when needed and absent from context. These are observations, not proof of physical completion. Wait for the result before deciding dependent actions. |
+| Action（动态通信目录） | `send` | `Agent.Communication.send` | Communication | `target`, `kind`, `content`, `taskID?`, `artifactID?` | 授权目标：applicationControl, memory, photographer；kind：cancel, input, request。request 创建任务时不传 taskID，其他类型要求已有 taskID。由 [AgentCommunicationAdapter.swift](../Support/Chat/AgentCommunicationAdapter.swift) 根据 task.* send 权限生成；不是 Tool。 |
 
 
+### 代码固定流程的内部函数
 
-✅ JSON v6 subscribes to speech.final and user.text; final transcript uses the same conversation path as text. Inputs expire before dequeue, never during a started reply. Partial transcripts cannot enter Assistant.
+| 类型 | 函数路径 | Channel | 参数 | 函数说明 | 注册来源 |
+| --- | --- | --- | --- | --- | --- |
+| InternalAction | `UI.Caption.beginReplyTurn` | Display | — | 开始本轮回复字幕展示。 | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
+| InternalAction | `Speech.Playback.speak` | Speech | `audioID` | 播放当前真实输出 Agent 所有的 audioID；进入串行 Speech Channel，不因子 Agent 回复而取消父 Agent 播放。 | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
+| InternalAction | `UI.Caption.print` | Display | `text` | 将回复文本输出到字幕；保持真实输出 Agent 和任务归属。 | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
 
-✅ JSON v6 also subscribes to speech.phase. Speech onset emits UI.Caption.beginReplyTurn once per turn as an Display Action, followed by agent.finished; it does not invoke Chat or resume capture. Other phases cause no Assistant behavior. App must not infer these UI operations from the Signal. Ordinary transcription still follows the existing chat path.
 
-✅ Runtime turn context is inherited from the triggering input. Repeated VAD onset notifications within one utterance do not repeat beginReplyTurn. Final processing also ensures that begin Tool exists if onset was missed. Every output has a monotonically increasing source sequence; text/base expression survive normal reply completion until the next turn; finite expression overrides end after their performance.
+### 通信输出权限
 
+这些是 CommunicationAction 的授权契约，不是额外的原生 Tool。publish 单向广播，不等待接收方回包，不因接收方拒绝/错误影响发送方；send 返回接纳回执，接纳与任务完成分别记录。模型 send 仅暴露上述 task.* 权限；语音合成、取消及事实广播由代码固定流程发出。
 
-## 输入、订阅与输出契约
-
-以 [Assistant.agent.json](Assistant.agent.json) 和 [AssistantAgent.swift](AssistantAgent.swift) 为准，以下是当前实现。公共信封见 [Agents 输入输出约定](../README.md#输入输出文档约定)。所有输入均经过 InputGateway；声明支持某种输入不等于订阅了该主题。
-
-| 接收方式 | contract / version / kind | source / topic | 数据与处理 |
+| 方式 | 契约 | 目标 | 用途 |
 | --- | --- | --- | --- |
-| 静态订阅 | `user.text / 1 / text` | `user / user.text` | `.text(String)`，最多 4096 UTF-8 字节；普通文本进入 Chat，精确等于 `/status` 时调用 runtimeInfo。当前 App 没有文本输入框，这是已支持的协议入口。 |
-| 静态订阅 | `speech.final / 1 / observation` | `speechPerception / speech.final` | `.observation(.transcript(text, final: true))`，非空、最多 4096 UTF-8 字节；与文本走同一处理路径。 |
-| 静态订阅 | `speech.phase / 1 / observation` | `speechPerception / speech.phase` | `.observation(.speechPhase(phase))`；仅 `speaking` 触发本轮 beginReplyTurn，其他阶段不产生业务输出，也不调用 Chat。 |
-| 宿主定向控制，无静态订阅 | `assistant.control / 1 / observation` | external origin，source 为 `runtime`，定向 `assistant` | `AssistantControl.cancelSession`，最多512编码字节；绕过满或暂停队列，移除指定 session 等待输入并取消、等待该 session 的活动生成。保留持久历史和其他会话。 |
-| Tool 定向回流，无静态订阅 | `tool.result / 1 / toolResult` | ToolDispatcher 经 InputGateway 回送原 Agent/session，默认 source 为 `runtime` | `.toolResult(ToolResult(callID: UUID, value: String, isError: Bool))`；当前按 value 输出转义文本，不依据 isError 分支或继续调用 Chat。 |
-
-控制输入有效期10秒；ToolResult.value 即时输出限制2000 UTF-8字节，超限输出 assistant.error。旧 runtime.event 不再接纳。不接收 raw audio、image、speech.partial 或 vision.pose。
+| publish | `interaction.replyActivity` | 订阅者 | 广播回复活动及任务占用事实，供聆听策略判断。 |
+| send | `speech.synthesize` | `speechSynthesis` | 提交文本合成请求；原输出 Agent 负责播放。 |
+| send | `speech.cancel` | `speechSynthesis` | 取消对应合成工作。 |
+| send | `task.request` | `photographer` | 委派新的子任务。 |
+| send | `task.input` | `photographer` | 向已存在的任务补充输入。 |
+| send | `task.cancel` | `photographer` | 请求取消指定任务；接纳不代表设备已经停止。 |
+| send | `task.request` | `memory` | 委派新的子任务。 |
+| send | `task.input` | `memory` | 向已存在的任务补充输入。 |
+| send | `task.cancel` | `memory` | 请求取消指定任务；接纳不代表设备已经停止。 |
+| send | `task.request` | `applicationControl` | 委派新的子任务。 |
+| send | `task.input` | `applicationControl` | 向已存在的任务补充输入。 |
+| send | `task.cancel` | `applicationControl` | 请求取消指定任务；接纳不代表设备已经停止。 |
 
-```mermaid
-flowchart LR
-    User["user.text / user"] --> IG[InputGateway]
-    Speech["SpeechPerception: speech.final / speech.phase"] --> OG1[OutputGateway]
-    OG1 --> IG
-    Runtime["assistant.control: external host"] --> IG
-    IG --> A[Assistant]
-    A -->|ordinary text or final| Chat[ChatCapability]
-    Chat -->|text deltas| Parser[AgentGenerator]
-    Parser --> Events[Ordered Actions, Tools and wait boundaries]
-    Events --> Calls[Resolved ActionCall / ToolCall]
-    Events -->|beginWait / endWait in order| OG2
-    Calls -->|speech text| Synthesis[Directed speech.synthesize]
-    Synthesis -->|audioID| Play[Resolved Speech.Playback.speak audioID]
-    Play --> OG2
-    A -->|speech onset / turn fallback| Begin[UI.Caption.beginReplyTurn]
-    A -->|/status| Tool[runtimeInfo]
-    Calls --> OG2[OutputGateway]
-    Begin --> OG2
-    Tool --> OG2
-    OG2 --> Schedule[ChannelScheduler task tree]
-    Schedule --> AR[ActionExecution: speech / display]
-    OG2 --> TR[ToolExecution]
-    TR -->|ToolResult via ToolDispatcher| IG
-```
 
-| 输出类别 | 调用路径 / Channel | 数据、触发与接收者 |
-| --- | --- | --- |
-| Agent 内部分段事件（尚未发送） | `Speech.Playback.speak / Speech` | `parameters["text"]: String`，非空、最多 2000 UTF-8 字节；自然语言分句映射后先定向提交 SpeechSynthesisAgent，成功接纳后转换成代码内部的 `Speech.Playback.speak(audioID)`。 |
-| Action | `Speech.Playback.speak / Speech`（隐藏） | `parameters["audioID"]: UUID 字符串`；沿用该文本段的 Channel。仅在 `speech.synthesize` 被接纳后输出；SpeechPlayback 用该 ID 等待并消费 PCM，接纳不保证当时已有音频。 |
-| Action | `UI.Caption.print`，Display Channel | `arguments["text"]` 追加回复字幕；与合成请求来自同一段自然文本，在合成接纳和播放 Action 输出后发出。 |
-| finite Action | `express → UI.Expression.express / Display` | `parameters["emotion"]` 为非 clear 的合法表情；等待单次目标过渡和恢复当前基础表情。 |
-| state Action | `setExpression → UI.Expression.setExpression / Display` | 同一表情集合加 clear；提交持续基础表情，clear 清除；不等待渲染结束。 |
-| Action | `UI.Caption.beginReplyTurn`，Display Channel | 无参数；有 AgentTurn 时在首次 speaking 或最终文本处理前确保本轮只发一次，原子清除上一轮回复和表情。 |
-| 有返回值 Tool | `runtimeInfo`，无 Channel | `arguments: [:]`；由 `/status` 确定性触发，结果经过 tool.result 回流。同时支持云端模型原生 Tool 调用。 |
-| control | `assistant.finished` | 正常生成或即时文本输出结束；由 App 经输出处理等待相关 Actions 完成，再协调恢复聆听。不能把“生成结束”等同于“语音已播放完”。App 在完成屏障后清理该 source/input 的剩余音频；打断或错误走取消清理。 |
-| control | `agent.finished` | speaking 阶段的输入完成通知（初始化展示通过 Tool 执行），释放该输入的 Action 跟踪。 |
-| rejectedCall | Action/Tool alias、typed reason、可选 native Tool callID | unknownCapability 或 invalidParameters 只拒绝该调用；计入120次调用上限，经 Gateway 留存错误结果，继续本轮生成及其他 Actions。 |
-| control | `assistant.historyError: …` | 拒绝的 native Tool 失败记录写入失败；Gateway 留存非终止 output failure，不取消 Action 调度。 |
-| control | `assistant.error: …` | 生成、解析、即时输出等失败；输出流溢出会直接进入 failed 并关闭流，不能保证再塞入错误消息。 |
 
-Action Channel 是默认值，生成中的显式 Channel 可覆盖；JSON 不再额外声明 `main`；跨轨同步使用 wait。参数始终为 `[String: String]`。所有调用封装为 `OutputEnvelope`，由 App 消费后送 OutputGateway；Assistant/SpeechPerception 为输出赋递增序号，并保留触发输入的 `inputID / sessionID / turn`。
+Purpose: Default user entry and delegation. Design goal: role-owned decisions with explicit permissions and shared, bounded execution mechanics.
 
-### Publish / send 数据标准
+Assistant owns the first user interaction, basic reply/expression and public task coordination. Photographer owns photography; Memory owns history workflows; ApplicationControl owns settings, resources, providers, navigation and independent device control. Assistant has their capability summaries and bounded public task reports, not their private histories.
 
-`communication.publications = []`：Assistant 不广播共享观测。`communication.sends` 只允许以下两种定向消息，目标均为 `speechSynthesis`，均通过 `AgentMessaging.send(message, parent: input, to:)` 经 OutputGateway → InputGateway。发送端身份由绑定端口确定为 `assistant`；parent 是触发该段回复的输入，保留 session/turn/因果链。send 的回执只确认接纳，不等待模型合成或播放。每段独立创建 audioID；合成 FIFO 与 Action Channel 独立推进，前段未播放完时后段仍可合成。没有自动重发或播放重试。
+| File | Responsibility |
+| --- | --- |
+| AssistantAgent.swift | Canonical entry specializing AgentChatWorker<AssistantContextState>; avoids a second private Chat loop. |
+| AssistantProcessing.swift | Structured history/task views, input validation, Action-only model policy and historical context projection. |
+| Assistant.agent.json | Display/Speech/Robot/System Actions, read-only environment observation, empty Tool catalog and directed task/synthesis communication grants. Robot gesture/motor Actions execute directly; no camera or history model calls. |
 
-| contract / version / kind | typed payload 与字段标准 | 时机与失败语义 |
-| --- | --- | --- |
-| `speech.synthesize / 1 / observation` | `.speechSynthesis(SpeechSynthesisInput(audioID: UUID, text: String, locale: String))`；audioID 为每段新建的唯一句柄；text 为 Agent 分好的非空语义段，最多 2000 UTF-8 字节；locale 当前默认 `auto`，协议允许 `auto / zh-CN / en-US`。完整编码受 16 KiB 消息上限约束。 | 自然文本完成分段后立即提交；必须在回执中确认目标已接纳且无拒绝，才输出同一 audioID 的内部 Speech.Playback.speak(audioID) Action。合成与后续 Action 调度并行。 |
-| `speech.cancel / 1 / observation` | `.cancelSpeech(audioID: UUID)`；只带待取消的音频句柄，不携带文本或 PCM。 | 提交已接纳但 播放 Action 无法成功入队等清理场景发送；SpeechSynthesis 按发送方、session、父输入所有权校验，不能取消别的请求。当前清理发送失败被忽略，原始入队错误继续上抛。 |
+Typed camera/history/settings UI inputs publish directly to their business owner; Assistant does not subscribe to them or create tasks for them. Natural language chooses the authorized XML send Action. Model content cannot construct trusted UI intent, source identity or execution grants.
 
-✅ 拍照 ActionResult 的图像附件可进入下一轮云端请求。❌ 通用图像输入和 partial 驱动回答仍未实现。云端 Tool 增量由适配器聚合为完整调用。
+Assistant maintains one foreground question and FIFO pending questions. Activation sends prepared TaskInput to the child for fixed speech/caption, without an extra model request. A user answer binds the interaction at speech onset (or text admission); TaskInput validates task/session/question/artifact. Stale inputs reject; ambiguity is handled by the main decision. Completed tasks close focus. Parent decision evidence is committed before Memory receives the parentCommitted input.
 
-✅ express emits semantic eye emotions; Assistant.agent.json remains the production capability declaration. No emoji conversion is performed. setExpression(clear) clears the persistent base; express rejects clear. Three added values are angry/scared/playful; JSON schema is v5, with an additive parameter-domain extension.
+Context: current/archived conversation projection plus admission sequence and public task views; unique structured repository is the writable truth. Existing import, archive, delete and UI projection remain compatible. Onset bindings are bounded32 with deadlines; input bindings share inbox capacity. Public prompt reports retain all live tasks and eight bounded terminal excerpts, with lifecycle status read from the task registry (including failure/cancellation), separate from waiting-user stage.
 
-✅ Conversation replies follow the user language (Mandarin/English speech), with short spoken sentences and no Markdown/emoji. Agent-owned text handling preserves mixed Mandarin/English; the synthesis provider validates text. Prompt wording does not guarantee compliance.
+Upstream: App user transport and SpeechPerception semantic Signals. Downstream: OutputGateway functions/task/synthesis communication; injected ChatCapability and structured repository. All child execution results stay with the child.
 
+## Processing and state
 
-✅ Speech segments are sent to speechSynthesis with a runtime UUID. After admission, Assistant creates Speech.Playback.speak(audioID) on the original Channel through its internal permission. speech.synthesize / speech.cancel remain declared communication sends. No internal playback alias or TTS model dependency belongs in JSON.
+Implemented: admitted Signal -> role preprocessing -> atomic structured context -> selected immutable batch -> role/context adapter -> fixed decision or shared one-round Chat worker -> Action output -> directed runtime feedback. XML send uses the common CommunicationAction transport. Receipt means admission, not task completion. Only explicit TaskProgress/TaskResult update a requester.
 
-✅ AssistantAgent.systemPrompt is shared by production and evaluation. Conversation history retains the actual prompt and raw model text. Its non-executing preview uses the same Assistant.mapText callback; no historical Action is replayed.
+The role owns its context repository and schema; it does not read a parent's private inference history. Chat evidence preserves actual requests, historical native call/result pairs, usage and failures; old native pairs are projected as inert text in new Assistant requests. Media bytes stay in bounded runtime stores; context keeps authorized references. Legacy business documents without Chat fields migrate once; partial/null/unsupported Chat fields fail. Write failure prevents dependent output. Restart interrupts unfinished work and never replays effects.
 
-✅ Assistant emits `.scheduling(.beginWait/.endWait)` in the same ordered output stream as resolved Actions. Speech synthesis admission and audioID substitution preserve each event's position; directives do not count as Actions. Output holds 256 events; generation remains bounded to 120 Actions and 32 wait groups. The shared prompt explains default lanes, parallelism, local nested joins, lexical validity and actual completion; the appended JSON registry remains the only model-callable list. ❌ Tool calls and speech synthesis prefetch are not members of Action wait groups.
+Model decisions have one worker, FIFO inbox32 plus one reserved continuation, output256, four requests, cumulative execution30 seconds and queue expiry60 seconds. Fixed intent admission does not wait for model loading or inference. Task views retain256 identities, at most32 live; terminal retention may retire old identities. Communication has16 pending outputs/four runtime deliveries. All overflow rejects explicitly.
 
-✅ The shared English systemPrompt takes the capability registry; Assistant supplies Speech as its fixed audio Channel. Callable Action details are grouped by Channel. Internal method metadata and subtitle mechanics are omitted. ❌ Live-model comprehension and device acceptance remain unverified.
+Pause cancels/joins inference and records cancelled decisions; resume admits future work without replay. Stop joins the Chat worker and relay. App owns registration/consumption independently of UI pages and microphone capture. Cancellation/target loss ends the correlated task; partial native effects remain actual facts. Existing platform safety is independent of Agent inference.
 
-## Durable conversation records and context
+## Development standard
 
-✅ App injects a process-wide ConversationHistoryStore. The explicit default in-memory store is for isolated tests; production creates a protected local document. Assistant persists original user input and the exact system + ten-round + current-user request before inference, then persists each received text fragment before its bounded parser. Successful generation saves completion/finish reason; parser/provider/limit failure and cancellation save the received prefix and error. Conversation admission, raw-fragment, request/usage and terminal persistence errors propagate without resetting history or silently dropping received data. If persisting a rejected native Tool outcome fails, Assistant emits assistant.historyError and then the original rejectedCall, continuing generation; output overflow and true task cancellation remain terminal. Store bounds can reject new work before inference.
+Use the same source template: Interface; State and dependencies; Registration; Lifecycle; Input processing; Output; Context; Observability. Keep schemas, preprocessing, builders and permissions in the role directory. Register every emitted function and communication contract explicitly; fixed and model calls reuse the canonical Action implementation. Core has no role/model/storage dependencies; Support adapts shared capabilities, not domain effects.
 
-Logical conversation identity survives voice-session changes, stop/start and App restart. Only Start New archives the current conversation and resets context. History messages are model context only, never re-parsed for execution. No old audioID or Action is replayed. Model/provider context budgets still apply: an oversized ten-round request fails explicitly, rather than silently dropping rounds or altering stored originals.
+Automated tests and builds are recorded in [validation](../../../docs/Validation-History.md). Real model, native UI, acoustic and physical-device acceptance remain outstanding. See [ADR0188](../../../docs/adr/0188-specialist-task-ownership.md).
 
-```mermaid
-flowchart LR
-    Input[User input via InputGateway] --> Begin[Persist input and exact request]
-    Journal[Current journal: latest ten completed rounds] --> Begin
-    Begin --> Model[ChatCapability]
-    Model --> Raw[Persist received fragment]
-    Raw --> Parse[Parse current output only]
-    Parse --> Output[Actions and wait directives via OutputGateway]
-    Model --> End[Persist completion / failure / cancellation]
-    End --> Journal
-```
 
-✅ Memory owns ConversationTitleGenerator, which generates titles from bounded excerpts as non-executable metadata. Its request is separate from Assistant conversation context and carries no Action instruction list. ❌ Storing raw responses does not guarantee that GPT-4.1 follows wait instructions or that Actions completed successfully; generation and execution status are distinct.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Implemented: trusted runtime assistant.control publishes to the default Agent through an exact static subscription; session cancellation no longer needs an external directed-send compatibility host.
 
-## Action runtime stage 2
+## Listening policy ownership
 
-✅ The versioned configuration accepts action.result. receive validates runtime source and owner/session, stores in ActionResultInbox and correlates generated results with the active round. actionResults() exposes bounded retained history. ✅ Registered observation can continue the model; automatic effect replay is not implemented.
+✅ Assistant publishes interaction.replyActivity snapshots containing admitted user reply identities and delegated task holds. It has no listening Action permission and does not receive speech.listening. Waiting-user releases delegated holds after runtime.replyFinished; task completion/cancellation releases them through existing task reports. SpeechPerception alone interprets these facts into listening policy.
 
-## Storage domain organization
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
 
-✅ Assistant and title generation import StorageChat for conversation schemas/journal. Generic storage core no longer owns chat records; Agent behavior and persisted data remain unchanged.
+✅ Production Chat workers receive the current configured model label through ApplicationRuntime. New history records use this label; historical missing labels are not fabricated.
 
-✅ Bounded owned JPEG storage is implemented for photo observations (ADR0184). ❌ Galleries/video/semantic-memory stores remain planned.
 
-## Supervised NexArm base Action
+✅ Robot Action ownership correction: Assistant.agent.json declares the Robot Channel and 11 existing NexArm gestures/motion Actions alongside reply/expression. Parameters/examples/function addresses are preserved. Ordinary mechanical-arm requests execute under Assistant identity and return results to its context, without delegation.
 
-✅ JSON is the only model registration: `<shakeBase cycles="1"/>` resolves to `NexArm.Motion.shakeBase` on Robot. Required integer `cycles` is 1...3; one cycle is origin → +2° → -2° → origin. No angle/speed parameters. All calls and completion receipts cross the Gateways. The domain handler validates arguments; the host binds a connected controller. The Mac USB integration harness exercises the real Assistant/parser with explicitly deterministic model output and test presentation.
+✅ Frontend/backend separation: Assistant no longer subscribes to camera/history/resource/provider/device UI command contracts and no longer synthesizes tasks for them. Conversational delegation and explicit task follow-up still use authorized communication.
 
-✅ iPhone binds the verified BLE profile through AppWorkflows. ❌ Unattended model motion and verified hardware stop/watchdog are unavailable; disconnected devices fail explicitly. Generation completion is not motion completion. Use only explicitly requested supervised motions; never automatically retry failures.
 
-✅ shakeBase documentation now identifies phone Settings → Bluetooth Devices and foreground/posture requirements. iPhone has a real BLE workflow binding. Terminal ActionResults enter the existing bounded inbox, and UI shows workflow completion independently of model prose. ❌ Robot bindings remain recordOnly; arbitrary robot Actions are not introduced.
+## Responses and Action-only Assistant migration
 
-## NexArm entertainment skills (2026-09-30)
+✅ Implemented: Assistant.agent.json has an empty tools catalog. Add readEnvironment Action on System Channel with observation feedback. Remove static runtimeInfo and /status special handling; plain text /status is ordinary user input. Send is an authorized communication Action only. Historical native calls/results remain stored but are rendered as inert text evidence for new model requests.
 
-✅ Robot now exposes waveWrist(count), tiltWrist(direction), lookAround(cycles), celebrate(cycles) and dance(cycles), alongside shakeBase. JSON v6 alone lists model permissions. Docs distinguish motion geometry, finite completion, foreground/connection requirements and no automatic retry; examples use structured wait. Choose a gesture when the user requests robot motion/performance, not on every ordinary chat reply. ❌ No new receipt-driven model recovery or implicit motion on reconnect.
+✅ Delegation prompt: emit only the authorized send Action; omit spoken acknowledgment, preamble and duplicate explanations. Specialist owns questions and outcome replies. Parent and specialist playback use the shared serialized Speech function without presentation-focus cancellation; permissions and explicit cancellation remain enforced.
 
-✅ Robot gesture descriptions now specify fixed preparation/body/home, larger coordinated angles and all-six-servo poses including grip. JSON v6 aliases and parameter schemas are unchanged. ❌ Physical choreography acceptance remains pending.
 
-✅ Robot docs now describe the phone base Action as ±30° and all performances as fixed Cartesian home/ready/body/home with800ms body interpolation. Joint calibration belongs to the device; no model-callable registry changes. ❌ Physical performance acceptance remains pending.
-
-✅ NexArm left/right means the arm’s own frame, viewed from behind facing forward. The tiltWrist description now matches the shared controller: left positive yaw/roll, right negative yaw/roll. ❌ Observer-relative directions are not a separate action mode.
-
-✅ Explicit NexArm preset requests are independent of prior unconfirmed motion: no recovery/stationary-feedback gate before an already validated connection starts its fixed 3000ms approach. A failed segment stops only that invocation; subsequent user requests can start. Current-request completion feedback, exclusive ownership, reset preemption and connection validation remain. Regression tests cover missing old feedback and a later successful request. ❌ No claim that ignoring an old result physically stops servo holding or repairs transport loss.
-
-✅ TiltWrist keeps ready height240mm with yaw±12° / roll±40° and its fixed return sequence; there is no extra260mm lift. ❌ Precise Cartesian positioning is not promised.
-
-## Action and Action presentation boundary
-
-✅ beginReplyTurn and per-sentence print are code-owned Display Actions; speech playback and model-selected expression remain scheduled Actions. Text mapping returns ordered GenerationEvents: speech Action followed by caption Action. Captions append sentence chunks, never full accumulated replies, and use the Display Channel. The same 120-call/256-output bounds cover both kinds. ✅ Cloud native Tools use the same declared registry and Gateway boundary.
-
-## Head gestures
-
-✅ JSON v6 adds nodHead and shakeHead on Robot, cycles1...3. Descriptions distinguish motor4 nodding and motor5 head shaking from base sway. Internal grants and Action presentation are unchanged. ❌ No implicit nod or shake is generated for ordinary replies.
-
-## NexArm feedback execution — 2026-10-01
-
-✅ The versioned Robot channel catalog includes `resetArm` → `NexArm.Motion.reset`, with no arguments. Nod and shakeHead descriptions specify motor4 and5 scope; all action failures still return through Gateway.
-
-❌ Sustained real-device acceptance remains pending.
-
-## Atomic composition — ADR0092
-
-✅ Robot JSONv6 exposes moveMotor/resetMotor and optional speed/acceleration on existing composites. Errors are terminal outcomes, not implicit cancellation of later Channel actions.
-
-❌ Sustained real-device acceptance and durable result delivery remain outstanding.
-
-✅ JSON v6 declares Camera.Capture.open, Camera.Capture.close and Camera.Capture.flip as no-argument native Tools, separately from Action Channels. They cross OutputGateway and reuse App camera lifecycle. ✅ Cloud ChatCapability emits complete native Tool calls.
-
-## Native cloud Tool calls
-
-✅ Cloud Chat Completions accepts JSON v6 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
-
-```mermaid
-flowchart LR
-    JSON[Agent JSON v6 Tools] --> Request[ChatRequest tools]
-    Request --> Cloud[Cloud request and SSE deltas]
-    Cloud --> Join[Bounded per-index argument assembly]
-    Join --> Call[Complete ChatEvent.toolCall]
-    Call --> Resolve[AgentCore ToolCallParser and permission resolution]
-    Resolve --> Gateway[OutputGateway / CallRuntime]
-    Gateway --> Result[Existing InputGateway result feedback]
-```
-
-Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
-
-✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Returning Tools retain the current literal feedback behavior; completion-only Tools produce no result.
-❌ Local native tools, partial native tool-call transcripts and Responses API transport.
-
-✅ Formatting now satisfies Swift 6.4 strict lint. Runtime behavior and Agent JSON permissions are unchanged.
-
-✅ A rejected synthesis request is recorded by the messaging port and skips only its dependent playback Action; other generated outputs and later inputs continue.
-
-## Durable native Tool and usage diagnostics
-
-✅ Assistant saves actual Tool declarations before chat, and complete native calls before resolution, preserving provider ID, runtime UUID and argument JSON. Resolution/admission errors are recorded against the same call; App supplies the actual Gateway execution outcome. ChatEvent.usage is stored before final completion. Ordinary chat requests omit maximumOutputTokens. XML and native calls may coexist; fixed internal caption Actions are excluded from model-native call history.
-✅ Complete native results drive bounded continuation. ❌ Incomplete native SSE calls remain unsupported; missing usage is not estimated.
-
-✅ Unknown model-callable aliases and invalid invocation parameters emit rejectedCall and continue the same turn. Native Tool failures retain their durable failed Tool outcome and correlation ID. Rejections share the120-call limit; malformed markup, bounds and cancellation remain terminal. ❌ Automatic correction/retry is not implemented.
-
-✅ Failure to persist a rejected native Tool outcome emits a nonterminal assistant.historyError result and preserves the original call rejection. True cancellation and output overflow remain terminal. ❌ Conversation admission/raw history persistence are still strict.
-
-✅ AssistantAgent.outputContext appends Assistant-owned text-to-synthesis/playback guidance to generic CapabilityContextBuilder scheduling/catalog text. SpeechSynthesisInput is owned by Agents/Communication/SpeechValues.swift; JSON catalogs and existing bounded messaging/playback behavior are preserved.
-
-✅ Assistant extracts PerceptionMessage from the generic message envelope after schema validation. Prompt policy and text admission helpers are grouped in AssistantAgent.swift; no separate prompt-only file is retained.
-
-✅ Assistant owns validated textSegmentation (Hanzi60 / other120 Characters) and supplies it to generation; App history preview supplies the same policy. Core defaults no longer imply speech latency policy. ❌ No timer flushing or first-chunk policy.
-
-## Context ownership
-
-✅ ConversationContextBuilder selects the last ten completed rounds and preserves exact raw text. Assistant reads records with a token, builds the request, persists it with fenced admission and sends that stored request to ChatCapability. Archived/failed/cancelled/interrupted rounds are excluded. Conflicts and persistence errors terminate this input without calling the model or retrying.
-
-❌ Retrieval-based context and automatic conflict retry are not implemented.
-
-✅ JSON v6 declares History.Conversation.list/read with required string pagination parameters. Cloud complete native calls reach bounded read-only history previews. Returned data uses the existing escaped ToolResult path, not Action parsing. ❌ Local native calls and full history search/export remain unsupported. ✅ Complete cloud native results drive bounded continuation.
-
-✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
-
-
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
-
-❌ Physical acceptance and additional business capability exposure are not established by this migration.
-
-✅ Implemented: accept typed assistant.control/1 from the external runtime host only, before ordinary observation and inbox processing. Reject malformed/foreign content, wrong provenance and expired controls without mutation. Remove runtime.event input and event echo behavior; preserve selected-session cancellation, full/paused bypass and joined worker cleanup.
-
-✅ Implemented: move ConversationTitleGenerator to Memory without changing its inference algorithm or public namespace. Assistant owns conversation generation only.
-
-
-## Bounded registered-observation continuation
-
-✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
-
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
-
-
-## Read-only model grants and shared capability facts
-
-✅ Implemented: Assistant JSON explicitly grants System.ModelResources.snapshotResources and System.Provider.readSettings as native read-only tools. The same canonical functions used by deterministic/manual routes return the current shared inventory and a confirmed cloud-enabled/model summary. Provider summary excludes endpoint/key and never restores or changes a binding; unavailable/unconfirmed state fails explicitly. LLM configuration mutations remain staged-secret human operations. These tools query current facts rather than fixed runtimeInfo text and can feed bounded model continuation.
-
-
-## Typed device, navigation and environment entry points
-
-✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
-
-✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
-
-✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
-
-
-## Model resource command grants
-
-✅ Implemented: Assistant has grants for the existing canonical download/cancel functions with bounded model ID, explicit HTTPS source and boolean cellular arguments. Manual and native model calls share execution and native transfer ownership; download acknowledges admission only and cancel awaits cleanup. Model removal is not granted: its native quiescence can join the calling voice runtime, so removal needs the same explicit session-handoff design as provider changes. No configuration or provider mutation grant is implied. Model feedback reports errors as data and never automatically replays a transfer.
-
-✅ Implemented bound regression: the fourth model round must await its already-issued native calls before reporting the round limit, preserve actual outcomes, and admit a subsequent input. It must not start a fifth request or fabricate completion for outstanding work.
-
-✅ Implemented failure-data correction: native continuation Tool messages wrap failed outcomes as bounded JSON containing isError, failureCode and the exact value. Successful values remain unchanged. Error metadata is model data and is never passed through Action parsing.
-
-✅ Implemented error-chain preservation: failed native continuation messages must also include any producer report, with every child outcome, execution failure and retained description. Preserve partial failure; a scalar error message must not replace the structured chain. The existing transcript byte bound rejects oversized data.
-
-✅ Assistant prompt shows a capability-derived concurrent expression/motion example with bare Action tags, without Channel wrappers or wait; sequential speech guidance remains separate.
-
-✅ Interaction refinement: Assistant.agent.json Camera.flip declaration requires facing enum front/back and describes target selection rather than toggling.
-
-## Action/Tool generation rounds — ADR0183
-
-
-✅ Assistant validates causal feedback, rejects stale/duplicate results, persists ordered execution evidence, pairs all native provider calls with native results, and sends Action observations as structured data. Failed observations do not replay effects.
-
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
-
-## Assistant photo observation — ADR0184
-
-✅ Implemented: Add Camera.Capture.takePhoto text Action on Camera, registered observation. Successful correlated results resolve photoID through injected owner-scoped reader; user-role image plus execution data drive the existing round barrier/loop. Failed capture remains data; unsupported image providers fail explicitly. History stores attachment metadata only, never base64 bytes.
-
-❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
-
-## Photo save and ignore — ADR0185
-
-✅ Camera Channel exposes savePhoto/ignorePhoto observation Actions. Optional UUID selects the current displayed photo; omitted ID means current at execution. Explicit save requests export to Photos; close/dismiss/discard requests hide the photo. Both delegate through Photographer and use actual receipts for the next reply. Only successful takePhoto attaches image bytes; disposition adds no image, no capture and no automatic replay.
-
-
-## Independent protocol consumers — 2026-10-08
-
-✅ Implemented: AssistantAgent.collect routes text fragments and complete native calls into separate structured workers. Text owns AgentGenerator, raw-text persistence and speech preparation; native calls own ToolCallParser, native history and Tool emission. Text backlog is bounded at8192 fragments/65536 UTF-8 bytes per round; native backlog at16 calls. Overflow fails explicitly. Both workers join before roundFinished; cancellation/failure closes streams, cancels siblings and joins cleanup. The transport reader is a structured child so parser failure wakes the owner even while model output is open. Shared call budgets are reserved synchronously before suspending. Merge order remains emitted call order; no global execution order is imposed across protocols.
-
-
-## Per-request conversation history
-
-✅ Implemented: AssistantAgent.swift begins a modelRequests entry immediately before every collect. The first entry contains user input; later entries contain only newly appended execution observations (plus photo metadata when applicable). Context records preserve native call/result correlation and omit image bytes. The transport reader timestamps the first nonempty text event before parsing/speech preparation; native complete-call events do not supply token timing. Requests complete after protocol workers join, while existing full-round execution barriers govern further model calls. The original input worker still owns deadlines, cancellation and terminal persistence. New records no longer duplicate continuationRequests.
-
-❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
-
-
-## History image thumbnails
-
-✅ Implemented: historyRequest encodes imageReferences (ID/MIME/byteCount) in metadata-only message JSON while preserving exact sent text/native correlation. Image bytes remain absent. The legacy diagnostic image line is readable for existing files; fresh structured requests do not append it to sent context text.
-
-❌ Native image/layout and live-model acceptance remain separate from automated verification.
+✅ Send Action-only audit (2026-10-10): remove automatic Agent.send native Tool declarations and the per-role exposesNativeCommunicationTools switch. Every role keeps authorized send Action declarations, target/kind/parameter documentation and receipt/task ownership contracts. Existing business Tools and historical native call/result evidence remain unchanged. Reject an explicit communication Tool registration instead of silently exposing it. Regression tests check all seven effective model catalogs and task request/progress/input/result flows using Action-call send, including roles with business Tools.

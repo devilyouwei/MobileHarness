@@ -35,8 +35,8 @@ final class VisionSession {
         do {
             try await runtime.photographer.attachTracking(sessionID: sessionID)
             trackingAttached = true
-            try await vision.bind(responses.messaging(for: .visionPerception))
             try await manager.start(.visionPerception)
+            let visionConsumer = try await responses.consumer(for: vision)
             try await withThrowingTaskGroup(of: Bool.self) { group in
                 group.addTask {
                     for try await frame in frames {
@@ -46,21 +46,17 @@ final class VisionSession {
                             attachment: CameraImageAttachment(frame: frame),
                             sequence: frame.sequence, timestamp: frame.timestamp, rotation: frame.rotation,
                             capturedAt: frame.capturedAt)
-                        let report = try await input.publish(MediaInputAdapter.image(image, sessionID: sessionID))
-                        guard report.rejected.isEmpty, report.delivered == [.visionPerception] else {
-                            if await vision.status().lifecycle == .failed { return false }
-                            continue
-                        }
+                        try await input.publish(MediaInputAdapter.image(image, sessionID: sessionID))
+                        if await vision.status().lifecycle == .failed { return false }
                     }
                     return true
                 }
                 group.addTask {
-                    for await envelope in vision.outputs {
+                    try await IndependentOutputWorkflow.consumeSignals(vision.outputs) { envelope in
                         try Task.checkCancellation()
-                        try await responses.execute(envelope)
+                        try await visionConsumer.execute(envelope)
                         if case .control(let state) = envelope.output, state.hasPrefix("agent.error:") {
                             await endpoint.visionStatus("姿态识别已停止，请重试", sessionID: sessionID)
-                            return false
                         }
                     }
                     if await vision.status().lifecycle == .failed {

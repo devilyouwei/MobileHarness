@@ -15,7 +15,7 @@ flowchart LR
 
 ## Perception and cognition
 
-SpeechPerception and VisionPerception share recognition/pose processing and publish typed observations. Assistant combines recognized input with retained conversation context and produces a streaming response. SpeechSynthesis is a separate directed service preparing PCM; playback follows scheduled Actions.
+SpeechPerception and VisionPerception share recognition/pose processing and publish typed observations. Assistant is the default user entry, combines input with its own context and delegates specialist tasks; each interactive specialist owns its private model history and streaming response. SpeechSynthesis is a separate directed service preparing PCM; playback follows scheduled Actions.
 
 Agents own their cognitive state and processing. Communication carries trusted source, session and causal context. Gateways validate admission and requested behavior, while Agent inboxes own pending messages.
 
@@ -39,7 +39,7 @@ UI pages do not own model/device sessions. Long-lived work belongs to App lifecy
 
 ## Conversation, settings and devices
 
-Conversation records persist locally across voice sessions and restarts. Assistant owns ten-round context selection and exact request assembly; Storage admits that request against an opaque read token. UI owns display-title defaults. SpeechSynthesis owns producer errors; StorageAudio validates PCM and retains audio, while App supplies localized failure wording after cleanup. New Conversation archives the current record before title generation; browsing history cannot replay behavior. Assistant exposes History.list/read as returning Tools backed by the same journal; bounded previews cross the existing Gateways. History refresh/delete/archive/title use typed InputGateway intent and root-owned Memory, which selects registered History.Conversation and UI.HistoryPresentation functions through OutputGateway. A scoped adapter projects raw records; the single-operation transport rejects overlap and joins cancellation before retry. MemoryHistoryWorkflow owns sequencing and ConversationTitleGenerator owns bounded title-only inference. Structured memory/semantic recall remain pending. Settings persist locally, credentials use the device Keychain, and App supplies narrow platform/presentation capabilities rather than history/title business decisions.
+Conversation records persist locally across voice sessions and restarts. Assistant owns ten-round context selection and exact request assembly; Storage admits that request against an opaque read token. UI owns display-title defaults. SpeechSynthesis owns producer errors; StorageAudio validates PCM and retains audio, while App supplies localized failure wording after cleanup. New Conversation archives the current record before title generation; browsing history cannot replay behavior. Memory exposes History.list/read as returning Tools backed by the same journal; bounded previews cross the existing Gateways. History refresh/delete/archive/title use typed InputGateway intent and root-owned Memory, which selects registered History.Conversation and UI.HistoryPresentation functions through OutputGateway. A scoped adapter projects raw records; the single-operation transport rejects overlap and joins cancellation before retry. MemoryHistoryWorkflow owns sequencing and ConversationTitleGenerator owns bounded title-only inference. Structured memory/semantic recall remain pending. Settings persist locally, credentials use the device Keychain, and App supplies narrow platform/presentation capabilities rather than history/title business decisions.
 
 The default pipeline uses local recognition, synthesis, pose and chat models. Explicit cloud configuration selects an OpenAI-compatible chat capability and sends its chat context to that provider; other perception/output remains local. Model configuration and resource acquisition share a process-wide manager.
 
@@ -55,7 +55,7 @@ Cloud chat supports native function declarations from Agent JSON v6. Complete ca
 
 Photographer subscribes to VisionPerception pose observations and emits internal Robot.aim through OutputGateway. App binds the foreground BLE workflow; Actions owns aim mapping and admission, while PlatformKit supplies native command encoding. Transport acceptance does not establish physical arrival.
 
-Tracking Tool calls publish latest targets after OutputGateway authorization. The App worker holds motors1–4 through ResourceCoordinator (ADR0126), checks current Photographer usable-pose reception and joins/releases after one second without fresh input. All six motors share a physical-writer execution group; App policy lets authorized Assistant actions preempt Photographer after cancellation and joined cleanup (ADR0139), while subsequent Channel work remains queued. Camera close removes its session; old targets never replay. Control admission/expected interruption does not trigger Bluetooth recovery or stop speech/vision.
+Tracking Tool calls publish latest targets after OutputGateway authorization. The App worker holds motors1–4 through ResourceCoordinator (ADR0126), checks current Photographer usable-pose reception and joins/releases after one second without fresh input. All six motors share a physical-writer execution group; App policy lets authorized ApplicationControl actions preempt Photographer after cancellation and joined cleanup (ADR0139), while subsequent Channel work remains queued. Camera close removes its session; old targets never replay. Control admission/expected interruption does not trigger Bluetooth recovery or stop speech/vision.
 
 VisionPerception and Photographer share observations but have independent execution failure scopes. A rejected Robot.aim does not stop showPose. BLE connectivity and control verification are separate states; query timeout retains connectivity while quarantining control queries until App reconnects the link.
 
@@ -286,7 +286,7 @@ Settings download, cancel and removal now enter ApplicationControl through typed
 
 ## Photographer camera control
 
-✅ Photographer owns camera open/close/lens switch/retry through typed photography.camera Signals and existing Camera.Capture functions. Manual input enters InputGateway; Assistant camera Tools delegate through the Gateway-bound invocation with original identity/causality before Photographer executes the same function. Returned errors retain the complete producer report.
+✅ Photographer owns camera open/close/lens switch/retry through typed photography.camera Signals and existing Camera.Capture functions. Manual camera data requests publish directly to Photographer through InputGateway, while conversational requests may delegate through Assistant. Photographer invokes the canonical camera function under its actual execution identity. Returned errors retain the complete producer report.
 
 The root service outlives preview. One attached vision session supplies pose tracking; closing capture retires/join-cleans that scope without stopping the camera-command Agent. Native camera permissions, leases, capture cleanup and immediate safety fencing remain App/PlatformKit responsibilities. ❌ Still capture, video recording and richer shooting interaction remain pending. See ADR0181.
 
@@ -294,3 +294,32 @@ The root service outlives preview. One attached vision session supplies pose tra
 ## ApplicationControl ownership — ADR0182
 
 ✅ Remaining application operations belong to the canonical ApplicationControl service. Its directory owns actor/configuration, fixed function permissions and pure resource-result policy; App owns ApplicationControlIntentRuntime and injected native endpoints. Photographer and Memory retain their domains. Role identity/source/session guards and packaged resources migrate together; domain Signal schemas and Actions algorithms remain unchanged. Generic specialist delegation remains pending.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+执行所有者（Agent/incarnation/session）、task/parentTask、Signal 因果 root/parent、decision/call 分别关联。ActionResult 按可信运行时所有者路由；TaskResult 是子任务显式报告，communication receipt 是接纳反馈。反馈旁路、普通输入 FIFO/融合/替换由各 Agent 决定。
+
+参见 [ADR0187](adr/0187-agent-composition-and-react.md) 与 [Agents 当前设计](../MobileHarness/Agents/README.md)。
+
+✅ Phase two specialist ownership implementation: [ADR0188](adr/0188-specialist-task-ownership.md). Implemented; real-model/native-UI/physical-device acceptance pending.
+
+✅ [ADR0189](adr/0189-agent-support-hierarchy.md): reusable Agent sources group under Support/Core, Communication, Chat and Context. Core retains independent Foundation-only compilation; the seven role directories own business decisions. Target names and dependency boundaries are unchanged; full checks and unsigned iOS device build passed.
+
+✅ [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md): SpeechPerception owns listening consent and admission policy through fixed Actions; interactive Agents publish reply occupancy and App executes native/playback barriers. External facts publish one-way, internal send retains admission receipts, and recoverable speech errors do not stop recording. Physical recording stops on user-off/native interruption; policy pause suppresses recognition input while preserving capture.
+
+## Basic mechanical-arm interaction ownership
+
+✅ Assistant directly exposes the 11 NexArm gesture/motor Actions as basic interaction. Photographer exposes camera Actions and retains its internal photographic tracking Tool; ApplicationControl exposes connection/configuration capabilities and retains fixed settings device transactions and also registers the same mechanical-arm Actions for Settings command tests. Action registration is many-to-many; each role executes under its own identity. App grants Assistant the motor writer and joined takeover of Photographer tracking; shared resource exclusion and native safety remain unchanged. ActionResult returns to the actual executor.
+
+✅ Frontend/backend boundary: local page navigation and UI state changes execute in UI/App without submitting Agent work. Explicit backend requests are subscribed directly by the owning Agent; Assistant remains the conversational entry only. Authorized Agent-issued UI Actions reuse the same presentation methods. Page visibility, system-settings opening and native stop fencing do not wait behind backend device transactions.
+
+
+## Responses transport and Action-only Assistant
+
+✅ Implemented: Cloud Chat uses Responses input/typed SSE under the existing ModelKit capability boundary. Model resource residency owns a reusable HTTP Session; each operation owns cancellation and never invalidates another request. Assistant has no Tool grants: environment observation and directed delegation use Action calls. Other Agent/host protocol grants remain role-owned. Historical native-call pairs stay in storage and become inert text evidence in Assistant requests. No server-side conversation ownership, protocol fallback or new modules/dependencies are introduced.

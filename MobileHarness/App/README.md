@@ -29,7 +29,7 @@ flowchart LR
     Root -.-> Services
 ```
 
-Agent-selected business effects always cross OutputGateway; input adaptation and runtime observations are not alternative permission paths. Local UI drafts remain in UI. Settings and manual-device commands are Agent-routed; native diagnostics and immediate safety fences remain host mechanisms.
+Agent-selected business effects always cross OutputGateway; input adaptation and runtime observations are not alternative permission paths. Local UI drafts remain in UI. Explicit settings/manual-device data commands are routed directly to their owning Agent; UI navigation and page cleanup remain local; native diagnostics and immediate safety fences remain host mechanisms.
 
 ## Internal structure
 
@@ -108,7 +108,7 @@ Native download background handling is separate from voice/device lifetime. App 
 
 See [Agent-driven architecture](../README.md), [Behavior assembly](Composition/Behaviors/README.md) and the owning lifecycle/workflow READMEs for detailed limits and platform policies.
 
-✅ Implemented: voice lifecycle cancellation emits typed AssistantControl through the existing InputGateway path; App retains immediate capture shutdown and session cleanup ownership.
+✅ App owns a stable interaction lifetime for the default Assistant and specialists. Microphone stop cleans capture/perception; full application shutdown cancels/joins business owners and reply transport. Scene background preserves immediate native safety fencing and joins inference cancellation.
 
 ✅ Implemented: history facade delegates all mutation operations to typed root Agent transport. Composition injects shared journal and lazy title-only computation; no App archival/title persistence policy remains.
 
@@ -166,7 +166,7 @@ See [Agent-driven architecture](../README.md), [Behavior assembly](Composition/B
 
 ✅ ADR0181: root PhotographerIntentRuntime owns lazy Photographer registration, one output consumer, one camera request and independent tracking dispatch. CameraInteractionWorkflow emits typed Photographer operations. VisionSession attaches/detaches tracking rather than constructing/removing Photographer. Native camera scopes remain unchanged.
 
-✅ Interaction refinement: Camera target-facing passes through existing root delegation and native capture lifecycle. Accepted caption updates retain finalized user text above the eyes until the next turn, preserving stale-output fences.
+✅ Interaction refinement: Camera target-facing passes through direct Photographer publication and native capture lifecycle. Accepted caption updates retain finalized user text above the eyes until the next turn, preserving stale-output fences.
 
 ## Action/Tool generation rounds — ADR0183
 
@@ -174,17 +174,17 @@ See [Agent-driven architecture](../README.md), [Behavior assembly](Composition/B
 
 ✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow admits Actions in order while executing up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../docs/adr/0183-generation-round-observations.md).
 
 ## Assistant photo observation — ADR0184
 
-✅ Implemented: Direct Assistant camera capture endpoint plus owner-scoped image resolver; existing root Photographer operations unchanged.
+✅ Implemented: Photographer directly invokes canonical Camera functions with an owner-scoped image resolver; typed camera operations publish directly to Photographer.
 
 ❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
 
 ## Photo save and ignore — ADR0185
 
-✅ Root camera intent transport now covers photo save/ignore. UI forwards only typed intent; RuntimePresentation validates root Photographer or active Assistant delegation. CameraCoordinator owns one displayed photo/owner and one joined native export; album success and per-image duplicate prevention are native completion facts. Existing voice/ReAct ownership remains independent.
+✅ Root camera intent transport now covers photo save/ignore. UI forwards only typed intent; RuntimePresentation validates the actual Photographer producer and active root/task scope. CameraCoordinator owns one displayed photo/owner and one joined native export; album success and per-image duplicate prevention are native completion facts. Existing voice/ReAct ownership remains independent.
 
 
 ## Independent protocol consumers — 2026-10-08
@@ -203,3 +203,30 @@ See [Agent-driven architecture](../README.md), [Behavior assembly](Composition/B
 ✅ Implemented: Composition shares one bounded photo store with CameraCoordinator and the history reader. History performs read-only adaptation/loads; camera lifetime and native effects are unchanged.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+## Phase two runtime lifetime
+
+✅ Implemented: ApplicationRuntime owns the default entry and three specialists; AppContainer retains its presentation/synthesis lifetime Task. View task cancellation does not own Agent loops or reply endpoints. Scene background still synchronously closes native capture and existing safety fences; no background inference is introduced.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories use read-only task lists with original request titles, terminal/waiting status and task-scoped model detail/export. App projects task/input membership from the same immutable Agent context snapshot; ReACT and later task inputs remain together across old archives. Missing associations remain separate and missing dates remain empty. No specialist summary/archive mutation is exposed. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+
+## One-way publication and listening admission correction
+
+## Listening policy ownership
+
+✅ The resident SpeechPerception emits listening Actions through RuntimePresentation. VoiceSessionCoordinator owns native microphone epochs, ordered output consumption, startup/pause/cleanup tasks and actual playback/tail barriers, independently of page navigation. User eye taps publish directly to SpeechPerception; App has no reply-policy watchdog. Native stop reports speech.captureEnded; agent.error/publication diagnostics retain existing frontend presentation.
+
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
+
+
+✅ Execution-log tabs: Root-owned presentation subscribes to Action, task-only and output-error snapshots; business task reports become bounded timelines. Agent lifecycle changes and independent failures remain visible. UI receives passive values only, with no Signal collection or subscription.
+
+✅ Task-history links: app view assembly resolves a task executor to an existing history destination and injects a read-only matching-input view. Log navigation creates no additional context repository or business operation.
+
+✅ Frontend/backend separation: App binds local UI navigation and immediate native cleanup separately from direct owning-Agent data transport. Assistant is the conversational entry; authorized Agent UI Actions remain output-driven. See the overall routing table.
+
+✅ Publication boundary audit: publish performs bounded one-way submission without subscriber/observer acknowledgment. Environment and model-resource observations have no App request/result waiter. Receiver effects and Agent errors proceed independently through registered output consumers. send retains directed admission receipts; explicit user data-operation completion remains a separate business result. See [ADR0190](/Users/devil/Pro/MobileHarness/docs/adr/0190-assistant-listening-and-one-way-publication.md).

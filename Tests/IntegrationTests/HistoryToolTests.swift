@@ -117,7 +117,7 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
 }
 
 @Test func historyDeclarationsResolveNativeStringArgumentsAndReturnCorrelatedResults() async throws {
-    let configuration = try AgentConfigurations.load(named: "Assistant")
+    let configuration = try AgentConfigurations.load(named: "Memory")
     let id = UUID()
     let call = try ToolCallParser.parse(
         id: id, alias: "History.list", argumentsJSON: Data("{\"offset\":\"0\",\"limit\":\"1\"}".utf8),

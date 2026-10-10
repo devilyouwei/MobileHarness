@@ -4,75 +4,17 @@ Purpose: admit external inputs and route validated signals to Agent inboxes. Gat
 
 ✅ `AgentInput` carries payload, contract/version, source/incarnation, session, capture metadata, sequence, causal root/parent, hop count and a monotonic admission deadline. Audio/image transport contracts are AgentCore-owned; App converts platform frames without exposing concrete model types to Gateway.
 
-✅ `publish` matches static JSON v6 contract/source/topic subscriptions. `send(to:)` bypasses subscription matching but preserves acceptance, identity, session, deadline and capacity checks. `publish` requires CommunicationPolicy and fails if no subscriptions match. `send` requires an explicit target; there is no default-Agent fallback or compatibility router. Policy-free construction supports explicit directed admission only, using the target descriptor and runtime checks. ToolResult remains directed to its original Agent/session.
+✅ `publish` is the sole production entry for external user, media and environment Signals. It validates source/protocol and matches static JSON v6 subscriptions, then returns without receiver acknowledgment. No matching subscribers is ordinary loss. Invalid publisher envelopes or unauthorized sources still throw; subscriber rejection, overflow and processing errors never become a publisher response.
 
-✅ External and internal admission share bounds of 128 concurrent operations, 256 branches, 8 MiB observation payload (charged per target) and 16 distinct targets per call; excess is rejected immediately. Gateway creates no persistent media mailbox. It reports per-target rejection; one destination does not prevent other destinations from admission. Concrete Agents own business queues. Internal delivery is reachable through the bound OutputGateway port and validates both sender and destination incarnations.
-
-```mermaid
-flowchart LR
-    Platform[PlatformKit via App] --> Validate[Envelope / size / expiry validation]
-    Validate --> Route{Publish or send}
-    Route -->|publish| Policy[Static JSON v6 subscriptions]
-    Route -->|send| Target[Explicit destination]
-    Policy --> Admit[Capability / incarnation / session check]
-    Target --> Admit
-    Output[OutputGateway] --> Admit
-    Admit --> Inbox[Bounded Agent inbox]
-```
+✅ Fan-out is owned by InputGateway: at most128 operations,256 branches,8 MiB observation bytes charged per destination and16 targets per publication. Overflow drops the publication and reports a diagnostic. Receivers independently validate identity, session, deadline and business admission; failures use runtime diagnostic presentation. Expected speech inputBusy suppression is not an exception. shutdown cancels and joins retained delivery tasks; flushPublications is a runtime/test cleanup barrier, not an acknowledgment API.
 
 ## External input admission and delivery
 
-External producers supply native `AgentInput` values through App adapters. InputGateway selects targets and calls their `receive` methods directly; this path does not enter InternalSignalBus or create per-target transport queues/workers.
+App builds AgentInput → publish validates external protocol → static subscriptions select destinations → bounded owned fan-out calls receive → Agent-owned preprocessing/inbox. Concurrent publication has no transport FIFO promise; each Agent owns ordering/replacement/fusion. The producer never waits for inference or subscriber completion.
 
-```mermaid
-flowchart TB
-    External["External Inputs<br/>Microphone / Camera / User / Legacy host events"]
-    App["App Adapters<br/>Build AgentInput"]
-    External --> App
+Internal send remains directed and returns a DeliveryReport describing acceptance, not task completion. Runtime Action/Tool feedback remains owner-fenced and directed. The public external send method is disabled by default; allowsExternalSend is an explicit compatibility option for isolated tests/legacy hosts only. Production App has no external directed-send path. No wildcard, default-target fallback, retry or replay is introduced.
 
-    subgraph Gateway["InputGateway — bounded direct admission"]
-        Route{"Input operation"}
-        Send["send: select explicit target"]
-        Publish["publish: match static subscriptions"]
-        Targets["Selected target list"]
-        Admit["Validate payload and external source<br/>Check admission and target limits"]
-        Route --> Send
-        Route --> Publish
-        Send --> Targets
-        Publish --> Targets
-        Targets --> Admit
-        Admit --> CheckA["Validate A<br/>Input support / Identity / Session"]
-        Admit --> CheckB["Validate B<br/>Input support / Identity / Session"]
-        Admit --> CheckC["Validate C<br/>Input support / Identity / Session"]
-    end
-
-    App --> Route
-    CheckA --> ReceiveA["A.receive(input)"]
-    CheckB --> ReceiveB["B.receive(input)"]
-    CheckC --> ReceiveC["C.receive(input)"]
-    ReceiveA --> InboxA["Agent A bounded inbox"]
-    ReceiveB --> InboxB["Agent B bounded inbox"]
-    ReceiveC --> InboxC["Agent C bounded inbox"]
-
-    classDef external fill:#F1F5F9,stroke:#64748B,color:#0F172A
-    classDef gateway fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A
-    classDef agent fill:#DCFCE7,stroke:#16A34A,color:#14532D
-    class External,App external
-    class Route,Send,Publish,Targets,Admit,CheckA,CheckB,CheckC gateway
-    class ReceiveA,ReceiveB,ReceiveC,InboxA,InboxB,InboxC agent
-```
-
-A/B/C represent selected destinations, not an unconditional broadcast. `send` selects one target; `publish` selects matching subscribers. The validation boxes belong to the same InputGateway instance. Inbox boxes represent Agent-owned business admission; individual Agents may handle explicit control inputs immediately instead of queuing them.
-
-1. Reject a supplied internal incarnation; resolve the explicit target or exact static subscriptions. A publication without subscribers fails with `noRecipients`.
-2. Validate the envelope/payload and expiry, reserve shared operation/branch/observation-byte capacity, and validate the allowed external source and at most 16 distinct targets. Exhaustion rejects; there is no waiting admission queue.
-3. A structured task group creates one task per target. Each checks declared input support, obtains and validates the live target identity/session, and awaits `receive`. These tasks are not persistent workers.
-4. Collect each target's success or rejection into DeliveryReport; one receiver's rejection does not suppress the others. The call awaits all target tasks, so a slow receiver can delay the aggregate report even while other targets admit independently.
-5. Release the operation, branch and byte reservations when the operation returns. `delivered` means reception/admission, not model processing or physical completion. Agent-owned queues enforce their own capacity, expiry and overflow rules.
-
-Concurrent external submissions have no Gateway per-target FIFO guarantee. Internal delivery uses the same bounded structured calls. Deadlines are checked before receive; there are no timeout tasks or communication session registries. Neither path has transport FIFO or state replacement; Agent inboxes own pending-message policy. InputGateway actor isolation alone does not establish arrival order across suspension points.
-
-Compare the [internal direct admission lifecycle](../../Agents/Core/Communication/README.md) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
+Compare the [internal direct admission lifecycle](../../Agents/Support/Core/Communication/README.md) and the [overall communication framework](../../README.md#communication-framework). ToolResult return also uses directed InputGateway admission to the original Agent/session, rather than internal event transport.
 
 SpeechPerception owns SpeechRecognitionTurn and VoiceActivitySegmenter. VisionPerception owns latest-frame retention and FrameCadence; Gateway does not compare pixels or decide inference cadence. Source normalization means protocol validation and metadata here, not inference or perceptual transformations.
 
@@ -119,4 +61,35 @@ Returning Tool feedback uses a fresh10-second admission deadline, preserved root
 
 ✅ Runtime-only roundResult admission preserves owner incarnation, session, turn, parent and root. External callers cannot forge generation feedback.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+输出运输使用 GatewayOutputConsumer 在读取之前绑定真实 Agent actor/incarnation；旧实例迟到输出不能借用新注册权限。OutputGateway 验证 JSON 通信声明与任务 grant，函数/通信消费者独立；App 通信分支最多16个待处理、4个并行投递。请求回执、子任务报告、函数结果分别关联；TaskResult 在执行清理屏障后投递，目标停止合成明确终态并记录无法投递的失败。
+
+输入 Gateway 只处理来源/协议/容量/权限；外部输入禁止伪造 taskScope、运行时反馈或 incarnation。任务输入接纳仍由目标 Agent 的业务 Schema/策略决定，不在 Gateway 拼接聊天内容。
+
+设计与阶段边界见 [ADR0187](../../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../../docs/Validation-History.md)。
+
+
+## One-way publication and listening admission correction
+
+✅ Implemented: External and internal publication are one-way; target failures do not change publisher success. Transport loss is allowed, without retries. The bounded delivery and shutdown contract is described above.
+
+
+✅ Execution-log tabs: InputGateway retains256 Signal rows,8 latest-snapshot observers and eviction counts. Each actual Signal updates one row with per-recipient outcomes; raw media is omitted. Audio/image/activity events aggregate within one-second windows by source/contract/session/mode/destinations. Validation/overflow/loss/rejection/suppression remain explicit. receive completion means admission, never business consumption or task completion. shutdown finishes observation after joined publication cleanup.
+
+Signal snapshots retain256 bounded summaries with at most16 distinct branches each; task protocol data is limited by its existing64KiB schema (up to16MiB retained task payload per collection; general and task-only retention share immutable Data backing until updates, with a combined32MiB worst-case bound). No audio/image data, opaque AgentMessage or credential objects are retained. Aggregation occurs after delivery with matching outcomes, so successes cannot erase failures. Observer buffers keep only the latest snapshot; counted row eviction and aggregate counts distinguish presentation retention from publication loss.
+
+
+✅ Home-log simplification: retain Action / Task / Agent only. Removed the Signal UI model, collection and subscription. InputGateway exposes independently bounded task-only snapshots (256 records, shared eight-observer limit, latest-one buffering), updated only for task protocol events; media and ordinary Signals never invalidate home state or evict task traces. Presentation retains task admission/completion semantics, related Action/history identities, Agent lifecycle and independent errors. General Signal diagnostics remain available outside the home UI. Native performance acceptance is separate.
+
+Task-only observation uses its own256-record retention, revision and eviction count, sharing the eight-observer cap with general diagnostics. Full retention evicts oldest; buffers keep the latest snapshot. Task completion can update its retained record even if ordinary traffic has evicted the general diagnostic row. shutdown finishes both observer families after joined delivery cleanup.
+
+✅ Publication audit correction: publish validates its own payload/source and submits bounded one-way work, never awaiting subscriber or App observer completion and never returning recipient errors. Observer work shares bounded Gateway publication lifetime; overflow is diagnostic loss without publisher acknowledgment. Environment facts bypass request/result waiters and emit no completion acknowledgment; ApplicationControl errors still flow through its independent output consumer. Directed send retains correlated admission receipt (not task completion). Explicit UI data-operation result waits remain business completion contracts, not publish receipts.

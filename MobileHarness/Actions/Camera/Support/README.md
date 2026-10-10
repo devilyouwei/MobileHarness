@@ -31,7 +31,7 @@ flowchart LR
 
 ## Camera command entry
 
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
 ✅ Interaction refinement: CameraControlCapability.flip receives CameraActions.Facing; CameraModule retains existing function registration and error/completion contracts.
 
@@ -44,3 +44,5 @@ flowchart LR
 ## Photo save and ignore — ADR0185
 
 ✅ CameraModule supplies seven definitions, including value-completing savePhoto/ignorePhoto. CameraControlCapability supplies neutral receipt methods; unsupported isolated fixtures throw unavailable. CameraControlError includes localized photoUnavailable and retains producer codes. No Photos or UI dependency.
+
+✅ Device regression fix: CameraModule binds open/close/flip as value-completing functions, preserving protocol and serialization policies. CameraCommandReceipt carries only the acknowledged requested camera state, not inferred pose or model readiness.

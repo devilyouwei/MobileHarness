@@ -6,6 +6,8 @@ import UI
 @MainActor public final class BluetoothInteractionWorkflow: BluetoothControlling {
     private let state: BluetoothSettingsState
     private let perform: (AppInteractionIntent) async throws -> Void
+    private let pageVisibility: (Bool) -> Void
+    private let openSettings: () -> Void
     private let fenceStop: () -> UUID
     private var fence: UUID
     private var pending: [[String: String]] = []
@@ -14,11 +16,14 @@ import UI
     private var closed = false
     public init(
         state: BluetoothSettingsState, initialFence: UUID, fenceStop: @escaping () -> UUID,
+        pageVisibility: @escaping (Bool) -> Void, openSettings: @escaping () -> Void,
         perform: @escaping (AppInteractionIntent) async throws -> Void
     ) {
         self.state = state
         self.fence = initialFence
         self.fenceStop = fenceStop
+        self.pageVisibility = pageVisibility
+        self.openSettings = openSettings
         self.perform = perform
     }
     public func waitUntilIdle() async { await worker?.value }
@@ -53,12 +58,11 @@ import UI
     }
     public func stopMotorControl() {
         replaceMotion()
-        submit(["operation": "stopMotorControl"], priority: true)
     }
-    public func openPage() { submit(["operation": "openPage"]) }
+    public func openPage() { pageVisibility(true) }
     public func closePage() {
         replaceMotion()
-        submit(["operation": "closePage"], priority: true)
+        pageVisibility(false)
     }
     public func scan() { submit(["operation": "scan"]) }
     public func stopScan() { submit(["operation": "stopScan"], priority: true) }
@@ -71,7 +75,7 @@ import UI
         replaceMotion()
         submit(["operation": "forget"], priority: true)
     }
-    public func openSystemSettings() { submit(["operation": "openSystemSettings"]) }
+    public func openSystemSettings() { openSettings() }
     private func replaceMotion() {
         fence = fenceStop()
         motors.removeAll()

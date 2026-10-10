@@ -37,3 +37,7 @@ flowchart LR
 ✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
 
 ✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+
+
+✅ Speech.Listening.update is an internal SpeechPerception function with injected native execution; Chat Agents report reply facts and have no listening grant. See [overall architecture](../../../README.md).

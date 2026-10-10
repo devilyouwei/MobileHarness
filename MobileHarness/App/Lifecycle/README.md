@@ -58,7 +58,7 @@ flowchart LR
 
 ✅ ADR0098: RuntimeDependencies supplies immutable voice/vision/camera service slices instead of ApplicationRuntime. Composition injects Agent factories; registration, input/output pumps, barriers and cleanup remain owned here.
 
-✅ CameraCoordinator implements explicit setEnabled/retry/flip(CameraActions.Facing) controls. Flip selects front/back; healthy same-target selection completes without restarting capture. Foreground and idle-worker admission are required; overlap fails busy, flip while disabled fails. Completion waits for reconciliation and checks revision, permission and capture state. Scene/UI supersession fails cancellation; close joins capture release and vision cleanup. VoiceSessionCoordinator validates Assistant source and active voice session. ❌ Open capture does not prove pose inference readiness; admitted intent is not rolled back on caller cancellation.
+✅ CameraCoordinator implements explicit setEnabled/retry/flip(CameraActions.Facing) controls. Flip selects front/back; healthy same-target selection completes without restarting capture. Foreground and idle-worker admission are required; overlap fails busy, flip while disabled fails. Completion waits for reconciliation and checks revision, permission and capture state. Scene/UI supersession fails cancellation; close joins capture release and vision cleanup. RuntimePresentation validates the actual Photographer and active stable root/task scope. ❌ Open capture does not prove pose inference readiness; admitted intent is not rolled back on caller cancellation.
 
 ✅ VisionSession registers VisionPerception and attaches its UUID to root-owned Photographer. Joined cleanup detaches tracking and removes VisionPerception; root camera control remains alive.
 
@@ -115,7 +115,7 @@ flowchart LR
 
 ## Isolated audio detection session
 
-✅ AudioDetectionSession.swift owns the entire diagnostic capture/perception endpoint: a fresh AppleAudioIO, session ID, AgentManager and both Gateways, with only SpeechPerception registered in soundSourceOnly mode. All PCM goes through MediaInputAdapter/InputGateway and direction through the bound publishResult port/OutputGateway observer. App maps SDK facts and observations into UI values; it contains no direction DSP. Native meter snapshots are latest replaceable values, at most 10 Hz; raw PCM admission retains explicit rejection. Route changes and interruptions stop the attempt for explicit retry, rather than silently updating layout/input. No Assistant, Photographer, conversation recording, playback or robot execution is registered.
+✅ AudioDetectionSession.swift owns the entire diagnostic capture/perception endpoint: a fresh AppleAudioIO, session ID, AgentManager and both Gateways, with only SpeechPerception registered in soundSourceOnly mode. All PCM goes through MediaInputAdapter/InputGateway and direction through the bound publish port/OutputGateway observer. App maps SDK facts and observations into UI values; it contains no direction DSP. Native meter snapshots are latest replaceable values, at most 10 Hz; raw PCM admission retains explicit rejection. Route changes and interruptions stop the attempt for explicit retry, rather than silently updating layout/input. No Assistant, Photographer, conversation recording, playback or robot execution is registered.
 
 ✅ Composition supplies mutual voice/diagnostic cleanup barriers. Starting diagnostics stops and joins admitted voice work; starting voice cancels and joins diagnostics before microphone setup. A pending voice start is not recursively joined by diagnostic pre-start cleanup. Shutdown closes UI updates, cancels/joins output handling and Agent publication, stops hardware and removes the isolated registration before replacement.
 
@@ -140,16 +140,16 @@ flowchart LR
 
 ✅ ADR0163: host camera activity events carry an explicit lease-scoped causal root shared across that activity's states. No Agent input exists on the current host camera route; Agent-controlled camera entry migration remains pending. Capture/renewal/cleanup algorithms are unchanged.
 
-✅ Implemented: VoiceSessionCoordinator replaces the assistant.cancel string with AssistantControl.cancelSession.input(sessionID:). Producer shutdown, audio cancellation and OutputGateway join ordering remain unchanged.
+✅ Microphone stop retires capture/perception only. The App-owned interaction lifetime retains the default Assistant, specialists and reply consumer; full application shutdown cancels/joins these owners. AgentSessionControl preserves the legacy wire contract for explicit session controls.
 
 ✅ ADR0171: scene activity controls resource observation independently of voice/camera. Background invalidates old resource presentation and cancels sampling; reactivation waits for the existing worker to finish before another starts. SDK background downloads remain independent.
 
 
 ## Camera command entry
 
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
-✅ ADR0181: VisionSession owns VisionPerception only and attaches one vision UUID to the root Photographer transport. Cleanup detaches/reset tracking, joins its worker and cancels that vision session without stopping Photographer or its root camera command. Voice camera validation allows only active-session Assistant or authorized Photographer delegated work. Native camera algorithms remain unchanged.
+✅ ADR0181: VisionSession owns VisionPerception only and attaches one vision UUID to the root Photographer transport. Cleanup detaches/reset tracking, joins its worker and cancels that vision session without stopping Photographer or its root camera command. Camera validation allows the actual Photographer in the stable interaction scope or an authorized active child task. Native camera algorithms remain unchanged.
 
 ✅ Interaction refinement: CameraCoordinator selects requested front/back, keeps permission/busy/revision checks and joins reconciliation. VoiceSessionCoordinator retains final ASR text, marks it finalized and clears both captions only on an accepted newer turn or new voice-session start; stopping voice retains the current captions.
 
@@ -160,7 +160,7 @@ flowchart LR
 
 ✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow admits Actions in order while executing up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
 
 ## Assistant photo observation — ADR0184
 
@@ -168,7 +168,7 @@ flowchart LR
 
 ❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
 
-✅ Voice correction: keep microphone-frame admission closed across all ReAct rounds and playback; reject stale listening/hearing presentation while handling a turn. Resume only after terminal assistant.finished and joined effects. A failed reply ends its voice scope but retains the Assistant consumer and prepared models for explicit retry; eye taps remain available during photo presentation. Native capture remains allocated during a reply, with PCM discarded before recognition, rather than restarting capture between model rounds.
+✅ Recognition admission follows actual playback and350ms tail protection, including model/ReACT wait. A confirmed utterance finishes bounded ASR before playback begins. Semantic final/phase Signals use the stable interaction scope; raw audio/partial recognition retain capture generation. A model failure does not stop unrelated capture or specialists; microphone stop does not cancel Agent tasks.
 
 ## Photo save and ignore — ADR0185
 
@@ -186,3 +186,48 @@ flowchart LR
 ✅ Implemented: CameraCoordinator receives the existing photo store from composition instead of creating its own instance. Exact source/session/input checks for live photo observations remain intact. History shares the store independently of camera capture/visibility lifetime.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+运输生命周期独立于页面。函数、通信、模型输出分支有界并在 round/terminal 屏障加入；生产输出在订阅时绑定真实 Agent 实例。ConversationPresentation 分开识别语句与回复身份（source/task/decision/turn）；后来的识别清理上一轮可见字幕，但不取消正在回复的任务或改变其执行身份。播放授权由真实输出源、活跃任务/会话和函数注册共同验证；SpeechPerception 在最终 ASR 发布前以及交互回复占用期间暂停新语句识别，覆盖模型等待及委派回复；实际播放与350ms尾音保护是额外恢复屏障。用户关闭时停止物理录音，策略暂停时保留原生采集并关闭帧接纳/ASR，不发新识别文本。
+
+设计与阶段边界见 [ADR0187](../../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../../docs/Validation-History.md)。
+
+## Phase two implementation contract - ADR0188
+
+✅ Implemented. Assistant is the persistent default user-entry Agent and delegates photography, history and application operations through authorized communication Actions and existing task Signals. Typed UI inputs use deterministic routing; model requests use the same output and function execution path. Execution results return to the real task executor.
+
+Support owns the reusable one-round Chat worker, native/XML communication adaptation and reply mapping, with injected identity, context and policies. Each business Agent owns independent durable history, preprocessing, capabilities and task completion. No new directory, target, dependency, Core role policy or delegation runtime is introduced.
+
+App owns registration, transport, stable interaction lifetime and native presentation authorization. Microphone capture is a separate lifetime. Delivery acceptance, child completion and native effects remain distinct. Pending questions and artifact references are bounded and task-scoped; deletion retains existing trusted UI confirmation. Storage failures terminate dependent processing, cancellation joins owned workers, and restart interrupts without replay.
+
+See `docs/adr/0188-specialist-task-ownership.md` for migration, capacity and validation contracts.
+
+
+## One-way publication and listening admission correction
+
+
+✅ Implemented: one-way external intent loss is bounded by a 120-second business-result watchdog, owned and joined by the existing operation. Camera cancellation acknowledgment waits at most two seconds and reports unconfirmed cleanup; it never fabricates device stop or replays work. Listening Action completion means policy accepted; microphone model preparation remains the owned startup task and is cancellable by user-off.
+
+✅ Implemented: Listening Action acknowledges policy without awaiting an utterance. The App owns a separately cancellable pause task, fenced by command revision and capture generation. A newer command cancels/joins old pause work; user-off stops capture before joining it. Native cleanup cancels and joins pause tasks; SpeechPerception joins its own recovery task. Existing canonical serialization remains, but no utterance wait retains its lease.
+
+## Listening policy ownership
+
+✅ VoiceSessionCoordinator registers SpeechPerception once for the runtime lifetime, consumes outputs while capture is off, and opens/closes capture epochs without removing the Agent. Speech.Listening commands require the actual SpeechPerception/root session and monotonic revision. Native startup, confirmed-utterance pause, playback count and350ms tail remain owned execution barriers; cleanup joins capture/pause/startup and reports revision-fenced speech.captureEnded. App no longer owns orphan-final recovery or reply occupancy. Recognition failures do not terminate capture; OS/native capture termination does.
+
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
+
+
+✅ Recognition-caption rollover: VoiceSessionCoordinator routes accepted caption/voice updates through the shared ConversationPresentation state projection. A newer recognized turn clears both previous captions and transcriptFinalized before its first update; rejected or same-turn updates do not reset state. Session/capture guards and Agent task/playback ownership are unchanged.
+
+
+✅ Reply/lifecycle regression correction: caption focus is presentation only and cannot cancel an authorized queued/playing reply from another Agent. Playback checks active session and explicit task cancellation, retaining Gateway owner/task/function authorization and the shared serialized Speech Channel. ApplicationControl accepts environment facts and correlated feedback while paused; fresh business commands still require running. Assistant delegation prompts emit send without redundant spoken acknowledgments and leave specialist speech to its executor. Scope/result delivery failures retain actual evidence; no silent error suppression or action replay is added. Add owner-switch playback admission and paused environment regressions.
+
+
+✅ Camera perception/context change (2026-10-10): CameraCoordinator exposes actual capture occupancy through existing CameraState.photoBusy for the lifetime of its owned capture task; defer clears it on success/failure/cancellation. App adapts these native facts into passive Signals; lifecycle and native safety stay here.

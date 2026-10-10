@@ -49,17 +49,17 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 
 ✅ `ActionActivityState` receives complete UI-owned display snapshots projected by AppWorkflows. The home footer replaces the robot-only motion label with up to3 channel summaries plus a bottom-right icon-only history button; concurrent channels retain separate rows. Same-channel parallel work and queued work show counts. Nonfailure terminal summaries hide after3s while history remains available; failures persist until dismissed or superseded by a newer execution in that channel. Dismissal never removes runtime records or cancels Actions. Newer revisions replace older state; dismissed IDs are bounded by retained records.
 
-✅ `ActionActivityView` exposes a read-only sheet containing all retained active records and the latest100 terminal records, using definition-provided names, exact Channel strings, generic statuses and timestamps without execution IDs or raw arguments; errors display the bounded thrown description. Cancellation pending says “正在取消”; terminal cancellation says “执行前已取消” or “已取消” based on whether execution started; completed settings/state/activity operations do not claim physical completion. Connection readiness remains a separate fallback label, and Settings manual tests do not feed this Action display. Views own only presentation selection and a wall-clock auto-hide refresh; long-lived observation remains in App. Dynamic Type, VoiceOver labels and system sheet controls are retained; no motion animation is required.
+✅ `ActionActivityView` exposes a read-only four-tab sheet with filtered Action records, bounded Signal admission branches, task timelines and runtime events, using definition-provided names, exact Channel strings, generic statuses and timestamps without execution IDs or raw arguments; errors display the bounded thrown description. Cancellation pending says “正在取消”; terminal cancellation says “执行前已取消” or “已取消” based on whether execution started; completed settings/state/activity operations do not claim physical completion. Connection readiness remains a separate fallback label, and Settings manual tests do not feed this Action display. Views own only presentation selection and a wall-clock auto-hide refresh; long-lived observation remains in App. Dynamic Type, VoiceOver labels and system sheet controls are retained; no motion animation is required.
 
 ❌ Device-specific stage progress and physical iPhone layout/accessibility acceptance remain separate. This is process-local recent history, not a durable per-conversation audit or an emergency-stop control.
 
 ✅ Debug-only `-actions-preview` renders the actual conversation/status components with explicitly labeled synthetic records for parallel, queued, cancelling and failed states; it bypasses models, camera, audio and Bluetooth startup. Release ignores the flag. ❌ Preview data is not execution acceptance.
 
-✅ The execution footer uses native iOS26+ Liquid Glass (`glassEffect`) with a material fallback on earlier supported systems. Home and detail records include all scheduled Actions without filtering. Fixed internal UI updates are immediate Tools. Direct native calls do not create scheduled execution records; explicitly scheduled native bindings can appear in the shared scheduler.
+✅ The execution footer uses native iOS26+ Liquid Glass (`glassEffect`) with a material fallback on earlier supported systems. Home and Action records share internal-action visibility; caption/listening maintenance Actions are hidden by default except failures. Fixed immediate presentation Tools do not create scheduled rows. Direct native calls do not create scheduled execution records; explicitly scheduled native bindings can appear in the shared scheduler.
 
 ## Action and Tool presentation boundary
 
-✅ The native glass panel receives every scheduled Action, including expression; fixed presentation Tools generate no records. Failed rows use the description from the thrown error rather than a frontend error catalog. ❌ Direct native calls/audio recognition are not synthetic scheduled rows.
+✅ The native glass panel receives the complete Action snapshot and applies internal-action visibility, including visible expression/playback actions; fixed presentation Tools generate no records. Failed rows use the description from the thrown error rather than a frontend error catalog. ❌ Direct native calls/audio recognition are not synthetic scheduled rows.
 
 ## Generic Action presentation
 
@@ -79,7 +79,7 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 
 ✅ ActionActivityItem and its Execution fields are UI-owned display data. AppWorkflows converts runtime observations and result details before state replacement. The action panel imports neither execution modules nor Agent result types.
 
-✅ 执行记录入口使用右下角 48 pt 纯图标按钮，保留 VoiceOver 标签。回复过程中的执行摘要、记录保留策略和原有执行记录 sheet 内容不变。字幕滚动窗口上下边缘使用透明度渐变，文字随滚动逐渐淡出/淡入。
+✅ 执行记录入口使用右下角 48 pt 纯图标按钮，保留 VoiceOver 标签。回复过程中的执行摘要、记录保留策略和执行记录 sheet 已分为四个 Tab。字幕滚动窗口上下边缘使用透明度渐变，文字随滚动逐渐淡出/淡入。
 
 ✅ ConversationState carries expression transition ID, renderer availability and a transient completion callback. ConversationView forwards these to CompanionEyes. App owns the single continuation and invalidates it at turn/session reset. ❌ Physical-device interruption/animation acceptance remains pending.
 
@@ -101,3 +101,18 @@ Sources compile once in UI; page navigation does not create or destroy the voice
 ✅ Interaction refinement: ConversationState tracks transcript finalization; ConversationView animates one stable user-caption identity from lower slot above eyes and renders assistant independently below. Next accepted turn resets both captions. User cyan/assistant lavender also have distinct VoiceOver labels.
 
 ✅ Caption positioning: ConversationView lowers the finalized user caption by24 pt (minimum center y84 instead of60); listening position, eye position and finalization animation remain unchanged.
+
+
+✅ Execution-log tabs: ActionActivityView renders Action(default) / Task / Agent, source/status filters and an internal-Action toggle shared with home summaries. Task timelines link to related Action and model history. ActionActivityState contains no Signal model or collection. Successful internal caption/listening controls are hidden by default; failures remain visible. Agent errors deduplicate against matching Action failures and repeated identical source/input/message errors.
+
+✅ Task-history links: ConversationView forwards an optional injected Agent/input-ID history destination. Task details can open the executor's matching model/Tool history through existing UI history rendering; no Agent/Gateway implementation is imported by UI.
+
+Log implementation files: ActionActivityView owns sheet/navigation; ActionActivityState owns bounded collections and filters; ExecutionLogState defines independent UI values. Task details use retained timeline input IDs to select related Actions and executor model/ReACT/Tool history; missing/evicted evidence stays explicit. App subscribes only to task reports, so ordinary audio/image/recognition/environment traffic never invalidates this UI.
+
+✅ Frontend/backend separation: Opening settings is a local navigation callback. Listening/camera data operations retain their injected controls; Agent-driven captions/expression/navigation remain supported by scoped host presentation.
+
+
+✅ Home-log simplification: retain Action / Task / Agent only. Removed the Signal UI model, collection and subscription. InputGateway exposes independently bounded task-only snapshots (256 records, shared eight-observer limit, latest-one buffering), updated only for task protocol events; media and ordinary Signals never invalidate home state or evict task traces. Presentation retains task admission/completion semantics, related Action/history identities, Agent lifecycle and independent errors. General Signal diagnostics remain available outside the home UI. Native performance acceptance is separate.
+
+
+✅ Caption rollover: App clears liveTranscript, assistantReply and transcriptFinalized together on a newly accepted recognition turn. New ASR previews render below until finishTranscript moves the user text above the eyes; replies then occupy the lower slot. Views continue rendering passive state with the existing animation; no Agent orchestration or artificial delay is introduced.

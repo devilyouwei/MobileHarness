@@ -2,7 +2,7 @@
 
 Purpose: coordinate exclusive control across declared Actions, Tools and host operations. Design goals: one actor-owned occupancy authority, explicit owner policy, bounded handoff and revocable execution identity; resource locks express control ownership rather than device health.
 
-Implementation: [ResourceCoordinator.swift](ResourceCoordinator.swift) owns arbitration, snapshots, leases, execution permits and joined cleanup. Shared context values live in [AgentCore/Output/ResourceLease.swift](../../../Agents/Core/Output/ResourceLease.swift); concrete owner/preemption policy is composed by [ApplicationRuntime.swift](../../../App/Composition/ApplicationRuntime.swift). This README is the current local implementation contract; [ADR0141](../../../../docs/adr/0141-resource-control-ownership.md) records the design decision.
+Implementation: [ResourceCoordinator.swift](ResourceCoordinator.swift) owns arbitration, snapshots, leases, execution permits and joined cleanup. Shared context values live in [AgentCore/Output/ResourceLease.swift](../../../Agents/Support/Core/Output/ResourceLease.swift); concrete owner/preemption policy is composed by [ApplicationRuntime.swift](../../../App/Composition/ApplicationRuntime.swift). This README is the current local implementation contract; [ADR0141](../../../../docs/adr/0141-resource-control-ownership.md) records the design decision.
 
 ## Public state and authority — ADR0141
 

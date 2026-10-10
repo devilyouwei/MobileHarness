@@ -828,3 +828,387 @@ Scope: healthy front/back camera input replacement and root-owned perception ret
 See [ADR0186](adr/0186-camera-lens-switch-lifetime.md). The healthy flip no longer waits for joined vision cleanup; off/background/model-maintenance cleanup still joins admitted work.
 
 ✅ Installation follow-up: version2026100808 installed successfully on the physical iPhone17 Pro (`dev.mobileharness.app`); `/tmp/mh-camera-flip-install.json` records the receipt. ❌ Automatic launch was denied because the phone was locked (`FBSOpenApplicationErrorDomain`7); startup and physical lens-switch acceptance remain pending. See `/tmp/mh-camera-flip-launch.json`. This supersedes the earlier connection-unavailable installation status only.
+
+
+## 2026-10-09 — Agent composition, owned context and generic ReACT (ADR0187)
+
+Scope: phase-one migration of all seven Agents, Core task/round/context contracts, shared Chat driver, communication Actions, owner-directed feedback, Assistant FIFO continuation/history migration and playback-based recognition admission. Business roles are retained; production Photographer LLM/delegation/focus routing is not enabled. Synthetic child Agents exercise the real Gateway/Action runtime with injected models and effects.
+
+- ❌ Final-source `./scripts/check.sh` did not pass:635 IntegrationTests recorded two issues in one existing BLE fixture, `bluetoothLatestCommunicationIssueClearsWhenFeedbackRecovers` (recovery predicate plus `.timeout`);65 AppWorkflowTests and all other package suites passed. All new architecture/history/round/perception regressions passed. Boundaries, six offline provisioning tests and strict formatting passed; project/privacy/entitlement property lists passed separately because the script stops after a test failure. The failed BLE fixture passed unchanged in isolation (one test,0.075s, `/tmp/mobileharness-phase1-ble-recovery-isolated.log`); this does not replace the failed full run or establish its timing cause. Log: `/tmp/mobileharness-phase1-check-final-source.log`. Earlier full633-test/65-workflow verification passed (`/tmp/mobileharness-phase1-check-final.log`); it is not final-source full-suite success.
+- ✅ Xcode27 unsigned generic iOS device build passed for the final application source; all seven packaged Agent JSON resources matched source. Logs: `/tmp/mobileharness-phase1-device-verified.log`; `verify-app-agent-resources.py` verified7 configurations. No signing, installation or native execution was performed.
+- ❌ Required `./scripts/build-ios.sh` failed at MobileHarnessSimulator: external `coreai-models/CoreAIShared/Runtime/ModelStructure.swift` cannot resolve `CoreAI` for simulator architectures. Later script schemes were not reached. Log: `/tmp/mobileharness-phase1-simulator-final.log`. The successful device-target build is separate evidence.
+- ✅ Changed Markdown references resolved590 local paths; diff whitespace checks passed. No new repository directory/module or third-party dependency was introduced; Agents adds an existing Storage target dependency while Core remains Foundation-only.
+- ❌ Real-model inference, native UI, physical ASR/VAD/echo,350ms playback-tail and confirmed-onset/playback races require separate device acceptance. Automated model fixtures and the device build do not establish these results.
+
+Regression coverage includes owner-only child native results and independent context, explicit parent reports/admission receipts, shared model driver, directed task input/permission fencing, subtree cancellation and target stop, duplicate/late results, duplicate request grant preservation, task-completion cleanup fences, bounded receipt/queue/fusion/budget/rolling-evidence retention, atomic failed commits/corrupt loads, one-time legacy import and restart interruption, active-history deletion protection, user-before-continuation ordering and exact native pairs, recognition/reply identity separation, synthesis cancellation/owner validation and existing deterministic/streaming policy regressions.
+
+Intermediate failures remain historical evidence: early focused checks exposed a stale feedback-index cancellation crash; a later full run was aborted after old standalone fixtures failed to bridge communication outputs and a count assertion dereferenced missing results. Both code/fixtures were corrected. A630-test broad run recorded six issues (five existing BLE resource/timing assertions plus the new parent-cancel expectation); the expectation was corrected to preserve a real cancelled ActionResult. A631-test broad run recorded three issues (one new completion-fence race plus two existing real-clock sound-source freshness assertions); the completion race was fixed. Those sound/BLE regressions passed in isolation; the later633-test full run passed. Their intermittent timing cause is not attributed to physical Bluetooth/acoustics. Boundary/comment lint failures, iOS actor/import/exhaustive-switch compilation issues and the final test's optional-toolCalls compilation error were corrected before the successful applicable verification. A subsequent634-test full run failed one existing `bluetoothReconnectDoesNotWaitForOldActionCompletionToShowConnected` fixture with `.disconnected`;65 workflow tests passed. The isolated BLE regression and three receipt/sound failure regressions passed together (four tests, `/tmp/mobileharness-phase1-terminal-failures.log`). The final rejected-native-outcome write failure regression also passed in isolation (`/tmp/mobileharness-phase1-write-failure.log`). Failed/incomplete attempts are not passing full checks.
+
+
+## 2026-10-09 - Agent Support organization follow-up
+
+Scope: the user explicitly authorized a Support directory after the phase-one implementation. The three shared Chat/context/storage adapters move from the Agents root to Agents/Support and remain in the existing Agents target. AgentDecisionContext moves into Core/Runtime and the Foundation-only AgentCore target, removing its same-target import. Concrete role policy files remain in place. No new module, dependency, duplicate definition or alias; no runtime behavior change or new mirror tests.
+
+- ✅ final ./scripts/check.sh completed successfully, including635 IntegrationTests,65 AppWorkflowTests, all remaining package suites, six offline provisioning tests, source/module boundaries, strict Swift formatting and project/privacy/entitlement property lists. Real-model evaluation is explicitly skipped. Log: /tmp/mobileharness-agent-support-check.log. This later full pass supersedes the outstanding full-suite verification status, while previous BLE failures above remain historical evidence; their timing cause is not established.
+- ✅ final Xcode27 unsigned generic iOS device build; all seven packaged Agent configurations verified. Log: /tmp/mobileharness-agent-support-device.log. No installation or physical execution.
+- ❌ required ./scripts/build-ios.sh stops at MobileHarnessSimulator because external coreai-models/CoreAIShared cannot resolve CoreAI for simulator architectures; later schemes were not reached. Log: /tmp/mobileharness-agent-support-simulator.log.
+- ✅ affected documentation64 local links resolved, diff whitespace checks passed, and each of the four moved source types has exactly one source file at its new location. Support has its own README excluded from compilation.
+
+Real model, native UI and physical-device acceptance remain separate from this source-organization verification. The ADR0187 phase-one no-new-directory restriction remains historical; this follow-up records the explicit authorization for Agents/Support.
+
+## 2026-10-09 - Agent business source audit
+
+Scope: standardized seven role actors and Processing files; shared atomic Signal evidence commits with explicit role-selected policies; consolidated owner-only helpers and application/provider/resource Signal files; moved bundled configuration loading into existing Support. Net seven fewer Swift source files; no new directory, target, dependency, permission or business role transfer.
+
+- ✅ ./scripts/check.sh passed:635 IntegrationTests,65 AppWorkflowTests, remaining package suites, six offline provisioning tests, strict formatting, source/module boundaries and property lists. The rejected-commit regression now verifies no input evidence, consumed batch or task survives a failed shared admission commit. Real-model evaluation and hardware tests remain explicitly skipped. Log: /tmp/mobileharness-agent-audit-check.log.
+- ✅ Xcode27 unsigned generic iOS device build passed; seven final packaged Agent configurations verified. Log: /tmp/mobileharness-agent-audit-device.log. No installation or physical execution.
+- ❌ ./scripts/build-ios.sh failed at MobileHarnessSimulator: external coreai-models/CoreAIShared/Runtime/ModelStructure.swift:6 cannot resolve CoreAI for simulator architectures. Later schemes were not reached. Log: /tmp/mobileharness-agent-audit-simulator.log.
+- ✅151 final local documentation links, Agent directory README coverage,16 single source definitions, seven actors with stored declarations before methods and diff whitespace checks passed.
+- Initial boundary validation rejected the removed TranscriptAccumulator.swift filename. The guard now checks its declaration in SpeechRecognitionTurn.swift and retains Foundation/ModelKit-only imports; the subsequent full check passed. An additional final-layout test invocation omitted the Command Line Tools Testing macro plugin path and failed before tests. Failed log: /tmp/mobileharness-agent-audit-final-layout-missing-plugin.log; the corrected invocation passed15 targeted context/application/photography/transcript regressions after rebuilding the final declaration layout. Successful log: /tmp/mobileharness-agent-audit-final-layout.log.
+
+Builds and synthetic tests do not establish real-model reasoning, native presentation, camera, microphone, tail protection, echo or physical-device acceptance. Assistant and ApplicationControl still retain their current business responsibilities; phase-two ownership redesign remains outstanding.
+
+## 2026-10-09 - Default entry and specialist task ownership (ADR0188)
+
+Scope: default Assistant entry; Photographer/Memory/ApplicationControl independent Chat contexts and domain grants; communication-Action delegation; true executor results; public progress/results; task-scoped question/artifact follow-up; parent evidence barrier; App-owned interaction independent of microphone. Removed Assistant camera proxy and invocation TaskLocal delegation. Existing deterministic/native workflows and destructive-history confirmation remain.
+
+- ✅ Targeted regression passed nine test functions, including parameterized native/XML delegation and four Bluetooth recovery cases. Synthetic providers/camera/Speech endpoints validate ownership and protocols, not real models or devices. Log: /tmp/mobileharness-phase-two-regression4.log.
+- ✅ Unsigned generic iOS device builds passed before final obsolete-proxy cleanup. Logs: /tmp/mobileharness-phase-two-device-final.log and /tmp/mobileharness-phase-two-device-final2.log. Seven bundled Agent resources verified. No installation or physical execution.
+- ❌ Required ./scripts/build-ios.sh failed at MobileHarnessSimulator because external coreai-models/CoreAIShared/Runtime/ModelStructure.swift:6 cannot resolve CoreAI for simulator architectures; later schemes were not reached. Log: /tmp/mobileharness-phase-two-simulator.log.
+- Earlier full checks were interrupted after failures or a waiting test helper: /tmp/mobileharness-phase-two-check1.log and /tmp/mobileharness-phase-two-check2.log. Corrections include exact request/history projection, literal feedback work identity, generic recording-error handling, updated role grants and reply behavior, and synchronized simulated Bluetooth initialization. The third run (/tmp/mobileharness-phase-two-check3.log) was interrupted because a test helper waited only for successful completion after cancellation; it now recognizes failure as a terminal result. These runs are not passing evidence.
+- ✅ Current changed documentation local links resolved (613 checked), Agents directory README coverage and diff whitespace checks passed before final evidence reconciliation. Source/module boundary check and seven packaged Agent configurations passed independently.
+- ✅ ./scripts/check.sh passed after the obsolete-proxy cleanup:641 IntegrationTests,65 AppWorkflowTests, remaining package suites, six offline provisioning tests, strict formatting, module boundaries and project/privacy/entitlement property lists. Real-model evaluation and hardware acceptance are explicitly skipped. Log: /tmp/mobileharness-phase-two-check-final2.log.
+- ✅ Unsigned generic iOS device build passed after proxy/TaskLocal removal: /tmp/mobileharness-phase-two-device-final3.log.
+- The preceding final check (/tmp/mobileharness-phase-two-check-final.log) completed with one SoundSource routing test failure: its deliberately200ms-old frame expired under parallel load. Fresh routing capture now uses the current clock; separate stale-frame rejection tests retain production freshness checks. Production500ms sound freshness is unchanged. The subsequent full check above passed.
+- ✅ Final ./scripts/check.sh passed including the explicit registry task-status prompt and its question-routing assertion:641 IntegrationTests,65 AppWorkflowTests, all remaining suites, six offline provisioning tests, boundaries, strict formatting and property lists. Log: /tmp/mobileharness-phase-two-check-final3.log.
+- ✅ Final Xcode27 unsigned generic iOS device build passed with task-status projection and all obsolete proxy code removed. Log: /tmp/mobileharness-phase-two-device-final4.log. Seven final bundled Agent configurations verified; no installation or physical execution.
+- ✅ Final documentation615 local links resolved, Agents directory README coverage and git diff --check passed. No new directory/target/third-party dependency; the existing Settings and History targets now reuse AppPresentationWorkflow for bounded shared output consumption.
+
+Real-model reasoning, native presentation/layout, camera/export, speech tail/echo, microphone/playback competition and physical robot behavior remain unverified. Builds and synthetic tests do not substitute for that acceptance.
+
+## 2026-10-09 - Shared Agent source hierarchy (ADR0189)
+
+Scope: user-authorized shared source consolidation to Agents/Support/Core, Communication, Chat and Context. Core remains the independent AgentCore framework; business roles retain policies/states/workflows. No target, dependency or runtime behavior change.
+
+- ✅64 Swift source relocations are byte-identical before/after; no duplicate or old source copies remain. Package excludes Support/Core from Agents compilation and retains an independent zero-project-dependency AgentCore target. Xcode navigator/file references cover the new hierarchy, including previously missing shared source entries.
+- ✅ ./scripts/check.sh passed:641 IntegrationTests,65 AppWorkflowTests, remaining package suites, six offline provisioning tests, strict formatting, module boundaries and project/privacy/entitlement property lists. Real-model/hardware evaluations remain explicitly skipped. Log: /tmp/mobileharness-support-hierarchy-check.log.
+- ✅ Final strengthened layer/path boundary checks passed: Core imports Foundation only; Communication uses Foundation/AgentCore; Context uses Foundation/AgentCore/Storage; Chat uses Foundation/AgentCore/ModelKit/StorageChat. Log: /tmp/mobileharness-support-hierarchy-boundaries-final.log. The initial path guard still expected the old Core exclusion and failed; it was updated to Support/Core before the full check.
+- ✅ Xcode27 unsigned generic iOS device build passed. Log: /tmp/mobileharness-support-hierarchy-device.log. Seven final packaged Agent configurations verified; no installation or physical execution.
+- ❌ Required ./scripts/build-ios.sh failed at MobileHarnessSimulator because external CoreAIShared/Runtime/ModelStructure.swift:6 cannot resolve CoreAI for simulator architectures; later schemes were not reached. Log: /tmp/mobileharness-support-hierarchy-simulator.log.
+- ✅ Agent directory README coverage, moved/shared local links, registered-source path checks and diff whitespace checks passed. Current links follow moved files; historical ADR/evidence descriptions remain distinct from current technical contracts.
+
+This source organization does not establish or change real-model reasoning, native UI/audio/camera or physical-device acceptance.
+
+
+## 2026-10-09 — Per-Agent conversation history navigation
+
+- `./scripts/check.sh` passed (exit 0), including 641 IntegrationTests, 67 AppWorkflowTests, remaining Swift suites, six offline provisioning tests, strict formatting, module boundary checks and plist validation. New cases cover isolated destination state, specialist read failure isolation and denial of specialist history mutations. Log: `/tmp/mobileharness-agent-history-check.log`.
+- Full Xcode generic iOS device build with signing disabled passed (exit 0); all seven packaged Agent configurations verified. Log: `/tmp/mobileharness-agent-history-device.log`.
+- Required `./scripts/build-ios.sh` with full Xcode failed (exit 65) at MobileHarnessSimulator because external coreai-models/CoreAIShared cannot resolve CoreAI for simulator arm64/x86_64. Subsequent schemes were not reached. Log: `/tmp/mobileharness-agent-history-simulator.log`.
+- Changed documentation paths and whitespace checked. No new directory, dependency or history copy was introduced. No installation, native UI inspection, live model or physical-device acceptance performed; these results do not establish native layout or gesture behavior.
+
+
+### 2026-10-09 — Physical installation follow-up
+
+✅ Current source signed iOS device build passed with build number `2026100901`; strict deep signature verification and all seven packaged Agent configurations passed. Installed successfully on the paired physical iPhone 17 Pro (`dev.mobileharness.app`); devicectl returned exit 0 and an installation receipt. Logs: `/tmp/mobileharness-agent-history-signed.log`, `/tmp/mobileharness-agent-history-install.log`, `/tmp/mobileharness-agent-history-install.json`. Build number supplied only as a build argument; local signing settings were not changed.
+
+❌ App was not launched as part of this installation request. Native history layout/navigation, real models, speech/camera and physical-device behavior remain unverified. Installation is not runtime acceptance.
+
+### 2026-10-09 — Assistant listening authority / one-way publication (ADR0190)
+
+✅ Prior complete automated run passed all645 IntegrationTests and67 AppWorkflowTests plus foundation/module tests, static ownership/dependency guards, Python checks, strict Swift formatting and project/privacy/entitlement parsing. New regressions cover publication return before subscriber completion and joined shutdown, ASR failure followed by successful recognition, final-text reply gating, Assistant-exclusive policy/user-off precedence, cancelled queued holds and pause/resume before the first capture frame. Targeted resource/camera regressions confirm correlated business errors terminate UI waits without publication receipts or effect replay.
+
+✅ Full confirmation after delegation-hold ordering and native pause ownership passed646 IntegrationTests and67 AppWorkflowTests; unsigned generic iOS-device build passed. Final host-control subscription verification also passed `./scripts/check.sh`:646 IntegrationTests,67 AppWorkflowTests and all available foundation/static/format checks; generic iOS-device build succeeded. Logs: `/tmp/mobileharness-listening-result-check.log`, `/tmp/mobileharness-listening-result-device.log`.
+
+✅ Required `./scripts/build-ios.sh` attempted with full Xcode; simulator build failed in the existing external coreai-models/CoreAIShared dependency because the CoreAI module is unavailable for simulator architectures. Log: `/tmp/mobileharness-listening-simulator.log`. Independent unsigned generic iOS-device builds passed; no signing configuration or third-party dependencies changed.
+
+❌ No new physical installation, live model, native UI or real-device acoustic acceptance performed for this correction. The prior installed history build is not this listening correction. Verify recording consent/toggle, final ASR→root/child reply, first-frame pause, acoustic echo/tail and route/interruption handling on device; synthetic tests and builds do not establish those outcomes.
+
+
+## 2026-10-09 — SpeechPerception listening authority
+
+Validated the ADR0190 authority revision on the final working tree:
+
+- ✅ `./scripts/check.sh` completed with exit0:651 IntegrationTests and67 AppWorkflowTests passed, along with the other available package/static/Python/format/plutil checks.
+- ✅ Focused regressions cover final-ASR admission before publication, actual Gateway publish/subscribe and SpeechPerception Action identity, user consent across microphone epochs, stale activity/incarnation and native-stop fencing, combined reply holds, bounded loss recovery, forged/cross-session control, and ASR failure followed by successful next recognition. These use synthetic model/native endpoints.
+- ✅ Unsigned generic iOS device build: `xcodebuild -project MobileHarness.xcodeproj -scheme MobileHarness -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DerivedDataDevice CODE_SIGNING_ALLOWED=NO build` with full Xcode completed with BUILD SUCCEEDED.
+- ✅ `git diff --check` passed.
+- ❌ Required `./scripts/build-ios.sh` was attempted with full Xcode; MobileHarnessSimulator failed because external CoreAIShared cannot resolve CoreAI for simulator arm64/x86_64. The script exits on that first scheme; subsequent schemes were not run.
+- ❌ Real-model evaluation remains skipped when its opt-in environment/fixtures are absent. This revision was not installed on the physical phone. Actual recording/echo, playback/tail competition, OS route interruption and native UI acceptance remain unverified.
+
+The initial full run exposed superseded Assistant permission/subscription fixtures and an order-dependent concurrent round assertion; these were corrected and focused/final full checks passed. Historical validation of Assistant-owned listening above describes the superseded implementation, not this current authority. No directory/module/dependency was added.
+
+
+### 2026-10-09 — SpeechPerception listening revision physical installation
+
+✅ Signed current-source device build passed with build number `2026100902`; strict deep signature verification and all seven packaged Agent configurations passed. Installed successfully on the paired physical iPhone17 Pro (`dev.mobileharness.app`). The device's installed-app inventory independently confirms bundleVersion `2026100902`. Build number was supplied only as a build argument; local signing settings were unchanged. Logs/receipts: `/tmp/mh-perception-install-build.log`, `/tmp/mh-perception-install.log`, `/tmp/mh-perception-install.json`, `/tmp/mh-perception-installed-apps.json`. This supersedes only the preceding not-installed status for this revision.
+
+❌ App was not launched during this installation request. Real microphone/ASR, reply gating, playback/tail echo protection, interruptions and native UI acceptance remain unverified; installation is not runtime acceptance.
+
+
+### 2026-10-09 — Camera-command incident correction
+
+Phone screenshots showed Assistant emitting kind=task for a Photographer delegation and repeated ApplicationControl capacityExceeded errors. Read-only inspection of the phone applicationControl context found751 records,259 consumed batches,0 outstanding work entries and959910 bytes, below its storage bounds. No device history was erased. Source inspection identified overlap rejection during suspended persistence, incomplete communication declarations and missing corrective handling for malformed model communication.
+
+The revision introduces bounded fixed-admission serialization, authorized model-task schema/examples, parser-level error association through the complete model catalog, bounded corrective continuation, and configured model labels. Synthetic tests exercise XML/native malformed delegation correction through Photographer Camera.close and child-only execution feedback. Results below distinguish automated/build/install evidence from physical acceptance.
+
+- ✅ Final `./scripts/check.sh` completed with exit0:654 IntegrationTests and67 AppWorkflowTests passed, alongside available package/static/Python/format/plutil checks. Focused camera regressions passed4 test functions, including4 native/XML valid/malformed delegation cases.
+- ✅ Final current-source signed iPhone build completed with BUILD SUCCEEDED, version2026100903; strict deep signature verification and all seven packaged Agent configurations passed. Build arguments did not change local signing files. Logs: `/tmp/mh-camera-final-check.log`, `/tmp/mh-camera-close-regressions.log`, `/tmp/mh-camera-final-device.log`.
+- ✅ `git diff --check` passed; no directory/module/dependency was added, and existing contexts were preserved.
+- ❌ Required `./scripts/build-ios.sh` with full Xcode failed at MobileHarnessSimulator because external CoreAIShared cannot resolve CoreAI for simulator arm64/x86_64; subsequent script schemes did not run. Log: `/tmp/mh-camera-command-simulator.log`.
+- ❌ Real-model evaluation remained opt-in/skipped. Physical camera cleanup, voice command/reply arbitration and native UI acceptance remain unverified; synthetic endpoints and successful builds do not establish these results.
+
+✅ Installed on the paired physical iPhone17 Pro; the independent installed-app inventory confirms `dev.mobileharness.app` bundleVersion `2026100903`. Receipts: `/tmp/mh-camera-install.json`, `/tmp/mh-camera-installed-apps.json`. App was not launched automatically; actual model/camera/microphone behavior remains for physical acceptance.
+
+
+### 2026-10-09 — Four-tab execution log visualization
+
+Implemented independent bounded Signal observations and UI-owned Action/Signal/Task/runtime projections. Models and native endpoints in tests are synthetic. Signal status is admission, not inferred business consumption; publish still has no subscriber acknowledgment. Task completion requires an explicit result, while runtime.replyFinished cannot overwrite waitingUser.
+
+- ✅ Final `./scripts/check.sh` completed with exit0:657 IntegrationTests,69 AppWorkflowTests and38 UITests passed, with available static/Python/format/package/plutil checks. Focused regressions also verify publish partial acceptance/overflow, one-way publisher success, bounded aggregation/retention/shutdown, actual child-only execution feedback, task admission/result distinction, waiting-user preservation across runtime playback completion, and history input filtering before model/ReACT expansion. Logs: `/tmp/mh-log-verified-check.log`, `/tmp/mh-log-current-regressions.log`.
+- ✅ Final current-source unsigned generic iOS device build completed with BUILD SUCCEEDED; final packaged resources match all seven Agent configurations. Log: `/tmp/mh-log-delivery-device.log`.
+- ✅ Final diff whitespace, changed-file format lint and project plist checks passed. Added files only within existing directories; no target/dependency/context repository was added.
+- ❌ Required `./scripts/build-ios.sh` was attempted with full Xcode; MobileHarnessSimulator failed because external CoreAIShared cannot resolve CoreAI for simulator arm64/x86_64. Subsequent script schemes did not run. Log: `/tmp/mh-log-simulator-build.log`.
+- ❌ Real-model opt-in evaluation remained skipped. Native visual layout/navigation, Dynamic Type/accessibility and physical media/model behavior were not exercised. No physical installation was performed for this UI change; automated state tests and unsigned build do not establish these acceptance results.
+
+## 2026-10-09 — Assistant mechanical-arm Action ownership
+
+- ✅ The 11 existing Robot gesture/motor declarations are registered only by Assistant. Synthetic executor/context tests verify direct Assistant execution, owner-directed ActionResult and no task delegation; specialist registries reject the moved aliases. Parameters, examples and native function addresses are unchanged.
+- ✅ Final required `./scripts/check.sh` passed:659 IntegrationTests,69 AppWorkflowTests,38 UITests and remaining targets, boundary/Python checks, strict Swift formatting and plist checks. Log: `/tmp/mh-robot-role-check-final2.log`. Earlier checks exposed stale ApplicationControl-based motion fixtures and prompt assertions; those were migrated to Assistant before the passing full run.
+- ✅ Focused role/prompt/ownership/takeover regressions passed (4 tests); focused BLE takeover/queue/recovery regressions passed (3 parameterized tests). Logs: `/tmp/mh-robot-role-regressions.log`, `/tmp/mh-robot-role-bluetooth.log`. Final full checks include the corrected shared native-motion fixture grants.
+- ✅ Unsigned generic iOS Debug build passed; all seven packaged Agent configs verified, including11 Assistant Robot Actions and zero in Photographer/ApplicationControl. Log: `/tmp/mh-robot-role-device.log`.
+- ❌ Required `./scripts/build-ios.sh` failed in external CoreAIShared because the Simulator cannot resolve CoreAI. Log: `/tmp/mh-robot-role-ios.log`. No Simulator success is claimed.
+- ❌ This revision was not installed. Live-model routing, physical arm motion/tracking takeover and native UI acceptance remain separate from synthetic fixtures and compilation. Opt-in physical serial/model evaluations were not enabled.
+
+## 2026-10-09 — Many-to-many Robot Action registration
+
+- ✅ Restored all11 ApplicationControl Robot declarations for Settings command tests. Assistant retains the same canonical declarations for basic interaction; Photographer has none. Configuration regressions verify matching aliases, function paths, channels and required/optional parameters across the two registered roles.
+- ✅ Required `./scripts/check.sh` passed:659 IntegrationTests,69 AppWorkflowTests,38 UITests, remaining targets, boundary/Python/formatting/plist checks. Log: `/tmp/mh-shared-robot-check-final.log`. An initial test compilation used equality on non-Equatable registration values; the test now checks their public fields explicitly.
+- ✅ Unsigned generic iOS build passed and all seven packaged Agent configs verified, including11 Robot Actions each in Assistant/ApplicationControl and zero in Photographer. Log: `/tmp/mh-shared-robot-device.log`.
+- ❌ Required `./scripts/build-ios.sh` remains blocked by the external CoreAIShared missing CoreAI Simulator module. Log: `/tmp/mh-shared-robot-ios.log`.
+- ❌ Not installed; live-model/native Settings and physical arm acceptance remain separate. Earlier exclusive-registration validation describes the superseded revision, not the current contract.
+
+## 2026-10-09 — Current Agent/log revision iPhone installation
+
+- ✅ Signed Debug0.1.0/build2026100904 built with current source and existing local signing configuration. Deep strict signature verification and all seven packaged Agent configuration checks passed. Log: `/tmp/mh-2026100904-signed-build.log`.
+- ✅ Installed over the existing app on the paired physical iPhone17 Pro without uninstalling. An independent installed-app query confirmed0.1.0/build2026100904; launch succeeded. Receipts: `/tmp/mh-2026100904-install-retry.json`, `/tmp/mh-2026100904-installed-apps-retry.json`, `/tmp/mh-2026100904-launch-retry.json`.
+- The first installation and launch attempts encountered native remote-device connection errors; refreshed connection and sequential retries succeeded. No app data reset or signing-file change was performed.
+- This delivery includes the execution-log tabs and shared Assistant/ApplicationControl Robot registration correction. Earlier no-install statements describe their prior validation stages. Automated checks are recorded above; installation/launch does not establish live-model, visual UI, acoustic or physical arm acceptance.
+
+## 2026-10-09 — Device camera continuation and scene lifecycle regressions
+
+- Read only the app conversation/context documents into `/tmp/mh-device-bug-contexts` for diagnosis; no device data was modified or added to the repository. The failed photographer input36EC5A9F-ED27-43E1-830D-1D0A552C146F contains open, then three repeated back-facing native flip calls, each completing, before the four-request limit. Earlier plain save/ignore questions had completed tasks without explicit waiting-user progress.
+- ✅ Photographer exposes seven camera operations as scheduled Actions; no native camera Tool is model-callable. Synthetic parent/child Gateway regressions now execute open then capture in one round, verify capture begins only after open completes, fuse observations, and return results only to Photographer. Fixed UI transactions retain their private single-call Tool grants.
+- ✅ Startup overlap regression holds child registration while a scene transition arrives, then verifies parent/child both pause after startup and resume. Camera failure/cancellation tests retain recovery and verify structured acknowledged open/flip results. Task-question regression inspects active-task identity and photo progress instructions, then verifies waitingUser, stale-input rejection and the same-task save answer. Four-round completion/budget regressions still pass.
+- ✅ Required final `./scripts/check.sh` passed:661 IntegrationTests,69 AppWorkflowTests,38 UITests and remaining targets, strict formatting, module/Python and plist checks. Log: `/tmp/mh-camera-actions-final-check.log`.
+- ✅ Generic unsigned iOS Debug build passed, and all seven packaged Agent resources verified. Log: `/tmp/mh-camera-actions-device.log`.
+- ❌ Required `./scripts/build-ios.sh` remains blocked by external CoreAIShared missing the CoreAI Simulator module. Log: `/tmp/mh-camera-actions-ios.log`.
+- ❌ Not installed in this fix turn. Live-model repeated-call behavior and native multi-step photo/save interactions remain unverified; role prompts improve task reporting but synthetic providers do not establish actual model compliance. Device motion, acoustics and native foreground safety acceptance remain separate.
+
+## 2026-10-09 — Photographer Action/lifecycle fix iPhone installation
+
+- ✅ Signed Debug0.1.0/build2026100905 built from the current fix with existing signing configuration. Deep strict signature verification and all seven packaged Agent resource checks passed. Log: `/tmp/mh-2026100905-signed-build.log`.
+- ✅ Installed over the existing app on the paired physical iPhone17 Pro without uninstalling; independent app query confirmed0.1.0/build2026100905 and launch succeeded. Receipts: `/tmp/mh-2026100905-install.json`, `/tmp/mh-2026100905-installed-apps.json`, `/tmp/mh-2026100905-launch.json`.
+- This delivers the seven Photographer camera Actions, explicit camera feedback/task reporting and startup-aware scene transitions. No app-data reset or signing-file modification was performed. Automated checks are recorded above; live-model repeated-call compliance, native photo/save dialogue and physical lifecycle/audio behavior still require on-device acceptance.
+
+## 2026-10-09 — Frontend/local interaction and owning-Agent backend separation
+
+- Removed mandatory Assistant typed-UI subscriptions/relay hooks and shared Chat fixed-UI task construction. Production subscriptions now directly deliver camera to Photographer, history to Memory, and resource/provider/device requests to ApplicationControl. Existing task/history records are retained; only new artificial touch delegations are eliminated.
+- ✅ Production-catalog regression checks each typed user contract has exactly its business-owner subscriber. Real Gateway camera transport test runs with a registered Assistant and verifies direct Photographer execution, no TaskRequest, and unchanged Assistant history/task views. Standalone fixtures no longer patch subscriptions. Existing deterministic history/resource/provider failure/cancellation and conversational specialist/task regressions still pass.
+- ✅ Held device-operation workflow regression proves page visibility/system-settings callbacks and native motor-stop fencing complete synchronously without enqueueing backend requests. Device command bounds/coalescing remain. UI navigation directly uses NavigationState.show; the authorized Agent openPage Action and existing UI callable functions remain available.
+- ✅ Required final `./scripts/check.sh` passed:662 IntegrationTests,69 AppWorkflowTests,38 UITests and remaining targets, strict formatting, module/Python and plist checks. Log: `/tmp/mh-frontend-backend-delivery-check.log`.
+- ✅ Final generic unsigned iOS Debug build passed after actual-producer/root-or-task conversational navigation authorization correction; all seven packaged Agent resources verified. Log: `/tmp/mh-frontend-backend-delivery-device.log`.
+- ❌ Required `./scripts/build-ios.sh` failed in external CoreAIShared because Simulator cannot resolve CoreAI. Log: `/tmp/mh-frontend-backend-ios.log`.
+- ❌ Not installed. Real models, touch navigation/forms, native Bluetooth/camera/provider operations and spoken UI control remain separate on-device acceptance; controlled test providers/endpoints do not establish those results. No directory, third-party dependency, signing-file change or device-data reset was introduced.
+
+
+## 2026-10-10 — Home Action / Task / Agent log
+
+- Removed Signal tab, UI record model/storage, branch rows and related-Signal navigation. Root workflow subscribes to task-only snapshots; ordinary audio/recognition/environment traffic does not invalidate this UI. Gateway task retention is independent of general Signal diagnostics, with256 rows, latest-one buffering and a shared eight-observer limit. Task admission/completion, terminal protection, related Action/history identity, Agent lifecycle/errors and Action popup are preserved.
+- ✅ Required `./scripts/check.sh` passed:663 IntegrationTests,69 AppWorkflowTests and remaining targets, strict formatting, module/Python and plist checks. Regression coverage includes quiet task observers through shutdown,300 unrelated Signals preserving task revision/history, three exact tabs, independent Agent errors and related-Action selection. Log: `/tmp/mh-log-simplification-check.log`.
+- ✅ Generic unsigned iOS Debug build passed; all seven packaged Agent configs verified. Log: `/tmp/mh-log-simplification-device.log`.
+- ❌ Required `./scripts/build-ios.sh` failed in external CoreAIShared because Simulator cannot resolve CoreAI. Log: `/tmp/mh-log-simplification-ios.log`.
+- ❌ Not installed in this turn. Native scrolling/refresh performance, actual visual presentation and live-model/device acceptance remain unverified; no physical performance measurement is claimed. No new directory, third-party dependency, signing-file change or device-data reset.
+
+
+## 2026-10-10 — Home log/frontend boundary iPhone installation
+
+- ✅ Signed Debug0.1.0/build2026101001 built with existing signing configuration; deep strict signature verification and all seven packaged Agent resource checks passed. Log: `/tmp/mh-2026101001-signed-build.log`.
+- ✅ Installed over the existing app on Youwei’s physical iPhone17 Pro without uninstalling. Independent installed-app query confirmed0.1.0/build2026101001 and launch succeeded. Receipts: `/tmp/mh-2026101001-install.json`, `/tmp/mh-2026101001-installed-apps.json`, `/tmp/mh-2026101001-launch.json`.
+- Delivers Action / Task / Agent home logs with task-only observation plus frontend/local interaction and owning-Agent backend separation; conversational UI Actions remain available. Earlier no-install statements describe previous validation turns. Installation/launch does not establish native performance, live-model, acoustic or physical-device acceptance. No app-data reset or signing-file modification.
+
+
+## 2026-10-10 — Model-interface first-text timing
+
+- Replaced Agent-consumer arrival timing with per-round provider sampling. OpenAI starts immediately before URLSession.bytes and captures the first nonempty decoded SSE text before emission; Gemma uses native generation start. Stored firstTokenLatency uses ContinuousClock rather than record-date subtraction. ASR, Agent admission/context/persistence, stream-consumer delay, TTS and UI rendering are excluded; network/service/SSE framing remain included.
+- ✅ Required final `./scripts/check.sh` passed:664 IntegrationTests,69 AppWorkflowTests,19 OpenAIChatTests and remaining targets; strict formatting, module/Python and plist checks. Offline URLProtocol fixtures verify provider evidence, empty-text handling and immutable first sampling. Synthetic buffered initial/ReACT/native-only rounds preserve exact provider timing, storage validates/persists it, and UI/Codable projections distinguish new interface metadata from legacy arrivals. Log: `/tmp/mh-model-ttft-final-check.log`.
+- ✅ Generic unsigned iOS Debug build passed and all seven packaged Agent resources verified. Log: `/tmp/mh-model-ttft-device.log`.
+- ❌ Required `./scripts/build-ios.sh` failed in external CoreAIShared because Simulator cannot resolve CoreAI. Log: `/tmp/mh-model-ttft-ios.log`.
+- ❌ Not installed in this turn. No live OpenAI/third-party request, physical timing capture, native UI acceptance or measured latency improvement is claimed. The existing per-delta persistence/output segmentation is unchanged; this corrects request metadata, not end-to-end response speed. No new directory, dependency, credentials/signing-file change or device-data reset.
+
+
+## 2026-10-10 — Model-interface timing iPhone installation
+
+- ✅ Signed Debug0.1.0/build2026101002 built with existing signing configuration. Deep strict signature verification and all seven packaged Agent resource checks passed. Log: `/tmp/mh-2026101002-signed-build.log`.
+- ✅ Installed over the existing app on Youwei’s physical iPhone17 Pro without uninstalling. Independent installed-app query confirmed0.1.0/build2026101002 and launch succeeded. Receipts: `/tmp/mh-2026101002-install.json`, `/tmp/mh-2026101002-installed-apps.json`, `/tmp/mh-2026101002-launch.json`.
+- Delivers adapter-sampled model-interface request/first-text timing and legacy-history labels. Prior no-install statements describe earlier validation turns. Installation and launch do not establish actual network/provider timing, native visual acceptance or measured end-to-end speed improvements. Existing app data was retained; no signing-file change or data reset.
+
+
+## 2026-10-10 — New-utterance caption rollover
+
+- Root cause: new accepted recognition turns cleared liveTranscript only, leaving transcriptFinalized true and previous assistantReply visible. The new ASR preview therefore inherited the upper caption position.
+- ✅ VoiceSessionCoordinator uses the shared ConversationPresentation accepted-state projection. A newer recognition identity resets both captions and the finalized flag; same-turn updates preserve text, finishTranscript seals/promotes it, and rejected stale/duplicate/closed updates cannot reset newer state. Reply/task execution identity and capture/ASR lifecycle are unchanged.
+- ✅ Final required `./scripts/check.sh` passed:664 IntegrationTests,71 AppWorkflowTests and remaining targets, strict formatting, module/Python and plist checks. Two new regressions exercise onset-first/transcript-first rollover, lower-slot state, final promotion, reply coexistence and rejected updates. Initial test compilation rejected direct mutating calls inside Testing macros; repaired tests invoke the real projection through a local function. Logs: `/tmp/mh-caption-rollover-check.log`, `/tmp/mh-caption-rollover-final-check.log`.
+- ✅ Generic unsigned iOS Debug build passed; all seven packaged Agent resources verified. Log: `/tmp/mh-caption-rollover-device.log`.
+- ❌ Required `./scripts/build-ios.sh` failed in external CoreAIShared because Simulator cannot resolve CoreAI. Log: `/tmp/mh-caption-rollover-ios.log`.
+- ❌ Not installed in this turn. Native caption animation/layout and real microphone/VAD/ASR acceptance remain unverified; passive-state regressions and builds do not establish physical-device behavior. No new directory, dependency, signing-file change or device-data reset.
+
+
+## 2026-10-10 — Responses transport and Action-only Assistant
+
+Implemented cloud Responses-only encoding and typed SSE, resource-resident reusable URLSession, request-only HTTP cancellation, Assistant empty Tool grants, readEnvironment/send Actions, static /status branch removal and inert projection of preserved native history. No new directories, modules, dependencies, credentials, signing settings or live API calls.
+
+- ✅ Final `./scripts/check.sh` exit0 (`/tmp/mh-responses-final-check.log`): boundary/static checks,6 Python tests, strict Swift formatting, all Swift test targets and project/privacy/entitlement plist checks. Includes665 IntegrationTests,71 AppWorkflowTests and21 OpenAIChatTests. Opt-in physical serial and real-model evaluation cases remain skipped by their normal test gates.
+- ✅ Responses offline regressions validate POST /responses, stream=true/store=false, optional max_output_tokens, omitted legacy request fields, input_text/input_image, flattened function declarations, preserved call_id pairs, bytewise Unicode/CRLF/multiline SSE, terminal usage/status, rejected partial/forged/failed native calls, sanitized HTTP errors, cancellation then session reuse, single Session across sequential operations and fresh residency after unload.
+- ✅ Assistant regressions validate no model Tools even with native-capable providers, XML delegation and parent/child ownership, observed readEnvironment Action continuation, old native evidence projected without undeclared function calls, FIFO versus ready continuation and independent native/text output consumer ordering. Explicit synthetic native-call roles preserve general protocol coverage without restoring production Assistant grants.
+- ✅ Failed full-run fixture assumptions were repaired (`/tmp/mh-responses-check.log`,13 issues): robot assemblies lacked the new environment Action, one mixed-output test assumed text always preceded native output, and a snapshot assertion cast a synthetic role to production Assistant. Six targeted test functions (including eight gesture cases) passed in `/tmp/mh-responses-regression.log`; final full checks passed. Early focused compilation required the existing CLT Testing plugin-path workaround and generic fixture/import corrections; these are not production failures.
+- ✅ Final unsigned generic iOS device build exit0 (`/tmp/mh-responses-final-device.log`). All7 packaged Agent JSON resources verified; packaged Assistant has tools=[] and readEnvironment on System Channel.
+- ❌ Required `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-ios.sh` failed in its Simulator target: external coreai-models CoreAIShared cannot resolve CoreAI (`/tmp/mh-responses-ios.log`). Subsequent schemes in that fail-fast script did not run; do not describe them as passing.
+- ❌ No physical installation, live Responses request, authentication/provider compatibility, native UI acceptance or measured latency improvement in this change. The configured cloud provider must support Responses. First-text timing still measures actual adapter network-request start to first nonempty decoded text; connection reuse is verified offline, not a quantified performance claim.
+
+
+## 2026-10-10 — Responses / Action-only Assistant physical installation
+
+- ✅ Signed Debug device build succeeded for connected iPhone 17 Pro (`00008150-000579D114C2401C`) with version `0.1.0`, build `2026101003`, bundle `dev.mobileharness.app`. Signature verification and all seven packaged Agent configuration checks passed; packaged Assistant has no Tools and includes the `readEnvironment` Action.
+- ✅ Installed over the existing application without uninstalling or clearing data. Independent device app inventory confirmed version/build; device process launch succeeded. This build includes Responses transport, resource-owned reusable network Session, Action-only Assistant and the new-utterance caption reset.
+- Evidence: `/tmp/mh-2026101003-signed-build.log`, `/tmp/mh-2026101003-install.json`, `/tmp/mh-2026101003-installed-apps.json`, `/tmp/mh-2026101003-launch.json`.
+- ❌ Installation and launch do not establish live provider compatibility, latency improvement, acoustic behavior or native UI acceptance; these require physical-device interaction. Automated checks and unsigned device build results are recorded in the preceding implementation entry.
+
+
+## 2026-10-10 — Live GPT-4.1 assistant-history HTTP400 regression
+
+- ✅ User-authorized temporary credential, official `https://api.openai.com/v1/responses`, GPT-4.1, streaming, store=false, temperature0.7. Four-message history (system/user/assistant/user) reproduced HTTP400 `invalid_value`: prior assistant `input[2].content[0]` used input_text, while the server requires output_text/refusal. Authentication succeeded far enough to validate this request; this is a request-encoding failure.
+- ✅ Encode prior assistant text as output_text with annotations=[]; retain input_text for system/user and exact native call/result pairing. Add offline multi-turn and assistant-text-plus-native-call regressions. No credentials were placed in repository files, test fixtures or normal output.
+- ✅ Corrected minimal protocol probe returned HTTP200, text `OK` and response.completed (one Python sample first-text time≈2.64s). A standalone Swift probe linked the actual compiled ModelKit, ModelKitRuntime and ModelKitOpenAI products, used their URLSession/encoder/decoder/lifecycle, and returned text `OK`, stop and usage input26/output2/total28; adapter timing≈2.11s. These single desktop samples do not establish physical-device latency improvements or full Agent/UI acceptance.
+- ✅ Focused OpenAI tests:22 passed. Signed physical iOS build, strict signature verification and all seven packaged Agent configuration checks passed. Build `0.1.0/2026101004` installed over the prior app on connected iPhone17 Pro (`00008150-000579D114C2401C`) and launched; independent app inventory confirmed the version. Existing app data was not cleared.
+- ❌ Required Simulator build remains blocked by external coreai-models/CoreAIShared missing CoreAI; subsequent fail-fast schemes did not run.
+- Evidence: `/tmp/mh-responses-400-tests.log`, `/tmp/mh-responses-live-fixed.sse` (synthetic prompt response only), `/tmp/mh-responses-400-check.log`, `/tmp/mh-responses-400-ios.log`, `/tmp/mh-2026101004-signed-build.log`, `/tmp/mh-2026101004-install.json`, `/tmp/mh-2026101004-installed-apps.json`, `/tmp/mh-2026101004-launch.json`. Live Swift probe source/executable are outside the repository and contain no embedded credential.
+
+- ✅ Full `./scripts/check.sh` completed with exit0: strict formatting, boundaries, Python checks, all Swift test targets and plist checks passed, including665 IntegrationTests,71 AppWorkflowTests and22 OpenAIChatTests. `git diff --check` passed.
+
+
+## 2026-10-10 — Specialist history task projection
+
+- ✅ Settings retains Assistant current/past conversation archives. Photographer, Memory and ApplicationControl now use read-only task lists and task-specific detail/export, with original request titles, status and model-round counts. ReACT and later user inputs are grouped by task across old archives; unknown task associations remain separately labeled inputs, without fabricated task dates.
+- ✅ HistoryPresentationAdapter uses one immutable owning Agent context snapshot. Task identity is read from task Signal content when present, including early evidence whose outer record was keyed by input identity. Retained evidence, task views and registry/work state supply membership/status; terminal cancellation/restart interruption overrides stale waiting-user reports. The UI receives only immutable view values and retains producer-specific image/preview controls. No storage rewrite, summary request, second writable history, directory or dependency was introduced.
+- ✅ Complete `./scripts/check.sh` recheck exited0, including665 IntegrationTests,73 AppWorkflowTests and22 OpenAIChatTests, strict formatting, boundaries, six Python tests and plist checks. New task tests cover two interleaved tasks, later input/ReACT, old archive boundaries, original request titles, early record identity, orphan inputs, no-model tasks and cancellation/recovery.
+- Initial full check had a sound-source diagnostic wait timeout (three assertions) outside modified files. The isolated test passed in0.023s and the complete recheck passed (including this diagnostic); no unrelated sound code was changed. The initial ad hoc Swift test invocation also encountered the known missing Testing plugin; repository checks supply the explicit plugin path.
+- ❌ `./scripts/build-ios.sh` Simulator build remains blocked by external coreai-models/CoreAIShared missing CoreAI; later fail-fast schemes did not run. Native layout, real-model behavior, installation and physical-device acceptance are not established by automated tests.
+- Evidence: `/tmp/mh-task-history-final-check.log` (initial diagnostic timeout), `/tmp/mh-task-history-sound-recheck.log`, `/tmp/mh-task-history-recheck.log` (passing full recheck), `/tmp/mh-task-history-ios.log`, `/tmp/mh-task-history-complete-device.log`.
+
+- ✅ Latest-source unsigned generic iOS device build succeeded; all seven packaged Agent configurations verified. `git diff --check` passed. This change has not been signed/installed to the physical phone.
+
+
+## 2026-10-10 — Reply focus, paused environment admission and scoped failure diagnostics
+
+- Confirmed source defects: VoiceSessionCoordinator used current caption producer to gate PCM consumption; specialist beginReply invalidated a playing Assistant. ApplicationControl rejected environment facts and correlated feedback after foreground pause.
+- Implemented: caption changes no longer revoke playback; active session and explicit cancellation still fence audio, Gateway retains source/task/capability authorization and Speech uses its existing serialization key. Assistant delegation prompt emits send alone. Paused deterministic ApplicationControl admits environment facts and correlated results, rejecting fresh business commands.
+- Round outbox failure now reports execution ID, Action path and closed/expired/exhausted state instead of generic scopeClosed; completed effects are not replayed. This distinguishes transport failure from task/presentation scope errors and does not suppress failures.
+- Automated regressions cover parent/child serialization, caption-owner change, paused environment admission/new-command rejection, correlated diagnostic completion through pause and failed feedback without effect replay. Initial test run required fixing the synthetic child's executor identity and updating an obsolete assertion that expected feedback failure during pause. Recheck passed; final check with the additional two-producer queue regression is recorded below.
+- Unsigned generic iOS device build passed (`/tmp/mh-reply-lifecycle-device-final.log`); seven packaged Agent JSON configurations decode successfully. `./scripts/build-ios.sh` failed resolving external CoreAI for CoreAIShared in the simulator dependency. This is not a passing simulator build.
+- Attempt to retrieve the device's failed Assistant context was rejected by CoreDevice 4016: required trusted connectivity/device services unavailable. The screenshot's exact scopeClosed source remains unverified; no live model, native playback or physical acceptance claimed. No installation performed in this change.
+
+Final validation: `./scripts/check.sh` passed (`/tmp/mh-reply-lifecycle-finalcheck.log`), including 667 IntegrationTests and 74 AppWorkflowTests; formatting, dependency boundaries, Python tests and project/plist validation passed. `git diff --check` passed.
+
+
+## 2026-10-10 — Publish/send boundary audit
+
+- Audited production publish entry points, Agent communication Actions/compatibility ports, App fact adapters and owner-directed send/runtime receipts. No production caller uses flushPublications as acknowledgment; the barrier is for tests/shutdown only. Explicit user data-operation result waits are business completion, distinct from transport acknowledgment.
+- Found and removed residual waits: App environment facts allocated request waiters and awaited application.control.finished; native model-resource observations waited for presentation completion and retried based on subscriber failure; OutputGateway awaited published-contract App observers; publication overflow awaited diagnostic callbacks.
+- Publish now submits bounded background work and returns before Agent/App observer completion. Observer branches share 128-operation/256-branch/8-MiB capacity and joined shutdown; loss is recorded without publisher receipt/retry. Environment facts produce no completion acknowledgment. Root-owned ApplicationControl consumer independently executes resource-fact presentation/feedback and receiver errors. send retains target admission reports and correlated receipts; no completed effects are replayed.
+- Regressions cover slow/failed App observers, independent subscriber delivery, overflow, recipient rejection, environment errors with no publisher waiter, stale fact rejection and asynchronous resource presentation. Initial checks exposed obsolete tests expecting receiver rejection as publisher failure and immediate post-publish state; fixtures now await independently observable processing, and local-invalid payload tests still expect producer validation errors.
+- Generic iOS device build passed (`/tmp/mh-publication-audit-device-final.log`), with seven packaged Agent configurations decoded. `./scripts/build-ios.sh` failed on unresolved external CoreAI dependency in CoreAIShared (`/tmp/mh-publication-audit-ios.log`). No physical/native/live-model acceptance or installation performed.
+
+Final validation: `./scripts/check.sh` passed (`/tmp/mh-publication-audit-finalcheck.log`), including 670 IntegrationTests and 74 AppWorkflowTests; boundary/Python/format/project/plist checks passed. `git diff --check` passed. These checks do not establish physical-device behavior.
+
+
+## 2026-10-10 — Physical installation of task history, reply/lifecycle and publication corrections
+
+- Signed Debug build 0.1.0/2026101005 succeeded using existing local signing configuration. Strict/deep signature verification and all seven packaged Agent resource checks passed.
+- Installed over build2026101004 on paired Youwei’s iPhone17 Pro (`00008150-000579D114C2401C`); independent device app inventory confirmed version0.1.0/build2026101005, and devicectl confirmed launch. No app-data reset or repository signing changes.
+- Delivers specialist task-scoped history, parent/child queued playback without caption-focus cancellation, paused ApplicationControl environment/feedback admission, specific round-delivery failure evidence, send-only delegation prompt and one-way environment/resource/observer publication corrections.
+- Evidence: `/tmp/mh-2026101005-signed-build.log`, `/tmp/mh-2026101005-install.json`, `/tmp/mh-2026101005-installed-apps.json`, `/tmp/mh-2026101005-launch.json`. Installation/launch does not establish physical acoustic, native UI, live-model acceptance or resolution of the previously unreproduced scopeClosed incident.
+
+
+## 2026-10-10 — Photographer camera-state context
+
+Implemented: App foreground camera sampler publishes changed revisioned camera.state facts (100ms sampling) through the existing one-way InputGateway path. Photographer authenticates root source/session/sequence, stores one latest snapshot without adding model work or per-sample history, accepts facts while paused and clears recovered live facts. Selected camera/task-phase data is appended to each actual provider request, including ReACT continuations; task phase derives from existing durable work/task/report/artifact state. Native capture occupancy now uses existing photoBusy until joined capture completion.
+
+Validation:
+- Focused synthetic camera tests passed: routing through configured subscription, source/session/revision/expiry validation, passive paused updates, bounded content, recovery, task phase and initial-versus-continuation facts.
+- First full check failed two cases of an existing photo-observation test that assumed the image must be the last message. Updated that test to verify image identity/bytes across the complete request, retaining native pairing and recorded evidence checks. This did not change image delivery.
+- Final `./scripts/check.sh` passed: 672 IntegrationTests,74 AppWorkflowTests and remaining package tests/checks; evaluation variants explicitly skipped by their existing configuration. Log: `/tmp/mh-camera-context-check-final.log`.
+- Unsigned generic iOS device build passed; all seven packaged Agent configurations verified. Log: `/tmp/mh-camera-context-device.log`.
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-ios.sh` failed at the existing Simulator CoreAIShared dependency: unable to resolve CoreAI. Log: `/tmp/mh-camera-context-simulator.log`. Simulator validation is not claimed as passing.
+- Affected README relative links checked; no new directories or dependencies. No device installation or live-provider/native-camera acceptance performed in this change. Sampling and unacknowledged publication do not guarantee instantaneous native readiness; Actions retain their real execution checks.
+
+
+## 2026-10-10 — All-Agent send Action-call audit
+
+Implemented: removed automatic native Agent.send model Tool generation and the per-role exposesNativeCommunicationTools switch. Each authorized task sender receives the existing XML send Action catalog. Explicit communication Tool registration now fails catalog assembly. Static business registrations are preserved: Memory2, ApplicationControl8, other five roles0 model Tools. Internal fixed/perception Tools are separate from model exposure and unchanged. Framework communication continues to output CommunicationAction, with send admission confirmation distinct from task completion.
+
+Validation:
+- `./scripts/check.sh` passed, including672 IntegrationTests,74 AppWorkflowTests and remaining package checks/tests. All seven effective catalogs exclude communication Tools; role business Tool paths are retained; unauthorized explicit send Tool registration rejects. Specialist request/progress/input/result and Memory parent-commit tests use Action-call send and pass. Log: `/tmp/mh-send-action-check.log`. Existing model evaluation variants explicitly skipped.
+- Unsigned generic iOS device build passed and all seven bundled Agent resources verified. Log: `/tmp/mh-send-action-device.log`.
+- Required `./scripts/build-ios.sh` with full Xcode failed on existing Simulator CoreAIShared unresolved CoreAI dependency; not claimed passing. Log: `/tmp/mh-send-action-simulator.log`.
+- An initial bare focused swift test invocation failed because the Command Line Tools Testing macro plugin path was missing; the repository check script supplies that path and its complete final run passed. Log: `/tmp/mh-send-action-tests.log`.
+- Affected diff whitespace and README relative links checked. No new directories/dependencies, live API requests or device installation. Live-model/native-UI/physical acceptance remains pending.
+
+
+## 2026-10-10 — Per-Agent Action/Tool duplicate registration audit
+
+Found one duplicate model exposure: ApplicationControl UI.Navigation.open was available as both openPage Action and App.openPage Tool. Removed only the native model Tool; scheduled openPage and the code-owned fixed navigation InternalTool remain authorized. All seven effective model catalogs now have disjoint Action/Tool paths and unique paths within each model protocol. ApplicationControl has7 business Tools, Memory2, other roles0. Cross-Agent function reuse and internal fixed command grants remain intentional, separate from model exposure; no generic framework protocol prohibition was added.
+
+Validation: `./scripts/check.sh` passed (673 IntegrationTests,74 AppWorkflowTests plus remaining checks/tests; existing evaluation variants skipped), including model path uniqueness and navigation Action/internal Tool compatibility. Log: `/tmp/mh-model-registration-check.log`. Unsigned iOS device build passed and seven packaged Agent resources verified (`/tmp/mh-model-registration-device.log`). Required full-Xcode `./scripts/build-ios.sh` failed on the existing Simulator CoreAIShared/CoreAI module dependency (`/tmp/mh-model-registration-simulator.log`); Simulator validation is not claimed. Affected diff whitespace and README links checked. No new directories/dependencies or device installation; live-model/native-UI acceptance remains pending.
+
+## 2026-10-10 — Agent 函数注册清单文档核对
+
+✅ 文档更新：七个 Agent README 新增统一的模型 Action/Tool、内部固定调用和通信输出权限清单，Agents README 提供 review 索引。逐项核对 JSON 中的名称、函数路径、Channel、参数和函数说明；核对代码追加的内部权限及共享 Chat 通信 Action。模型条目数（含动态 send）依次为 Assistant 15、Photographer 8、Memory 3、ApplicationControl 20、SpeechPerception 0、SpeechSynthesis 0、VisionPerception 0；内部权限数依次为 3、10、7、20、4、0、2。
+
+✅ 验证：自动核对七份清单覆盖配置内全部模型函数与 publish/send 输出权限，内部权限数量匹配代码，新增注册来源链接有效；文档 diff 格式检查通过。本次仅修改文档，未运行构建或行为测试，未安装真机；这些清单不构成真实模型、UI 或设备验收证据。
+
+## 2026-10-10 — 当前 Agent 注册与状态版本真机安装
+
+✅ 使用现有本地签名配置构建 Debug 0.1.0/2026101006 成功；严格/深层签名校验及全部七个最终包内 Agent 配置校验通过。覆盖安装至已配对的 Youwei’s iPhone 17 Pro（00008150-000579D114C2401C），设备应用清单确认版本 0.1.0、build 2026101006，CoreDevice 确认启动成功。未重置应用数据，未修改仓库签名配置。本次包括上一安装之后的相机状态上下文、send Action-only 及模型函数重复注册修正；函数清单文档不影响运行行为。
+
+证据：/tmp/mh-2026101006-signed-build.log、/tmp/mh-2026101006-install.json、/tmp/mh-2026101006-installed-apps.json、/tmp/mh-2026101006-launch.json。相关代码自动检查及 Simulator CoreAI 依赖限制见前文；本次安装未重复运行测试。❌ 安装和启动不代表真实模型、原生 UI、声音或机械臂行为验收。
+
+## 2026-10-10 — 对话详情生成信息展示调整
+
+✅ ConversationHistoryView 将生成记录改为页面最后的“生成信息”DisclosureGroup，默认收起，仅包含轮次、所属输入、模型、首 token 耗时、状态与结束原因、temperature 和输入/生成/总计 token 数。实际上下文的消息标题保留 role，去掉数字前缀；顺序与消息内容不变。原有生成/执行错误单独展示，完整导出保留证据。ConversationHistoryPresentation 仅展示接口采样耗时差值；无接口计时的旧记录不推算耗时。OpenAI 采样仍从 network.bytes 请求前开始，到首个非空 SSE 文本 delta 解码到达；本次不改请求及采样链路。
+
+✅ ./scripts/check.sh 通过，包含 UI 历史展示回归、673 IntegrationTests 和 74 AppWorkflowTests；已有真实模型 opt-in 评估仍跳过。iOS 真机目标无签名构建成功，七个打包 Agent 配置校验通过。文档与变更 diff 格式检查通过。日志：/tmp/mh-generation-info-check.log、/tmp/mh-generation-info-device.log。
+
+❌ ./scripts/build-ios.sh 的 Simulator 构建因现有外部 CoreAIShared 无法解析 CoreAI 模块失败，后续脚本 scheme 未运行（/tmp/mh-generation-info-ios.log）。本次未安装真机；折叠交互、页面视觉效果及真实模型计时仍需原生 UI / 设备验收。
+
+## 2026-10-10 — 对话详情生成信息版本真机安装
+
+✅ 现有本地签名配置下 Debug 0.1.0/2026101007 构建成功，严格/深层签名及七个最终包内 Agent 配置校验通过。覆盖安装到 Youwei’s iPhone 17 Pro（00008150-000579D114C2401C），独立设备应用清单确认 build 2026101007，CoreDevice 确认启动成功。保留应用数据，未改仓库签名配置。包含对话详情末尾默认折叠的生成信息、耗时差值和无序号上下文标题。
+
+证据：/tmp/mh-2026101007-signed-build.log、/tmp/mh-2026101007-install.json、/tmp/mh-2026101007-installed-apps.json、/tmp/mh-2026101007-launch.json。自动检查/构建证据见上一条；本次未重复测试。❌ 安装和启动不代表原生折叠交互、视觉效果或真实模型验收。
+
+## 2026-10-10 — 修复历史解析预览漏注册 send
+
+✅ 根因：HistoryAgentAdapter 的 GenerationTrace 仅加载角色函数与内部权限，未像生产 AgentChatWorker 一样调用 AgentCommunicationAdapter.catalog，导致历史详情将动态注册的 send Action 误报 unknownCapability。修复为按实际角色的 communication declaration 组装完整模型目录再解析；不更改执行权限、任务投递、回执或生命周期。预览仍不执行任何函数，Communication Action 识别不代表接纳/完成。
+
+✅ 新增参数化回归覆盖 Assistant → Photographer request，以及 Photographer/Memory/ApplicationControl → Assistant progress/result，共七组，包括跨片段 send、文本映射、缺参数拒绝及未知函数拒绝。真机目标无签名构建成功，七个最终包 Agent 配置校验通过（/tmp/mh-history-send-preview-device.log）。
+
+首次 ./scripts/check.sh 在并行构建期间两项现有 SoundSourceTests 因等待声源输出超时失败（/tmp/mh-history-send-preview-check.log）；停止并行构建后重新运行全量脚本通过，含 674 IntegrationTests、74 AppWorkflowTests，两个声源回归和七组新增用例均通过（/tmp/mh-history-send-preview-check-retry.log）。不据重试成功认定声源时序故障已根治。已有真实模型 opt-in 评估保持跳过；变更 diff 格式检查通过。
+
+❌ ./scripts/build-ios.sh 仍因外部 CoreAIShared 无法解析 CoreAI 模块失败，后续 scheme 未执行（/tmp/mh-history-send-preview-ios.log）。本次未安装真机，未验收原生历史详情或实时模型委派；用户提供的预览文本不能单独证明实际投递失败。
+
+## 2026-10-10 — send 历史预览修复真机安装
+
+✅ 用户确认实际任务投递正确。使用现有本地签名构建 Debug 0.1.0/2026101008 成功，严格/深层签名和七个最终包内 Agent 配置校验通过。覆盖安装到 Youwei’s iPhone 17 Pro（00008150-000579D114C2401C），设备应用清单确认 build 2026101008，CoreDevice 确认启动成功。保留应用数据，未修改仓库签名配置。该版本包含历史预览补齐动态 send Action 目录的修复。
+
+证据：/tmp/mh-2026101008-signed-build.log、/tmp/mh-2026101008-install.json、/tmp/mh-2026101008-installed-apps.json、/tmp/mh-2026101008-launch.json。相关全量检查和构建记录见前条，本次未重复运行测试。❌ 安装/启动不代表修复后原生预览视觉验收或新增真实模型/设备测试。

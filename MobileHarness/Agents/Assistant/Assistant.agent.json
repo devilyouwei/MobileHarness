@@ -2,63 +2,6 @@
   "version": 6,
   "id": "assistant",
   "actions": {
-    "Camera": [
-      {
-        "alias": "takePhoto",
-        "path": {
-          "domain": "Camera",
-          "module": "Capture",
-          "function": "takePhoto"
-        },
-        "parameters": [],
-        "examples": [
-          "<takePhoto/>"
-        ],
-        "doc": "On an explicit user request, take one photo using the current ready foreground camera. Capture, retain private App evidence and show the actual photo; this does not save to the system Photos library. Its execution observation supplies the photo to the next model round for visual understanding. Emit once, then wait for actual image feedback before describing it. Use savePhoto only on an explicit save request. Do not repeat capture merely to continue reasoning. Camera must be enabled and ready."
-      },
-      {
-        "alias": "savePhoto",
-        "path": {
-          "domain": "Camera",
-          "module": "Capture",
-          "function": "savePhoto"
-        },
-        "parameters": [
-          {
-            "name": "photoID",
-            "valueType": "string",
-            "required": false,
-            "description": "Optional exact UUID from the photo result. Omit to operate on the currently displayed photo; never invent an ID.",
-            "constraints": "Valid UUID of the displayed photo only; omit for the current photo."
-          }
-        ],
-        "examples": [
-          "<savePhoto/>"
-        ],
-        "doc": "On an explicit user request, save the currently displayed captured photo to the system Photos library. Wait for the actual observation before confirming success; permission denial is a failure. Repeated saves of the same displayed photo do not create duplicates. This does not take another photo."
-      },
-      {
-        "alias": "ignorePhoto",
-        "path": {
-          "domain": "Camera",
-          "module": "Capture",
-          "function": "ignorePhoto"
-        },
-        "parameters": [
-          {
-            "name": "photoID",
-            "valueType": "string",
-            "required": false,
-            "description": "Optional exact UUID from the photo result. Omit to operate on the currently displayed photo; never invent an ID.",
-            "constraints": "Valid UUID of the displayed photo only; omit for the current photo."
-          }
-        ],
-        "examples": [
-          "<ignorePhoto/>"
-        ],
-        "doc": "On a request to close, dismiss, ignore or discard the displayed photo, hide its thumbnail and preview without exporting to Photos. This does not close the camera, delete an existing album photo, or take another photo. Wait for the actual result before confirming."
-      }
-    ],
     "Display": [
       {
         "alias": "express",
@@ -494,402 +437,24 @@
         ],
         "doc": "Reset only the selected motor to its configured home; motor6 requires an explicitly configured home. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
       }
+    ],
+    "System": [
+      {
+        "alias": "readEnvironment",
+        "path": {
+          "domain": "System",
+          "module": "Device",
+          "function": "readEnvironment"
+        },
+        "parameters": [],
+        "examples": [
+          "<readEnvironment/>"
+        ],
+        "doc": "Read the latest admitted scene, navigation and device capability facts only when needed and absent from context. These are observations, not proof of physical completion. Wait for the result before deciding dependent actions."
+      }
     ]
   },
-  "tools": [
-    {
-      "path": {
-        "domain": "System",
-        "module": "Runtime",
-        "function": "runtimeInfo"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "runtimeInfo",
-          "description": "Read the fixed local runtime configuration description. This is not a live health or model-readiness probe.",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "Camera",
-        "module": "Capture",
-        "function": "open"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "Camera.open",
-          "description": "Enable foreground camera preview and vision processing. Requires camera permission and an available camera; completion confirms capture, not pose-model readiness.",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "Camera",
-        "module": "Capture",
-        "function": "close"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "Camera.close",
-          "description": "Disable camera preview and vision processing, and wait for capture and vision cleanup.",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "Camera",
-        "module": "Capture",
-        "function": "flip"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "Camera.flip",
-          "description": "Select the requested front or back lens of the enabled foreground camera. Already selecting that lens leaves it unchanged. Fails if disabled, busy or unavailable.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "facing": {
-                "type": "string",
-                "enum": [
-                  "front",
-                  "back"
-                ],
-                "description": "Target camera: front for selfies, back for the rear camera."
-              }
-            },
-            "required": [
-              "facing"
-            ],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "History",
-        "module": "Conversation",
-        "function": "list"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "History.list",
-          "description": "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "offset": {
-                "type": "string",
-                "description": "Decimal integer from 0 through 64, encoded as a string."
-              },
-              "limit": {
-                "type": "string",
-                "description": "Decimal integer from 1 through 5, encoded as a string."
-              }
-            },
-            "required": [
-              "offset",
-              "limit"
-            ],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "History",
-        "module": "Conversation",
-        "function": "read"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "History.read",
-          "description": "Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Conversation UUID from History.list"
-              },
-              "offset": {
-                "type": "string",
-                "description": "Decimal integer from 0 through 256, encoded as a string."
-              },
-              "limit": {
-                "type": "string",
-                "description": "Decimal integer from 1 through 2, encoded as a string."
-              }
-            },
-            "required": [
-              "id",
-              "offset",
-              "limit"
-            ],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "System",
-        "module": "ModelResources",
-        "function": "snapshotResources"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "ModelResources.snapshot",
-          "description": "Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model.",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "System",
-        "module": "Provider",
-        "function": "readSettings"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "Provider.readSettings",
-          "description": "Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration.",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "UI",
-        "module": "Navigation",
-        "function": "open"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "App.openPage",
-          "description": "Open an existing app page through the same registered navigation function as a user tap. Completion confirms route commitment.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "destination": {
-                "type": "string",
-                "enum": [
-                  "home",
-                  "settings",
-                  "language",
-                  "recognition",
-                  "synthesis",
-                  "vision",
-                  "bluetooth",
-                  "history"
-                ]
-              }
-            },
-            "required": [
-              "destination"
-            ],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "System",
-        "module": "Device",
-        "function": "readStatus"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "Bluetooth.readStatus",
-          "description": "Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot.",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "System",
-        "module": "Device",
-        "function": "control"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "Bluetooth.control",
-          "description": "Submit an explicit Bluetooth connection/discovery command. Accepted is not connected or physically completed. Read status to confirm actual state.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "operation": {
-                "type": "string",
-                "enum": [
-                  "scan",
-                  "stopScan",
-                  "connect",
-                  "reconnect",
-                  "disconnect",
-                  "forget",
-                  "refresh"
-                ]
-              },
-              "id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "operation"
-            ],
-            "additionalProperties": false
-          },
-          "strict": false
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "System",
-        "module": "Device",
-        "function": "readEnvironment"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "App.readEnvironment",
-          "description": "Read latest sequenced scene, navigation and device capability facts admitted by the root Agent. Facts are observations, not proof of physical completion.",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "System",
-        "module": "ModelResources",
-        "function": "download"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "ModelResources.download",
-          "description": "Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "endpoint": {
-                "type": "string"
-              },
-              "allowsCellular": {
-                "type": "string",
-                "enum": [
-                  "true",
-                  "false"
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "endpoint",
-              "allowsCellular"
-            ],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    },
-    {
-      "path": {
-        "domain": "System",
-        "module": "ModelResources",
-        "function": "cancel"
-      },
-      "definition": {
-        "type": "function",
-        "function": {
-          "name": "ModelResources.cancel",
-          "description": "Cancel and join an admitted model transfer. Failure is returned without replay.",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id"
-            ],
-            "additionalProperties": false
-          },
-          "strict": true
-        }
-      }
-    }
-  ],
+  "tools": [],
   "communication": {
     "inputs": [
       {
@@ -926,6 +491,41 @@
         "contract": "generation.round.result",
         "version": 1,
         "kind": "roundResult"
+      },
+      {
+        "contract": "communication.receipt",
+        "version": 1,
+        "kind": "communicationReceipt"
+      },
+      {
+        "contract": "task.request",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.input",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.progress",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.result",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.cancel",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "agent.userInput",
+        "version": 1,
+        "kind": "observation"
       }
     ],
     "subscriptions": [
@@ -943,9 +543,21 @@
         "contract": "speech.phase",
         "source": "speechPerception",
         "topic": "speech.phase"
+      },
+      {
+        "contract": "agent.userInput",
+        "source": "user",
+        "topic": "agent.userInput"
+      },
+      {
+        "contract": "assistant.control",
+        "source": "runtime",
+        "topic": "assistant.control"
       }
     ],
-    "publications": [],
+    "publications": [
+      "interaction.replyActivity"
+    ],
     "sends": [
       {
         "contract": "speech.synthesize",
@@ -956,8 +568,40 @@
         "target": "speechSynthesis"
       },
       {
-        "contract": "photography.camera",
+        "contract": "task.request",
         "target": "photographer"
+      },
+      {
+        "contract": "task.input",
+        "target": "photographer"
+      },
+      {
+        "contract": "task.cancel",
+        "target": "photographer"
+      },
+      {
+        "contract": "task.request",
+        "target": "memory"
+      },
+      {
+        "contract": "task.input",
+        "target": "memory"
+      },
+      {
+        "contract": "task.cancel",
+        "target": "memory"
+      },
+      {
+        "contract": "task.request",
+        "target": "applicationControl"
+      },
+      {
+        "contract": "task.input",
+        "target": "applicationControl"
+      },
+      {
+        "contract": "task.cancel",
+        "target": "applicationControl"
       }
     ]
   }

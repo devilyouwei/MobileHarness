@@ -112,19 +112,18 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
 @Test func bundledV6ConfigurationsSeparateModelCatalogFromInternalPermissions() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     #expect(config.agentID == .assistant)
+    #expect(config.capabilities.actions.filter { $0.path.domain == "UI" }.map(\.alias) == ["express", "setExpression"])
+    #expect(config.capabilities.actions.filter { $0.path.domain == "NexArm" }.count == 11)
+    #expect(config.capabilities.channels == ["Display", "Robot", "Speech", "System"])
+    #expect(!config.capabilities.tools.contains { $0.path.hasPrefix("Camera.") || $0.path.hasPrefix("History.") })
+    #expect(config.capabilities.tools.isEmpty)
     #expect(
-        config.capabilities.actions.map(\.alias) == [
-            "takePhoto", "savePhoto", "ignorePhoto", "express", "setExpression", "shakeBase", "waveWrist", "tiltWrist",
-            "lookAround", "celebrate",
-            "dance",
-            "nodHead",
-            "shakeHead", "resetArm", "moveMotor", "resetMotor",
-        ])
-    #expect(config.capabilities.channels == ["Camera", "Display", "Robot", "Speech"])
-    #expect(try config.capabilities.resolveTool("runtimeInfo", arguments: [:]).toolPath == "System.Runtime.runtimeInfo")
+        try config.capabilities.resolveAction("readEnvironment", parameters: [:]).actionPath.description
+            == "System.Device.readEnvironment")
     let agent = try AssistantAgent(chat: FixedTextChat())
     let registry = agent.descriptor.capabilities
     #expect(registry.internalActions.count == 3 && registry.internalTools.isEmpty)
+    #expect(!registry.internalActions.contains { $0.path.description == "Speech.Listening.update" })
     #expect(
         registry.permits(
             ActionCall(
@@ -193,18 +192,14 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let registry = try AssistantAgent.runtimeCapabilities(config.capabilities)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
-    #expect(prompt.contains("AVAILABLE CHANNELS: Camera, Display, Robot, Speech"))
+    #expect(prompt.contains("AVAILABLE CHANNELS: Display, Robot, Speech, System"))
     #expect(prompt.contains("Action express: path=UI.Expression.express; default Channel=Display"))
     #expect(prompt.contains("Do not wrap Actions in Channel tags merely to name their default Channels"))
-    let concurrent = "<express emotion=\"laugh\"/><dance cycles=\"1\"/>"
-    #expect(prompt.contains("Concurrent expression-and-dance example: " + concurrent))
-    var concurrentGenerator = AgentGenerator(capabilities: registry)
-    let concurrentEvents = try concurrentGenerator.append(concurrent) + concurrentGenerator.finish()
-    #expect(concurrentEvents.count == 2)
-    #expect(concurrentEvents.compactMap(\.actionCall).map(\.channel) == ["Display", "Robot"])
+    #expect(prompt.contains("Action dance: path=NexArm.Gesture.dance; default Channel=Robot"))
+    #expect(!prompt.contains("takePhoto"))
     #expect(prompt.contains("Channel Speech — automatic audio playback"))
     #expect(prompt.contains("played on the independent Speech Channel"))
-    #expect(prompt.contains("<wait>I will finish speaking first.</wait><takePhoto"))
+    #expect(prompt.contains("<wait>I will finish speaking first.</wait><express"))
     for text in [
         "Action say:", "Action print:", "playAudio", "audioID", "beginReplyTurn", "runtimeInfo", "not callable",
     ] {
@@ -369,4 +364,140 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
     #expect(registry.permits(try allowed.call()))
     let other = ActionCall(actionPath: .init(domain: "Two", module: "Shared", function: "run"), channel: "main")
     #expect(!registry.permits(other))
+}
+
+@Test func robotActionsAreSharedByInteractionAndSettingsRoles() throws {
+    let assistant = try AgentConfigurations.load(named: "Assistant").capabilities
+    let robot = assistant.actions.filter { $0.path.domain == "NexArm" }
+    #expect(
+        Set(robot.map(\.alias)) == [
+            "shakeBase", "waveWrist", "tiltWrist", "lookAround", "celebrate", "dance", "nodHead", "shakeHead",
+            "resetArm", "moveMotor", "resetMotor",
+        ])
+    #expect(robot.allSatisfy { $0.defaultChannel == "Robot" })
+    let settings = try AgentConfigurations.load(named: "ApplicationControl").capabilities
+    let settingsRobot = settings.actions.filter { $0.path.domain == "NexArm" }
+    #expect(settingsRobot.map(\.alias) == robot.map(\.alias))
+    for (setting, interaction) in zip(settingsRobot, robot) {
+        #expect(setting.path == interaction.path)
+        #expect(setting.defaultChannel == interaction.defaultChannel)
+        #expect(setting.requiredParameters == interaction.requiredParameters)
+        #expect(setting.optionalParameters == interaction.optionalParameters)
+    }
+    #expect(settings.channels.contains("Robot"))
+    for name in ["Photographer"] {
+        let other = try AgentConfigurations.load(named: name).capabilities
+        #expect(!other.actions.contains { $0.path.domain == "NexArm" })
+        for action in robot {
+            #expect(throws: GenerationError.unknownCapability) {
+                try other.resolveAction(action.alias, parameters: [:], channel: "Robot")
+            }
+        }
+    }
+    #expect(!assistant.actions.contains { $0.path.domain == "Camera" })
+    #expect(
+        try AgentConfigurations.load(named: "Photographer").capabilities.actions.contains { $0.alias == "takePhoto" })
+}
+
+@Test func photographerCameraModelCallsUseScheduledActions() throws {
+    let capabilities = try AgentConfigurations.load(named: "Photographer").capabilities
+    #expect(capabilities.tools.isEmpty)
+    for alias in ["openCamera", "closeCamera", "flipCamera", "retryCamera", "takePhoto", "savePhoto", "ignorePhoto"] {
+        let registration = try #require(capabilities.actions.first { $0.alias == alias })
+        #expect(registration.defaultChannel == "Camera")
+        #expect(registration.path.domain == "Camera")
+        #expect(PhotographerContextState.actionFeedback(registration.path.description) == .observation)
+    }
+    let catalog = try AgentCommunicationAdapter.catalog(
+        capabilities, policy: AgentConfigurations.load(named: "Photographer").communication)
+    #expect(catalog.tools.isEmpty)
+}
+
+@Test func typedUIRequestsSubscribeOnlyAtTheirBusinessOwner() throws {
+    let configurations = try AgentConfigurations.all()
+    let owners: [String: AgentID] = [
+        "photography.camera": .photographer, "history.intent": .memory,
+        "app.interaction": .applicationControl, "model.resource.intent": .applicationControl,
+        "provider.settings": .applicationControl, "provider.discovery": .applicationControl,
+    ]
+    for (contract, owner) in owners {
+        let subscribers = configurations.filter {
+            $0.communication.subscriptions.contains { $0.source == "user" && $0.contract == contract }
+        }.map(\.agentID)
+        #expect(subscribers == [owner])
+    }
+    let controls = try AgentConfigurations.load(named: "ApplicationControl").capabilities
+    #expect(
+        try controls.resolveAction("openPage", parameters: ["destination": "settings"], channel: nil).actionPath
+            .description == "UI.Navigation.open")
+}
+
+@Test func eachAgentModelCatalogUsesOneProtocolPerFunction() throws {
+    for role in try AgentConfigurations.all() {
+        let catalog = try AgentCommunicationAdapter.catalog(role.capabilities, policy: role.communication)
+        let actions = catalog.actions.map { $0.path.description }
+        let tools = catalog.tools.map(\.path)
+        #expect(Set(actions).count == actions.count)
+        #expect(Set(tools).count == tools.count)
+        #expect(Set(actions).isDisjoint(with: Set(tools)))
+    }
+    let configuration = try AgentConfigurations.load(named: "ApplicationControl")
+    let catalog = try AgentCommunicationAdapter.catalog(configuration.capabilities, policy: configuration.communication)
+    #expect(
+        try catalog.resolveAction("openPage", parameters: ["destination": "settings"]).actionPath.description
+            == "UI.Navigation.open")
+    #expect(throws: GenerationError.unknownCapability) {
+        try catalog.resolveTool("App.openPage", arguments: ["destination": "settings"])
+    }
+    let runtime = try ApplicationControlAgent(sessionID: UUID())
+    #expect(
+        runtime.descriptor.capabilities.permits(
+            ToolCall(toolPath: "UI.Navigation.open", arguments: ["destination": "settings"])))
+}
+
+@Test(arguments: [
+    ("Assistant", "photographer", "request"),
+    ("Photographer", "assistant", "progress"),
+    ("Photographer", "assistant", "result"),
+    ("Memory", "assistant", "progress"),
+    ("Memory", "assistant", "result"),
+    ("ApplicationControl", "assistant", "progress"),
+    ("ApplicationControl", "assistant", "result"),
+])
+func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, String)) throws {
+    let (name, target, kind) = scenario
+    let configuration = try AgentConfigurations.load(named: name)
+    let runtime: CapabilityRegistry
+    switch name {
+    case "Photographer": runtime = try PhotographerContextState.runtimeCapabilities(configuration.capabilities)
+    case "Memory": runtime = try MemoryContextState.runtimeCapabilities(configuration.capabilities)
+    case "ApplicationControl":
+        runtime = try ApplicationControlContextState.runtimeCapabilities(configuration.capabilities)
+    default: runtime = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
+    }
+    let catalog = try AgentCommunicationAdapter.catalog(runtime, policy: configuration.communication)
+    var trace = try GenerationTrace(
+        capabilities: catalog, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
+    let task = kind == "request" ? "" : " taskID=\"\(UUID().uuidString)\""
+    try trace.append("照片已拍摄。<se")
+    try trace.append("nd target=\"\(target)\" kind=\"\(kind)\"\(task) content=\"保存或忽略？\"/>")
+    trace.finish()
+    #expect(trace.parserError == nil)
+    #expect(!trace.events.contains { if case .rejected = $0 { true } else { false } })
+    let send = try #require(trace.calls.first { $0.actionPath.description == "Agent.Communication.send" })
+    #expect(send.channel == "Communication")
+    #expect(send.parameters["target"] == target && send.parameters["kind"] == kind)
+    #expect(trace.calls.contains { $0.actionPath.description == "UI.Caption.print" })
+
+    var invalid = try GenerationTrace(capabilities: catalog)
+    try invalid.append("<send target=\"\(target)\" content=\"missing kind\"/><unknown/>")
+    invalid.finish()
+    #expect(
+        invalid.events.contains {
+            $0 == .rejected(CallRejection(kind: .action, alias: "send", reason: .invalidParameters))
+        })
+    #expect(
+        invalid.events.contains {
+            $0 == .rejected(CallRejection(kind: .action, alias: "unknown", reason: .unknownCapability))
+        })
 }

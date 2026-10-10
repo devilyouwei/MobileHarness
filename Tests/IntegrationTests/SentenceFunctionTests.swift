@@ -50,7 +50,7 @@ private actor StreamingSentenceChat: ChatCapability {
         await speechRequests.restored(remainder) == [
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "下一句，尾巴"])),
             expectedPrint("下一句，尾巴"),
-            .control("assistant.finished"),
+            .control("agent.finished"),
         ])
     await agent.stop()
 }
@@ -126,7 +126,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
         Issue.record("Expected explicit sentence limit failure")
         return
     }
-    #expect(state.hasPrefix("assistant.error:"))
+    #expect(state.hasPrefix("agent.error:"))
     #expect(state.contains("limitExceeded"))
     await agent.stop()
 }

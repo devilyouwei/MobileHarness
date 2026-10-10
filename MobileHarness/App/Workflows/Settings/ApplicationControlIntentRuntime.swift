@@ -1,5 +1,6 @@
 import AgentCore
 import Agents
+import AppPresentationWorkflow
 import Foundation
 import Gateway
 
@@ -9,7 +10,10 @@ public actor ApplicationControlIntentRuntime {
     private let manager: AgentManager
     private let input: InputGateway
     private let output: OutputGateway
+    private var consumer: GatewayOutputConsumer?
     private let sessionID: UUID
+
+    public func prepareForInteraction() async throws { try await ensureStarted() }
     private var started = false
     private var ownsRegistration = false
     private var closed = false
@@ -64,13 +68,12 @@ public actor ApplicationControlIntentRuntime {
             throw ProviderIntentFailure(message: transport.message, failureCode: nil)
         }
     }
+    /// One-way facts have no request slot, completion waiter or recipient acknowledgment.
     public func observeEnvironment(_ fact: AppEnvironmentFact) async throws {
         try fact.validate()
-        do {
-            _ = try await executeInput(fact.input(sessionID: sessionID), maximumCalls: 0)
-        } catch let error as TransportFailure {
-            throw ApplicationControlIntentFailure.execution(error.message)
-        }
+        guard !closed else { throw CommunicationError.scopeClosed }
+        try await ensureStarted()
+        try await input.publish(fact.input(sessionID: sessionID))
     }
     public func interact(_ intent: AppInteractionIntent) async throws {
         try intent.validate()
@@ -94,9 +97,9 @@ public actor ApplicationControlIntentRuntime {
     public func observe(_ observation: ModelResourceObservation, sequence: UInt64) async throws {
         try observation.validate()
         guard sequence > 0 else { throw CommunicationError.invalidPayload }
-        _ = try await executeBusinessInput(
-            observation.input(sessionID: sessionID, sequence: sequence),
-            scope: .refresh(generation: observation.generation), failure: observation.failureMessage)
+        guard !closed else { throw CommunicationError.scopeClosed }
+        try await ensureStarted()
+        try await input.publish(observation.input(sessionID: sessionID, sequence: sequence))
     }
     public func preferences(_ intent: ModelResourceIntent) async throws -> String {
         switch intent {
@@ -105,6 +108,11 @@ public actor ApplicationControlIntentRuntime {
         }
         guard let value = try await executeIntent(intent) else { throw CommunicationError.invalidPayload }
         return value
+    }
+    public func rejectInput(_ id: UUID, reason: String) async { if requests[id] != nil { await fail(id, reason) } }
+    private func boundConsumer() throws -> GatewayOutputConsumer {
+        guard let consumer else { throw CommunicationError.scopeClosed }
+        return consumer
     }
     private func executeIntent(_ intent: ModelResourceIntent) async throws -> String? {
         if case .retire = intent { throw CommunicationError.unauthorized }
@@ -174,14 +182,15 @@ public actor ApplicationControlIntentRuntime {
         requests[request.id] = Request(providerRequest: providerRequest, maximumCalls: maximumCalls, failure: failure)
         defer { requests[request.id] = nil }
         do {
-            let receipt = try await input.send(request, to: .applicationControl)
-            guard receipt.rejected.isEmpty else {
-                throw ApplicationControlIntentFailure.execution("Resource intent rejected: \(receipt.rejected)")
-            }
+            try await input.publish(request)
         } catch {
             throw TransportFailure(phase: .admission, message: String(describing: error))
         }
-        // Accepted work is independently owned; page cancellation does not revoke native admission.
+        // Accepted work is independently owned; publication loss has a bounded business-result wait.
+        let watchdog = Task {
+            do { try await Task.sleep(for: .seconds(120)) } catch { return }
+            await finish(request.id, .failure(ApplicationControlIntentFailure.execution("Result deadline exceeded")))
+        }
         do {
             let value: String? = try await withCheckedThrowingContinuation { continuation in
                 if let result = requests[request.id]?.result {
@@ -190,9 +199,13 @@ public actor ApplicationControlIntentRuntime {
                     requests[request.id]?.waiter = continuation
                 }
             }
+            watchdog.cancel()
+            await watchdog.value
             await requests[request.id]?.worker?.value
             return value
         } catch {
+            watchdog.cancel()
+            await watchdog.value
             await requests[request.id]?.worker?.value
             throw error
         }
@@ -212,12 +225,13 @@ public actor ApplicationControlIntentRuntime {
     private func start() async throws {
         try Task.checkCancellation()
         guard !closed else { throw CommunicationError.scopeClosed }
-        try await manager.register(agent, sessionID: sessionID)
+        try await manager.register(agent)
         ownsRegistration = true
         do {
             try Task.checkCancellation()
             guard !closed else { throw CommunicationError.scopeClosed }
             try await manager.start(.applicationControl)
+            consumer = try await output.consumer(for: agent)
         } catch {
             try await manager.remove(.applicationControl)
             ownsRegistration = false
@@ -225,14 +239,40 @@ public actor ApplicationControlIntentRuntime {
         }
         started = true
         let stream = agent.outputs
-        pump = Task { [weak self] in
-            for await envelope in stream { await self?.consume(envelope) }
-            await self?.streamEnded()
+        pump = Task {
+            do {
+                try await IndependentOutputWorkflow.consumeGeneration(stream) { envelope in await self.consume(envelope)
+                }
+            } catch { await self.streamEnded() }
+            await self.streamEnded()
         }
     }
     private func consume(_ envelope: OutputEnvelope) async {
-        guard !closed, envelope.source == .applicationControl, envelope.sessionID == sessionID,
-            requests[envelope.inputID] != nil, requests[envelope.inputID]?.result == nil
+        if envelope.roundID != nil || envelope.taskScope != nil && requests[envelope.inputID] == nil
+            || {
+                if case .communication = envelope.output { return true }
+                return false
+            }()
+        {
+            do { _ = try await boundConsumer().execute(envelope) } catch { await streamEnded() }
+            return
+        }
+        guard !closed, envelope.source == .applicationControl, envelope.sessionID == sessionID else { return }
+        if requests[envelope.inputID] == nil {
+            // Published facts have no waiter; their effects/feedback and receiver errors are independent.
+            let resourceFact = envelope.inputMetadata.contract == ModelResourceObservation.contract
+            let receiverError: Bool
+            if case .control(let value) = envelope.output {
+                receiverError = value.hasPrefix("agent.error:")
+            } else {
+                receiverError = false
+            }
+            if resourceFact || receiverError {
+                do { _ = try await boundConsumer().execute(envelope) } catch { await streamEnded() }
+            }
+            return
+        }
+        guard requests[envelope.inputID]?.result == nil
         else { return }
         switch envelope.output {
         case .toolCall(let call):
@@ -253,15 +293,17 @@ public actor ApplicationControlIntentRuntime {
             await requests[envelope.inputID]?.worker?.value
             guard !closed, requests[envelope.inputID]?.result == nil else { return }
             do {
-                let result = try await output.execute(envelope)
+                let result = try await boundConsumer().execute(envelope)
                 if result.isError {
                     throw ApplicationControlIntentFailure.execution(result.failure ?? "Resource control failed")
                 }
                 switch control {
+                case let value where value.hasPrefix("agent.error:"):
+                    await fail(envelope.inputID, value)
                 case "application.control.finished":
-                    finish(envelope.inputID, .success(requests[envelope.inputID]?.value))
+                    await finish(envelope.inputID, .success(requests[envelope.inputID]?.value))
                 case "application.control.failed":
-                    finish(
+                    await finish(
                         envelope.inputID,
                         .failure(
                             resourceFailure(envelope.inputID)))
@@ -281,7 +323,7 @@ public actor ApplicationControlIntentRuntime {
             guard case .toolCall(let call) = envelope.output, await output.returnsToolResult(for: call) else {
                 throw ApplicationControlIntentFailure.execution("Resource call requires returning feedback")
             }
-            let result = try await output.execute(envelope)
+            let result = try await boundConsumer().execute(envelope)
             if let tool = result.tool {
                 if tool.isError {
                     if requests[envelope.inputID]?.failureCode == nil {
@@ -334,24 +376,30 @@ public actor ApplicationControlIntentRuntime {
             requests[id]?.failure.map {
                 String($0.prefix(512)) + "; dispatch: " + String(message.prefix(512))
             } ?? String(message.prefix(512))
-        if !closed {
+        if !closed, !message.hasPrefix("agent.error: input rejected:") {
             do {
-                let receipt = try await input.send(
-                    ModelResourceIntent.retire(id).input(sessionID: sessionID), to: .applicationControl)
-                if !receipt.rejected.isEmpty {
-                    throw ApplicationControlIntentFailure.execution("Resource retirement rejected")
-                }
+                try await input.publish(ModelResourceIntent.retire(id).input(sessionID: sessionID))
             } catch { failure += "; retirement: " + String(String(describing: error).prefix(512)) }
         }
         requests[id]?.failure = failure
         if requests[id]?.failurePresentationAttempted == true {
-            finish(id, .failure(resourceFailure(id)))
+            await finish(id, .failure(resourceFailure(id)))
         } else {
-            finish(id, .failure(TransportFailure(phase: .dispatch, message: failure)))
+            await finish(id, .failure(TransportFailure(phase: .dispatch, message: failure)))
         }
     }
-    private func finish(_ id: UUID, _ result: Result<String?, any Error>) {
+    private func finish(_ id: UUID, _ result: Result<String?, any Error>) async {
         guard requests[id]?.result == nil else { return }
+        var result = result
+        if !closed {
+            do {
+                switch result {
+                case .success(let value): try await agent.completeFixedTask(inputID: id, value: value)
+                case .failure(let error):
+                    try await agent.completeFixedTask(inputID: id, value: nil, failure: String(describing: error))
+                }
+            } catch { result = .failure(error) }
+        }
         requests[id]?.result = result
         requests[id]?.waiter?.resume(with: result)
         requests[id]?.waiter = nil
@@ -379,12 +427,12 @@ public actor ApplicationControlIntentRuntime {
         for worker in workers { await worker.value }
         if ownsRegistration {
             do { try await manager.remove(.applicationControl) } catch {
-                for id in Array(requests.keys) { finish(id, .failure(error)) }
+                for id in Array(requests.keys) { await finish(id, .failure(error)) }
             }
             ownsRegistration = false
         }
         pump?.cancel()
-        for id in Array(requests.keys) { finish(id, .failure(CommunicationError.scopeClosed)) }
+        for id in Array(requests.keys) { await finish(id, .failure(CommunicationError.scopeClosed)) }
     }
 }
 public enum ApplicationControlIntentFailure: LocalizedError, Sendable {

@@ -76,13 +76,7 @@ private actor CameraProbe {
 }
 private actor CameraBridge: CameraControlCapability {
     let probe: CameraProbe
-    private var runtime: PhotographerIntentRuntime?
-    private var gateway: OutputGateway?
     init(probe: CameraProbe) { self.probe = probe }
-    func bind(_ runtime: PhotographerIntentRuntime, gateway: OutputGateway) {
-        self.runtime = runtime
-        self.gateway = gateway
-    }
     func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         try await photo(.savePhoto, id: id, invocation: invocation)
     }
@@ -92,16 +86,6 @@ private actor CameraBridge: CameraControlCapability {
     private func photo(_ operation: PhotographerCameraIntent.Operation, id: UUID?, invocation: any FunctionInput)
         async throws -> CameraPhotoCommandReceipt
     {
-        if invocation.context.source == "assistant", let runtime, let gateway {
-            guard
-                let raw = try await runtime.perform(
-                    operation, photoID: id,
-                    delegate: { message in
-                        try await gateway.delegate(message, context: invocation.context, to: .photographer)
-                    })
-            else { throw CommunicationError.invalidPayload }
-            return try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(raw.utf8))
-        }
         guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
         return try await probe.photo(operation, id: id, source: invocation.context.source)
     }
@@ -116,21 +100,8 @@ private actor CameraBridge: CameraControlCapability {
         _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil,
         invocation: any FunctionInput
     ) async throws {
-        if invocation.context.source == "assistant", let runtime, let gateway {
-            do {
-                try await runtime.perform(
-                    operation, facing: facing.flatMap { PhotographerCameraIntent.Facing(rawValue: $0.rawValue) },
-                    delegate: { message in
-                        try await gateway.delegate(message, context: invocation.context, to: .photographer)
-                    })
-            } catch PhotographerIntentFailure.execution(let result) {
-                if case .report(let report)? = result.tool?.completion { throw ActionReportedError(report) }
-                throw PhotographerIntentFailure.execution(result)
-            }
-        } else {
-            guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
-            try await probe.perform(operation, source: invocation.context.source, facing: facing?.rawValue)
-        }
+        guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
+        try await probe.perform(operation, source: invocation.context.source, facing: facing?.rawValue)
     }
 }
 private struct CameraTools: ToolModule { let definitions: [ActionBinding] }
@@ -160,12 +131,12 @@ private struct CameraFixture {
         manager = AgentManager()
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication,
-            externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
-            configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer"].map
-            {
-                try AgentConfigurations.load(named: $0)
-            })
-        let input = InputGateway(manager: manager, policy: policy)
+            externalSources: [
+                "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+                "app.environment",
+            ],
+            configurations: AgentConfigurations.all())
+        let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
         probe = CameraProbe()
         let bridge = CameraBridge(probe: probe)
         let bindings = CameraModule(camera: bridge).definitions.map {
@@ -182,7 +153,6 @@ private struct CameraFixture {
         runtime = PhotographerIntentRuntime(
             sessionID: root, manager: manager, input: input, output: gateway,
             agent: try PhotographerAgent(sessionID: root))
-        await bridge.bind(runtime, gateway: gateway)
     }
 }
 @Test(.timeLimit(.minutes(1))) func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
@@ -190,6 +160,10 @@ private struct CameraFixture {
 {
     let f = try await CameraFixture()
     try await f.runtime.perform(.open)
+    let opened = try #require(await f.runtime.agent.cameraResult())
+    #expect(
+        try JSONDecoder().decode(CameraCommandReceipt.self, from: Data(opened.value.utf8))
+            == CameraCommandReceipt(operation: "open", enabled: true))
     await #expect(throws: PhotographerIntentFailure.self) { try await f.runtime.perform(.flip, facing: .back) }
     let feedback = try #require(await f.runtime.agent.cameraResult())
     #expect(feedback.isError)
@@ -201,6 +175,10 @@ private struct CameraFixture {
     #expect(report.entries.map(\.path) == ["prepare", "switch"])
     #expect(report.entries.last?.details["cause"] == "test device failure")
     try await f.runtime.perform(.flip, facing: .front)
+    let flipped = try #require(await f.runtime.agent.cameraResult())
+    #expect(
+        try JSONDecoder().decode(CameraCommandReceipt.self, from: Data(flipped.value.utf8))
+            == CameraCommandReceipt(operation: "flip", facing: .front))
     try await f.runtime.perform(.retry)
     try await f.runtime.perform(.close)
     #expect(await f.probe.operations == [.open, .flip, .flip, .retry, .close])
@@ -239,39 +217,19 @@ private struct CameraFixture {
     try await f.runtime.perform(.open)
     await f.runtime.shutdown()
 }
-@Test(.timeLimit(.minutes(1))) func boundAssistantCameraDelegationUsesPhotographerAndReturnsCompleteNativeFailure()
-    async throws
-{
+@Test func assistantCannotExecutePhotographyFunctions() async throws {
     let f = try await CameraFixture()
-    let voice = UUID()
-    try await f.manager.register(CameraCaller(), sessionID: voice)
+    try await f.manager.register(CameraCaller())
     try await f.manager.start(.assistant)
-    let parent = AgentInput(sessionID: voice, payload: .text("switch camera"))
-    let context = ActionExecutionContext(source: "assistant", sessionID: voice, inputID: parent.id)
-    await #expect(throws: CommunicationError.unauthorized) {
-        try await f.gateway.delegate(PhotographerCameraIntent(.open).message, context: context, to: .photographer)
-    }
+    let parent = AgentInput(sessionID: UUID(), payload: .text("switch camera"))
     let result = try await f.gateway.execute(
         OutputEnvelope(
             source: .assistant, input: parent,
             output: .toolCall(ToolCall(toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]))))
     #expect(result.isError)
-    #expect(result.tool?.failureCode?.rawValue == "camera.unavailable")
-    #expect(await f.probe.facings == ["back"])
-    guard case .report(let report)? = result.tool?.completion else {
-        Issue.record("Missing delegated failure report")
-        return
-    }
-    #expect(report.entries.map(\.path) == ["prepare", "switch"])
-    #expect(report.entries.last?.details["cause"] == "test device failure")
-    let recovery = try await f.gateway.execute(
-        OutputEnvelope(
-            source: .assistant, input: parent,
-            output: .toolCall(ToolCall(toolPath: "Camera.Capture.open", arguments: [:]))))
-    #expect(!recovery.isError)
-    #expect(await f.probe.sources == ["photographer", "photographer"])
-    await f.runtime.shutdown()
+    #expect(await f.probe.operations.isEmpty)
     try await f.manager.remove(.assistant)
+    await f.runtime.shutdown()
 }
 
 @Test func photographerCameraRejectsForeignScopeAndFeedbackWithoutLosingPendingWork() async throws {
@@ -354,20 +312,20 @@ private struct CameraFixture {
     await fixture.runtime.shutdown()
 }
 
-@Test func assistantPhotoActionsDelegateAndReturnActualDisposition() async throws {
+@Test func photographerActionsReturnActualDisposition() async throws {
     let fixture = try await CameraFixture()
-    let caller = try CameraCaller()
-    try await fixture.manager.register(caller)
-    try await fixture.manager.start(.assistant)
+    try await fixture.runtime.prepareForInteraction()
+    let caller = fixture.runtime.agent
     let capabilities = caller.descriptor.capabilities
     for (alias, state) in [("savePhoto", CameraPhotoCommandReceipt.State.saved), ("ignorePhoto", .ignored)] {
         let input = AgentInput(sessionID: UUID(), payload: .text(alias))
-        let call = try capabilities.resolveAction(alias, parameters: [:])
+        let call = try capabilities.resolveAction(
+            alias, parameters: ["photoID": await fixture.probe.photoID.uuidString])
         let result = try await fixture.gateway.execute(
-            OutputEnvelope(source: .assistant, input: input, output: .actionCall(call), sequence: 1))
+            OutputEnvelope(source: .photographer, input: input, output: .actionCall(call), sequence: 1))
         #expect(result.isError == false)
         _ = try await fixture.gateway.execute(
-            OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished"), sequence: 2))
+            OutputEnvelope(source: .photographer, input: input, output: .control("agent.finished"), sequence: 2))
         let snapshot = await fixture.gateway.executionResults(inputID: input.id)
         let record = try #require(snapshot.actions.records.first)
         guard case .value(let raw)? = record.completion else {
@@ -385,16 +343,15 @@ private struct CameraFixture {
 
 @Test func malformedPhotoCommandsCannotReachNativeEffect() async throws {
     let fixture = try await CameraFixture()
-    let caller = try CameraCaller()
-    try await fixture.manager.register(caller)
-    try await fixture.manager.start(.assistant)
+    try await fixture.runtime.prepareForInteraction()
+    let caller = fixture.runtime.agent
     let input = AgentInput(sessionID: UUID(), payload: .text("invalid photo"))
     let call = try caller.descriptor.capabilities.resolveAction("savePhoto", parameters: ["photoID": "invalid"])
     let result = try await fixture.gateway.execute(
-        OutputEnvelope(source: .assistant, input: input, output: .actionCall(call), sequence: 1))
+        OutputEnvelope(source: .photographer, input: input, output: .actionCall(call), sequence: 1))
     #expect(result.isError == false)
     _ = try await fixture.gateway.execute(
-        OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished"), sequence: 2))
+        OutputEnvelope(source: .photographer, input: input, output: .control("agent.finished"), sequence: 2))
     let snapshot = await fixture.gateway.executionResults(inputID: input.id)
     #expect(snapshot.actions.records.first?.phase == .failed)
     #expect(await fixture.probe.exports == 0)

@@ -15,7 +15,9 @@ struct VoiceRuntimeDependencies {
     let output: OutputGateway
     let presentation: RuntimePresentation
     let conversations: ConversationHistoryStore
-    let makeAssistant: (any ChatCapability, @escaping @Sendable () async throws -> String) throws -> AssistantAgent
+    let interactionSessionID: UUID
+    let startInteraction: @MainActor () async throws -> Void
+    let stopInteraction: @MainActor () async -> Void
     let makeSynthesis: (any SpeechSynthesisCapability, SpeechAudioStore) throws -> SpeechSynthesisAgent
     let makePerception:
         (any SpeechRecognitionCapability, any VoiceActivityCapability, UUID) throws -> SpeechPerceptionAgent

@@ -2,6 +2,8 @@
 
 Purpose: validate, route, dispatch and observe Agent output. ActionCalls enter ChannelScheduler; ToolCalls execute through Gateway/Runtime and return results through InputGateway. Alias binding belongs to Agents.
 
+❌ ADR0188: terminal runtime controls may join cleanup after their task grant has retired. They still validate the real registered producer and session; functions, communication, scheduling and round events require an active task grant. This permits a child to report TaskResult before closing its output protocol without granting further device effects.
+
 - ✅ OutputGateway connects validation, routing, dispatch and the observation sink, with error propagation and cancellation/completion barriers.
 - ✅ Validation, Routing, Dispatch and Scheduling have separate responsibilities.
 - ✅ assistant.finished waits for all admitted Actions of its source Agent/input; assistant.error cancels that input's Actions.
@@ -38,7 +40,7 @@ Maintenance: update this contract when changing producers, consumers, limits, or
 
 ## Typed event path
 
-✅ `messaging(for:)` returns a port bound to the current source incarnation. It validates outbound JSON v6 permissions, payload schema/size, session, parent deadline and hop count before bounded direct InputGateway admission. Gateways have no message queue; Agents own pending input and any state replacement. Limits are 16 concurrent emissions per source; each schema is bounded. Gateway creates source IDs/sequences, and expired ports cannot publish after replacement.
+✅ Production Agents emit CommunicationAction through `consumer(for:)`, bound to the actual producer actor/incarnation. `messaging(for:)` remains a low-level Gateway/isolated-host compatibility port; no production Agent holds or calls it. It validates outbound JSON v6 permissions, payload schema/size, session, parent deadline and hop count before bounded direct InputGateway admission. Gateway owns bounded one-way publication delivery tasks; Agents own business pending input and state replacement. Limits are 16 concurrent emissions per source; each schema is bounded. Gateway creates source IDs/sequences, and expired ports cannot publish after replacement.
 
 ```mermaid
 flowchart LR
@@ -47,7 +49,7 @@ flowchart LR
     Validate --> Observer[Registered App speech observation endpoint]
 ```
 
-The configured observer consumes only current speech state and has no unbounded queue. No recipients is an error unless a matching observer is registered. Event receipts report recipient admission, not Action or handler completion. ❌ Requests/replies and model-assisted routing are deferred.
+The configured observer consumes only current speech state and has no unbounded queue. No recipients is ordinary publication loss. Only send emits admission receipts; publish has no response and target errors use diagnostics. ✅ Explicit task request/report contracts are implemented. ✅ Production specialist delegation is implemented; ❌ model-assisted routing changes remain future policy.
 
 ✅ Tool dispatch supports explicitly registered Void completion handlers. UI.Pose.showPose executes directly without Channel admission or ToolResult feedback; normal data tools continue returning through InputGateway.
 
@@ -111,7 +113,7 @@ The observation path neither injects a new Agent result nor invokes device recov
 
 ✅ ADR0140/ADR0141: ResourceCoordinator owns cancellation-independent bounded cleanup. Public resource state is unlocked/locked(owner), including transient use. Cleanup timeout fails only its requester; retained work automatically unlocks when it finishes. Stop errors after joined cleanup release occupancy. Execution permits invalidate stale inherited context. ❌ Physical stop acknowledgment remains outside this software contract.
 
-✅ ADR0149: AgentMessaging constructs Agent-origin metadata; output envelopes retain input context. Returning Tools route Runtime-origin feedback through captured-owner delivery and preserve actual values/errors when delivery fails. ✅ ADR0163 completes Action/activity original-root propagation through explicit SignalCausality.
+✅ ADR0149/0187: OutputGateway constructs trusted Agent-origin metadata from the bound producer; output envelopes retain input context. Returning Tools route Runtime-origin feedback through captured-owner delivery and preserve actual values/errors when delivery fails. ✅ ADR0163 completes Action/activity original-root propagation through explicit SignalCausality.
 
 ✅ ChannelScheduler fences execution by definition-owned serializationKey captured at admission, releasing only after joined cleanup. Existing FIFO, wait, capacity, feedback and resource policies remain intact.
 
@@ -128,19 +130,44 @@ The observation path neither injects a new Agent result nor invokes device recov
 
 ✅ Implemented: OutputGateway exposes a read-only returnsToolResult registration-policy query. Bounded history transport uses this protocol metadata to distinguish delivered returning-handler errors (Agent follow-up) from completion-only presentation failures (abort); it does not select business functions or effects.
 
-✅ ADR0181: delegate(message, context, target) is available only during a bound direct Tool invocation. Exact source/session/input identity must match the task-local envelope; directed send declarations and the original causal metadata are preserved. Bound context is restored across nested dispatch.
 
 Invocation context also captures the original ExecutionOwner incarnation, rejecting stopped/replaced sources rather than binding their replacement. Root output pumps are detached owned tasks so a long-lived service cannot inherit a caller’s invocation authority.
 
 ## Action/Tool generation rounds — ADR0183
 
 
-✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+✅ AgentCore owns neutral policies/envelopes; the owning role selects continuation policy through the shared Chat worker; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
 
 ✅ Final identity hardening: reject a roundFinished payload whose roundID differs from its envelope before joining or acknowledging any scheduling scope.
 
 ✅ Delivery hardening: native deliveryFailure must terminate the round while retaining the actual ToolResponse; never replace a completed effect with a fabricated handler-failure result.
 
-✅ Photo Action delegation correction: bind InvocationSignalContext inside the actual scheduled Action worker, using its validated envelope/ExecutionOwner. Tools retain their current binding. Ownerless direct scheduler fixtures receive no authority; nested bindings restore automatically, and completion/feedback callbacks run outside the handler binding. No new module or media retention.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+输出运输使用 GatewayOutputConsumer 在读取之前绑定真实 Agent actor/incarnation；旧实例迟到输出不能借用新注册权限。OutputGateway 验证 JSON 通信声明与任务 grant，函数/通信消费者独立；App 通信分支最多16个待处理、4个并行投递。请求回执、子任务报告、函数结果分别关联；TaskResult 在执行清理屏障后投递，目标停止合成明确终态并记录无法投递的失败。
+
+输入 Gateway 只处理来源/协议/容量/权限；外部输入禁止伪造 taskScope、运行时反馈或 incarnation。任务输入接纳仍由目标 Agent 的业务 Schema/策略决定，不在 Gateway 拼接聊天内容。
+
+设计与阶段边界见 [ADR0187](../../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../../docs/Validation-History.md)。
+
+✅ ADR0187 最终报告进入 completing fence 后禁止新输入/设备调用；执行或最终投递拒绝时生成真实运行时任务失败报告，清理屏障与失败投递可观察，不留下活跃授权。
+
+✅ ADR0188: delegation is an Agent communication Action and trusted task Signal. The old native-function delegation API and TaskLocal invocation binding are removed. Function effects retain validated ExecutionOwner, resources and cancellation through their ordinary invocation contracts.
+
+
+## One-way publication and listening admission correction
+
+✅ Implemented: CommunicationAction.target == nil publishes without CommunicationReceipt. send retains its receipt; function results retain actual execution ownership. Child finish joins scheduled outputs then reports runtime.replyFinished to the parent so Assistant can report cleared waiting-user reply occupancy. agent.error enters existing output failure presentation.
+
+✅ Log correlation: captured output errors include the originating inputID, allowing App to associate the same failure with a Signal/Action without merging unrelated errors by wording.
+
+✅ Publication audit correction: publish validates its own payload/source and submits bounded one-way work, never awaiting subscriber or App observer completion and never returning recipient errors. Observer work shares bounded Gateway publication lifetime; overflow is diagnostic loss without publisher acknowledgment. Environment facts bypass request/result waiters and emit no completion acknowledgment; ApplicationControl errors still flow through its independent output consumer. Directed send retains correlated admission receipt (not task completion). Explicit UI data-operation result waits remain business completion contracts, not publish receipts.

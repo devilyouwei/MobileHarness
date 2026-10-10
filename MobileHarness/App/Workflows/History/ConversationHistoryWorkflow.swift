@@ -6,6 +6,7 @@ public enum HistoryImageLoadingError: Error { case invalidReference, busy, overs
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
+    public var agents: [HistoryAgentDestination] = []
     public let state: ConversationHistoryState
     private let deleteArchive: @MainActor (UUID) async throws -> Void
     private let refresh: @MainActor () async throws -> Void
@@ -57,7 +58,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         perform { try await self.deleteArchive(id) }
     }
     private func perform(_ operation: @escaping @MainActor () async throws -> Void) {
-        guard !state.isBusy, loaded else { return }
+        guard state.allowsMutations, !state.isBusy, loaded else { return }
         state.isBusy = true
         task = Task {
             defer {

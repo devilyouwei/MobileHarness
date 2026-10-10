@@ -510,7 +510,7 @@ Cancellation rollback fixtures cancel a separate invoking Task, not the test run
 
 ## Bounded native result continuation
 
-✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+✅ Implemented: Assistant correlates model-native calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts retain their handling; the static /status shortcut is retired.
 
 ✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact continuation request JSON bytes as data, with bounded records and unchanged v1 compatibility. Camera native model calls use returning protocol registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
 
@@ -596,3 +596,101 @@ ADR0181 regression coverage: camera open/close/flip/retry through both Gateways,
 ✅ Implemented: Photo store regressions verify archived input-scoped reads, mismatch rejection and missing images; generation photo history tests verify structured metadata and absence of attachment bytes. Existing history controller fixtures supply the required reader explicitly.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+## Agent composition migration — ADR0187
+
+✅ ADR0187 implemented: adopt Agent-owned Signal preprocessing, structured context and context builders; common Foundation-only queue/round/task mechanisms live in existing Core directories. Communication becomes output-stream Actions with owner-directed delivery receipts. Execution owner, task parent and causal root remain distinct; replies require active task/session authorization. Assistant rounds yield to FIFO user inputs, with listening gated by actual playback. Persist business records, retain media/DSP in bounded memory, and never replay interrupted device work. Existing business responsibilities and JSON v6 grants remain unchanged. See [ADR0187](/Users/devil/Pro/MobileHarness/docs/adr/0187-agent-composition-and-react.md) for the complete pending contract.
+
+## Agent composition contract coverage
+
+AgentArchitectureTests uses a separately configured model-backed child with its own Context and shared AgentChatDriver. Real Gateway routing verifies child-only ActionResult, explicit parent reports, admission/completion distinction, instance replacement fences and joined parent/child stop. Core tests verify bounded fusion, receipt deduplication, write failure, import/restart interruption, foreign/corrupt state and evidence deletion with active-work protection. GenerationRoundTests verifies that an admitted second user task executes before the first task's ready continuation while preserving provider call/result blocks.
+
+FixtureCommunications is test transport only: it consumes communication Actions from legacy standalone fixtures, produces trusted synthetic admission receipts and exposes the remaining output stream. Production uses bound GatewayOutputConsumer and16-pending/four-way communication consumption. These fixtures do not claim physical camera, BLE, speech, UI or real-model acceptance.
+
+✅ Regression coverage: sound-source publication context-write failure terminates perception without an emitted communication Action or publisher self-join; ordinary subscriber rejection remains nonterminal.
+
+Verified source organization: existing architecture/context commit-failure, history projection, transcript ordering, synthesis failure/cancellation and application/provider/resource suites passed in the full check. The existing rejected-commit regression now verifies the shared admission transaction leaves no evidence, consumption or task state after persistence failure; file consolidation adds no mirror tests.
+
+## Phase two implementation contract - ADR0188
+
+❌ Pending implementation. Assistant is the persistent default user-entry Agent and delegates photography, history and application operations through authorized communication Actions and existing task Signals. Typed UI inputs use deterministic routing; model requests use the same output and function execution path. Execution results return to the real task executor.
+
+Support owns the reusable one-round Chat worker, native/XML communication adaptation and reply mapping, with injected identity, context and policies. Each business Agent owns independent durable history, preprocessing, capabilities and task completion. No new directory, target, dependency, Core role policy or delegation runtime is introduced.
+
+App owns registration, transport, stable interaction lifetime and native presentation authorization. Microphone capture is a separate lifetime. Delivery acceptance, child completion and native effects remain distinct. Pending questions and artifact references are bounded and task-scoped; deletion retains existing trusted UI confirmation. Storage failures terminate dependent processing, cancellation joins owned workers, and restart interrupts without replay.
+
+See `docs/adr/0188-specialist-task-ownership.md` for migration, capacity and validation contracts.
+
+Bluetooth simulated initial connections wait for the existing restoration/recovery idle barrier after discovery; list appearance alone is not startup completion. Generic communication TTL fixtures allow two seconds for loaded parallel scheduling and assert the assigned deadline; production TTLs are unchanged.
+
+
+## One-way publication and listening admission correction
+
+✅ Implemented: regressions cover one-way publication/no receipts, subscriber failures and joined shutdown; ASR failure recovery, final reply admission, first-frame pause/resume; Assistant-only listening permissions, user-off precedence and queued cancellation; registered behavior bindings and independent business error presentation. Physical microphone/playback acceptance remains separate.
+
+✅ Implemented: speech pause/resume before the first capture frame accepts the next frame without inputBusy or a fabricated utterance.
+
+✅ Listening Action completion acknowledges policy while physical pause work remains independently owned; a newer off command completes without waiting for that pause, and stale completion cannot restore the old policy.
+
+## Listening policy ownership
+
+✅ Listening regressions verify resident consent across capture epochs, full reply snapshot combination, stale revision/incarnation fencing, bounded loss recovery, forged/cross-session controls, native-stop fencing and actual Gateway publication/Action ownership. Isolated sound fixtures include the subscribed Agent declarations without starting them. Mixed round outcomes validate protocol-result pairing independently of concurrent registration order.
+
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
+
+
+
+
+✅ Camera-command regressions cover concurrent environment admission during a held durable commit, waiting-input cancellation/stop, authorized communication schema, XML/native invalid-kind correction, and a Photographer-owned Camera.close tool with child-only result/context and explicit parent task completion. Endpoints/models are synthetic; physical camera, ASR and model acceptance remain separate.
+
+
+✅ Execution-log tabs: Add production Gateway observation regressions for successful/rejected/one-way publication, no subscribers, overflow, feedback, media aggregation, observer shutdown and task receipt/result separation.
+
+
+✅ Robot Action ownership correction: Role/prompt assertions and the Assistant-to-Gateway synthetic robot Action regression verify Assistant execution and owner-directed feedback while Photographer rejects general motion capabilities and ApplicationControl retains equivalent shared registrations.
+
+✅ Robot regression fixture alignment: NexArmTests, NexArmBluetoothTests and opt-in NexArmSerialAcceptanceTests Assistant gesture/recovery fixtures use Assistant identity, context and shared writer grants, preserving their native recovery, queued-action and speech coexistence assertions.
+
+✅ Shared Action registration: Action implementations support many-to-many Agent registration. ApplicationControl registers the 11 Robot Actions for Settings command tests; retain Assistant basic interaction registration and Photographer camera-only model permissions. Each role calls canonical functions under its own identity; no inter-Agent delegation is needed to reuse an Action.
+
+✅ Device regression fix: Regressions cover startup/scene transition overlap, structured successful camera command feedback and active-task/requester plus explicit photo-question reporting data. Retain continuation-budget, native pairing and scoped save follow-up tests.
+
+✅ Camera model exposure: Photographer declares openCamera/closeCamera/flipCamera/retryCamera alongside takePhoto/savePhoto/ignorePhoto as scheduled Camera Actions; no camera native Tool is exposed to the model. Host binds the canonical camera functions to both protocols only for explicit fixed UI transaction reuse. Model camera Actions keep observed owner-directed results and same-Channel ordering/wait groups.
+
+✅ Frontend/backend separation: Fixtures use production subscriptions without patching catalogs. Regression verifies each typed user contract has only its business owner, touch camera execution leaves Assistant context/tasks empty, and conversational delegation/UI Action coverage remain available.
+
+
+✅ Home-log regression: ordinary publication traffic leaves task observers silent through shutdown. Synthetic specialist delegation verifies task-only history/revision survives300 unrelated Signals; native/model/performance acceptance remains separate.
+
+
+✅ Interface timing regressions: synthetic model rounds emit before consumer attachment, and stored timing must exactly equal provider evidence for each initial/ReACT request. Native-only rounds retain request start without text TTFT. Storage preserves optional timing through Codable and rejects invalid latency; legacy records remain supported.
+
+
+## Responses and Action-only Assistant migration
+
+✅ Implemented: Verify production Assistant exposes no native Tools, environment observation uses Action, communication remains XML Action even with native-capable providers, and old native history cannot request undeclared functions. Existing native protocol tests use explicitly synthetic native-capable test Agent catalogs, separate from production Assistant grants.
+
+
+✅ Fixture alignment: Robot-only Assistant assemblies declare an unavailable environment Action handler to satisfy complete grant validation without performing environment reads. Native-history tests accept independent Action/native consumer ordering and use synthetic native state for snapshot assertions. These fixes preserve the tested behavior and do not weaken production permission checks.
+
+
+✅ Reply/lifecycle regression correction: caption focus is presentation only and cannot cancel an authorized queued/playing reply from another Agent. Playback checks active session and explicit task cancellation, retaining Gateway owner/task/function authorization and the shared serialized Speech Channel. ApplicationControl accepts environment facts and correlated feedback while paused; fresh business commands still require running. Assistant delegation prompts emit send without redundant spoken acknowledgments and leave specialist speech to its executor. Scope/result delivery failures retain actual evidence; no silent error suppression or action replay is added. Add owner-switch playback admission and paused environment regressions.
+
+✅ Round feedback delivery failures report execution ID, Action path and delivery state (closed/expired/exhausted), separately from task or presentation scope closure. Preserve failure, stop dependent continuation and never replay completed effects.
+
+✅ Publication audit correction: publish validates its own payload/source and submits bounded one-way work, never awaiting subscriber or App observer completion and never returning recipient errors. Observer work shares bounded Gateway publication lifetime; overflow is diagnostic loss without publisher acknowledgment. Environment facts bypass request/result waiters and emit no completion acknowledgment; ApplicationControl errors still flow through its independent output consumer. Directed send retains correlated admission receipt (not task completion). Explicit UI data-operation result waits remain business completion contracts, not publish receipts.
+
+✅ Resource-fact extension of the same audit: model-resource observations are also one-way facts. Their registered presentation functions and runtime feedback execute under the root-owned ApplicationControl consumer independently of request slots. Sampling never retries because the subscriber rejected or its presentation failed. Tests await observable business state, not a publication receipt.
+
+
+✅ Camera perception/context change (2026-10-10): Add camera-state regressions for permissions/routing, latest revision, paused observation, recovery, bounded validation, task-phase projection and model-visible state on initial/continuation requests. Synthetic model/device fixtures do not establish native camera acceptance.
+
+Camera observation request coverage inspects the complete message list for the owned image, because role state facts may follow the image message; image identity/bytes, native pairing and recorded request evidence remain required.
+
+
+✅ Send Action-only audit (2026-10-10): remove automatic Agent.send native Tool declarations and the per-role exposesNativeCommunicationTools switch. Every role keeps authorized send Action declarations, target/kind/parameter documentation and receipt/task ownership contracts. Existing business Tools and historical native call/result evidence remain unchanged. Reject an explicit communication Tool registration instead of silently exposing it. Regression tests check all seven effective model catalogs and task request/progress/input/result flows using Action-call send, including roles with business Tools.
+
+
+✅ Duplicate model registration audit (2026-10-10): Audit all seven packaged configurations plus shared communication catalogs for Action/Tool path overlap, duplicate paths within each model protocol and native send leakage. Verify ApplicationControl openPage resolves as an Action while App.openPage no longer resolves as a model Tool; fixed internal navigation remains authorized.
+
+✅ Regression: dry-run GenerationTrace with the same effective role catalogs as production/history preview accepts split-fragment Assistant task.request and specialist task.progress/result send Actions, while retaining rejection for unknown aliases and invalid parameters. This verifies parser behavior, not live delivery or the native history screen.

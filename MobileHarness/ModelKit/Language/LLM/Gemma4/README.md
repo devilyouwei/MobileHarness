@@ -32,3 +32,6 @@ flowchart LR
 ✅ Implemented: Reject image attachments explicitly before tokenization; no pretending local text chat can see images.
 
 ❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.
+
+
+✅ Model-interface TTFT: after resource admission/tokenization, sample request start immediately before native generate and the first nonempty generation delta before emission. Loading/tokenization and consumer/UI/storage work are excluded. The optional request sampler does not change native inference or resource cleanup.

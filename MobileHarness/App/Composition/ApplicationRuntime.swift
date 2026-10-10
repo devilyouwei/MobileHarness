@@ -27,6 +27,35 @@ final class ApplicationRuntime {
     let applicationControlIntents: ApplicationControlIntentRuntime
     let photographerIntents: PhotographerIntentRuntime
     let historyIntents: HistoryIntentRuntime
+    private let contextDirectory: URL
+    let interaction: AgentInteractionRuntime
+    let interactionSessionID: UUID
+    private var startup: Task<Void, Never>?
+    private var foregroundUpdate: Task<Void, Never>?
+    func setForeground(_ foreground: Bool) {
+        let prior = foregroundUpdate
+        foregroundUpdate = Task { [interaction, actionActivity] in
+            await prior?.value
+            do { try await interaction.setForeground(foreground) } catch {
+                actionActivity.recordFailure(
+                    title: "Agent lifecycle", source: "runtime", message: "Scene transition failed: \(error)")
+            }
+        }
+    }
+
+    func shutdown() async {
+        startup?.cancel()
+        await startup?.value
+        await foregroundUpdate?.value
+        await interaction.shutdown()
+        await photographerIntents.shutdown()
+        await historyIntents.shutdown()
+        await applicationControlIntents.shutdown()
+        await manager.stopAll()
+        await output.shutdown()
+    }
+    private let assistantContext: AgentContextRepository<AssistantContextState>
+    let historyReaders: [String: @MainActor () async throws -> HistoryAgentSnapshot]
     let conversations: ConversationHistoryStore
     let manager: AgentManager
     let input: InputGateway
@@ -89,7 +118,9 @@ final class ApplicationRuntime {
         resourceInventory: any ModelResourceInventoryCapability,
         resourceFingerprint: @escaping @MainActor () async throws -> String,
         resourceSnapshotAccepted: @escaping @MainActor () -> Void,
-        summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String
+        summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String,
+        modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
+        chatProvider: @escaping @Sendable () async throws -> any ChatCapability
     ) throws {
         self.photoCamera = cameraControl
         let root = try FileManager.default.url(
@@ -103,7 +134,15 @@ final class ApplicationRuntime {
         let document = try LocalDocumentStore<ConversationArchive>(
             url: directory.appendingPathComponent("history.json"),
             maximumBytes: ConversationHistoryStore.maximumBytes)
-        conversations = ConversationHistoryStore(document: document)
+        self.contextDirectory = directory
+        let assistantContext = try AgentContextRepository.persistent(
+            agent: .assistant,
+            scope: Self.contextScope, state: AssistantContextState(),
+            url: directory.appendingPathComponent("assistant.context.json"))
+        self.assistantContext = assistantContext
+        conversations = AssistantHistoryContext.store(
+            repository: assistantContext,
+            legacy: ConversationHistoryStore(document: document))
         let providerSettings = ProviderSettingsRequests(
             service: ProviderSettingsService(
                 store: ProviderSettingsStore(credentials: SettingsCredentialAdapter()), runtime: providerSettingsRuntime
@@ -111,23 +150,44 @@ final class ApplicationRuntime {
         self.providerSettings = providerSettings
         let applicationControlSessionID = UUID()
         self.applicationControlSessionID = applicationControlSessionID
+        self.interactionSessionID = applicationControlSessionID
         let providerRequests = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
         self.providerRequests = providerRequests
         let providerPresentation = ProviderPresentationAdapter(
             state: providerState, sessionID: applicationControlSessionID, settings: providerSettings,
             discovery: providerRequests)
         self.providerPresentation = providerPresentation
-        let applicationControlAgent = try ApplicationControlAgent(sessionID: applicationControlSessionID)
+        let applicationContext = try Self.context(directory, .applicationControl, ApplicationControlContextState())
+        let photographerContext = try Self.context(directory, .photographer, PhotographerContextState())
+        let memoryContext = try Self.context(directory, .memory, MemoryContextState())
+        historyReaders = [
+            "photographer": { try HistoryPresentationAdapter.taskSnapshot(await photographerContext.snapshot()) },
+            "memory": { try HistoryPresentationAdapter.taskSnapshot(await memoryContext.snapshot()) },
+            "applicationControl": { try HistoryPresentationAdapter.taskSnapshot(await applicationContext.snapshot()) },
+        ]
+        let applicationControlAgent = try ApplicationControlAgent(
+            sessionID: applicationControlSessionID,
+            context: applicationContext,
+            reportsReplyActivity: true, chatProvider: chatProvider, modelName: modelName)
         device.environment = { try await applicationControlAgent.environmentSnapshot() }
-        let photographerSessionID = UUID()
+        let photographerSessionID = applicationControlSessionID
         let photographerAgent = try PhotographerAgent(
             sessionID: photographerSessionID, controlsArm: true,
-            controlAvailable: { await bluetooth.trackingAvailable })
+            controlAvailable: { await bluetooth.trackingAvailable },
+            context: photographerContext,
+            reportsReplyActivity: true, chatProvider: chatProvider, modelName: modelName,
+            photoObservation: { id, input in
+                let data = try await cameraControl.readPhoto(
+                    id, source: "photographer", sessionID: input.sessionID, inputID: input.id)
+                return try ChatImage(id: id, data: data)
+            })
         bluetooth.trackingInputAvailable = { [weak photographerAgent] in
             await photographerAgent?.hasFreshPose() ?? false
         }
-        let historySessionID = UUID()
-        let historyAgent = try MemoryAgent(sessionID: historySessionID)
+        let historySessionID = applicationControlSessionID
+        let historyAgent = try MemoryAgent(
+            sessionID: historySessionID, context: memoryContext,
+            reportsReplyActivity: true, chatProvider: chatProvider, modelName: modelName)
         let historyPresentation = HistoryPresentationAdapter(
             state: historyState, store: conversations, sessionID: historySessionID)
         let policy = try CommunicationPolicy(
@@ -140,7 +200,44 @@ final class ApplicationRuntime {
                 try AgentConfigurations.load(named: $0)
             })
         let manager = AgentManager()
-        let input = InputGateway(manager: manager, policy: policy)
+        let activity = ActionActivityWorkflow(state: ActionActivityState())
+        let input = InputGateway(
+            manager: manager, policy: policy,
+            signalSummary: { input in
+                switch input.payload {
+                case .text(let text): return String(text.prefix(256))
+                case .observation(let message):
+                    if case .transcript(let text, _) = message.perception { return String(text.prefix(256)) }
+                    if let task = message.content(as: AgentTaskSignal.self),
+                        let content = try? AgentTaskContent.decode(task)
+                    {
+                        return String(content.text.prefix(256))
+                    }
+                    if let task = message.content(as: AgentTaskSignal.self),
+                        task.businessContract == "runtime.taskTermination"
+                    {
+                        return String(String(decoding: task.data, as: UTF8.self).prefix(256))
+                    }
+                    return ""
+                case .toolResult(let result): return String(result.value.prefix(256))
+                default: return ""
+                }
+            })
+        activity.startTasks(
+            observe: { try await input.observeTasks() },
+            taskContent: { signal in
+                guard let content = try? AgentTaskContent.decode(signal) else { return ("", false) }
+                return (String(content.text.prefix(256)), content.stage == .waitingUser)
+            })
+        activity.startAgents {
+            var values: [(String, AgentLifecycle)] = []
+            for descriptor in await manager.descriptors() {
+                if let agent = try? await manager.agent(descriptor.id) {
+                    values.append((descriptor.id.rawValue, await agent.status().lifecycle))
+                }
+            }
+            return values
+        }
         let presentation = RuntimePresentation(cameraControl: cameraControl, rootSessionID: photographerSessionID)
         self.bluetooth = bluetooth
         let resources = try ResourceCoordinator(
@@ -155,9 +252,9 @@ final class ApplicationRuntime {
                 + (1...6).map { motor in
                     ResourceDefinition(
                         id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
-                        allowedOwners: motor == 6 ? [.assistant] : [.assistant, .photographer],
+                        allowedOwners: [.assistant, .applicationControl, .photographer],
                         executionGroup: ResourceID(rawValue: "nexarm.writer"),
-                        preempts: [.assistant: [.photographer]]
+                        preempts: [.assistant: [.photographer], .applicationControl: [.photographer]]
                     ) {
                         // Cancel and join software ownership; this is not a hardware stop acknowledgment.
                         await bluetooth.stopAgentActions()
@@ -180,7 +277,6 @@ final class ApplicationRuntime {
                 throw NexArmExecutionError.resourceUnavailable(String(describing: error))
             }
         }
-        let activity = ActionActivityWorkflow(state: ActionActivityState())
         device.input = input
         device.activity = activity
         let robot = NexArmBehaviorAdapter(bluetooth: bluetooth, activity: activity)
@@ -236,13 +332,6 @@ final class ApplicationRuntime {
                 Logger(subsystem: "dev.mobileharness", category: "Photographer").error("\(message, privacy: .private)")
             })
         photographerIntents = photography
-        presentation.cameraRequests = { operation, facing, photoID, invocation in
-            try await photography.perform(
-                operation, facing: facing, photoID: photoID,
-                delegate: { message in
-                    try await gateway.delegate(message, context: invocation.context, to: .photographer)
-                })
-        }
         let intents = ApplicationControlIntentRuntime(
             sessionID: applicationControlSessionID, manager: manager, input: input, output: gateway,
             agent: applicationControlAgent)
@@ -256,34 +345,71 @@ final class ApplicationRuntime {
                 case .changed: observation = .changed(generation: generation)
                 case .failed(let message): observation = .failed(generation: generation, message: message)
                 }
-                do {
-                    try await intents.observe(observation, sequence: sequence)
-                    return .accepted
-                } catch ApplicationControlIntentFailure.presented(let message) {
-                    return .retry(message)
-                }
+                try await intents.observe(observation, sequence: sequence)
+                // Local publication submission, not subscriber admission or business completion.
+                return .accepted
             },
             invalidate: { resourceState.beginRefresh() },
             report: { _ in resourceState.error = "资源状态更新失败，请稍后重试。" })
-        historyIntents = HistoryIntentRuntime(
+        let history = HistoryIntentRuntime(
             sessionID: historySessionID, manager: manager, input: input, output: gateway, agent: historyAgent)
+        historyIntents = history
+        let main = try AssistantAgent(
+            reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations, modelName: modelName,
+            generationPolicies: generationPolicies, context: assistantContext)
+        let interaction = AgentInteractionRuntime(
+            agent: main, manager: manager, input: input, output: gateway,
+            startChildren: {
+                try await photography.prepareForInteraction()
+                try await history.prepareForInteraction()
+                try await intents.prepareForInteraction()
+            },
+            report: { message in
+                Logger(subsystem: "dev.mobileharness", category: "Agents").error("\(message, privacy: .private)")
+            },
+            inputRejected: { id, reason in
+                await photography.rejectInput(id, reason: reason)
+                await history.rejectInput(id, reason: reason)
+                await intents.rejectInput(id, reason: reason)
+            })
+        self.interaction = interaction
+        startup = Task {
+            do { try await interaction.start() } catch {
+                Logger(subsystem: "dev.mobileharness", category: "Agents").error(
+                    "Agent startup failed: \(error, privacy: .private)")
+            }
+        }
         activity.startFailures { try await gateway.observeFailures() }
+    }
+    private static let contextScope = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+    private static func context<State: AgentContextState>(_ directory: URL, _ agent: AgentID, _ state: State) throws
+        -> AgentContextRepository<State>
+    {
+        try AgentContextRepository.persistent(
+            agent: agent, scope: contextScope, state: state,
+            url: directory.appendingPathComponent(agent.rawValue + ".context.json"))
     }
     var voiceDependencies: VoiceRuntimeDependencies {
         VoiceRuntimeDependencies(
             manager: manager, input: input, output: output, presentation: presentation, conversations: conversations,
-            makeAssistant: { [conversations, generationPolicies, photoCamera] chat, modelName in
-                try AssistantAgent(
-                    chat: chat, conversations: conversations, modelName: modelName,
-                    generationPolicies: generationPolicies,
-                    photoObservation: { id, input in
-                        let data = try await photoCamera.readPhoto(
-                            id, source: "assistant", sessionID: input.sessionID, inputID: input.id)
-                        return try ChatImage(id: id, data: data)
-                    })
+            interactionSessionID: interactionSessionID,
+            startInteraction: { [interaction] in try await interaction.start() },
+            stopInteraction: { [weak self] in await self?.shutdown() },
+            makeSynthesis: { [contextDirectory] in
+                try SpeechSynthesisAgent(
+                    synthesis: $0, store: $1,
+                    context: Self.context(
+                        contextDirectory, AgentID(rawValue: "speechSynthesis"), SpeechSynthesisContextState()))
             },
-            makeSynthesis: { try SpeechSynthesisAgent(synthesis: $0, store: $1) },
-            makePerception: { try SpeechPerceptionAgent(recognition: $0, vad: $1, sessionID: $2) })
+            makePerception: { [contextDirectory, interactionSessionID] in
+                try SpeechPerceptionAgent(
+                    recognition: $0, vad: $1, sessionID: $2, interactionSessionID: interactionSessionID,
+                    residentListening: true,
+                    context: Self.context(contextDirectory, .speechPerception, SpeechPerceptionContextState()))
+            })
+    }
+    func visionContext() throws -> AgentContextRepository<VisionPerceptionContextState> {
+        try Self.context(contextDirectory, .visionPerception, VisionPerceptionContextState())
     }
     var visionDependencies: VisionRuntimeDependencies {
         .init(

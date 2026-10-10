@@ -3,7 +3,19 @@ import FunctionContracts
 
 /// Host owns permission, capture leases and foreground lifecycle.
 extension CameraActions {
-    public enum Facing: String, Sendable { case front, back }
+    public enum Facing: String, Codable, Sendable { case front, back }
+}
+
+/// Acknowledged command state after the native operation completes, not model/pose readiness.
+public struct CameraCommandReceipt: Codable, Sendable, Equatable {
+    public let operation: String
+    public let enabled: Bool?
+    public let facing: CameraActions.Facing?
+    public init(operation: String, enabled: Bool? = nil, facing: CameraActions.Facing? = nil) {
+        self.operation = operation
+        self.enabled = enabled
+        self.facing = facing
+    }
 }
 
 public struct CameraPhotoReceipt: Codable, Sendable, Equatable {
@@ -90,14 +102,14 @@ public struct CameraModule: CapabilityModule {
             CameraActions.retryDefinition(handler: { [camera] invocation in
                 try await CameraActions.retry(invocation: invocation, using: camera)
             }),
-            CameraActions.openDefinition(handler: { [camera] invocation in
-                try await CameraActions.open(invocation: invocation, using: camera)
+            CameraActions.openDefinition(completing: { [camera] invocation in
+                .value(try await CameraActions.open(invocation: invocation, using: camera))
             }),
-            CameraActions.closeDefinition(handler: { [camera] invocation in
-                try await CameraActions.close(invocation: invocation, using: camera)
+            CameraActions.closeDefinition(completing: { [camera] invocation in
+                .value(try await CameraActions.close(invocation: invocation, using: camera))
             }),
-            CameraActions.flipDefinition(handler: { [camera] invocation in
-                try await CameraActions.flip(invocation: invocation, using: camera)
+            CameraActions.flipDefinition(completing: { [camera] invocation in
+                .value(try await CameraActions.flip(invocation: invocation, using: camera))
             }),
         ]
     }

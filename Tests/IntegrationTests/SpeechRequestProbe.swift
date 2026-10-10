@@ -19,32 +19,48 @@ actor SpeechRequestProbe {
     }
     func restored(_ outputs: [AgentOutput]) -> [AgentOutput] { outputs.map(restored) }
 }
-func bindSpeechRequests(_ agent: AssistantAgent) async throws -> SpeechRequestProbe {
+func bindSpeechRequests(_ agent: any Agent) async throws -> SpeechRequestProbe {
     let probe = SpeechRequestProbe()
-    try await agent.bind(
-        AgentMessaging { message, _, target in
-            await probe.receive(message)
-            return DeliveryReport(delivered: target.map { [$0] } ?? [])
-        })
+    try bindFixtureCommunications(
+        agent,
+        port:
+            AgentMessaging { message, _, target in
+                await probe.receive(message)
+                return DeliveryReport(delivered: target.map { [$0] } ?? [])
+            })
     return probe
 }
 
 /// Synthetic execution adapter for Agent-only tests. Integration round tests use the real Gateways.
 struct FixtureGenerationOutputs: AsyncSequence {
     typealias Element = OutputEnvelope
-    let agent: AssistantAgent
-    func makeAsyncIterator() -> Iterator { Iterator(base: agent.outputs.makeAsyncIterator(), agent: agent) }
+    let agent: any Agent
+    func makeAsyncIterator() -> Iterator { Iterator(base: fixtureOutputs(agent).makeAsyncIterator(), agent: agent) }
     struct Iterator: AsyncIteratorProtocol {
         var base: AsyncStream<OutputEnvelope>.Iterator
-        let agent: AssistantAgent
+        let agent: any Agent
         mutating func next() async throws -> OutputEnvelope? {
             while let envelope = await base.next() {
+                if case .communication(let action) = envelope.output {
+                    let payload = InputPayload.communicationReceipt(
+                        .init(
+                            callID: action.id,
+                            report: DeliveryReport(delivered: action.target.map { [$0] } ?? []),
+                            owner: ExecutionOwner(
+                                agent: envelope.source, incarnation: UUID(), sessionID: envelope.sessionID),
+                            causality: SignalCausality(envelope: envelope)))
+                    try await agent.receive(
+                        AgentInput(
+                            sessionID: envelope.sessionID, payload: payload,
+                            metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime)))
+                    continue
+                }
                 if let roundID = envelope.roundID {
                     let payload: InputPayload?
                     switch envelope.output {
                     case .actionCall(let call):
                         let owner = ExecutionOwner(
-                            agent: .assistant, incarnation: UUID(), sessionID: envelope.sessionID)
+                            agent: envelope.source, incarnation: UUID(), sessionID: envelope.sessionID)
                         payload = .actionResult(
                             .init(
                                 executionID: UUID(), owner: owner, path: call.actionPath,

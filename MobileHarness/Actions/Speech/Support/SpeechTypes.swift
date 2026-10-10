@@ -1,1 +1,1 @@
-public enum SpeechActionError: Error { case missingAudio }
+public enum SpeechActionError: Error { case missingAudio, listeningUnavailable }

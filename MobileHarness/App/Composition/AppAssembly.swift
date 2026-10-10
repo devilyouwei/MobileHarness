@@ -22,6 +22,46 @@ final class AppAssembly {
     @ObservationIgnored private var environmentSample = ""
     private(set) var environmentFailure: String?
     @ObservationIgnored private lazy var environmentObservation = makeEnvironmentObservation()
+    @ObservationIgnored private var cameraSample: CameraStateObservation?
+    @ObservationIgnored private lazy var cameraObservation = makeCameraObservation()
+    private func makeCameraObservation() -> ResourceObservationWorkflow {
+        ResourceObservationWorkflow(
+            read: { [weak self] in
+                guard let self else { throw CancellationError() }
+                let state = self.camera.state
+                let value = CameraStateObservation(
+                    sequence: 1, observedAt: Date(timeIntervalSince1970: 0),
+                    enabled: state.isEnabled, visible: state.isVisible, busy: state.isBusy || state.photoBusy,
+                    needsSettings: state.needsSettings, facing: state.facing == .front ? .front : .back,
+                    displayedPhotoID: state.capturedPhoto?.id, savedPhotoID: state.savedPhotoID,
+                    failure: state.message.map { String($0.prefix(128)) })
+                self.cameraSample = value
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                return String(decoding: try encoder.encode(value), as: UTF8.self)
+            },
+            deliver: { [weak self] sample, sequence in
+                guard let self else { throw CancellationError() }
+                switch sample {
+                case .changed:
+                    guard let value = self.cameraSample else { throw DeviceControlError.invalidRequest }
+                    try await self.runtime().photographerIntents.observeCamera(
+                        CameraStateObservation(
+                            sequence: sequence, enabled: value.enabled, visible: value.visible,
+                            busy: value.busy, needsSettings: value.needsSettings, facing: value.facing,
+                            displayedPhotoID: value.displayedPhotoID, savedPhotoID: value.savedPhotoID,
+                            failure: value.failure))
+                    return .accepted
+                case .failed(let message): return .retry(message)
+                }
+            }, wait: { try await Task.sleep(for: .milliseconds(100)) }, invalidate: {},
+            report: { [weak self] message in
+                self?.runtimeValue?.actionActivity.recordFailure(
+                    title: "摄像头状态发布失败", source: CameraStateObservation.source,
+                    message: String(message.prefix(512)), failureCode: "camera.observation")
+            })
+    }
+
     private func makeEnvironmentObservation() -> ResourceObservationWorkflow {
         ResourceObservationWorkflow(
             read: { [weak self] in
@@ -188,17 +228,17 @@ final class AppAssembly {
         BluetoothInteractionWorkflow(
             state: bluetooth.state,
             initialFence: deviceControl.fence, fenceStop: { [deviceControl] in deviceControl.stopFence() },
+            pageVisibility: { [bluetooth] visible in
+                if visible { bluetooth.openPage() } else { bluetooth.closePage() }
+            }, openSettings: { [bluetooth] in bluetooth.openSystemSettings() },
             perform: { [weak self] intent in
                 guard let self else { throw CancellationError() }
                 try await self.runtime().applicationControlIntents.interact(intent)
             })
     }
 
-    func navigate(_ destination: AppDestination?) async {
-        do {
-            try await runtime().applicationControlIntents.interact(
-                .init(kind: .navigation, parameters: ["destination": destination?.rawValue ?? "home"]))
-        } catch { bluetooth.state.error = "无法打开页面：" + error.localizedDescription }
+    func navigate(_ destination: AppDestination?) {
+        navigation.show(destination)
     }
     @ObservationIgnored lazy var bluetooth = BluetoothWorkflow(
         state: BluetoothSettingsState(), link: NexArmBluetooth(),
@@ -224,17 +264,19 @@ final class AppAssembly {
                 guard let self else { throw CancellationError() }
                 let models = try await ModelKitDefaults.manager(resources: self.resources)
                 let pose = try await models.get(.pose, load: false)
+                let context = try self.runtime().visionContext()
                 return try VisionSession(runtime: self.runtime().visionDependencies) {
                     sessionID, configuration, mirroredGaze in
                     try VisionPerceptionAgent(
-                        pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze)
+                        pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze,
+                        context: context)
                 }
             })
     }
-    private let historyState = ConversationHistoryState()
+    private let historyState = ConversationHistoryState(title: "Assistant")
     @ObservationIgnored lazy var history = makeHistory()
     private func makeHistory() -> ConversationHistoryWorkflow {
-        ConversationHistoryWorkflow(
+        let assistant = ConversationHistoryWorkflow(
             state: historyState,
             prepare: { [weak self] in
                 guard let self else { throw CancellationError() }
@@ -263,6 +305,43 @@ final class AppAssembly {
                 guard let self else { throw CancellationError() }
                 return try await self.capturedPhotos.readForInput(id, source: "assistant", input: inputID)
             })
+        let root = ConversationHistoryWorkflow(
+            state: ConversationHistoryState(), prepare: {}, refresh: {}, deleteArchive: { _ in },
+            startNew: {}, summarize: { _ in }, previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
+        root.agents = [
+            HistoryAgentDestination(
+                id: "assistant", name: "Assistant", summary: "用户交互与任务委派", state: historyState, controls: assistant)
+        ]
+        for (id, name, summary) in [
+            ("photographer", "Photographer", "拍摄任务与照片处理"),
+            ("memory", "Memory", "历史与记忆任务"),
+            ("applicationControl", "ApplicationControl", "应用、资源与设备任务"),
+        ] {
+            let state = ConversationHistoryState(title: name, allowsMutations: false, groupsByTask: true)
+            let workflow = ConversationHistoryWorkflow(
+                state: state,
+                prepare: { [weak self] in
+                    guard let self else { throw CancellationError() }
+                    _ = try self.runtime()
+                },
+                refresh: { [weak self] in
+                    guard let self else { throw CancellationError() }
+                    guard let read = try self.runtime().historyReaders[id] else { throw CancellationError() }
+                    let snapshot = try await read()
+                    try Task.checkCancellation()
+                    state.archive = snapshot.archive
+                    state.tasks = snapshot.tasks
+                }, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
+                previewOutput: { HistoryAgentAdapter.preview($0, agent: id) },
+                readPhoto: { [weak self] photo, input in
+                    guard let self else { throw CancellationError() }
+                    return try await self.capturedPhotos.readForInput(photo, source: id, input: input)
+                })
+            root.agents.append(
+                HistoryAgentDestination(
+                    id: id, name: name, summary: summary, state: state, controls: workflow))
+        }
+        return root
     }
     private func makeHistoryChat() async throws -> any ChatCapability {
         try await settingsControls.restore()
@@ -315,11 +394,23 @@ final class AppAssembly {
                 let chat = try await self.makeHistoryChat()
                 try Task.checkCancellation()
                 return try await ConversationTitleGenerator.summarize(conversation, using: chat)
+            },
+            modelName: { [weak self] in
+                guard let self else { throw CancellationError() }
+                return await self.settingsWorkflow.modelName
+            },
+            chatProvider: { [resources] in
+                let models = try await ModelKitDefaults.manager(resources: resources)
+                return try await models.get(.chat)
             })
         runtimeValue = runtime
         return runtime
     }
+    func setAgentForeground(_ value: Bool) {
+        runtimeValue?.setForeground(value)
+    }
     func setResourceObservationForeground(_ value: Bool) {
+        cameraObservation.setForeground(value)
         environmentObservation.setForeground(value)
         resourceObservationForeground = value
         guard container != nil else { return }

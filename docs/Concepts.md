@@ -36,3 +36,21 @@ Edge/cloud collaboration means explicitly selecting remote processing where prov
 [Architecture](Architecture.md) describes current collaboration. The [technical design](../MobileHarness/README.md#part-iii--key-techniques) defines cross-module flows and module READMEs define the algorithms.
 
 The active [Signal contract](../MobileHarness/README.md#unified-signal-contract) defines the shared envelope, payload ownership, admission and feedback rules, with current implementation gaps explicitly marked.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+执行所有者（Agent/incarnation/session）、task/parentTask、Signal 因果 root/parent、decision/call 分别关联。ActionResult 按可信运行时所有者路由；TaskResult 是子任务显式报告，communication receipt 是接纳反馈。反馈旁路、普通输入 FIFO/融合/替换由各 Agent 决定。
+
+参见 [ADR0187](adr/0187-agent-composition-and-react.md) 与 [Agents 当前设计](../MobileHarness/Agents/README.md)。
+
+✅ [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md): SpeechPerception owns listening consent and admission policy through fixed Actions; interactive Agents publish reply occupancy and App executes native/playback barriers. External facts publish one-way, internal send retains admission receipts, and recoverable speech errors do not stop recording. Physical recording stops on user-off/native interruption; policy pause suppresses recognition input while preserving capture.
+
+## Frontend and Agent backend
+
+✅ Signal/Action describes the Agent boundary, not every UI event. Like a web frontend, UI owns local navigation, drafts, filtering, selection and rendering. Explicit data/resource/history/camera/device requests publish directly to their owning Agent. Conversation enters Assistant, which may delegate actual tasks. Agent-initiated presentation still uses authorized UI Action functions over the same presentation state; local touch interaction does not create a backend task merely to reuse a UI operation. App owns native lifecycle and immediate cleanup.

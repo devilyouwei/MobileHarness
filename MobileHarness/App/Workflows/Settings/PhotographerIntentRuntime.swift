@@ -1,5 +1,6 @@
 import AgentCore
 import Agents
+import AppPresentationWorkflow
 import Foundation
 import Gateway
 
@@ -9,14 +10,16 @@ public actor PhotographerIntentRuntime {
     private let manager: AgentManager
     private let input: InputGateway
     private let output: OutputGateway
+    private var consumer: GatewayOutputConsumer?
     private let sessionID: UUID
     private let report: @Sendable (String) async -> Void
+
+    public func prepareForInteraction() async throws { try await prepare() }
     private var started = false
     private var closed = false
     private var pump: Task<Void, Never>?
     private var cleanup: Task<Void, Never>?
     private var closing: Task<Void, Never>?
-    private var cancelAck: CheckedContinuation<Void, Never>?
     private var starting: Task<Void, Error>?
     private var trackingSession: UUID?
     private var trackingWorker: Task<Void, Never>?
@@ -45,6 +48,13 @@ public actor PhotographerIntentRuntime {
         self.agent = agent
         self.report = report
     }
+    public func rejectInput(_ id: UUID, reason: String) async {
+        await cancel(id, failure: PhotographerIntentFailure.rejected(reason))
+    }
+    private func boundConsumer() throws -> GatewayOutputConsumer {
+        guard let consumer else { throw CommunicationError.scopeClosed }
+        return consumer
+    }
     private func prepare() async throws {
         guard !closed else { throw CommunicationError.scopeClosed }
         if started { return }
@@ -56,12 +66,16 @@ public actor PhotographerIntentRuntime {
             try await manager.register(agent)
             do {
                 try await manager.start(.photographer)
+                consumer = try await output.consumer(for: agent)
                 guard !closed else { throw CommunicationError.scopeClosed }
                 started = true
                 pump = Task.detached { [agent] in
-                    for await envelope in agent.outputs {
-                        if Task.isCancelled { break }
-                        await self.consume(envelope)
+                    do {
+                        try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { envelope in
+                            await self.consume(envelope)
+                        }
+                    } catch is CancellationError {} catch {
+                        await self.report("Photographer output transport stopped: \(error)")
                     }
                 }
             } catch {
@@ -76,10 +90,17 @@ public actor PhotographerIntentRuntime {
         }
         starting = nil
     }
+    /// One-way passive observation; no command slot, model invocation or result waiter.
+    public func observeCamera(_ value: CameraStateObservation) async throws {
+        try value.validate()
+        try await prepare()
+        guard !closed else { throw CommunicationError.scopeClosed }
+        try await input.publish(value.input(sessionID: sessionID))
+    }
+
     @discardableResult public func perform(
         _ operation: PhotographerCameraIntent.Operation,
-        facing: PhotographerCameraIntent.Facing? = nil, photoID: UUID? = nil,
-        delegate: (@Sendable (AgentMessage) async throws -> DeliveryReport)? = nil
+        facing: PhotographerCameraIntent.Facing? = nil, photoID: UUID? = nil
     ) async throws -> String? {
         guard operation != .cancel else { throw CommunicationError.unauthorized }
         try Task.checkCancellation()
@@ -89,30 +110,56 @@ public actor PhotographerIntentRuntime {
         guard request == nil else { throw CommunicationError.capacityExceeded }
         let intent = PhotographerCameraIntent(operation, facing: facing, photoID: photoID)
         _ = try intent.message.validatedSize()
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { waiter in
-                request = Request(id: intent.requestID, waiter: waiter)
-                request?.delivery = Task {
-                    do {
-                        let receipt: DeliveryReport
-                        if let delegate {
-                            receipt = try await delegate(intent.message)
-                        } else {
-                            receipt = try await input.send(intent.input(sessionID: sessionID), to: .photographer)
-                        }
-                        guard receipt.delivered == [.photographer], receipt.rejected.isEmpty else {
-                            throw PhotographerIntentFailure.rejected(
-                                receipt.failure ?? String(describing: receipt.rejected))
-                        }
-                    } catch { await cancel(intent.requestID, failure: error) }
+        let watchdog = Task {
+            do { try await Task.sleep(for: .seconds(120)) } catch { return }
+            await cancel(
+                intent.requestID, failure: PhotographerIntentFailure.rejected("Camera result deadline exceeded"))
+        }
+        do {
+            let value = try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { waiter in
+                    request = Request(id: intent.requestID, waiter: waiter)
+                    request?.delivery = Task {
+                        do {
+                            try await input.publish(intent.input(sessionID: sessionID))
+
+                        } catch { await cancel(intent.requestID, failure: error) }
+                    }
                 }
+            } onCancel: {
+                Task { await self.cancel(intent.requestID, failure: CancellationError()) }
             }
-        } onCancel: {
-            Task { await self.cancel(intent.requestID, failure: CancellationError()) }
+            watchdog.cancel()
+            await watchdog.value
+            return value
+        } catch {
+            watchdog.cancel()
+            await watchdog.value
+            throw error
         }
     }
+
     private func consume(_ envelope: OutputEnvelope) async {
         guard envelope.source == .photographer else { return }
+        if envelope.roundID != nil
+            || envelope.taskScope != nil && envelope.inputID != request?.inputID
+                && envelope.inputMetadata.rootID != request?.id
+            || {
+                if case .communication = envelope.output { return true }
+                return false
+            }()
+        {
+            do { _ = try await boundConsumer().execute(envelope) } catch {
+                await report("Photographer output failed: \(error)")
+            }
+            return
+        }
+        if case .control(let value) = envelope.output, value.hasPrefix("agent.error:"), let active = request,
+            envelope.inputID == active.id
+        {
+            await cancel(active.id, failure: PhotographerIntentFailure.rejected(value))
+            return
+        }
         if case .toolCall(let call) = envelope.output, call.toolPath.hasPrefix("Camera.Capture.") {
             guard !closed, request?.id == call.id, request?.worker == nil, request?.cancelling == false else {
                 await report("Rejected unowned camera output")
@@ -122,7 +169,7 @@ public actor PhotographerIntentRuntime {
             request?.sessionID = envelope.sessionID
             request?.worker = Task {
                 do {
-                    let result = try await output.execute(envelope)
+                    let result = try await boundConsumer().execute(envelope)
                     await completed(call.id, outcome: result)
                 } catch { await cancel(call.id, failure: error) }
             }
@@ -131,10 +178,8 @@ public actor PhotographerIntentRuntime {
         if case .control("photographer.camera.cancelled") = envelope.output,
             request?.cancelling == true, request?.id == envelope.inputID, envelope.sessionID == sessionID
         {
-            _ = try? await output.execute(envelope)
+            _ = try? await boundConsumer().execute(envelope)
             request?.cancelAcknowledged = true
-            cancelAck?.resume()
-            cancelAck = nil
             return
         }
         if case .control(let state) = envelope.output, state.hasPrefix("photographer.camera.") {
@@ -142,10 +187,10 @@ public actor PhotographerIntentRuntime {
                 active.inputID == envelope.inputID, active.sessionID == envelope.sessionID
             else { return }
             do {
-                let result = try await output.execute(envelope)
+                let result = try await boundConsumer().execute(envelope)
                 guard !result.isError else { throw PhotographerIntentFailure.execution(result) }
                 request?.terminal = true
-                finishIfReady()
+                await finishIfReady()
             } catch { await cancel(active.id, failure: error) }
             return
         }
@@ -162,7 +207,7 @@ public actor PhotographerIntentRuntime {
         while !Task.isCancelled, !trackingQueue.isEmpty {
             let envelope = trackingQueue.removeFirst()
             do {
-                let result = try await output.execute(envelope)
+                let result = try await boundConsumer().execute(envelope)
                 if result.isError { await report(result.failure ?? result.tool?.value ?? "Tracking failed") }
             } catch is CancellationError { return } catch { await report(String(describing: error)) }
         }
@@ -173,11 +218,20 @@ public actor PhotographerIntentRuntime {
         if outcome.failure != nil {
             await cancel(id, failure: PhotographerIntentFailure.execution(outcome))
         } else {
-            finishIfReady()
+            await finishIfReady()
         }
     }
-    private func finishIfReady() {
+    private func finishIfReady() async {
         guard let active = request, !active.cancelling, active.terminal, let result = active.outcome else { return }
+        do {
+            try await agent.completeFixedTask(
+                inputID: active.id, value: result.tool?.value,
+                failure: result.isError ? result.failure ?? result.tool?.value ?? "Camera operation failed" : nil)
+        } catch {
+            request = nil
+            active.waiter.resume(throwing: error)
+            return
+        }
         request = nil
         if result.isError {
             active.waiter.resume(throwing: PhotographerIntentFailure.execution(result))
@@ -196,13 +250,16 @@ public actor PhotographerIntentRuntime {
         cleanup = Task {
             await worker?.value
             await delivery?.value
-            let receipt = try? await input.send(
-                PhotographerCameraIntent(.cancel, requestID: id).input(sessionID: sessionID), to: .photographer)
-            if receipt?.rejected.isEmpty != true {
-                await report("Photographer cancellation Signal rejected")
-            } else if request?.cancelAcknowledged == false {
-                await withCheckedContinuation { cancelAck = $0 }
-            }
+            do {
+                try await input.publish(PhotographerCameraIntent(.cancel, requestID: id).input(sessionID: sessionID))
+                let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+                while request?.id == id, request?.cancelAcknowledged == false, ContinuousClock.now < deadline {
+                    do { try await Task.sleep(for: .milliseconds(10)) } catch { break }
+                }
+                if request?.id == id, request?.cancelAcknowledged == false {
+                    await report("Camera cancellation acknowledgment deadline exceeded")
+                }
+            } catch { await report("Photographer cancellation publication failed: \(error)") }
             guard let active = request, active.id == id else {
                 cleanup = nil
                 return
@@ -221,7 +278,7 @@ public actor PhotographerIntentRuntime {
     public func detachTracking(sessionID: UUID) async {
         guard trackingSession == sessionID else { return }
         trackingSession = nil
-        await agent.unbindTracking(sessionID: sessionID)
+        do { try await agent.unbindTracking(sessionID: sessionID) } catch { await report("保存追踪结束状态失败：\(error)") }
         trackingQueue.removeAll()
         let worker = trackingWorker
         worker?.cancel()

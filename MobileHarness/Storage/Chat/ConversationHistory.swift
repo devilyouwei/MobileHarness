@@ -58,6 +58,8 @@ public struct ConversationModelRequest: Codable, Sendable, Identifiable {
     public let date: Date
     public let input: String
     public let requestJSON: String
+    public var modelRequestStartedAt: Date?
+    public var firstTokenLatency: Double?
     public var firstTokenAt: Date?
     public var fragments: [String] = []
     public var toolCalls: [ConversationToolCall] = []
@@ -135,6 +137,7 @@ public struct ConversationReadSnapshot: Sendable {
 /// Writes are serialized across document awaits; at most 16 callers may wait, overflow fails busy.
 public actor ConversationHistoryStore {
     public static let maximumBytes = 32 * 1024 * 1024
+    public private(set) var contextIdentity: UUID?
     private let document: LocalDocumentStore<ConversationArchive>?
     private var value = ConversationArchive()
     private var revision: UUID?
@@ -156,10 +159,47 @@ public actor ConversationHistoryStore {
         if writers.isEmpty { writing = false } else { writers.removeFirst().resume() }
     }
 
-    public init(document: LocalDocumentStore<ConversationArchive>? = nil) { self.document = document }
+    private var contextLoad: (@Sendable () async throws -> ConversationArchive)?
+    private var contextCommit: (@Sendable (ConversationArchive) async throws -> Void)?
+    public init(document: LocalDocumentStore<ConversationArchive>? = nil) {
+        self.document = document
+        contextIdentity = nil
+        contextLoad = nil
+        contextCommit = nil
+    }
+    /// Compatibility facade over the Agent-owned authoritative context; no second writer.
+    public init(
+        contextIdentity: UUID? = nil,
+        contextLoad: @escaping @Sendable () async throws -> ConversationArchive,
+        contextCommit: @escaping @Sendable (ConversationArchive) async throws -> Void
+    ) {
+        document = nil
+        self.contextIdentity = contextIdentity
+        self.contextLoad = contextLoad
+        self.contextCommit = contextCommit
+    }
 
+    /// The host attaches an authoritative projection only after importing this facade's legacy snapshot.
+    public func attachContext(
+        identity: UUID,
+        load: @escaping @Sendable () async throws -> ConversationArchive,
+        commit: @escaping @Sendable (ConversationArchive) async throws -> Void
+    ) async throws {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        guard contextIdentity == nil || contextIdentity == identity else { throw ConversationHistoryError.busy }
+        let authoritative = try await load()
+        guard authoritative.version == 1 else { throw DocumentStorageError.unsupportedVersion }
+        contextIdentity = identity
+        contextLoad = load
+        contextCommit = commit
+        value = authoritative
+        loaded = true
+        readToken = ConversationReadToken(value: UUID())
+    }
     private func load() async throws {
         guard !loaded else { return }
+        if let contextLoad { value = try await contextLoad() }
         if let saved = try await document?.load() {
             guard saved.value.version == 1 else { throw DocumentStorageError.unsupportedVersion }
             value = saved.value
@@ -185,7 +225,9 @@ public actor ConversationHistoryStore {
         guard try JSONEncoder().encode(next).count <= Self.maximumBytes - reserve else {
             throw ConversationHistoryError.capacityExceeded
         }
-        if let document {
+        if let contextCommit {
+            try await contextCommit(next)
+        } else if let document {
             let saved = try await document.save(next, expecting: revision)
             revision = saved.revision
         }
@@ -217,9 +259,7 @@ public actor ConversationHistoryStore {
         defer { releaseWrite() }
         try await load()
         guard token == readToken else { throw ConversationHistoryError.conflict }
-        guard !value.current.turns.contains(where: { $0.state == .generating }) else {
-            throw ConversationHistoryError.busy
-        }
+
         guard value.current.turns.count < 256 else { throw ConversationHistoryError.capacityExceeded }
         guard user.utf8.count <= 4096, model.utf8.count <= 512,
             request.count <= 514,
@@ -271,13 +311,21 @@ public actor ConversationHistoryStore {
         }
     }
 
-    public func recordFirstToken(at date: Date, for id: UUID) async throws {
+    /// Exact provider evidence; the original record date remains an admission timestamp.
+    public func recordModelTiming(startedAt: Date, firstTokenAt: Date?, latency: Double?, for id: UUID) async throws {
+        guard startedAt.timeIntervalSinceReferenceDate.isFinite,
+            firstTokenAt?.timeIntervalSinceReferenceDate.isFinite ?? true,
+            latency.map({ $0.isFinite && $0 >= 0 }) ?? true,
+            (firstTokenAt == nil) == (latency == nil)
+        else { throw ConversationHistoryError.invalidRecord }
         try await updateTurn(id) { turn in
             guard let index = turn.modelRequests?.indices.last,
                 turn.modelRequests?[index].state == .generating,
-                turn.modelRequests?[index].firstTokenAt == nil
+                turn.modelRequests?[index].modelRequestStartedAt == nil
             else { return false }
-            turn.modelRequests?[index].firstTokenAt = date
+            turn.modelRequests?[index].modelRequestStartedAt = startedAt
+            turn.modelRequests?[index].firstTokenAt = firstTokenAt
+            turn.modelRequests?[index].firstTokenLatency = latency
             return true
         }
     }

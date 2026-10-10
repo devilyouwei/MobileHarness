@@ -65,7 +65,8 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
         ],
         [
             "id": secondID, "date": 20, "input": "[tool]\nactual-result", "requestJSON": requestJSON,
-            "firstTokenAt": 20.125, "fragments": ["observed"], "toolCalls": [], "state": "completed",
+            "firstTokenAt": 20.125, "modelRequestStartedAt": 20.1, "firstTokenLatency": 0.025,
+            "fragments": ["observed"], "toolCalls": [], "state": "completed",
             "finishReason": "stop",
             "tokenUsage": ["input": 4, "generated": 2, "total": 6],
         ],
@@ -75,12 +76,12 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     #expect(rows.count == 2 && rows.map(\.id.uuidString) == [firstID, secondID])
     #expect(rows[0].user == "question" && rows[0].isReACT == false)
     #expect(rows[0].raw.isEmpty && rows[0].outputSummary == "Tool Call：inspect")
-    #expect(rows[0].firstTokenReport == "首 token 到达时间：")
+    #expect(rows[0].firstTokenReport == "首 token 耗时：")
     #expect(rows[1].user == "[tool]\nactual-result" && rows[1].isReACT == true)
     #expect(rows[1].raw == "observed" && rows[1].toolCalls?.isEmpty == true)
     #expect(rows[1].request.last?.role == .tool && rows[1].request.last?.toolCallID == "provider-call")
     #expect(rows[1].request[2].toolCalls?.first?.name == "inspect")
-    #expect(rows[1].firstTokenReport.contains("0.125"))
+    #expect(rows[1].firstTokenReport == "首 token 耗时：0.025 秒")
     #expect(rows[1].toolDefinitions == ["definition"])
     #expect(rows[1].diagnosticReport().contains(requestJSON))
     #expect(rows[1].diagnosticReport().contains("CURRENT INPUT\n[tool]\nactual-result"))
@@ -105,7 +106,7 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     #expect(rows[1].outputSummary.isEmpty)
     #expect(rows[1].dateReport.isEmpty && rows[1].stateReport.isEmpty)
     #expect(!rows[1].diagnosticReport().contains(rows[1].id.uuidString))
-    #expect(rows[1].tokenReport == "Token 用量：" && rows[1].firstTokenReport == "首 token 到达时间：")
+    #expect(rows[1].tokenReport == "Token 用量：" && rows[1].firstTokenReport == "首 token 耗时：")
     #expect(rows[1].toolReport.isEmpty)
     #expect(rows[0].executionError == "actual failure" && rows[1].executionError == nil)
     #expect(!rows[1].diagnosticReport().contains("旧记录"))
@@ -165,4 +166,27 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     #expect(
         HistoryMessage(role: .user, content: "\nImage attachments (bytes omitted): invalid image/png 1 bytes")
             .attachedImages.isEmpty)
+}
+
+@Test func taskHistoryFiltersOriginalInputBeforeExpandingRequests() throws {
+    let value = try conversation(user: "task input")
+    let id = try #require(value.turns.first?.id)
+    #expect(ConversationHistoryPresentation.turns(value, inputIDs: [id]).count == 1)
+    #expect(ConversationHistoryPresentation.turns(value, inputIDs: [UUID()]).isEmpty)
+    #expect(ConversationHistoryPresentation.turns(value).count == 1)
+}
+
+@Test func legacyFirstTextArrivalDoesNotInventInterfaceLatency() throws {
+    let id = UUID().uuidString
+    let conversation = try historyFixture(extra: [
+        "modelRequests": [
+            [
+                "id": id, "date": 20, "input": "hello", "requestJSON": "[]", "firstTokenAt": 23,
+                "fragments": ["reply"], "toolCalls": [], "state": "completed",
+            ]
+        ]
+    ])
+    let row = try #require(ConversationHistoryPresentation.turns(conversation).first)
+    #expect(row.firstTokenReport == "首 token 耗时：")
+    #expect(!row.firstTokenReport.contains("3.000"))
 }

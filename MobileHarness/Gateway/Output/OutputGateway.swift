@@ -4,6 +4,24 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 
+/// A producer-bound port; the source cannot select or replace its registration identity.
+public struct GatewayOutputConsumer: Sendable {
+    private let consume: @Sendable (OutputEnvelope) async throws -> OutputExecutionResult
+    fileprivate init(_ consume: @escaping @Sendable (OutputEnvelope) async throws -> OutputExecutionResult) {
+        self.consume = consume
+    }
+    @discardableResult public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+        try await consume(envelope)
+    }
+}
+private enum OutputProducerBinding {
+    struct Identity: Sendable {
+        let agent: AgentID
+        let incarnation: UUID
+    }
+    @TaskLocal static var identity: Identity?
+}
+
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
     public typealias Sink = @Sendable (OutputEnvelope) async -> Void
@@ -44,7 +62,10 @@ public actor OutputGateway {
             failures.removeFirst()
             evictedFailures &+= 1
         }
-        failures.append(.init(source: envelope.source, title: title, message: message, failureCode: code?.rawValue))
+        failures.append(
+            .init(
+                source: envelope.source, title: title, message: message, failureCode: code?.rawValue,
+                inputID: envelope.inputID))
         failureRevision &+= 1
         let snapshot = failureSnapshot()
         for observer in failureObservers.values { observer.yield(snapshot) }
@@ -89,6 +110,26 @@ public actor OutputGateway {
         self.sink = sink
     }
 
+    public func consumer(for producer: any Agent) async throws -> GatewayOutputConsumer {
+        let id = producer.descriptor.id
+        let incarnation = try await manager.outputIdentity(for: producer)
+        return GatewayOutputConsumer { [self] envelope in
+            guard envelope.source == id else { throw CommunicationError.unauthorized }
+            try await manager.validate(id, incarnation: incarnation, sessionID: envelope.sessionID)
+            return try await OutputProducerBinding.$identity.withValue(.init(agent: id, incarnation: incarnation)) {
+                try await execute(envelope)
+            }
+        }
+    }
+    private func sourceIdentity(_ envelope: OutputEnvelope) async throws -> UUID {
+        if let bound = OutputProducerBinding.identity {
+            guard bound.agent == envelope.source else { throw CommunicationError.unauthorized }
+            try await manager.validate(bound.agent, incarnation: bound.incarnation, sessionID: envelope.sessionID)
+            return bound.incarnation
+        }
+        return try await manager.identity(envelope.source)
+    }
+
     public func messaging(for source: AgentID) async throws -> AgentMessaging {
         let incarnation = try await manager.identity(source)
         guard policy?.agents[source] != nil else { throw CommunicationError.unauthorized }
@@ -107,93 +148,159 @@ public actor OutputGateway {
             metadata: parent.metadata, turn: parent.turn, source: source, incarnation: incarnation, target: target)
     }
 
-    /// Delegate only from the currently bound invocation, preserving original causal routing data.
-    public func delegate(_ message: AgentMessage, context: ActionExecutionContext, to target: AgentID) async throws
-        -> DeliveryReport
-    {
-        guard let binding = InvocationSignalContext.binding else { throw CommunicationError.unauthorized }
-        let envelope = binding.envelope
-        guard
-            envelope.source.rawValue == context.source, envelope.sessionID == context.sessionID,
-            envelope.inputID == context.inputID, envelope.sequence == context.sequence,
-            envelope.turn?.id == context.correlationID, envelope.turn?.ordinal == context.ordinal
-        else { throw CommunicationError.unauthorized }
-        let incarnation = binding.owner.incarnation
-        return try await emit(
-            message, inputID: envelope.inputID, sessionID: envelope.sessionID,
-            metadata: envelope.inputMetadata, turn: envelope.turn, source: envelope.source,
-            incarnation: incarnation, target: target)
-    }
-
     private func emit(
         _ observation: AgentMessage, inputID: UUID, sessionID: UUID,
         metadata: InputMetadata, turn: AgentTurn?, source: AgentID, incarnation: UUID, target: AgentID?
     ) async throws -> DeliveryReport {
-        try Task.checkCancellation()
-        guard let policy, let declaration = policy.agents[source] else {
-            throw CommunicationError.unauthorized
-        }
-        guard emitting[source, default: 0] < 16 else { throw CommunicationError.capacityExceeded }
-        emitting[source, default: 0] += 1
-        defer { emitting[source, default: 1] -= 1 }
-        try await manager.validate(source, incarnation: incarnation, sessionID: sessionID)
-        _ = try policy.contracts.validatedSize(observation)
-        guard let contract = policy.contracts[observation.contract] else {
-            throw CommunicationError.unsupportedContract
-        }
-        if let target {
-            guard
-                declaration.sends.contains(where: {
-                    $0.contract == observation.contract && $0.target == target.rawValue
-                })
-            else {
+        var issuedGrant: (UUID, UUID)?
+        do {
+            try Task.checkCancellation()
+            guard let policy, let declaration = policy.agents[source] else {
                 throw CommunicationError.unauthorized
             }
-        } else {
-            guard declaration.publications.contains(observation.contract) else { throw CommunicationError.unauthorized }
-        }
-        // These commands are newly produced work, not forwarded sensor observations. Their
-        // admission deadline starts now; the accepted input may outlive its original routing TTL.
-        let generatedCommand = contract.startsNewWork
-        guard (0..<8).contains(metadata.hops) else { throw CommunicationError.hopLimitExceeded }
-        guard generatedCommand || !metadata.expired else { throw CommunicationError.expired }
-        sequences[source, default: 0] += 1
-        let payload = InputPayload.observation(observation)
-        let input = AgentInput(
-            sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
-                capturedAt: metadata.capturedAt, sequence: sequences[source]!, rootID: metadata.rootID,
-                parentID: inputID, hops: metadata.hops + 1,
-                deadline: min(
-                    generatedCommand ? .now.advanced(by: .seconds(contract.lifetime)) : metadata.deadline,
-                    .now.advanced(by: .seconds(contract.lifetime)))),
-            turn: turn)
-        let destinations = target.map { [$0] } ?? policy.destinations(for: input)
-        let observed = target == nil && observedContracts.contains(observation.contract) && observeEvent != nil
-        guard !destinations.isEmpty || observed else { throw CommunicationError.noRecipients }
-        var targets: [(AgentID, UUID)] = []
-        var unavailable: [AgentID: String] = [:]
-        for id in destinations {
-            do { targets.append((id, try await manager.identity(id))) } catch {
-                unavailable[id] = String(describing: error)
+            guard emitting[source, default: 0] < 16 else { throw CommunicationError.capacityExceeded }
+            emitting[source, default: 0] += 1
+            defer { emitting[source, default: 1] -= 1 }
+            try await manager.validate(source, incarnation: incarnation, sessionID: sessionID)
+            _ = try policy.contracts.validatedSize(observation)
+            guard let contract = policy.contracts[observation.contract] else {
+                throw CommunicationError.unsupportedContract
             }
+            if let target {
+                guard
+                    declaration.sends.contains(where: {
+                        $0.contract == observation.contract && $0.target == target.rawValue
+                    })
+                else {
+                    throw CommunicationError.unauthorized
+                }
+            } else {
+                guard declaration.publications.contains(observation.contract) else {
+                    throw CommunicationError.unauthorized
+                }
+            }
+            // These commands are newly produced work, not forwarded sensor observations. Their
+            // admission deadline starts now; the accepted input may outlive its original routing TTL.
+            let task = observation.content(as: AgentTaskSignal.self)
+            if let task {
+                try task.validate()
+                let incoming = task.kind == .request || task.kind == .input || task.kind == .cancel
+                guard sessionID == task.scope.sessionID,
+                    source == (incoming ? task.scope.requester : task.scope.executor),
+                    target == (incoming ? task.scope.executor : task.scope.requester)
+                else { throw CommunicationError.unauthorized }
+                if task.kind == .request {
+                    let token = try await manager.grantTask(task.scope, sender: source)
+                    issuedGrant = (task.scope.id, token)
+                } else {
+                    try await manager.validateTask(task.scope, agent: source, sessionID: sessionID)
+                    if task.kind == .input { try await manager.validateTaskInput(task.scope, agent: source) }
+                    if task.kind == .cancel { try await manager.cancelTask(task.scope, requester: source) }
+                    if task.kind == .result {
+                        try await manager.beginTaskCompletion(task.scope, executor: source)
+                        if task.status != .succeeded {
+                            for id in try await manager.taskExecutions(task.scope) {
+                                await actions.executor.cancel(inputID: id, source: source)
+                            }
+                            await cancelTaskCalls(task.scope.id)
+                        }
+                        for id in try await manager.taskExecutions(task.scope) {
+                            do { try await actions.executor.finish(inputID: id, source: source) } catch {
+                                if task.status == .succeeded { throw error }
+                                try Task.checkCancellation()
+                            }
+                        }
+                        let calls = taskCalls[task.scope.id] ?? [:]
+                        for call in calls.values {
+                            do { _ = try await call.value } catch {
+                                if task.status == .succeeded { throw error }
+                                try Task.checkCancellation()
+                            }
+                        }
+                    }
+                }
+            }
+            let generatedCommand = contract.startsNewWork
+            guard (0..<8).contains(metadata.hops) else { throw CommunicationError.hopLimitExceeded }
+            guard generatedCommand || !metadata.expired else { throw CommunicationError.expired }
+            sequences[source, default: 0] += 1
+            let payload = InputPayload.observation(observation)
+            let input = AgentInput(
+                sessionID: sessionID, payload: payload,
+                metadata: InputMetadata(
+                    payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
+                    capturedAt: metadata.capturedAt, sequence: sequences[source]!, rootID: metadata.rootID,
+                    parentID: inputID, hops: metadata.hops + 1,
+                    deadline: min(
+                        generatedCommand ? .now.advanced(by: .seconds(contract.lifetime)) : metadata.deadline,
+                        .now.advanced(by: .seconds(contract.lifetime)))),
+                turn: turn,
+                taskScope: task.flatMap {
+                    ($0.kind == .request || $0.kind == .input || $0.kind == .cancel) ? $0.scope : nil
+                })
+            if target == nil {
+                let observe: (@Sendable (AgentInput) async -> Void)?
+                if observedContracts.contains(observation.contract), let observeEvent {
+                    observe = { input in
+                        do { try await observeEvent(input) } catch {
+                            // Presentation endpoint failure belongs to the observer, never the publisher.
+                        }
+                    }
+                } else {
+                    observe = nil
+                }
+                try await requests.publishInternal(
+                    input, targets: policy.destinations(for: input).map { ($0, nil) }, observe: observe)
+                return DeliveryReport()
+            }
+            let destinations = target.map { [$0] } ?? []
+            guard !destinations.isEmpty else { throw CommunicationError.noRecipients }
+            var targets: [(AgentID, UUID)] = []
+            var unavailable: [AgentID: String] = [:]
+            for id in destinations {
+                do { targets.append((id, try await manager.identity(id))) } catch {
+                    unavailable[id] = String(describing: error)
+                }
+            }
+            // The observer is a runtime/UI endpoint, never a direct business-Agent callback.
+            try Task.checkCancellation()
+            try await manager.validate(source, incarnation: incarnation, sessionID: input.sessionID)
+            guard !input.metadata.expired else { throw CommunicationError.expired }
+            let report = targets.isEmpty ? DeliveryReport() : try await requests.sendInternal(input, targets: targets)
+            if let task {
+                if task.kind == .result, report.delivered.isEmpty || !report.rejected.isEmpty {
+                    await failTaskCompletion(
+                        task.scope,
+                        owner: ExecutionOwner(agent: source, incarnation: incarnation, sessionID: sessionID),
+                        reason: "Final task report rejected")
+                } else if task.kind == .result
+                    || (task.kind == .request && (report.delivered.isEmpty || !report.rejected.isEmpty))
+                {
+                    await manager.retireTask(task.scope.id)
+                }
+            }
+            return DeliveryReport(
+                delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new })
+        } catch {
+            if let issuedGrant { await manager.retireTask(issuedGrant.0, admissionID: issuedGrant.1) }
+            throw error
         }
-        // The observer is a runtime/UI endpoint, never a direct business-Agent callback.
-        try Task.checkCancellation()
-        try await manager.validate(source, incarnation: incarnation, sessionID: input.sessionID)
-        guard !input.metadata.expired else { throw CommunicationError.expired }
-        if observed { try await observeEvent?(input) }
-        let report = targets.isEmpty ? DeliveryReport() : try await requests.sendInternal(input, targets: targets)
-        return DeliveryReport(
-            delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new })
     }
 
     private func bindLifecycle() async throws {
         guard !lifecycleBound else { return }
         let scheduler = actions.executor
         let resources = self.resources
-        try await manager.observeStops(id: lifecycleObserverID) { agent, incarnation in
+        let requests = self.requests
+        try await manager.observeStops(id: lifecycleObserverID) { [weak self] agent, incarnation, terminations in
+            for event in terminations {
+                for executionID in event.executionIDs {
+                    await scheduler.cancel(inputID: executionID, source: event.scope.executor)
+                }
+                await self?.cancelTaskCalls(event.scope.id)
+                let outcome = await requests.deliverTaskTermination(event)
+                await self?.recordTaskTermination(event, outcome: outcome)
+            }
             async let jobs: Void = scheduler.cancel(agent: agent, incarnation: incarnation)
             await resources?.close(agent: agent, incarnation: incarnation)
             await jobs
@@ -201,10 +308,65 @@ public actor OutputGateway {
         lifecycleBound = true
     }
 
+    private var taskCalls: [UUID: [UUID: Task<ToolResponse?, any Error>]] = [:]
+    private var taskTerminationFailures: [UUID: String] = [:]
+    public func terminationFailures() -> [UUID: String] { taskTerminationFailures }
+    private func recordTaskTermination(_ event: AgentTaskTermination, outcome: ActionResultDelivery) {
+        if case .accepted = outcome { return }
+        if taskTerminationFailures.count >= 32 { taskTerminationFailures.removeValue(forKey: event.scope.id) }
+        if taskTerminationFailures.count >= 32,
+            let oldest = taskTerminationFailures.keys.sorted(by: { $0.uuidString < $1.uuidString }).first
+        {
+            taskTerminationFailures[oldest] = nil
+        }
+        taskTerminationFailures[event.scope.id] = "Task terminal delivery rejected"
+    }
+    private func failTaskCompletion(_ scope: AgentTaskScope, owner: ExecutionOwner, reason: String) async {
+        do {
+            let events = try await manager.failTask(
+                scope, executor: owner.agent, incarnation: owner.incarnation, reason: reason)
+            for event in events {
+                for id in event.executionIDs {
+                    await actions.executor.cancel(inputID: id, source: event.scope.executor)
+                }
+                await cancelTaskCalls(event.scope.id)
+                let outcome = await requests.deliverTaskTermination(event)
+                recordTaskTermination(event, outcome: outcome)
+            }
+        } catch CommunicationError.scopeClosed {
+            // Concurrent lifecycle retirement already owns joined cleanup.
+        } catch CommunicationError.staleIncarnation {
+            // The stopped owner's cleanup carries its captured recipient incarnation.
+        } catch {
+            if taskTerminationFailures.count == 32,
+                let oldest = taskTerminationFailures.keys.sorted(by: { $0.uuidString < $1.uuidString }).first
+            {
+                taskTerminationFailures[oldest] = nil
+            }
+            taskTerminationFailures[scope.id] =
+                "Task completion cleanup rejected: " + String(String(describing: error).prefix(512))
+        }
+    }
+    private func cancelTaskCalls(_ taskID: UUID) async {
+        let calls = taskCalls.removeValue(forKey: taskID) ?? [:]
+        for call in calls.values { call.cancel() }
+        for call in calls.values { _ = await call.result }
+    }
     private func executionOwner(_ envelope: OutputEnvelope) async throws -> ExecutionOwner {
         try await bindLifecycle()
-        let identity = try await manager.identity(envelope.source)
+        let identity = try await sourceIdentity(envelope)
         try await manager.validate(envelope.source, incarnation: identity, sessionID: envelope.sessionID)
+        let terminalControl: Bool
+        if case .control(let value) = envelope.output {
+            terminalControl =
+                value == "agent.finished" || value.hasPrefix("agent.error:")
+                || value == "assistant.finished" || value.hasPrefix("assistant.error:")
+        } else {
+            terminalControl = false
+        }
+        if let scope = envelope.taskScope, !terminalControl {
+            try await manager.validateTaskInput(scope, agent: envelope.source)
+        }
         return ExecutionOwner(agent: envelope.source, incarnation: identity, sessionID: envelope.sessionID)
     }
 
@@ -250,6 +412,7 @@ public actor OutputGateway {
         async let cancelled: Void = actions.shutdown()
         await resources?.shutdown()
         await cancelled
+        await requests.shutdown()
         await manager.removeStopObserver(lifecycleObserverID)
     }
 
@@ -365,6 +528,8 @@ public actor OutputGateway {
     public func dispatch(_ envelope: OutputEnvelope) async throws -> ToolResponse? {
         var toolResult: ToolResponse?
         try Task.checkCancellation()
+        let identity = try await sourceIdentity(envelope)
+        try await manager.validate(envelope.source, incarnation: identity, sessionID: envelope.sessionID)
         let descriptor = try await manager.agent(envelope.source).descriptor
         try Task.checkCancellation()
         do { try OutputValidator.validate(envelope.output, descriptor: descriptor) } catch {
@@ -378,10 +543,51 @@ public actor OutputGateway {
                 failureCode: rejection.reason == .invalidParameters ? .invalidArguments : .unknownTool)
         }
         switch try ExecutionRouter.route(envelope.output) {
+        case .communication(let call):
+            try await bindLifecycle()
+            let owner = ExecutionOwner(
+                agent: envelope.source, incarnation: try await sourceIdentity(envelope), sessionID: envelope.sessionID)
+            try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
+            let report: DeliveryReport
+            do {
+                report = try await emit(
+                    call.message,
+                    parent: AgentInput(
+                        id: envelope.inputID,
+                        sessionID: envelope.sessionID, payload: .observation(call.message),
+                        metadata: envelope.inputMetadata, turn: envelope.turn), source: envelope.source,
+                    incarnation: owner.incarnation, target: call.target)
+            } catch is CancellationError {
+                if let task = call.message.content(as: AgentTaskSignal.self) {
+                    if task.kind == .result {
+                        await failTaskCompletion(
+                            task.scope, owner: owner, reason: "Final task report cancelled")
+                    }
+                }
+                throw CancellationError()
+            } catch {
+                if let task = call.message.content(as: AgentTaskSignal.self) {
+                    if task.kind == .result {
+                        await failTaskCompletion(task.scope, owner: owner, reason: String(describing: error))
+                    }
+                }
+                report = DeliveryReport(
+                    rejected: call.target.map { [$0: String(describing: error)] } ?? [:],
+                    failure: String(describing: error))
+            }
+            if call.target != nil {
+                try await requests.deliverCommunicationReceipt(
+                    CommunicationReceipt(
+                        callID: call.id,
+                        report: report, owner: owner, causality: SignalCausality(envelope: envelope)))
+            }
         case .action(let token):
             do {
                 try Task.checkCancellation()
                 let owner = try await executionOwner(envelope)
+                if let scope = envelope.taskScope {
+                    try await manager.registerExecution(envelope.schedulingID, scope: scope, agent: envelope.source)
+                }
                 let required = try actions.executor.requiredResources(for: token)
                 let lease = await resources?.lease(for: owner, resources: required)
                 try await actions.dispatch(
@@ -403,8 +609,26 @@ public actor OutputGateway {
             }
         case .tool(let call):
             let owner = try await executionOwner(envelope)
-            toolResult = try await InvocationSignalContext.$binding.withValue(.init(envelope: envelope, owner: owner)) {
-                try await tools.dispatch(call, envelope: envelope, owner: owner)
+            if let scope = envelope.taskScope {
+                guard taskCalls.count < 32 || taskCalls[scope.id] != nil,
+                    taskCalls[scope.id, default: [:]].count < 16
+                else { throw CommunicationError.capacityExceeded }
+                let dispatcher = tools
+                let execution = Task {
+                    try await dispatcher.dispatch(call, envelope: envelope, owner: owner)
+                }
+                taskCalls[scope.id, default: [:]][call.id] = execution
+                defer {
+                    taskCalls[scope.id]?[call.id] = nil
+                    if taskCalls[scope.id]?.isEmpty == true { taskCalls[scope.id] = nil }
+                }
+                toolResult = try await withTaskCancellationHandler {
+                    try await execution.value
+                } onCancel: {
+                    execution.cancel()
+                }
+            } else {
+                toolResult = try await tools.dispatch(call, envelope: envelope, owner: owner)
             }
         case .roundFinished:
             guard let roundID = envelope.roundID, case .roundFinished(let sealedID) = envelope.output,
@@ -425,11 +649,19 @@ public actor OutputGateway {
             try await requests.deliverRoundResult(
                 .init(roundID: roundID, failure: failure), owner: owner, envelope: envelope)
         case .finish:
-            do { try await actions.finish(envelope) } catch {
+            do {
+                try await actions.finish(envelope)
+                if let scope = envelope.taskScope { await requests.deliverReplyCompletion(scope) }
+            } catch {
                 await actions.cancel(envelope)
                 throw error
             }
         case .cancel:
+            if case .control(let value) = envelope.output,
+                value.hasPrefix("agent.error:") || value.hasPrefix("assistant.error:")
+            {
+                recordFailure(envelope, message: value, code: nil)
+            }
             if let roundID = envelope.roundID { roundFailures[roundID] = nil }
             await actions.cancel(envelope)
         case .observe: break

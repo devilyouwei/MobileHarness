@@ -13,8 +13,8 @@ Purpose: present App configuration with accessible native SwiftUI controls. Desi
 | ModelResourcesView.swift | Recognition/synthesis/vision destinations and reusable filtered download/source sections for 大模型 |
 | AudioDetectionState.swift | Display-only detection values, direction/PCM freshness and injected whole-endpoint/control contracts |
 | AudioDetectionSection.swift | Compact recognition-page detection controls, capture/fallback results, level and current direction |
-| ConversationHistoryState.swift | History snapshot/status and ConversationHistoryControlling interface |
-| ConversationHistoryView.swift | Current/past lists, raw request/reply inspection, export and explicit mutation controls |
+| ConversationHistoryState.swift | Agent destination values, isolated history snapshot/status and ConversationHistoryControlling interface |
+| ConversationHistoryView.swift | Agent picker, Assistant current/past lists and specialist task lists, request/reply inspection, export and authorized mutation controls |
 
 App owns these state instances and injects workflows. UI imports Storage for record values; it receives no store or model capability. Credentials exist in the editable form state and SecureField; persistence and model requests belong to AppWorkflows.
 
@@ -34,7 +34,7 @@ App owns these state instances and injects workflows. UI imports Storage for rec
 
 ## Conversation history
 
-✅ Settings → 对话历史 replaces the former independent single-turn raw-output test. `ConversationHistoryWorkflow` reads the process-wide durable journal and updates `ConversationHistoryState`; `ConversationHistoryView` renders those values. It shows current and archived conversations; the current title is the latest user input, never a generated summary. Expanding a conversation shows each model request, including peer ReACT continuations, with its current input, exact model text/native calls, state, finish reason, first text-token arrival, generation options, model label, actual context (including system prompt) and escaped fragments. Missing values in legacy records stay empty without storage explanations. Text/XML uses verbatim rendering and explicit export. Per-turn diagnostic export includes the exact request, raw model text, fragments, IDs/options and error status.
+✅ Settings → 对话历史 replaces the former independent single-turn raw-output test. `ConversationHistoryWorkflow` reads the process-wide durable journal and updates `ConversationHistoryState`; `ConversationHistoryView` renders those values. It shows current and archived conversations; the current title is the latest user input, never a generated summary. Expanding a conversation shows each model request, including peer ReACT continuations, with its current input, exact model text/native calls, actual context (including system prompt) and escaped fragments. Generation information is a final, initially collapsed disclosure containing only model-round ID, owning-input ID, model, interface first-token elapsed seconds, state/finish reason, temperature and input/generated/total token counts. Missing values in legacy records stay empty without storage explanations. Text/XML uses verbatim rendering and explicit export. Per-turn diagnostic export includes the exact request, raw model text, fragments, IDs/options and error status.
 
 ✅ The journal records real Assistant traffic before Action parsing. Parsing, provider, cancellation and interrupted-process failures retain received prefixes; a failure stops production generation, so the record does not claim an unseen suffix. Executed effects are not rolled back. Execution errors observed by the App output pump are saved after producer cleanup. No provider HTTP data, token IDs or hidden reasoning is available.
 
@@ -62,7 +62,7 @@ Parser preview uses the current packaged JSON and GenerationTrace; it is a reint
 
 ✅ JSON v6 uses Channel-grouped callable Actions; Assistant text interpretation uses Assistant.mapText rather than JSON aliases. Regression coverage checks internal permissions cannot be called through model markup and preserves wait event order. ❌ Live-model/device acceptance is separate from automated checks.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_output_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
 ✅ Source location: `MobileHarness/UI/Settings`; compiled by `UI`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
 
@@ -223,7 +223,7 @@ flowchart LR
 
 ## Per-request conversation history
 
-✅ Implemented: ConversationHistoryState/Presentation/View display each model invocation in order as an individual row. Detail order is 用户本轮输入, 模型本轮输出 (text and native Tool Call input/output disclosures), 生成记录, actual context, actual Tools when declarations exist, then read-only parser preview/fragments. Generation records show the first nonempty text-token arrival timestamp and elapsed seconds from request start; unavailable native-only/legacy timing stays empty. Context preserves tool-role messages, call IDs, assistant native calls and metadata-only image descriptors. Sent declarations are visible even when there are no calls. ReACT input contains actual new execution observations. Inline raw export and the continuation section were removed; one upper-right export includes the complete per-request evidence. Legacy records retain available data and leave missing per-request output/usage/timing empty. Original owner generation/execution errors remain visible beside model completion. Details/export preserve model-round and owning-input identities.
+✅ Implemented detail presentation update: ConversationHistoryState/Presentation/View keep each model invocation as an individual row. Detail order is 用户本轮输入, 模型本轮输出 (including native call/result disclosures), actual context, actual Tools when present, parser preview/fragments, separate failure information when present, then a default-collapsed 生成信息 disclosure. The disclosure contains only round/input IDs, model, first-token elapsed seconds, state/finish reason, temperature and input/generated/total token counts. Context disclosure titles show roles without numeric prefixes, retaining actual order and stable index identity. Elapsed time uses the adapter-recorded model request → first nonempty SSE text delta interval; no absolute timestamps or invented legacy duration. Export preserves complete evidence, including original owner generation/execution errors. Missing legacy metadata remains empty.
 
 ❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
 
@@ -249,3 +249,20 @@ flowchart LR
 ✅ Implemented: UIKit prepares images asynchronously within the existing UI import boundary. Cancellation is checked after preparation; full-preview failures offer a concise retry. Prepared image dimensions remain bounded to320/2048 pixels.
 
 ✅ Implemented: prepared images retain the source aspect ratio within their pixel bounds; gallery buttons crop to112×84 and full previews fit the available screen.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories use read-only task lists with original request titles, terminal/waiting status and task-scoped model detail/export. App projects task/input membership from the same immutable Agent context snapshot; ReACT and later task inputs remain together across old archives. Missing associations remain separate and missing dates remain empty. No specialist summary/archive mutation is exposed. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+✅ Task-log history navigation: TaskConversationHistoryView is a read-only projection of the existing Agent history and matching input IDs. It reuses request/Tool/image detail rendering, propagates load status, and never copies or mutates contexts. History projection filters original input identity before expanding model/ReACT requests.
+
+✅ Frontend/backend separation: Settings navigation/form drafts/device-detail selection remain local. Submitted provider/resource/history/device data operations call their injected owner interfaces without Assistant task delegation.
+
+
+✅ Model-interface timing presentation: details show modelRequestStartedAt and firstTokenAt with the stored monotonic firstTokenLatency; export preserves request start. Old arrival timestamps remain visible with an explicit missing-interface-timing label, never recalculated from record creation. Native-only/no-evidence replies leave text TTFT empty. Native visual acceptance remains separate.
+
+
+## Task-scoped specialist history
+
+✅ Implemented: Assistant keeps current/archived conversation navigation. Specialist destinations show task lists and task-scoped detail/export instead of current/past conversation summaries. App HistoryPresentationAdapter projects one immutable repository snapshot using task identity, durable Signal evidence and task state; UI owns display-only task values. ReACT and later task inputs belong to the same task. Original task requests provide titles, not the latest reply. Records lacking retained task association remain separately labeled unassociated inputs, without inventing task identity. Task reads reuse the existing single load slot and photo authorization; no second writable history, LLM summary, directory or dependency is added. Regressions cover isolation, continuation grouping across old archives, task status, legacy/unassociated records and empty tasks. Missing task dates stay empty; terminal/recovered status takes precedence over stale waiting-user reports. ❌ Native UI/device acceptance remains separate from automated checks.

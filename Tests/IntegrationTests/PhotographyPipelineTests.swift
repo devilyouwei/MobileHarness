@@ -26,7 +26,7 @@ private actor ControlledPose: PoseCapability {
     nonisolated let availability: CapabilityAvailability = .available
     nonisolated let started: AsyncStream<UInt8>
     private let continuation: AsyncStream<UInt8>.Continuation
-    private var waiter: CheckedContinuation<Void, Never>?
+    private var waiters: [CheckedContinuation<Void, Never>] = []
     private(set) var calls: [UInt8] = []
     private(set) var active = 0
     private(set) var maximumActive = 0
@@ -46,14 +46,15 @@ private actor ControlledPose: PoseCapability {
         let value = request.image.rgb?.first ?? 0
         calls.append(value)
         await withCheckedContinuation { waiter in
-            self.waiter = waiter
+            self.waiters.append(waiter)
             continuation.yield(value)
         }
         return PoseResult(context: request.context, people: [])
     }
     func release() {
-        waiter?.resume()
-        waiter = nil
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume() }
     }
 }
 
@@ -152,7 +153,7 @@ private actor ControlledPose: PoseCapability {
     #expect(await agent.status().lifecycle == .stopped)
     await model.release()
     await stopping.value
-    var output = agent.outputs.makeAsyncIterator()
+    var output = fixtureOutputs(agent).makeAsyncIterator()
     #expect(await output.next() == nil)
 }
 
@@ -197,15 +198,18 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
         ]))
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
-        configurations: [AgentConfigurations.load(named: "VisionPerception")]
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
+        configurations: AgentConfigurations.all()
             + (withSubscribers ? [secondConfig, thirdConfig] : []))
     try await manager.register(third, sessionID: session)
     await third.start()
     try await manager.register(vision, sessionID: session)
     try await manager.register(second, sessionID: session)
     await second.start()
-    let input = InputGateway(manager: manager, policy: policy)
+    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let recorder = OverlayRecorder()
     let actions = ChannelScheduler(registry: try testActionRegistry(handlers: [:]), maximumTrackedInputs: 1)
     let tools = ToolRegistry()
@@ -225,14 +229,13 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
         sink: { _ in })
     try await vision.bind(output.messaging(for: .visionPerception))
     try await vision.start()
-    var envelopes = vision.outputs.makeAsyncIterator()
+    var envelopes = fixtureOutputs(vision).makeAsyncIterator()
     var started = model.started.makeAsyncIterator()
     for i: UInt64 in 1...3 {
-        let report = try await input.publish(
+        try await input.publish(
             AgentInput(
                 sessionID: session, payload: .image(image(UInt8(i * 40), sequence: i)),
                 metadata: InputMetadata(payload: .image(image(UInt8(i * 40), sequence: i)), source: "phone.camera")))
-        #expect(report.delivered == [.visionPerception])
         #expect(await started.next() == UInt8(i * 40))
         await model.release()
         for _ in 0..<2 {
@@ -317,7 +320,7 @@ private struct CrowdPose: PoseCapability {
         try await agent.receive(AgentInput(sessionID: UUID(), payload: .image(image(40, sequence: 1))))
     }
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(40, sequence: 1))))
-    var stream = agent.outputs.makeAsyncIterator()
+    var stream = fixtureOutputs(agent).makeAsyncIterator()
     let envelope = try #require(await stream.next())
     #expect(envelope.source == .visionPerception)
     guard case .toolCall(let call) = envelope.output else {
@@ -350,7 +353,6 @@ private struct CrowdPose: PoseCapability {
 @Test(.timeLimit(.minutes(1))) func visionSlowDisplayKeepsOnlyLatestWithoutFailingPerception() async throws {
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
-    try await agent.bind(AgentMessaging { _, _, _ in throw CommunicationError.noRecipients })
     try await agent.start()
     for i: UInt64 in 1...9 {
         try await agent.receive(AgentInput(sessionID: session, payload: .image(image(UInt8(i * 20), sequence: i))))
@@ -363,8 +365,10 @@ private struct CrowdPose: PoseCapability {
     #expect(await agent.status().lifecycle == .running)
     #expect(await agent.overlayReplacements == 8)
     #expect(await agent.gazeReplacements == 8)
-    var output = agent.outputs.makeAsyncIterator()
-    let envelope = try #require(await output.next())
+    var output = fixtureOutputs(agent).makeAsyncIterator()
+    var next = await output.next()
+    while let value = next, case .communication = value.output { next = await output.next() }
+    let envelope = try #require(next)
     guard case .toolCall(let call) = envelope.output else {
         Issue.record("Missing tool")
         return
@@ -449,7 +453,7 @@ private func nativeCameraInput(
 private actor BlockedPosePublication {
     let started: AsyncStream<UInt64>
     private let continuation: AsyncStream<UInt64>.Continuation
-    private var waiter: CheckedContinuation<Void, Never>?
+    private var waiters: [CheckedContinuation<Void, Never>] = []
     init() {
         let pair = AsyncStream<UInt64>.makeStream(bufferingPolicy: .bufferingOldest(8))
         started = pair.stream
@@ -458,26 +462,27 @@ private actor BlockedPosePublication {
     func publish(_ observation: AgentMessage) async throws -> DeliveryReport {
         guard case .pose(let pose)? = observation.perception else { throw CommunicationError.invalidPayload }
         await withCheckedContinuation { waiter in
-            self.waiter = waiter
+            self.waiters.append(waiter)
             continuation.yield(pose.sequence)
         }
         try Task.checkCancellation()
         return DeliveryReport()
     }
     func release() {
-        waiter?.resume()
-        waiter = nil
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume() }
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func slowPublicationDoesNotBlockInferenceOrDisplayAndCoalescesLatest() async throws {
+@Test(.timeLimit(.minutes(1))) func slowSubscriberDoesNotBlockInferenceDisplayOrLaterPublications() async throws {
     let session = UUID()
     let port = BlockedPosePublication()
     let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
     try await agent.bind(AgentMessaging { value, _, _ in try await port.publish(value) })
     try await agent.start()
     var receipts = port.started.makeAsyncIterator()
-    var displays = agent.outputs.makeAsyncIterator()
+    var displays = fixtureOutputs(agent).makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(30, sequence: 1))))
     #expect(await receipts.next() == 1)
     _ = try #require(await displays.next())
@@ -499,9 +504,10 @@ private actor BlockedPosePublication {
             return
         }
     }
-    #expect(await agent.publicationReplacements == 2)
-    await port.release()
+    #expect(await receipts.next() == 2)
+    #expect(await receipts.next() == 3)
     #expect(await receipts.next() == 4)
+    await port.release()
     let stop = Task { await agent.stop() }
     for _ in 0..<10000 {
         if await agent.status().lifecycle == .stopped { break }
@@ -523,7 +529,6 @@ private struct FailingSecondPose: PoseCapability {
 @Test(.timeLimit(.minutes(1))) func visualTerminalErrorSurvivesPendingSkeletonReplacement() async throws {
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: FailingSecondPose(), sessionID: session)
-    try await agent.bind(AgentMessaging { _, _, _ in throw CommunicationError.noRecipients })
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(40, sequence: 1))))
     for _ in 0..<10000 {
@@ -536,9 +541,11 @@ private struct FailingSecondPose: PoseCapability {
         await Task.yield()
     }
     #expect(await agent.status().lifecycle == .failed)
-    var output = agent.outputs.makeAsyncIterator()
+    var output = fixtureOutputs(agent).makeAsyncIterator()
     // The bounded pair may retain one older display before the terminal error.
-    var terminal = try #require(await output.next())
+    var next = await output.next()
+    while let value = next, case .communication = value.output { next = await output.next() }
+    var terminal = try #require(next)
     if case .control = terminal.output {} else { terminal = try #require(await output.next()) }
     guard case .control(let value) = terminal.output else {
         Issue.record("Terminal error was lost behind display state")
@@ -556,7 +563,7 @@ private struct FailingSecondPose: PoseCapability {
     try await manager.register(agent, sessionID: session)
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
     try await manager.start(.visionPerception)
-    let input = InputGateway(manager: manager)
+    let input = InputGateway(manager: manager, allowsExternalSend: true)
     let owner = ExecutionOwner(
         agent: .visionPerception, incarnation: try await manager.identity(.visionPerception), sessionID: session)
     let result = ActionResult(
@@ -571,7 +578,7 @@ private struct FailingSecondPose: PoseCapability {
                 sessionID: session, payload: .actionResult(result),
                 metadata: InputMetadata(payload: .actionResult(result), source: "untrusted")))
     }
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = fixtureOutputs(agent).makeAsyncIterator()
     try await agent.receive(AgentInput(sessionID: session, payload: .image(image(30, sequence: 1))))
     _ = try #require(await outputs.next())
     _ = try #require(await outputs.next())
@@ -587,7 +594,7 @@ private struct FailingSecondPose: PoseCapability {
             DeliveryReport(rejected: [.photographer: "notRunning"])
         })
     try await agent.start()
-    var output = agent.outputs.makeAsyncIterator()
+    var output = fixtureOutputs(agent).makeAsyncIterator()
     for sequence: UInt64 in 1...2 {
         try await agent.receive(
             AgentInput(
@@ -602,11 +609,7 @@ private struct FailingSecondPose: PoseCapability {
         #expect(call.toolPath == "UI.Pose.showPose")
         _ = await output.next()  // Independent gaze output.
     }
-    for _ in 0..<10000 {
-        if await agent.publicationRejections >= 2 { break }
-        await Task.yield()
-    }
-    #expect(await agent.publicationRejections == 2)
+    #expect(await agent.publicationRejections == 0)
     #expect(await agent.status().lifecycle == .running)
     await agent.stop()
 }
@@ -621,7 +624,7 @@ private struct FailingSecondPose: PoseCapability {
         width: 1, height: 1, rgb: Data([0, 0, 0]), sequence: 1, timestamp: 0, rotation: 0,
         capturedAt: capturedAt)
     try await agent.receive(AgentInput(sessionID: session, payload: .image(frame)))
-    var output = agent.outputs.makeAsyncIterator()
+    var output = fixtureOutputs(agent).makeAsyncIterator()
     let envelope = try #require(await output.next())
     guard case .toolCall(let call) = envelope.output else {
         Issue.record("Missing pose Tool")
@@ -932,7 +935,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
         AgentInput(sessionID: session, payload: .image(image(0, sequence: 2, rotation: 0, capturedAt: .now))))
     #expect(await started.next() == 0)
     await model.release()
-    var outputs = agent.outputs.makeAsyncIterator()
+    var outputs = fixtureOutputs(agent).makeAsyncIterator()
     let first = try #require(await outputs.next())
     #expect(first.sequence == 2)
     #expect(await model.maximumActive == 1)
@@ -981,7 +984,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
         width: original.width, height: original.height, attachment: attachment,
         sequence: 2, timestamp: original.timestamp, rotation: original.rotation, capturedAt: original.capturedAt)
     try await agent.receive(AgentInput(sessionID: session, payload: .image(mismatched)))
-    var output = agent.outputs.makeAsyncIterator()
+    var output = fixtureOutputs(agent).makeAsyncIterator()
     let failure = try #require(await output.next())
     guard case .control(let message) = failure.output else {
         Issue.record("Expected terminal input error")

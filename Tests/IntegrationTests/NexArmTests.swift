@@ -281,13 +281,13 @@ struct NexArmAssistantUIModule: ActionModule {
                 kind: .finite,
                 completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") })
         ]
-            + ["takePhoto", "savePhoto", "ignorePhoto"].map {
+            + [
                 ActionBinding(
-                    path: ActionPath(domain: "Camera", module: "Capture", function: $0),
-                    displayName: "Unavailable photo fixture", kind: .finite,
-                    completion: "No camera is bound in robot fixtures.",
-                    handler: { _ in throw CameraControlError.unavailable })
-            }
+                    path: ActionPath(domain: "System", module: "Device", function: "readEnvironment"),
+                    displayName: "Unavailable environment fixture", kind: .finite,
+                    completion: "No environment reader is bound in robot fixtures.",
+                    handler: { _ in throw DeviceControlError.unavailable })
+            ]
     }
 }
 
@@ -323,17 +323,18 @@ private func runNexArmAssistantMarkup(
         throw NexArmError.invalidMotion
     }
 ) async throws {
-    let assistant = try AssistantAgent(chat: FixedTextChat(text: markup))
+    let assistant = try AgentChatWorker<AssistantContextState>(chat: FixedTextChat(text: markup))
     let manager = AgentManager()
     let session = UUID()
     try await manager.register(assistant, sessionID: session)
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
-        configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer"].map {
-            try AgentConfigurations.load(named: $0)
-        })
-    let input = InputGateway(manager: manager, policy: policy)
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
+        configurations: AgentConfigurations.all())
+    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let assembly = try BehaviorAssembly(
         actionModules: [
             ScheduledFunctionFixture(NexArmBaseModule { count, _ in try await move(count) }),
@@ -356,9 +357,9 @@ private func runNexArmAssistantMarkup(
         let report = try await input.send(
             AgentInput(sessionID: session, payload: .text("执行请求的机械臂动作")), to: .assistant)
         #expect(report.rejected.isEmpty)
-        for await envelope in assistant.outputs {
+        for await envelope in fixtureOutputs(assistant) {
             try await output.dispatch(envelope)
-            if envelope.output == .control("assistant.finished") { break }
+            if envelope.output == .control("agent.finished") { break }
             if case .control(let token) = envelope.output, token.hasPrefix("assistant.error") {
                 throw NexArmError.invalidMotion
             }

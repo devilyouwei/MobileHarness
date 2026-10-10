@@ -107,7 +107,7 @@ See [Chat](Chat/README.md), [Audio](Audio/README.md), [Model management](../Mode
 
 ✅ StorageChat persists optional bounded generationRounds and text/native continuation requests with metadata-only image descriptors; existing version-1 histories still decode. Execution evidence is distinct from raw model text.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../docs/adr/0183-generation-round-observations.md).
 
 ## Assistant photo observation — ADR0184
 
@@ -121,3 +121,15 @@ See [Chat](Chat/README.md), [Audio](Audio/README.md), [Model management](../Mode
 ✅ Implemented: CapturedPhotoStore adds readForInput(id,source,input), a bounded read for archived references across session restarts. Missing indexed/file data returns nil; wrong source/input and corrupt lengths reject explicitly. Existing exact-owner read remains unchanged. Both APIs share the same bounded file-read helper; no photo eviction or new persisted schema is introduced.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+Storage 只提供原子通用文档和历史兼容接口，不选择 Agent 输入或续轮。Assistant 的 archive/query/delete/startNew/title 等接口连接同一 Context 仓库事务；旧 current/archive 在第一次成功提交后仅作为导入源。损坏、版本/容量或 CAS 失败显式返回，禁止空历史回退或旧新双写。
+
+设计与阶段边界见 [ADR0187](../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../docs/Validation-History.md)。

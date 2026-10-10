@@ -1,6 +1,7 @@
 import AVFAudio
 import AgentCore
 import Agents
+import AppWorkflows
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -46,10 +47,7 @@ import UI
                     sequence: frame.sequence, timestamp: frame.timestamp,
                     layout: frame.layout == .mono ? .mono : .firstOrderAmbisonicsACNSN3D,
                     capturedAt: frame.capturedAt)
-                let report = try await scope.input.publish(MediaInputAdapter.audio(audio, sessionID: scope.id))
-                guard report.rejected.isEmpty, !report.delivered.isEmpty else {
-                    throw CommunicationError.unavailableTarget
-                }
+                try await scope.input.publish(MediaInputAdapter.audio(audio, sessionID: scope.id))
             }
             try Task.checkCancellation()
             throw scope.failure ?? AudioDetectionError.captureEnded
@@ -122,8 +120,16 @@ private enum AudioDetectionError: LocalizedError {
             contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
             configurations: [configuration])
         input = InputGateway(manager: manager, policy: policy)
+        let root = try FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: true)
+        let context = try AgentContextRepository.persistent(
+            agent: .speechPerception,
+            scope: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2)), state: SpeechPerceptionContextState(),
+            url: root.appendingPathComponent("MobileHarness/Conversations/speechPerception.diagnostic.context.json"))
         speech = try SpeechPerceptionAgent(
-            recognition: recognition, vad: vad, sessionID: id, configuration: configuration, mode: .soundSourceOnly)
+            recognition: recognition, vad: vad, sessionID: id, configuration: configuration, mode: .soundSourceOnly,
+            context: context)
         self.update = update
     }
     func start() async throws {
@@ -137,14 +143,13 @@ private enum AudioDetectionError: LocalizedError {
         }
         try Task.checkCancellation()
         try await manager.register(speech, sessionID: id)
-        let port = try await output.messaging(for: .speechPerception)
-        try await speech.bind(port)
         try await speech.start()
+        let speechConsumer = try await output.consumer(for: speech)
         outputTask = Task {
             do {
-                for await envelope in speech.outputs {
+                try await IndependentOutputWorkflow.consumeSignals(speech.outputs) { envelope in
                     try Task.checkCancellation()
-                    try await output.execute(envelope)
+                    try await speechConsumer.execute(envelope)
                 }
                 if !closing, await speech.status().lifecycle == .failed {
                     await fail(AudioDetectionError.perceptionFailed)

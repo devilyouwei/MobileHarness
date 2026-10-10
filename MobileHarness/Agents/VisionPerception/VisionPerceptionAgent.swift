@@ -5,14 +5,22 @@ import PlatformKit
 
 /// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven gaze Tools.
 public actor VisionPerceptionAgent: Agent {
+
+    // MARK: - Interface
+
+    public nonisolated let descriptor: AgentDescriptor
+    public nonisolated let outputs: AsyncStream<OutputEnvelope>
+
+    // MARK: - State and dependencies
+
+    private let contextRepository: AgentContextRepository<VisionPerceptionContextState>
+    private let preprocessor = VisionPerceptionSignalPreprocessor()
+    private let contextBuilder = VisionPerceptionContextBuilder()
+
     private static let gaze = InternalTool(path: "UI.Gaze.moveEyes", required: ["x", "y"])
     private static let overlay = InternalTool(path: "UI.Pose.showPose", required: ["payload"])
     private var resultInbox = ActionResultInbox()
-    public func actionResults() -> [ActionResult] { resultInbox.results }
-    public nonisolated let descriptor: AgentDescriptor
-    public nonisolated let outputs: AsyncStream<OutputEnvelope>
-    private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private var port: AgentMessaging?
+    private let mailbox: AgentOutputMailbox
     private var cadence: FrameCadence
     private var gaze: FaceGazeTracker
     public private(set) var gazeReplacements = 0
@@ -39,35 +47,43 @@ public actor VisionPerceptionAgent: Agent {
     private var fpsCompletions = 0
     private var framesPerSecond: Double?
 
+    // MARK: - Registration
+
     public init(
         pose: any PoseCapability, sessionID: UUID, configuration: AgentConfiguration? = nil,
-        sampling: FrameSamplingConfiguration? = nil, mirroredGaze: Bool = false
+        sampling: FrameSamplingConfiguration? = nil, mirroredGaze: Bool = false,
+        context: AgentContextRepository<VisionPerceptionContextState>? = nil
     ) throws {
+        self.contextRepository =
+            context
+            ?? AgentContextRepository(agent: .visionPerception, scope: UUID(), state: VisionPerceptionContextState())
+        guard contextRepository.agentID == .visionPerception else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "VisionPerception")
         guard configuration.agentID == .visionPerception else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: "VisionPerception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
-            outputs: [.toolCall, .control],
+            outputs: [.communication, .toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.cadence = FrameCadence(configuration: try sampling ?? FrameSamplingConfiguration())
         self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
         self.pose = pose
         self.sessionID = sessionID
-        let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingNewest(2))
-        outputs = stream.stream
-        continuation = stream.continuation
+        let mailbox = AgentOutputMailbox(capacity: 18)
+        self.mailbox = mailbox
+        outputs = mailbox.stream
     }
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
         try model.adding(internalTools: [gaze, overlay])
     }
 
-    public func bind(_ port: AgentMessaging) throws {
-        guard lifecycle == .registered, self.port == nil else { throw HarnessError.invalidTransition }
-        self.port = port
-    }
-    public func start() throws {
-        guard lifecycle == .registered, port != nil else { throw HarnessError.invalidTransition }
+    // MARK: - Lifecycle
+
+    public func start() async throws {
+        guard lifecycle == .registered else { throw HarnessError.invalidTransition }
+        _ = try await contextRepository.snapshot()
+        let id = sessionID
+        try await contextRepository.update { $0.state.perceptionSessionID = id }
         lifecycle = .running
     }
     public func pause() throws {
@@ -90,12 +106,13 @@ public actor VisionPerceptionAgent: Agent {
         publication?.cancel()
         await inference?.value
         await publication?.value
-        continuation.finish()
+        mailbox.close()
     }
-    public func status() -> AgentStatus {
-        AgentStatus(lifecycle: lifecycle, queuedInputs: pending == nil ? 0 : 1, processedInputs: processed)
-    }
-    public func receive(_ input: AgentInput) throws {
+
+    // MARK: - Input processing
+
+    public func receive(_ input: AgentInput) async throws {
+
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID else { throw CommunicationError.scopeClosed }
         guard !input.metadata.expired else {
@@ -103,12 +120,16 @@ public actor VisionPerceptionAgent: Agent {
             throw CommunicationError.expired
         }
         if case .actionResult(let result) = input.payload {
-            guard input.metadata.source == "runtime", result.owner.agent == descriptor.id,
+            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
+                result.owner.agent == descriptor.id,
                 result.owner.sessionID == input.sessionID
             else { throw CommunicationError.unauthorized }
+            try await prepareSignal(input)
             resultInbox.accept(result)
             return
         }
+        let state = try await contextRepository.snapshot().state
+        _ = try preprocessor.classify(input, state: state)
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
         guard lastSequence.map({ image.sequence > $0 }) ?? true,
             lastTimestamp.map({ image.timestamp >= $0 }) ?? true
@@ -119,6 +140,9 @@ public actor VisionPerceptionAgent: Agent {
         pending = input  // Every valid capture replaces the slot, regardless of motion or cadence.
         drain()
     }
+
+    // MARK: - Decision workers
+
     private func drain() {
         guard lifecycle == .running, worker == nil, pending != nil else { return }
         worker = Task { await inferLatest() }
@@ -147,16 +171,13 @@ public actor VisionPerceptionAgent: Agent {
                 expiredInputs += cadence.staleInputs - staleBefore
                 return
             }
-            let context = InferenceContext(requestID: input.id, conversationID: input.sessionID)
-            let resolved = try Self.resolveImage(image)
-            guard resolved.width == image.width, resolved.height == image.height else {
-                throw ImageInputError.invalidFrame
-            }
+            let selection = AgentDecisionContext(snapshot: try await contextRepository.snapshot(), input: input)
+            let decision = try contextBuilder.build(state: selection, batch: selection.batch())
+            let inference = try decision.inferenceRequest()
+            let context = inference.context
             let startedAt = ContinuousClock.now
             if fpsWindow == nil { fpsWindow = startedAt }
-            let result = try await pose.estimatePose(
-                PoseRequest(
-                    image: resolved, context: context))
+            let result = try await pose.estimatePose(inference)
             let finishedAt = ContinuousClock.now
             try Task.checkCancellation()
             guard lifecycle == .running || lifecycle == .paused else { return }
@@ -180,6 +201,8 @@ public actor VisionPerceptionAgent: Agent {
             let observation = try PoseObservation(
                 width: image.width, height: image.height, sequence: image.sequence,
                 timestamp: image.timestamp, rotation: image.rotation, people: people)
+            try await contextRepository.update { $0.state.latestFrameSequence = observation.sequence }
+            try Task.checkCancellation()
             try cadence.observe(observation, inferenceDuration: inferenceDuration, totalLatency: totalLatency)
             fpsCompletions += 1
             if let fpsWindow {
@@ -219,11 +242,9 @@ public actor VisionPerceptionAgent: Agent {
             if publication.parent.metadata.expired { continue }
             do {
                 try Task.checkCancellation()
-                guard let port else { throw CommunicationError.unauthorized }
-                let report = try await port.publishResult(.pose(publication.observation), parent: publication.parent)
+                try await communicate(.pose(publication.observation), parent: publication.parent)
                 try Task.checkCancellation()
                 // Optional subscribers own their admission failures; local perception/display continues.
-                publicationRejections += max(report.rejected.count, report.failure == nil ? 0 : 1)
             } catch CommunicationError.noRecipients {
                 // Optional business subscribers do not gate local visualization.
             } catch is CancellationError {
@@ -241,30 +262,17 @@ public actor VisionPerceptionAgent: Agent {
         pendingPublication = nil
         worker?.cancel()
         publisher?.cancel()
-        // Terminal control replaces only an unconsumed display state; no later state is admitted.
-        _ = continuation.yield(
-            OutputEnvelope(
-                source: descriptor.id, input: input, output: .control("agent.error: pose processing failed")))
-        continuation.finish()
-    }
-    private static func resolveImage(_ input: ImageInput) throws -> ImageFrame {
-        switch input.content {
-        case .rgb(let rgb): return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
-        case .attachment(let attachment):
-            guard let sample = attachment as? SampledImageAttachment,
-                let camera = sample.source as? CameraImageAttachment,
-                camera.frame.width == input.width, camera.frame.height == input.height,
-                camera.frame.rotation == input.rotation,
-                camera.frame.sequence == input.sequence, camera.frame.timestamp == input.timestamp,
-                camera.frame.capturedAt == input.capturedAt, camera.frame.gray64 == sample.gray64
-            else { throw ImageInputError.invalidFrame }
-            return try camera.frame.withPixelBuffer { try ImageFrame(pixelBuffer: $0, rotation: input.rotation) }
-        }
+        mailbox.close(
+            terminal: OutputEnvelope(
+                source: descriptor.id, input: input,
+                output: .control("agent.error: pose processing failed")))
     }
     private static func milliseconds(_ duration: Duration) -> Double {
         let components = duration.components
         return max(0, Double(components.seconds) * 1000 + Double(components.attoseconds) / 1e15)
     }
+    // MARK: - Output
+
     private func emitOverlay(
         _ image: PoseObservation, input: AgentInput, statistics: PoseOverlayPayload.Statistics
     ) throws {
@@ -294,24 +302,72 @@ public actor VisionPerceptionAgent: Agent {
         let call = try Self.overlay.call(["payload": json])
         try emit(.toolCall(call), input: input)
     }
+
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
-        switch continuation.yield(
-            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: image.sequence))
-        {
-        case .enqueued: return
-        case .dropped(let replaced):
-            // Only this Agent's replaceable UI state may be coalesced; never arbitrary device commands.
-            switch replaced.output {
-            case .toolCall(let call) where call.toolPath == "UI.Pose.showPose": overlayReplacements += 1
-            case .toolCall(let call) where call.toolPath == "UI.Gaze.moveEyes":
-                gazeReplacements += 1
-            default: throw HarnessError.queueFull
+        let key: String?
+        if case .toolCall(let call) = output {
+            switch call.toolPath {
+            case "UI.Pose.showPose": key = "overlay"
+            case "UI.Gaze.moveEyes": key = "gaze"
+            default: key = nil
             }
-        case .terminated: throw CancellationError()
-        @unknown default: throw HarnessError.queueFull
+        } else {
+            key = nil
+        }
+        let replaced = try mailbox.admit(
+            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: image.sequence),
+            replacing: key)
+        if let replaced {
+            if case .toolCall(let call) = replaced.output, call.toolPath == "UI.Pose.showPose" {
+                overlayReplacements += 1
+            } else {
+                gazeReplacements += 1
+            }
         }
     }
+
+    // MARK: - Communication output
+
+    private func communicate(_ message: AgentMessage, parent: AgentInput) async throws {
+        let action = try CommunicationAction(message: message)
+        let evidence = try JSONEncoder().encode(
+            SignalEvidence(
+                AgentInput(
+                    id: action.id, sessionID: parent.sessionID, payload: .observation(message),
+                    metadata: parent.metadata, turn: parent.turn, taskScope: parent.taskScope)))
+        try await contextRepository.update {
+            try $0.append(
+                .init(
+                    id: action.id, taskID: parent.taskScope?.id ?? parent.id,
+                    kind: "communication.output", data: evidence),
+                retainingLast: VisionPerceptionSignalPreprocessor.evidenceCapacity)
+        }
+        try emit(.communication(action), input: parent)
+    }
+
+    // MARK: - Context
+
+    private func prepareSignal(_ input: AgentInput) async throws {
+        let snapshot = try await contextRepository.snapshot()
+        let disposition = try preprocessor.classify(input, state: snapshot.state)
+        if input.payload.kind == .audio || input.payload.kind == .image { return }
+        if case .replaceLatest = disposition { return }
+        try await contextRepository.recordSignal(
+            input, disposition: disposition, admissionSequence: snapshot.revision + 1,
+            consumed: disposition != .feedback, retainingLast: VisionPerceptionSignalPreprocessor.evidenceCapacity)
+    }
+
+    // MARK: - Observability
+
+    public func status() -> AgentStatus {
+        AgentStatus(lifecycle: lifecycle, queuedInputs: pending == nil ? 0 : 1, processedInputs: processed)
+    }
+
+    public func contextSnapshot() async throws -> AgentContext<VisionPerceptionContextState> {
+        try await contextRepository.snapshot()
+    }
+    public func actionResults() -> [ActionResult] { resultInbox.results }
 }
 
 /// Agent transport retains the unconverted device output; only the inference worker constructs ModelKit input.

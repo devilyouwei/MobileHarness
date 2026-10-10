@@ -166,7 +166,7 @@ private struct MarkupChat: ChatCapability {
         } else if case .toolCall(let tool) = output {
             #expect(tool.toolPath == "UI.Caption.print")
         } else {
-            #expect(output == .control("assistant.finished"))
+            #expect(output == .control("agent.finished"))
         }
     }
     #expect(calls.map(\.channel) == ["Speech", "Display", "Speech", "Speech", "Display"])
@@ -192,7 +192,7 @@ private struct MarkupChat: ChatCapability {
         await agent.stop()
         return
     }
-    #expect(state.hasPrefix("assistant.error:"))
+    #expect(state.hasPrefix("agent.error:"))
     try await agent.receive(
         AgentInput(sessionID: UUID(), payload: .toolResult(ToolResult(callID: UUID(), value: "recovered"))))
     #expect(
@@ -350,7 +350,7 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
             expectedPrint("你好。"),
             .scheduling(.endWait), .scheduling(.beginWait),
             .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])),
-            .scheduling(.endWait), .control("assistant.finished"),
+            .scheduling(.endWait), .control("agent.finished"),
         ])
     await agent.stop()
 }

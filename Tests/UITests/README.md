@@ -72,3 +72,14 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ Implemented: History presentation regressions cover structured/legacy image references, deduplication/bounds, valid user-role attachments and missing legacy fields.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+
+✅ Execution-log tabs: Add passive-state regressions for tab/source/status filtering, internal Action failures, task timeline bounds and immutable observation revisions.
+
+
+✅ Home-log regression: tabs are exactly Action / Task / Agent. Without Signal rows, independent Agent failures remain visible and identical source/input/message failures deduplicate. Related Action filtering uses retained task timeline input identities. Native visual/performance acceptance remains separate.
+
+
+✅ Interface timing regressions: a record created at20 with interface start20.1/arrival20.125 displays0.025 seconds from provider evidence. Legacy arrival-only records show missing interface timing rather than a duration derived from record date.
+
+✅ First-token presentation regression verifies elapsed-only interface timing and empty timing for historical records lacking interface evidence. Native default-collapsed generation disclosure and role-only context headings require separate UI acceptance.

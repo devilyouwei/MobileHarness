@@ -6,25 +6,38 @@ Design goals: MainActor isolation, independent compilation/previews, passive bus
 
 ## Upstream and downstream
 
-Arrows show runtime interaction; UI has no import dependency on the services shown outside its boundary. Dashed lines identify staged host workflows.
+**Agents form the backend business layer; Actions are the operation interfaces they call.** UI has two control paths:
+
+| Source | Path | Examples |
+| --- | --- | --- |
+| Direct user interaction | UI → App interaction logic → UI state update | Open a page, dismiss a dialog, switch a log tab |
+| Agent decision | Signal → Agent → Action call → OutputGateway → Action implementation → App presentation endpoint → UI state update | Open settings during a conversation, show a reply, display a captured photo |
+
+When a user gesture requests data or device work, App converts it into a business Signal: **UI → App → InputGateway → owning Agent → Action call → OutputGateway → Action implementation → data/device/presentation endpoint.** Pure presentation interactions stay local; immediate native cleanup remains App-owned.
+
+Arrows below show runtime interaction, not import dependencies. App injects state, operation interfaces and native preview content into UI.
 
 ```mermaid
 flowchart LR
     Human[Human touch / selection] --> Views[UI views]
-    Views -->|Intent via injected operation interface| Host[App input adapter]
-    Host -->|Migrated Signal| Input[InputGateway]
-    Input --> Agents
-    Agents --> Output[OutputGateway]
-    Output --> Functions[Actions/UI functions]
-    Functions --> Endpoint[App presentation adapter]
+    Views -->|Local interaction| Local[App interaction logic]
+    Local --> State[UI observable state]
+    Views -->|Data / device intent| Host[App input adapter]
+    Host -->|Business Signal| Input[InputGateway]
+    Input --> Agents[Owning Agent]
+    Agents -->|Action call| Output[OutputGateway]
+    Output -->|Execute| Functions[Action implementation]
+    Functions --> Endpoint[App presentation endpoint]
     Endpoint -->|Session / turn / request-fenced state| State[UI observable state]
     State --> Views
-    Host -.->|Staged feature operations| Workflows[App workflows / lifecycle]
-    Workflows -.-> State
-    App[App composition] -.->|State / controls / native preview content| Views
+    Output -->|Requested ActionResult as Signal| Input
 ```
 
-Business rendering does not automatically generate another Signal. Scrolling, expansion, animation and form drafts remain local UI state. Completion-only presentation calls do not inject a synthetic ToolResult. Migrated business output follows OutputGateway; existing host workflows remain documented exceptions.
+**Both control paths reuse the same UI state-update interface.** For example, a user opening settings calls App's local navigation method; an Agent's `UI.Navigation.open` Action calls the App presentation endpoint. Both commit the route through `NavigationState.show`, keeping presentation logic in one place.
+
+**UI usually updates during Action execution.** The Action invokes the presentation endpoint and commits accepted state before returning. When requested, `ActionResult` reports success or failure at the declared completion boundary to the initiating Agent so it can decide the next step; receiving it is not the trigger for that Action's UI update. A business result may lead the Agent to select a subsequent presentation Action.
+
+Rendering does not automatically generate another Signal. Scrolling, expansion, animation and form drafts remain local UI state. Completion-only presentation calls do not inject a synthetic ToolResult.
 
 ## Internal structure
 
@@ -62,7 +75,7 @@ flowchart TB
 
 **Acceptance and visual completion are distinct.** A registered presentation function can complete when the current scope accepts state. It must not claim that an animation finished unless its renderer contract actually acknowledges it. App converts independent domain payloads into UI-owned values; UI does not inspect Agent permission or call protocol metadata.
 
-**Presentation is not a feedback generator.** Re-rendering observable state does not emit another Signal. Meaningful user or domain feedback uses explicit operation interfaces, preventing accidental self-triggered business loops. Settings, device, camera and navigation business commands enter Agents; native diagnostics and immediate lifecycle cleanup retain host ownership.
+**Presentation is not a feedback generator.** Re-rendering observable state does not emit another Signal. Meaningful user or domain feedback uses explicit operation interfaces, preventing accidental self-triggered business loops. Explicit settings/data/device/camera requests enter their owning Agents; local navigation and page presentation remain frontend operations; native diagnostics and immediate lifecycle cleanup retain host ownership.
 
 ## Ownership and boundaries
 
@@ -74,9 +87,9 @@ flowchart TB
 
 ## Implementation status
 
-✅ Conversation, camera, settings/history/resource and diagnostic interfaces, independent previews, bounded execution-status presentation and typed state acceptance. Expression render IDs/callbacks do not embed a runtime queue.
+✅ Conversation, camera, settings/history/resource and diagnostic interfaces, independent previews, bounded execution-status presentation and typed state acceptance. Local interaction and Agent-issued UI Actions share presentation state/interfaces; UI imports no Agent/runtime services. Expression render IDs/callbacks do not embed a runtime queue.
 
-❌ Complete Agent/typed-Signal routing for every UI business operation, cross-platform presentation and independent multi-window routing remain outstanding. Real animation, microphone/BLE touch interaction and device tracking need physical acceptance.
+❌ Cross-platform presentation and independent multi-window routing remain outstanding. Real animation, microphone/BLE touch interaction and device tracking need physical acceptance.
 
 See [App](../App/README.md), [Conversation](Conversation/README.md), [Camera](Camera/README.md), [Settings](Settings/README.md), [Components](Components/README.md) and [Diagnostics](Diagnostics/README.md).
 
@@ -103,9 +116,9 @@ See [App](../App/README.md), [Conversation](Conversation/README.md), [Camera](Ca
 
 ## Typed device, navigation and environment entry points
 
-✅ Implemented: app.interaction/1 maps explicit device commands and navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
+✅ Implemented: app.interaction/1 maps explicit device commands and Agent-requested navigation destinations to fixed registered functions through ApplicationControl and the shared root transport. This Agent now coordinates native resource interactions as well as model resources; it performs no native I/O. UI device controls emit typed intent through a root-owned BluetoothInteractionWorkflow; native BluetoothWorkflow remains the injected connection/recovery/manual worker host. Existing arrival tolerance, timeouts, pacing and takeover algorithms stay unchanged.
 
-✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state; manual taps and model requests share that function. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
+✅ Implemented: System.Device.control validates bounded string arguments and invokes neutral DeviceControlCapability; successful submission reports acceptance, not physical arrival. Read-only status and selected connection commands are explicitly model-granted. UI.Navigation.open commits native route state through App; manual taps and Agent calls share `NavigationState.show`. A bounded latest motor-intent worker sends only changed values, with reset/stop priority and explicit failure display. No queued motion replay.
 
 ✅ Implemented: app.environment/1 stores latest sequenced scene/device/capability facts in the root Agent, with finite categories and bounded data. App still performs synchronous background/native safety fencing before reporting facts; physical safety cannot wait on Agent admission or iOS background execution. Native back navigation remains platform-owned and reports a fact, rather than replaying navigation effects. Photo-library creation and physical acceptance are feature/acceptance boundaries, not implied by navigation support.
 
@@ -142,3 +155,11 @@ See [App](../App/README.md), [Conversation](Conversation/README.md), [Camera](Ca
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
 
 ✅ Implemented: UIKit prepares images asynchronously within the existing UI import boundary. Cancellation is checked after preparation; full-preview failures offer a concise retry. Prepared image dimensions remain bounded to320/2048 pixels.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories use read-only task lists with original request titles, terminal/waiting status and task-scoped model detail/export. App projects task/input membership from the same immutable Agent context snapshot; ReACT and later task inputs remain together across old archives. Missing associations remain separate and missing dates remain empty. No specialist summary/archive mutation is exposed. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+
+✅ Execution-log tabs: Execution history uses Action / Task / Agent with Agent/status filters and matching internal-Action filtering on the home overlay. Task timelines and Agent lifecycle/errors use passive UI values; no Signal collection or Gateway/Agent dependency.

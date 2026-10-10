@@ -300,3 +300,11 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [ADR0185](0185-photo-save-and-ignore.md): Agent-driven current-photo save to system Photos and ignore from UI/dialogue; physical acceptance remains pending.
 
 ✅ [ADR0186](0186-camera-lens-switch-lifetime.md): healthy lens input replacement completes independently of joined perception retirement; physical latency acceptance remains pending.
+
+✅ [ADR0187 — Agent composition and ReACT](0187-agent-composition-and-react.md): implemented abstraction and contracts; business roles retained, phase-two delegation remains separate.
+
+✅ Phase two specialist ownership implementation: [ADR0188](0188-specialist-task-ownership.md). Implemented; real-model/native-UI/physical-device acceptance pending.
+
+✅ [Shared Agent source hierarchy - ADR0189](0189-agent-support-hierarchy.md): implemented; repository checks and unsigned iOS device build passed.
+
+✅ [ADR0190 — SpeechPerception listening authority and one-way publication](0190-assistant-listening-and-one-way-publication.md): resident perception authority, fixed listening Action, unacknowledged publication and recoverable speech errors. ❌ Physical acoustic acceptance pending.

@@ -4,11 +4,32 @@ import Foundation
 import UI
 
 enum HistoryAgentAdapter {
-    static func preview(_ turn: HistoryTurn) -> String {
+    static func preview(_ turn: HistoryTurn) -> String { preview(turn, agent: "assistant") }
+
+    static func preview(_ turn: HistoryTurn, agent: String) -> String {
         do {
-            let configuration = try AgentConfigurations.load(named: "Assistant")
+            let name: String
+            switch agent {
+            case "assistant": name = "Assistant"
+            case "photographer": name = "Photographer"
+            case "memory": name = "Memory"
+            case "applicationControl": name = "ApplicationControl"
+            default: throw HarnessError.unknownAgent
+            }
+            let configuration = try AgentConfigurations.load(named: name)
+            let capabilities: CapabilityRegistry
+            switch agent {
+            case "photographer":
+                capabilities = try PhotographerContextState.runtimeCapabilities(configuration.capabilities)
+            case "memory": capabilities = try MemoryContextState.runtimeCapabilities(configuration.capabilities)
+            case "applicationControl":
+                capabilities = try ApplicationControlContextState.runtimeCapabilities(configuration.capabilities)
+            default: capabilities = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
+            }
+            let modelCapabilities = try AgentCommunicationAdapter.catalog(
+                capabilities, policy: configuration.communication)
             var trace = try GenerationTrace(
-                capabilities: AssistantAgent.runtimeCapabilities(configuration.capabilities),
+                capabilities: modelCapabilities,
                 textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
             for delta in turn.fragments { try trace.append(delta) }
             if turn.finishReason != nil { trace.finish() }

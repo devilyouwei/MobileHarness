@@ -83,18 +83,21 @@ Outside generation rounds, completion-only Tool errors remain execution outcomes
 
 ✅ Implemented: accepted device-control calls acknowledge submission only. Preset/jog native workers capture their own origin and report sink, retain one latest structured terminal failure, publish independent home issues and deliver a trusted ActionResult through InputGateway after non-cancellation failure. Root ApplicationControl accepts runtime-owned Action results into a bounded128-result inbox; environment context exposes the latest result summary. No accepted Tool receipt is rewritten, no movement replay, and no tolerance/arrival/timeout algorithm changes. Ordinary failure stops only its worker and keeps subsequent intents admissible. Diagnostic delivery rejection is reported separately.
 
-✅ ADR0181: InvocationSignalContext retains only the current OutputEnvelope during actual Action/Tool execution, avoiding retention of original media attachments. Nested calls replace/restore task-local context; outside-invocation delegation rejects. Generic message delegation remains in OutputGateway, not Actions.
 
 Invocation context also captures the original ExecutionOwner incarnation, rejecting stopped/replaced sources rather than binding their replacement. Root output pumps are detached owned tasks so a long-lived service cannot inherit a caller’s invocation authority.
 
 ## Action/Tool generation rounds — ADR0183
 
 
-✅ AgentCore owns neutral policies/envelopes; Assistant owns continuation decisions; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
+✅ AgentCore owns neutral policies/envelopes; the owning role selects continuation policy through the shared Chat worker; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
 
 
 ## Independent protocol consumers — 2026-10-08
 
 ✅ Implemented: App transport feeds ToolDispatcher and ActionDispatcher independently. Tools retain direct execution; Actions retain Channel/wait admission. The round seal reaches Gateway only after both transport consumers join; Gateway then joins Action execution/result delivery before acknowledging the merged round.
+
+✅ ADR0187: BehaviorTranslation preserves task scope and decision-round identity in host execution context; reply handlers separate recognition identity from the active reply execution.
+
+✅ ADR0188: delegation is an Agent communication Action and trusted task Signal. The old native-function delegation API and TaskLocal invocation binding are removed. Function effects retain validated ExecutionOwner, resources and cancellation through their ordinary invocation contracts.

@@ -244,7 +244,10 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
     ]
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"], configurations: configs)
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ], configurations: configs)
     let manager = AgentManager()
     let store = SpeechAudioStore()
     let model = PlaybackSynthesisFixture()
@@ -252,7 +255,8 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
     try await manager.register(synthesizer)
     try await synthesizer.start()
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, policy: policy), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager, policy: policy, allowsExternalSend: true),
+        tools: ToolRegistry(),
         policy: policy, sink: { _ in })
     for config in configs.prefix(3) {
         let client = SynthesisClient(config)
@@ -328,7 +332,7 @@ private actor ReplyCompletionGate {
     try await manager.register(AssistantAgent(chat: UnusedPlaybackChat()))
     try await manager.start(.assistant)
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     try await gateway.dispatch(
         OutputEnvelope(
@@ -337,7 +341,7 @@ private actor ReplyCompletionGate {
     await started.wait()
     let finishing = Task {
         try await gateway.dispatch(
-            OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished")))
+            OutputEnvelope(source: .assistant, input: input, output: .control("agent.finished")))
         await store.cancel(inputID: input.id, source: "assistant")
     }
     try await store.validate(id, owner: owner)
@@ -356,7 +360,7 @@ private actor ReplyCompletionGate {
     let manager = AgentManager()
     try await manager.register(AssistantAgent(chat: UnusedPlaybackChat()))
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
         sink: { _ in })
     await #expect(throws: ActionExecutionError.missingHandler(job.2.call.actionPath)) {
         try await gateway.dispatch(job.2.testEnvelope)

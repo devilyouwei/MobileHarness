@@ -1,5 +1,35 @@
 # Vision Perception
 
+## 函数与通信注册清单
+
+✅ 以下为当前实现的完整注册清单。模型权限来源：[配置文件](VisionPerception.agent.json)；内部权限来源见各行链接。参数后缀 `?` 表示可选，`—` 表示无参数或无 Channel。
+
+模型 Action 通过 Action call 调度；模型 Tool 通过原生函数调用取得结果。InternalAction / InternalTool 是代码固定流程的权限，不会自动进入模型函数目录。同一函数跨 Agent 注册，或在同一 Agent 同时提供模型入口与内部入口，属于授权复用；模型 Action 和模型 Tool 不重复注册同一路径。
+
+### 模型可调用函数
+
+无模型 Action 或模型 Tool。
+
+### 代码固定流程的内部函数
+
+| 类型 | 函数路径 | Channel | 参数 | 函数说明 | 注册来源 |
+| --- | --- | --- | --- | --- | --- |
+| InternalTool | `UI.Gaze.moveEyes` | — | `x`, `y` | 根据接受的姿态结果更新双眼视线坐标。 | [VisionPerceptionAgent.swift](VisionPerceptionAgent.swift) |
+| InternalTool | `UI.Pose.showPose` | — | `payload` | 展示有效姿态 payload。 | [VisionPerceptionAgent.swift](VisionPerceptionAgent.swift) |
+
+
+PoseCapability 为注入依赖，不是模型 Tool。
+
+### 通信输出权限
+
+这些是 CommunicationAction 的授权契约，不是额外的原生 Tool。publish 单向广播，不等待接收方回包，不因接收方拒绝/错误影响发送方；send 返回接纳回执，接纳与任务完成分别记录。模型 send 仅暴露上述 task.* 权限；语音合成、取消及事实广播由代码固定流程发出。
+
+| 方式 | 契约 | 目标 | 用途 |
+| --- | --- | --- | --- |
+| publish | `vision.pose` | 订阅者 | 广播姿态感知事实。 |
+
+
+
 Purpose: own shared visual perception and its skeleton visualization. Design goals: one inference per accepted latest frame, typed observations for business subscribers, and direct UI Tool calls through OutputGateway. Camera motion and robot policy do not belong here.
 
 ```mermaid
@@ -24,9 +54,9 @@ flowchart LR
 
 ✅ Raw inputs have increasing sequence/timestamps and matching sessions. One worker processes a frame; every valid capture replaces the one latest pending frame independently of pixel changes. At worker start, expiry and capture-time cadence decide whether to infer that newest frame. Too-early frames are skipped without advancing the last inference timestamp; no older candidate is retained. Pause suspends dequeue, stop cancels/joins inference and suppresses late outputs. Shared observations retain up to 300 people independently of the six-person display limit.
 
-✅ Publication uses a separate Agent-owned worker and one latest pending observation. Slow subscriber admission does not hold the inference worker or UI output. Pending observations are replaced explicitly (publicationReplacements); expired pending observations are skipped. Missing subscribers is allowed; ordinary publication errors remain recorded delivery outcomes and do not stop inference or display. Pause holds pending publication; stop cancels and joins inference and publication before finishing outputs.
+✅ Publication uses a separate Agent-owned worker and one latest pending observation. Slow subscriber admission does not hold the inference worker or UI output. Pending observations are replaced explicitly (publicationReplacements); expired pending observations are skipped. Missing subscribers is allowed; subscriber errors use independent diagnostics, without publication receipts and do not stop inference or display. Pause holds pending publication; stop cancels and joins inference and publication before finishing outputs.
 
-✅ Presentation output is a capacity-two bufferingNewest stream: every fresh successful inference emits showPose followed by moveEyes, including neutral gaze. Only these two replaceable presentation states can be superseded, with separate overlayReplacements/gazeReplacements counters; arbitrary commands fail overflow. App awaits each admitted Tool handler before consuming the next state. The in-flight Tool remains outside the replaceable buffer and completes before the next state is dispatched. Terminal error may follow one buffered display state, finishes the stream, and cannot be overwritten by later results. OutputEnvelope holds correlation metadata rather than raw input media. A publication may retain its parent frame until delivery completes; active/pending publication slots bound that lifetime.
+✅ Presentation output is a capacity-two bufferingNewest stream: every fresh successful inference emits showPose followed by moveEyes, including neutral gaze. Only these two replaceable presentation states can be superseded, with separate overlayReplacements/gazeReplacements counters; arbitrary commands fail overflow. App awaits each admitted Tool handler before consuming the next state. The in-flight Tool remains outside the replaceable buffer and completes before the next state is dispatched. Terminal error may follow one buffered display state, finishes the stream, and cannot be overwritten by later results. OutputEnvelope holds correlation metadata rather than raw input media. The Agent releases its publication slot after output emission; Gateway bounds any retained fan-out frame references until delivery completes.
 
 ## 自适应动态检测算法
 
@@ -188,10 +218,10 @@ flowchart TD
 | --- | --- | --- | --- |
 | 静态订阅 | `media.image / 1 / image` | `phone.camera / media.image` | `AgentInput.payload = .image(ImageInput)`，来自 App VisionSession 的摄像帧适配，经 InputGateway 路由。匹配 session、严格递增 sequence、非倒退 timestamp，并检查接纳期限。 |
 | 初始化注入，不是业务消息 | `PoseCapability`、`FrameSamplingConfiguration` | App | 能力执行一次姿态推理，VisionPerception 内部将传输附件转换为 ModelKit ImageFrame；配置提供默认 0...250ms 自适应间隔（初始 100ms）；启动时对最新帧判断，图像运动、结果运动/置信度、耗时及总延迟反馈更新节奏，不恢复固定灰度百分比筛帧。 |
-| 生命周期，不是订阅 | `bind / start / pause / resume / stop` | App / AgentManager | 注入消息端口、管理两条有界 worker；没有外部指令或 ToolResult 输入。 |
+| 生命周期，不是订阅 | `start / pause / resume / stop` | App / AgentManager | 输出通信 Action、管理两条有界 worker；没有外部指令或 ToolResult 输入。 |
 
 ```swift
-// 输入结构摘要；真实定义在 Agents/Core/Input/ImageInput.swift。
+// 输入结构摘要；真实定义在 Agents/Support/Core/Input/ImageInput.swift。
 ImageInput {
     width: Int; height: Int  // 正向推理图像的尺寸
     sequence: UInt64; timestamp: TimeInterval
@@ -311,7 +341,7 @@ flowchart LR
 
 ✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI has zero project dependencies; AgentCore has zero project dependencies. See ADR0121.
 
-✅ PoseObservation is owned by Agents/Communication, while PoseOverlay remains in UI/Camera. COCO value validation belongs to the Agent message contract; cadence, gaze and observation projection remain here. AgentCore owns neither pose-value schema nor detection algorithms.
+✅ PoseObservation is owned by Agents/Support/Communication, while PoseOverlay remains in UI/Camera. COCO value validation belongs to the Agent message contract; cadence, gaze and observation projection remain here. AgentCore owns neither pose-value schema nor detection algorithms.
 
 ✅ Generic image transport carries an opaque attachment. SampledImageAttachment and the gray64 convenience initializer are grouped with FrameMotionAnalyzer; only this Agent requires a 4096-byte sample. Generic messages expose PerceptionMessage.pose through the business communication module. The scheduling algorithm and Tool payload are unchanged.
 
@@ -327,3 +357,29 @@ flowchart LR
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
 
 ❌ Physical acceptance and additional business capability exposure are not established by this migration.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+开发契约（输入/输出权限仍以本目录 JSON v6 和 InternalAction/InternalTool 注册为准）：
+
+- 预处理与隔离：只保留最新有效帧；sequence/timestamp 单调校验、采样/过期策略由本 Agent 决定；一个 pose worker、一个独立 latest publication worker。
+- Context Schema：VisionPerceptionContextState：perceptionSessionID、最近已完成帧序号；输出事实/回执持久化，像素与推理会话临时保留。
+- Builder 与决策：VisionPerceptionContextBuilder 验证附件/尺寸并构建 PoseRequest；推理结果验证 request context，再生成注册的 UI 函数和通信 Action。
+- 容量、取消、失败与恢复：OutputMailbox18：16个离散通信槽与2个可替换展示状态。发布与函数消费者分离；overflow 明确失败且终态可读。停止关闭回执、取消并加入推理/发布，重启不恢复推理。
+
+设计与阶段边界见 [ADR0187](../../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../../docs/Validation-History.md)。
+
+✅ ADR0187 流式感知只保留最近256条证据/消费摘要，淘汰计数可查询；原始媒体不存盘，业务边界保存状态/序号摘要。长期运行不因连续感知事实累计填满普通业务档案。
+
+Implemented source organization: follow the [business source standard](../README.md#business-source-organization-standard). Agent.swift groups interface/declarations, registration, lifecycle, admission/workers, output, context and observability; Processing.swift groups State/Preprocessor/Builder and pure role policies. Shared recordSignal persists role-classified evidence atomically; the Agent still selects consumption timing, retention and business mutations.
+
+
+## One-way publication and listening admission correction
+
+✅ Implemented: Pose publication emits a communication Action with no receipt waiter. Subscriber rejection/loss never stops inference or native presentation. Local inference/lifecycle failures retain their documented handling.

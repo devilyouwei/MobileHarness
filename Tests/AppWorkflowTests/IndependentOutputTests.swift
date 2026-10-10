@@ -82,7 +82,7 @@ private enum TrackingUnavailable: Error { case offline }
     _ = await startup.next()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: failedInput, output: .control("assistant.error:fixture"), sequence: 2))
+            source: .assistant, input: failedInput, output: .control("agent.error:fixture"), sequence: 2))
     for (callSequence, sealSequence) in [(UInt64(3), UInt64(4)), (5, 6)] {
         let round = UUID()
         outputs.continuation.yield(
@@ -95,7 +95,7 @@ private enum TrackingUnavailable: Error { case offline }
                 sequence: sealSequence, roundID: round))
     }
     outputs.continuation.yield(
-        OutputEnvelope(source: .assistant, input: nextInput, output: .control("assistant.finished"), sequence: 7))
+        OutputEnvelope(source: .assistant, input: nextInput, output: .control("agent.finished"), sequence: 7))
     outputs.continuation.finish()
     try await consumer.value
     #expect(await record.accepted == [1, 2, 3, 4, 5, 6, 7])
@@ -161,7 +161,7 @@ private actor ProtocolDispatchGate {
         ),
         (8, .scheduling(.endWait)),
         (9, .roundFinished(round)),
-        (10, .control("assistant.finished")),
+        (10, .control("agent.finished")),
     ] {
         outputs.continuation.yield(
             OutputEnvelope(source: .assistant, input: input, output: output, sequence: sequence, roundID: round))
@@ -207,7 +207,7 @@ private actor ProtocolDispatchGate {
     outputs.continuation.yield(
         OutputEnvelope(source: .assistant, input: input, output: .roundFinished(round), sequence: 3, roundID: round))
     outputs.continuation.yield(
-        OutputEnvelope(source: .assistant, input: input, output: .control("assistant.finished"), sequence: 4))
+        OutputEnvelope(source: .assistant, input: input, output: .control("agent.finished"), sequence: 4))
     outputs.continuation.finish()
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in

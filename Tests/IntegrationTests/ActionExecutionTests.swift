@@ -672,3 +672,35 @@ func registryRejectsInvalidSerializationKeyBeforeExecution(_ key: String) {
         ])
     }
 }
+
+@Test(.timeLimit(.minutes(1))) func parentAndChildSpeechQueueWithoutCancellingParent() async throws {
+    let started = ActionTestGate()
+    let release = ActionTestGate()
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: try testActionRegistry(handlers: [
+            sayPath: { invocation in
+                await log.append("\(invocation.context.source):start")
+                if invocation.context.source == "assistant" {
+                    await started.open()
+                    await release.wait()
+                    try Task.checkCancellation()
+                }
+                await log.append("\(invocation.context.source):end")
+            }
+        ]))
+    let session = UUID()
+    let parent = AgentInput(sessionID: session, payload: .text("parent"))
+    let child = AgentInput(sessionID: session, payload: .text("child"))
+    try await scheduler.enqueue(invocation: actionInvocation("parent", input: parent, source: .assistant))
+    await started.wait()
+    try await scheduler.enqueue(invocation: actionInvocation("child", input: child, source: .photographer))
+    #expect(await log.values == ["assistant:start"])
+    let parentFinish = Task { try await scheduler.finish(inputID: parent.id, source: .assistant) }
+    let childFinish = Task { try await scheduler.finish(inputID: child.id, source: .photographer) }
+    await release.open()
+    try await parentFinish.value
+    try await childFinish.value
+    #expect(await log.values == ["assistant:start", "assistant:end", "photographer:start", "photographer:end"])
+    await scheduler.shutdown()
+}

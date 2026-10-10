@@ -18,7 +18,6 @@ import UI
 final class VoiceSessionCoordinator: VoiceOutputHandling {
     let state: ConversationState
     private let runtime: VoiceRuntimeDependencies
-    private let modelName: @Sendable () async throws -> String
     private var speechPlayback: SpeechPlayback?
     private var presentationPhase: VoicePhase = .loading { didSet { updatePhase() } }
     private var playbackActive = false { didSet { updatePhase() } }
@@ -34,7 +33,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     private var voiceGeneration: UUID? { didSet { state.isVoiceActive = voiceGeneration != nil } }
     private let audio: AppleAudioIO
     private let voiceActivity: any VoiceActivityCapability
-    private let chat: any ChatCapability
     private let recognition: any SpeechRecognitionCapability
     private let synthesis: any SpeechSynthesisCapability
     private let prepareRecognition: @Sendable () async throws -> Void
@@ -44,25 +42,25 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     private var speechTask: Task<Void, Never>?
     private var speechAudioStore: SpeechAudioStore?
     private var speech: SpeechPerceptionAgent?
-    private var responseTasks: [UUID: Task<Void, Error>] = [:]
     private var responses: OutputGateway?
     private var interruptionTask: Task<Void, Never>?
     private var routeTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
+    private var listeningRevision: UInt64 = 0
+    private var listeningPaused = false
+    private var playbackCount = 0
+    private var listeningPause: Task<Void, Never>?
     private var handlingTurn = false
     private let log = Logger(subsystem: "dev.mobileharness", category: "AppLifecycle")
 
     init(
         runtime: VoiceRuntimeDependencies, state: ConversationState,
-        modelName: @escaping @Sendable () async throws -> String,
         audio: AppleAudioIO, recognition: any SpeechRecognitionCapability,
         synthesis: any SpeechSynthesisCapability, prepareRecognition: @escaping @Sendable () async throws -> Void,
-        voiceActivity: any VoiceActivityCapability, chat: any ChatCapability
+        voiceActivity: any VoiceActivityCapability
     ) {
         self.runtime = runtime
         self.state = state
-        self.modelName = modelName
-        self.chat = chat
         self.audio = audio
         self.recognition = recognition
         self.synthesis = synthesis
@@ -74,15 +72,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard manager == nil else { return }
         let manager = runtime.manager
         self.manager = manager
-        let agent: Agents.AssistantAgent
-        do { agent = try runtime.makeAssistant(chat, modelName) } catch {
-            self.manager = nil
-
-            presentationPhase = .failed
-            state.voiceStatus = "Agent 配置加载失败：\(error)"
-            record(state.voiceStatus)
-            return
-        }
         let requests = runtime.input
         let responses = runtime.output
         do { try runtime.presentation.bindVoice(self) } catch {
@@ -99,94 +88,46 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             let synthesizer = try runtime.makeSynthesis(synthesis, audioStore)
             try await manager.register(synthesizer)
             try await manager.start(synthesizer.descriptor.id)
-            try await manager.register(agent)
-            try await agent.bind(responses.messaging(for: .assistant))
-            try await manager.start(.assistant)
+            let speech = try runtime.makePerception(recognition, voiceActivity, runtime.interactionSessionID)
+            try await manager.register(speech)
+            self.speech = speech
+            try await manager.start(.speechPerception)
+            let speechConsumer = try await responses.consumer(for: speech)
+            speechTask = Task { [weak self] in
+                do {
+                    try await IndependentOutputWorkflow.consumeSignals(speech.outputs) {
+                        @MainActor [weak self] output in
+                        guard let self else { throw CancellationError() }
+                        do { try await speechConsumer.execute(output) } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            self.record("输出失败：\(error)")
+                        }
+                    }
+                } catch is CancellationError { return } catch {
+                    self?.record("语音输出消费失败：\(error)")
+                }
+            }
+            try await runtime.startInteraction()
             self.requests = requests
             presentationPhase = .idle
             state.isReady = true
-
-            try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { @MainActor [self] output in
-                try Task.checkCancellation()
-                guard output.sessionID == voiceGeneration else { return }
-                do {
-                    guard responseTasks.count < 5 else { throw HarnessError.queueFull }
-                    let responseID = UUID()
-                    let task = Task {
-                        do {
-                            let result = try await responses.execute(output)
-                            if case .toolCall(let call) = output.output {
-                                do {
-                                    try await runtime.conversations.recordToolOutcome(
-                                        call.id, for: output.inputID,
-                                        state: result.isError ? .failed : .completed,
-                                        output: result.tool?.value, error: result.failure)
-                                } catch { record("保存 Tool 执行记录失败：\(error)") }
-                            }
-                            // Dispatch joins Action completion/cancellation. Only then retire this reply's audio.
-                            if case .control(let state) = output.output,
-                                state == "assistant.finished" || state == "agent.finished"
-                                    || state.hasPrefix("assistant.error:") || state.hasPrefix("agent.error:")
-                            {
-                                await audioStore.cancel(inputID: output.inputID, source: output.source.rawValue)
-                            }
-                        } catch {
-                            if case .toolCall(let call) = output.output {
-                                do {
-                                    try await runtime.conversations.recordToolOutcome(
-                                        call.id, for: output.inputID,
-                                        state: error is CancellationError ? .cancelled : .failed,
-                                        error: String(describing: error))
-                                } catch { record("保存 Tool 执行记录失败：\(error)") }
-                            }
-                            await audioStore.cancel(inputID: output.inputID, source: output.source.rawValue)
-                            throw error
-                        }
-                    }
-                    responseTasks[responseID] = task
-                    defer { responseTasks[responseID] = nil }
-                    try await withTaskCancellationHandler {
-                        try await task.value
-                    } onCancel: {
-                        task.cancel()
-                    }
-                    if case .control("assistant.finished") = output.output,
-                        let generation = voiceGeneration, output.sessionID == generation
-                    {
-                        // Generation and every queued action have completed, including physical playback.
-                        try await Task.sleep(for: .milliseconds(350))
-                        try await resumeListening(generation: generation)
-                    }
-                } catch is CancellationError {
-                    if Task.isCancelled { throw CancellationError() }
-                } catch {
-                    stopVoice(
-                        message: (error is any ActionReportFailureProviding ? "动作未完成：" : "语音处理失败：")
-                            + error.localizedDescription)
-                    record("处理失败：\(String(describing: error))")
-                    await cleanupTask?.value
-                    do {
-                        try await runtime.conversations.recordExecutionFailure(
-                            String(describing: error), for: output.inputID)
-                    } catch { record("保存执行错误失败：\(error)") }
-                }
-            }
+            let lifetime = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { _ in }
+            for await _ in lifetime { try Task.checkCancellation() }
         } catch is CancellationError {} catch {
             record("运行错误：\(error)")
-        }
-        let finalStatus = await agent.status()
-        if finalStatus.lifecycle == .failed, !Task.isCancelled {
-            record("Assistant 已停止，其他 Agent 继续运行；请重新加载以恢复回复。")
-            state.isReady = false
-            // Keep independently registered perception/synthesis alive until host cancellation.
-            let lifetime = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { _ in }
-            for await _ in lifetime {}
         }
         stopVoice()
         state.isReady = false
         self.requests = nil
         await cleanupTask?.value
-        try? await manager.remove(.assistant)
+        await speech?.stop()
+        speechTask?.cancel()
+        await speechTask?.value
+        speechTask = nil
+        speech = nil
+        try? await manager.remove(.speechPerception)
+        await runtime.stopInteraction()
         try? await manager.remove(AgentID(rawValue: "speechSynthesis"))
         await audioStore.shutdown()
         speechAudioStore = nil
@@ -202,15 +143,12 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard state.isReady, !changingSettings, voiceGeneration == nil, !Task.isCancelled else { return }
         let generation = UUID()
         voiceGeneration = generation
+        conversationPresentation.beginRecognitionScope()
         presentationPhase = .loading
-        state.resetCaptions()
         state.voiceStatus = "检查本地语音识别…"
         do {
             await cleanupTask?.value
             guard voiceGeneration == generation else { return }
-            if case .unavailable(let reason) = await chat.availability {
-                throw CapabilityError.unavailable(reason)
-            }
             if case .unavailable(let reason) = await recognition.availability {
                 throw CapabilityError.unavailable(reason)
             }
@@ -230,37 +168,15 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
             guard voiceGeneration == generation else { return }
             try Task.checkCancellation()
             guard let manager, let requests, let responses else { throw CapabilityError.sessionClosed }
-            let speech = try runtime.makePerception(recognition, voiceActivity, generation)
-            try await manager.register(speech, sessionID: generation)
-            guard voiceGeneration == generation, !Task.isCancelled else {
-                try? await manager.remove(.speechPerception)
-                return
-            }
-            self.speech = speech
-            try await speech.bind(responses.messaging(for: .speechPerception))
-            try await speech.start()
-            guard voiceGeneration == generation, !Task.isCancelled else {
-                await speech.stop()
-                return
-            }
-            speechTask = Task { [weak self] in
-                for await output in speech.outputs {
-                    guard let self, self.voiceGeneration == generation else { return }
-                    do { try await responses.execute(output) } catch is CancellationError { return } catch {
-                        self.record("输出失败：\(error)")
-                    }
-                }
-                if await speech.status().lifecycle == .failed, let self, self.voiceGeneration == generation {
-                    await self.stopPerception(message: "语音识别已停止；其他 Agent 继续运行")
-                }
-            }
+            guard let speech = self.speech else { throw CapabilityError.sessionClosed }
+            try await speech.openCapture(sessionID: generation)
             let frames = try await audio.startCapture(preferSpatial: true)
             guard voiceGeneration == generation, !Task.isCancelled else {
                 await audio.stopCapture()
                 return
             }
-            handlingTurn = false
-            presentationPhase = .listening
+            handlingTurn = listeningPaused || playbackCount > 0
+            presentationPhase = handlingTurn ? .processing : .listening
             state.voiceStatus = "正在聆听 · 停顿后自动识别"
             captureTask = Task { [weak self] in
                 var sequence: UInt64 = 0
@@ -301,18 +217,14 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
                             layout: frame.layout == .mono ? .mono : .firstOrderAmbisonicsACNSN3D,
                             capturedAt: frame.capturedAt)
                         sequence += 1
-                        let report = try await requests.publish(
-                            MediaInputAdapter.audio(audioInput, sessionID: generation))
-                        // Endpoint processing can close admission while the last capture packet is in flight.
-                        guard self.voiceGeneration == generation else { return }
-                        if !report.rejected.isEmpty {
-                            if report.rejected.values.allSatisfy({
-                                $0 == String(describing: CapabilityError.inputBusy)
-                            }) {
-                                continue
-                            }
-                            throw CommunicationError.unavailableTarget
+                        do {
+                            try await requests.publish(MediaInputAdapter.audio(audioInput, sessionID: generation))
+                        } catch is CancellationError { throw CancellationError() } catch {
+                            // Local publication validation failure is diagnostic; the microphone stays active.
+                            self.state.voiceStatus = "音频输入异常：\(error)"
+                            self.record("音频输入异常：\(error)")
                         }
+
                     }
                     guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
                     await self.stopPerception(message: "录音已结束，请重新开始聆听")
@@ -366,38 +278,78 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
 
     func toggleVoice() {
         guard !changingSettings else { return }
-        if voiceGeneration != nil {
-            stopVoice()
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await runtime.startInteraction()
+                try await runtime.input.publish(ListeningIntent().input(sessionID: runtime.interactionSessionID))
+            } catch { state.voiceStatus = "聆听切换失败：\(error)" }
+        }
+    }
+
+    func updateListening(enabled: Bool, paused: Bool, revision: UInt64, invocation: any FunctionInput) async throws {
+        guard invocation.context.source == "speechPerception",
+            invocation.context.sessionID == runtime.interactionSessionID,
+            revision > listeningRevision
+        else { return }
+        listeningRevision = revision
+        listeningPaused = paused
+        let previousPause = listeningPause
+        listeningPause = nil
+        previousPause?.cancel()
+        if !enabled {
+            stopVoice(message: voiceGeneration == nil ? state.voiceStatus : "语音已停止")
+            await previousPause?.value
             return
         }
-        startupTask = Task { [weak self] in await self?.startVoice() }
+        await previousPause?.value
+        if voiceGeneration == nil {
+            startupTask?.cancel()
+            startupTask = Task { [weak self] in await self?.startVoice() }
+            return
+        }
+        guard revision == listeningRevision, let generation = voiceGeneration else { return }
+        if paused {
+            listeningPause = Task { [weak self] in
+                guard let self else { return }
+                do {
+                    try await self.pauseListening(generation: generation, revision: revision)
+                } catch is CancellationError {} catch { self.state.voiceStatus = "聆听暂停异常：\(error)" }
+            }
+        } else if playbackCount == 0 {
+            try await resumeListening(generation: generation)
+        }
+    }
+
+    private func pauseListening(generation: UUID, revision: UInt64) async throws {
+        // Finish a confirmed utterance before closing host capture admission.
+        if let speech {
+            while !(await speech.acquirePlaybackAdmission()) {
+                try Task.checkCancellation()
+                guard revision == listeningRevision, voiceGeneration == generation else { return }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
+        guard revision == listeningRevision, voiceGeneration == generation else {
+            // A late acquire must not undo a newer resume, or reopen a user-off session.
+            if !listeningPaused, voiceGeneration == generation, playbackCount == 0 {
+                try await resumeListening(generation: generation)
+            }
+            return
+        }
+        handlingTurn = true
+        presentationPhase = .processing
+        state.voiceStatus = "正在回复 · 聆听已暂停"
     }
 
     private func stopPerception(message: String) async {
-        let generation = voiceGeneration
-        captureTask?.cancel()
-        captureTask = nil
-        await audio.stopCapture()
-        guard voiceGeneration == generation else { return }
-        let failedAgent = speech
-        Task { await failedAgent?.stop() }
-        presentationPhase = .failed
-        handlingTurn = false
-        state.microphoneSpectrum = AudioSpectrum.silence
-        state.voiceStatus = message
+        stopVoice(message: message)
         record(message)
     }
 
     func stopVoice(message: String = "语音已停止") {
         let oldGeneration = voiceGeneration
-        let previousRequests = requests
-        let previousResponses = responses
-        let previousAudioStore = speechAudioStore
-        let previousResponsesTasks = Array(responseTasks.values)
-        resetExpression()
         voiceGeneration = nil
-        conversationPresentation = ConversationPresentation()
-        playbackActive = false
         presentationPhase = message == "语音已停止" || message == "已提交，语音已结束" ? .idle : .failed
         state.playbackSpectrum = AudioSpectrum.silence
         state.microphoneSpectrum = AudioSpectrum.silence
@@ -405,35 +357,29 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         // Before voice admission this task only joins diagnostics; joining it here would form a cleanup cycle.
         let previousStartup = oldGeneration == nil ? nil : startupTask
         startupTask = nil
+        let stoppedRevision = listeningRevision
         let previousCleanup = cleanupTask
         let previousCapture = captureTask
         let previousSpeech = speech
-        speech = nil
-        let previousSpeechTask = speechTask
-        let previousManager = manager
+        let previousPause = listeningPause
+        listeningPause = nil
+        previousPause?.cancel()
         cleanupTask = Task {
             await previousCleanup?.value
-            await audio.stop()
+            await audio.stopCapture()
             await previousStartup?.value
-            if previousSpeech != nil { try? await previousManager?.stop(.speechPerception) }
-            await previousSpeech?.stop()
+            await previousSpeech?.closeCapture()
+            await previousPause?.value
             await previousCapture?.value
-            await previousSpeechTask?.value
-            if let oldGeneration, let previousRequests {
-                _ = try? await previousRequests.send(
-                    AssistantControl.cancelSession.input(sessionID: oldGeneration), to: .assistant)
-                await previousAudioStore?.cancel(sessionID: oldGeneration)
-                await previousResponses?.cancel(sessionID: oldGeneration)
-                for task in previousResponsesTasks { _ = try? await task.value }
+            if oldGeneration != nil, stoppedRevision > 0 {
+                do {
+                    try await runtime.input.publish(
+                        SpeechCaptureEnded(revision: stoppedRevision).input(sessionID: runtime.interactionSessionID))
+                } catch { record("采集结束上报失败：\(error)") }
             }
-            if previousSpeech != nil { try? await previousManager?.remove(.speechPerception) }
         }
         captureTask?.cancel()
         captureTask = nil
-        speechTask?.cancel()
-        speechTask = nil
-        for task in responseTasks.values { task.cancel() }
-        responseTasks.removeAll()
         interruptionTask?.cancel()
         interruptionTask = nil
         routeTask?.cancel()
@@ -444,23 +390,31 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     }
 
     func observeSpeech(_ input: AgentInput) {
-        guard input.sessionID == voiceGeneration, let observation = input.payload.perception else { return }
+        guard accepts(session: input.sessionID), let observation = input.payload.perception else { return }
         switch observation {
         case .transcript(let text, let final):
-            if final { record("你（语音）：\(text)") }
+            if final {
+                record("你（语音）：\(text)")
+                // SpeechPerception has already closed admission before publishing final.
+            }
         case .speechPhase(let phase):
             // Runtime capture admission only. Signals never mutate presentation state.
-            if phase == .processing { handlingTurn = true }
-            if phase == .empty { handlingTurn = false }
+            // Recognition processing does not close host capture; the Agent gates only its own endpoint drain.
+            if phase == .empty, !listeningPaused, playbackCount == 0 { handlingTurn = false }
         case .soundSource, .pose, .speechSynthesis, .cancelSpeech: break
         }
     }
     private func resumeListening(generation: UUID) async throws {
-        guard voiceGeneration == generation else { return }
+        guard voiceGeneration == generation, !listeningPaused, playbackCount == 0 else { return }
         do { try await speech?.resumeListening() } catch is CancellationError { try Task.checkCancellation() } catch {
-            await stopPerception(message: "语音识别恢复失败：\(error)")
+            state.voiceStatus = "语音识别恢复失败：\(error)"
+            throw error
         }
         guard voiceGeneration == generation, captureTask != nil else { return }
+        guard !listeningPaused, playbackCount == 0 else {
+            _ = await speech?.acquirePlaybackAdmission()
+            return
+        }
         handlingTurn = false
         // Commit after resume acknowledgment; its emitted perception update may arrive while admission is closed.
         presentationPhase = .listening
@@ -468,22 +422,44 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
     }
     func play(audioID: UUID, invocation: any FunctionInput) async throws {
         guard let speechPlayback else { throw CommunicationError.scopeClosed }
+        // A confirmed utterance completes before output takes the microphone admission boundary.
+        if let speech {
+            while !(await speech.acquirePlaybackAdmission()) {
+                try Task.checkCancellation()
+                guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+                guard await speech.status().lifecycle == .running else { throw CapabilityError.sessionClosed }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
+        handlingTurn = true
+        playbackCount += 1
         do {
             try await speechPlayback.play(audioID: audioID, invocation: invocation) { [weak self] stream, invocation in
                 guard let self else { throw CancellationError() }
                 try await self.play(stream, envelope: invocation.context)
             }
-        } catch { throw SpeechFailurePresentation.adapting(error) }
+            try await Task.sleep(for: .milliseconds(350))
+        } catch {
+            playbackCount -= 1
+            if accepts(session: invocation.context.sessionID) {
+                // Cleanup retains the acoustic guard even when the Action's task was cancelled.
+                await Task.detached { try? await Task.sleep(for: .milliseconds(350)) }.value
+                if let generation = voiceGeneration { try await resumeListening(generation: generation) }
+            }
+            throw SpeechFailurePresentation.adapting(error)
+        }
+        playbackCount -= 1
+        if let generation = voiceGeneration { try await resumeListening(generation: generation) }
     }
 
     private func play(_ stream: SpeechAudio, envelope: ActionExecutionContext) async throws {
         let generation = envelope.sessionID
-        guard conversationPresentation.isCurrent(envelope), accepts(session: generation) else {
+        guard acceptsPlayback(envelope) else {
             throw CancellationError()
         }
         let meter = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self, self.voiceGeneration == generation else { return }
+                guard let self, self.accepts(session: generation) else { return }
                 self.state.playbackSpectrum = AudioSpectrum.smooth(
                     self.audio.playbackSpectrum, previous: self.state.playbackSpectrum)
                 do { try await Task.sleep(for: .milliseconds(33)) } catch { return }
@@ -491,17 +467,19 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         }
         defer {
             meter.cancel()
-            if voiceGeneration == generation {
+            if accepts(session: generation) {
                 state.playbackSpectrum = AudioSpectrum.silence
                 playbackActive = false
             }
         }
         try await audio.playStream { [weak self] in
-            guard let self, self.accepts(session: generation), self.conversationPresentation.isCurrent(envelope) else {
+            try Task.checkCancellation()
+            guard let self, self.acceptsPlayback(envelope) else {
                 throw CancellationError()
             }
             guard let frame = try await stream.next() else { return nil }
-            guard self.accepts(session: generation), self.conversationPresentation.isCurrent(envelope) else {
+            try Task.checkCancellation()
+            guard self.acceptsPlayback(envelope) else {
                 throw CancellationError()
             }
             guard frame.format.encoding == .float32, frame.format.channels == 1 else {
@@ -515,22 +493,23 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         }
     }
     private func accepts(session: UUID) -> Bool {
-        session == voiceGeneration
+        session == runtime.interactionSessionID || session == voiceGeneration
+    }
+    private func acceptsPlayback(_ context: ActionExecutionContext) -> Bool {
+        conversationPresentation.acceptsPlayback(
+            context, activeSessions: Set([runtime.interactionSessionID, voiceGeneration].compactMap { $0 }))
     }
 
     func validateCameraControl(invocation: any FunctionInput) throws {
         try Task.checkCancellation()
-        guard [AgentID.assistant.rawValue, AgentID.photographer.rawValue].contains(invocation.context.source),
+        guard invocation.context.source == AgentID.photographer.rawValue,
             accepts(session: invocation.context.sessionID)
         else { throw CancellationError() }
     }
 
     private func acceptPresentation(_ context: ActionExecutionContext, update: ConversationPresentation.Update) -> Bool
     {
-        let previous = conversationPresentation.turn
-        guard conversationPresentation.accept(context, update: update) else { return false }
-        if conversationPresentation.turn != previous { state.resetCaptions() }
-        return true
+        conversationPresentation.accept(context, update: update, state: state)
     }
 
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws {
@@ -562,7 +541,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         guard captureTask != nil else { throw CancellationError() }
         // A late perception update must not reopen listening between model rounds or during playback.
         if handlingTurn, voiceState == .listening || voiceState == .hearing { return }
-        if conversationPresentation.isCurrent(invocation.context), conversationPresentation.transcriptClosed,
+        if conversationPresentation.isRecognitionCurrent(invocation.context), conversationPresentation.transcriptClosed,
             voiceState != .listening
         {
             return
@@ -676,14 +655,11 @@ final class VoiceSessionCoordinator: VoiceOutputHandling {
         case .toolCall(let call): record("工具调用：\(call.toolPath)")
         case .control(let state):
             record("状态：\(state)")
-            if state.hasPrefix("agent.error:") { stopVoice(message: state) }
+            if state.hasPrefix("agent.error:") { self.state.voiceStatus = state }
             if state.hasPrefix("assistant.error:") {
-                // A failed turn does not invalidate loaded models. Cancel the session and
-                // Actions, but reuse the prepared providers when the user retries.
-                stopVoice(
-                    message: "回复生成失败：" + String(state.dropFirst("assistant.error:".count)))
+                self.state.voiceStatus = "回复生成失败：" + String(state.dropFirst("assistant.error:".count))
             }
-        case .actionCall, .scheduling, .rejectedCall, .roundFinished: break
+        case .actionCall, .communication, .scheduling, .rejectedCall, .roundFinished: break
         }
     }
     private func record(_ text: String) {

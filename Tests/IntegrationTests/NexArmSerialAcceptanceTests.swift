@@ -229,17 +229,18 @@ import UI
     private func serialAssistant(
         _ markup: String, workflow: BluetoothWorkflow, expected: ActionExecutionRecord.Phase
     ) async throws {
-        let assistant = try AssistantAgent(chat: FixedTextChat(text: markup))
+        let assistant = try AgentChatWorker<AssistantContextState>(chat: FixedTextChat(text: markup))
         let manager = AgentManager()
         let session = UUID()
         try await manager.register(assistant, sessionID: session)
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication,
-            externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
-            configurations: ["Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception"].map {
-                try AgentConfigurations.load(named: $0)
-            })
-        let input = InputGateway(manager: manager, policy: policy)
+            externalSources: [
+                "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+                "app.environment",
+            ],
+            configurations: AgentConfigurations.all())
+        let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
         let assembly = try BehaviorAssembly(
             actionModules: [
                 ScheduledFunctionFixture(
@@ -296,9 +297,9 @@ import UI
             let report = try await input.send(
                 AgentInput(sessionID: session, payload: .text("执行串口验收动作")), to: .assistant)
             try #require(report.rejected.isEmpty)
-            for await envelope in assistant.outputs {
+            for await envelope in fixtureOutputs(assistant) {
                 try await output.dispatch(envelope)
-                if envelope.output == .control("assistant.finished") { break }
+                if envelope.output == .control("agent.finished") { break }
                 if case .control(let token) = envelope.output, token.hasPrefix("assistant.error") {
                     throw NexArmExecutionError.invalidArguments
                 }
@@ -350,8 +351,8 @@ import UI
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication,
             externalSources: ["user", "runtime", "phone.camera", "phone.microphone"],
-            configurations: ["VisionPerception", "Photographer"].map { try AgentConfigurations.load(named: $0) })
-        let input = InputGateway(manager: manager, policy: policy)
+            configurations: AgentConfigurations.all())
+        let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
         let failures = SerialControlFailureProbe()
         let tools = try ToolRegistry(modules: [
             NexArmTrackingModule { base, pitch, invocation in

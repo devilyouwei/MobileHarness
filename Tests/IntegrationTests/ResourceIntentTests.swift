@@ -59,6 +59,16 @@ private actor ResourceFixture: ModelResourceCapability {
     func remove(_ id: String) async throws { calls.append("remove:\(id)") }
 }
 private struct ResourceTools: ToolModule { let definitions: [ActionBinding] }
+func resourceFixturePolicy() throws -> CommunicationPolicy {
+    return try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: [
+            "phone.microphone", "phone.camera",
+            "user", "runtime", ModelResourceObservation.source, ModelResourceHostFailure.source,
+            AppEnvironmentFact.source,
+        ],
+        configurations: AgentConfigurations.all())
+}
 func resourceRuntime(
     _ resources: any ModelResourceCapability,
     preferences: any ModelResourcePreferencesCapability = UnusedModelResourcePreferencesCapability(),
@@ -72,17 +82,12 @@ func resourceRuntime(
     providerSettings: any ProviderSettingsCapability = UnusedProviderSettings(),
     device: any DeviceControlCapability = UnusedDeviceControl(),
     camera: any CameraControlCapability = UnusedCameraControl(),
-    sessionID: UUID = UUID(), manager: AgentManager = AgentManager(), suppliedInput: InputGateway? = nil
+    sessionID: UUID = UUID(), manager: AgentManager = AgentManager(), suppliedInput: InputGateway? = nil,
+    outputSink: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in }
 ) throws -> ApplicationControlIntentRuntime {
     let session = sessionID
-    let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", ModelResourceObservation.source, ModelResourceHostFailure.source,
-            AppEnvironmentFact.source,
-        ],
-        configurations: [AgentConfigurations.load(named: "ApplicationControl")])
-    let input = suppliedInput ?? InputGateway(manager: manager, policy: policy)
+    let policy = try resourceFixturePolicy()
+    let input = suppliedInput ?? InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let functions =
         ModelResourcesModule(resources: resources, preferences: preferences, inventory: inventory).definitions
         + ResourcePresentationModule(inventory: inventory, presentation: presentation).definitions
@@ -101,7 +106,7 @@ func resourceRuntime(
     let output = OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [ResourceTools(definitions: bindings)]),
-        actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
+        actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: outputSink)
     return ApplicationControlIntentRuntime(
         sessionID: session, manager: manager, input: input, output: output,
         agent: try ApplicationControlAgent(sessionID: session))
@@ -193,11 +198,30 @@ private actor HeldResourceFixture: ModelResourceCapability {
     await runtime.shutdown()
 }
 
+@Test func pausedApplicationControlRetainsEnvironmentAdmissionWithoutStartingBusiness() async throws {
+    let session = UUID()
+    let agent = try ApplicationControlAgent(sessionID: session)
+    try await agent.start()
+    try await agent.pause()
+    let fact = AppEnvironmentFact(category: .devices, sequence: 1, value: "camera: available")
+    try await agent.receive(fact.input(sessionID: session))
+    #expect(try await agent.environmentSnapshot().contains("camera: available"))
+    await #expect(throws: HarnessError.notRunning) {
+        try await agent.receive(ModelResourceIntent.cancel("model").input(sessionID: session))
+    }
+    #expect(await agent.status().lifecycle == .paused)
+    try await agent.resume()
+    try await agent.receive(
+        AppEnvironmentFact(category: .devices, sequence: 2, value: "camera: closed").input(sessionID: session))
+    #expect(try await agent.environmentSnapshot().contains("camera: closed"))
+    await agent.stop()
+}
+
 @Test func resourceIntentRejectsForeignSessionAndMalformedResourceBeforeEffects() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    await #expect(throws: CommunicationError.invalidPayload) {
+    await #expect(throws: CommunicationError.unauthorized) {
         try await agent.receive(ModelResourceIntent.cancel("model").input(sessionID: UUID()))
     }
     await #expect(throws: CommunicationError.invalidPayload) {
@@ -276,4 +300,37 @@ struct UnusedCameraControl: CameraControlCapability {
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
         throw CameraControlError.unavailable
     }
+}
+
+@Test(.timeLimit(.minutes(1))) func environmentPublicationHasNoCompletionWaitAndReceiverErrorsStayIndependent()
+    async throws
+{
+    let session = UUID()
+    let manager = AgentManager()
+    let policy = try resourceFixturePolicy()
+    let input = InputGateway(manager: manager, policy: policy)
+    let errors = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let runtime = try resourceRuntime(
+        UnusedModelResourceCapability(), sessionID: session,
+        manager: manager, suppliedInput: input,
+        outputSink: { errors.continuation.yield($0) })
+    try await runtime.prepareForInteraction()
+    let start = ContinuousClock.now
+    try await runtime.observeEnvironment(.init(category: .devices, sequence: 1, value: "camera open"))
+    #expect(start.duration(to: .now) < .seconds(2))
+    await input.flushPublications()
+    #expect(try await runtime.agent.environmentSnapshot().contains("camera open"))
+    // Duplicate sequence is receiver-owned rejection; publication still completes successfully.
+    try await runtime.observeEnvironment(.init(category: .devices, sequence: 1, value: "camera closed"))
+    await input.flushPublications()
+    var iterator = errors.stream.makeAsyncIterator()
+    let error = try #require(await iterator.next())
+    #expect(error.source == .applicationControl)
+    if case .control(let message) = error.output {
+        #expect(message.contains("agent.error:") && message.contains("outOfOrder"))
+    } else {
+        Issue.record("Expected receiver-owned error, no environment completion acknowledgment")
+    }
+    await input.shutdown()
+    await runtime.shutdown()
 }

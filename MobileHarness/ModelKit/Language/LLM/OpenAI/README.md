@@ -1,92 +1,46 @@
-# OpenAI-compatible cloud chat
+# OpenAI Responses cloud chat
 
-Purpose: implement third-party cloud text generation behind the same `ChatCapability`, `ChatRequest`, `ChatEvent` and cancellable `InferenceSession` used by local Gemma 4 E2B. Design goals: independent adapter target, no business dependencies, explicit configuration, complete reply buffering and managed lifecycle.
+Purpose: implement cloud generation behind the provider-neutral `ChatCapability`, `ChatRequest`, `ChatEvent` and cancellable `InferenceSession`. Design goals: independent Foundation-only adapter, explicit configuration, bounded streaming, reusable connections and model-resource-owned cleanup.
 
-✅ `ModelKitOpenAI` uses Foundation URLSession; no new third-party package. HTTPS Base URL includes the provider's API prefix (for example `https://provider.example/v1`); the adapter appends `chat/completions`. Key, model and timeout are supplied by the host. Uses Bearer authorization when the supplied key is nonempty and Chat Completions `stream`, `messages`, `temperature`, `max_tokens` fields. Providers must support these fields and SSE text deltas.
+## Request protocol
 
-```swift
-import ModelKitDefaults
-import ModelKitOpenAI
+✅ Implemented: `OpenAIChatConfiguration.request` uses POST `<baseURL>/responses`, stream=true and store=false. Base URL includes the HTTPS API prefix, e.g. https://api.openai.com/v1. The host supplies credentials, model and timeout; credentials stay private and descriptions/errors redact them. No chat request occurs during registration. Availability means configured, not reachable or authenticated.
 
-let cloud = try OpenAIChatConfiguration(
-    baseURL: endpoint, apiKey: keyFromSecureStorage, model: selectedModel)
-let manager = try await ModelKitDefaults.manager(resources: resources, cloudChat: cloud)
-let chat = try await manager.get(.chat)
-```
+Caller-owned history is sent through `input` on every decision, without server conversation IDs or previous_response_id. ✅ Prior assistant text uses output_text with annotations=[]; system/user text uses input_text and optional input_image (JPEG/PNG data URLs, detail=auto). Encoding assistant history as input_text is rejected by the official API with HTTP400; native histories use paired function_call/function_call_output items and original call_id. Declarations are converted from the shared legacy function envelope to flattened Responses function objects with request-local safe names. Registered native calls remain available to other consumers; Assistant supplies no Tools and uses text Action tags. No chat/completions fallback or automatic retries exist. Configured providers must support Responses.
 
-Omit `cloudChat` to retain local Gemma 4 E2B. The resource root remains fixed for the process. Settings changes use `ModelKitDefaults.configureChat(resources:configuration:)` to replace only the chat binding without restarting; existing raw provider handles become terminal, so consumers resolve the current binding for each operation. Defaults owns registration; consumers receive only capabilities. No remote request occurs during registration/load. `availability` means configured, not authenticated or reachable. App settings UI and Keychain credential persistence belong to the host; never put keys in Agent JSON or tracked files.
+Temperature is retained. An explicit output budget maps to max_output_tokens; omitted budgets remain omitted. No reasoning parameters are sent for GPT-4.1, which is a non-reasoning model. Store=false keeps Agent-owned context authoritative; it is not a claim of latency improvement or of overriding provider retention policy.
 
-## Stream and lifecycle design
+## Stream and resource lifecycle
 
 ```mermaid
 flowchart LR
-    Request[ChatRequest] --> Validate[Bound request and encode HTTP]
-    Validate --> Lease[ModelResource single operation]
-    Lease --> Network[Ephemeral URLSession]
-    Network --> Frame[Bounded byte and SSE decoder]
-    Frame --> Events[InferenceSession - no event-count cap]
-    Events --> Consumer[ChatCapability consumer]
-    Events -->|cancel or error| Cancel[Cancel worker and HTTP]
-    Cancel --> Release[Release resource lease]
-    Network -->|finish or error| Release
+    Request[ChatRequest] --> Encode[Responses input encoding]
+    Encode --> Lease[ModelResource operation admission]
+    Lease --> Pool[Reusable URLSession per residency]
+    Pool --> Decode[Bounded typed Responses SSE]
+    Decode --> Events[InferenceSession events]
+    Events --> Consumer[Capability consumer]
+    Events -->|cancel / failure| Cleanup[Cancel matching HTTP task]
+    Cleanup --> Release[Release operation lease]
+    Pool -->|EOF after terminal response| Release
 ```
 
-✅ Requests: at most 64 messages, 64 KiB text and at most 32768 explicitly requested output tokens (omitted by default). No inference waiting queue; overlap fails `inputBusy`. SSE line/event: 64 KiB, cumulative response: 8 MiB. Output: no pending-event count limit; each event retains the 65568 estimated-byte limit. Slow consumers do not cause bufferOverflow; normal finish drains all accepted fragments in order. Exceeding limits fails explicitly, never drops text silently. CR/LF/CRLF, fragmented UTF-8, comments and multiline data fields are supported.
+✅ Implemented: One ChatNetworkSession resource owns one ephemeral URLSession across successive requests. Cookies/cache and redirects are disabled. Per-request cancellation/failure cancels its HTTP task and worker, preserving the pooled session. Normal completion drains to EOF after the terminal event for connection reuse; an incomplete stream fails. Resource unload/shutdown drops the wrapper after joined request cleanup and invalidates the session; reload creates a fresh residency. Shutdown is terminal. One active operation per provider; overlap fails inputBusy and no inference waiting queue is added. Timeouts remain 1–600 seconds (default60).
 
-✅ `stop` and `length` map to the shared finish reasons. A finish reason is required; EOF or `[DONE]` before a terminal choice fails. The HTTP request drains trailing usage through `[DONE]` or clean EOF before completing. Refusal and unsupported finish reasons fail explicitly. Errors do not expose provider bodies, URLs or credentials. No automatic retry/fallback; partial text may already have reached the consumer.
+Text is emitted on response.output_text.delta. Function argument deltas are bounded and checked against completed item identity/arguments; no function call is emitted before response.completed validates the full output set. Refusals, response.failed, error events, unsupported output types and malformed status/usage fail explicitly. response.incomplete maps only max_output_tokens with no incomplete calls to lengthLimit. Completed native-only output maps to toolCalls; ordinary completion maps to stop. Usage input_tokens/output_tokens/total_tokens accompanies the terminal response, before the consumer's finished event. Partial delivered text cannot be retracted and errors never replay Actions.
 
-✅ One ephemeral session per active request, no cookie/cache persistence, no redirects (including same-host redirects). Timeouts are 1–600 seconds (default 60), including total resource duration. Cancellation, stream failure and manager shutdown cancel the worker; the request is invalidated before releasing admission. Local unload/reload and terminal manager shutdown use the same ModelResource contract.
+Limits: at most64 messages and64KiB transcript text,128 declarations/64KiB total declarations,32768 explicitly requested output tokens,64KiB per SSE line/event,8MiB cumulative stream,128 native output indices,512-byte item/call IDs,64-byte declared names and4096-byte string-object arguments. CR/LF/CRLF, bytewise UTF-8, comments and multiline data fields are supported. No pending-event count limit; each emitted event is bounded at65568 estimated bytes. Image limits are separately four images/16MiB transcript and4MiB per attachment. Slow consumers retain every accepted fragment in order.
 
-❌ Cloud ASR/TTS/vision/judge, Responses API, retry and live-provider acceptance. Text-only compatibility is intentional; unsupported modalities are not advertised.
+First-text timing starts immediately before URLSession.bytes and samples the first nonempty decoded delta before yielding. It includes network and remote-service latency; validation/admission, consumer/persistence, ASR, TTS and UI are excluded. Native-only replies have no text TTFT.
 
-Protocol reference: [official OpenAI Chat API](https://developers.openai.com/api/reference/resources/chat).
+## Configuration and discovery
 
-✅ OpenAIChatConfiguration.models performs GET /models with optional authentication for explicit user selection: 30-second timeout, no redirects/cache/cookies, 1 MiB response, at most 2048 IDs of at most 512 bytes, deduplicated in server order. Discovery errors are sanitized. Actions owns nonsecret configuration persistence through Storage and credential references; App injects Keychain primitives and Defaults.configureChat application without restart. The SDK owns no settings transaction. ❌ A listed model is not guaranteed to support chat; generation errors remain explicit.
+The host assembles through ModelKitDefaults. Reconfiguration replaces only the chat binding; old handles become terminal and consumers resolve the current binding each operation. Local Gemma remains selected without cloud configuration. No SDK dependency on Agents, UI, Storage or device orchestration is introduced.
 
-✅ Empty credentials omit Authorization for both discovery and chat. Blank endpoint text resolves to https://api.openai.com/v1; HTTPS validation remains enforced. Discovery validates raw model IDs without business filtering. Actions owns the app chat-family eligibility heuristic. ❌ Discovery does not prove provider compatibility. See [official model objects](https://developers.openai.com/api/reference/resources/models).
+`models` remains a distinct explicit GET /models query: optional Bearer authentication,30-second timeout, no redirects/cache/cookies,1MiB response,2048 IDs each at most512 bytes, deduplicated in server order. Empty credentials omit Authorization; blank endpoint resolves to https://api.openai.com/v1. Discovery validates raw IDs, not business eligibility or Responses support. The host owns secure credential references and setting transactions.
 
-✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
+✅ A user-authorized temporary credential reproduced the assistant-history input_text HTTP400 on official GPT-4.1; the corrected output_text history returned HTTP200, streamed text and response.completed. A standalone live probe linked the actual compiled ModelKit/OpenAI/Runtime code and verified the same four-message history through URLSession, text decoding, usage and terminal completion (interface TTFT approximately2.11s in one sample). The protocol and adapter probes do not establish full native Agent/UI or physical-device acceptance. Credentials were kept out of repository files and outputs.
 
-## Native cloud Tool calls
+❌ General live-provider compatibility, measured physical networking/latency, cloud ASR/TTS/video, local native calls and retry policies remain separate acceptance/work. No real credentials are used in offline tests.
 
-✅ Cloud Chat Completions accepts JSON v6 function declarations and returns complete typed tool calls. ModelKit owns provider-neutral declaration bytes, provider call IDs, names and argument JSON; it imports no AgentCore types. Assistant resolves declared names through ToolCallParser and emits ToolCall through OutputGateway. Internal Tools are never exposed to the model. Local Gemma 4 E2B remains text-only.
-
-```mermaid
-flowchart LR
-    JSON[Agent JSON v6 Tools] --> Request[ChatRequest tools]
-    Request --> Cloud[Cloud request and SSE deltas]
-    Cloud --> Join[Bounded per-index argument assembly]
-    Join --> Call[Complete ChatEvent.toolCall]
-    Call --> Resolve[AgentCore ToolCallParser and permission resolution]
-    Resolve --> Gateway[OutputGateway / CallRuntime]
-    Gateway --> Result[Existing InputGateway result feedback]
-```
-
-Declarations: at most 128, 64 KiB total. Cloud function names use a request-local safe name with an index suffix, mapped back to the declared name before emission; dotted registry paths never become provider identifiers. SSE aggregation admits at most 128 indices, 512-byte provider IDs, 64-byte names and 4096-byte string-object arguments per call, within the existing 8 MiB response bound. Calls are emitted only on tool_calls completion after all pending calls validate. Truncation, unknown names, malformed arguments and cancellation do not dispatch incomplete calls; there is no retry.
-
-✅ Tool-only completion is accepted. Provider IDs remain in ModelKit events; Assistant creates runtime UUIDs for the existing ToolResult correlation contract. Text still uses the existing Action/wait parser. Complete returning native results drive bounded Agent continuation as data; completion-only Tools produce no result.
-✅ Provider-neutral complete Tool transcripts are supported for bounded Agent-owned continuation. ❌ Local native tools, incomplete native transcripts and Responses API transport remain unsupported.
-
-✅ SSE decoding and request declarations satisfy Swift 6.4 strict formatting; provider behavior is unchanged.
-
-## Usage stream completion
-
-✅ Requests ask for stream_options.include_usage. The adapter continues reading after the terminal choice through trailing usage until [DONE] or clean EOF; it holds the finished event until the stream is drained and the lease released. Only usage may follow a terminal choice. Complete tool calls retain their existing validation/dispatch boundary. prompt_tokens/completion_tokens/total_tokens become provider-neutral ChatEvent.usage; invalid/duplicate usage fails explicitly. Missing usage is allowed and never fabricated.
-❌ Real third-party support for include_usage remains an acceptance item; no fallback request or retry is added.
-
-✅ Provider discovery execution is now called through the host-injected Actions capability and an opaque Agent intent; HTTP decoding/cancellation bounds remain unchanged. ✅ Model-family filtering has moved to Actions ProviderModelList; decodeModels only validates and deduplicates raw IDs.
-
-✅ Implemented: native discovery decoding returns all valid unique IDs without isLikelyChatModel. Actions owns eligibility; HTTP and malformed-response bounds remain native.
-
-
-## Bounded registered-observation continuation
-
-✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
-
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
-
-## Assistant photo observation — ADR0184
-
-✅ Implemented: Encode user text/image content parts with base64 image_url per official vision API; text/native pairing and response streaming stay unchanged. Endpoint modality support does not guarantee selected model vision; HTTP failure stays explicit.
-
-❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.
+References: [Responses migration](https://developers.openai.com/api/docs/guides/migrate-to-responses), [streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events), [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1).

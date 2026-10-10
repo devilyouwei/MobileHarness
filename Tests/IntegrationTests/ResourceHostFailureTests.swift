@@ -172,18 +172,20 @@ private actor HeldHostBinding: ModelResourceCapability {
     await runtime.shutdown()
 }
 
-@Test func resourceHostAcknowledgmentSurvivesDiagnosticFeedbackFailure() async throws {
+@Test func resourceHostAcknowledgmentContinuesThroughPause() async throws {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
     let runtime = try resourceRuntime(native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
     await ui.pauseAfterCommit(runtime.agent)
     do {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
-        Issue.record("Diagnostic feedback failure must preserve the original failure")
+        Issue.record("Original dispatch failure must be preserved through pause")
     } catch ApplicationControlIntentFailure.presented(let message) {
         #expect(message.contains("returning feedback"))
-        #expect(message.contains("diagnostic:"))
+        #expect(!message.contains("diagnostic:"))
     }
+    #expect(await runtime.agent.status().lifecycle == .paused)
+    #expect(await runtime.agent.status().queuedInputs == 0)
     #expect(await ui.calls == ["operation"])
     #expect(await native.calls.isEmpty)
     await runtime.shutdown()

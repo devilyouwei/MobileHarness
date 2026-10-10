@@ -1,5 +1,26 @@
 # SpeechSynthesis
 
+## 函数与通信注册清单
+
+✅ 以下为当前实现的完整注册清单。模型权限来源：[配置文件](SpeechSynthesis.agent.json)；内部权限来源见各行链接。参数后缀 `?` 表示可选，`—` 表示无参数或无 Channel。
+
+模型 Action 通过 Action call 调度；模型 Tool 通过原生函数调用取得结果。InternalAction / InternalTool 是代码固定流程的权限，不会自动进入模型函数目录。同一函数跨 Agent 注册，或在同一 Agent 同时提供模型入口与内部入口，属于授权复用；模型 Action 和模型 Tool 不重复注册同一路径。
+
+### 模型可调用函数
+
+无模型 Action 或模型 Tool。
+
+### 代码固定流程的内部函数
+
+无内部函数注册。SpeechSynthesis 直接使用注入的 SpeechSynthesisCapability 合成并保存音频引用；播放由原输出 Agent 注册的 Speech.Playback.speak 执行。
+
+### 通信输出权限
+
+这些是 CommunicationAction 的授权契约，不是额外的原生 Tool。publish 单向广播，不等待接收方回包，不因接收方拒绝/错误影响发送方；send 返回接纳回执，接纳与任务完成分别记录。模型 send 仅暴露上述 task.* 权限；语音合成、取消及事实广播由代码固定流程发出。
+
+无 publish / send 输出权限。
+
+
 Purpose: a shared text-to-audio Agent, independent of Assistant and playback Channels. Owns a FIFO request queue and one serial ModelKit synthesis worker. Configuration and directed permissions use JSON v6.
 
 ```mermaid
@@ -88,7 +109,7 @@ sequenceDiagram
 
 ✅ SpeechSynthesis passes the trusted directed sender string into StorageAudio; audio storage does not import AgentCore. Ownership still includes the originating session and parent input.
 
-✅ SpeechSynthesisInput is owned by Agents/Communication/SpeechValues.swift with unchanged text/locale contract and queue policy. Domain value validation is independent of AgentCore; message admission maps errors to the existing transport rejection.
+✅ SpeechSynthesisInput is owned by Agents/Support/Communication/SpeechValues.swift with unchanged text/locale contract and queue policy. Domain value validation is independent of AgentCore; message admission maps errors to the existing transport rejection.
 
 ✅ Synthesis owns the ModelKit.AudioFrame → StorageAudio.SpeechPCMFrame conversion, preserving bytes, format, sequence and timestamp after existing format/order validation. Storage owns its PCM types; it does not import ModelKit or Types. ❌ No playback/device preparation belongs to synthesis.
 
@@ -97,3 +118,25 @@ sequenceDiagram
 ✅ SpeechSynthesisError owns timedOut and invalidOutput. Context identity, mono Float32/stable format, sequence, EOS, nonempty output and synthesis byte policy remain Agent-owned; StorageAudio validates its PCM contract separately. Producer errors pass through the store to playback unchanged. App owns localized messages.
 
 ❌ Automatic producer retry and real-device performance acceptance remain outstanding.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+开发契约（输入/输出权限仍以本目录 JSON v6 和 InternalAction/InternalTool 注册为准）：
+
+- 预处理与隔离：定向 speech.synthesis FIFO32；cancelSpeech 控制旁路，按原始 source/session/input 验证音频所有权；不发布聊天消息。
+- Context Schema：SpeechSynthesisContextState：pendingAudioIDs/activeAudioID，输入/批次及完成/失败记录；音频流由 StorageAudio 的有界所有权容器保管。
+- Builder 与决策：SpeechSynthesisContextBuilder 构建真实 SpeechSynthesisRequest 与 InferenceContext；一个合成 worker，独立于播放 Channel。
+- 容量、取消、失败与恢复：单任务执行默认60秒。取消/停止加入合成会话并关闭音频；错误保留真实失败，Context 写入失败禁止开始依赖该状态的合成。重启清除音频句柄，不恢复播放。
+
+设计与阶段边界见 [ADR0187](../../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../../docs/Validation-History.md)。
+
+✅ ADR0187 流式能力只保留最近256条证据/消费摘要，淘汰计数可查询；原始媒体不存盘。长期运行不因感知事实累计填满普通业务档案。合成取消先验证音频所有权，成功后提交状态并加入 worker 清理；已接纳但注册失败的音频任务明确记录终态。
+
+Implemented source organization: follow the [business source standard](../README.md#business-source-organization-standard). Agent.swift groups interface/declarations, registration, lifecycle, admission/workers, output, context and observability; Processing.swift groups State/Preprocessor/Builder and pure role policies. Shared recordSignal persists role-classified evidence atomically; the Agent still selects consumption timing, retention and business mutations.
+SpeechSynthesisError and task-local failure cleanup context are co-located with SpeechSynthesisAgent; Processing contains only pure state/input/request policies.

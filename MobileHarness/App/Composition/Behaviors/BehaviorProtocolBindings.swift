@@ -6,8 +6,10 @@ import FunctionContracts
 struct BehaviorProtocolBindings {
     enum Error: Swift.Error { case unknownModule(ActionIdentifier) }
     static func bind(_ function: ActionFunction) throws -> ActionBinding {
-        if function.path.domain == "Camera", function.path.module == "Capture",
-            ["takePhoto", "savePhoto", "ignorePhoto"].contains(function.path.function)
+        if (function.path.domain == "Camera" && function.path.module == "Capture")
+            || (function.path.domain == "UI" && function.path.module == "Navigation")
+            || (function.path.domain == "System" && function.path.module == "Device"
+                && function.path.function == "readEnvironment")
         {
             return ActionBinding(
                 function: function, protocols: [.action, .tool], executionPolicy: .direct,
@@ -18,10 +20,10 @@ struct BehaviorProtocolBindings {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
         }
         switch group {
-        case "UI.Expression", "Speech.Playback", "NexArm.Motion", "NexArm.Gesture":
+        case "UI.Expression", "Speech.Playback", "Speech.Listening", "NexArm.Motion", "NexArm.Gesture":
             return ActionBinding(function: function)
         case "History.Conversation", "System.Runtime", "System.ModelResources", "System.Provider",
-            "UI.ResourcePresentation", "Camera.Capture", "UI.Navigation", "System.Device":
+            "UI.ResourcePresentation", "System.Device":
             return ActionBinding(
                 function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning,
                 feedbackPolicy: .observation)

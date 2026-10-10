@@ -60,13 +60,15 @@ let package = Package(
                 "Settings/README.md", "Diagnostics/README.md",
             ]),
         .target(
-            name: "AppSettingsWorkflow", dependencies: ["UI", "AgentCore", "Agents", "Gateway"],
+            name: "AppSettingsWorkflow",
+            dependencies: ["UI", "AgentCore", "Agents", "Gateway", "AppPresentationWorkflow"],
             path: "MobileHarness/App/Workflows/Settings",
             exclude: ["README.md"]),
         .target(
             name: "AppHistoryWorkflow",
             dependencies: [
-                "UI", "StorageChat", "AgentCore", "Agents", "Gateway", "Actions", "FunctionContracts",
+                "UI", "StorageChat", "AgentCore", "Agents", "Gateway", "Actions", "AppPresentationWorkflow",
+                "FunctionContracts",
                 "ExecutionRuntime", "CallRuntime",
             ],
             path: "MobileHarness/App/Workflows/History", exclude: ["README.md"]),
@@ -106,7 +108,7 @@ let package = Package(
             ],
             exclude: ["README.md"]),
         .target(
-            name: "AgentCore", dependencies: [], path: "MobileHarness/Agents/Core",
+            name: "AgentCore", dependencies: [], path: "MobileHarness/Agents/Support/Core",
             exclude: [
                 "Input/README.md", "Communication/README.md", "Capability/README.md", "Generation/README.md",
                 "Output/README.md",
@@ -146,13 +148,14 @@ let package = Package(
             ]),
         .target(
             name: "Agents",
-            dependencies: ["AgentCore", "ModelKit", "PlatformKit", "StorageChat", "StorageAudio"],
+            dependencies: ["AgentCore", "ModelKit", "PlatformKit", "Storage", "StorageChat", "StorageAudio"],
             path: "MobileHarness/Agents",
             exclude: [
-                "Core", "Communication/README.md", "SpeechSynthesis/README.md", "Assistant/README.md",
+                "Support/Core", "Support/Communication/README.md", "SpeechSynthesis/README.md", "Assistant/README.md",
                 "SpeechPerception/README.md",
                 "VisionPerception/README.md", "Photographer/README.md", "Memory/README.md",
-                "ApplicationControl/README.md", "README.md",
+                "ApplicationControl/README.md", "Support/README.md", "Support/Chat/README.md",
+                "Support/Context/README.md", "README.md",
             ],
             resources: [
                 .process("Assistant/Assistant.agent.json"),

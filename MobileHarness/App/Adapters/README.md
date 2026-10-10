@@ -43,9 +43,9 @@ flowchart LR
 
 ✅ UI capability endpoints receive Actions.PoseOverlay; lifecycle adaptation converts it to the UI value. Action and Tool callbacks retain only opaque module-owned execution context.
 
-✅ ADR0098: NexArmBehaviorAdapter owns the unchanged host gesture/report bindings; SettingsProviderAdapter validates/applies the configured provider; HistoryAgentAdapter owns Assistant-specific dry-run preview. These adapters create no queues or new lifecycle owners.
+✅ ADR0098: NexArmBehaviorAdapter owns the unchanged host gesture/report bindings; SettingsProviderAdapter validates/applies the configured provider; HistoryAgentAdapter owns role-specific dry-run preview. These adapters create no queues or new lifecycle owners.
 
-✅ RuntimePresentation implements CameraControlCapability: requires the bound voice endpoint to validate the active Assistant session, then forwards to the root camera owner even when vision is currently off. Camera presentation remains separately bound by vision-session lifetime.
+✅ RuntimePresentation implements CameraControlCapability for the actual Photographer in the stable interaction root or validated active task scope, with foreground checks. Effects go directly to the camera owner; vision presentation retains its separate capture-session lifetime.
 
 ✅ Cloud native Tool declarations and complete call events pass through ChatCapability; CurrentChatCapability forwards the current provider support flag. Local Gemma 4 E2B reports no native Tool support and rejects requests carrying tools. See [technical flow](../../ModelKit/Language/LLM/OpenAI/README.md).
 
@@ -183,7 +183,7 @@ ProviderIntentFailure carries the producer failureCode separately from the error
 
 ## Camera command entry
 
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
 
 ## Manual worker terminal feedback
@@ -194,7 +194,7 @@ ProviderIntentFailure carries the producer failureCode separately from the error
 
 ✅ Implemented admission hardening: the native device endpoint validates its existing foreground, connection and worker admission conditions before accepting scan/connect/reconnect/preset/jog. Rejected void UI commands must become explicit call errors, without changing native recovery/motion algorithms. Device facts include the current native issue. Motor arguments reject unrelated preset fields.
 
-✅ ADR0181: RuntimePresentation accepts physical camera effects from Photographer in its root session or an active validated voice session. Assistant calls validate voice then delegate through the bound Gateway invocation Signal context; they do not directly mutate native capture. Retain complete nested Tool reports when returning failures to the original caller. No ApplicationControl camera exemption remains.
+✅ RuntimePresentation authorizes real Photographer camera effects by stable root/task scope. Assistant emits task communication Actions and never invokes a camera proxy. Function failures retain the actual producer report.
 
 ✅ Interaction refinement: RuntimePresentation forwardss explicit target facing through camera delegation and the typed native endpoint; no implicit toggling.
 
@@ -206,4 +206,30 @@ ProviderIntentFailure carries the producer failureCode separately from the error
 
 ## Photo save and ignore — ADR0185
 
-✅ RuntimePresentation routes Assistant save/ignore through authorized Photographer messages, validates root/active voice scopes and decodes the actual returned receipt. Photographer executes the injected CameraControlCapability; no fabricated receipt or direct UI effect.
+✅ RuntimePresentation executes Photographer save/ignore directly through injected CameraControlCapability with actual artifact ownership and native receipt. Assistant delegates the task; no fabricated receipt or direct UI effect.
+
+## Phase two - ADR0188
+
+✅ Implemented: camera effects validate the real Photographer/root task and invoke canonical native Camera functions directly. The Assistant-to-Photographer function proxy is removed. Presentation accepts the stable interaction scope and registered task executor independently of capture generation. Chat bindings are acquired lazily and pinned per decision.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories are read-only until scoped mutation intents are defined. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+HistoryAgentAdapter selects the producing Agent’s capability registry when previewing stored fragments. Shared text segmentation/output parsing stays in the Chat worker; a preview never executes a stored Action.
+
+
+## One-way publication and listening admission correction
+
+## Listening policy ownership
+
+✅ RuntimePresentation authorizes Speech.Listening.update only for the actual SpeechPerception and root interaction session. Reply display/playback retains actual producer/task authorization. External facts remain one-way publications; target failure cannot stop a media producer.
+
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
+
+✅ Frontend/backend separation: Agent-issued presentation retains actual-producer/root-or-task validation. Local frontend navigation uses the same UI state without requesting execution grants; this is distinct from registered Agent output.
+
+✅ Conversational navigation authorization: UI navigation validates the actual ApplicationControl producer and either its root settings session or Gateway-issued active task executor identity. Remove the old Assistant-name bypass; touch navigation needs no execution grant because it uses local UI state.
+
+✅ History-preview catalog fix: HistoryAgentAdapter combines each role’s runtime function grants with AgentCommunicationAdapter.catalog and that role’s communication declaration before constructing GenerationTrace, matching the production Chat worker. Authorized task send must appear as a Communication Action in both parent and child previews. Preview checks parsing only, does not dispatch communication, and cannot claim delivery or task completion; unknown functions retain rejection evidence.

@@ -195,6 +195,9 @@ flowchart LR
 
 ✅ ChannelScheduler uses envelope.schedulingID (roundID for generated work, inputID otherwise), joins every Action, and awaits scoped result delivery before round acknowledgment. Native Tool projection and its receipt queue are removed.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
 
-✅ Photo Action delegation correction: bind InvocationSignalContext inside the actual scheduled Action worker, using its validated envelope/ExecutionOwner. Tools retain their current binding. Ownerless direct scheduler fixtures receive no authority; nested bindings restore automatically, and completion/feedback callbacks run outside the handler binding. No new module or media retention.
+
+✅ ADR0188: delegation is an Agent communication Action and trusted task Signal. The old native-function delegation API and TaskLocal invocation binding are removed. Function effects retain validated ExecutionOwner, resources and cancellation through their ordinary invocation contracts.
+
+✅ Round feedback delivery failures report execution ID, Action path and delivery state (closed/expired/exhausted), separately from task or presentation scope closure. Preserve failure, stop dependent continuation and never replay completed effects.

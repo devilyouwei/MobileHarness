@@ -100,58 +100,61 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
     func request(_ chat: ChatRequest) throws -> URLRequest {
         guard chat.messages.count <= 64,
             chat.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536,
-            chat.maximumOutputTokens.map { $0 <= 32768 } ?? true
+            chat.maximumOutputTokens.map({ $0 <= 32768 }) ?? true
         else { throw CapabilityError.invalidRequest("Cloud chat exceeds message or output limits") }
-        var request = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
+        var request = URLRequest(url: baseURL.appendingPathComponent("responses"))
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
         if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let names = Self.toolNames(chat.tools)
+        var input: [[String: Any]] = []
+        for message in chat.messages {
+            if message.role == .tool {
+                guard let id = message.toolCallID else { throw CapabilityError.invalidRequest("Missing call identity") }
+                input.append(["type": "function_call_output", "call_id": id, "output": message.content])
+                continue
+            }
+            if !message.content.isEmpty || message.toolCalls.isEmpty {
+                var parts: [[String: Any]] = [
+                    message.role == .assistant
+                        ? ["type": "output_text", "text": message.content, "annotations": []]
+                        : ["type": "input_text", "text": message.content]
+                ]
+                parts += (message.images ?? []).map {
+                    [
+                        "type": "input_image",
+                        "image_url": "data:\($0.mimeType);base64,\($0.data.base64EncodedString())",
+                        "detail": "auto",
+                    ]
+                }
+                input.append(["role": message.role.rawValue, "content": parts])
+            }
+            for call in message.toolCalls {
+                guard let name = names.first(where: { $0.value == call.name })?.key else {
+                    throw CapabilityError.invalidRequest("Undeclared transcript tool")
+                }
+                input.append([
+                    "type": "function_call", "call_id": call.id, "name": name,
+                    "arguments": call.argumentsJSON,
+                ])
+            }
+        }
         var body: [String: Any] = [
-            "model": model,
-            "messages": try chat.messages.map { message -> [String: Any] in
-                var value: [String: Any] = ["role": message.role.rawValue, "content": message.content]
-                if let images = message.images, !images.isEmpty {
-                    var parts: [[String: Any]] = [["type": "text", "text": message.content]]
-                    parts += images.map {
-                        [
-                            "type": "image_url",
-                            "image_url": [
-                                "url": "data:\($0.mimeType);base64,\($0.data.base64EncodedString())", "detail": "auto",
-                            ],
-                        ]
-                    }
-                    value["content"] = parts
-                }
-                if let id = message.toolCallID { value["tool_call_id"] = id }
-                if !message.toolCalls.isEmpty {
-                    let names = Self.toolNames(chat.tools)
-                    value["tool_calls"] = try message.toolCalls.map { call -> [String: Any] in
-                        guard let name = names.first(where: { $0.value == call.name })?.key else {
-                            throw CapabilityError.invalidRequest("Undeclared transcript tool")
-                        }
-                        return [
-                            "id": call.id, "type": "function",
-                            "function": ["name": name, "arguments": call.argumentsJSON],
-                        ]
-                    }
-                }
-                return value
-            },
-            "temperature": chat.temperature, "stream": true,
+            "model": model, "input": input, "temperature": chat.temperature,
+            "stream": true, "store": false,
         ]
-        body["stream_options"] = ["include_usage": true]
-        if let maximum = chat.maximumOutputTokens { body["max_tokens"] = maximum }
+        if let maximum = chat.maximumOutputTokens { body["max_output_tokens"] = maximum }
         if !chat.tools.isEmpty {
-            let names = Self.toolNames(chat.tools)
             body["tools"] = try chat.tools.map { tool in
-                guard var object = try JSONSerialization.jsonObject(with: tool.declaration) as? [String: Any],
-                    var function = object["function"] as? [String: Any]
+                guard let object = try JSONSerialization.jsonObject(with: tool.declaration) as? [String: Any],
+                    var function = object["function"] as? [String: Any],
+                    let name = names.first(where: { $0.value == tool.name })?.key
                 else { throw CapabilityError.invalidRequest("Invalid tool declaration") }
-                function["name"] = names.first(where: { $0.value == tool.name })?.key
-                object["function"] = function
-                return object
+                function["name"] = name
+                function["type"] = "function"
+                return function
             }
             body["tool_choice"] = "auto"
         }

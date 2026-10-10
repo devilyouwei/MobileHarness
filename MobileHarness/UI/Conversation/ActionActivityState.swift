@@ -16,6 +16,9 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
             self.endedAt = endedAt
         }
     }
+    public let source: String
+    public let inputID: UUID?
+    public let isInternal: Bool
     public let id: UUID
     public let title: String
     public let channel: String
@@ -28,8 +31,11 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
     public var isFailure: Bool { execution.phase == .failed }
     public init(
         id: UUID, title: String, channel: String, status: String, issueDescriptions: [String], symbol: String,
-        execution: Execution
+        execution: Execution, source: String = "", inputID: UUID? = nil, isInternal: Bool = false
     ) {
+        self.source = source
+        self.inputID = inputID
+        self.isInternal = isInternal
         self.id = id
         self.title = title
         self.channel = channel
@@ -54,6 +60,7 @@ public struct ExecutionIssue: Identifiable, Sendable, Equatable {
             self.callID = callID
         }
     }
+    public let inputID: UUID?
     public let context: Context?
     public let failureCode: String?
     public let id: UUID
@@ -63,8 +70,9 @@ public struct ExecutionIssue: Identifiable, Sendable, Equatable {
     public let time: Date
     public init(
         id: UUID = UUID(), title: String, source: String, message: String, time: Date = Date(),
-        failureCode: String? = nil, context: Context? = nil
+        failureCode: String? = nil, context: Context? = nil, inputID: UUID? = nil
     ) {
+        self.inputID = inputID ?? context?.inputID
         self.id = id
         self.title = String(title.prefix(128))
         self.source = String(source.prefix(64))
@@ -87,6 +95,15 @@ public struct ActionChannelSummary: Identifiable {
 /// Presentation only. The root-owned workflow consumes snapshots; views never own observation tasks.
 @MainActor @Observable
 public final class ActionActivityState {
+    public var selectedTab: ExecutionLogTab = .action
+    public var selectedTaskID: UUID?
+    public private(set) var agentEvents: [AgentRuntimeLogItem] = []
+    public private(set) var agentEventEvictions: UInt64 = 0
+    public var selectedSource = "全部"
+    public var selectedFilter: ExecutionLogFilter = .all
+    public var showsInternalActions = false
+    public private(set) var tasks: [TaskLogItem] = []
+    public private(set) var taskEvictions: UInt64 = 0
     public private(set) var items: [ActionActivityItem] = []
     public private(set) var revision: UInt64?
     public private(set) var evictedCount: UInt64 = 0
@@ -110,7 +127,85 @@ public final class ActionActivityState {
         }
         backgroundIssues.append(issue)
     }
-    public var hasRecords: Bool { !items.isEmpty || !outputIssues.isEmpty || !backgroundIssues.isEmpty }
+    public var hasRecords: Bool {
+        !items.isEmpty || !tasks.isEmpty || !agentEvents.isEmpty || !outputIssues.isEmpty
+            || !backgroundIssues.isEmpty
+    }
+    public var sources: [String] {
+        Array(
+            Set(
+                items.map(\.source) + tasks.flatMap { [$0.requester, $0.executor] } + runtimeIssues.map(\.source)
+                    + agentEvents.map(\.source))
+        ).filter { !$0.isEmpty }.sorted()
+    }
+    public func matchesSource(_ values: [String]) -> Bool { selectedSource == "全部" || values.contains(selectedSource) }
+    public func matchesStatus(active: Bool, success: Bool, failure: Bool) -> Bool {
+        switch selectedFilter {
+        case .all: true
+        case .active: active
+        case .succeeded: success
+        case .failed: failure
+        }
+    }
+    public var visibleActions: [ActionActivityItem] {
+        items.filter { item in
+            (selectedTaskID == nil
+                || tasks.contains { task in task.id == selectedTaskID && task.events.contains { $0.id == item.inputID }
+                })
+                && (showsInternalActions || !item.isInternal || item.isFailure) && matchesSource([item.source])
+                && matchesStatus(
+                    active: item.isActive, success: item.execution.phase == .succeeded, failure: item.isFailure)
+        }
+    }
+    public var visibleTasks: [TaskLogItem] {
+        tasks.filter {
+            matchesSource([$0.requester, $0.executor])
+                && matchesStatus(active: !$0.isTerminal, success: $0.phase == .succeeded, failure: $0.phase == .failed)
+        }
+    }
+    public var runtimeIssues: [ExecutionIssue] {
+        var seen: Set<String> = []
+        return (outputIssues + backgroundIssues).sorted { $0.time > $1.time }.filter { issue in
+            let linked =
+                items.contains { item in
+                    item.inputID == issue.inputID && item.isFailure
+                        && item.issueDescriptions.contains { !$0.isEmpty && issue.message.contains($0) }
+                }
+            return !linked
+                && seen.insert("\(issue.source)|\(issue.inputID?.uuidString ?? issue.id.uuidString)|\(issue.message)")
+                    .inserted
+        }
+    }
+    public func recordAgentEvent(_ event: AgentRuntimeLogItem) {
+        if agentEvents.count == 100 {
+            agentEvents.removeFirst()
+            agentEventEvictions &+= 1
+        }
+        agentEvents.append(event)
+    }
+    public func updateTask(_ incoming: TaskLogItem, event: TaskLogEvent) {
+        if let index = tasks.firstIndex(where: { $0.id == incoming.id }) {
+            if let existing = tasks[index].events.firstIndex(where: { $0.id == event.id }) {
+                tasks[index].events[existing] = event
+            } else {
+                if tasks[index].events.count == 32 {
+                    tasks[index].events.removeFirst()
+                    tasks[index].evictedEvents += 1
+                }
+                tasks[index].events.append(event)
+            }
+            if !tasks[index].isTerminal { tasks[index].phase = incoming.phase }
+            if tasks[index].title.isEmpty { tasks[index].title = incoming.title }
+        } else {
+            if tasks.count == 100 {
+                tasks.removeFirst()
+                taskEvictions &+= 1
+            }
+            var value = incoming
+            value.events = [event]
+            tasks.append(value)
+        }
+    }
 
     private var dismissed: Set<UUID> = []
 
@@ -128,7 +223,8 @@ public final class ActionActivityState {
         dismissed.insert(id)
     }
     public func summaries(at now: Date) -> [ActionChannelSummary] {
-        let channels = Dictionary(grouping: items, by: \.channel)
+        let channels = Dictionary(
+            grouping: items.filter { showsInternalActions || !$0.isInternal || $0.isFailure }, by: \.channel)
         return channels.values.compactMap { group in
             let active = group.filter(\.isActive)
             let running = active.filter { $0.execution.phase != .queued }

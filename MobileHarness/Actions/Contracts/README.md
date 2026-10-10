@@ -21,3 +21,5 @@ flowchart LR
 ❌ Durable replay/codecs, generic typed JSON arguments and remaining feature Signal/continuation migration are separate work. Standard function input is not a replacement for Signal.
 
 ✅ Implemented: ActionReport.empty provides an explicit empty validated value for attaching an actual worker exception without forced/fallible placeholder construction.
+
+✅ ADR0187: ActionExecutionContext carries opaque task and decision identities supplied by the host. FunctionContracts does not interpret authorization; Gateway validates active Agent/task grants before supplying them.

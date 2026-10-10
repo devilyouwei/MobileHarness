@@ -1,6 +1,6 @@
 # Speech Actions
 
-Purpose: scheduled physical speech playback. Production synthesis is owned by SpeechSynthesisAgent, not by Actions or Gateway.
+Purpose: canonical speech playback and revisioned listening execution functions. SpeechPerception owns listening policy; App injects native admission/capture endpoints. Production synthesis is owned by SpeechSynthesisAgent.
 
 ```mermaid
 flowchart LR
@@ -84,3 +84,15 @@ Purpose: implement directory/module-file/function ownership while preserving cur
 ✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
 
 ✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+
+
+
+ListeningActions.swift owns Speech.Listening.update; PlaybackActions.swift retains Speech.Playback.speak. SpeechModule injects optional listening authority separately from playback and rejects unavailable execution explicitly.
+
+✅ Implemented: Listening Action acknowledges policy without awaiting an utterance. The App owns a separately cancellable pause task, fenced by command revision and capture generation. A newer command cancels/joins old pause work; user-off stops capture before joining it. Native cleanup cancels and joins pause/recovery tasks. Existing canonical serialization remains, but no utterance wait retains its lease.
+
+## Listening policy ownership
+
+✅ Speech.Listening.update is a code-owned SpeechPerception Action, excluded from all Chat model catalogs. Its finite acknowledgment accepts versioned consent/pause policy; injected App execution separately owns microphone readiness and playback/tail admission. It does not wait for a confirmed utterance while holding the Listening serialization lane.
+
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.

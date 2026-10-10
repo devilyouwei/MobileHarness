@@ -68,10 +68,12 @@ public actor Gemma4Chat: ChatCapability {
             let emitter = pair.emitter
             let task = Task {
                 do {
+                    request.timing?.start()
                     let generation = try await lease.model.generate(
                         tokens: tokens, maximumTokens: maximumTokens, temperature: request.temperature,
                         stopTokens: []
                     ) { delta in
+                        request.timing?.recordText(delta)
                         try emitter.yield(.text(delta))
                     }
                     try Task.checkCancellation()

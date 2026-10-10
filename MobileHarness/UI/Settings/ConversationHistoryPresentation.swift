@@ -6,8 +6,9 @@ public enum ConversationHistoryPresentation {
         return conversation.turns.last?.user ?? "新对话"
     }
     /// Presentation peers preserve the original input's nested execution ownership on disk.
-    public static func turns(_ conversation: HistoryConversation) -> [HistoryTurn] {
+    public static func turns(_ conversation: HistoryConversation, inputIDs: Set<UUID>? = nil) -> [HistoryTurn] {
         conversation.turns.flatMap { turn -> [HistoryTurn] in
+            guard inputIDs == nil || inputIDs!.contains(turn.id) else { return [] }
             if let requests = turn.modelRequests, !requests.isEmpty {
                 return requests.enumerated().map { index, request in
                     project(
@@ -16,7 +17,8 @@ public enum ConversationHistoryPresentation {
                         calls: request.toolCalls, usage: request.tokenUsage, fragments: request.fragments,
                         state: request.state, reason: request.finishReason,
                         error: request.error ?? (index == requests.count - 1 ? turn.error : nil),
-                        react: index > 0)
+                        react: index > 0, modelRequestStartedAt: request.modelRequestStartedAt,
+                        firstTokenLatency: request.firstTokenLatency)
                 }
             }
             guard let continuations = turn.continuationRequests, !continuations.isEmpty else { return [turn] }
@@ -45,7 +47,8 @@ public enum ConversationHistoryPresentation {
     private static func project(
         _ parent: HistoryTurn, id: UUID, date: Date, input: String, requestJSON: String?, firstTokenAt: Date?,
         calls: [HistoryToolCall]?, usage: HistoryTokenUsage?, fragments: [String], state: HistoryTurn.State,
-        reason: String?, error: String?, react: Bool, generationMetadataAvailable: Bool = true
+        reason: String?, error: String?, react: Bool, generationMetadataAvailable: Bool = true,
+        modelRequestStartedAt: Date? = nil, firstTokenLatency: Double? = nil
     ) -> HistoryTurn {
         HistoryTurn(
             id: id, date: date, user: input,
@@ -57,7 +60,8 @@ public enum ConversationHistoryPresentation {
             generationMetadataAvailable: generationMetadataAvailable,
             continuationRequests: nil, toolDefinitions: parent.toolDefinitions, toolCalls: calls, tokenUsage: usage,
             fragments: fragments, state: state, finishReason: reason, error: error,
-            executionError: generationMetadataAvailable ? parent.executionError : nil)
+            executionError: generationMetadataAvailable ? parent.executionError : nil,
+            modelRequestStartedAt: modelRequestStartedAt, firstTokenLatency: firstTokenLatency)
     }
 
 }
@@ -74,10 +78,10 @@ extension HistoryTurn {
         return "Tool Call：" + calls.map(\.name).joined(separator: "、")
     }
     public var firstTokenReport: String {
-        guard let firstTokenAt else { return "首 token 到达时间：" }
-        let delay = max(0, firstTokenAt.timeIntervalSince(date))
-        return
-            "首 token 到达时间：\(firstTokenAt.formatted(date: .omitted, time: .standard))（距请求开始 \(String(format: "%.3f", delay)) 秒）"
+        guard modelRequestStartedAt != nil, firstTokenAt != nil, let delay = firstTokenLatency else {
+            return "首 token 耗时："
+        }
+        return "首 token 耗时：\(String(format: "%.3f", delay)) 秒"
     }
     public var tokenReport: String {
         guard let usage = tokenUsage else { return "Token 用量：" }
@@ -104,6 +108,7 @@ extension HistoryTurn {
             ReACT: \(isReACT == true)
             Model: \(model)
             Date: \(generationMetadataAvailable == false ? "" : date.ISO8601Format())
+            Model request started: \(modelRequestStartedAt.map { $0.ISO8601Format() } ?? "")
             First token: \(firstTokenAt.map { $0.ISO8601Format() } ?? "")
             \(firstTokenReport)
             State: \(stateReport); finish: \(finishReason ?? "")

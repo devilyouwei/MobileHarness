@@ -38,7 +38,7 @@ Foundational independence: UI currently imports StorageChat domain values. Remov
 
 No delivery dates or physical safety certification are implied. Requirements belong to [Requirements](Requirements.md), experimental results to evidence documents, and architecture decisions to [ADRs](adr/README.md).
 
-- Camera.open/close/flip Tools are registered and declared in Assistant JSON; physical camera/lens/permission acceptance and native model Tool event transport remain pending.
+- Camera.open/close/flip Tools are registered and declared in Photographer JSON; native/XML task transport is implemented; physical camera/lens/permission acceptance remains pending.
 
 ✅ Shared-pose Photographer and five-axis Robot.aim BLE dispatch are implemented. ❌ Physical tracking, wrist recovery and Wi-Fi control acceptance remain pending.
 
@@ -207,7 +207,7 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ [ADR0137](adr/0137-nexarm-ordinary-home.md) restores ordinary reset motor3/4 targets1198/1238 with query-free shared Settings/Agent execution, separately from tracking preparation. ❌ The restored posture has not been revalidated on hardware; earlier tracking-rest reset trials remain revision-scoped evidence.
 
-✅ [ADR0139](adr/0139-tracking-freshness-and-assistant-preemption.md): Photographer usable-pose freshness expires after one second; camera/session shutdown and stale input release the tracking motor use. Authorized Assistant NexArm actions preempt Photographer through host-configured joined writer takeover, keeping subsequent Channel Actions. ❌ Physical camera-off/source-stall/takeover timing and hardware stop acceptance remain pending.
+✅ [ADR0139](adr/0139-tracking-freshness-and-assistant-preemption.md): Photographer usable-pose freshness expires after one second; camera/session shutdown and stale input release the tracking motor use. Authorized ApplicationControl NexArm actions preempt Photographer through host-configured joined writer takeover, keeping subsequent Channel Actions. ❌ Physical camera-off/source-stall/takeover timing and hardware stop acceptance remain pending.
 
 
 ✅ [ADR0141](adr/0141-resource-control-ownership.md): public unlocked/locked(owner) replaces persistent faulted/recover. One occupancy authority includes transient writers, and revocable execution permits protect App effects. Cleanup timeout fails only its request; retained late cleanup automatically unlocks. Cancellation-independent acknowledgment remains. ❌ Physical camera-close/takeover timing and native uncooperative-I/O isolation acceptance remain pending.
@@ -308,3 +308,30 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ✅ [ADR0184](adr/0184-assistant-photo-observation.md): Assistant photo Action, screenshot presentation and multimodal observation loop.
 
 ✅ [ADR0185](adr/0185-photo-save-and-ignore.md): Agent-driven current-photo save to system Photos and ignore from UI/dialogue; physical acceptance remains pending.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+✅ 第一阶段包含统一 Signal 预处理、独立持久化 Context、Builder、共享 Chat 驱动、任务契约和输出通信；七个现有 Agent 的业务职责保持现状。
+
+❌ 下一阶段调整 Assistant/Photographer 分工和持续对话路由，摄影 LLM 不在当前实现范围。
+
+参见 [ADR0187](adr/0187-agent-composition-and-react.md) 与 [Agents 当前设计](../MobileHarness/Agents/README.md)。
+
+✅ Phase two specialist ownership implementation: [ADR0188](adr/0188-specialist-task-ownership.md). Implemented; real-model/native-UI/physical-device acceptance pending.
+
+✅ [ADR0189](adr/0189-agent-support-hierarchy.md): shared Agent sources consolidate under Support/Core, Communication, Chat and Context; Core retains independent Foundation-only compilation. Source-only migration preserves role/runtime behavior.
+
+✅ ADR0190 resident SpeechPerception listening policy, reply-activity snapshots, microphone epoch isolation and one-way Signal publication implemented. ❌ Verify real-device echo suppression, reply/delegation timing, first-frame pause/resume, route changes and350ms tail acoustics with actual models; automated tests/builds do not establish physical acceptance.
+
+✅ Frontend/backend input separation is implemented: local navigation/page cleanup and direct owner subscriptions replace mandatory UI-to-Assistant task delegation. Agent-driven conversation and callable UI effects remain. ❌ Native touch, dialog routing and actual data/device operations need separate on-device acceptance.
+
+
+## Photographer camera context (2026-10-10)
+
+✅ Passive revisioned camera.state subscription and independent latest Context, selected facts on every model request/continuation, and photography phase projection from existing task/work/artifact state. No automatic model invocation on state changes. ❌ Live-model and physical-device capture/save/ignore/background-race acceptance remain outstanding; sampled facts never replace native readiness checks.

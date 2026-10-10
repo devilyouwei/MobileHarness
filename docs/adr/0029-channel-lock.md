@@ -16,7 +16,7 @@ Planned lock control enters through OutputGateway runtime APIs, with outcomes th
 
 - Agent B sends facts, current state and optional advice to Agent A.
 - Agent A decides whether to request a lock; the runtime authorizes and performs takeover.
-- Signals never grant ownership. See the [general interaction](../../MobileHarness/Agents/Core/Communication/README.md).
+- Signals never grant ownership. See the [general interaction](../../MobileHarness/Agents/Support/Core/Communication/README.md).
 
 ## Takeover and physical boundaries
 

@@ -30,9 +30,13 @@ private func intentRuntime(
 {
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication, externalSources: ["user", "runtime"],
-        configurations: [AgentConfigurations.load(named: "Memory")])
-    let input = InputGateway(manager: manager, policy: policy)
+        contracts: AgentContracts.communication,
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
+        configurations: AgentConfigurations.all())
+    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let definition = ActionBinding(
         function: UIActions.showHistoryDefinition(handler: { invocation in
             try await UIActions.showHistory(invocation: invocation, using: presentation)
@@ -128,10 +132,10 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
                 sessionID: session, payload: .event("history.delete"),
                 metadata: InputMetadata(payload: .event("history.delete"), source: "user")))
     }
-    await #expect(throws: CommunicationError.invalidPayload) {
+    await #expect(throws: CommunicationError.unauthorized) {
         try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: UUID()))
     }
-    for _ in 0..<8 { try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session)) }
+    for _ in 0..<256 { try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session)) }
     await #expect(throws: CommunicationError.capacityExceeded) {
         try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session))
     }
@@ -540,7 +544,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     try await memory.start()
     try await photographer.start()
     var accepted: [UUID] = []
-    for _ in 0..<8 {
+    for _ in 0..<256 {
         let input = MemoryHistoryIntent.refresh.input(sessionID: session)
         accepted.append(input.id)
         try await memory.receive(input)
@@ -549,7 +553,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         try await memory.receive(MemoryHistoryIntent.refresh.input(sessionID: session))
     }
     #expect(await memory.status().lifecycle == .failed)
-    #expect(await memory.status().processedInputs == 8)
+    #expect(await memory.status().processedInputs == 256)
     #expect(await photographer.status().lifecycle == .running)
     var retained: [UUID] = []
     for await envelope in memory.outputs {

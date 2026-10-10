@@ -163,3 +163,30 @@ ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed 
 ✅ Implemented: History workflow tests cover selected turn/reference ownership, missing files, reader failure, cancellation and four-read rejection without file/model/native I/O.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories are read-only until scoped mutation intents are defined. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+
+✅ Execution-log regressions cover task-only projection, admission vs completion, ignored playback completion and terminal progress without native models/devices.
+
+✅ Frontend/backend regression: while a backend device operation is held, page visibility/system settings and motor-stop fencing complete immediately and add no business request. Explicit device commands retain coalescing and bounded sequencing.
+
+
+✅ Home-log regression: task-only projection retains admission/completion distinction, ignores runtime.replyFinished and prevents late progress reopening terminal tasks. No native model or device is used.
+
+
+✅ Model timing regression: context/history projection preserves adapter request start, first text time and monotonic latency, excluding journal/admission timestamps.
+
+
+✅ ConversationPresentationTests covers finalized prior user/reply captions followed by onset-first or transcript-first recognition, lower-slot reset, partial replacement, final promotion, preserved user text during reply, and stale/duplicate/invalid-sequence rejection. Tests use real presentation projection with passive UI state, no native capture or ASR; true-device layout/animation remains separate.
+
+
+## Task-scoped specialist history
+
+✅ Implemented: Assistant keeps current/archived conversation navigation. Specialist destinations show task lists and task-scoped detail/export instead of current/past conversation summaries. App HistoryPresentationAdapter projects one immutable repository snapshot using task identity, durable Signal evidence and task state; UI owns display-only task values. ReACT and later task inputs belong to the same task. Original task requests provide titles, not the latest reply. Records lacking retained task association remain separately labeled unassociated inputs, without inventing task identity. Task reads reuse the existing single load slot and photo authorization; no second writable history, LLM summary, directory or dependency is added. Regressions cover isolation, continuation grouping across old archives, task status, legacy/unassociated records and empty tasks. Missing task dates stay empty; terminal/recovered status takes precedence over stale waiting-user reports. ❌ Native UI/device acceptance remains separate from automated checks.
+
+
+✅ Reply/lifecycle regression correction: caption focus is presentation only and cannot cancel an authorized queued/playing reply from another Agent. Playback checks active session and explicit task cancellation, retaining Gateway owner/task/function authorization and the shared serialized Speech Channel. ApplicationControl accepts environment facts and correlated feedback while paused; fresh business commands still require running. Assistant delegation prompts emit send without redundant spoken acknowledgments and leave specialist speech to its executor. Scope/result delivery failures retain actual evidence; no silent error suppression or action replay is added. Add owner-switch playback admission and paused environment regressions.

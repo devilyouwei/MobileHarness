@@ -2,6 +2,8 @@
 
 Purpose: validate code, download local models and stage selected resources. Design goals: reproducible development inputs and minimal runtime configuration.
 
+Implemented Agent business-source audit: speech boundary validation maps TranscriptAccumulator to its owning SpeechRecognitionTurn source, requires the helper declaration and preserves the Foundation/ModelKit-only import rule. File co-location does not relax module isolation.
+
 - ✅ check.sh runs formatting, root tests and metadata validation; build-ios.sh builds four simulator schemes.
 - ✅ select-app-icon.sh accepts `original` or `robot-camera`, copying a preserved 1024 × 1024 variant into the shared app icon slot; rebuild/install after selection.
 - ✅ model_download.py reads production sources from model-catalog.json and resolves selected HF files through paginated Hub metadata. Only Gemma 4 E2B4B retains a separate test profile; Nemotron macos/ios options select the same Core ML catalog entry. Gemma 4 E2B defaults to 2B; --size 4b selects comparison. The inactive Audio8 wrapper/profile is removed.
@@ -46,7 +48,7 @@ flowchart LR
 
 ✅ Agent boundary validation now allows Foundation-only Storage for the shared conversation journal. ModelKit remains independent of Storage and business modules.
 
-✅ Directory consolidation checks require Agents/Core to remain the independent AgentCore target, exclude it from business compilation, compile independent FunctionContracts/ExecutionRuntime/CallRuntime targets with their explicit dependency boundaries and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
+✅ Directory consolidation checks require Agents/Support/Core to remain the independent AgentCore target, exclude it from business compilation, compile independent FunctionContracts/ExecutionRuntime/CallRuntime targets with their explicit dependency boundaries and reject direct Gateway behavior calls. Core source checks use its new path and fail if it is missing. ❌ Static checks do not prove callback behavior.
 
 ✅ Boundary checks enforce the independent UI target at MobileHarness/UI, shared value-only dependencies, no service construction/App coordinator references, explicit ApplicationRuntime injection, and README coverage in both App and UI directories.
 
@@ -102,7 +104,7 @@ flowchart LR
 
 ✅ Boundary checks require AgentCore → Types only and reject concrete AgentID constants, pose/speech value definitions and automatic speech prompt policy under Core. Closed domain messages and their catalog remain a documented future migration.
 
-✅ Boundary checks reject speech/vision schema strings and fixed gray64 transport under Core/Gateway, enforce shared values in Types and business contracts in Agents/Communication, and validate relocated App native adapters.
+✅ Boundary checks reject speech/vision schema strings and fixed gray64 transport under Core/Gateway, enforce shared values in Types and business contracts in Agents/Support/Communication, and validate relocated App native adapters.
 
 ✅ SpeechPerception boundary checks require the four perception helpers and restrict their imports to Foundation/ModelKit; transport, presentation and device ownership remain in their owning layers. ❌ Semantic actor race validation remains runtime-test responsibility.
 
@@ -112,7 +114,7 @@ flowchart LR
 
 ✅ Storage boundary validation scans nested core sources and qualified imports (including import struct/import func). Storage core accepts Foundation only; StorageChat/StorageAudio accept Foundation plus internal Storage only. ❌ External data aliases and concrete services cannot enter storage targets.
 
-✅ Boundary checks require Agent-domain speech/pose values in Agents/Communication, reject their declarations under Types/Core, and keep image receiver ordering/session policy out of Types. ❌ No domain value re-export or compatibility alias is retained.
+✅ Boundary checks require Agent-domain speech/pose values in Agents/Support/Communication, reject their declarations under Types/Core, and keep image receiver ordering/session policy out of Types. ❌ No domain value re-export or compatibility alias is retained.
 
 ✅ Types removal is checked through zero-dependency AgentCore, StorageChat-only UI, retired-target/import rejection, and existing vision payload/PCM integration tests. ❌ Simulator validation remains subject to CoreAI availability.
 
@@ -253,3 +255,16 @@ flowchart LR
 ❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.
 
 ✅ Ownership inventory update: add Camera.Capture.savePhoto/ignorePhoto to the existing boundary check; keep PlatformKit localization and module independence checks intact.
+
+Pending ADR0188: boundary validation permits the shared output consumer in existing Settings/History targets and base ModelKit/StorageChat in specialist business Agents. Core remains Foundation-only; concrete device/UI/Actions imports remain forbidden in Agents. Canonical Assistant entry may specialize the shared Chat actor. Robot takeover belongs to Assistant interaction Actions and fixed ApplicationControl operations over Photographer.
+
+✅ ADR0189 implemented: boundary checks follow Agents/Support/Core and Support/Communication; the independent AgentCore target and its exclusion from Agents business compilation remain enforced.
+
+ADR0189 layer checks require Core imports to remain Foundation-only, Communication to use Foundation/AgentCore, Context to use Foundation/AgentCore/Storage, and Chat to use Foundation/AgentCore/ModelKit/StorageChat. Shared source placement cannot relax these boundaries.
+
+✅ Implemented: capability ownership guards recognize cohesive Speech/ListeningActions.swift and its canonical Speech.Listening.update function. Publication/listening regressions validate one-way routing and default-Agent authority.
+
+
+✅ Robot Action ownership correction: Resource-policy audit checks Assistant and fixed ApplicationControl allowed writers and joined takeover of Photographer. Do not treat old ApplicationControl-only model-motion ownership as current architecture.
+
+✅ Task-history boundary update: HistoryPresentationAdapter may import AgentCore/Agents solely to project immutable context/task contracts to UI-owned values. It does not invoke Agents, mutate history, select context for inference or own task policy. The boundary allowlist remains file-specific; UI retains zero project dependencies.

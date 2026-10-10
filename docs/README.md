@@ -227,3 +227,11 @@ Agent role organization: [ADR0180](adr/0180-memory-photographer-service-organiza
 ✅ [Independent Tool/Action consumer validation](Validation-History.md#2026-10-08--independent-tool-and-action-protocol-consumers) records focused regressions and unsigned iOS device build separately from full-run BLE fixture failures and the Simulator CoreAI dependency limit.
 
 ✅ [ADR0186](adr/0186-camera-lens-switch-lifetime.md): healthy lens input replacement completes independently of joined perception retirement; physical latency acceptance remains pending.
+
+✅ [ADR0187 — Agent composition and ReACT](adr/0187-agent-composition-and-react.md): implemented abstraction and contracts; business roles retained, phase-two delegation remains separate.
+
+✅ [Shared Agent source hierarchy - ADR0189](adr/0189-agent-support-hierarchy.md): implemented; repository checks and unsigned iOS device build passed.
+
+✅ [SpeechPerception listening and one-way publication](adr/0190-assistant-listening-and-one-way-publication.md): resident perception authority, fixed listening Action, unacknowledged publication and recoverable speech errors. ❌ Physical acoustic acceptance pending.
+
+✅ [SpeechPerception listening authority validation](Validation-History.md#2026-10-09--speechperception-listening-authority):651 integration and67 workflow tests plus unsigned iOS device build passed. ❌ Simulator CoreAI dependency, installation and physical acoustic acceptance remain outstanding.

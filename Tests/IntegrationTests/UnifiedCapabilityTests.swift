@@ -181,7 +181,7 @@ private actor UnifiedReceiptAgent: Agent {
     try await manager.register(agent, sessionID: session)
     try await manager.start(agent.descriptor.id)
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager),
+        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true),
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
     let first = AgentInput(sessionID: session, payload: .event("fixture"))
     try await gateway.dispatch(
@@ -374,7 +374,7 @@ private struct PureFunctionFixture: CapabilityModule {
     try await manager.start(agent.descriptor.id)
     let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager),
+        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true),
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
     let failed = try await gateway.dispatch(
         .init(

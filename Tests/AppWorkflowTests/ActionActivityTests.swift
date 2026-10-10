@@ -210,3 +210,67 @@ extension ActionActivityState {
     #expect(state.outputIssues.count == 1)
     pair.continuation.finish()
 }
+
+@Test @MainActor func executionLogInternalFilteringMatchesHomeAndPreservesFailures() {
+    func caption(_ phase: ActionExecutionRecord.Phase) -> ActionActivityItem {
+        .init(
+            execution: .init(
+                id: UUID(), path: .init(domain: "UI", module: "Caption", function: "print"),
+                displayName: "字幕", source: .assistant, sessionID: UUID(), inputID: UUID(), channel: "Display",
+                semantics: .finite, phase: phase, admittedAt: .now))
+    }
+    let state = ActionActivityState()
+    let internalSuccess = caption(.succeeded)
+    let internalFailure = caption(.failed)
+    let business = ActionActivityItem(execution: activityRecord())
+    state.replace(revision: 1, records: [business, internalSuccess, internalFailure], evictedCount: 0)
+    #expect(state.visibleActions.map(\.id) == [business.id, internalFailure.id])
+    #expect(state.summaries(at: .now).allSatisfy { $0.item.id != internalSuccess.id })
+    state.showsInternalActions = true
+    #expect(state.visibleActions.count == 3)
+    state.selectedFilter = .failed
+    #expect(state.visibleActions.map(\.id) == [internalFailure.id])
+}
+
+@Test @MainActor func executionLogTaskReceiptIsNotCompletionAndLateProgressCannotReopen() async throws {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    workflow.startTasks(
+        observe: { pair.stream }, taskContent: { signal in ("task report", signal.kind == .progress) })
+    let scope = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: UUID())
+    func record(
+        _ kind: AgentTaskSignal.Kind, status: AgentTaskSignal.Status? = nil, businessContract: String = "fixture"
+    ) throws -> SignalTraceRecord {
+        let signal = try AgentTaskSignal(
+            kind: kind, scope: scope, businessContract: businessContract, data: Data(), status: status)
+        let input = AgentInput(
+            sessionID: scope.sessionID, payload: .observation(try signal.message()), taskScope: scope)
+        var value = SignalTraceRecord(input: input, mode: .send, targets: [.photographer], summary: "")
+        value.phase = .accepted
+        return value
+    }
+    let accepted = try record(.request)
+    pair.continuation.yield(.init(revision: 1, records: [accepted]))
+    let end = ContinuousClock.now.advanced(by: .seconds(3))
+    while state.tasks.isEmpty && ContinuousClock.now < end { await Task.yield() }
+    #expect(state.tasks.first?.phase == .accepted)
+    #expect(state.tasks.first?.isTerminal == false)
+    let question = try record(.progress)
+    pair.continuation.yield(.init(revision: 2, records: [accepted, question]))
+    while state.tasks.first?.phase != .waitingUser && ContinuousClock.now < end { await Task.yield() }
+    #expect(state.tasks.first?.phase == .waitingUser)
+    let playback = try record(.progress, businessContract: "runtime.replyFinished")
+    pair.continuation.yield(.init(revision: 3, records: [accepted, question, playback]))
+    #expect(state.tasks.first?.phase == .waitingUser)
+    let result = try record(.result, status: .succeeded)
+    pair.continuation.yield(.init(revision: 4, records: [accepted, question, playback, result]))
+    while state.tasks.first?.phase != .succeeded && ContinuousClock.now < end { await Task.yield() }
+    #expect(state.tasks.first?.phase == .succeeded)
+    let progress = try record(.progress)
+    pair.continuation.yield(.init(revision: 5, records: [accepted, question, playback, result, progress]))
+    while state.tasks.first?.events.count != 4 && ContinuousClock.now < end { await Task.yield() }
+    #expect(state.tasks.first?.phase == .succeeded)
+    #expect(state.tasks.first?.events.count == 4)
+    pair.continuation.finish()
+}

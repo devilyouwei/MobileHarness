@@ -6,11 +6,16 @@
     public struct ActionActivityView: View {
         @Bindable private var state: ActionActivityState
         @State private var showingHistory = false
-        public init(state: ActionActivityState) { self.state = state }
+        @State private var taskPath: [UUID] = []
+        private let taskHistory: ((String, Set<UUID>) -> AnyView?)?
+        public init(state: ActionActivityState, taskHistory: ((String, Set<UUID>) -> AnyView?)? = nil) {
+            self.state = state
+            self.taskHistory = taskHistory
+        }
 
         public var body: some View {
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                let channels = state.summaries(at: context.date).filter { !$0.item.isFailure }
+                let channels = state.summaries(at: context.date)
                 VStack(alignment: .trailing, spacing: 12) {
                     if !channels.isEmpty || state.observationUnavailable {
                         VStack(alignment: .leading, spacing: 8) {
@@ -74,64 +79,175 @@
             }
             .accessibilityIdentifier("conversation.actions.status")
             .sheet(isPresented: $showingHistory) {
-                NavigationStack {
-                    List {
-                        let active = state.items.filter(\.isActive)
-                        if !active.isEmpty {
-                            Section("正在执行与等待") {
-                                ForEach(active) { item in historyRow(item) }
-                            }
-                        }
-                        Section("调度异常") {
-                            ForEach(state.items.filter(\.isFailure).reversed()) { item in historyRow(item) }
-                            ForEach((state.outputIssues + state.backgroundIssues).sorted { $0.time > $1.time }) {
-                                issue in
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(issue.title).font(.body.weight(.medium))
-                                    Text(issue.source).font(.caption).foregroundStyle(.secondary)
-                                    Text(issue.message).font(.subheadline).textSelection(.enabled)
-                                    Text(issue.time, style: .time).font(.caption).foregroundStyle(.secondary)
-                                    if issue.failureCode != nil || issue.context != nil {
-                                        DisclosureGroup("执行信息") {
-                                            if let code = issue.failureCode { Text("错误代码：\(code)") }
-                                            if let context = issue.context {
-                                                Text("持续任务：\(context.workerID)")
-                                                if let call = context.callID { Text("来源调用：\(call)") }
-                                                if let input = context.inputID { Text("来源输入：\(input)") }
-                                                if let session = context.sessionID { Text("来源会话：\(session)") }
-                                            }
-                                        }.font(.caption).textSelection(.enabled)
-                                    }
+                NavigationStack(path: $taskPath) {
+                    VStack(spacing: 0) {
+                        Picker("记录类型", selection: $state.selectedTab) {
+                            ForEach(ExecutionLogTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }.pickerStyle(.segmented).padding(.horizontal).padding(.top, 12)
+                        HStack {
+                            Menu {
+                                Button("全部 Agent") { state.selectedSource = "全部" }
+                                ForEach(state.sources, id: \.self) { source in
+                                    Button(source) { state.selectedSource = source }
                                 }
+                            } label: {
+                                Label(
+                                    state.selectedSource == "全部" ? "全部 Agent" : state.selectedSource,
+                                    systemImage: "line.3.horizontal.decrease")
                             }
-                            if state.items.allSatisfy({ !$0.isFailure }) && state.outputIssues.isEmpty
-                                && state.backgroundIssues.isEmpty
-                            {
-                                Text("暂无调度异常").foregroundStyle(.secondary)
+                            Spacer()
+                            if state.selectedTab == .action {
+                                Toggle("内部动作", isOn: $state.showsInternalActions).font(.caption).fixedSize()
                             }
+                        }.padding(.horizontal).padding(.vertical, 8)
+                        Picker("状态", selection: $state.selectedFilter) {
+                            ForEach(ExecutionLogFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }.pickerStyle(.segmented).padding(.horizontal).padding(.bottom, 8)
+                        if let taskID = state.selectedTaskID,
+                            state.selectedTab == .action
+                        {
+                            HStack {
+                                Text("任务：" + String(taskID.uuidString.prefix(8))).font(.caption)
+                                Spacer()
+                                Button("查看全部") { state.selectedTaskID = nil }
+                            }.padding(.horizontal).padding(.bottom, 8)
                         }
-                        Section("最近结果") {
-                            ForEach(state.items.filter { !$0.isActive && !$0.isFailure }.reversed()) { item in
-                                historyRow(item)
-                            }
-                            if state.items.allSatisfy({ $0.isActive || $0.isFailure }) {
-                                Text("还没有已结束的动作").foregroundStyle(.secondary)
-                            }
-                        }
-                        if state.evictedCount > 0 || state.issueEvictions > 0 {
-                            Text("每类历史最多保留 100 条，已移除 \(state.evictedCount + state.issueEvictions) 条较早记录。")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
+                        List { logRows }
                     }
+                    .navigationDestination(for: UUID.self) { taskDetail($0) }
                     .navigationTitle("执行记录")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("完成") { showingHistory = false }
-                        }
+                        ToolbarItem(placement: .confirmationAction) { Button("完成") { showingHistory = false } }
                     }
                 }
                 .presentationDetents([.medium, .large])
+            }
+        }
+
+        @ViewBuilder private var logRows: some View {
+            switch state.selectedTab {
+            case .action:
+                let active = state.visibleActions.filter(\.isActive)
+                let finished = state.visibleActions.filter { !$0.isActive }
+                if !active.isEmpty { Section("正在执行与等待") { ForEach(active) { historyRow($0) } } }
+                if !finished.isEmpty { Section("最近结果") { ForEach(finished.reversed()) { historyRow($0) } } }
+                if state.visibleActions.isEmpty { emptyRow("暂无符合条件的动作") }
+                retention(state.evictedCount)
+            case .task:
+                ForEach(state.visibleTasks.reversed()) { task in
+                    NavigationLink(value: task.id) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(task.title.isEmpty ? "任务 " + String(task.id.uuidString.prefix(8)) : task.title)
+                                .lineLimit(2)
+                            Text(task.requester + " → " + task.executor).font(.caption).foregroundStyle(.secondary)
+                            Text(task.phase.rawValue).font(.subheadline).foregroundStyle(
+                                task.phase == .failed ? .orange : .secondary)
+                        }.padding(.vertical, 4)
+                    }
+                }
+                if state.visibleTasks.isEmpty { emptyRow("暂无符合条件的任务") }
+                retention(state.taskEvictions)
+            case .agent:
+                let issues = state.runtimeIssues.filter {
+                    state.matchesSource([$0.source])
+                        && state.matchesStatus(active: false, success: false, failure: true)
+                }
+                let events = state.agentEvents.filter {
+                    state.matchesSource([$0.source])
+                        && state.matchesStatus(active: false, success: !$0.isFailure, failure: $0.isFailure)
+                }
+                if !issues.isEmpty { Section("运行异常") { ForEach(issues) { issueRow($0) } } }
+                if !events.isEmpty {
+                    Section("Agent 状态") {
+                        ForEach(events.reversed()) { event in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(event.source).font(.body.weight(.medium))
+                                Text(event.status).font(.subheadline).foregroundStyle(
+                                    event.isFailure ? .orange : .secondary)
+                                Text(event.time, style: .time).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                if issues.isEmpty && events.isEmpty { emptyRow("暂无符合条件的 Agent 记录") }
+                retention(state.issueEvictions + state.agentEventEvictions)
+            }
+        }
+        private func emptyRow(_ title: String) -> some View { Text(title).foregroundStyle(.secondary) }
+        @ViewBuilder private func retention(_ count: UInt64) -> some View {
+            if count > 0 { Text("已移除 \(count) 条较早记录").font(.footnote).foregroundStyle(.secondary) }
+        }
+        @ViewBuilder private func taskDetail(_ id: UUID) -> some View {
+            if let task = state.tasks.first(where: { $0.id == id }) {
+                List {
+                    Section("任务") {
+                        Text(task.title)
+                        Text(task.requester + " → " + task.executor)
+                        Text(task.phase.rawValue)
+                        if let parentID = task.parentID {
+                            Text("父任务 / 输入：" + parentID.uuidString).font(.caption).textSelection(.enabled)
+                        }
+                    }
+                    Section("时间线") {
+                        ForEach(task.events) { event in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "circle.fill").font(.caption2).foregroundStyle(.blue).padding(.top, 5)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(event.title)
+                                    if !event.detail.isEmpty {
+                                        Text(event.detail).font(.subheadline).textSelection(.enabled)
+                                    }
+                                    Text(event.time, style: .time).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        if task.evictedEvents > 0 {
+                            Text("已移除 \(task.evictedEvents) 条较早事件").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Section("关联记录") {
+                        Button("查看 Action") { selectRelated(.action, task: id) }
+                        if let destination = taskHistory?(
+                            task.executor,
+                            Set(task.events.map(\.id)))
+                        {
+                            NavigationLink {
+                                destination
+                            } label: {
+                                Text("查看模型与 Tool 记录")
+                            }
+                        }
+                    }
+                }.navigationTitle("任务详情")
+            } else {
+                Text("该任务记录已超出保留范围")
+            }
+        }
+        private func selectRelated(_ tab: ExecutionLogTab, task: UUID) {
+            taskPath.removeAll()
+            state.selectedTaskID = task
+            state.selectedTab = tab
+            state.selectedFilter = .all
+            state.selectedSource = "全部"
+        }
+        private func issueRow(_ issue: ExecutionIssue) -> some View {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(issue.title).font(.body.weight(.medium))
+                Text(issue.source).font(.caption).foregroundStyle(.secondary)
+                Text(issue.message).font(.subheadline).textSelection(.enabled)
+                Text(issue.time, style: .time).font(.caption).foregroundStyle(.secondary)
+                if let code = issue.failureCode { Text("错误代码：" + code).font(.caption) }
+                if let input = issue.inputID {
+                    Text("来源输入：" + input.uuidString).font(.caption2).textSelection(.enabled)
+                }
+                if let context = issue.context {
+                    DisclosureGroup("关联信息") {
+                        Text("持续任务：" + context.workerID.uuidString)
+                        if let callID = context.callID { Text("来源调用：" + callID.uuidString) }
+                        if let sessionID = context.sessionID { Text("会话：" + sessionID.uuidString) }
+                    }.font(.caption).textSelection(.enabled)
+                }
             }
         }
 
@@ -148,9 +264,18 @@
                     .foregroundStyle(item.isFailure ? Color.orange : Color.secondary)
                     .frame(width: 20)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(item.title).font(.body.weight(.medium))
-                    Text("\(item.channelTitle) · \(item.status)")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    HStack {
+                        Text(item.title).font(.body.weight(.medium))
+                        if item.isInternal { Text("内部").font(.caption2).foregroundStyle(.secondary) }
+                    }
+                    if let start = item.execution.startedAt, let end = item.execution.endedAt {
+                        Text(end.timeIntervalSince(start).formatted(.number.precision(.fractionLength(2))) + " 秒")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text(
+                        "\(item.source.isEmpty ? item.channelTitle : item.source + " · " + item.channelTitle) · \(item.status)"
+                    )
+                    .font(.subheadline).foregroundStyle(.secondary)
                     if !item.issueDescriptions.isEmpty {
                         DisclosureGroup("查看全部问题") {
                             ForEach(Array(item.issueDescriptions.enumerated()), id: \.offset) { _, description in

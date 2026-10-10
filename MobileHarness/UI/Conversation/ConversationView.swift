@@ -5,13 +5,15 @@
     public struct ConversationView: View {
         @Bindable var state: ConversationState
         @Bindable var activity: ActionActivityState
+        private let taskHistory: ((String, Set<UUID>) -> AnyView?)?
         private let toggleVoice: () -> Void
         public init(
             state: ConversationState, activity: ActionActivityState,
-            toggleVoice: @escaping () -> Void
+            toggleVoice: @escaping () -> Void, taskHistory: ((String, Set<UUID>) -> AnyView?)? = nil
         ) {
             self.state = state
             self.activity = activity
+            self.taskHistory = taskHistory
             self.toggleVoice = toggleVoice
         }
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -117,7 +119,7 @@
                     VStack {
                         Spacer(minLength: 0)
                         if activity.hasRecords || activity.observationUnavailable {
-                            ActionActivityView(state: activity)
+                            ActionActivityView(state: activity, taskHistory: taskHistory)
                         }
                     }
                     .frame(width: geometry.size.width - 40)

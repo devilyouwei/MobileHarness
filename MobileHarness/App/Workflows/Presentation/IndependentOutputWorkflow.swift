@@ -11,12 +11,17 @@ public enum IndependentOutputWorkflow {
         let reader = OutputStreamReader(outputs)
         while true {
             let tools = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+            let communications = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
             let actions = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
             let boundary = try await withThrowingTaskGroup(
                 of: BranchCompletion.self, returning: OutputEnvelope?.self
             ) { group in
                 group.addTask {
                     try await consumeTools(tools.stream, dispatch: dispatch)
+                    return .drained
+                }
+                group.addTask {
+                    try await consumeTools(communications.stream, dispatch: dispatch)
                     return .drained
                 }
                 group.addTask {
@@ -28,11 +33,14 @@ public enum IndependentOutputWorkflow {
                     return .drained
                 }
                 group.addTask {
-                    let boundary = try await reader.routeRound(tools: tools.continuation, actions: actions.continuation)
+                    let boundary = try await reader.routeRound(
+                        tools: tools.continuation, actions: actions.continuation,
+                        communications: communications.continuation)
                     return .boundary(boundary)
                 }
                 defer {
                     group.cancelAll()
+                    communications.continuation.finish()
                     tools.continuation.finish()
                     actions.continuation.finish()
                 }
@@ -45,6 +53,7 @@ public enum IndependentOutputWorkflow {
                             boundary = envelope
                             cancelling = envelope.map { isFailure($0.output) } ?? true
                             if cancelling { group.cancelAll() }
+                            communications.continuation.finish()
                             tools.continuation.finish()
                             actions.continuation.finish()
                         }
@@ -112,6 +121,45 @@ public enum IndependentOutputWorkflow {
         }
     }
 
+    /// Streaming/deterministic producers have independent communication delivery and ordered function output.
+    public static func consumeSignals(
+        _ outputs: AsyncStream<OutputEnvelope>,
+        dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
+    ) async throws {
+        let actions = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
+        let communications = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await consumeTools(communications.stream, dispatch: dispatch) }
+            group.addTask {
+                for await envelope in actions.stream {
+                    try Task.checkCancellation()
+                    try await dispatch(envelope)
+                }
+            }
+            group.addTask {
+                for await envelope in outputs {
+                    try Task.checkCancellation()
+                    let destination: AsyncStream<OutputEnvelope>.Continuation
+                    if case .communication = envelope.output {
+                        destination = communications.continuation
+                    } else {
+                        destination = actions.continuation
+                    }
+                    guard case .enqueued = destination.yield(envelope) else { throw HarnessError.queueFull }
+                }
+                communications.continuation.finish()
+                actions.continuation.finish()
+            }
+            defer {
+                group.cancelAll()
+                communications.continuation.finish()
+                actions.continuation.finish()
+            }
+            try await group.waitForAll()
+            try Task.checkCancellation()
+        }
+    }
+
     public static func consume(
         _ outputs: AsyncStream<OutputEnvelope>,
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void,
@@ -136,6 +184,7 @@ private actor OutputStreamReader {
     private var iterator: AsyncStream<OutputEnvelope>.Iterator?
     private var inputID: UUID?
     private var nativeCalls = 0
+    private var taskCounts: [UUID: Int] = [:]
 
     init(_ outputs: AsyncStream<OutputEnvelope>) { iterator = outputs.makeAsyncIterator() }
 
@@ -150,15 +199,18 @@ private actor OutputStreamReader {
 
     func routeRound(
         tools: AsyncStream<OutputEnvelope>.Continuation,
-        actions: AsyncStream<OutputEnvelope>.Continuation
+        actions: AsyncStream<OutputEnvelope>.Continuation,
+        communications: AsyncStream<OutputEnvelope>.Continuation
     ) async throws -> OutputEnvelope? {
         while let envelope = try await next() {
             try Task.checkCancellation()
-            if let inputID {
-                guard inputID == envelope.inputID else { throw HarnessError.invalidTransition }
-            } else {
-                inputID = envelope.inputID
-                nativeCalls = 0
+            if envelope.roundID != nil {
+                if let inputID {
+                    guard inputID == envelope.inputID else { throw HarnessError.invalidTransition }
+                } else {
+                    inputID = envelope.inputID
+                    nativeCalls = taskCounts[envelope.inputID, default: 0]
+                }
             }
             let terminal: Bool
             if case .control(let value) = envelope.output {
@@ -168,11 +220,15 @@ private actor OutputStreamReader {
             } else {
                 terminal = false
             }
-            if terminal {
+            if terminal, inputID == nil || inputID == envelope.inputID {
+                taskCounts[envelope.inputID] = nil
                 inputID = nil
                 return envelope
             }
-            if case .roundFinished = envelope.output { return envelope }
+            if case .roundFinished = envelope.output {
+                inputID = nil
+                return envelope
+            }
             let native: Bool
             switch envelope.output {
             case .toolCall: native = envelope.roundID != nil
@@ -182,8 +238,16 @@ private actor OutputStreamReader {
             if native {
                 guard nativeCalls < 16 else { throw HarnessError.queueFull }
                 nativeCalls += 1
+                guard taskCounts[envelope.inputID] != nil || taskCounts.count < 32 else { throw HarnessError.queueFull }
+                taskCounts[envelope.inputID] = nativeCalls
             }
-            switch (native ? tools : actions).yield(envelope) {
+            let destination: AsyncStream<OutputEnvelope>.Continuation
+            if case .communication = envelope.output {
+                destination = communications
+            } else {
+                destination = native ? tools : actions
+            }
+            switch destination.yield(envelope) {
             case .enqueued: break
             case .dropped, .terminated: throw HarnessError.queueFull
             @unknown default: throw HarnessError.queueFull

@@ -119,11 +119,11 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 @Test func photographerPolicyAcceptsVisionPose() throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: ["user", "runtime", "phone.microphone", "phone.camera"],
-        configurations: [
-            AgentConfigurations.load(named: "VisionPerception"),
-            AgentConfigurations.load(named: "Photographer"),
-        ])
+        externalSources: [
+            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
+            "app.environment",
+        ],
+        configurations: AgentConfigurations.all())
     let input = observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: UUID())
     #expect(policy.destinations(for: input) == [.photographer])
 }
@@ -337,7 +337,7 @@ private actor AimLink: NexArmWritableLink {
 
 @Test func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
     let session = UUID()
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
     try await agent.start()
     for index in 0..<8 {
         try await agent.receive(
@@ -396,7 +396,7 @@ private actor ArmAvailability {
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
     await agent.stop()
     var sequences: [UInt64] = []
-    for await output in agent.outputs { sequences.append(output.sequence) }
+    for await output in agent.outputs { sequences.append(output.inputMetadata.sequence) }
     #expect(sequences == [2])
 }
 
@@ -417,7 +417,7 @@ private actor ArmAvailability {
 
 @Test func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
     let session = UUID()
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
     try await agent.start()
     for sequence in 1...8 {
         try await agent.receive(

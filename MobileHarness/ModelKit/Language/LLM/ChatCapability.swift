@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Bounded image bytes, independent of platform images and Agent storage.
 public struct ChatImage: Codable, Equatable, Sendable {
@@ -61,7 +62,47 @@ public struct ChatToolCall: Codable, Equatable, Sendable {
     }
 }
 
+/// Per-request provider timing. Sampling never waits for the consumer or persistence.
+public final class ChatTiming: Sendable {
+    public struct Snapshot: Sendable, Equatable {
+        public let startedAt: Date
+        public let firstTokenAt: Date?
+        public let firstTokenLatency: Double?
+    }
+    private struct State {
+        var startedAt: Date?
+        var started: ContinuousClock.Instant?
+        var firstTokenAt: Date?
+        var latency: Double?
+    }
+    private let state = Mutex(State())
+    public init() {}
+    public func start() {
+        state.withLock {
+            guard $0.started == nil else { return }
+            $0.startedAt = Date()
+            $0.started = .now
+        }
+    }
+    public func recordText(_ text: String) {
+        guard !text.isEmpty else { return }
+        state.withLock {
+            guard let start = $0.started, $0.firstTokenAt == nil else { return }
+            let elapsed = start.duration(to: .now).components
+            $0.firstTokenAt = Date()
+            $0.latency = Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
+        }
+    }
+    public var snapshot: Snapshot? {
+        state.withLock {
+            guard let start = $0.startedAt else { return nil }
+            return Snapshot(startedAt: start, firstTokenAt: $0.firstTokenAt, firstTokenLatency: $0.latency)
+        }
+    }
+}
+
 public struct ChatRequest: Sendable {
+    public var timing: ChatTiming?
     public let context: InferenceContext
     public let messages: [ChatMessage]
     public let maximumOutputTokens: Int?

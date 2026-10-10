@@ -157,7 +157,7 @@ flowchart LR
 
 ## Action and Tool presentation boundary
 
-✅ ActionActivityWorkflow forwards every scheduled Action without module/source filtering; UI displays its captured failureDescription directly. Unknown errors use Swift localizedDescription; App adapts neutral speech storage/producer failures after playback cleanup, while other domain LocalizedError values retain their wording. Conversation history dry-run output labels Tool events explicitly. ❌ No duplicate error-message table is maintained.
+✅ ActionActivityWorkflow retains the complete scheduled Action snapshot; UI applies source/status/internal-action filters and displays captured failureDescription directly. Unknown errors use Swift localizedDescription; App adapts neutral speech storage/producer failures after playback cleanup, while other domain LocalizedError values retain their wording. Conversation history dry-run output labels Tool events explicitly. ❌ No duplicate error-message table is maintained.
 
 ## Head gestures
 
@@ -293,3 +293,10 @@ flowchart LR
 ✅ Implemented: History adds a read-only photo loader, validates model-turn/attachment identity against the current archive and admits at most four active reads with explicit overflow and joined per-call cleanup. No mutation or model operation is added.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories are read-only until scoped mutation intents are defined. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+✅ Execution-log tabs: root presentation owns independent Signal/Action/error observations. Admission diagnostics and explicit public task progress drive passive log projections, never business execution or publication acknowledgments.

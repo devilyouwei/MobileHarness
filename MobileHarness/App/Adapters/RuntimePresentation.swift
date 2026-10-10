@@ -10,6 +10,7 @@ import FunctionContracts
 @MainActor
 protocol VoiceOutputHandling: AnyObject, Sendable {
     func validateCameraControl(invocation: any FunctionInput) throws
+    func updateListening(enabled: Bool, paused: Bool, revision: UInt64, invocation: any FunctionInput) async throws
     func play(audioID: UUID, invocation: any FunctionInput) async throws
     func present(_ text: String, invocation: any FunctionInput) throws
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws
@@ -33,7 +34,7 @@ protocol CameraOutputHandling: AnyObject, Sendable {
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
 @MainActor
 final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
-    PosePresentationCapability, CameraControlCapability
+    PosePresentationCapability, CameraControlCapability, SpeechListeningCapability
 {
     private let cameraControl: any CameraControlCapability
     private let rootSessionID: UUID
@@ -41,12 +42,6 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         self.cameraControl = cameraControl
         self.rootSessionID = rootSessionID
     }
-    var cameraRequests:
-        (
-            @MainActor @Sendable (
-                PhotographerCameraIntent.Operation, PhotographerCameraIntent.Facing?, UUID?, any FunctionInput
-            ) async throws -> String?
-        )?
     private func cameraOperation(
         _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil, photoID: UUID? = nil,
         invocation: any FunctionInput
@@ -77,18 +72,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
             }
             return nil
         }
-        guard invocation.context.source == "assistant", let voice, let cameraRequests else {
-            throw CommunicationError.unauthorized
-        }
-        try voice.validateCameraControl(invocation: invocation)
-        do {
-            return try await cameraRequests(
-                operation, facing.flatMap { PhotographerCameraIntent.Facing(rawValue: $0.rawValue) }, photoID,
-                invocation)
-        } catch PhotographerIntentFailure.execution(let result) {
-            if case .report(let report)? = result.tool?.completion { throw ActionReportedError(report) }
-            throw PhotographerIntentFailure.execution(result)
-        }
+        throw CommunicationError.unauthorized
     }
     func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         guard let result = try await cameraOperation(.savePhoto, photoID: id, invocation: invocation) else {
@@ -103,8 +87,11 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         return try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(result.utf8))
     }
     func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
-        guard invocation.context.source == "assistant", let voice else { throw CommunicationError.unauthorized }
-        try voice.validateCameraControl(invocation: invocation)
+        guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
+        if invocation.context.sessionID != rootSessionID {
+            guard let voice else { throw CommunicationError.scopeClosed }
+            try voice.validateCameraControl(invocation: invocation)
+        }
         return try await cameraControl.takePhoto(invocation: invocation)
     }
     func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data {
@@ -134,6 +121,12 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     }
     func unbindCamera(_ value: any CameraOutputHandling) {
         if camera === value { camera = nil }
+    }
+    func updateListening(enabled: Bool, paused: Bool, revision: UInt64, invocation: any FunctionInput) async throws {
+        guard invocation.context.source == "speechPerception", invocation.context.sessionID == rootSessionID,
+            let voice
+        else { throw CommunicationError.unauthorized }
+        try await voice.updateListening(enabled: enabled, paused: paused, revision: revision, invocation: invocation)
     }
     func play(audioID: UUID, invocation: any FunctionInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
@@ -184,7 +177,10 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         voice.observeSpeech(input)
     }
     func output(_ envelope: OutputEnvelope) async {
-        guard envelope.source.rawValue == "assistant" || envelope.source.rawValue == "speechPerception" else { return }
+        guard
+            ["assistant", "photographer", "memory", "applicationControl", "speechPerception"].contains(
+                envelope.source.rawValue)
+        else { return }
         voice?.show(envelope)
     }
 }

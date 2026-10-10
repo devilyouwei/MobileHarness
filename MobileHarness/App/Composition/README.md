@@ -9,7 +9,7 @@ Purpose: construct the application graph and bind concrete services. Design goal
 | --- | --- |
 | AppAssembly.swift | Root-owned resource path and lazy runtime, settings/history operations, camera coordinator and prepared AppContainer |
 | AppContainer.swift | Receive the resource path/runtime, acquire managed capability handles, prepare voice models, assemble VoiceSessionCoordinator and diagnostic operations, forward memory warnings |
-| ApplicationRuntime.swift | Shared journal, packaged communication policy, AgentManager, Gateways and typed capability bindings to BehaviorAssembly; create Assistant with the same journal and injected chat/model-label query |
+| ApplicationRuntime.swift | Independent Agent context repositories and history readers, packaged communication policy, AgentManager, Gateways and typed capability bindings to BehaviorAssembly; create Assistant with the same journal and injected chat/model-label query |
 
 AppAssembly is owned by MobileHarnessApp. Its services survive page navigation. ApplicationRuntime has no static shared accessor; voice, vision and camera receive immutable role-specific service slices. ModelKitDefaults retains process-wide model registration and the manager. Chat operations use the current-binding adapter in App/Adapters. Diagnostic execution lives in App/Workflows; this directory only supplies its dependencies and connects views.
 
@@ -165,7 +165,7 @@ flowchart TD
 ✅ ADR0171: ApplicationRuntime owns observer and resource transport, injects fact/read, sequenced delivery, revision invalidation and host failure reporting. AppAssembly starts observation only after preparation and forwards active/background changes. No page owns the loop.
 
 
-✅ ADR0174 packaging: existing Agents package discovers ResourceHostFailure.swift in Communication; the Xcode navigator references that source. Root communication policy admits app.resources with the typed contract, without adding a target or model grant.
+✅ ADR0174 packaging: existing Agents package discovers ModelResourceSignals.swift in Communication; the Xcode navigator references that source. Root communication policy admits app.resources with the typed contract, without adding a target or model grant.
 
 
 ## Provider discovery
@@ -196,7 +196,7 @@ flowchart TD
 
 ## Camera command entry
 
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the dedicated camera root session or validated active voice delegation; Assistant calls delegate through the bound Gateway context. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
+✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
 
 
 ## Manual worker terminal feedback
@@ -214,7 +214,7 @@ flowchart TD
 
 ✅ BehaviorAssembly projects immutable host feedback policies. IndependentOutputWorkflow admits Actions in order while executing up to four Tools concurrently; VoiceSessionCoordinator owns, cancels and joins all dispatch tasks independently of page lifetime.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../docs/adr/0183-generation-round-observations.md).
 
 ## Assistant photo observation — ADR0184
 
@@ -232,3 +232,71 @@ flowchart TD
 ✅ Implemented: AppAssembly owns one CapturedPhotoStore at the existing CapturedPhotos path, inject it into CameraCoordinator and supply an Assistant-source/producing-input history loader. No new directory, path, module or dependency is added.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
+
+## Agent composition — ADR0187
+
+✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+运输生命周期独立于页面。函数、通信、模型输出分支有界并在 round/terminal 屏障加入；生产输出在订阅时绑定真实 Agent 实例。ConversationPresentation 分开识别语句与回复身份（source/task/decision/turn）；后来的识别不能清掉正在回复的任务。播放授权由真实输出源、活跃任务/会话和函数注册共同验证；SpeechPerception 在最终 ASR 发布前及交互回复占用期间暂停新语句识别，覆盖模型等待、ReACT 和受委派任务的回复；完成及350ms播放尾音屏障后恢复。用户关闭停止物理录音，暂停保持采集会话但不接纳识别帧。
+
+设计与阶段边界见 [ADR0187](../../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../../docs/Validation-History.md)。
+
+Implemented source organization: Xcode navigator references track the consolidated Agents business Signal/Processing sources and Support configuration loader; SwiftPM continues to compile the same Agents target. No composition/runtime behavior change.
+
+## Phase two implementation contract - ADR0188
+
+✅ Implemented. Assistant is the persistent default user-entry Agent and delegates photography, history and application operations through authorized communication Actions and existing task Signals. Typed UI inputs use deterministic routing; model requests use the same output and function execution path. Execution results return to the real task executor.
+
+Support owns the reusable one-round Chat worker, native/XML communication adaptation and reply mapping, with injected identity, context and policies. Each business Agent owns independent durable history, preprocessing, capabilities and task completion. No new directory, target, dependency, Core role policy or delegation runtime is introduced.
+
+App owns registration, transport, stable interaction lifetime and native presentation authorization. Microphone capture is a separate lifetime. Delivery acceptance, child completion and native effects remain distinct. Pending questions and artifact references are bounded and task-scoped; deletion retains existing trusted UI confirmation. Storage failures terminate dependent processing, cancellation joins owned workers, and restart interrupts without replay.
+
+See `docs/adr/0188-specialist-task-ownership.md` for migration, capacity and validation contracts.
+
+Implemented ADR0188: the application scene pauses all four business Agent inference workers in background, joins cancellation and records cancelled decisions. Foreground resumes admission without replaying cancelled actions. Microphone stop alone leaves Agent tasks alive.
+
+
+## Agent conversation history selection
+
+✅ Implemented: the history entry lists the four conversation-storage owners (Assistant, Photographer, Memory and ApplicationControl). Each destination has a separately owned state/workflow and reads the same live context repository used by that Agent; no history copies or model startup are required. Existing request, reply, tool, usage and image presentation is reused. Assistant retains Agent-routed archive/delete/title controls; specialist histories are read-only until scoped mutation intents are defined. Streaming perception/synthesis context contains no conversation archive and is excluded. Reads propagate errors, admit one operation per destination and retain the four-image read bound. Photo reads and parser previews use the selected producer identity. Native UI acceptance remains pending.
+
+
+## One-way publication and listening admission correction
+
+
+## Listening policy ownership
+
+✅ ApplicationRuntime enables reply-activity reporting on the four interactive Chat workers and injects a resident SpeechPerception factory. VoiceSessionCoordinator registers that Agent before receiving user control and keeps it alive across native microphone epochs. The common communication catalog includes explicit reply-state and native-capture facts.
+
+❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
+
+✅ Production Chat workers receive the current configured model label through ApplicationRuntime. New history records use this label; historical missing labels are not fabricated.
+
+
+✅ Execution-log tabs: ApplicationRuntime connects the root-owned task-only subscription and bounded task-content adapter. General Signal snapshots are not subscribed by the home UI. Agent errors retain independent output-failure observation and Action failure deduplication.
+
+
+✅ Robot Action ownership correction: Motor resource allowedOwners includes Assistant; Assistant may preempt Photographer through existing joined cleanup, alongside existing fixed ApplicationControl takeover. Shared writer exclusion, permit validation and hardware safety remain unchanged.
+
+✅ Device regression fix: Scene transitions await the interaction startup barrier through AgentInteractionRuntime before accessing registered business Agents; they no longer race sequential child registration. Native foreground safety remains immediate and independent.
+
+✅ Frontend/backend separation: AppAssembly navigates through NavigationState.show synchronously and injects immediate Bluetooth page/system-settings callbacks. ApplicationRuntime no longer binds typed specialist transports to Assistant; each transport publishes directly to its owner.
+
+
+✅ Home-log simplification: retain Action / Task / Agent only. Removed the Signal UI model, collection and subscription. InputGateway exposes independently bounded task-only snapshots (256 records, shared eight-observer limit, latest-one buffering), updated only for task protocol events; media and ordinary Signals never invalidate home state or evict task traces. Presentation retains task admission/completion semantics, related Action/history identities, Agent lifecycle and independent errors. General Signal diagnostics remain available outside the home UI. Native performance acceptance is separate.
+
+
+## Task-scoped specialist history
+
+✅ Implemented: Assistant keeps current/archived conversation navigation. Specialist destinations show task lists and task-scoped detail/export instead of current/past conversation summaries. App HistoryPresentationAdapter projects one immutable repository snapshot using task identity, durable Signal evidence and task state; UI owns display-only task values. ReACT and later task inputs belong to the same task. Original task requests provide titles, not the latest reply. Records lacking retained task association remain separately labeled unassociated inputs, without inventing task identity. Task reads reuse the existing single load slot and photo authorization; no second writable history, LLM summary, directory or dependency is added. Regressions cover isolation, continuation grouping across old archives, task status, legacy/unassociated records and empty tasks. Missing task dates stay empty; terminal/recovered status takes precedence over stale waiting-user reports. ❌ Native UI/device acceptance remains separate from automated checks.
+
+✅ Publication audit correction: publish validates its own payload/source and submits bounded one-way work, never awaiting subscriber or App observer completion and never returning recipient errors. Observer work shares bounded Gateway publication lifetime; overflow is diagnostic loss without publisher acknowledgment. Environment facts bypass request/result waiters and emit no completion acknowledgment; ApplicationControl errors still flow through its independent output consumer. Directed send retains correlated admission receipt (not task completion). Explicit UI data-operation result waits remain business completion contracts, not publish receipts.
+
+✅ Resource-fact extension of the same audit: model-resource observations are also one-way facts. Their registered presentation functions and runtime feedback execute under the root-owned ApplicationControl consumer independently of request slots. Sampling never retries because the subscriber rejected or its presentation failed. Tests await observable business state, not a publication receipt.
+
+
+✅ Camera perception/context change (2026-10-10): AppAssembly owns an independent foreground camera-state sampler (100ms, changed snapshots only). It reads actual CameraState, publishes through PhotographerIntentRuntime and shares the root lifetime; it does not depend on Bluetooth reads or create Assistant tasks. Publication errors report local adapter failures; recipient errors never become publisher errors.

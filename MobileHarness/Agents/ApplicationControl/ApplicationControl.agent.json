@@ -1,22 +1,761 @@
 {
   "version": 6,
   "id": "applicationControl",
-  "actions": {},
-  "tools": [],
+  "actions": {
+    "Speech": [],
+    "Display": [
+      {
+        "alias": "openPage",
+        "path": {
+          "domain": "UI",
+          "module": "Navigation",
+          "function": "open"
+        },
+        "parameters": [
+          {
+            "name": "destination",
+            "valueType": "string",
+            "required": true,
+            "description": "Existing application destination.",
+            "constraints": "home, settings, language, recognition, synthesis, vision, bluetooth or history."
+          }
+        ],
+        "examples": [
+          "<openPage destination=\"settings\"/>"
+        ],
+        "doc": "On a conversational request, open the requested application page through authorized UI presentation. Touch navigation is local and does not call this Agent."
+      }
+    ],
+    "Robot": [
+      {
+        "alias": "shakeBase",
+        "path": {
+          "domain": "NexArm",
+          "module": "Motion",
+          "function": "shakeBase"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete left/right/return cycles.",
+            "constraints": "Integer 1 through 3 only."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<shakeBase cycles=\"1\"/>",
+          "<shakeBase cycles=\"3\"/>"
+        ],
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "waveWrist",
+        "path": {
+          "domain": "NexArm",
+          "module": "Gesture",
+          "function": "waveWrist"
+        },
+        "parameters": [
+          {
+            "name": "count",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><waveWrist count=\"1\"/></wait>"
+        ],
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "tiltWrist",
+        "path": {
+          "domain": "NexArm",
+          "module": "Gesture",
+          "function": "tiltWrist"
+        },
+        "parameters": [
+          {
+            "name": "direction",
+            "valueType": "string",
+            "required": true,
+            "description": "Tilt direction relative to the arm.",
+            "constraints": "Exactly left or right."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><tiltWrist direction=\"left\"/></wait>"
+        ],
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "lookAround",
+        "path": {
+          "domain": "NexArm",
+          "module": "Gesture",
+          "function": "lookAround"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><lookAround cycles=\"1\"/></wait>"
+        ],
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "celebrate",
+        "path": {
+          "domain": "NexArm",
+          "module": "Gesture",
+          "function": "celebrate"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><celebrate cycles=\"1\"/></wait>"
+        ],
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "dance",
+        "path": {
+          "domain": "NexArm",
+          "module": "Gesture",
+          "function": "dance"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gesture repetitions.",
+            "constraints": "Integer 1 through 3. No default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><dance cycles=\"1\"/></wait>"
+        ],
+        "doc": "Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "nodHead",
+        "path": {
+          "domain": "NexArm",
+          "module": "Gesture",
+          "function": "nodHead"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gestures, each containing two back-and-forth sweeps.",
+            "constraints": "Integer 1 through 3 only; no default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><nodHead cycles=\"1\"/></wait>"
+        ],
+        "doc": "Compose home, sweeps and return using only motor4. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "shakeHead",
+        "path": {
+          "domain": "NexArm",
+          "module": "Gesture",
+          "function": "shakeHead"
+        },
+        "parameters": [
+          {
+            "name": "cycles",
+            "valueType": "integer",
+            "required": true,
+            "description": "Number of complete gestures, each containing two back-and-forth sweeps.",
+            "constraints": "Integer 1 through 3 only; no default."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><shakeHead cycles=\"1\"/></wait>"
+        ],
+        "doc": "Compose home, sweeps and return using only motor5. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "resetArm",
+        "path": {
+          "domain": "NexArm",
+          "module": "Motion",
+          "function": "reset"
+        },
+        "parameters": [
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native motor speed, 1–1400; default1400.",
+            "valueType": "integer",
+            "constraints": "Native motor speed, 1–1400; default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration register value, 1–254; default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration register value, 1–254; default30."
+          }
+        ],
+        "examples": [
+          "<wait><resetArm/></wait>"
+        ],
+        "doc": "Reset motors1–5 only; do not command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "moveMotor",
+        "path": {
+          "domain": "NexArm",
+          "module": "Motion",
+          "function": "moveMotor"
+        },
+        "parameters": [
+          {
+            "name": "motor",
+            "required": true,
+            "description": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.",
+            "valueType": "integer",
+            "constraints": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5."
+          },
+          {
+            "name": "target",
+            "required": true,
+            "description": "Native encoder target, restricted to configured motor limits.",
+            "valueType": "integer",
+            "constraints": "Native encoder target, restricted to configured motor limits."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native speed1–1400, default1400.",
+            "valueType": "integer",
+            "constraints": "Native speed1–1400, default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration1–254, default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration1–254, default30."
+          }
+        ],
+        "examples": [
+          "<wait><moveMotor motor=\"4\" target=\"1238\"/></wait>"
+        ],
+        "doc": "Move only the explicitly selected motor to its native encoder target. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      },
+      {
+        "alias": "resetMotor",
+        "path": {
+          "domain": "NexArm",
+          "module": "Motion",
+          "function": "resetMotor"
+        },
+        "parameters": [
+          {
+            "name": "motor",
+            "required": true,
+            "description": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.",
+            "valueType": "integer",
+            "constraints": "Motor ID1–6. Reset requires a configured home; current arm homes cover1–5."
+          },
+          {
+            "name": "speed",
+            "required": false,
+            "description": "Native speed1–1400, default1400.",
+            "valueType": "integer",
+            "constraints": "Native speed1–1400, default1400."
+          },
+          {
+            "name": "acceleration",
+            "required": false,
+            "description": "Native acceleration1–254, default30.",
+            "valueType": "integer",
+            "constraints": "Native acceleration1–254, default30."
+          }
+        ],
+        "examples": [
+          "<wait><resetMotor motor=\"4\"/></wait>"
+        ],
+        "doc": "Reset only the selected motor to its configured home; motor6 requires an explicitly configured home. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space."
+      }
+    ]
+  },
+  "tools": [
+    {
+      "path": {
+        "domain": "System",
+        "module": "ModelResources",
+        "function": "snapshotResources"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "ModelResources.snapshot",
+          "description": "Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Provider",
+        "function": "readSettings"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Provider.readSettings",
+          "description": "Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Device",
+        "function": "readStatus"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Bluetooth.readStatus",
+          "description": "Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Device",
+        "function": "control"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "Bluetooth.control",
+          "description": "Submit an explicit Bluetooth connection/discovery command. Accepted is not connected or physically completed. Read status to confirm actual state.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "scan",
+                  "stopScan",
+                  "connect",
+                  "reconnect",
+                  "disconnect",
+                  "forget",
+                  "refresh"
+                ]
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation"
+            ],
+            "additionalProperties": false
+          },
+          "strict": false
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "Device",
+        "function": "readEnvironment"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "App.readEnvironment",
+          "description": "Read latest sequenced scene, navigation and device capability facts admitted by the root Agent. Facts are observations, not proof of physical completion.",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "ModelResources",
+        "function": "download"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "ModelResources.download",
+          "description": "Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string"
+              },
+              "allowsCellular": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "endpoint",
+              "allowsCellular"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    },
+    {
+      "path": {
+        "domain": "System",
+        "module": "ModelResources",
+        "function": "cancel"
+      },
+      "definition": {
+        "type": "function",
+        "function": {
+          "name": "ModelResources.cancel",
+          "description": "Cancel and join an admitted model transfer. Failure is returned without replay.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    }
+  ],
   "communication": {
     "inputs": [
-      {"contract":"action.result","version":1,"kind":"actionResult"},
-      {"contract":"app.environment","version":1,"kind":"observation"},
-      {"contract":"app.interaction","version":1,"kind":"observation"},
-      {"contract": "provider.settings", "version": 1, "kind": "observation"},
-      {"contract": "provider.discovery", "version": 1, "kind": "observation"},
-      {"contract": "model.resource.hostFailure", "version": 1, "kind": "observation"},
-      {"contract": "model.resource.state", "version": 1, "kind": "observation"},
-      {"contract": "model.resource.intent", "version": 1, "kind": "observation"},
-      {"contract": "tool.result", "version": 1, "kind": "toolResult"}
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
+      },
+      {
+        "contract": "app.environment",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "app.interaction",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "provider.settings",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "provider.discovery",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "model.resource.hostFailure",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "model.resource.state",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "model.resource.intent",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      },
+      {
+        "contract": "task.request",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.input",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.progress",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.result",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.cancel",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "generation.round.result",
+        "version": 1,
+        "kind": "roundResult"
+      },
+      {
+        "contract": "communication.receipt",
+        "version": 1,
+        "kind": "communicationReceipt"
+      },
+      {
+        "contract": "user.text",
+        "version": 1,
+        "kind": "text"
+      }
     ],
-    "subscriptions": [],
-    "publications": [],
-    "sends": []
+    "subscriptions": [
+      {
+        "contract": "model.resource.intent",
+        "source": "runtime",
+        "topic": "model.resource.intent"
+      },
+      {
+        "contract": "model.resource.state",
+        "source": "model.resources",
+        "topic": "model.resource.state"
+      },
+      {
+        "contract": "model.resource.hostFailure",
+        "source": "app.resources",
+        "topic": "model.resource.hostFailure"
+      },
+      {
+        "contract": "app.environment",
+        "source": "app.environment",
+        "topic": "app.environment"
+      },
+      {
+        "contract": "app.interaction",
+        "source": "user",
+        "topic": "app.interaction"
+      },
+      {
+        "contract": "model.resource.intent",
+        "source": "user",
+        "topic": "model.resource.intent"
+      },
+      {
+        "contract": "provider.settings",
+        "source": "user",
+        "topic": "provider.settings"
+      },
+      {
+        "contract": "provider.discovery",
+        "source": "user",
+        "topic": "provider.discovery"
+      }
+    ],
+    "publications": [
+      "interaction.replyActivity"
+    ],
+    "sends": [
+      {
+        "contract": "task.progress",
+        "target": "assistant"
+      },
+      {
+        "contract": "task.result",
+        "target": "assistant"
+      },
+      {
+        "contract": "speech.synthesize",
+        "target": "speechSynthesis"
+      },
+      {
+        "contract": "speech.cancel",
+        "target": "speechSynthesis"
+      }
+    ]
   }
 }

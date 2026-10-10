@@ -46,20 +46,27 @@ private actor InteractionPresentation: ResourcePresentationCapability {
 }
 @Test func environmentFactsAreBoundedOrderedAndDoNotInvokeDeviceCommands() async throws {
     let device = InteractionDevice()
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), device: device)
+    let manager = AgentManager()
+    let input = InputGateway(manager: manager, policy: try resourceFixturePolicy())
+    let runtime = try resourceRuntime(
+        UnusedModelResourceCapability(), device: device,
+        manager: manager, suppliedInput: input)
     try await runtime.observeEnvironment(.init(category: .scene, sequence: 1, value: "active"))
-    await #expect(throws: ApplicationControlIntentFailure.self) {
-        try await runtime.observeEnvironment(.init(category: .scene, sequence: 1, value: "replay"))
-    }
+    await input.flushPublications()
+    // Subscriber rejects stale state independently; the publishing API returns no acknowledgment.
+    try await runtime.observeEnvironment(.init(category: .scene, sequence: 1, value: "replay"))
+    await input.flushPublications()
     await #expect(throws: CommunicationError.self) {
         try await runtime.observeEnvironment(
             .init(category: .devices, sequence: 2, value: String(repeating: "x", count: 16385)))
     }
     try await runtime.observeEnvironment(.init(category: .scene, sequence: 3, value: "background"))
+    await input.flushPublications()
     let snapshot = try await runtime.agent.environmentSnapshot()
     #expect(snapshot.contains("background"))
     #expect(!snapshot.contains("replay"))
     #expect(await device.calls.isEmpty)
+    await input.shutdown()
     await runtime.shutdown()
 }
 

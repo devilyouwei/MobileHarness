@@ -102,7 +102,10 @@ extension ActionActivityItem {
             issueDescriptions: mapped.issueDescriptions, symbol: mapped.symbol,
             execution: .init(
                 phase: execution.phase.presentationPhase, admittedAt: execution.admittedAt,
-                startedAt: execution.startedAt, endedAt: execution.endedAt))
+                startedAt: execution.startedAt, endedAt: execution.endedAt),
+            source: execution.source.rawValue, inputID: execution.inputID,
+            isInternal: ["UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Listening.update"].contains(
+                execution.path.description))
     }
 }
 
@@ -115,6 +118,43 @@ extension ActionExecutionRecord.Phase {
         case .succeeded: .succeeded
         case .failed: .failed
         case .cancelled: .cancelled
+        }
+    }
+}
+
+extension SignalTraceRecord.Phase {
+    var displayTitle: String {
+        switch self {
+        case .delivering: "投递中"
+        case .accepted: "已接纳"
+        case .partial: "部分接纳"
+        case .rejected: "接纳失败"
+        case .suppressed: "已抑制"
+        case .dropped: "已丢弃"
+        case .unobserved: "无订阅者"
+        }
+    }
+}
+
+extension AgentTaskSignal.Kind {
+    var logTitle: String {
+        switch self {
+        case .request: "委派任务"
+        case .input: "补充输入"
+        case .progress: "任务进度"
+        case .result: "任务结果"
+        case .cancel: "取消请求"
+        }
+    }
+}
+extension AgentLifecycle {
+    var logTitle: String {
+        switch self {
+        case .registered: "已注册"
+        case .running: "已运行"
+        case .paused: "已暂停"
+        case .stopped: "已停止"
+        case .failed: "运行失败"
         }
     }
 }

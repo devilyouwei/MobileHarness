@@ -87,4 +87,6 @@ Output failure/delivery descriptions are bounded to512 characters. Tool data and
 
 ✅ Envelopes and terminal results retain optional round/call identity. Typed roundFinished and roundResult separate round sealing from final conversation completion; bounded ledger delivery failure is explicit.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; local native Tools and generic Agent request/reply are not implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+
+✅ Round feedback delivery failures report execution ID, Action path and delivery state (closed/expired/exhausted), separately from task or presentation scope closure. Preserve failure, stop dependent continuation and never replay completed effects.

@@ -17,6 +17,7 @@ struct PhotographerCameraWorkflow {
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
         try capabilities.adding(internalTools: permissions)
     }
+    var requestID: UUID? { pending?.requestID }
     mutating func reset() { pending = nil }
     mutating func retire(_ id: UUID) {
         if pending?.requestID == id { pending = nil }
