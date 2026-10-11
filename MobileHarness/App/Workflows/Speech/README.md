@@ -1,17 +1,32 @@
-# AppSpeechPlayback
+# Owned Speech Playback
 
-Purpose: own speech application operations in an independent compilation boundary. Design goals: explicit injected effects and unchanged business lifetimes. Direct dependencies: FunctionContracts and StorageAudio.
+## Summary
 
-✅ SpeechPlayback checks out one owner-scoped audio handle, awaits injected playback, and joins cancellation cleanup before release. It has no synthesis/model/device dependency or work queue.
+Checks out owner-scoped PCM and awaits injected playback with joined cleanup.
+
+## Ownership and boundaries
+
+SpeechPlayback is an actor in AppSpeechPlayback, depending only on FunctionContracts and StorageAudio. It owns one admitted playback operation; synthesis, device implementation and speech policy are injected/owned elsewhere.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Root[App composition] -->|Inject operations and services| Workflow[AppSpeechPlayback]
-    Workflow -->|Actual state and completion| Consumer[UI or caller]
+ Function[Speech function invocation] --> Playback[SpeechPlayback]
+ Storage[StorageAudio] -->|Owner-scoped checked-out PCM| Playback
+ Playback -->|Injected play and stop| Native[App playback endpoint]
+ Native -->|Drain or failure| Playback
+ Playback -->|Cleanup-complete result| Function
 ```
 
-❌ No replay or audio mixing is introduced.
+## Checkout and completion
 
-✅ Playback propagates neutral storage and caller-supplied producer failures after existing cleanup; host adaptation supplies user wording. ❌ No synthesis policy is implemented here.
+Validate the audio handle and trusted execution ownership, check out the producer's stream, await native drain, then release it. Cancellation joins playback/stream cleanup before propagating. Producer/storage failures retain their underlying cause; App adaptation supplies localized wording after cleanup. There is no playback queue, synthesis, retry, replay or audio mixing in this directory.
 
-✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+✅ Owner-scoped checkout, cancellation cleanup and actual playback completion are implemented.
+
+## Related design
+
+[Parent design](../README.md)

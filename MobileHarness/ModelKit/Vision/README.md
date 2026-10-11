@@ -1,10 +1,36 @@
-# Vision capabilities
+# Pose Inference Contract
 
-Purpose: model-independent visual inference contracts. Design goals: immutable Sendable inputs/results, bounded requests, no camera or business dependencies.
+## Summary
 
-✅ PoseCapability accepts one unmirrored ImageFrame with upright geometry (RGB or native storage) and returns person boxes and COCO-17 joints in original-image pixels with top-left origin. Confidence values remain model scores; low-confidence joints are retained for consumers to interpret. Results carry the request context. Image transport belongs to Core.
+One-image model-independent pose requests/results with original upright pixel coordinates and request identity.
 
-✅ YOLO is a separate concrete adapter target; consumers receive `manager.get(.pose)` from the shared default manager. One image per call, no frame queue.
-❌ Tracking identities and model-level video sessions. Camera capture/orientation and VisionPerception integration are implemented outside ModelKit; future Photographer motion policy is only a [proposal](../../../docs/Photographer-Proposal.md).
+## Ownership and boundaries
 
-✅ PoseCapability accepts ImageFrame in RGB or retained native BGRA storage; native orientation is resolved by the backend and result coordinates use upright image dimensions. Apple Vision/Core ML with CPU+ANE is the native YOLO26 baseline. The end-to-end model head produces candidate rows; Swift filters scores and restores coordinates without a second NMS. PlatformKit/Vision owns camera I/O, not this inference. The shared domain name does not create a dependency between the Kits.
+Core owns ImageFrame/native buffers. PoseCapability owns inference contract; YOLO adapter/backend owns preprocessing/decoding. PlatformKit owns camera I/O; VisionPerception owns frame cadence/gaze and Photographer owns motion decisions.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
+
+```mermaid
+flowchart LR
+ Caller --> Request[PoseRequest and ImageFrame]
+ Request --> Capability[PoseCapability]
+ Capability --> Adapter[YOLOPose]
+ Adapter --> Result[Person boxes and COCO-17 joints]
+ Result --> Caller
+```
+
+## Coordinate and lifetime contract
+
+Input is unmirrored upright geometry in RGB or retained native BGRA with orientation. Result boxes/joints use original upright pixel dimensions, top-left origin, retained low-confidence scores and InferenceContext. Confidence is a model score, not identity or calibrated certainty. One image per call; no video frame queue exists.
+
+Shared manager supplies .pose under one operation lease. Native scaleFit/end-to-end candidates are filtered/restored by the adapter without second NMS. Consumers independently choose presentation/semantic policies.
+
+✅ Typed image pose inference and concrete YOLO provider are implemented.
+
+❌ Temporal identity and general model video sessions are not implemented.
+
+## Related design
+
+[Parent design](../README.md) · [YOLO](YOLO/README.md)

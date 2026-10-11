@@ -8,6 +8,7 @@
 
 | Document | Purpose |
 | --- | --- |
+| [Project README](../README.md) | Project introduction, Agent-loop concepts and getting started. |
 | [Requirements](Requirements.md) | Product goals, user scenarios, expected behavior and scope boundaries. |
 | [Concepts](Concepts.md) | Biological analogy and vocabulary for Agents, capabilities, communication, Actions and Tools. |
 | [Architecture](Architecture.md) | Public explanation of the current system and ownership boundaries. |
@@ -22,6 +23,21 @@
 | [Resource 状态计划](Resource-State-Plan.md) | ❌ 当前 UI/App/设备状态的快速存取与 Agent 上下文接入计划；lock 兜底另行处理。 |
 
 ## Current technical design
+
+The [19-document Agents design audit](Validation-History.md#2026-10-11--agents-technical-design-alignment) records role/shared/Core diagram, table and contract checks against the latest source and prompt resources.
+
+The [role-owned prompt validation](Validation-History.md#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance) records the separate role and Function Token resources, strict rendering and final packaging checks.
+
+The [OpenAI backpressure validation](Validation-History.md#2026-10-11--openai-128-event-backpressure) records the 128-event session, ordered suspending emission and cancellation/cleanup checks.
+
+The [overall accuracy and redundancy review](Validation-History.md#2026-10-11--overall-design-accuracy-and-redundancy-review) preserves the original organization while reconciling current flows, source contracts and duplicate explanations.
+
+The [108-document source README audit](Validation-History.md#2026-10-10--full-source-readme-audit) records current design reconciliation, static verification and the complete inspection register. [Documentation history](Documentation-History.md#2026-10-10--source-readme-technical-design-reconciliation) records evidence relocation.
+
+The [expanded overall-design verification](Validation-History.md#2026-10-10--expanded-overall-technical-design) records the restored system-level contracts, complete production target map and current diagram/link checks after the overall README expansion.
+
+The [original-structure restoration](Validation-History.md#2026-10-11--original-overall-design-structure-restored) records restoration of the original three Parts, subsection order and three-layer architecture, with targeted current-content corrections.
+
 
 | Location | Owns |
 | --- | --- |

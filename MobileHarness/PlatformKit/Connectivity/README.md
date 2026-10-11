@@ -1,28 +1,31 @@
-# Connectivity — External Device Communication
+# External Device Connectivity
 
-Purpose: implement bounded transport and protocol capabilities for external hardware. Design goals: explicit admission, observable connection state, structured diagnostics and no action/presentation policy.
+## Summary
 
-✅ [NexArm](NexArm/README.md) implements USB/BLE links, framing, native motor register encoding, hardware position limits, timestamped feedback and connection-health tracking. Device SDKs may know vendor commands and limits; they must not know application gestures, home/reset behavior, motion recipes, localized UI text or preferred discovery ordering.
+Transport and protocol capabilities for external hardware; the current implementation is NexArm USB/BLE.
 
-✅ Connections use the concrete NexArm link capabilities. The unused generic transport/emergency-stop placeholder has been removed; no implemented emergency-stop capability is claimed. App supplies persisted selection, foreground/reconnection lifetime and UI mappings. Actions owns all action behavior and wrappers.
+## Ownership and boundaries
+
+No gesture catalog, presentation, Agent admission or recovery policy. NexArm owns bounded framing, native session fencing and connection facts; callers own what commands mean.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Actions[Action behavior] --> Protocol[Device protocol and native commands]
-    Protocol --> Link[Bounded USB / BLE link]
-    Link --> Device[Hardware]
-    Device --> Feedback[Structured telemetry and connection facts]
-    Feedback --> Consumer[Actions / App adapters]
+ Callers[App and Actions] <--> NexArm[NexArm SDK]
+ NexArm <--> Device[USB or BLE firmware]
 ```
 
-❌ General network transports, device-side watchdog validation and independently confirmed physical emergency stop remain unimplemented. iOS process lifetime is not a hardware safety mechanism.
+## Structure and contract
 
-## Passive BLE connection — ADR0130
+[NexArm](NexArm/README.md) owns the link protocols, packet encoder/decoder, timestamped telemetry, USB serial and CoreBluetooth implementations. Connection/subscription success exposes a usable transport without pose probes or indication motion. Motion arrival is a caller-owned interpretation of feedback.
 
-✅ Native connection/subscription completion makes Settings controls available immediately. App performs no connection pose/version/IK probe, stationary validation or indication movement. It listens to unsolicited position packets and publishes measured state; refresh reads the latest received packet only. Feedback silence remains visible but does not disable manual commands, disconnect or start recovery. Native write/connection failures remain explicit. Actions uses passive BLE compatibility for this App connection; recipe IK resolution is deferred to an explicit preset request, not connection verification. Manual jog can start from the existing configured reference when no sample has arrived; that reference is not measured telemetry. Segment arrival observation and cancellable replacement remain in Actions/App.
+Discrete operations reject excess work explicitly. Live control returns whether a packet was actually admitted; the caller owns its latest intent. Disconnect invalidates old observation/control sessions, and no failed command is replayed.
 
-❌ Physical feedback cadence, preset IK availability and sustained manual takeover require real-device acceptance. Passive connection does not establish physical clearance or target arrival.
+✅ NexArm transports and protocol values.
 
-✅ ADR0129: NexArm native session closure exposes device disconnection errors to existing callers; explicit Task cancellation retains cancellation semantics. No business queue or Agent lifetime policy enters connectivity.
+## Related design
 
-✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
+[Parent design](../README.md) · [NexArm](NexArm/README.md)

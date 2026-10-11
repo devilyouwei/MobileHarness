@@ -1,46 +1,56 @@
-# OpenAI Responses cloud chat
+# Responses Cloud Chat Adapter
 
-Purpose: implement cloud generation behind the provider-neutral `ChatCapability`, `ChatRequest`, `ChatEvent` and cancellable `InferenceSession`. Design goals: independent Foundation-only adapter, explicit configuration, bounded streaming, reusable connections and model-resource-owned cleanup.
+## Summary
 
-## Request protocol
+Responses-only streaming ChatCapability with caller-owned history, bounded SSE/native calls and model-residency-owned connections.
 
-✅ Implemented: `OpenAIChatConfiguration.request` uses POST `<baseURL>/responses`, stream=true and store=false. Base URL includes the HTTPS API prefix, e.g. https://api.openai.com/v1. The host supplies credentials, model and timeout; credentials stay private and descriptions/errors redact them. No chat request occurs during registration. Availability means configured, not reachable or authenticated.
+## Ownership and boundaries
 
-Caller-owned history is sent through `input` on every decision, without server conversation IDs or previous_response_id. ✅ Prior assistant text uses output_text with annotations=[]; system/user text uses input_text and optional input_image (JPEG/PNG data URLs, detail=auto). Encoding assistant history as input_text is rejected by the official API with HTTP400; native histories use paired function_call/function_call_output items and original call_id. Declarations are converted from the shared legacy function envelope to flattened Responses function objects with request-local safe names. Registered native calls remain available to other consumers; Assistant supplies no Tools and uses text Action tags. No chat/completions fallback or automatic retries exist. Configured providers must support Responses.
+Foundation-only adapter depends on ModelKit. Host supplies HTTPS endpoint/credentials/model/timeout; credentials stay private/redacted. Registration performs no network generation. Configured availability does not prove authentication/reachability.
 
-Temperature is retained. An explicit output budget maps to max_output_tokens; omitted budgets remain omitted. No reasoning parameters are sent for GPT-4.1, which is a non-reasoning model. Store=false keeps Agent-owned context authoritative; it is not a claim of latency improvement or of overriding provider retention policy.
+## External relationships and data flow
 
-## Stream and resource lifecycle
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Request[ChatRequest] --> Encode[Responses input encoding]
-    Encode --> Lease[ModelResource operation admission]
-    Lease --> Pool[Reusable URLSession per residency]
-    Pool --> Decode[Bounded typed Responses SSE]
-    Decode --> Events[InferenceSession events]
-    Events --> Consumer[Capability consumer]
-    Events -->|cancel / failure| Cleanup[Cancel matching HTTP task]
-    Cleanup --> Release[Release operation lease]
-    Pool -->|EOF after terminal response| Release
+ Caller --> Encoding[Responses request encoding]
+ Encoding --> Resource[ModelResource operation lease]
+ Resource --> Pool[Reusable URLSession per residency]
+ Pool --> Decoder[Bounded typed SSE]
+ Decoder --> Session[ChatEvent session]
+ Session --> Caller
+ Session -->|Cancel or fail| Cleanup[Cancel matching task and release lease]
 ```
 
-✅ Implemented: One ChatNetworkSession resource owns one ephemeral URLSession across successive requests. Cookies/cache and redirects are disabled. Per-request cancellation/failure cancels its HTTP task and worker, preserving the pooled session. Normal completion drains to EOF after the terminal event for connection reuse; an incomplete stream fails. Resource unload/shutdown drops the wrapper after joined request cleanup and invalidates the session; reload creates a fresh residency. Shutdown is terminal. One active operation per provider; overlap fails inputBusy and no inference waiting queue is added. Timeouts remain 1–600 seconds (default60).
+## Request encoding
 
-Text is emitted on response.output_text.delta. Function argument deltas are bounded and checked against completed item identity/arguments; no function call is emitted before response.completed validates the full output set. Refusals, response.failed, error events, unsupported output types and malformed status/usage fail explicitly. response.incomplete maps only max_output_tokens with no incomplete calls to lengthLimit. Completed native-only output maps to toolCalls; ordinary completion maps to stop. Usage input_tokens/output_tokens/total_tokens accompanies the terminal response, before the consumer's finished event. Partial delivered text cannot be retracted and errors never replay Actions.
+POST baseURL/responses with stream=true/store=false. History travels in input every request without conversation/previous_response_id. System/user text uses input_text, assistant text output_text with annotations=[], user images input_image JPEG/PNG data URLs/detail=auto. Native history uses paired function_call/function_call_output with original call_id; definitions flatten the neutral function envelope and use safe request-local names consistently.
 
-Limits: at most64 messages and64KiB transcript text,128 declarations/64KiB total declarations,32768 explicitly requested output tokens,64KiB per SSE line/event,8MiB cumulative stream,128 native output indices,512-byte item/call IDs,64-byte declared names and4096-byte string-object arguments. CR/LF/CRLF, bytewise UTF-8, comments and multiline data fields are supported. No pending-event count limit; each emitted event is bounded at65568 estimated bytes. Image limits are separately four images/16MiB transcript and4MiB per attachment. Slow consumers retain every accepted fragment in order.
+Temperature is retained; explicit output budget maps to max_output_tokens, absent stays absent. No protocol fallback, implicit retry or automatic provider switch exists. Providers must implement Responses. store=false preserves caller history control and does not override retention policy. Credentials/model/HTTPS endpoint validate; timeout is 1–600 seconds (default 60).
 
-First-text timing starts immediately before URLSession.bytes and samples the first nonempty decoded delta before yielding. It includes network and remote-service latency; validation/admission, consumer/persistence, ASR, TTS and UI are excluded. Native-only replies have no text TTFT.
+## Streaming and resource cleanup
 
-## Configuration and discovery
+One ChatNetworkSession resource owns ephemeral URLSession across requests; disable cookies/cache/redirects. A request owns one HTTP task and worker. Cancel/failure joins that request without destroying the pool; normal terminal completion drains to EOF for reuse. Missing terminal/incomplete EOF fails. Unload/shutdown joins active work, invalidates session and drops wrapper; reload makes a new residency. Shutdown is terminal. One active provider operation rejects inputBusy; no inference queue exists.
 
-The host assembles through ModelKitDefaults. Reconfiguration replaces only the chat binding; old handles become terminal and consumers resolve the current binding each operation. Local Gemma remains selected without cloud configuration. No SDK dependency on Agents, UI, Storage or device orchestration is introduced.
+Emit text on response.output_text.delta. Validate bounded argument deltas against completed item identity/full arguments; emit no native call before response.completed validates output. Refusal/error/failed/unsupported output/malformed status/usage fail. Only max_output_tokens incomplete output without incomplete calls maps to lengthLimit. Native-only complete maps to toolCalls, ordinary complete to stop; usage precedes finished. Partial delivered text cannot be retracted or replayed.
 
-`models` remains a distinct explicit GET /models query: optional Bearer authentication,30-second timeout, no redirects/cache/cookies,1MiB response,2048 IDs each at most512 bytes, deduplicated in server order. Empty credentials omit Authorization; blank endpoint resolves to https://api.openai.com/v1. Discovery validates raw IDs, not business eligibility or Responses support. The host owns secure credential references and setting transactions.
+## Bounds and timing
 
-✅ A user-authorized temporary credential reproduced the assistant-history input_text HTTP400 on official GPT-4.1; the corrected output_text history returned HTTP200, streamed text and response.completed. A standalone live probe linked the actual compiled ModelKit/OpenAI/Runtime code and verified the same four-message history through URLSession, text decoding, usage and terminal completion (interface TTFT approximately2.11s in one sample). The protocol and adapter probes do not establish full native Agent/UI or physical-device acceptance. Credentials were kept out of repository files and outputs.
+At most 64 messages/64 KiB text, 128 declarations/64 KiB declarations, 32,768 requested output tokens, 64 KiB SSE line/event and eight MiB total stream. Native output indices ≤128; item/call IDs ≤512 bytes, safe names ≤64 and string-object arguments ≤4096. Images separately retain four/16 MiB transcript and four MiB each. CR/LF/CRLF, bytewise UTF-8, comments and multiline SSE fields are supported.
 
-❌ General live-provider compatibility, measured physical networking/latency, cloud ASR/TTS/video, local native calls and retry policies remain separate acceptance/work. No real credentials are used in offline tests.
+The session uses `StreamLimits(capacity: 128, maximumEventBytes: 65568)` and serialized `yieldSuspending` for every event, including the terminal event. A full queue pauses event production without dropping fragments or failing with bufferOverflow. The request retains its operation lease while waiting; normal completion drains accepted events, and cancellation/failure wakes the producer and suppresses buffered delivery. Callers must consume or cancel a session before awaiting ordinary unload, which drains active work without cancellation. Queue limits cover decoded events, not URLSession or decoder memory. Optional timing starts immediately before URLSession.bytes and first nonempty decoded text before yield; validation/loading/consumer/voice/UI are excluded. Native-only has no TTFT.
 
-References: [Responses migration](https://developers.openai.com/api/docs/guides/migrate-to-responses), [streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events), [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1).
+## Model discovery
+
+Explicit GET /models is separate, optionally authenticated, 30 seconds, no redirects/cache/cookies, one MiB response and 2048 IDs each ≤512 bytes, deduplicated in server order. Empty key omits Authorization; blank endpoint uses configured default. Discovery checks raw IDs only; Actions owns business eligibility. Reconfiguration replaces the chat binding and consumers resolve current provider each request.
+
+✅ Responses encoding, typed streaming, pooled residency and explicit discovery are implemented.
+
+✅ The 128-event queue uses producer backpressure, including terminal delivery; cancellation releases waiting production.
+
+❌ Cloud ASR/TTS/video and automatic retry policies are not implemented.
+
+## Related design
+
+[Parent design](../README.md)

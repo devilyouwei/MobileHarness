@@ -1,43 +1,40 @@
-# CoreAI graph backend
+# CoreAI Graph and Gemma Execution
 
-Purpose: provide the independent ModelKitCoreAI target for native graph execution and tensor conversion. Design goals: public platform APIs, validated tensor boundaries and no business dependencies.
+## Summary
 
-GraphModel owns AIModel and InferenceFunction. TensorValue copies values and validates names, shapes and scalar types. Adapters own preprocessing and recurrent state. Language tokenizer/graph execution stays in the backend; model registration and voice orchestration belong to their owners.
+Named tensor graph execution and stateful Gemma generation through public CoreAI APIs.
 
-```mermaid
-flowchart LR
-    Adapter[Optional native graph caller] -->|Named tensors| Graph[GraphModel actor]
-    Graph -->|Native graph calls| CoreAI[Apple CoreAI]
-    CoreAI -->|Tensor results| Adapter
-```
+## Ownership and boundaries
 
-- ✅ Independent native graph execution and tensor utilities, plus the current Gemma chat backend.
-- ✅ Platform availability checks and tensor conversion.
-- ❌ Universal model generation, downloading and cross-model scheduling.
+GraphModel/TensorValue owns native graph/tensor validation. CoreAILanguageEngine separately owns tokenizer/cache/pipelined language state. Resources are local; registration/download/admission belongs to callers.
 
-Preserve source attribution in docs/licenses/CoreAIKit-BSD-3-Clause.txt and CoreAIModels-BSD-3-Clause.txt.
+## External relationships and data flow
 
-## Gemma language execution
-
-✅ CoreAILanguageEngine loads the Gemma 4 E2B QAT b2 decode-only graph through CoreAILM from john-rocky/coreai-models 0.2.8-zoo. This concrete integration requires the fork's static-input buffer support; base ModelKit and Management do not depend on it. No CoreAIKit catalog/downloader or MLX runtime is linked.
-✅ iOS admits iPhone18,1 / iPhone18,2 only for the h18p AOT artifact; macOS selects the matching uncompiled b2 graph. Checkpoint-matched QAT PLE files are size-validated and loaded once into owned shared GPU buffers. Failed allocation/load propagates. The existing increased-memory-limit entitlement is required for the ~4.47 GB model.
-✅ Single-token prefill is explicit. Each request resets cache, uses a 4096-token total context bound, suppresses thought channels, and cancels/joins the pipelined worker before reset/release. No internal request queue; output is bounded by the request token budget and 256 KiB decoded text. The upstream token sequence is drained immediately; its maximum production is the requested token budget. Overflow or decoding mismatch fails visibly.
-❌ Broad parity, device memory/thermal acceptance and support for other iPhones remain unverified.
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Adapter[Gemma4Chat] --> Prompt[Gemma turn renderer / tokenizer]
-    Prompt --> Engine[CoreAILanguageEngine actor]
-    Tables[Immutable QAT PLE buffers] --> Engine
-    Engine --> Factory[CoreAILM pipelined engine]
-    Factory --> CoreAI[Apple CoreAI GPU]
-    CoreAI --> Tokens[Token stream]
-    Tokens --> Filter[Thought-channel filter]
-    Filter --> Adapter
+ Caller[Owning adapter or artifact store] --> Backend[CoreAI backend]
+ Files[Local resource or persisted file plan] --> Backend
+ Backend --> Native[Concrete native or library SDK]
+ Native -->|Actual result| Backend
+ Backend --> Caller
 ```
 
-The existing stateless GraphModel remains for tensor callers; language execution owns its stateful engine separately. Downloading remains in Management/ModelKitHub.
+## Graph and language contracts
 
-❌ The iOS simulator SDK lacks CoreAI; the external CoreAILM target cannot build there. build-ios.sh currently stops on this limitation. Independent UI tests run on Mac; a separate simulator assembly remains outstanding.
+GraphModel actor owns AIModel/InferenceFunction; TensorValue copies values and checks names/shapes/scalar types. Caller owns recurrent preprocessing and a resource lease. Stateful language uses CoreAILM from pinned coreai-models 0.2.8-zoo with static-input buffers; no MLX/downloader/catalog runtime exists here.
 
-✅ 2026-10-04: Mac CoreAI smoke returned “你好”; generation cancellation and unload/reload passed. Four Gemma tests passed. Signed iPhone 17 Pro build and bundled Agent resource verification passed. Full check.sh passed boundaries, format and provisioning checks but failed two unchanged IntegrationTests aim-follow tests (four assertions). build-ios.sh is blocked by the simulator SDK missing CoreAI. Physical model inference remains pending.
+Gemma uses checkpoint-matched QAT PLE GPU tables and b2 decoder. iOS h18p AOT supports iPhone18,1/18,2; macOS uses matching uncompiled graph. OS/native/hardware checks and allocation/load failures are explicit. Increased-memory-limit entitlement is required by the large graph allocation.
+
+Each request resets cache, performs single-token prefill and fits prompt/generation within 4096 tokens. Filter private thought channels before text output; decoded text is bounded to 256 KiB. Immediately drain upstream tokens under requested generation count. Cancel/join pipelined worker before resetting/releasing state. No inference queue exists.
+
+✅ Native graph/tensor execution and bounded Gemma backend are implemented.
+
+❌ Other iPhone graph variants and a simulator assembly without the CoreAI dependency are not implemented.
+
+Source notices: [CoreAIKit](../../../../docs/licenses/CoreAIKit-BSD-3-Clause.txt), [CoreAIModels](../../../../docs/licenses/CoreAIModels-BSD-3-Clause.txt).
+
+## Related design
+
+[Parent design](../README.md)

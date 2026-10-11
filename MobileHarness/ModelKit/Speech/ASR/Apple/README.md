@@ -1,32 +1,37 @@
-# Apple speech recognition
+# Apple SpeechAnalyzer Recognition
 
-Purpose: provide on-device recognition through the public iOS/macOS 26+ SpeechAnalyzer and SpeechTranscriber APIs. Design goals: managed exclusive admission, ordered bounded PCM, observable cancellation and no microphone or conversation policy ownership.
+## Summary
 
-✅ Availability checks device and locale support. Explicit warmup obtains missing system language assets through AssetInventory; no HF download source or app model receipt is involved. Apple's assets may require an initial network download.
+Modern native recognition with transcriber/detector, required locale assets and request-local ordered PCM.
 
-✅ Every request owns a fresh transcriber, medium-sensitivity SpeechDetector and shared analyzer under a ModelResource lease. Ordered 16 kHz mono Float32 input is converted to the analyzer's preferred native format. At most four native input frames (maximum 1 MiB each) are buffered; a single ordered producer suspends until the analyzer receives a frame. Cancellation wakes blocked sends. No captured PCM is dropped. Each packet is at most 16,000 samples, total input at most 300 seconds. Output has 128 events, at most 65,600 estimated bytes/event; at most 2,048 time-range fragments and 64 KiB aggregate text are retained. Framework-internal buffering is opaque.
+## Ownership and boundaries
 
-✅ Native revisions replace overlapping time ranges in a single capability segment. finishInput drains the analyzer/result stream and emits one aggregate final event; a 25-second finalization deadline fails stalled work. Cancel/error/shutdown stop the analyzer before releasing admission. Overlap fails with inputBusy; there is no request queue.
+Depends on ModelKit/system Speech frameworks. App owns permission/capture; Agent owns silence endpoint. Every request owns analyzer/transcriber/detector/conversion under an exclusive ModelResource lease.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Warmup --> Assets[AssetInventory locale assets]
-    PCM[Ordered PCM] --> Convert[Native format conversion]
-    Convert --> Input[Four-frame bounded stream]
-    Input --> Analyzer[SpeechAnalyzer / SpeechTranscriber + SpeechDetector]
-    Analyzer --> Revisions[Bounded aggregate revisions]
-    Finish[Finish / cancel / error] --> Cleanup[Drain or stop analyzer and release lease]
+ Caller --> Adapter[AppleSpeechRecognition]
+ Assets[AssetInventory and locale availability] --> Adapter
+ Adapter --> Queue[Four native input frames]
+ Queue --> Analyzer[SpeechAnalyzer and SpeechTranscriber]
+ Analyzer --> Events[Revisioned transcript session]
+ Events --> Caller
 ```
 
-❌ Unsupported locales/hardware, guaranteed system asset download time and control over native internal buffering. No legacy SFSpeechRecognizer or cloud fallback is used. App owns microphone permission/capture and Agents owns silence endpoint policy.
+## Native processing and limits
 
-Sources: [Apple SpeechAnalyzer session](https://developer.apple.com/videos/play/wwdc2025/277/), [AssetInventory](https://developer.apple.com/documentation/speech/assetinventory).
+Validate supported locale/assets/hardware explicitly; asset preparation may require network. Ordered 16 kHz mono Float32 is converted to native preferred format. Four input frames of ≤one MiB buffer; serialized producer suspends until native consumption, with cancellation waking sends and no PCM drops. Per input ≤16,000 samples; total ≤300 seconds.
 
+Output retains 128 events of ≤65,600 estimated bytes, 2048 time-range fragments and 64 KiB aggregate text. Native revisions replace overlapping ranges in one capability segment. finishInput drains analyzer/results and emits aggregate final; a 25-second finalization watchdog fails stalls. Cancel/error/shutdown stops analyzer before releasing admission. Framework-internal buffer size is opaque.
 
-✅ Native ASR and VAD use the same SpeechAnalyzer/input/converter, with reportResults=false. Apple documents detector results as currently supporting VAD error handling only; a real Chinese-plus-two-second-silence probe with reportResults=true returned no activity events. Public SDK fields alone do not establish usable endpoint callbacks. Silero or Energy remains outside this adapter for Agent silence timing, independently of the ASR preference. No fake VoiceActivityCapability or unsupported native endpoint claims are introduced.
+SpeechDetector shares analyzer/input/converter with reportResults=false. Normal activity events are not exposed as VoiceActivityCapability; external VAD remains the endpoint source. There is no legacy SFSpeechRecognizer or cloud fallback.
 
-✅ The final combined-module integration test recognizes the Chinese fixture under dense 137-sample input plus trailing silence and permits session reuse. ❌ Native detector quality/power and physical-phone end-to-end behavior still need acceptance.
+✅ Managed native recognition, bounded input backpressure and joined finalization are implemented.
 
-Source: [SpeechDetector](https://developer.apple.com/documentation/speech/speechdetector).
+## Related design
 
-✅ Capability failures retain typed CapabilityError/CapabilityAvailability outcomes with neutral technical diagnostics. User-facing localization, retry guidance and settings instructions belong to consumers. ❌ No presentation policy is introduced into this adapter.
+[Parent design](../README.md)

@@ -1,25 +1,44 @@
-# Inference and resource backends
+# Concrete Inference and Download Backends
 
-Purpose: isolate native graph execution, CoreAI language generation and concrete Hub acquisition. Design goals: backend-specific types stay behind adapters; no Agent, Gateway, Action, UI or device orchestration dependency.
+## Summary
 
-| Directory | Responsibility |
-| --- | --- |
-| HuggingFace | Independent ModelKitHub adapter for declarative artifact acquisition |
-| CoreAI | Native graph/tensor utilities and Gemma 4 pipelined language execution |
-| CoreML | Validated Core ML graph execution for Silero |
-| FluidAudio | Shared multilingual Nemotron Core ML graphs, optional Kokoro and local Mandarin frontend |
+Independent native/library targets behind capability adapters and artifact-management interfaces.
+
+## Ownership and boundaries
+
+Backends own native graph/tokenizer/network implementation; adapters own capability request semantics. No Agent, Gateway, Action, UI, Storage or device orchestration dependency is introduced.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Adapter[Model adapter] -->|Model files and typed backend inputs| Backend[CoreAI / CoreML]
-    Backend -->|Platform or library calls| Engine[System framework / third-party engine]
-    Engine -->|Results| Backend
-    Backend -->|Tensors or text deltas| Adapter
+ Adapters[Model capability adapters] --> Backends
+ Management[Injected artifact downloader contract] --> Backends
+ Backends --> Native[CoreAI, Core ML, Speech or network SDK]
+ Native -->|Tensor, token or file result| Backends
 ```
 
-- ✅ Separate backend targets compiled from this single source tree.
-- ✅ Backend concurrency and cancellation contracts are documented in each child README.
-- ❌ A universal backend interchange format or cross-model scheduler.
+## Internal structure
 
+```mermaid
+flowchart LR
+ Backends[Backend target group] --> CoreAI
+ Backends --> CoreML
+ Backends --> FluidAudio
+ Backends --> MossCoreML
+ Backends --> HuggingFace
+```
 
-✅ [MossCoreML](MossCoreML/README.md) contains the pinned, narrowly adapted MOSS beta graph loop and tokenizer. MossCoreML does not implement downloading; ModelKitHub owns the separate resource acquisition adapter. ❌ iPhone stability/performance acceptance remains pending.
+## Target boundaries
+
+CoreAI owns named tensors and Gemma engine; CoreML owns fixed graphs/native pose execution; FluidAudio owns multilingual Nemotron and optional Kokoro/Mandarin execution; MossCoreML owns the local MOSS graph pipeline; HuggingFace is the separate ModelKitHub downloader. Each child documents its own admission/cancellation/format bounds.
+
+✅ Separate backend targets and concrete immutable resource loading are implemented.
+
+❌ Universal engine interchange and cross-model scheduler are not implemented.
+
+## Related design
+
+[Parent design](../README.md) · [CoreAI](CoreAI/README.md) · [CoreML](CoreML/README.md) · [FluidAudio](FluidAudio/README.md) · [HuggingFace](HuggingFace/README.md) · [MossCoreML](MossCoreML/README.md)

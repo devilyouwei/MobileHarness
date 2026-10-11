@@ -2,6 +2,13 @@
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
+## 2026-10-11 — Role-owned model prompts
+
+- Move role/style and workflow prompts into four role-owned JSON template resources; remove Assistant-specific instructions from shared Worker and move delegation guidance out of the shared task schema source.
+- Keep generic Function Token syntax and wait/Channel semantics in an independent AgentCore protocol resource. Role system templates supply speech/action ordering examples; native Tool definitions retain their separate request transport.
+- Add strict bounded single-pass rendering and immutable role-resource discovery. Missing/malformed templates and variable mismatches fail explicitly. Preserve generation ownership, parsing and execution contracts; generated send examples respect each role's actual grants.
+- Package and verify both role and protocol assets. Validation and Simulator limitations are recorded in [Validation history](Validation-History.md#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance).
+
 ## 2026-10-09 — Execution log tabs and causal visualization
 
 - Split the home execution sheet into Action(default), Signal, Task and runtime tabs, with Agent/status filters. Home and Action share internal-action visibility; caption/listening maintenance is hidden by default except failures. Scheduled Action execution remains separate from Tools and transport messages.

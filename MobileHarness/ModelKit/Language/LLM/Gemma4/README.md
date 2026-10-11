@@ -1,37 +1,40 @@
-# Gemma 4 E2B chat adapter
+# Gemma 4 E2B Chat Adapter
 
-Purpose: implement local ChatCapability using Gemma 4 E2B QAT CoreAI. Design goals: capability-only consumers, manager-owned lifetime, explicit failure and private reasoning channels.
+## Summary
 
-✅ ModelKitGemma4 depends only on ModelKit and ModelKitCoreAI. Defaults registers one managed resource and supplies Gemma4 as the installed root. No automatic provider fallback.
-✅ Each request resets the backend cache and receives caller-owned history. Admission rejects concurrent requests. Cancellation joins backend cleanup before releasing the lease; unload waits for that lease.
-✅ At most 64 nonempty messages / 64 KiB, ending in user, with optional initial system instructions. Prompt plus generation fits 4096 tokens. The output queue holds at most 4096 events of 4096 bytes each; overflow fails explicitly. Usage counts consumed tokens including stop markers. Thought channels never reach Agent text.
-✅ iOS uses the pinned h18p AOT graph for iPhone 17 Pro / Pro Max; other hardware fails explicitly. macOS real-model tests require the matching uncompiled b2 decoder alongside the same QAT tables. Cloud settings remain separate.
-❌ Mac real inference, cancellation and unload/reload passed using the matching QAT resources. Sustained memory/latency and physical conversation acceptance remain unverified. Native local tools and vision are not implemented.
+Local text-only ChatCapability using managed Gemma QAT CoreAI resource and caller-owned history.
+
+## Ownership and boundaries
+
+ModelKitGemma4 depends on ModelKit/ModelKitCoreAI. Defaults supplies sandbox Gemma4 and provider registration. Backend owns tokenization/cache/pipelining; adapter owns request/session validation and private-channel suppression.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Defaults -->|Installed Gemma4 root| Adapter[Gemma4Chat]
-    Consumer -->|ChatRequest| Adapter
-    Adapter -->|Exclusive lease| Resource[Manager-owned ModelResource]
-    Resource --> Backend[CoreAILanguageEngine]
-    Backend -->|Filtered text / real token counts| Adapter
-    Adapter -->|Bounded ChatEvent session| Consumer
+ Caller --> Adapter[Gemma4Chat]
+ Adapter --> Lease[ModelResource lease]
+ Lease --> Backend[CoreAILanguageEngine]
+ Backend -->|Filtered text and token usage| Session[ChatEvent session]
+ Session --> Caller
 ```
 
-✅ 2026-10-04: Mac CoreAI smoke returned “你好”; generation cancellation and unload/reload passed. Four Gemma tests passed. Signed iPhone 17 Pro build and bundled Agent resource verification passed. Full check.sh passed boundaries, format and provisioning checks but failed two unchanged IntegrationTests aim-follow tests (four assertions). build-ios.sh is blocked by the simulator SDK missing CoreAI. Physical model inference remains pending.
+## Request and output bounds
 
+At most 64 nonempty messages/64 KiB ending in user, with optional initial system instruction. Prompt plus generation fits 4096 tokens. Native Tool declarations/transcripts and image attachments reject before tokenization; no local vision or native-call fallback exists.
 
-## Bounded registered-observation continuation
+Each request resets backend cache. Event stream currently retains 4096 events of ≤4096 estimated bytes; overflow fails explicitly. Usage includes consumed stop tokens. Thought-channel text never reaches public Agent text. The resource owns supported iOS h18p AOT/macOS matching b2 graph selection.
 
-✅ Implemented: Assistant correlates generated Action/Tool calls with runtime-only feedback under the original turn, awaits complete results and requests the next model round. Limits: four total model rounds,16 native calls,64 KiB aggregate feedback/transcript and one30-second joined generation worker. A failed call becomes data for the model, never an automatic function retry. Cancellation clears owned feedback state and joins model cleanup; unknown/stale/duplicate feedback cannot resume a turn. Internal UI receipts and explicit /status retain their existing handling.
+## Admission and timing
 
-✅ Implemented: ModelKit ChatMessage gains provider-neutral assistant tool-call declarations and tool-result messages. OpenAI serializes request-local aliases consistently across declarations and prior calls; Gemma rejects native transcripts explicitly. Storage keeps optional exact text/native continuation JSON and metadata-only image descriptors as data, with bounded records and unchanged v1 compatibility. Camera native model calls use explicit observation registration so actual completion/error can continue reasoning. No change to camera or NexArm function implementation.
+One model lease rejects overlap; cancellation joins backend cleanup before release; unload drains the lease. There is no waiting request queue. Sample optional model-interface start immediately before native generate after resource/tokenization, then first nonempty delta before emission. Loading, tokenization, persistence/UI/voice are excluded; missing timing is not fabricated.
 
-## Assistant photo observation — ADR0184
+✅ Managed local text generation, explicit unsupported inputs and provider timing are implemented.
 
-✅ Implemented: Reject image attachments explicitly before tokenization; no pretending local text chat can see images.
+❌ Local native calls and image inference are not implemented.
 
-❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording and system Photos export are outside this iteration.
+## Related design
 
-
-✅ Model-interface TTFT: after resource admission/tokenization, sample request start immediately before native generate and the first nonempty generation delta before emission. Loading/tokenization and consumer/UI/storage work are excluded. The optional request sampler does not change native inference or resource cleanup.
+[Parent design](../README.md)

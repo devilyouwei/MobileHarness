@@ -1,8 +1,33 @@
-# Speech synthesis
+# Text-to-PCM Synthesis Contract
 
-Purpose: define text-to-PCM sessions and implement system and local synthesis. Design goals: managed ownership, bounded cancellable output and separation from playback.
+## Summary
 
-- ✅ Defaults selects enabled installed available MOSS Nano, otherwise Apple AVSpeechSynthesizer; disabling custom synthesis forces Apple. Explicit MOSS access remains available to isolated callers.
-- ✅ Apple system voices produce PCM for the same App-owned playback pipeline.
-- ✅ Kokoro remains only for isolated historical tests, outside production registration and packaging.
-- ❌ Playback and conversation scheduling are outside this module. Real voice quality remains device acceptance work.
+Context-bearing text/locale requests and audio/finished events, independent of physical playback.
+
+## Ownership and boundaries
+
+SpeechSynthesisCapability produces InferenceSession<SynthesisEvent>. Provider owns output format/bounds; consumer owns speech segmentation, storage, playback and execution timeout.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
+
+```mermaid
+flowchart LR
+ Caller --> Request[SpeechSynthesisRequest]
+ Request --> Provider[Synthesis capability]
+ Provider --> Events[AudioFrame and finished]
+ Events --> Consumer[PCM consumer]
+```
+
+## Input and completion
+
+Request rejects blank text/locale and retains InferenceContext. audio events carry independently validated AudioFrame with continuous provider sequencing; finished marks synthesis only. No speaker/permission/microphone is opened. Consumer explicitly cancels on early stop.
+
+Defaults selects enabled installed available MOSS, otherwise Apple. Kokoro is an optional isolated provider without production registration/download. Output admission, language conversion and native cleanup are provider-specific and documented below.
+
+✅ Managed text-to-PCM contract and local/system adapters are implemented.
+
+## Related design
+
+[Parent design](../README.md) · [Apple](Apple/README.md) · [Kokoro](Kokoro/README.md) · [MossNano](MossNano/README.md)

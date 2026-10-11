@@ -1,51 +1,90 @@
-# Shared Chat composition
+# Shared Chat Decision Worker
 
-Purpose: adapt injected ChatCapability to reusable one-round Agent decisions. This directory compiles in Agents, with AgentCore, ModelKit and StorageChat interfaces. It contains no device/UI effects or fixed role identities.
+## Summary
 
-✅ ADR0189 source migration implemented: AgentChatWorker, AgentChatDriver, AgentChatContext, AgentChatContextBuilder and AgentCommunicationAdapter have moved here unchanged.
+Adapts an injected ChatCapability into bounded role-specific model decisions and observation continuations. Assistant specializes this worker; Photographer, Memory and ApplicationControl compose it with deterministic workflows.
 
-Worker owns bounded admission, round feedback/barriers, continuation and joined cancellation. Driver demultiplexes native/text/evidence fields. Context contracts/builders adapt immutable role snapshots and exact provider call/result pairing; model communication maps authorized XML declarations to communication Actions. Roles supply preprocessing, prompts, grants, context schemas and completion/output policies.
+## Ownership and boundaries
 
-One inference worker, inbox32 plus one reserved continuation, output256, four requests/sixteen native calls,30 seconds cumulative execution and60 seconds queue expiry. Receipts are record-only; task results report actual outcomes. Pause/stop join work even when child cancellation delivery fails. Write failure prevents dependent actions; restart never replays effects.
+Roles own identity, preprocessing, schemas, system/style templates, grants, context selection and completion policy. This directory owns request construction, model-event consumption, output interpretation and round coordination. Gateway executes resolved output; ModelKit owns provider transport.
 
-Upstream: role actors/builders and injected capabilities. Downstream: Core contracts, ModelKit processing, Context repository and Communication business schemas. See [Support](../README.md), [Core](../Core/README.md), [Context](../Context/README.md) and [ADR0189](../../../../docs/adr/0189-agent-support-hierarchy.md). Real-model/native-UI/device acceptance remains outstanding.
+## External relationships and data flow
 
+Runtime flow; dashed arrows supply immutable resources or configuration.
 
+```mermaid
+flowchart LR
+ Role[Role State and systemPrompt] -->|System context and fresh facts| Worker[AgentChatWorker]
+ Assets[Role-owned JSON templates] -.-> Loader[AgentPrompts]
+ Loader -.->|Validated templates| Role
+ Loader -.-> Worker
+ Core[Function Token guide and visible catalog] -.-> Role
+ Repository[Context repository] -->|Immutable snapshot| Worker
+ Worker -->|Exact request copy| ModelKit
+ ModelKit -->|ChatEvents| Driver[AgentChatDriver]
+ Driver -->|Text queue| Text[Action-text consumer]
+ Driver -->|Native-call queue| Native[Tool consumer]
+ Driver -->|Usage and timing evidence| History[Conversation history]
+ Text -->|Persist fragments, parse and resolve| Worker
+ Native -->|Persist calls, parse and resolve| Worker
+ Worker -->|Calls and sealed rounds| Gateway
+ Gateway -->|Owner-directed feedback| Worker
+```
 
-✅ Implemented: business admission failures on validated external Signals emit correlated agent.error through the normal output stream before rejection. Authentication failures do not emit effects. This is an independent error observation, not a publication receipt; waiting UI operations consume it without waiting for the result watchdog.
+The two consumers run independently within the driver's task group. Each request creates its own AgentGenerator and ToolCallParser use; parser implementations are shared, while parser state, history and permissions remain local to the executing worker.
 
-✅ Implemented: session cancellation removes queued root listening holds and emits a final aggregate policy command, so cancelled queued input cannot leave recognition paused.
+## Components and requests
 
-Delegation listening holds are registered after context/output evidence and receipt registration succeed, immediately before communication output. A failed context commit cannot create an orphan reply hold or emit a delegated Action.
+| Source | Responsibility |
+| --- | --- |
+| AgentChatWorker.swift | Admission, text/native interpretation, task routing, feedback/barriers, continuation, occupancy and cancellation |
+| AgentChatDriver.swift | Provider session ownership, event demultiplexing, timing/evidence callbacks and joined consumer cleanup |
+| AgentChatContext.swift | Role State hooks, selected request values and private history adaptation |
+| AgentChatContextBuilder.swift | Completed request-block projection and provider call/result pairing |
+| AgentCommunicationAdapter.swift | Visible send Action metadata and typed task-message validation |
+| AgentPrompts.swift | Bundle discovery, immutable template/error caching and required-key validation |
 
-## Listening policy ownership
+Each provider invocation selects fresh role-owned `decisionContextMessages` from a repository snapshot, appends them to an immutable request copy and stores that exact request. Initial delegated requests identify the active task, requester and executor. Continuations retain the decision's Chat binding.
 
-✅ AgentChatWorker optionally reports bounded replyInputs/replyTasks through complete revisioned interaction.replyActivity publications. Stop clears occupancy after joined worker cleanup. It owns reply/task state, never listening consent, policy or Speech.Listening permission. Independent completion follows existing output barriers; task receipts remain distinct from task completion.
+History selects the latest ten completed request blocks by date, excluding blocks with unresolved native calls. One conversation turn can contain several blocks. Assistant projects historical native calls/results as inert text; other chat roles retain provider call/result pairing. The builder requires role templates explicitly and propagates rendering errors.
 
-❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
+Unknown/invalid invocations may produce bounded observation continuation. Successful send admission is record-only. Persistence failure or uncertain delivery after validation ends the decision without re-delegating. A sealed round joins Action and Tool results before a registered observation starts another request.
 
+## Prompt ownership and rendering
 
+`AgentPrompts.load(named:)` discovers at most 32 unique `.prompts.json` sets in the Agents `Bundle.module`, selected by `State.configurationName`. It caches immutable resources and load errors. Every role asset must contain `system`, `activeTask`, `taskReports`, `taskReport`, `executionObservations`, `historicalExecution` and `toolFailure`; role hooks select any additional templates.
 
+`State.systemPrompt` combines its own system template with the AgentCore Function Token guide and current visible Action catalog. Role assets own identity, expression style and speech/action examples. Worker code renders task summaries, active-task context and execution observations; the context builder renders history projections. Native Tool definitions are separate `ChatRequest.tools` values. Internal grants are never model-callable aliases.
 
+The shared [PromptTemplates renderer](../Core/Generation/README.md#prompt-resources-and-rendering) uses exact named variables and single-pass substitution. Input values are not reparsed or automatically escaped. Missing resources, invalid documents, missing templates/variables and oversized output fail explicitly. Assets have no hot reload or fallback prose.
 
-✅ Model task communication exposes send with authorized task kind/target enums and request examples. Telemetry publish and internal speech grants are absent from this model catalog. Parser rejection resolves against the complete model catalog, preserving original native call/result pairs. Invalid preflight communication and rejected admission enter bounded observation continuation; successful admission remains record-only. Persistence or uncertain delivery failure after validation terminates the decision without re-delegating.
+`AgentCommunicationAdapter.catalog` derives send metadata from allowed task target/contract pairs. Its illustrative example uses an actual permitted pair. `action` validates the exact pair and existing task scope, constructs trusted typed content and never broadcasts task ownership. Explicit native communication Tool registration rejects.
 
-✅ Device regression fix: Each initial delegated model request explicitly identifies its active task ID, requester and executor, independently of historical task summaries. Model communication documents waiting-user progress versus final result in the XML Action catalog. Four-request budgets and real feedback barriers remain enforced.
+## Bounds and overflow
 
-✅ Frontend/backend separation: Removed the routingTarget contract and fixed typed-UI task relay. Shared Chat still owns explicit conversational delegation and directed user task-input forwarding; no UI routing policy remains in the worker.
+| Owned state or queue | Bound and full-capacity behavior |
+| --- | --- |
+| Worker admission / output | Defaults: 32 queued inputs plus one reserved continuation; 256 output envelopes. Excess admission rejects; failed output yield marks the worker failed, clears its inbox, cancels inference and closes output. |
+| Driver text queue | 8192 fragments; cumulative text also limited to 8192 fragments and 65536 UTF-8 bytes per request. Failed yield terminates the round. |
+| Driver native queue | 16 complete calls; failed yield terminates the round. The decision budget independently limits total native calls to 16. |
+| Decision budget | Four requests, 120 generated calls, 64 KiB aggregate feedback/transcript and 30 seconds cumulative execution |
+| Queue expiry | 60 seconds; expired queued work receives terminal accounting |
+| Task views / prompt reports | 256 identities, at most 32 live; only terminal views may be retired. Prompts include live views and eight terminal excerpts. |
 
+The driver's secondary queues use synchronous checked yields. They do not suspend the provider producer; ModelKit adapters define the upstream ChatEvent queue policy. Cancellation or failure cancels the provider session, finishes both queues and joins all consumers. Only normal provider completion flushes the Action parser; partial failed/cancelled syntax is not finished or replayed.
 
-✅ Model-interface first-text timing: optional caller-owned ChatRequest timing captures request start and first nonempty text in the provider adapter, using monotonic elapsed time. OpenAI starts immediately before URLSession.bytes, after validation/encoding/admission; Gemma starts immediately before native generation. Agent consumption/persistence, ASR, TTS and rendering are excluded. The shared driver persists adapter evidence only; providers without timing and native-only replies do not fabricate TTFT. Storage adds optional request-start/elapsed fields; old timestamps remain readable and explicitly lack interface timing. UI uses exact adapter timing for new records and labels legacy timing separately. No new directories/dependencies or live API calls.
+## Lifecycle and occupancy
 
-ChatTiming is a single per-round caller-owned sampler, injected only into that immutable request copy. Provider sampling uses a bounded Mutex state and never awaits evidence storage. The driver commits the sampled values on the first available event or native-only terminal completion; it has no consumer-arrival timing fallback. Providers that do not report timing leave metadata absent. Existing streaming text persistence/segmentation is unchanged.
+One worker owns inference and dispatch independently of UI pages. Round results must match call, round, task and session identities plus sealed barriers. Pause/stop cancel and join owned work, including when cancellation delivery fails. Restart never replays effects.
 
+Reply occupancy is an optional complete revisioned publication of bounded reply inputs/tasks. Evidence commits precede delegation holds; failed commits cannot create orphan holds. Stop clears occupancy after joined cleanup. This worker has no consent/listening grant.
 
-## Responses and Action-only Assistant migration
+## Provider timing
 
-✅ Implemented: All roles expose send exclusively as an Action. Assistant also projects old native pairs as inert text observations without replay. Remove the /status static Tool branch and its duplicated pending-call state. Other native consumers retain complete function-call pairing.
+The driver adds a per-request ChatTiming sampler. Supporting adapters sample monotonic request start and first nonempty text before consumer persistence; the driver persists supplied evidence. Native-only replies and unsupported providers leave TTFT absent. ASR/TTS/UI timing is excluded; historical consumer timestamps remain distinctly labeled.
 
+✅ Shared bounded decisions, independent protocol consumers, role-owned prompt rendering and Action-only communication adaptation are implemented.
 
-✅ Camera perception/context change (2026-10-10): Add a default-empty role-owned decisionContextMessages hook. AgentChatWorker reads a fresh immutable repository snapshot before each provider request, appends selected role facts to a request copy and records that exact copy. The hook has no role identity, device policy or effect; continuation history/native pairing remain unchanged and prior request copies are not mutated.
+## Related design
 
-
-✅ Send Action-only audit (2026-10-10): remove automatic Agent.send native Tool declarations and the per-role exposesNativeCommunicationTools switch. Every role keeps authorized send Action declarations, target/kind/parameter documentation and receipt/task ownership contracts. Existing business Tools and historical native call/result evidence remain unchanged. Reject an explicit communication Tool registration instead of silently exposing it. Regression tests check all seven effective model catalogs and task request/progress/input/result flows using Action-call send, including roles with business Tools.
+[Parent design](../README.md) · [Generation](../Core/Generation/README.md) · [Capability](../Core/Capability/README.md) · [Communication schemas](../Communication/README.md) · [Context persistence](../Context/README.md)

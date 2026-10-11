@@ -1,15 +1,33 @@
-# Speech recognition
+# Streaming Recognition Contract
 
-Purpose: Define PCM input sessions and revisioned transcript events; provide native recognition adapters.
+## Summary
 
-Design goals: explicit ownership, capability boundaries and no duplicate production sources.
+Ordered PCM send/finish sessions and context-bearing revisioned transcript events.
 
-- ✅ Nemotron streaming ASR and optional Apple recognition.
-- ✅ Defaults selects enabled installed available Nemotron, otherwise modern Apple SpeechAnalyzer/SpeechTranscriber; disabling downloaded speech forces Apple.
-- ❌ Universal hardware/language support and fallback after active inference failure.
+## Ownership and boundaries
 
+SpeechRecognitionCapability opens request-local recognition; caller owns native capture, resampling and utterance endpoint policy. Providers own locale/admission/output bounds and joined native cleanup.
 
-✅ Nemotron now uses the shared macOS/iOS multilingual/2240ms Core ML export through ModelKitFluidAudio, with fresh session state and exact prompt_dictionary language selection. ❌ Physical-device acceptance is pending.
+## External relationships and data flow
 
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
-✅ AppleSpeechRecognition composes SpeechDetector with SpeechTranscriber. Public normal VAD events are not usable in the current real runtime probe, so Agent endpoint timing uses independently selected Silero or Energy; no capability contract changes are required.
+```mermaid
+flowchart LR
+ Caller --> Request[SpeechRecognitionRequest]
+ Request --> Session[SpeechRecognitionSession]
+ Caller -->|Ordered AudioFrame and finishInput| Session
+ Session -->|Transcript revisions and final event| Caller
+```
+
+## Session semantics
+
+Recognition input retains AudioFormat/InferenceContext and requested locale. Send preserves sequence/format and provider limits; finishInput closes input and drains final result; cancel stops/join-cleans without inventing a final transcript. Events carry segment/revision/context for consumers to reject stale updates. One provider operation rejects overlap; there is no shared request backlog here.
+
+Defaults selects enabled installed available Nemotron, otherwise modern Apple. Apple includes its native detector but external Silero/Energy owns usable acoustic scores for Agent endpoint timing. No active-failure system/cloud fallback exists.
+
+✅ Streaming transcript contract and two providers are implemented.
+
+## Related design
+
+[Parent design](../README.md) · [Apple](Apple/README.md) · [Nemotron](Nemotron/README.md)

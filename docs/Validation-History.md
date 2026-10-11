@@ -813,7 +813,7 @@ Scope: current working-tree Assistant model collection and App generation transp
 - ❌ Required scripts/build-ios.sh failed in the Simulator target: external coreai-models/CoreAIShared cannot resolve CoreAI for arm64/x86_64 Simulator. The successful device-target build is separate evidence.
 - ❌ Full scripts/check.sh did not pass. First full run:616 IntegrationTests, one issue in bluetoothLatestSliderSupersedesPresetWhileOldAimCleanupIsJoining (`disconnected`);59 AppWorkflowTests passed. After adding the open-parser regression, second full run:617 IntegrationTests, three issues across bluetoothSettingsOverridesAgentMotionAndAimWithSharedRecipe (`disconnected`) and bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode (recovery predicate plus timeout);59 AppWorkflowTests passed. All new protocol tests passed in both applicable runs. The two disconnected fixtures passed in the final focused run; bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode also passed in isolation (15.229s). These full-run failures are not a passing full suite and have not been attributed to a physical Bluetooth fault.
 
-Implementation and queue/failure contracts: [ADR0183](adr/0183-generation-round-observations.md), [Assistant](../MobileHarness/Agents/Assistant/README.md#independent-protocol-consumers--2026-10-08), [App transport](../MobileHarness/App/Workflows/Presentation/README.md#independent-protocol-consumers--2026-10-08). No new directory/module/dependency or generic Agent request/reply transport was added. Existing downstream ReAct continuation consumes the full merged round after both protocols settle.
+Implementation and queue/failure contracts: [ADR0183](adr/0183-generation-round-observations.md), [Assistant](../MobileHarness/Agents/Support/Chat/README.md#external-relationships-and-data-flow), [App transport](../MobileHarness/App/Workflows/Presentation/README.md#independent-protocol-consumers--2026-10-08). No new directory/module/dependency or generic Agent request/reply transport was added. Existing downstream ReAct continuation consumes the full merged round after both protocols settle.
 
 ## 2026-10-08 — Camera lens-switch lifetime
 
@@ -1212,3 +1212,355 @@ Validation: `./scripts/check.sh` passed (673 IntegrationTests,74 AppWorkflowTest
 ✅ 用户确认实际任务投递正确。使用现有本地签名构建 Debug 0.1.0/2026101008 成功，严格/深层签名和七个最终包内 Agent 配置校验通过。覆盖安装到 Youwei’s iPhone 17 Pro（00008150-000579D114C2401C），设备应用清单确认 build 2026101008，CoreDevice 确认启动成功。保留应用数据，未修改仓库签名配置。该版本包含历史预览补齐动态 send Action 目录的修复。
 
 证据：/tmp/mh-2026101008-signed-build.log、/tmp/mh-2026101008-install.json、/tmp/mh-2026101008-installed-apps.json、/tmp/mh-2026101008-launch.json。相关全量检查和构建记录见前条，本次未重复运行测试。❌ 安装/启动不代表修复后原生预览视觉验收或新增真实模型/设备测试。
+
+
+## 2026-10-10 — Full source README audit
+
+Documentation-only reconciliation of every tracked directory under MobileHarness. Each owning README was checked against its source/configuration and direct boundaries; callable grants, algorithms, state/lifecycle/failure contracts and implementation status were reconciled. The register below records all 108 documents. Downloaded model/binary-package internal directories and vendor READMEs were excluded; their boundary is documented in Resources/Models.
+
+The counts and inspection register in this section capture the initial audit revision. The later [overall-design expansion](#2026-10-10--expanded-overall-technical-design) records the enlarged overall README and updated static counts.
+
+### Actual verification
+
+| Check | Result |
+| --- | --- |
+| Tracked directory / README coverage | 108 / 108; no missing directories or documents |
+| First-level module structure | Nine; each has separate external one-level and internal diagrams |
+| Mermaid syntax | 129 / 129 parsed with installed Mermaid 12.1.0; zero parse failures |
+| Markdown syntax | 108 / 108 parsed as GFM with installed marked; 66 tables and all 129 Mermaid fences retained |
+| Relative file references in source READMEs | 292 checked; all target paths exist |
+| Incoming source-README anchors from tracked Markdown | Zero unresolved anchors after compatibility restoration; two pre-existing broken anchors also resolved |
+| Parent/direct-child navigation | Checked across all 108 directories |
+| Role metadata | All seven Agent JSON configurations matched for configured Action/Tool aliases, canonical paths, parameters and declared input schemas; subscriptions/communication grants retained |
+| Language/structure/status scan | English visible text; no chronological/ADR/roadmap/requirements headings; no acceptance-only item marked unimplemented |
+| Source/target/resource boundaries | `python3 scripts/check-modelkit-boundaries.py` passed its import, dependency, directory, value ownership, resource and retired-implementation checks |
+| Diff formatting | `git diff --check` passed |
+| Repository integrity | No non-Markdown tracked changes, new directories or business/interface/module changes; original Technical_Design.docx byte-identical to HEAD |
+
+Graphs were parsed and their declared relationships reviewed against code/configuration. No native-screen rendering or runtime diagram simulation was performed. No build, automated runtime test suite, network/model inference, native UI or physical-device acceptance was run for this documentation change. The boundary checker is a static repository check, not a build or device test.
+
+### Corrections and remaining implementation facts
+
+Current documentation distinguishes one-way publication from directed send receipts, task completion from admission, direct Tools from Channel-scheduled Actions, effect failure from feedback-delivery failure, executor-owned results from parent task identity, local frontend state from owner-routed submitted operations, and model/native completion from physical acceptance. Historical native Assistant calls are inert request evidence; current Assistant model exposure is Action-only. Specialist history is task-scoped; SpeechPerception owns listening consent/occupancy policy; healthy camera input replacement is separate from joined vision replacement. Foundation boundaries and actual target exclusions are documented.
+
+❗ OpenAIChat currently creates an event session with nil capacity and no producer backpressure. Its eight-MiB wire limit and per-event limit do not define a decoded-event queue capacity. Slow consumers may retain the full response; abandonment requires cancellation/join. This source-confirmed buffering gap is recorded in the [owning adapter](../MobileHarness/ModelKit/Language/LLM/OpenAI/README.md). It was not changed in this audit.
+
+❌ Empty/shared-extension boundaries and absent providers remain explicit: PlatformKit/Core has no compiled implementation; judgment has contracts but no production provider; System.Runtime.runtimeInfo is a fixed compatibility stub rather than live diagnostics. Other absent capabilities are listed only in their owning current designs. Lack of real-model/native/device acceptance is not treated as absence of code.
+
+### Relocated historical claims
+
+The following observations occurred in pre-audit source READMEs and are retained here as historical claims, not newly executed verification. Existing dedicated measurements/validation records remain the primary evidence where available.
+
+- Former Hub README recorded Mac production Silero downloads against official Hugging Face in 11.55 s and HF-Mirror in 9.89 s, plus 38 Management/five Hub contract tests, repository checks, four simulator builds and a signed device build. These small-file durations do not establish sustained bandwidth or lock-screen/server-resume behavior.
+- Former Management README recorded an early 2026-10-03 check blocked by missing Metal/full Xcode, followed by full-Xcode checks/builds and a metadata-only bundle of 104 KiB. A native YOLO storage probe recorded 3261955 installed bytes, settled transfer state, legacy /var-to-/private/var receipt-path repair and rejection of altered files. These are historical environment/probe observations, not this audit's runtime results.
+- Former Gemma README recorded 2026-10-04 Mac generation returning a Chinese greeting, cancellation/unload/reload and four Gemma tests; a signed iPhone build/resource check passed. The then-current full check failed two IntegrationTests aim-follow cases (four assertions), and simulator build-ios.sh was blocked by missing CoreAI SDK. No new physical local-model inference claim follows from those records.
+- Former Models README recorded local deletion of unused CoreAI Kokoro/iPhone Nemotron artifacts (about 1.6 GiB) and separate Kokoro CoreML comparison artifacts (about 330 MiB), while other ignored Mac fixtures were retained. This is cleanup history, not a required installation state.
+
+### Per-document inspection register
+
+Every row passed the shared structure, graph, link, navigation and current-design checks above. Direct Swift/config counts describe files owned immediately by that directory, not inferred implementation. A zero count may mean a documented aggregation/resource boundary; nested implementation is represented by linked child designs. Technical contracts were reviewed within the owning module; this table is not runtime acceptance.
+
+| Module | README count |
+| --- | --- |
+| Overall | 1 |
+| App | 12 |
+| Agents | 19 |
+| Gateway | 12 |
+| Actions | 14 |
+| ModelKit | 30 |
+| PlatformKit | 6 |
+| Storage | 3 |
+| UI | 6 |
+| Resources | 5 |
+
+| # | Document | Direct Swift / config files | Mermaid diagrams | Inspection |
+| --- | --- | --- | --- | --- |
+| 1 | [MobileHarness/README.md](../MobileHarness/README.md) | 0 / 0 | 5 | ✅ Current technical design reconciled |
+| 2 | [MobileHarness/App/README.md](../MobileHarness/App/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 3 | [MobileHarness/App/Adapters/README.md](../MobileHarness/App/Adapters/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 4 | [MobileHarness/App/Composition/README.md](../MobileHarness/App/Composition/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 5 | [MobileHarness/App/Lifecycle/README.md](../MobileHarness/App/Lifecycle/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 6 | [MobileHarness/App/Workflows/README.md](../MobileHarness/App/Workflows/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 7 | [MobileHarness/App/Composition/Behaviors/README.md](../MobileHarness/App/Composition/Behaviors/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 8 | [MobileHarness/App/Workflows/Bluetooth/README.md](../MobileHarness/App/Workflows/Bluetooth/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 9 | [MobileHarness/App/Workflows/Diagnostics/README.md](../MobileHarness/App/Workflows/Diagnostics/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 10 | [MobileHarness/App/Workflows/History/README.md](../MobileHarness/App/Workflows/History/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 11 | [MobileHarness/App/Workflows/Presentation/README.md](../MobileHarness/App/Workflows/Presentation/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 12 | [MobileHarness/App/Workflows/Settings/README.md](../MobileHarness/App/Workflows/Settings/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 13 | [MobileHarness/App/Workflows/Speech/README.md](../MobileHarness/App/Workflows/Speech/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 14 | [MobileHarness/Agents/README.md](../MobileHarness/Agents/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 15 | [MobileHarness/Agents/ApplicationControl/README.md](../MobileHarness/Agents/ApplicationControl/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 16 | [MobileHarness/Agents/Assistant/README.md](../MobileHarness/Agents/Assistant/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 17 | [MobileHarness/Agents/Memory/README.md](../MobileHarness/Agents/Memory/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 18 | [MobileHarness/Agents/Photographer/README.md](../MobileHarness/Agents/Photographer/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 19 | [MobileHarness/Agents/SpeechPerception/README.md](../MobileHarness/Agents/SpeechPerception/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 20 | [MobileHarness/Agents/SpeechSynthesis/README.md](../MobileHarness/Agents/SpeechSynthesis/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 21 | [MobileHarness/Agents/Support/README.md](../MobileHarness/Agents/Support/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 22 | [MobileHarness/Agents/VisionPerception/README.md](../MobileHarness/Agents/VisionPerception/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 23 | [MobileHarness/Agents/Support/Chat/README.md](../MobileHarness/Agents/Support/Chat/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 24 | [MobileHarness/Agents/Support/Communication/README.md](../MobileHarness/Agents/Support/Communication/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 25 | [MobileHarness/Agents/Support/Context/README.md](../MobileHarness/Agents/Support/Context/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 26 | [MobileHarness/Agents/Support/Core/README.md](../MobileHarness/Agents/Support/Core/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 27 | [MobileHarness/Agents/Support/Core/Capability/README.md](../MobileHarness/Agents/Support/Core/Capability/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 28 | [MobileHarness/Agents/Support/Core/Communication/README.md](../MobileHarness/Agents/Support/Core/Communication/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 29 | [MobileHarness/Agents/Support/Core/Generation/README.md](../MobileHarness/Agents/Support/Core/Generation/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 30 | [MobileHarness/Agents/Support/Core/Input/README.md](../MobileHarness/Agents/Support/Core/Input/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 31 | [MobileHarness/Agents/Support/Core/Output/README.md](../MobileHarness/Agents/Support/Core/Output/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 32 | [MobileHarness/Agents/Support/Core/Runtime/README.md](../MobileHarness/Agents/Support/Core/Runtime/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 33 | [MobileHarness/Gateway/README.md](../MobileHarness/Gateway/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 34 | [MobileHarness/Gateway/Input/README.md](../MobileHarness/Gateway/Input/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 35 | [MobileHarness/Gateway/Output/README.md](../MobileHarness/Gateway/Output/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 36 | [MobileHarness/Gateway/Runtime/README.md](../MobileHarness/Gateway/Runtime/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 37 | [MobileHarness/Gateway/Output/Dispatch/README.md](../MobileHarness/Gateway/Output/Dispatch/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 38 | [MobileHarness/Gateway/Output/Protocols/README.md](../MobileHarness/Gateway/Output/Protocols/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 39 | [MobileHarness/Gateway/Output/Registration/README.md](../MobileHarness/Gateway/Output/Registration/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 40 | [MobileHarness/Gateway/Output/Resources/README.md](../MobileHarness/Gateway/Output/Resources/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 41 | [MobileHarness/Gateway/Output/Results/README.md](../MobileHarness/Gateway/Output/Results/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 42 | [MobileHarness/Gateway/Output/Routing/README.md](../MobileHarness/Gateway/Output/Routing/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 43 | [MobileHarness/Gateway/Output/Scheduling/README.md](../MobileHarness/Gateway/Output/Scheduling/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 44 | [MobileHarness/Gateway/Output/Validation/README.md](../MobileHarness/Gateway/Output/Validation/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 45 | [MobileHarness/Actions/README.md](../MobileHarness/Actions/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 46 | [MobileHarness/Actions/Camera/README.md](../MobileHarness/Actions/Camera/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 47 | [MobileHarness/Actions/Contracts/README.md](../MobileHarness/Actions/Contracts/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 48 | [MobileHarness/Actions/History/README.md](../MobileHarness/Actions/History/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 49 | [MobileHarness/Actions/NexArm/README.md](../MobileHarness/Actions/NexArm/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 50 | [MobileHarness/Actions/Speech/README.md](../MobileHarness/Actions/Speech/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 51 | [MobileHarness/Actions/System/README.md](../MobileHarness/Actions/System/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 52 | [MobileHarness/Actions/UI/README.md](../MobileHarness/Actions/UI/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 53 | [MobileHarness/Actions/Camera/Support/README.md](../MobileHarness/Actions/Camera/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 54 | [MobileHarness/Actions/History/Support/README.md](../MobileHarness/Actions/History/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 55 | [MobileHarness/Actions/NexArm/Support/README.md](../MobileHarness/Actions/NexArm/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 56 | [MobileHarness/Actions/Speech/Support/README.md](../MobileHarness/Actions/Speech/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 57 | [MobileHarness/Actions/System/Support/README.md](../MobileHarness/Actions/System/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 58 | [MobileHarness/Actions/UI/Support/README.md](../MobileHarness/Actions/UI/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 59 | [MobileHarness/ModelKit/README.md](../MobileHarness/ModelKit/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 60 | [MobileHarness/ModelKit/Backends/README.md](../MobileHarness/ModelKit/Backends/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 61 | [MobileHarness/ModelKit/Core/README.md](../MobileHarness/ModelKit/Core/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 62 | [MobileHarness/ModelKit/Defaults/README.md](../MobileHarness/ModelKit/Defaults/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 63 | [MobileHarness/ModelKit/Language/README.md](../MobileHarness/ModelKit/Language/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 64 | [MobileHarness/ModelKit/Management/README.md](../MobileHarness/ModelKit/Management/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 65 | [MobileHarness/ModelKit/Speech/README.md](../MobileHarness/ModelKit/Speech/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 66 | [MobileHarness/ModelKit/Vision/README.md](../MobileHarness/ModelKit/Vision/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 67 | [MobileHarness/ModelKit/Backends/CoreAI/README.md](../MobileHarness/ModelKit/Backends/CoreAI/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 68 | [MobileHarness/ModelKit/Backends/CoreML/README.md](../MobileHarness/ModelKit/Backends/CoreML/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 69 | [MobileHarness/ModelKit/Backends/FluidAudio/README.md](../MobileHarness/ModelKit/Backends/FluidAudio/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 70 | [MobileHarness/ModelKit/Backends/HuggingFace/README.md](../MobileHarness/ModelKit/Backends/HuggingFace/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 71 | [MobileHarness/ModelKit/Backends/MossCoreML/README.md](../MobileHarness/ModelKit/Backends/MossCoreML/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 72 | [MobileHarness/ModelKit/Language/JEV/README.md](../MobileHarness/ModelKit/Language/JEV/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 73 | [MobileHarness/ModelKit/Language/LLM/README.md](../MobileHarness/ModelKit/Language/LLM/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 74 | [MobileHarness/ModelKit/Speech/ASR/README.md](../MobileHarness/ModelKit/Speech/ASR/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 75 | [MobileHarness/ModelKit/Speech/Shared/README.md](../MobileHarness/ModelKit/Speech/Shared/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 76 | [MobileHarness/ModelKit/Speech/TTS/README.md](../MobileHarness/ModelKit/Speech/TTS/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 77 | [MobileHarness/ModelKit/Speech/VAD/README.md](../MobileHarness/ModelKit/Speech/VAD/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 78 | [MobileHarness/ModelKit/Vision/YOLO/README.md](../MobileHarness/ModelKit/Vision/YOLO/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 79 | [MobileHarness/ModelKit/Language/LLM/Gemma4/README.md](../MobileHarness/ModelKit/Language/LLM/Gemma4/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 80 | [MobileHarness/ModelKit/Language/LLM/OpenAI/README.md](../MobileHarness/ModelKit/Language/LLM/OpenAI/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 81 | [MobileHarness/ModelKit/Speech/ASR/Apple/README.md](../MobileHarness/ModelKit/Speech/ASR/Apple/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 82 | [MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md](../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 83 | [MobileHarness/ModelKit/Speech/Shared/Apple/README.md](../MobileHarness/ModelKit/Speech/Shared/Apple/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 84 | [MobileHarness/ModelKit/Speech/TTS/Apple/README.md](../MobileHarness/ModelKit/Speech/TTS/Apple/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 85 | [MobileHarness/ModelKit/Speech/TTS/Kokoro/README.md](../MobileHarness/ModelKit/Speech/TTS/Kokoro/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 86 | [MobileHarness/ModelKit/Speech/TTS/MossNano/README.md](../MobileHarness/ModelKit/Speech/TTS/MossNano/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 87 | [MobileHarness/ModelKit/Speech/VAD/Energy/README.md](../MobileHarness/ModelKit/Speech/VAD/Energy/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 88 | [MobileHarness/ModelKit/Speech/VAD/Silero/README.md](../MobileHarness/ModelKit/Speech/VAD/Silero/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 89 | [MobileHarness/PlatformKit/README.md](../MobileHarness/PlatformKit/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 90 | [MobileHarness/PlatformKit/Audio/README.md](../MobileHarness/PlatformKit/Audio/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 91 | [MobileHarness/PlatformKit/Connectivity/README.md](../MobileHarness/PlatformKit/Connectivity/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 92 | [MobileHarness/PlatformKit/Core/README.md](../MobileHarness/PlatformKit/Core/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 93 | [MobileHarness/PlatformKit/Vision/README.md](../MobileHarness/PlatformKit/Vision/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 94 | [MobileHarness/PlatformKit/Connectivity/NexArm/README.md](../MobileHarness/PlatformKit/Connectivity/NexArm/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 95 | [MobileHarness/Storage/README.md](../MobileHarness/Storage/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 96 | [MobileHarness/Storage/Audio/README.md](../MobileHarness/Storage/Audio/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 97 | [MobileHarness/Storage/Chat/README.md](../MobileHarness/Storage/Chat/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 98 | [MobileHarness/UI/README.md](../MobileHarness/UI/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 99 | [MobileHarness/UI/Camera/README.md](../MobileHarness/UI/Camera/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 100 | [MobileHarness/UI/Components/README.md](../MobileHarness/UI/Components/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 101 | [MobileHarness/UI/Conversation/README.md](../MobileHarness/UI/Conversation/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 102 | [MobileHarness/UI/Diagnostics/README.md](../MobileHarness/UI/Diagnostics/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 103 | [MobileHarness/UI/Settings/README.md](../MobileHarness/UI/Settings/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 104 | [MobileHarness/Resources/README.md](../MobileHarness/Resources/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
+| 105 | [MobileHarness/Resources/AppIconVariants/README.md](../MobileHarness/Resources/AppIconVariants/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 106 | [MobileHarness/Resources/Assets.xcassets/README.md](../MobileHarness/Resources/Assets.xcassets/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 107 | [MobileHarness/Resources/Models/README.md](../MobileHarness/Resources/Models/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 108 | [MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/README.md](../MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+
+## 2026-10-10 — Expanded overall technical design
+
+Documentation-only follow-up to restore the overall technical design after its 237-line audit revision. [MobileHarness/README.md](../MobileHarness/README.md) now has 1263 lines, twenty-two Mermaid diagrams and nineteen tables, with navigation to the complete framework and cross-module contracts. Historical/acceptance material stays in docs; the other 107 source READMEs retain the preceding audit edits.
+
+### Actual verification
+
+| Check | Result |
+| --- | --- |
+| Production target map | 38 / 38 production target/macro declarations independently matched against Package.swift for names, source ownership, direct project dependencies and external products; test targets excluded |
+| Current technical alignment | Reviewed source/configuration and owning designs for assembly/identity, seven-role grants and communication, protocol bindings, atomic contexts, parsing/scheduling/rounds, execution feedback/resource cleanup, media/device lifecycles, feature transactions and model/artifact ownership |
+| Source README coverage/structure | 108 / 108 tracked directories; nine modules retain separate external/internal diagrams; parent/child navigation and English current-design/status checks passed |
+| Current Mermaid syntax | 146 / 146 source diagrams parsed with installed Mermaid 12.1.0, including all twenty-two overall diagrams; zero failures |
+| Current Markdown syntax | 108 / 108 source READMEs parsed as GFM with installed marked; eighty-three tables and all 146 Mermaid fences retained |
+| Current source-relative references | 359 checked, including twenty-four local fragment references; all paths and referenced anchors resolved |
+| Incoming source-README anchors | All tracked Markdown incoming references checked; zero unresolved source-README anchors, including compatibility anchors retained from the earlier design |
+| Role metadata | All seven JSON configurations retained and checked for configured aliases, canonical function paths, parameters and input schemas |
+| Follow-up record references | Added documentation-index/history/validation links and anchors resolved |
+| Diff formatting | git diff --check passed |
+| Follow-up integrity | Hash comparison against the working tree at follow-up start confirms only the overall README and three existing docs records changed; other 107 source READMEs, code, interfaces, targets and tracked resources preserved; no new repository files/directories |
+| Original design source | Technical_Design.docx remains byte-identical to HEAD |
+
+Reviewed relationships distinguish compilation, assembly and runtime data. The speech diagram now separates caption execution through OutputGateway from final-transcript publication through InputGateway. Overall scenarios retain admission versus actual execution, specialist ownership, scoped user questions, immediate native lifecycle fences, request-local failure and independent delivery failure.
+
+The OpenAI nil-capacity event-session buffering gap remains a documented source fact. No code fix, build, runtime test suite, model/network inference, native UI rendering, physical-device acceptance or rendered-diagram layout validation was performed. Static Markdown/Mermaid parsing does not establish those results.
+
+## 2026-10-10 — Project README concepts and current capabilities
+
+Documentation-only root-entry update. The project README now introduces the biological analogy, feedback loop, ownership questions and current seven roles, and embeds the unchanged MobileHarness/agent-loop.svg. The detailed 1263-line MobileHarness technical design and all 107 other source READMEs remain unchanged from the preceding expansion.
+
+### Actual verification
+
+| Check | Result |
+| --- | --- |
+| Root relative references | All thirty-five image/file/fragment references resolved, including the SVG, icon, module designs, setup files and documentation entries |
+| Incoming root anchors | Tracked Markdown links to root README headings checked; no unresolved anchors |
+| Embedded SVG | Original XML parses; Signal/Cognition/Action labels and title inspected; asset bytes preserved |
+| Runtime diagram | One Mermaid diagram parsed with installed Mermaid 12.1.0; relationships reviewed as runtime data/capability paths rather than compilation dependencies |
+| Markdown | Root README and updated existing index/history/validation records parsed as GFM with installed marked |
+| Current design alignment | Role names/grants, owner-routed UI transactions, continuation, default speech/VAD, Responses/photo support, resource reattachment and listening lifetime checked against current owning designs and relevant source/configuration |
+| Setup/development | Package Swift/platform declarations, app deployment configuration, local signing example, current UI labels and actual check/build script steps inspected; no build result inferred |
+| Stale root claims | Removed obsolete ConversationMemory/Camera.open/Robot.aim paths, unimplemented native transport/continuation claims, unconditional relaunch restart and unused sound-direction-consumer description |
+| Source-README incoming links | Existing source-link audit passed with zero unresolved references |
+| Diff formatting | git diff --check passed |
+| Follow-up integrity | Only root README and three existing docs records changed relative to this turn's starting working tree; all 108 source READMEs, SVG, business source, configuration, resources and original Word design preserved; no new repository files/directories |
+
+The SVG was embedded rather than copied or moved; existing source/packaging paths remain intact. No runtime code, model/provider operation, build, automated runtime test suite, browser/native layout rendering or physical-device acceptance was performed. The static checks verify document structure/references and source alignment, not those runtime outcomes.
+
+## 2026-10-11 — Original overall-design structure restored
+
+Documentation-only correction following the user's requirement to preserve the original overall-design structure and correct content. The pre-audit README is the baseline. MobileHarness/README.md again uses its original title and three Parts; stale content is corrected and current mechanisms are integrated within existing subsections. The dated appended checkpoints are consolidated rather than reinstated as extra top-level chapters. Earlier audit/expansion counts describe their respective historical snapshots.
+
+### Actual verification
+
+| Check | Result |
+| --- | --- |
+| Original heading structure | Exact text/order/level comparison passed for all 67 headings: one title, three Parts, 47 third-level and 16 fourth-level headings; no replacement chapters or renamed subsections |
+| Original three-layer architecture | Original App Host / Business / Foundations Mermaid source retained verbatim |
+| Correct-content preservation | Verbatim checks passed for original coordination ownership, composition/mediation, computation/effect/host boundaries, SDK comparison, adaptive vision and Settings detection descriptions; unchanged original contracts/diagrams remain in their owning chapters |
+| Current-content corrections | Reviewed Support directory tree, actual target dependencies, direct owner subscriptions, seven roles, canonical functions, private contexts, bound executor feedback, Responses/native grants, resident listening, healthy lens switch/photos and feature/resource ownership against current source/design |
+| Canonical function inventory | All 57 current canonical functions matched owning Action declarations; no invented function names |
+| Source coverage and navigation | All 108 tracked READMEs/directories checked; nine module diagrams and seven role metadata contracts retained |
+| Mermaid syntax | All 158 source diagrams parsed with installed Mermaid 12.1.0, including 34 overall diagrams; zero failures |
+| Markdown syntax | All 108 source READMEs parsed as GFM with installed marked; 92 tables and all 158 Mermaid fences retained |
+| Overall document convention | Original introduction retained instead of adding a Summary chapter; literal existing UI label 音频识别 retained; no dated/ADR/requirements/roadmap headings introduced |
+| Source relative references | All 314 references, including nine fragment references, resolved; duplicate explicit IDs rejected |
+| Incoming source anchors | Tracked Markdown incoming source-README links checked; zero unresolved anchors |
+| Follow-up records | Added index/history/validation links and fragments resolved; changed records parsed as GFM |
+| Diff formatting | git diff --check passed |
+| Integrity | Only the overall README and three existing docs records changed from this turn's starting working tree; root project README, other 107 source READMEs, SVG, code/configuration/resources and original Word preserved; no new repository files/directories |
+
+This restores both the document hierarchy and the original architecture layers. It does not establish runtime or physical acceptance. No build, runtime test suite, model/network invocation, native UI/device acceptance or rendered-diagram layout inspection was performed.
+
+## 2026-10-11 — Project opening summary and keywords
+
+Documentation-only placement change: conceptual summary and keywords now appear at the start of the project README; the overall technical design opens with its scope and introduction link.
+
+| Check | Result |
+| --- | --- |
+| Overall preservation | Title and all 67 headings retain their text, order and levels; three-part navigation and all content from Part I onward are byte-for-byte unchanged from the starting working tree |
+| Project preservation | Existing icon/title/tagline, navigation and all sections from The Agent loop onward are unchanged; the original SVG remains unchanged |
+| References and syntax | Local paths and Markdown fragments in the four changed documents resolve; changed documents parse as GFM; the source README static audit and incoming-link audit pass |
+| Diff and integrity | git diff --check passes; only the two READMEs and these two existing records changed in this follow-up; the other 107 source READMEs, code, assets, configuration and original Word design are preserved |
+
+No build, runtime tests, model invocation, native UI rendering or physical-device acceptance was performed.
+
+## 2026-10-11 — Overall design accuracy and redundancy review
+
+Documentation-only review of MobileHarness/README.md, preserving the user's original organization. Every overall section was inspected; current claims were reconciled with package declarations, Agent JSON, canonical Action declarations, host protocol bindings, Gateway/context/Chat/resource behavior and relevant test source. Tests were inspected as contracts, not executed.
+
+| Check | Result |
+| --- | --- |
+| Original organization | All 67 heading texts, levels and order preserved; original App Host / Business / Foundations diagram unchanged |
+| Source target map | All 38 production target/macro declarations covered; explicit dependencies matched; facade/default adapter groups checked separately |
+| Canonical functions | All 57 current @Action entry addresses matched the inventory |
+| Static subscriptions | All 27 source/contract subscriptions across seven Agent JSON files represented in the route table |
+| Corrected guarantees | History builder selects ten completed request blocks; AgentContext rejects unknown/terminal transitions without enforcing the illustrated graph; InputGateway has separate directed/publication capacity pools; resource deduplication follows local publication submission |
+| Current integration | Listening/capture-ended, reply occupancy, camera state, task answers/results, ApplicationControl native grants, camera/environment sampling and scan/status APIs aligned with source; activity events remain local where transport is not integrated |
+| Mermaid syntax | All 157 source diagrams parsed successfully, including 33 overall diagrams; one redundant resource failure diagram removed |
+| Markdown syntax | All 108 source READMEs parsed as GFM; all 92 tables retained; changed docs records/index also parsed |
+| References | All source relative paths/fragments and tracked incoming source-README anchors resolved; changed docs links/fragments resolved |
+| Formatting | git diff --check passed |
+| Review integrity | Only overall README and three existing docs records/index changed from the review baseline; project README, other 107 source READMEs, code, assets, configuration, directory structure and original Word preserved |
+
+The existing OpenAI decoded-event buffering gap remains documented as a confirmed bug. This review did not fix runtime code or establish new operational acceptance. No build, runtime test suite, model/provider invocation, rendered-diagram layout inspection, native UI or physical-device acceptance was performed.
+
+
+## 2026-10-11 — OpenAI 128-event backpressure
+
+The OpenAI Responses adapter now uses a 128-event session with `maximumEventBytes: 65568`. Serialized `yieldSuspending` covers text, native calls, usage and the final completion event. The request retains its operation lease while waiting for queue capacity. Normal completion drains accepted events; cancellation/failure wakes pending production. Consumers must drain or cancel before ordinary unload, which waits for active use. The eight-MiB wire cap remains separate from decoded-event buffering; no total process-memory bound is claimed. This resolves the nil-capacity gap recorded by the earlier source README audits.
+
+- ✅ Focused offline Swift tests passed: 23 OpenAIChatTests and 17 ModelKitTests. Long-reply fixtures cover 127, 128 and 1,024 text fragments with delayed/slow consumption, terminal delivery, paused-consumer cancellation/shutdown and reuse after cancellation/unload. Shared session tests cover a full-buffer producer wait and cancellation wakeup. Log: `/tmp/mh-openai128-focused.log`.
+- ✅ Required `./scripts/check.sh` exited 0: module-boundary checks, six Python tests, strict Swift formatting, all Swift test targets and project/privacy/entitlement plist checks passed. The full run includes the 23 OpenAIChatTests, 17 ModelKitTests and 74 AppWorkflowTests; normally gated real-model/physical cases remain skipped. Log: `/tmp/mh-openai128-check.log`.
+- ❌ Required `./scripts/build-ios.sh` with full Xcode exited 65 at the first Simulator scheme: external CoreAIShared could not resolve the CoreAI module for arm64/x86_64. Later script schemes did not run. This reproduces the previously recorded Simulator dependency limitation. Log: `/tmp/mh-openai128-ios.log`.
+- ✅ Unsigned generic iOS device-target Debug build passed with Xcode 27 via `xcodebuild -project MobileHarness.xcodeproj -scheme MobileHarness -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`. All seven packaged Agent configurations matched their source files. Log: `/tmp/mh-openai128-device.log`. The app was not installed.
+- ✅ Current adapter/module/overall designs and the owning test README describe the new bound and suspension policy. Static source README validation found all 108 documents and no path/anchor errors; Swift formatting and `git diff --check` passed. The original overall heading structure is preserved.
+- No live provider, real-model, native UI, memory/latency measurement, phone installation or physical-device acceptance was performed. The first focused attempt failed only because the URLProtocol fixture did not retain `httpBody` for selecting reply length; selecting the fixture through the request URL fixed the test, and the final focused run passed.
+
+
+## 2026-10-11 — Role-owned prompt templates and shared Function Token guidance
+
+Four chat roles now own separate `.prompts.json` resources: Assistant, Photographer, Memory and ApplicationControl. Identity, response style, speech/action examples and workflow system/user messages are authored there. Task summaries, active-task context, execution observations, inert native history, photo state/review and title generation are rendered rather than embedded in Swift. The independent AgentCore resource owns generic Function Token syntax, Channel/wait semantics and catalog formatting. Native Tool declarations remain separate in `ChatRequest.tools`.
+
+The Foundation-only renderer uses schema version 1, exact named-variable matching and single-pass substitution, with 64 templates, 64 KiB document/output and 16 KiB per template. Role discovery caches at most 32 immutable template sets without a hard-coded role list. Invalid/missing resources, templates or variables propagate errors. Configuration loading remains bundled and immutable; no template hot reload or expression engine was introduced. Existing Agent declaration JSON, parsing/execution mechanics and queue/lifecycle bounds are unchanged. Shared send examples now select a real allowed target/kind pair and omit taskID for request examples.
+
+- ✅ Final required `./scripts/check.sh` exited 0: module-boundary checks, six Python tests, strict Swift formatting, all Swift test targets and project/privacy/entitlement plist checks passed. Includes 680 IntegrationTests and 74 AppWorkflowTests; gated physical/real-model cases remain skipped. Log: `/tmp/mh-prompts-final-check.log`. Earlier focused rendering/prompt/history/title tests and the first full check also passed before the final asset-discovery/example refinement.
+- ✅ New prompt regressions cover malformed schema/expressions, exact variable contracts, UTF-8/file/template/output bounds, missing resources/templates, single-pass insertion, independent role identity/grants, shared grammar inclusion, workflow/title data and valid communication example grants. Existing parser, wait execution, continuation, title and photography tests remain in the full suite.
+- ✅ Unsigned generic iOS device-target Debug build passed using Xcode 27. Final app verification matched all seven Agent declarations, four role prompt assets and one independent AgentCore protocol asset against source bytes. Offline verifier checks additionally accepted exact bundles and rejected missing, stale and unexpected prompt resources. Log: `/tmp/mh-prompts-device.log`; verifier: `scripts/verify-app-agent-resources.py`. No phone installation occurred.
+- ❌ Required `./scripts/build-ios.sh` with full Xcode exited 65 at the first Simulator scheme because external CoreAIShared could not resolve CoreAI for arm64/x86_64. Subsequent script schemes did not run. This reproduces the previously documented Simulator dependency limitation. Log: `/tmp/mh-prompts-ios.log`.
+- ✅ Static source README checks found all 108 tracked documents with no path/anchor errors. Mermaid parsing passed for all 157 graphs; GFM parsing passed for all 108 tracked source READMEs and 92 tables. The overall design retains all original 67 headings and its original three-layer architecture diagram. `git diff --check` passed; prior unrelated working-tree edits and the original Technical_Design.docx are preserved.
+- No live provider/model request, native UI inspection, device interaction, performance measurement or physical acceptance was performed. Automated prompt-content checks do not establish model instruction-following quality.
+
+## 2026-10-11 — Agents technical design alignment
+
+Documentation-only inspection of all 19 `MobileHarness/Agents/**/README.md` documents against the current role actors/processing, bundled v6 declarations, role and Function Token prompt resources, shared adapters, neutral Core contracts and relevant regression definitions. Existing uncommitted implementation work was retained. No source, configuration, template, test or build-script content changed during this inspection. The project introduction and overall three-part technical design were unchanged.
+
+### Per-document inspection register
+
+| Owning README | Source comparison and resulting correction |
+| --- | --- |
+| [Agents](../MobileHarness/Agents/README.md) | Seven declarations and Package target/resources; separate Gateway-routed role messages from source composition, add return task reports/occupancy and describe Assistant specialization accurately. |
+| [Assistant](../MobileHarness/Agents/Assistant/README.md) | Type alias, Assistant State hooks and prompt asset; integrate prompt ownership/internal composition, preserve Action-only history behavior and every function/communication grant. |
+| [Photographer](../MobileHarness/Agents/Photographer/README.md) | Actor, camera workflow, tracking policy, context/photo hooks and prompts; correct exposed send Action and pose-gap reset semantics, document bounded tracking integration and source relationships. |
+| [Memory](../MobileHarness/Agents/Memory/README.md) | Actor/history workflow, State hooks, title generator and prompts; separate fixed transactions/Chat/title inference and document title sampling, output bounds and timeout. |
+| [ApplicationControl](../MobileHarness/Agents/ApplicationControl/README.md) | Fixed transaction actor, classifiers/grants, Chat hooks and prompts; add source composition and integrate prompt ownership while retaining native/Action/internal registration distinctions. |
+| [SpeechPerception](../MobileHarness/Agents/SpeechPerception/README.md) | Resident actor, listening policy, resampler/segmentation/ASR and sound estimator; add internal processing flow, explicit FIFO/output overflow and confirmed diagnostic-yield limitation. |
+| [SpeechSynthesis](../MobileHarness/Agents/SpeechSynthesis/README.md) | Actor, context request builder and PCM producer; distinguish queued admissions from the active producer/global handle bound, configurable timeout and pause behavior. |
+| [VisionPerception](../MobileHarness/Agents/VisionPerception/README.md) | Actor, cadence, motion, overlay/gaze and generic mailbox; add internal flow and correct the shared 18-slot capacity with keyed coalescing and no reserved per-kind partition. |
+| [Support](../MobileHarness/Agents/Support/README.md) | Target imports/resources and adapter source; correct component table and distinguish business schemas, prompt loading and Core protocol packaging. |
+| [Support/Chat](../MobileHarness/Agents/Support/Chat/README.md) | All six source files and role call sites; redraw independent consumers, document per-generation parser ownership, exact ten-request-block history, prompt keys/errors, checked secondary queues and joined cleanup. |
+| [Support/Communication](../MobileHarness/Agents/Support/Communication/README.md) | Contract assembly, configuration loader and typed values; remove capability-summary ownership from AgentTasks, retain trusted fixed input boundaries and clarify 512/2048-byte intent/state schemas. |
+| [Support/Context](../MobileHarness/Agents/Support/Context/README.md) | Repository and document adapter; distinguish optional in-memory persistence, FIFO cancellation behavior and mutation-owner cancellation policy. |
+| [Support/Core](../MobileHarness/Agents/Support/Core/README.md) | Foundation-only target/contracts and resource packaging; integrate protocol rendering ownership and reflect Capability/Generation source use within one target. |
+| [Core/Capability](../MobileHarness/Agents/Support/Core/Capability/README.md) | v6 decoder, registry, documentation and builder; add context-construction flow, sorted catalog/render bounds and separate native definitions/internal grants. |
+| [Core/Communication](../MobileHarness/Agents/Support/Core/Communication/README.md) | Policy, task scope/registry, delivery history and trace values; document opaque task data versus encoded envelope bounds and status/provenance checks. |
+| [Core/Generation](../MobileHarness/Agents/Support/Core/Generation/README.md) | Incremental generator/parser, sentence/Channel/Tool consumers, trace and new template engine; distinguish native calls from XML events and document exact template schema, variables, limits and cached resources. |
+| [Core/Input](../MobileHarness/Agents/Support/Core/Input/README.md) | AudioInput/ImageInput validation; add RGB/attachment dimensions, pixel cap, time and rotation constraints. |
+| [Core/Output](../MobileHarness/Agents/Support/Core/Output/README.md) | Calls, envelopes, mailbox, receipts/results and resource values; correct envelope versus executor identity binding, scheduling-ID precedence and shared mailbox overflow/terminal semantics. |
+| [Core/Runtime](../MobileHarness/Agents/Support/Core/Runtime/README.md) | Manager/registry, context, inbox/gate, round coordinator and budget; clarify bounded priority/FIFO batches, owner-scoped replacement keys and expiry accounting. |
+
+### Static verification
+
+- ✅ All 19 owning READMEs were reviewed and revised; 31 Mermaid diagrams parse successfully and 42 GFM tables are recognized.
+- ✅ Seven v6 declarations match documented model function identities/Channels, Action metadata and parameter constraints, native definitions, input schemas, subscriptions and send/publication grants. No extra or duplicate callable rows were found. The dynamically injected task send remains separate from each JSON Action catalog.
+- ✅ Wider source-document checks cover 108 tracked README/directory pairs, nine first-level modules, 166 Mermaid diagrams, 349 relative links and 31 anchor references. Mermaid parsing, GFM parsing (94 tables), required technical sections, parent/child navigation and `git diff --check` pass.
+- ✅ A task-start file-content snapshot confirms only the 19 Agents README files and `docs/` Markdown changed. Root README, `MobileHarness/README.md`, original `docs/Technical_Design.docx`, implementation, role declarations, prompt assets and existing unrelated work were preserved.
+- ✅ No dated change sections, requirements or roadmap headings were added to technical READMEs. The historical Assistant protocol-consumer link now references the current shared Chat flow.
+
+Confirmed source issue: `SpeechPerceptionAgent.reportError` ignores `continuation.yield` and therefore cannot guarantee delivery of its diagnostic when the 32-slot output buffer is full or closed. The owning README records this with ❗. This inspection changes no runtime code and adds no runtime reproduction claim.
+
+Builds and automated tests were not rerun for this documentation-only task. Existing prompt implementation checks/device build remain in the [preceding validation record](#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance); they are not new acceptance evidence. No real-model, native UI or physical-device acceptance was performed.
+
+## 2026-10-11 — Physical installation of current Agent prompt design
+
+- ✅ Signed Debug iOS device build succeeded with existing local signing configuration and command-line build number `2026101101`; project version/signing files were not edited. App version is `0.1.0`, bundle ID `dev.mobileharness.app`, minimum iOS version `27.0`.
+- ✅ Strict/deep signature verification passed. Final resource verification matched all seven Agent declarations, four role-owned prompt files and the separate AgentCore Function Token resource against current source bytes.
+- ✅ Installed directly over build `2026101008` on the paired physical Youwei’s iPhone 17 Pro (`00008150-000579D114C2401C`), without uninstalling or resetting app data. Independent device app inventory confirmed `0.1.0/2026101101`.
+- ✅ Device launch succeeded. A subsequent process inventory showed the installed executable running with PID `2611`; this was an immediate startup observation, not a sustained runtime test.
+- Evidence: `/tmp/mh-2026101101-signed-build.log`, `/tmp/mh-2026101101-install.json`, `/tmp/mh-2026101101-installed-apps.json`, `/tmp/mh-2026101101-launch.json`, `/tmp/mh-2026101101-processes.json`.
+
+This deployment uses the current working tree, including role-owned prompt rendering, shared Function Token guidance and OpenAI 128-event backpressure. No implementation changes were made during installation. Earlier automated checks are recorded in [prompt validation](#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance); they were not rerun for deployment. Installation and startup do not establish real-model, native UI, acoustic or physical robot acceptance.

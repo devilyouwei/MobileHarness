@@ -1,48 +1,33 @@
-# Camera Action Support
+# Camera Values and Capability Catalog
 
-Purpose: bind explicit entries to the host camera capability. Design goals: required typed injection, no discovery and no owned device/session state.
+## Summary
 
-✅ CameraModule supplies seven protocol-neutral ActionFunctions; host registration selects returning observation feedback for photo operations. CameraControlCapability exposes setEnabled, retry and flip(CameraActions.Facing) with opaque FunctionInput correlation. CameraControlError reports foreground, busy, disabled, permission and availability failures. No queue or platform dependency.
+Neutral camera interfaces, errors, receipts and seven canonical function definitions.
+
+## Ownership and boundaries
+
+CameraModule binds required CameraControlCapability without owning native sessions, queues, permissions or UI. Host registration chooses call protocol/feedback; role grants remain outside this directory.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Catalog[CapabilityModules] --> Module[CameraModule]
-    Module --> Definitions[Generated definitions]
-    Definitions --> Entries[CameraActions entries]
-    Entries --> Host[Required CameraControlCapability]
+ Host[Injected CameraControlCapability] --> Module[CameraModule]
+ Module --> Definitions[Seven ActionFunctions]
+ Definitions --> Entry[CaptureActions]
+ Entry -->|Command or photo receipt| Values[Neutral receipt values]
 ```
 
-❌ No fallback camera, permission bypass, native Tool transport or device readiness claim.
+## Interface and result semantics
 
-✅ ADR0132: Domain validation/availability errors provide bounded FunctionContracts producer codes; generic execution and home observation preserve them without importing platform errors. ❌ Physical acceptance remains pending.
+CameraControlCapability supplies setEnabled, retry, target flip, takePhoto, savePhoto/ignorePhoto and owner-scoped JPEG read with opaque FunctionInput correlation. Facing is front/back. CameraCommandReceipt carries acknowledged operation/enabled/facing, not pose readiness. CameraPhotoReceipt carries capture identity/dimensions/MIME; CameraPhotoCommandReceipt carries saved/ignored identity and duplicate-save state.
 
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
-✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
+CameraControlError distinguishes foreground, busy, disabled, permission, unavailable and photoUnavailable producer failures. Unsupported isolated fixture methods throw unavailable; production assembly requires real injection. Catalog completion is value-based for command/photo operations; there is no fallback camera or permission bypass.
 
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one pure `<Domain>Module`; host registration creates Action/Tool projections. Superseded aliases/protocol catalogs are retired.
-✅ Unified definitions and compatibility retirement are implemented in ADR0157.
+✅ Neutral capability, receipts and explicit camera catalog are implemented.
 
-✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
+## Related design
 
-✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
-
-✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
-
-
-## Camera command entry
-
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
-
-✅ Interaction refinement: CameraControlCapability.flip receives CameraActions.Facing; CameraModule retains existing function registration and error/completion contracts.
-
-## Assistant photo observation — ADR0184
-
-✅ Implemented: CameraModule includes takePhoto with finite value completion; CameraPhotoReceipt and owner-scoped JPEG read interface are host boundaries. Unsupported fixture defaults throw unavailable.
-
-❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
-
-## Photo save and ignore — ADR0185
-
-✅ CameraModule supplies seven definitions, including value-completing savePhoto/ignorePhoto. CameraControlCapability supplies neutral receipt methods; unsupported isolated fixtures throw unavailable. CameraControlError includes localized photoUnavailable and retains producer codes. No Photos or UI dependency.
-
-✅ Device regression fix: CameraModule binds open/close/flip as value-completing functions, preserving protocol and serialization policies. CameraCommandReceipt carries only the acknowledged requested camera state, not inferred pose or model readiness.
+[Parent design](../README.md)

@@ -12,7 +12,7 @@ Purpose: independently verify the OpenAI-compatible adapter without network acce
 
 ✅ Chat output-token budgets are optional and default to nil. Assistant/cloud requests omit max_output_tokens so the provider chooses its default; local Gemma 4 E2B uses remaining room in its existing 4096-token context. History omits max tokens display and preserves older explicit budgets on disk. The separate 2000-byte whole-reply cap is removed; parser, queue, timeout and per-segment bounds remain. Explicit title/warmup budgets are unchanged. ❌ Live-provider/device acceptance remains separate.
 
-✅ Offline long-reply regression queues 1,024 Unicode text events before starting the consumer and verifies every fragment plus the terminal finish reason. Producer completion is joined through resource unload; no timing sleeps or live credentials are used.
+✅ Offline regressions cover delayed/slow consumption of 127, 128 and 1,024 Unicode text events plus terminal completion, cancellation or shutdown after pausing consumption, and successful reuse after cancellation/unload. Unload runs after consumption or cancellation. Fixtures use URLProtocol without live credentials. Shared SessionTests separately verify suspension at a full queue and cancellation waking a blocked producer.
 
 ✅ Responses usage regression covers terminal-response counts before finished, malformed/negative/duplicate counts, store=false request encoding and URLProtocol delivery. ❌ Live-provider compatibility remains separate.
 

@@ -1,7 +1,33 @@
-# Energy activity detection
+# Energy Activity Detection
 
-Purpose: provide a lightweight acoustic-activity capability when Silero is absent or disabled. Design goals: no weights, bounded PCM state and no business endpoint policy.
+## Summary
 
-- ✅ Independent ModelKitEnergy target depends only on ModelKit. One managed session; ordered 16 kHz mono Float32 input is capped at 16,000 samples/call. 512-sample RMS windows retain fewer than 512 residual samples and return at most 32 scores.
-- ✅ Adaptive quiet-noise floor and separate start/end energy thresholds yield binary activity scores. reset clears detector state; finish flushes residual samples; cancellation releases the lease once.
-- ❌ Energy is not a learned speech probability and cannot distinguish voice from television/noise. Agents owns onset, pre-roll and 800 ms silence endpoint policy.
+Weight-free adaptive RMS windows and hysteresis behind VoiceActivityCapability.
+
+## Ownership and boundaries
+
+ModelKitEnergy depends only on ModelKit. Request-local detector state supplies acoustic scores; Agent owns speech/endpoint interpretation. Managed session owns exclusive operation lease.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
+
+```mermaid
+flowchart LR
+ Caller --> PCM[Ordered 16 kHz mono Float32]
+ PCM --> Detector[EnergyVoiceActivity]
+ Detector --> Scores[Binary acoustic scores]
+ Scores --> Caller
+```
+
+## Algorithm and lifecycle
+
+Per process ≤16,000 samples; consume 512-sample RMS windows and retain fewer than 512 residual samples, returning at most 32 scores. Adaptive quiet-noise floor and separate start/end energy thresholds provide hysteresis. reset clears state/sample position; finish flushes actual remainder; cancellation releases lease exactly once.
+
+No weights, request queue or voice/noise identity model exists. An active score cannot distinguish user speech from TV/noise. Overlap and invalid format/order fail explicitly.
+
+✅ Bounded adaptive RMS detection is implemented.
+
+## Related design
+
+[Parent design](../README.md)

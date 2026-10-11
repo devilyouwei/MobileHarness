@@ -1,7 +1,33 @@
-# Voice activity detection
+# Sample-Aligned Voice Activity Contract
 
-Purpose: provide streaming activity scores independently of conversation endpoint policy. Design goals: request-local state, explicit bounds and managed ownership.
+## Summary
 
-- ✅ Silero streaming probabilities with finish/reset/cancel.
-- ✅ EnergyVoiceActivity provides adaptive RMS thresholds and hysteresis without downloaded weights. Defaults uses it when Silero is missing/unavailable, independently of the recognition switch.
-- ❌ Energy detection cannot distinguish speech from other loud sounds. Agents/SpeechPerception owns onset, pre-roll and 800 ms silence termination; this SDK owns no conversation timing policy.
+Ordered request-local acoustic activity scoring with explicit process/finish/reset/cancel semantics.
+
+## Ownership and boundaries
+
+Capability scores are model/acoustic estimates. SpeechPerception owns onset, pre-roll and silence endpoint decisions. This contract does not create a microphone, conversation or shared frame queue.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
+
+```mermaid
+flowchart LR
+ Caller --> Session[VoiceActivitySession]
+ Session --> Provider[Silero or Energy]
+ Provider --> Scores[Contiguous sample-aligned scores]
+ Scores --> Caller
+```
+
+## Score and session interfaces
+
+VoiceActivityScore validates nonnegative startSample, 1–16,000 sampleCount and finite probability in 0–1. Sessions accept ≤16,000 samples per process and return ≤64 scores. finish flushes residual input and releases; reset clears recurrent/sample position; cancel discards and joins.
+
+Defaults independently selects installed available Silero or Energy. Energy's binary hysteresis is not a learned speech probability; loud background media/noise can be active. Native Apple detector is internal to ASR and supplies no assumed normal endpoint callback.
+
+✅ Independent scored-session contract and two bounded providers are implemented.
+
+## Related design
+
+[Parent design](../README.md) · [Energy](Energy/README.md) · [Silero](Silero/README.md)

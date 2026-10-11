@@ -1,34 +1,36 @@
-# AppDiagnosticWorkflow
+# Explicit Diagnostic Operations
 
-Purpose: own diagnostics application operations in an independent compilation boundary. Design goals: explicit injected effects and unchanged business lifetimes. Direct dependencies: UI, ModelKit and PlatformKit.
+## Summary
 
-✅ Existing explicit chat and synthesis diagnostics retain their one-operation/cancellation/cleanup policies. Debug/provider and iOS availability gates are unchanged. Diagnostic model/capture effects are explicit; whole Agent sessions are injected from App Lifecycle.
+Owns user-started chat, speech and sound-source diagnostic attempts with injected capabilities and explicit completion.
 
-```mermaid
-flowchart LR
-    Root[App composition] -->|Inject operations and services| Workflow[AppDiagnosticWorkflow]
-    Workflow -->|Actual state and completion| Consumer[UI or caller]
-```
+## Ownership and boundaries
 
-❌ Physical-device diagnostic acceptance is separate.
+AppDiagnosticWorkflow depends on UI, ModelKit and PlatformKit. Composition injects complete AudioDetectionRunning endpoints; this directory does not construct Agents/Gateways or implement direction DSP. Diagnostic controls are gated by native availability and configured providers.
 
-✅ Speech diagnostics now await AppleAudioIO shutdown inside their owned start/stop tasks, joining capture/playback cleanup before unload or replacement. Direction DSP stays with SpeechPerception and sound-source UI stays in UI/Settings; this workflow owns their diagnostic operation lifetime only.
+## External relationships and data flow
 
-## Audio detection operation
-
-✅ AudioDetectionWorkflow.swift owns one running endpoint task, one 100 ms freshness/deadline monitor and no pending queue. The 10-second duration starts at the first received PCM snapshot. Stop cancels, clears valid angles immediately and awaits endpoint cleanup before restart/voice takeover. Generation checks reject callbacks from stopped/replaced sessions. Failure retains permission/capture facts for review and allows retry. App injects AudioDetectionRunning; the feature target does not construct Agents, Gateways, audio devices or direction DSP.
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Button[UI start / stop] --> Workflow[AudioDetectionWorkflow]
-    Workflow --> Endpoint[Injected whole session endpoint]
-    Endpoint --> Snapshot[Latest capture / direction snapshot]
-    Snapshot --> State[UI AudioDetectionState]
-    Timer[100 ms monitor] --> State
-    Timer -->|10 seconds / cancel| Cleanup[Cancel and join endpoint]
-    Workflow --> Cleanup
+ UI -->|Explicit start or stop| Diagnostics
+ ModelKit -->|Model events| Diagnostics
+ PlatformKit -->|Playback and native completion| Diagnostics
+ Lifecycle[Isolated App diagnostic session] -->|Capture and direction observations| Diagnostics
+ Diagnostics -->|Facts and terminal phase| UI
 ```
 
-❌ Real microphone routing, FOA axes and native interaction acceptance remain separate from workflow fixtures.
+## Sound-source operation
 
-✅ Terminal failure/finish/stop phases are published after joined monitor cleanup and operation-slot release. A visible retry is ready to start; no endpoint or Agent lifetime moves into UI. Existing permission-failure/retry coverage verifies this ordering.
+AudioDetectionWorkflow owns one endpoint task, one 100 ms freshness/deadline monitor and no pending queue. The ten-second duration starts on first PCM. Generation fencing rejects callbacks from stopped/replaced sessions. Stop clears valid angles immediately, cancels and awaits endpoint cleanup before restart or voice takeover. Failure keeps permission/capture facts visible and permits explicit retry.
+
+## Chat and speech attempts
+
+ChatDiagnosticWorkflow validates an explicitly selected provider with a bounded request. SpeechDiagnosticWorkflow retains its operation, injected synthesis and real playback; shutdown awaits AppleAudioIO before unloading/replacing resources. Reports are diagnostic evidence, not production conversation success. Terminal phases follow cleanup and slot release; cancellation never fabricates successful model/device output.
+
+✅ Explicit diagnostic ownership, bounded capture monitoring and joined native cleanup are implemented.
+
+## Related design
+
+[Parent design](../README.md)

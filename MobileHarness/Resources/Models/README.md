@@ -1,51 +1,48 @@
-# Local model resources
+# Model Source Declarations
 
-Purpose: keep the compact production source catalog and the local weights needed by opt-in Mac tests. Design goals: one production declaration per artifact, reproducible test exports and no weights in App resources or Git.
+## Summary
 
-## Configuration ownership
+Pinned production catalog and ignored, explicitly provisioned local test artifacts.
 
-- ✅ `model-catalog.json` schema v2 is the shared production source for App resource acquisition and developer download wrappers. It declares repositories/selection rules or a ZIP source, key required files, license/compatibility and advisory size. Per-file URLs/sizes/hashes are resolved at download time.
-- ✅ Only one separate development configuration remains: `gemma4-e2b-macos.download.json` (matching uncompiled CoreAI decoder for opt-in Mac tests). These do not redefine production resources.
-- ✅ Redundant production download JSONs and the inactive Audio8 profile/wrapper are removed. Historical Audio8 validation remains in docs.
+## Ownership and boundaries
 
-| Local directory retained | Mac test use |
-| --- | --- |
-| Nemotron | Nemotron real streaming/cancellation and Silero comparison |
-| Gemma4 | Gemma 4 E2B generation/tokenizer/lifecycle and Agent prompt evaluation |
-| Silero | Real VAD streaming/reset tests |
-| MossTTSNano | Chinese/English synthesis and lifecycle |
-| YOLOPose | Opt-in real pose/lifecycle tests via YOLO_POSE_MODEL_ROOT |
+This directory declares files and compatibility; it performs no inference or active-model selection. Vendor READMEs inside downloaded weights/compiled graphs remain untouched and are covered by this resource boundary.
 
-✅ Old unused `Kokoro` CoreAI weights and iPhone-only `Nemotron` h18p weights were removed locally (about 1.6 GiB). Other local model weights are retained for Mac validation. Gemma4 requires new CoreAI resources; old Qwen files are incompatible and are not loaded. These directories are ignored by Git and are never App build prerequisites.
+## External relationships and data flow
 
-## Developer acquisition workflow
-
-Use the existing wrappers: `download-gemma4.py` uses the h18p iOS catalog (`--platform macos` selects the matching uncompiled decoder); `download-nemotron.py --platform macos` selects the Mac test export (default/ios reads the production catalog). Silero/MOSS/YOLO wrappers read the same production catalog as App. `--endpoint` supports official HF, mirror and custom HTTPS domains; `--force` refreshes reused local files.
+Arrows show build-time asset/metadata movement; runtime acquisition is owned outside this directory.
 
 ```mermaid
 flowchart LR
-    Catalog[Production source catalog] --> Resolve[Hub tree API: selected paths / sizes / LFS hashes]
-    Tests[Separate Mac / comparison profile] --> Download[Four bounded download workers]
-    Resolve --> Download
-    Download --> Local[Ignored local test weights]
-    ZIP[Catalog ZIP source] --> Verify[Archive hash / safe paths / required files / bounds]
-    Verify --> Local
-    Catalog --> Bundle[App: metadata and license notices only]
+ Catalog[model-catalog.json] --> App[App metadata injection]
+ Catalog --> Scripts[Developer download wrappers]
+ Profile[Gemma macOS test profile] --> Scripts
+ Scripts --> Weights[Ignored test weights]
+ App --> Management[ModelKit acquisition]
 ```
 
-✅ Developer downloads use only Python standard library plus existing curl, bounded metadata pages/files, four workers, partial files and atomic replacement. ZIP installation preserves the previous model on failure. Runtime SDK/state/installation belongs to [Management](../../ModelKit/Management/README.md#local-model-resources--current-contract), not these scripts.
+## Catalog and selection
 
-❌ Real network/mirror and iPhone acceptance remain pending. Local weights are reproducible test assets; do not commit them, user media, credentials or signing settings.
+`model-catalog.json` schema v2 defines package IDs, capability, destination directory, compatibility, license, advisory size and source declaration. Hugging Face sources pin repository/revision, path selection and optional prefix stripping; per-file size/LFS hash is resolved at acquisition. ZIP sources supply archive hash and required files. [Management](../../ModelKit/Management/README.md) owns validation, bounded installation, receipts and removal.
 
-✅ Unregistered Kokoro comparison provisioning is removed: download JSON, wrapper and local KokoroCoreML weights (about 330 MiB). Its optional adapter/contract tests remain; real-model tests must explicitly supply an external root.
+| Package / local directory | Use |
+| --- | --- |
+| `nemotron` / Nemotron | Multilingual 2240 ms streaming ASR, shared pinned iOS/macOS export |
+| `silero` / Silero | Optional neural VAD, independent of custom-recognition preference |
+| `gemma4-e2b` / Gemma4 | Production h18p CoreAI binding; separate macOS decoder test profile |
+| `moss-tts-nano` / MossTTSNano | Optional custom synthesis |
+| `yolo26n-pose` / YOLOPose | Explicitly provisioned native pose graph |
 
+Old Qwen receipts are not Gemma installations. Apple ASR/TTS assets are OS-managed. Acquisition does not enable a custom mode. Kokoro adapter tests require an external root; Kokoro has no production catalog binding.
 
-✅ Nemotron macOS and iOS provisioning use one pinned multilingual/2240ms Core ML source (22 files, 664,846,846 bytes). The obsolete nemotron-macos.download.json profile was removed. Existing old-revision installations require explicit deletion and re-download.
+## Developer artifacts
 
+Existing download wrappers use the production catalog except `gemma4-e2b-macos.download.json`, which selects the matching uncompiled Mac decoder. `--endpoint` accepts official/mirror/custom HTTPS sources; `--force` refreshes reused files. Metadata/file bounds, four workers, partial files and atomic replacement avoid replacing a valid local model with a failed download. ZIP extraction validates safe paths/hash/required files.
 
-✅ Nemotron, MOSS and Silero downloads are optional for speech: defaults use Apple ASR/TTS and energy VAD when missing/unavailable or Settings disables the corresponding ASR/TTS choice; installed available Silero is selected regardless of the recognition switch. Catalog/receipts still manage installed custom weights; Apple language assets are managed by the OS.
+Ignored Nemotron/Gemma4/Silero/MossTTSNano/YOLOPose directories support opt-in tests, are not build prerequisites and are never committed. Model packages and binary graph subdirectories do not acquire application README contracts. Historical measurements are in [validation history](../../../docs/Validation-History.md).
 
+✅ Production declarations and explicit developer provisioning.
 
-✅ Settings groups catalog entries by business use without changing catalog IDs, weight acquisition, receipts or directory layout. Recognition needs Nemotron only before custom activation; synthesis needs MOSS. Downloading never auto-enables a voice mode.
+## Related design
 
-✅ Gemma replaces the qwen35 catalog ID with gemma4-e2b and uses Gemma4 as a new directory. Existing device Qwen receipts/weights are not treated as Gemma installations. Obsolete ignored development Qwen35 weights were removed; device cleanup remains separate.
+[Parent design](../README.md)

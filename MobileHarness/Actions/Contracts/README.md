@@ -1,25 +1,35 @@
-# Function Contracts
+# FunctionContracts — Inputs, Outcomes and Metadata
 
-Purpose: define standard callable business input/output and intrinsic metadata. Design goals: independent FunctionContracts target, bounded values and no call protocol, execution implementation or Agent dependency.
+## Summary
 
-✅ FunctionRequest contains canonical address and parameters, with no Channel. FunctionInput exposes that request, opaque ActionExecutionContext, execution identity and a FunctionReporting sink. FunctionInvocation is the ordinary concrete value; handlers use the shared interface. Reporting is injected; storage and cancellation machinery are runtime-owned.
+Independent bounded business-function interfaces and intrinsic execution constraints.
 
-✅ ActionFunction/@Action describe business kind/completion, resource/key requirements and constant/dynamic budgets. CapabilityModule/CapabilityCatalog contain functions only, validate metadata and freeze at most32 modules/256 entries. Arguments, outcomes and producer failures retain their bounds: values64 KiB, reports256 entries, resources8. No contract grants Agent permission, a resource lease or a hardware guarantee.
+## Ownership and boundaries
+
+The FunctionContracts target has no project dependency, Agent identity policy, call protocol, scheduler or execution implementation. Reporting and resource values are injected; contracts alone grant neither permission nor lease.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Function[Business function / intrinsic metadata] --> Descriptor[ActionFunction]
-    Request[FunctionRequest / opaque context] --> Input[FunctionInput interface]
-    Reporter[Host-injected FunctionReporting] --> Input
-    Input --> Handler[Canonical function handler]
-    Handler --> Output[Completion / value / report / activity]
-    Descriptor --> Handler
+ Definitions[Actions definitions] --> Contracts[FunctionContracts]
+ Adapters[CallRuntime adapters] --> Contracts
+ Executor[ExecutionRuntime] --> Contracts
+ Host[App endpoints] --> Contracts
 ```
 
-✅ Actions can import this target without seeing Gateway/Runtime, ActionInvocation/ActionRequest scheduling adapters, Tool contracts or protocol bindings. Pure function constraints cannot be weakened by a call binding.
+## Public interfaces
 
-❌ Durable replay/codecs, generic typed JSON arguments and remaining feature Signal/continuation migration are separate work. Standard function input is not a replacement for Signal.
+FunctionRequest owns canonical address/string arguments without Channel. FunctionInput exposes request, ActionExecutionContext, execution identity and FunctionReporting; FunctionInvocation is its neutral concrete value. Context carries opaque host-supplied task/decision identity without interpreting grants.
 
-✅ Implemented: ActionReport.empty provides an explicit empty validated value for attaching an actual worker exception without forced/fallible placeholder construction.
+ActionFunction describes kind (finite/state/activity start/update/stop), completion policy, serialization key, resource resolvers and constant/dynamic budgets. CapabilityModule/Catalog validate and freeze at most 32 modules/256 entries. Request-dependent budgets are validated; sequence budgets sum and parallel budgets take the maximum.
 
-✅ ADR0187: ActionExecutionContext carries opaque task and decision identities supplied by the host. FunctionContracts does not interpret authorization; Gateway validates active Agent/task grants before supplying them.
+Completion values are bounded to 64 KiB; reports to 256 entries; resources to eight. ActionReport retains leaf status/details plus executionFailure/failureDescription. ActionReport.empty is a validated empty value, not a fabricated success. Producer codes are bounded opaque identifiers. ActionArguments decodes shared string transport; domain values remain caller-owned.
+
+✅ Independent standard inputs, bounded reports and immutable intrinsic metadata are implemented.
+
+## Related design
+
+[Parent design](../README.md)

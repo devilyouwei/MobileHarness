@@ -1,68 +1,44 @@
-# Camera UI
+# Camera Presentation
 
-Purpose: present the camera surface and user controls around startup/conversation content. Design goals: independent camera intent, accessible recovery and no capture/model ownership in UI.
+## Summary
 
-| File | Responsibility |
-| --- | --- |
-| PoseOverlayProjection.swift | Value-only joint rotation into native sensor coordinates; crop/mirroring remain in App adapter |
-| CameraState.swift | MainActor visibility, facing, errors, skeleton/gaze and YOLO statistics values; CameraControlling declares user operations |
-| CameraConversationSurface.swift | Injected preview content, dimming, controls, messages and eye-gaze environment |
+Camera controls, injected preview content, pose statistics and one current-photo surface.
 
-## Upstream and downstream
+## Ownership and boundaries
 
-App supplies CameraState, CameraControlling and the native preview view. [CameraCoordinator](../../App/Lifecycle/README.md) owns permissions and capture/inference lifetimes. [CameraPreviewAdapter](../../App/Adapters/README.md) owns native layer connection, rotation/mirroring and skeleton drawing. UI owns PoseOverlay values; it imports no platform service.
+UI owns display values and rendering acknowledgment. App owns preview-layer mapping, camera admission and export; Agents owns perception policy. No native session/model is created here.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    App[App camera coordinator] --> State[CameraState]
-    State --> Surface[CameraConversationSurface]
-    Surface -->|User intent| Controls[CameraControlling]
-    Controls --> App
-    Adapter[App native camera preview adapter] -->|Injected view content| Surface
-    Surface --> Gaze[Conversation eye-gaze environment]
+ App -->|CameraState, CameraControlling and preview view| Surface[CameraConversationSurface]
+ Surface -->|typed user intent| App
+ Surface --> Photo[CapturedPhotoView]
+ Photo -->|photo UUID and renderer receipt| App
+ Surface -->|normalized gaze environment| Conversation
 ```
 
-✅ The same surface wraps startup and ready conversation. Camera availability does not wait for voice-model readiness. The preview uses aspect fill and front mirroring; a 42% black overlay dims it. Preview/dimming never intercept touches, and off/inactive/error states hide old frames.
+## Camera and pose
 
-✅ The primary toolbar is 8 pt below the top safe area. Camera toggle/settings use 48-point targets; All controls share one horizontal capsule: camera toggle → lens switch → Settings. Lens controls appear in the middle only while camera intent is enabled; a 200 ms opacity/scale transition accompanies capsule expansion/collapse. Settings remains at the trailing edge. Existing camera.toggle, camera.switch and app.settings accessibility identifiers stay stable across source/operation renames. Switching is disabled during transitions; on/off replaces pending intent. Permission denial exposes a system Settings link. Reduce Motion disables expansion animation.
+The surface wraps startup and ready conversation independently of speech-model readiness. Preview is dimmed by 42%; hidden/off/error states show no stale image. Toggle/lens/Settings use one capsule with 48-point targets; lens appears only while intent is on. Switch is disabled during transitions; denial exposes system Settings. Local geometry uses 200 ms transitions unless reduced motion.
 
-✅ UI.Pose.showPose reaches CameraState through the App callback; the native adapter draws joints/edges with confidence ≥0.3 and hides rotation-mismatched overlays. UI.Gaze.moveEyes supplies normalized gaze through App. Front mirroring happens once in perception; lifecycle reset clears pose and centers gaze. Changing camera replaces the vision session while retaining model weights.
+`PoseOverlay` and statistics are independent UI schemas. `PoseOverlayProjection` rotates normalized joints into sensor coordinates; App owns crop/mirroring and native drawing. Timing displays measured FPS, adaptive interval, wait/inference/total milliseconds, skipped pending frames and optional normalized image motion. Missing values are absent/em dash; the UI does not choose inference cadence or claim screen-render latency. Collapse state is view-local.
 
-✅ Window-owned camera observation survives page navigation. Entering Settings suspends capture without changing on/off intent; returning restores intent. Simulator unavailability is explicit.
+CameraState contains camera/vision failures. Execution failures belong to the home issue list and do not erase preview/pose.
 
-❌ Recording, exact preview-crop mapping of gaze, and physical-device visual, navigation, permission and performance acceptance.
+## Photo rendering
 
-Sources compile once in the UI target; there is no App source membership for this directory.
+One current UUID fades in 150 ms, holds 250 ms and shrinks to a 96×128 thumbnail over 450 ms. New identity replaces the old surface. Animation completion is one-shot and distinct from target state; disappearance during shrink reports failure. Inspection becomes available after acknowledgment. The full transition layer ignores touches; only the positioned thumbnail/control buttons intercept them.
 
-✅ CameraState and its surface contain camera/vision failures only. Removed trackingMessage; Action/Tool execution failures appear only in the home scheduling issue list and do not clear preview or skeleton (ADR0131).
+Inspect/save/ignore forward the rendered UUID. Busy/error/confirmed saved identity come from App. Ignore hides the thumbnail; save retains it. Identity replacement dismisses full-screen inspection. Reduced motion uses fade/direct-thumbnail completion. No gallery or export worker is owned here.
 
-✅ CameraConversationSurface shows a compact YOLO statistics panel at the upper left, with the same 8 pt top safe-area inset and 48 pt header height as the camera/settings toolbar: measured result FPS, next adaptive interval ms, callback-to-model waiting ms, capability-call ms, callback-to-result total ms and cumulative skipped pending frames (displayed as “跳过 N 帧”; counts older pending frames replaced by newer captures). It appears only with a visible camera and a current measured result, uses monospaced digits and clears with the skeleton/session. The header button (`camera.poseStatistics.toggle`) collapses/expands the detail rows while keeping FPS visible; it starts expanded and retains its view-local selection across result updates. Detail rows allow touches through; the header provides an accessible 48 pt target. Reduce Motion disables the 200 ms toggle animation. Missing timing/FPS displays an em dash. ❌ Native screen rendering delay is not included.
+✅ Camera controls, injected preview, pose statistics, identity-fenced photo animation and export affordances.
 
-✅ The fixed grayscale-percentage menu/state/control method are removed. Detection cadence remains Agent-owned and App-configured; UI has no sampling policy.
+❌ Video UI and exact preview-crop mapping of eye gaze.
 
-✅ The interval row shows Agent-supplied scheduling data; UI does not infer motion, choose FPS or call models. Actual result FPS remains separately measured.
+## Related design
 
-✅ The upper-left panel also displays optional 0...1 image-motion activity with two decimals. This is Agent-supplied normalized evidence, not a threshold control or raw pixel-change percentage; UI still renders values only.
-
-✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI has zero project dependencies; AgentCore has zero project dependencies. See ADR0121.
-
-✅ ADR0121 removes the Types module: AgentCore/Input owns generic audio/image transport, UI/Camera owns PoseOverlay, and VisionPerception owns PoseOverlayPayload. App adapts the independent Tool payload into UI values. ❌ Capability SDKs must not import consumer or presentation modules.
-
-
-## Camera command entry
-
-✅ Implemented: CameraInteractionWorkflow emits typed open/close/flip/retry intents through Photographer and existing Camera functions. Root presentation accepts Photographer in the stable root session or validated active task scope; Assistant delegates through task communication; Photographer executes under its actual identity. Native capture, permission, lifecycle fences and joined cleanup remain CameraCoordinator responsibilities. Retry uses a canonical callable and the native explicit settings/permission request. UI receives controls and passive camera state, not the native coordinator. One command slot rejects overlap, no replay.
-
-## Assistant photo observation — ADR0184
-
-✅ Implemented: Add screenshot-style overlay: full photo fades in150ms, holds250ms, shrinks to bottom-right450ms, persists thumbnail and supports fullscreen inspection. UI reports animation completion with photo identity; reduced motion uses fade/direct thumbnail. New photos replace old; no unbounded gallery.
-
-❌ Real camera/shutter/animation and configured-model vision acceptance remain pending; video recording remains outside this iteration; system Photos export is implemented by ADR0185.
-
-✅ Thumbnail target state and animation-completed acknowledgment are distinct. Disappearance during shrink reports failure; inspect is enabled only after the completion callback. Stale callbacks acknowledge at most once.
-
-✅ Touch correction: CapturedPhotoView renders the whole fade/shrink layer without hit testing; only an independently positioned96×128 thumbnail Button accepts inspection taps after animation acknowledgment. No full-screen gesture may intercept conversation or interruption controls.
-
-## Photo save and ignore — ADR0185
-
-✅ Thumbnail inspection,44pt ignore and save controls remain confined to96×128. UI forwards the rendered UUID via CameraControlling; CameraState supplies export busy/message/savedPhotoID. Fullscreen inspection offers Save to Photos, Ignore and Return; changing/ignoring photo identity dismisses inspection. Animated image and messages pass touches through. Ignore removes the thumbnail; save retains it with confirmed status. Errors remain visible even with capture off. ❌ Native gesture/VoiceOver/Reduce Motion acceptance remains pending.
+[Parent design](../README.md)

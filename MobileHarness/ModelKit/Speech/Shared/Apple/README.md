@@ -1,21 +1,35 @@
-# Apple Speech Shared PCM Helpers
+# Apple PCM Conversion
 
-Purpose: share system audio-buffer conversion between the optional Apple ASR and TTS adapters. Design goals: owned Sendable PCM values across concurrency boundaries, explicit format validation and no device I/O or business policy.
+## Summary
 
-This directory contains `PCMCodec.swift` and compiles into `ModelKitAppleSpeech` alongside [ASR/Apple](../../ASR/Apple/README.md) and [TTS/Apple](../../TTS/Apple/README.md). It is not a separate target. Root Package.swift defines this source selection; the adapter depends only on ModelKit and system frameworks.
+PCMCodec converts native Speech buffers to/from ModelKit mono Float32 values.
+
+## Ownership and boundaries
+
+Compiles into ModelKitAppleSpeech and depends on ModelKit/system audio frameworks. Caller owns mutable buffers and serial callbacks; this helper has no independent session, inference lease or worker.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    ASR[Apple ASR worker] --> Decode[PCMCodec.decode]
-    Frame[ModelKit AudioFrame] --> Decode
-    Decode --> Buffer[Owned AVAudioPCMBuffer]
-    TTS[Apple TTS callback] --> Encode[PCMCodec.encode]
-    Encode --> PCM[Sendable mono Float32 AudioFrame]
+ Native[Native Float32 or Int16 buffer] --> Codec[PCMCodec]
+ Codec --> Frame[Mono Float32 AudioFrame]
+ Frame --> Codec
+ Codec --> Recognition[Fresh native recognition buffer]
 ```
 
-- ✅ Copies supported Float32/Int16 system buffers into mono Float32 data; validates frame count and unsupported encodings.
-- ✅ Converts mono Float32 AudioFrame input into a new system buffer for recognition. Mutable framework buffers remain worker-owned.
-- ✅ No additional queue, session, inference registration or microphone/speaker ownership. Adapter READMEs own admission, timeout and cancellation contracts.
-- ❌ General-purpose resampling, arbitrary multichannel preservation and device capture/playback. PlatformKit owns device I/O.
+## Encoding rules
 
-Production conversation uses Nemotron ASR and MOSS TTS. These Apple adapters remain optional capabilities. SpeechSynthesisAgent owns production synthesis and StorageAudio handoff; Actions/Speech only consumes prepared audio IDs and awaits playback.
+Copy supported Float32/Int16 frames into validated mono Float32 data; reject unsupported encoding or invalid frame count. Convert ordered mono model input into a newly allocated system buffer for analyzer use. Do not mutate caller-retained model payloads or claim arbitrary multichannel preservation.
+
+Native/system providers are selected by current Defaults, not fixed production model names. SpeechSynthesisAgent adapts model PCM to StorageAudio; prepared audio playback stays outside ModelKit.
+
+✅ Explicit native/model PCM copying is implemented.
+
+❌ General-purpose resampling and arbitrary multichannel conversion are not implemented here.
+
+## Related design
+
+[Parent design](../README.md)

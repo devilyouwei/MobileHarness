@@ -1,21 +1,35 @@
-# History Action Support
+# History Query and Mutation Services
 
-Purpose: inject journal capabilities, project query results and classify domain failures. Design goals: protocol-neutral catalogs, explicit read/mutation separation and bounded data.
+## Summary
 
-✅ HistoryModule binds five ActionFunctions to required HistoryQueryCapability/HistoryMutationCapability endpoints. HistoryQueryService uses the shared ConversationHistoryStore, validates pagination, projects requested entries and bounds JSON. Storage owns persistence; Actions owns query/preview policy. Host composition separately chooses native returning registration.
+Protocol-neutral history catalog and bounded projection/mutation policy over a shared journal.
+
+## Ownership and boundaries
+
+HistoryModule injects query/mutation endpoints and binds five functions. Storage owns persistence; this directory owns paging/preview/transaction meaning. App injects title computation; no implicit store/model, UI or transport policy exists.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Module[HistoryModule / ActionFunction] --> Contract[Injected query / mutation capability]
-    Contract --> Service[HistoryQueryService / HistoryMutationService]
-    Service --> Journal[StorageChat journal]
-    Service --> Outcome[Bounded JSON / neutral producer failure]
+ Entries[ConversationActions] --> Query[HistoryQueryService]
+ Entries --> Mutation[HistoryMutationService]
+ Query --> Store[ConversationHistoryStore]
+ Mutation --> Store
+ Mutation --> Title[Injected title capability]
+ Module[HistoryModule] --> Entries
 ```
 
-✅ Read operations retain the existing StorageChat16-waiter bound and overflow policy. Mutation deletes archives through the injected journal, preserving missing/current-ID failures and atomic persistence. This directory adds no queue, cache, concrete UI/model dependency or new store.
+## Reads and mutations
 
-❌ No unbounded/full-record result, automatic retry, stable pagination snapshot, implicit store or permission inference.
+HistoryQueryService validates page ranges/IDs, selects a fresh shared snapshot and encodes bounded previews/JSON with explicit whole-character truncation. Reads share StorageChat's 16-waiter admission bound; no extra cache or queue is added.
 
-✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
+HistoryMutationService validates archive-only mutation and awaits atomic journal persistence before acknowledgment. startNew retains empty-current behavior. summarize invokes only injected title computation, commits bounded failure/retry state on error/cancellation, then propagates. If recording failure also fails, return both causes. Committed data remains real after later feedback failure; no automatic retry or rollback fiction.
 
-✅ Implemented: expand HistoryMutationCapability/Service and HistoryModule to five functions. Service shares the journal and requires injected title computation. Title failure/cancellation records a bounded retry error before propagating; failure to save that state propagates explicitly. No fallback store/model or retry is introduced.
+✅ Explicit query/mutation interfaces, five canonical definitions and shared-journal policy are implemented.
+
+## Related design
+
+[Parent design](../README.md)

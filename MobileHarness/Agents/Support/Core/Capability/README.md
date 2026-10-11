@@ -1,60 +1,50 @@
-# Capability declarations and runtime permissions
+# Capability Declarations and Permissions
 
-Purpose: validate Agent configuration and resolve model-local names without depending on concrete Agents, models or device implementations. Design goal: keep model exposure distinct from trusted runtime output permissions.
+## Summary
 
-- ✅ AgentConfiguration accepts bounded JSON v6: version, id, Channel-grouped three-field actions, explicit Tool path/definition bindings and unchanged communication.
-- ✅ Group keys supply Channel defaults; empty groups declare Channels. Old channels/textActions/hidden/defaultChannel fields fail validation.
-- ✅ Action examples are parsed and resolved against the model-only catalog. Group traversal is sorted for deterministic prompt assembly; aliases are globally unique within an Agent.
-- ✅ InternalAction and InternalTool define code-owned paths and argument names without aliases/docs. Registry permits checks include internal grants, but resolveAction/resolveTool never search them.
-- ✅ CapabilityContextBuilder produces English Channel/module/wait instructions and callable Action details. The owning Agent adds its own natural-text policy outside Core. Internal metadata and Tools never enter this text.
-- ✅ NativeToolDefinition preserves the OpenAI Chat Completions envelope. Current argument transport supports string properties, optional enums and required-name checks. Unsupported schemas fail explicitly.
-- ❌ Full JSON Schema, provider-native Tool streaming, configuration hot reload and physical-device authorization remain outside this module.
+Strict JSON v6 configuration, model alias resolution and separate code-owned runtime grants.
 
-## Validation and assembly
+## Ownership and boundaries
+
+Core owns declaration/permission validation, not business argument meaning, physical authorization or provider transport. Application catalogs are injected. Model exposure and internal permission remain separate.
+
+## External relationships and data flow
+
+The graph shows declaration validation and context construction; dashed arrows supply immutable resources. Gateway receives a permission snapshot at assembly.
 
 ```mermaid
 flowchart LR
-    Data[At most 64 KiB JSON] --> Schema[Version 6 and strict field checks]
-    Schema --> Catalog[Grouped Actions and native Tools]
-    Catalog --> Examples[XML example validation]
-    Examples --> Config[Immutable model configuration]
-    Config --> Agent[Agent assembly]
-    Internal[Code-owned internal permissions] --> Agent
-    Agent --> Registry[Immutable runtime registry]
-    Catalog --> Resolve[Model alias resolution and prompt]
-    Registry --> Permits[Gateway resolved-call validation]
+ JSON[Bounded JSON v6] --> Validation
+ Catalog[Injected communication schemas] --> Validation
+ Validation --> Config[Immutable model declarations]
+ Config --> Resolver[Alias and native-name resolution]
+ Internal[Code-owned InternalAction and InternalTool] --> Permissions[Runtime permission registry]
+ Config --> Permissions
+ Config --> Builder[CapabilityContextBuilder]
+ Templates[Function Token templates] -.-> Builder
+ Builder -->|Visible XML catalog| Role[Role system prompt]
+ Config -->|Native definitions| Request[ChatRequest.tools]
+ Permissions -->|Injected permission snapshot| Gateway
 ```
 
-The configuration permits at most 128 capabilities; assembly applies the same bound including internal grants. At most 16 Channels include model groups and internal defaults; parameter sets have at most 32 entries. Paths are keys, not reflected method names. Required and optional arguments must be disjoint; calls reject unknown/missing names and oversized values. Action handlers remain responsible for value semantics. Native Tool enums are checked during resolution and Gateway permission validation.
+## Schema and resolution
 
-No Channel is implicitly main or blocking. DefaultChannel remains an internal runtime property derived from the JSON group, not a redundant JSON field. Text mapping is not part of AgentConfiguration: AgentGenerator receives an optional code-owned callback, and Assistant provides synthesis/playback/caption behavior. See [Agent standard](../../../README.md) for complete schema rules and [Generation](../Generation/README.md) for streaming limits.
+Maximum JSON size is 64 KiB; total capabilities including internal grants are bounded to 128, Channels to 16 and parameter sets to 32. Group keys provide default Channels; empty groups declare Channels. Old channels/textActions/hidden/defaultChannel fields reject. Aliases are globally unique and sorted group traversal makes prompt construction deterministic.
 
-✅ Source location: `MobileHarness/Agents/Support/Core/Capability`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
+Actions use domain/module/function paths and model aliases. Native Tools bind a distinct provider function definition to the same path representation. Required/optional argument names must be disjoint; unknown/missing/oversized values reject. Native string-property enums are checked during resolution and Gateway authorization. Full JSON Schema is not implemented.
 
-## Action and Tool presentation boundary
+InternalAction/InternalTool carry code-owned paths/parameter names; permits includes them, resolveAction/resolveTool does not. XML examples validate against the model-only catalog.
 
-✅ CallArguments provides shared, bounded transport decoding for Action and Tool domains. Actions retains the ActionArguments compatibility name; Tools has no Actions dependency. ❌ Domain-specific defaults/meaning remain outside this decoder.
+The native definition retains a legacy function envelope as a neutral declaration; provider adapters convert it to their wire protocol. It does not imply Chat Completions transport. Communication configuration validates against the supplied catalog; Core has no speech/pose domains.
 
-✅ Capability permissions remain Agent-owned. Execution argument readers live separately in Actions/Contracts and Actions/Contracts; the unused AgentCore reader was removed.
+✅ Strict v6 validation and separate model/runtime permissions are implemented.
 
-✅ CapabilityContextBuilder contains no automatic synthesis/playback assumptions. AssistantAgent.outputContext adds that Agent’s Speech-channel, wait/playback guidance and examples. Catalog metadata is still resolved solely from versioned Agent JSON.
+❌ Full JSON Schema and configuration hot reload are not implemented.
 
-✅ AgentConfiguration receives CommunicationContracts from its caller and validates JSON declarations against that registry. The standard registry has no speech/vision entries; business AgentConfigurations selects the application catalog explicitly.
+## Model context construction
 
-✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+CapabilityContextBuilder renders protocol and capability-description templates from [FunctionToken.prompts.json](../Generation/FunctionToken.prompts.json), using the current visible registry only. Roles supply natural-text interpretation and special speech/action ordering examples in their own system templates. Native definitions and internal grants remain outside the XML catalog. Channels are rendered in sorted order; Action metadata, parameter constraints and examples come from the current registrations. The final catalog is bounded to 65536 UTF-8 bytes. Resource/render failures propagate rather than substituting instructions.
 
+## Related design
 
-✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/FunctionContracts. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
-
-❌ Physical acceptance and additional business capability exposure are not established by this migration.
-
-✅ CapabilityContextBuilder explicitly prefers default Channel routing and reserve Channel scopes for intentional overrides; different default Channels need no wrappers or wait for concurrent requests.
-
-## Action/Tool generation rounds — ADR0183
-
-
-✅ AgentCore owns neutral policies/envelopes; the owning role selects continuation policy through the shared Chat worker; Gateway owns execution and round acknowledgment; App owns bounded dispatch and registration projection. Shared resources, deadlines and joined cleanup still apply across both routes.
-
-❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../../../docs/adr/0183-generation-round-observations.md).
-
-✅ ADR0187: ActionPath has a Codable structural representation for Agent-owned execution evidence; authorization still uses the validated registered path.
+[Parent design](../README.md)

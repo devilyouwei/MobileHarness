@@ -1,56 +1,50 @@
-# Runtime · Agent 注册与生命周期
+# Registration, Context and Coordination Mechanisms
 
-用途：管理独立 Agent 实例。设计目标：通用基础层不引用具体 Agent，业务状态与运行状态分离。
+## Summary
 
-- ✅ AgentManager actor：注册、查找、描述符列表、start/pause/resume/stop/stopAll。
-- ✅ AgentRegistry：Manager 隔离下的值类型目录，拒绝重复 ID，最多 64 个 Agent，满时明确 queueFull。
-- ✅ AgentLifecycle/AgentStatus：registered/running/paused/stopped/failed 与排队/处理数。
-- ❌ factory、自动 restart、健康监督与通用 AgentRuntime；已实现结构化 Context 与中断恢复；仍由具体 Agent 持有 worker/mailbox。
+Bounded lifecycle registration, generic decision context, input admission and task/round coordination.
+
+## Ownership and boundaries
+
+AgentManager owns live identity and grants; concrete roles own workers and lifecycle behavior. This Foundation-only directory has no role/model/Storage implementation. AgentContextPersistence supplies injected load/CAS commit.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    App[App 装配] --> Manager[AgentManager actor]
-    Manager --> Registry[有界 AgentRegistry]
-    Registry --> Agent[独立 Agent actor]
-    Manager --> Lifecycle[生命周期操作与状态]
-    Lifecycle --> Agent
+ Host[App lifecycle] --> Manager[AgentManager]
+ Manager --> Registry[AgentRegistry]
+ Registry --> Role[Agent instance]
+ Role --> Gate[AgentAdmissionGate and SignalInbox]
+ Role --> Context[AgentContext and immutable decision snapshot]
+ Role --> Round[RoundCoordinator and TaskBudget]
+ Manager --> Grants[Scoped task and execution grants]
 ```
 
-stop 仍是现有 Agent 的终态，恢复需新实例；pause 只阻止领取下一输入，进行中的生成允许完成。
+## Identity and lifecycle
 
-维护：修改本目录代码、文件或子目录时同步 README；✅ 已实现，❌ 未实现。设计以 MobileHarness/README.md 为目标，历史决策见 ADR 0018。
+Registry permits 64 Agents and rejects duplicates/full capacity. Registration issues an incarnation UUID and optional session binding. Stop revokes identity/task grants before joining Agent work and resource cleanup; repeat stop joins the same cleanup. Up to four stop observers are supported. A stopped instance is terminal; replacement requires a new instance after removal. Pause semantics belong to each role.
 
-✅ 生命周期枚举与文件名统一为 AgentLifecycle / AgentLifecycle.swift。
+Manager retains at most 32 active task grants and 32 execution scopes per task, validating both participant incarnations and full scope. Stop revokes descendants and joins cleanup. ActionResultInbox retains 128 terminal results by default (configurable 1–512), deduplicates execution IDs and counts history eviction; it is not a work queue.
 
+## Context and round state
 
-✅ Registration issues an incarnation UUID with optional session binding. Stop invalidates identity before joining the Agent; remove allows a freshly constructed replacement only after cleanup. Speech/camera session instances are isolated; generic restart/factory supervision remains unimplemented.
+AgentContext<State> version 1 validates agent/scope/revision, at most 8192 records (each ≤512 KiB), 8192 consumption batches and 256 work/task records. Active work cannot be evicted/erased. append/consume may explicitly retain a recent window with counted eviction; default overflow rejects. Restart recovery interrupts unfinished work without replay.
 
-✅ Source location: `MobileHarness/Agents/Support/Core/Runtime`; compiled by `AgentCore`. Directory relocation preserves existing behavior and public contracts. ❌ No new runtime capabilities are implied.
+AgentDecisionContext validates immutable snapshots and selected Signal/batch membership. AgentRoundCoordinator registers up to 120 calls, deduplicates results, seals/cancels and gates observation continuation. AgentTaskBudget validates cumulative requests/calls/execution; the role commits budget evidence at its round boundary. Persistence contracts contain no Storage dependency.
 
-## Action runtime stage 2
+## Admission and cancellation
 
-✅ ActionResultInbox retains 128 terminal receipts by default (configurable 1–512), deduplicates retained execution IDs and counts oldest-history eviction. AgentManager supports at most four stop observers, invalidates incarnation before stopping, and joins Agent stop with resource cleanup concurrently. ❌ Inbox is not a durable business work queue.
+SignalInbox accepts capacities 1–8192, takes highest priority first and FIFO within a priority, and fuses at most 128 same-key inputs within one session/task. Only explicit replaceLatest removes pending same-key entries; replacement itself is keyed across the inbox, so the role owns key scoping. New entries at capacity reject. Expired items return to the role for terminal accounting.
 
-## Agent composition — ADR0187
+AgentAdmissionGate serializes short actor state/commit sections across suspension. A lock protects its permit and bounded FIFO waiters. Overflow rejects; cancellation removes a waiter; close fails queued waiters. The role releases on every exit and checks cancellation before processing. Model/device work must not retain the permit.
 
-✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Support/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
+✅ Bounded registration, revocable grants and generic context/admission/round mechanisms are implemented.
 
-✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+❌ Factory creation, automatic restart and generic health supervision are not implemented.
 
-✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+## Related design
 
-SignalInbox 声明容量/序号/优先级与融合 key；只在相同 session/task 中形成批次，替换仅作用于显式最新状态。过期条目交还 Agent 记录终态。AgentRoundCoordinator 精确登记最多120个调用、去重结果、seal/cancel 和 observation 屏障；AgentTaskBudget 保存累计请求/调用/执行预算，Assistant 在本轮边界写入 work budget 证据；解码与使用均验证预算结构。
-
-AgentContext<State> version1 保存结构化 State、最多8192条每条512KiB的证据、8192消费批次与256个 work/任务记录。终态 work 可被明确淘汰，活跃工作禁止淘汰；其他容量超限明确拒绝。AgentContextPersistence 只定义 load/CAS commit，不导入 Storage。AgentManager 保存32个活跃任务 grant、每任务32个执行范围，校验完整 scope 与双方 incarnation；停止撤销后代任务并加入清理，重复 stop 加入同一清理工作。
-
-设计与阶段边界见 [ADR0187](../../../../../docs/adr/0187-agent-composition-and-react.md)；验证见 [Validation-History](../../../../../docs/Validation-History.md)。
-
-✅ eraseEvidence 按任务身份清理已结束工作与消费证据，活跃 work 拒绝删除；业务历史选择仍在 Agents 适配层。
-
-✅ append/consume 可由 Agent 显式选择 retainingLast；默认仍拒绝超限，流式 Agent 的淘汰计数与最近证据持久化，Core 不选择哪些业务事实可替换。
-
-✅ Implemented organization: AgentDecisionContext.swift resides in Core/Runtime and compiles in AgentCore, with its same-target import removed. Immutable snapshots and selected Signal/batch validation belong to AgentCore; model and persistence adapters belong to Agents/Support. No duplicate definition or compatibility alias is retained.
-
-
-
-✅ AgentAdmissionGate serializes short actor state/commit admission across suspension points. A Foundation lock protects the permit and bounded FIFO waiters; overflow rejects explicitly, cancellation removes a waiter, and close fails all queued waiters. The owning Agent releases the granted permit on every exit and checks cancellation before processing. No business/model/device dependency is introduced.
+[Parent design](../README.md)

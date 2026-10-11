@@ -1,9 +1,37 @@
-# Shared context persistence adapter
+# Atomic Agent Context Persistence
 
-Purpose: adapt generic AgentCore Context transactions to Storage atomic documents. Compiles inside Agents; business schemas, admission/retention and context selection remain owned by roles.
+## Summary
 
-✅ ADR0189 source migration implemented: AgentContextRepository.swift has moved here unchanged. It owns serialized immutable snapshots/copy-before-commit updates and SignalEvidence encoding. At most16 commit waiters; overflow rejects. Documents are bounded64MiB and compare-and-swap failures preserve the previous snapshot. Initial load validates identity/version/schema, commits interrupted work and never replays effects. Media bytes/credentials are not included in evidence.
+Adapts generic AgentCore contexts to atomic Storage documents and records neutral Signal evidence.
 
-Upstream: role preprocessing and Chat context adapters. Downstream: Foundation-only Core contracts and Storage generic document interfaces. No Chat/model dependency, shared global history, role permissions, UI or device effects. Actor/repository lifetime belongs to Agent/runtime, independent of pages.
+## Ownership and boundaries
 
-See [Support](../README.md), [Core](../Core/README.md), [Chat](../Chat/README.md) and [ADR0189](../../../../docs/adr/0189-agent-support-hierarchy.md). Failure/integration verification remains in [Validation-History](../../../../docs/Validation-History.md).
+AgentContextRepository<State> compiles inside Agents with Foundation/AgentCore/Storage. Roles own state/schema, classification, admission, consumption and retention; this adapter has no model, UI or device policy.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
+
+```mermaid
+flowchart LR
+ Role[Role preprocessor or Chat worker] --> Repository[AgentContextRepository]
+ Repository -->|Copy, validate and CAS commit| Document[Storage LocalDocumentStore]
+ Document -->|Atomic bounded document| Disk[Private file]
+ Repository -->|Immutable snapshot| Role
+```
+
+## Transaction algorithm
+
+One actor serializes snapshots and copy-before-commit updates with at most 16 commit waiters. Overflow throws capacityExceeded. Each mutation advances and validates revision/agent/scope before persistence. The in-memory value changes only after successful commit. A repository created without injected persistence remains in memory; `persistent` supplies the Storage-backed adapter. ContextDocumentAdapter compares logical revision and Storage token; conflict preserves the previous snapshot.
+
+persistent uses a 64 MiB LocalDocumentStore. Initial load validates identity/schema, recovers interrupted state/tasks/work, advances revision and commits recovery before exposing it. No effect is replayed. recordSignal encodes bounded neutral SignalEvidence and atomically updates role-selected evidence, consumption and business state. Media bytes and credentials are excluded.
+
+## Cancellation and ownership
+
+The owner retains repository lifetime independently of pages. Repository waiters are FIFO and are not removed on cancellation. A waiter granted the write slot after cancellation still owns it; repository methods release via defer. The adapter does not add an automatic cancellation check to the mutation; owning workflows enforce cancellation policy. No suspended model/device operation holds the slot. Storage/load/encoding/CAS failure propagates; there is no fabricated snapshot or silent fallback.
+
+✅ Serialized atomic contexts, recovery commits and neutral evidence encoding are implemented.
+
+## Related design
+
+[Parent design](../README.md)

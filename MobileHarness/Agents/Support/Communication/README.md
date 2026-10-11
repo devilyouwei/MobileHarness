@@ -1,45 +1,51 @@
-# Shared business communication contracts
+# Application Signal Schemas and Configuration
 
-Purpose: define immutable application Signal values, schema/catalog assembly and bundled configuration loading shared by Agents and App/Gateway adapters. Compiles in the existing Agents target with Foundation/AgentCore. Generic messaging/authorization protocols belong to [Core/Communication](../Core/Communication/README.md).
+## Summary
 
-| File | Responsibility |
+Immutable application Signal values, schema catalogs and bundled role configuration loading.
+
+## Ownership and boundaries
+
+Compiles in Agents with Foundation/AgentCore. Generic identity/admission contracts belong to Core/Communication. Gateway binds trusted provenance; roles process content. This directory owns no queue, model session, retry or effect.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
+
+```mermaid
+flowchart LR
+ Roles[Agent roles] -->|Typed content| Schemas[Communication values]
+ App -->|Typed user and native facts| Schemas
+ Schemas --> Catalog[Business schema catalog]
+ Catalog --> Config[AgentConfigurations validation]
+ Catalog --> Gateway[Injected communication policy]
+```
+
+## Schema ownership
+
+| Source | Contract group |
 | --- | --- |
-| AgentConfigurations.swift | Load bounded JSON v6 resources from Bundle.module and validate the business catalog; fail missing/invalid configuration explicitly |
-| AgentContracts.swift | Built-in application identities, PerceptionMessage wrappers, typed factories/access, small history/session controls and schema catalog assembly |
-| AgentTasks.swift | Public task content/views, capability overview, trusted fixed-intent unwrapping and explicit scoped user replies |
-| ApplicationSignals.swift | Application environment facts and device/navigation intent values/validation |
-| ModelResourceSignals.swift | Resource intents/observations and owner-correlated host-failure values |
-| ProviderIntents.swift | Provider settings/discovery intent values |
-| PhotographerCameraIntent.swift | Typed camera operation, facing and artifact identity validation |
-| SpeechValues.swift | Speech phase and synthesis input values |
-| PoseObservation.swift / SoundSourceObservation.swift | Bounded perception values and validation |
+| AgentConfigurations.swift | Bounded JSON v6 Bundle.module loading and catalog validation |
+| AgentContracts.swift | Built-in identities, typed factories/access and schema assembly |
+| AgentTasks.swift | Public task content/views, trusted fixed-task unwrapping and scoped user input |
+| ApplicationSignals.swift | App environment/device/navigation, listening consent, reply activity and native termination |
+| ModelResourceSignals.swift / ProviderIntents.swift | Resource requests/state/host failures and private provider intent IDs |
+| PhotographerCameraIntent.swift | Camera operation/facing/artifact intent and passive camera.state |
+| SpeechValues.swift | Speech phases and directed synthesis input |
+| PoseObservation.swift / SoundSourceObservation.swift | Validated bounded perception facts |
 
-✅ ADR0189: the former Agents/Communication directory and shared AgentConfigurations now live here. Type names, Codable schemas, permissions, byte limits and freshness policies are unchanged. Configuration resources remain in their seven role directories. No role processing, worker, retry, model/device effect or transport implementation moves here.
+Assistant delegation guidance belongs to Assistant.prompts.json; shared code retains no role capability-summary prose. Typed task schemas remain here; shared send usage metadata is rendered from the Function Token protocol resource by Support/Chat.
 
-Upstream: role output/input adapters and App typed intent producers. Downstream: neutral Core AgentMessage/CommunicationContracts, configuration validation and injected Gateway routing policy. The catalog supplies business schemas; Gateway supplies trusted runtime identity and admission; each receiving Agent owns business processing.
+## Validation and causality
 
-Input factories preserve provenance/root/parent/session. Runtime feedback authority cannot be supplied by model or user content. Domain validation rejects unknown content, malformed identities, forbidden fields and oversized encoded payloads. TaskRequest/Input/Progress/Result/Cancel retain explicit scopes; admission receipt is separate from final completion. Task messages are directed. Fixed UI intent unwrapping requires trusted Assistant/task provenance; models cannot construct a trusted UI command or confirmation.
+Factories preserve session, source, root/parent and turn; payloads cannot supply runtime authority. Unknown types, malformed identities, forbidden fields and oversized encoded values reject. TaskRequest/Input/Progress/Result/Cancel are directed scoped values; TaskInput user text is ≤4096 bytes. Fixed UI confirmation requires trusted provenance.
 
-Speech/pose observations inherit causal freshness; sound source is500ms, pose1s and partial transcript2s. Synthesis/cancellation and work intents have fresh bounded admission. Camera/history/provider payloads retain512-byte schema bounds; resource/application intent bounds remain in their declared schemas. Task user text is bounded4096 bytes; generic task metadata remains in Core. Queues, consumption, persistence, cancellation and recovery policy belong to Agents/runtime, not these immutable contracts.
+Sound freshness is 500 ms, pose one second and partial transcript two seconds. Camera/history/provider intents retain declared 512-byte schema limits; application interaction and model-resource intents permit 2048 bytes. Camera-state snapshots permit 2048 bytes. ReplyActivity carries up to 128 input and task IDs each, source-local revision and causal acknowledgment. camera.state carries monotonic sequence/sample time, native permission/busy/lens state, displayed/saved photo IDs and bounded errors; root session stays in the envelope. Passive facts create neither task nor receipt.
 
-✅ Source relocation and cross-Agent task contracts are implemented. ❌ Durable/remote transport, richer memory schemas and real-model/native-UI/device acceptance remain outstanding. See [Support](../README.md), [Agents](../../README.md), [ADR0189](../../../../docs/adr/0189-agent-support-hierarchy.md) and [validation](../../../../docs/Validation-History.md).
+Configuration declares model exposure separately from internal functions. Many-to-many Action registration does not alter schemas or share role histories. New task send uses kind=request without taskID; follow-up/cancellation requires existing scoped task identity.
 
-## Listening policy ownership
+✅ Typed business catalog, strict configuration loading and passive fact schemas are implemented.
 
-✅ ApplicationSignals.swift defines speech.listening user intent, interaction.replyActivity complete bounded occupancy snapshots and speech.captureEnded revision-fenced native termination. AgentContracts.swift validates these schemas; JSON declares publishers and subscriptions. ReplyActivity carries up to128 input/task IDs each, source-local revision and acknowledged causal root; no device policy appears in the value.
+## Related design
 
-❌ True-device acoustic echo, tail, route/interruption and native UI acceptance remain pending.
-
-
-
-✅ AgentCapabilityCatalog explains new-task kind=request with a concrete Photographer example; kind=task is invalid, and existing task input/cancellation requires taskID. Model exposure and correction belong to Support/Chat; fixed publication and transport remain independent.
-
-
-
-✅ Shared Action registration: Action implementations support many-to-many Agent registration. ApplicationControl registers the 11 Robot Actions for Settings command tests. Assistant retains basic interaction registration; Photographer retains camera-only model permissions. Each role calls canonical functions under its own identity; no inter-Agent delegation is needed to reuse an Action.
-
-
-✅ Reply/lifecycle regression correction: caption focus is presentation only and cannot cancel an authorized queued/playing reply from another Agent. Playback checks active session and explicit task cancellation, retaining Gateway owner/task/function authorization and the shared serialized Speech Channel. ApplicationControl accepts environment facts and correlated feedback while paused; fresh business commands still require running. Assistant delegation prompts emit send without redundant spoken acknowledgments and leave specialist speech to its executor. Scope/result delivery failures retain actual evidence; no silent error suppression or action replay is added. Add owner-switch playback admission and paused environment regressions.
-
-
-✅ Camera perception/context change (2026-10-10): PhotographerCameraIntent.swift also defines bounded camera.state snapshots: monotonic sequence, sample time, enabled/visible/busy/permission flags, lens, displayed/saved photo identities and bounded native errors. AgentContracts registers the passive fact schema; Photographer JSON grants only phone.camera subscription. Root session is fenced by the Signal envelope. No task or transport receipt is created.
+[Parent design](../README.md)

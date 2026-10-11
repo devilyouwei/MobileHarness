@@ -1,17 +1,45 @@
-# Speech capabilities
+# Speech Capability Group
 
-Purpose: Group recognition, synthesis and voice-activity protocols and their adapters.
+## Summary
 
-Design goals: explicit ownership, capability boundaries and no duplicate production sources.
+Independent ASR, TTS and voice-activity contracts/adapters with managed operation state.
 
-- ✅ Independent ASR, TTS and VAD targets; public consumers receive protocols.
-- ❌ Microphone ownership and conversation orchestration belong to upper layers.
+## Ownership and boundaries
 
+Consumers own microphone/playback/utterance endpoint policy. Speech adapters produce transcript, activity scores or PCM and do not route Signals or decide conversations.
 
-✅ Local recognition uses the shared multilingual Nemotron 2240 ms Core ML export; there is no device-specific CoreAI export selection.
+## External relationships and data flow
 
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
-✅ Speech defaults choose enabled installed available Nemotron/MOSS or Apple SpeechAnalyzer/AVSpeechSynthesizer. VAD independently chooses installed available Silero, otherwise Energy. Settings may force Apple ASR/TTS; App owns playback/capture and Agents owns endpoint timing.
+```mermaid
+flowchart LR
+ Consumer --> ASR[Recognition capability]
+ Consumer --> TTS[Synthesis capability]
+ Consumer --> VAD[Activity capability]
+ ASR -->|Transcript| Consumer
+ TTS -->|PCM| Consumer
+ VAD -->|Sample-aligned scores| Consumer
+```
 
+## Internal structure
 
-✅ Apple recognition adds same-analyzer SpeechDetector for internal gating. Energy remains for Agent endpoint timing by explicit user agreement; public SDK fields do not imply normal native activity events. Custom recognition and synthesis are selected independently.
+```mermaid
+flowchart LR
+ ASR --> Shared
+ TTS --> Shared
+ VAD --> Scores[Direct score contract]
+ Shared --> Apple[Apple PCM helpers]
+```
+
+## Composition
+
+ASR provides Nemotron/Apple; TTS provides MOSS/Apple plus isolated Kokoro; VAD provides Silero/Energy; Shared/Apple supplies codec helpers. Custom ASR/TTS preference is independent; VAD selection is independent of ASR. Missing/unavailable local speech selects system capability before admission, never after failed active inference.
+
+Apple's transcriber/detector share analyzer state; normal detector activity callbacks are not assumed usable, so Agent silence timing still uses separate VAD. Local graph resources are provisioned through Management, never during inference.
+
+✅ Independent managed speech capabilities and shared codec adaptation are implemented.
+
+## Related design
+
+[Parent design](../README.md) · [ASR](ASR/README.md) · [Shared](Shared/README.md) · [TTS](TTS/README.md) · [VAD](VAD/README.md)

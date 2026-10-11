@@ -1,25 +1,43 @@
-# Shared Execution Runtime
+# Protocol-Neutral Function Execution
 
-Purpose: register and execute canonical functions independently of call protocols. Design goals: one implementation store, bounded state, joined deadlines/cancellation and an independent ExecutionRuntime target.
+## Summary
 
-✅ FunctionRegistry validates at most256 unique ActionFunctions. FunctionExecutor looks up the canonical function and consumes canonical budget metadata and owns stored/returned report precedence and completion-kind validation. It accepts FunctionInput, not Agent or protocol envelopes. Dynamic budgets override constant timeout and caller fallback; queue time is excluded.
+Independent ExecutionRuntime target for canonical registration, budgeted execution, reports and finite composition.
 
-✅ ActionReportStore implements FunctionReporting with one report slot and explicit duplicate-report failure. ActionDeadline/CooperativeExecution cancel and join cleanup; caller cancellation propagates. ActionComposition supplies bounded generic finite composition. Recipes and motion shaping remain business Actions.
+## Ownership and boundaries
+
+Depends only on FunctionContracts. Host/Gateway supplies permissions, scheduling and leases; low-level execution supplies none implicitly. Domain recipes/planning stay in Actions.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Catalog[Validated business function catalog] --> Registry[FunctionRegistry]
-    Input[Standard FunctionInput] --> Executor[FunctionExecutor]
-    Registry --> Executor
-    Executor --> Lifetime[Cooperative deadline / cancellation / cleanup]
-    Lifetime --> Handler[Canonical handler]
-    Handler --> Report[Injected bounded report sink]
-    Handler --> Completion[Shared ActionCompletion]
-    Report --> Completion
+ Caller[Action or Tool adapter] --> Executor[FunctionExecutor]
+ Registry[FunctionRegistry] -->|Canonical definition| Executor
+ Executor --> Budget[Declared execution budget]
+ Executor --> Handler[FunctionInput handler]
+ Handler --> Report[ActionReportStore]
+ Handler --> Outcome[Completion or failure]
+ Report --> Outcome
+ Budget -->|Cancel and join on deadline| Handler
 ```
 
-✅ This target depends only on FunctionContracts; it has no AgentCore, call-protocol, business, model, UI, App or device dependency. Gateway separately supplies permission/owner checks, queues and resources. Low-level executor calls acquire no lease or authorization.
+## Registry and execution
 
-❌ Durable execution, generic progress, arbitrary rollback and physical stop proof are not implemented.
+FunctionRegistry validates at most 256 unique ActionFunctions. FunctionExecutor looks up the canonical definition, validates invocation/completion kind and chooses request-dependent executionBudget before constant timeout or caller/default fallback. Default timeout is 30 seconds; invalid explicit budgets fail, never silently fall back. Queue time is excluded.
 
-✅ FunctionExecutor supplies protocol-neutral failure normalization preserving child reports and bounded terminal causes. Gateway call adapters use it at terminal result boundaries; low-level execution still throws for callers that handle errors themselves.
+Returned terminal reports take precedence over stored children; if a throw has no full terminal report, preserve stored entries and append the original failure. Partial failure cannot become success. ActionReportStore has one report slot and duplicate reporting fails. Producer codes/description remain bounded neutral data.
+
+## Cooperative lifetime and composition
+
+ActionDeadline/CooperativeExecution races deadline/caller cancellation, cancels and joins body cleanup before returning. A non-cooperative handler can outlive its deadline; no forced interruption or false release exists. ActionComposition supplies bounded finite generic steps/results/delays and inherited resource context; business recipes remain outside this target.
+
+✅ One canonical executor, report precedence and cooperative joined deadlines are implemented.
+
+❌ Durable execution, arbitrary rollback and generic physical-stop proof are not implemented.
+
+## Related design
+
+[Parent design](../README.md)

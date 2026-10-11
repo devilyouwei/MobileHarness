@@ -1,24 +1,38 @@
-# MOSS-TTS-Nano synthesis
+# MOSS-TTS-Nano Synthesis Adapter
 
-Purpose: the default Chinese/English synthesis capability. Design goals: local-only resources, managed ownership, bounded PCM and explicit failure instead of Kokoro fallback.
+## Summary
 
-✅ ModelKitDefaults binds `moss-tts-nano` to this actor; explicit App voice preparation and the MossValidation scheme use the same provider. Chinese or mixed-script `auto` input uses zh_1; English uses en_2. Explicit zh/en locales choose the corresponding voice. Other locales fail. Text is limited to 2048 UTF-8 bytes; the backend tokenizes and splits at 50 tokens with at most 32 chunks.
+Managed local Chinese/English neural PCM with strict output validation and explicit EOS failure.
 
-One active detached worker holds a ModelResource lease; overlap fails with inputBusy, no pending request queue. Native 48 kHz stereo frames are downmixed to mono Float32, split into at most 4096 samples/event, and assigned continuous sequence/timestamps. At most 256 events of 16,448 estimated bytes are buffered; a full queue fails explicitly rather than dropping speech. Per-callback audio is at most 400 ms and total audio is capped at 60 seconds, including pauses. The callback is serial and synchronous, protected by a mutex for PCM state; no upstream AsyncThrowingStream is used.
+## Ownership and boundaries
 
-Cancellation synchronously cancels the worker, checked between every Core ML prediction and emitted frame. The worker releases the lease after inference exits and then clears its admission; shutdown joins through the resource. A running system prediction cannot be forcibly interrupted. Success requires backend stop tokens; frame-limit exhaustion fails. Playback completion remains downstream of synthesis.
+The adapter owns request admission/format and a ModelResource lease. Backend/native framework owns prediction; caller owns synthesis segmentation/cache/playback. No native capture, speaker, business or transport dependency exists.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Request --> Admission[One worker / busy rejection]
-    Admission --> Lease[Managed local graphs]
-    Lease --> Backend[Token chunks / sampled frames]
-    Backend --> PCM[48 kHz stereo to mono / sequence]
-    PCM --> Queue[256 events / overflow fails]
-    Queue --> Agent[SpeechSynthesisAgent / StorageAudio]
-    Cancel[Cancel / failure] --> Join[Finish active graph / release lease]
+ Caller --> Adapter[MossNano synthesis adapter]
+ Resource[Managed local or system resource] --> Adapter
+ Adapter --> Native[Backend or system synthesis]
+ Native --> PCM[Validated PCM events]
+ PCM --> Caller
 ```
 
-❌ iPhone sustained stability, numeric/date normalization parity, other languages and custom voice registration remain unverified or unimplemented. This is a real beta neural model, not demo audio. Missing artifacts never trigger downloads or another provider.
+## PCM and worker contract
 
-✅ Explicit voice admission/diagnostics perform real in-memory synthesis warmup before conversation admission or measured speech. It exercises lazy kernels using synthetic Chinese text, drains PCM without playback and propagates failures. The first device run took 10.63 s to first PCM without warmup; voice-admission warmup absorbs that compilation cost. Current production StorageAudio reads have no independent timeout; SpeechSynthesisAgent separately bounds each executing job to 60 seconds. That execution deadline is distinct from this adapter’s 60-second generated-audio duration cap, and the Agent/cache 8 MiB limit is approximately 43.7 seconds at 48 kHz mono Float32. ❌ Warmup does not prove sustained runtime stability.
+MossInput owns request adaptation; MossPCMEncoder downmixes native 48 kHz stereo to mono Float32, splits ≤4096 samples/event and assigns continuous sequence/time. One detached worker rejects overlap. Stream retains 256 events of ≤16,448 bytes, failing explicitly on full rather than dropping speech. Per native callback ≤400 ms; generated request audio ≤60 seconds including pauses.
+
+Callbacks are serial/synchronous and mutex-protected; no upstream unbounded stream exists. Cancel synchronously marks worker, checked between predictions/frames. Lease releases only after inference exits; shutdown joins. Success requires stop tokens; exhausted frame budget fails. Missing artifacts do not trigger download/provider fallback.
+
+Explicit voice/diagnostic warmup drains synthetic real PCM without playback. Adapter's 60-second audio-duration limit differs from Agent's 60-second execution timer and StorageAudio's eight MiB bound (about 43.7 seconds at this rate). Synthesis completion is not playback completion.
+
+✅ Managed MOSS output, EOS enforcement and bounded PCM conversion are implemented.
+
+❌ Additional languages and custom voice registration are not implemented.
+
+## Related design
+
+[Parent design](../README.md)

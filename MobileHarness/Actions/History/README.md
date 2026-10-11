@@ -1,59 +1,50 @@
-# History Actions
+# Conversation History Functions
 
-Purpose: expose conversation discovery, record previews and explicit archival/title operations and archive-only deletion through the existing output boundary. Design goals: shared deterministic queries, bounded results, explicit truncation and no effect replay.
+## Summary
 
-| Entry | Arguments (strings) | Result |
-| --- | --- | --- |
-| History.Conversation.list | offset 0–64, limit 1–5 | Current conversation first, then newest archives; IDs, ISO-8601 timestamps, archive flag, summary/latest-input previews and turn counts |
-| History.Conversation.startNew | None | Committed archived UUID/null; empty current is unchanged |
-| History.Conversation.summarize | Archived conversation UUID | Saved title acknowledgment; inference failure/cancel retains retry error |
-| History.Conversation.delete | Archived conversation UUID | Deleted UUID acknowledgment; current/missing IDs fail; fixed internal memory permission only |
-| History.Conversation.read | conversation UUID, offset 0–256, limit 1–2 | Oldest-first turn previews with IDs and generation state |
+Bounded history discovery/read previews and authorized archive/title/delete transactions.
 
-List/read return JSON pages with items, total and optional nextOffset (absent at end). Preview fields contain value and truncated. List title/input previews use 40 UTF-8 bytes; read user/response previews use 80/160 bytes, preserving whole characters. These are bounded previews, not full export or semantic retrieval. Each call reads a fresh snapshot; pagination is not a stable cross-call transaction.
+## Ownership and boundaries
 
-✅ Arguments are required, unknown keys reject, and cancellation is checked before/after query. Encoded results above 1800 bytes fail resultTooLarge; callers can request a smaller page. Missing IDs fail notFound. Credentials, request prompts, Tool arguments/results and model settings are excluded. Raw response text is data, never parsed or replayed.
+ConversationActions owns callable validation. Support owns query/transaction policy through shared StorageChat and injected mutation/title capability. Memory owns operation sequencing and trusted deletion confirmation; no raw response is parsed or replayed.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    JSON[Assistant JSON declarations] --> Gateway[OutputGateway authorization]
-    Gateway --> Runtime[FunctionContracts]
-    Runtime --> Entries[HistoryActions]
-    Entries --> Service[HistoryQueryService: bounded projection]
-    App[App composition] -.->|Inject shared journal| Service
-    Service --> Store[StorageChat raw snapshots]
-    Runtime -->|Correlated ToolResult| Input[InputGateway]
+ Gateway -->|FunctionInput| History[ConversationActions]
+ History --> Query[HistoryQueryCapability]
+ History --> Mutation[HistoryMutationCapability]
+ Query --> Storage[Shared StorageChat]
+ Mutation --> Storage
+ Mutation --> Title[Injected title computation]
+ History -->|Bounded actual result| Gateway
 ```
 
-✅ Actions/History depends on StorageChat for the concrete query implementation. Runtime and BehaviorAssembly retain their independent contracts; no new store, queue or Agent is added. See [Support](Support/README.md).
+## Interfaces and result bounds
 
-✅ Refresh and confirmed deletion use the memory Agent intent route. ❌ Full-text export/search and model result-driven continuation remain pending. Cloud native calls can invoke these functions through host ToolCall bindings; local chat remains text-only. Current Assistant presents escaped Tool results without continued model reasoning.
+| History.Conversation function | Arguments | Result |
+| --- | --- | --- |
+| list | offset 0–64; limit 1–5 | Current first then newest archives; paged metadata |
+| read | conversation UUID; offset 0–256; limit 1–2 | Oldest-first bounded turn previews |
+| startNew | None | Committed archived UUID/null; empty current unchanged |
+| summarize | Archived UUID | Persisted title acknowledgment or retained retry error |
+| delete | Archived UUID | Deleted UUID acknowledgment; current/missing IDs fail |
 
-✅ History.Conversation.delete uses an injected HistoryMutationCapability. HistoryMutationService validates the archive against the shared journal and invokes its atomic transaction; Actions/History owns no UI or model effect. It returns a small JSON acknowledgment only after persistence succeeds. Cancellation before the transaction prevents the call; later cancellation cannot undo a committed write. No automatic retry or missing-ID success fallback.
+String arguments are required where declared; unknown keys reject. JSON pages contain items/total and nextOffset only when more exists. Title/input previews use 40 UTF-8 bytes; read user/response previews 80/160, preserving whole characters with explicit truncated. Encoded result >1800 bytes fails resultTooLarge rather than truncating structure. Each call takes a fresh snapshot; pagination is not stable across calls.
 
-❌ Assistant JSON exposes only read-only list/read; deletion is not model-callable in this stage.
+## Transaction and failure
 
-✅ ADR0151: this domain is compiled once in Actions; both ActionCall and ToolCall entries use FunctionContracts contracts. Host injection and permission/feedback behavior are unchanged.
-✅ Shared execution from ADR0157 is retained; ADR0160 separates callable functions from host bindings.
+Cancellation before mutation prevents it; cancellation after durable commit cannot undo it. Archive precedes title inference. summarize has a 60-second function budget including preparation; title inference retains its 30-second bound. Failed title state is committed before throwing; secondary persistence failure retains both causes. Delete does not fabricate success for missing IDs or retry a write.
 
-✅ ADR0152: functions are classified by domain before protocol unification. Canonical namespaces use `<Domain>Actions`; production uses one pure `<Domain>Module`; host registration creates Action/Tool projections. Superseded aliases/protocol catalogs are retired.
-✅ Unified definitions and compatibility retirement are implemented in ADR0157.
+Memory model grants list/read only; fixed archive/delete/title permission is code-owned. Observation continuations are implemented in shared Chat; queries do not themselves start inference. Credentials, request prompts/native arguments/results and settings are excluded from previews.
 
-## Cohesive module files — ADR0154
+✅ Bounded queries and explicit durable history mutations are implemented.
 
-Purpose: implement directory/module-file/function ownership while preserving current protocol APIs. The domain Actions enum remains a used namespace facade; callable bodies belong exclusively to the files below. Support owns one domain catalog, values and host capabilities.
+❌ Full-text search and unbounded record export through these functions are not implemented.
 
-- [ConversationActions.swift](ConversationActions.swift)
+## Related design
 
-✅ Implementations are split without forwarding or duplicated metadata/handlers. Generated factories and existing call paths, permissions, resources and scheduling are unchanged.
-✅ Three-field addresses, Agent v6 configuration and shared definitions/results are implemented in ADR0156/0157.
-
-✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
-
-✅ ADR0160: this domain exposes ActionFunction values with canonical invocation and intrinsic constraints. Protocol availability, native scheduling and feedback belong to host-created ActionBinding; domain code consumes no Tool wire/error contracts. ❌ New feature/physical acceptance remains separate.
-
-✅ ADR0161: standard callable inputs use FunctionInput/FunctionContracts; common execution and call protocols belong to independent Gateway targets. This directory retains its existing ownership, resource/permission and lifecycle boundaries. ❌ Remaining feature Signal/continuation and physical acceptance are separate work.
-
-✅ Implemented: History.Conversation.startNew validates no arguments and returns archived UUID/null; summarize validates archive UUID and invokes the title mutation capability. Preserve commit-before-inference, bounded title-only inference, archived-only validation and retryable error persistence before throwing. No output text is executed or model mutation grant added.
-
-✅ Implemented: summarize has a60-second cooperative execution deadline (including capability preparation), retaining the title helper30-second inference limit. If recording a title failure also fails, return a bounded two-cause ActionReport rather than hiding either error.
+[Parent design](../README.md) · [Support](Support/README.md)

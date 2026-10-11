@@ -1,35 +1,40 @@
-# Call Registration
+# Function Bindings and Protocol Views
 
-Purpose: provide Action/Tool registration views over one canonical function registry. Design goals: independent CallRuntime compilation, explicit protocol policy, bounded validation and no AgentCore dependency.
+## Summary
 
-✅ ActionBinding wraps a function with protocol availability, direct native execution and native feedback policy. ActionBindingCatalog validates before projecting ActionModule/ToolModule. ActionRegistry and ToolRegistry expose protocol views; with a supplied FunctionRegistry, canonical handlers/resources/budgets come from that shared store. Protocol bindings cannot replace or weaken the function implementation.
+Projects host bindings over a single frozen canonical function registry into Action and native Tool views.
 
-✅ Scheduled registration is bounded to32 modules/256 entries; native registration to32 modules/128 entries. Invalid/duplicate metadata and unknown canonical functions fail startup. Mutable native convenience registration adds to its bounded function store before publishing the binding. ToolDefinition/ToolResource aliases are retired.
+## Ownership and boundaries
+
+Part of CallRuntime with Protocols, depending only on FunctionContracts/ExecutionRuntime. Host selects protocol/scheduling/feedback; Agent grants are independent. Registration does not construct business functions or infer permissions.
+
+## External relationships and data flow
+
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
-    Functions[Canonical FunctionRegistry] --> Action[Action registration view]
-    Functions --> Tool[Tool registration view]
-    Profiles[Host ActionBinding policies] --> Action
-    Profiles --> Tool
-    Grants[Independent Agent permissions] --> Gateway[Gateway coverage / authorization]
-    Action --> Gateway
-    Tool --> Gateway
+ Host[BehaviorAssembly] --> Binding[ActionBinding]
+ Functions[FunctionRegistry] --> Action[ActionRegistry]
+ Functions --> Tool[ToolRegistry]
+ Binding --> Action
+ Binding --> Tool
+ Action --> Scheduler[Scheduled execution]
+ Tool --> Direct[Direct native execution]
 ```
 
-✅ This folder and sibling Protocols compile as CallRuntime, depending only on FunctionContracts/ExecutionRuntime. App supplies grouped profiles; Agent configuration/code remains the authority for exposure and permission.
+## Validation and limits
 
-❌ Dynamic discovery, permission inference, protocol default convenience cleanup and durable registrations are separate work.
+ActionBinding references one canonical function and explicit protocol projections, display name and feedbackPolicy. Functions retain canonical serialization/resources/budgets; duplicate/unknown addresses, invalid metadata and missing handlers reject. Native scheduled bindings reject; Tool execution is direct.
 
-✅ [Protocol selection and dispatch](../Protocols/README.md#protocol-selection-one-function-two-call-paths) explains how host bindings and Agent declarations expose one function as ActionCall/ToolCall, and why direct native execution is a separate decision.
+Common function registry permits 256 functions. Action view permits 256 bindings; Tool view 128; each projection permits 32 modules. One function may support both protocols for different callers, but a role's model catalog must not expose the same business address twice. Internal fixed grants can reuse a separately registered view.
 
-## Action/Tool generation rounds — ADR0183
+recordOnly/observation is independent of return type. Generated void observation calls still retain terminal outcome; deterministic completion-only policy retains its no-returning-feedback contract. Frozen views own no worker, transport queue or execution lifetime.
 
+✅ Shared canonical storage, explicit protocol metadata and strict view validation are implemented.
 
-✅ ActionBinding owns feedbackPolicy; ToolRegistry rejects scheduled native bindings. ToolExecutor supplies terminal completion for void observation and for every generation-round native call. Legacy deterministic completion-only Tools preserve their transport contract.
+❌ Dynamic registration/hot reload is not implemented.
 
-❌ Live-model, native UI and physical-device acceptance remain pending; native/XML task delegation and specialist loops are implemented. See [ADR0183](../../../../docs/adr/0183-generation-round-observations.md).
+## Related design
 
-✅ Registration default hardening: every initializer defaults feedbackPolicy to recordOnly, including value-returning conveniences. Production observation bindings declare the property explicitly. Return transport remains independent.
-
-✅ A dual-protocol binding may declare direct execution for its native view; ActionRegistry still schedules its ActionCall on the Agent-declared Channel. ExecutionPolicy never turns an Action into an immediate native invocation.
+[Parent design](../README.md)

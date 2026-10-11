@@ -1,25 +1,32 @@
-# Diagnostics UI
+# Diagnostics Presentation
 
-Purpose: show explicitly selected model checks outside ordinary Agent conversation. Design goals: observable status, user controls and no model/player ownership in views.
+## Summary
 
-| File | Responsibility |
-| --- | --- |
-| SpeechDiagnosticState.swift | Editable text, report and running/stopping values; SpeechDiagnosticControlling declares start/stop |
-| MossValidationView.swift | MOSS form and report; delegates synthesis/playback/cleanup to injected controls |
-| ChatValidationView.swift | Debug-only result display and a page-scoped task invoking the injected chat check |
+Injected debug forms for language generation and MOSS synthesis/playback reports.
 
-## Upstream and downstream
+## Ownership and boundaries
 
-[App composition](../../App/Composition/README.md) creates dependencies and supplies state/operations. [AppWorkflows](../../App/Workflows/README.md) implements both checks; ModelKitDefaults owns provider registration. UI constructs no model session or player.
+UI owns editable text/running/stopping/report state. App diagnostics owns model/device calls, exclusive admission, cleanup and result formatting. Reports are diagnostic output, not production acceptance claims.
 
-✅ `-moss-benchmark` opens MOSS Mandarin/English/mixed synthesis and optional playback. Text is editable while idle and disabled during running/stopping. Stop and disappearance request workflow cleanup. The load measurement includes actual synthesis warmup; first PCM, synthesis duration, audio duration and thermal state appear in the report.
+## External relationships and data flow
 
-✅ `-moss-autorun` runs without playback and writes a report. Adding `-moss-playback` uses the production AppleAudioIO playback path and reports speaker completion only after playback drains. Manual synthesis includes playback. Current evidence and reproduction are in [MOSS validation](../../../docs/Moss-Validation.md).
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
-✅ The existing Debug launch flag `-gemma4-validation` and `GEMMA_VOICE_VALIDATION_*` log markers remain compatible with diagnostic scripts. The operation prepares ASR and the **currently configured chat binding**, then requests a short synthetic arithmetic reply. This is local Gemma 4 E2B by default or the explicitly configured cloud chat provider. It cancels the inference session when the operation exits; it does not explicitly unload chat weights. The page owns the task lifetime and ModelManager owns model residency. It records no microphone audio and executes no Agent Actions.
+```mermaid
+flowchart LR
+ User --> Forms[ChatValidationView and MossValidationView]
+ Forms -->|start or stop via injected interface| App[App diagnostic workflow]
+ App -->|display report and state| Forms
+```
 
-Conversation history is a normal [Settings](../Settings/README.md) feature, not a diagnostic inference page.
+## Interfaces and lifecycle
 
-✅ Sources compile in UI; chat validation is Debug-only. No direct model/device imports enter the UI target.
+`SpeechDiagnosticState` and `SpeechDiagnosticControlling` expose MOSS text, status, report, start and stop. The host joins producer/playback cleanup before terminal state. Chat diagnostics use an injected check in a page-scoped task and are debug-only. View disappearance cancels page work; cancellation does not manufacture success.
 
-❌ Physical-device editing, playback/route-change acceptance, model coexistence/performance, and prolonged thermal/audio quality verification. A short completion marker establishes generation, not answer quality or device endurance.
+No separate microphone/player/model backend exists in this target. Production controls and native telemetry are reused by the host. Debug/synthetic results remain visibly distinct from actual model and physical-device evidence.
+
+✅ Injected chat/MOSS diagnostic presentation.
+
+## Related design
+
+[Parent design](../README.md)

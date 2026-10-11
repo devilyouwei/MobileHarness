@@ -391,3 +391,74 @@ Actions and Tools now own Contracts directories and have no AgentCore dependency
 ## Shared Types layout — ADR0099 (2026-10-02)
 
 Types is the independent shared-value target, organized by category under Types/Audio. ModelKit, PlatformKit and StorageAudio consume Types; audio algorithms, validation and compatibility exports are unchanged. Image values currently remain in ModelKit/Core; future shared categories require concrete consumers. Current Tools has no PlatformKit dependency; a future device Tool domain may consume PlatformKit without adding a dependency to ToolRuntime. The technical plan now includes the current compilation dependency diagram. See [ADR0099](adr/0099-shared-types-layout.md).
+
+
+## 2026-10-10 — Source README technical-design reconciliation
+
+All 108 tracked directories/READMEs under MobileHarness were reconciled with current source, configuration, direct consumers and relevant test contracts. Source READMEs now hold English current design: summary, ownership/boundary, direct relationships/data flow and implementation mechanisms. The nine module documents separate external one-level relationships from internal structure. Deeper documents link their parent/children and retain owning contracts instead of repeated architecture/ADR appendices.
+
+The overall source map now places Core, Communication, Chat and Context under Agents/Support. Compile dependencies, host injection and runtime flows are distinct. Current role grants and communication schemas are recorded from all seven JSON configurations, with code-owned internal permissions separate. One-way publication, send admission versus task completion, direct Tools versus scheduled Actions, executor feedback, resident listening authority, current camera context and task-scoped specialist history supersede older descriptions.
+
+Parser grammar/limits, VAD sample-count segmentation, pose/cadence/gaze algorithms, NexArm parameters/tolerances/budgets, resource cleanup, provider transactions, model backpressure, PCM ownership and native readiness were retained or corrected against source. Gemma's current stream is bounded to 4096 events of 4096 bytes; OpenAI's nil-capacity event queue remains a documented buffering gap. No runtime fix was made.
+
+Chronological headings, implementation-stage notes, repeated ADR summaries and obsolete claims were removed from current design. Existing ADRs, change/milestone records and model/device validation remain historical evidence. Compatibility anchors preserve existing incoming references, including two previously broken anchors, without retaining dated appendices.
+
+Historical evidence routing:
+
+| Earlier material | Retained location |
+| --- | --- |
+| NexArm serial arrival trials, celebration/dance outcomes and calibration limits | [Milestone history](Milestone-History.md), [physical acceptance](NexArm_Physical_Acceptance.md), [measurements](measurements/README.md) |
+| First MOSS prediction/warmup and audio deadline investigation | [MOSS validation](Moss-Validation.md) |
+| Nemotron/Silero real-weight and packet-size observations | [Nemotron validation](Nemotron-Validation.md), [Silero validation](Silero-Validation.md) |
+| FOA capture/extraction investigation and device installation | [Validation history](Validation-History.md) |
+| Former Hub/Management/Gemma README-only observations and local artifact cleanup | Relocated historical-claims subsection in [this audit's validation record](Validation-History.md#2026-10-10--full-source-readme-audit) |
+
+The original Technical_Design.docx, source code, interfaces, targets, catalog/config files, downloaded vendor READMEs and module/directory structure were unchanged. The per-document inspection register and actual static checks are in [validation history](Validation-History.md#2026-10-10--full-source-readme-audit).
+
+## 2026-10-10 — Expanded overall technical design
+
+The overall source README had been reduced to 237 lines during the full audit, leaving too much system-level design available only through local documents. It now contains a navigable 1263-line current technical design with twenty-two Mermaid diagrams and nineteen tables. Historical appendices remain in docs rather than being restored to the current contract.
+
+Restored detail includes all thirty-eight production target declarations and their source/dependency ownership; the seven-role runtime topology; assembly and owner identities; Signal provenance and payloads; publication/send/task semantics; atomic contexts; effective grants and host protocol bindings; Function Token grammar; Channel/wait scheduling; reasoning rounds; execution reports, feedback and resource handoff. Speech, UI, camera/photo, robot/Bluetooth, settings/provider, history, model/artifact and diagnostic lifecycles now retain their system-level algorithms, bounds, failure handling and completion boundaries. Module documents continue to own deeper implementation detail.
+
+The expanded design follows current code/configuration rather than restoring superseded claims: Support/Core layout, independent foundational targets, Action-only Assistant and private specialist reasoning, one-way publication, resident SpeechPerception authority, direct owner-routed UI submissions, current model defaults, healthy lens switching and executor-owned feedback are explicit. Compilation, injection and runtime diagrams have separate meanings. The source-confirmed OpenAI buffering gap remains documented without a code fix.
+
+Only the overall source README and existing documentation history/index/validation records changed in this follow-up. The preceding module README edits, source code, target configuration, directory structure and original Word design were preserved. Actual checks and limits are in the [follow-up validation record](Validation-History.md#2026-10-10--expanded-overall-technical-design).
+
+## 2026-10-10 — Project introduction and Agent-loop concepts
+
+The root project README now carries the conceptual introduction formerly embedded in the overall technical design: biological inspiration, Signal → Cognition → Action feedback, specialist cooperation, the governing questions for App/Agents/Gateway, and the distinction between computation, authorized effects and native/UI lifetimes. The existing MobileHarness/agent-loop.svg is embedded through its repository-relative path; the original asset is unchanged. The complete current technical design remains in MobileHarness/README.md.
+
+The introduction qualifies the former “every input is a Signal, every output is an Action” slogan at the Agent boundary: local frontend state and immediate native lifecycle work are not implicit backend tasks. Actual results, bounded continuation, publication versus directed admission and private specialist ownership are now described consistently with current source.
+
+Outdated root claims were replaced: Memory supersedes ConversationMemory; typed UI intents, native Tools and bounded continuation are implemented; current camera capture/save/ignore and specialist histories are included; Apple speech is the default with optional Nemotron/MOSS and independent Silero/Energy selection. Cloud chat requires Responses and supports authorized image content. HF generations/background reattachment replace the unconditional restart-after-relaunch description. Listening consent withdrawal no longer promises cancellation of independently owned reply playback. Development instructions distinguish attempted simulator builds from the known CoreAI SDK limitation.
+
+Dated migration/test appendices were removed from the project introduction. Their ADRs and existing validation records remain historical evidence. Existing license/signing/resource/privacy boundaries were retained and reconciled; no code, asset, directory or API changes were made. Checks are recorded in [validation history](Validation-History.md#2026-10-10--project-readme-concepts-and-current-capabilities).
+
+## 2026-10-11 — Original overall-design structure restored
+
+The preceding overall expansion changed the original document organization. At the user's direction, MobileHarness/README.md was restored from the pre-audit design as its structural/textual baseline: original title, Part I — Overall Architecture, Part II — Module Responsibilities and Part III — Cross-module Technical Design. All sixty-seven headings retain their exact text, order and level, including forty-seven third-level and sixteen fourth-level headings. The original App Host / Business / Foundations architecture diagram is retained verbatim.
+
+Correct original narrative, diagrams and contracts remain in place. Targeted changes correct the old Agents source tree, target dependencies, owner subscriptions, role grants, canonical function inventory, context persistence, Responses transport, resident listening and camera/photo lifetimes. Missing current contracts were placed under the original owning subsections without introducing replacement chapters. Duplicated runtimeInfo/coverage/transition material and dated appendices were consolidated; existing historical records remain available. Incoming links retain compatible anchors.
+
+The root project README and its conceptual introduction/SVG embed were preserved. No runtime source, asset, target or directory changes were made. Static evidence and the outline/preservation checks are in [validation history](Validation-History.md#2026-10-11--original-overall-design-structure-restored).
+
+## 2026-10-11 — Opening concepts moved to the project README
+
+At the user's direction, the overall design's opening conceptual summary and keywords now introduce the root project README. The summary retains biological inspiration, independent Agents and the Signal → Cognition → Action feedback loop, with the input/output vocabulary scoped to the Agent boundary. The existing root Agent-loop illustration remains in place.
+
+The overall design now opens with its technical scope and a link to the project introduction. Its title, three-part navigation, original heading hierarchy and complete architecture/module/cross-module body are unchanged. Checks are recorded in [validation history](Validation-History.md#2026-10-11--project-opening-summary-and-keywords).
+
+## 2026-10-11 — Overall design accuracy and redundancy review
+
+MobileHarness/README.md was checked section by section against current source, Package.swift, all seven Agent configurations, host bindings and relevant regression-test contracts. The three-part hierarchy, all 67 headings, original three-layer architecture diagram and canonical function inventory were preserved.
+
+Repeated ownership, feedback, task, cloud transport, storage and resource-failure explanations were consolidated under their owning chapters, with local references replacing duplicate detail. One redundant resource-operation failure diagram and diagram-authoring instructions were removed. Parameters, capacity/overflow rules, cancellation, cleanup and completion contracts remain explicit.
+
+Corrections include ten completed request blocks rather than ten generic rounds; the actual work-state transition guard; separate InputGateway publication/admission pools; and resource fingerprints advanced by local publication submission rather than recipient/presentation acknowledgment. The route table now covers every static JSON subscription, including listening/capture-ended, reply occupancy, camera state, scoped user answers and specialist results. ApplicationControl native download/cancel grants and camera/environment sampling were completed. Discovery uses the actual scan/status APIs; history-error diagrams now distinguish the host failure surface from an absent generic presentation function.
+
+Only the overall design and existing docs index/history/validation records changed in this review. The project introduction, other 107 source READMEs, code, configurations, assets and original Word design were preserved. [Validation evidence](Validation-History.md#2026-10-11--overall-design-accuracy-and-redundancy-review) records the checks and their limits.
+
+## 2026-10-11 — Agents design documentation alignment
+
+Reviewed and revised all 19 Agents technical READMEs for the current prompt/resource design, independent output consumers and exact role/runtime contracts. Integrated trailing prompt notes into owning design sections, separated runtime routing from source composition, preserved function/parameter/communication tables and corrected queue, identity, cancellation and tracking descriptions. Technical READMEs contain current contracts and the confirmed ❗ diagnostic-delivery issue; the complete inspection register and static results are in [validation history](Validation-History.md#2026-10-11--agents-technical-design-alignment). Implementation and project/overall introductions were unchanged.

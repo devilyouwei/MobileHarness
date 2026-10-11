@@ -1,76 +1,49 @@
-# ModelKit Core — Data, Sessions and Model Admission
+# Inference Data, Sessions and Resource Admission
 
-Purpose: document the implemented concurrency contracts and their limits. Design goal: explicit ownership, adapter-selected buffering and observable termination.
+## Summary
 
-## Queue and asynchronous processing contract
+Model-neutral media/request identity, single-consumer streams and adapter-facing managed resource handles.
 
-`InferenceSession` connects one adapter producer to one capability consumer. `StreamLimits.capacity` defaults to 64 and uses `AsyncThrowingStream.bufferingOldest`; an explicit nil selects `.unbounded` for finite LLM replies. Bounded capacity must be positive and its product with maximum estimated bytes/event is checked for integer overflow. The per-event byte limit remains positive for both policies. These are payload accounting limits, not measured total process memory. The producer must serialize emissions.
+## Ownership and boundaries
 
-`yield` checks event size, then stream admission. Oversized events fail with `eventTooLarge`; a dropped yield fails the session with `bufferOverflow`. It never waits for a free slot. The single consumer checks terminal failure before and after awaiting each event, so failure/cancellation prevents buffered events being delivered afterwards. Normal finish permits accepted events to drain. A second iterator is rejected. Explicit cancellation, consumer cancellation or session-handle destruction terminates the session; the adapter's termination callback stops its worker. Callers breaking consumption early must cancel explicitly.
+Core owns no capture, files/network, provider selection or business state. ModelContext belongs to Management; adapters acquire/release leases and implement finite cooperative native work.
 
-`ModelResource` is an adapter-facing handle owned by a manager-created ModelContext. It coalesces weight loading (32 waiters), reserves exactly one active inference lease per model, including system speech, and rejects busy work without a request queue. One manager shares a four-loader gate across its contexts. Cancellation of a load waiter never cancels other waiters. Explicit unload gates admission and waits for backend cleanup; shutdown also signals registered cancellation callbacks. Neither dropping a completed inference lease nor cancelling one turn unloads weights.
+## External relationships and data flow
 
-The active lease is one optional record containing its ID and cancellation callback. Release and callback registration require a matching ID; delayed operations from an earlier request cannot alter the current lease.
-
-ModelState reports registered/constructing at the manager, unmanaged for providers without a resource, and unloaded/loading/ready/unloading/closed for managed resources. Residency is not capability availability; query manager.availability(id, for:) separately without loading weights. Lifecycle and composition APIs are in [ModelKitRuntime](../Management/README.md). Adapters load local files through their backend SDK. OperationAdmission independently bounds backend graph operations.
-Unsupported: blocking producer admission, durable event replay, request priority/fairness and cross-model resource scheduling.
+Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
-flowchart TD
-    Producer[Adapter producer] --> Check[Check estimated event size]
-    Check --> Policy{Event capacity policy}
-    Policy -->|positive count| Buffer[Bounded event stream]
-    Policy -->|nil - finite LLM output| Chat[Unbounded event stream]
-    Chat --> Consumer
-    Buffer --> Consumer[Single consumer]
-    Check -->|oversize| Fail[Fail session]
-    Buffer -->|overflow| Fail
-    Cancel[Cancel] --> Fail
-    Fail --> Cleanup[Adapter termination callback]
-    Acquire[Acquire model lease] --> Busy{Active lease?}
-    Busy -->|Yes| Reject[inputBusy]
-    Busy -->|No| Load[Reserve ID and load or reuse model]
-    Load --> Work[One active operation]
-    Work --> CleanupLease[Finish backend cleanup]
-    CleanupLease --> Release[Release only matching lease ID]
-    Release --> Unload[Complete pending unload]
+flowchart LR
+ Adapter[Provider adapter] --> Resource[ModelResource]
+ Resource -->|Matching operation lease| Worker[Adapter producer]
+ Worker --> Emitter[InferenceEmitter]
+ Emitter --> Session[InferenceSession]
+ Session --> Consumer[Capability consumer]
+ Consumer -->|Cancel or finish| Resource
 ```
 
-✅ The algorithm above describes the current implementation.
-❌ Waiting admission, replay or additional scheduling guarantees are unsupported unless explicitly stated above.
+## Stream admission
 
-Maintenance: update this contract when changing producers, consumers, limits, ordering, cancellation or completion semantics.
+StreamLimits defaults to capacity 64/maximumEventBytes 4096. Positive finite capacity×bytes is overflow-checked; nil permits unbounded event count but retains per-event validation. InferenceEmitter.yield rejects a full buffer; it never silently drops. yieldSuspending lets one serialized producer wait for capacity and wakes on consume/cancel/termination; it does not wait when capacity is nil. A second producer capacity waiter fails.
 
-✅ OperationAdmission admits one backend operation and immediately rejects overlap; it owns no request queue. ModelContext management is restricted to ModelManagement SPI. Memory-pressure eviction is atomic and skips loading, active or closing resources; no cancellation or delayed eviction is introduced.
+InferenceEvents permits one iterator. Check failure/cancellation before and after awaiting next; terminal error prevents delivery of buffered events. Normal finish drains accepted events. Cancel, consumer cancellation or handle destruction triggers a fast nonblocking adapter termination callback; consumers breaking early must cancel explicitly. Byte estimates are payload accounting, not measured total process memory.
 
-✅ Core owns capability/session contracts and resource admission. Model registration and lifecycle orchestration are in ../Management; native/library execution is in ../Backends. The root project package compiles these as separate targets.
+## Managed resource lifetime
 
-## Shared media data
+A ModelContext owns at most one ModelResource. Coalesce load with 32 waiters and a manager-shared four-loader gate. Reserve one active inference including system speech; busy work rejects with no request queue. Cancelled waiters do not cancel other loads. Lease IDs fence late release/callback registration. OperationAdmission separately rejects overlapping backend operations.
 
-Core owns model-independent audio, image and video data contracts. These types describe validated payloads and metadata; they do not capture devices, read files, render UI or own inference engines. Platform adapters convert framework-specific buffers at their boundary.
+Unload gates new load/acquire and waits for active lease cleanup; completion releases usage, not weights. Shutdown additionally cancels registered active work and is terminal. Atomic memory pressure eviction skips loading/active/closing resources. Maintenance SPI gates retained handles through unload/disk removal; partial barriers release on failure.
 
-- ✅ AudioFrame.swift defines AudioFormat and AudioFrame: PCM encoding, sample rate, channels, payload, sequence and timestamp, with size/alignment validation and duration calculation.
-- ✅ ImageFrame and NativeImageBuffer own validated model image input. ❌ General video transport remains unimplemented.
+## Data and error contracts
 
-Keep shared media values separate from model-specific tensors, preprocessing and business message types.
+AudioFormat/AudioFrame validates model PCM and metadata, separate from PlatformKit/Storage values. ImageFrame accepts tightly packed upright RGB8 or retained read-only BGRA NativeImageBuffer with quarter-turn orientation, at most 4096 per dimension/4,194,304 pixels. The producer must not mutate retained storage. Encoded-image decoding/model tensors remain outside Core.
 
-✅ ImageFrame validates tightly packed upright RGB8 data, at most 4,194,304 pixels and 4096 per dimension. ❌ Encoded image decoding, orientation conversion and video transport remain outside Core.
+ModelState is residency (unloaded/loading/ready/unloading/closed or unmanaged), not availability. CapabilityError/Availability provide neutral typed diagnostics; consumers localize and choose recovery.
 
-✅ ImageFrame now accepts either RGB Data or a read-only retained BGRA NativeImageBuffer with clockwise quarter-turn orientation. Native storage validates 4 MP / 4096-per-side bounds and format; producer must not mutate it while retained. CoreVideo is an Apple data-buffer API, not a concrete model engine or business dependency. rgb is optional for native inputs; consumers must select the available storage explicitly.
+✅ Explicit session backpressure, media boundaries and matching-ID resource admission are implemented.
 
-✅ InferenceEmitter.yieldSuspending is an opt-in serialized-producer operation: it suspends at the configured event capacity until the single consumer removes an event. One producer waiter is allowed; synchronous yield retains explicit overflow failure. Cancellation/termination wakes the waiter; cancellation suppresses buffered events. Size validation and single-consumer rules are unchanged. For bounded streams, capacity accounts for emitted events until consumer receipt; no additional task/event queue is introduced. ❌ Concurrent producer emission is unsupported.
+❌ Durable event replay, inference waiting queues and forced native interruption are not implemented.
 
-✅ Cloud and local LLM adapters explicitly select no event-count cap. Pending fragments drain in order after normal completion; cancellation, errors, per-event size checks and single-consumer ownership still apply. yieldSuspending does not wait for capacity in this mode. Generation/response limits belong to the adapter; this is a user-requested exception to bounded event queues. ❌ This does not remove downstream parser, journal or Action limits or promise bounded total memory for arbitrary unbounded producers.
+## Related design
 
-✅ AudioFormat and AudioFrame are defined in Core with the original constructor labels and CapabilityError validation. The previous Types forwarding contract is superseded by ADR0119.
-
-## Disk-maintenance admission
-
-✅ ModelContext management SPI exposes beginMaintenance/endMaintenance. ModelResource rejects acquire/load through retained handles while maintenance spans unload and disk removal. Management closes all associated resources before App quiescence, drains/unloads and retains admission barriers until mutation completes; it releases partial reservations on failure. Ordinary unload remains reusable and shutdown terminal. Core owns no file/network/meta handling.
-
-❌ Full iPhone acceptance and non-cooperative backend interruption remain outside this guarantee. See [Management](../Management/README.md#local-model-resources--current-contract).
-
-
-✅ CapabilityError conforms to LocalizedError so diagnostic consumers retain invalidRequest/unavailable reasons and explicit stream/lifecycle codes instead of numeric NSError descriptions. No UI or business dependency is added.
-
-✅ Errors and availability expose typed outcomes plus neutral technical diagnostics. Consumers own localization and recovery guidance. Chinese warm-up utterances are model input fixtures, not display text. ❌ SDK diagnostics must not prescribe App settings or UI workflows.
+[Parent design](../README.md)
