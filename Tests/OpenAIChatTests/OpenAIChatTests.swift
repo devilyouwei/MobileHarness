@@ -6,9 +6,10 @@ import Testing
 
 @testable import ModelKitOpenAI
 
-private func config() throws -> OpenAIChatConfiguration {
+private func config(replyFragments: Int? = nil) throws -> OpenAIChatConfiguration {
     try OpenAIChatConfiguration(
-        baseURL: #require(URL(string: "https://example.test/custom/v1/")), apiKey: "test-only", model: "third-party")
+        baseURL: #require(URL(string: "https://example.test/\(replyFragments.map { "reply-\($0)" } ?? "custom")/v1/")),
+        apiKey: "test-only", model: "third-party")
 }
 
 @Test func configurationAndRequest() throws {
@@ -135,8 +136,9 @@ private final class LongReplyProtocol: URLProtocol, @unchecked Sendable {
                 url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/event-stream"])
         else { return }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let count = url.path.contains("reply-127") ? 127 : url.path.contains("reply-128") ? 128 : 1024
         var wire = ""
-        for index in 0..<1024 {
+        for index in 0..<count {
             wire +=
                 "data: {\"type\":\"response.output_text.delta\",\"delta\":\"\(index)你\"}\n\n"
         }
@@ -147,9 +149,10 @@ private final class LongReplyProtocol: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
-@Test(.timeLimit(.minutes(1))) func longCloudReplyCompletesBeforeConsumerStarts() async throws {
+@Test(.timeLimit(.minutes(1)), arguments: [127, 128, 1024])
+func longCloudReplyDrainsWithDelayedConsumer(fragmentCount: Int) async throws {
     let manager = ModelManager()
-    let configuration = try config()
+    let configuration = try config(replyFragments: fragmentCount)
     try await manager.register(
         ModelRegistration(id: ModelID("long-cloud"), capabilities: [.chat]) { context in
             ProvidedCapabilities(
@@ -162,13 +165,56 @@ private final class LongReplyProtocol: URLProtocol, @unchecked Sendable {
                     }))
         }, defaults: [.chat])
     let chat = try await manager.get(.chat)
-    let session = try await chat.chat(ChatRequest(messages: [.init(role: .user, content: "Long reply")]))
-    // Unload joins producer cleanup without cancelling it. Do not consume until it releases its lease.
-    try await manager.unload(.chat)
+    let session = try await chat.chat(ChatRequest(messages: [.init(role: .user, content: "reply-\(fragmentCount)")]))
+    defer { session.cancel() }
+    // Consume before awaiting unload, which otherwise may wait on a full queue.
+    for _ in 0..<100 { await Task.yield() }
     var events: [ChatEvent] = []
-    for try await event in session.events { events.append(event) }
-    #expect(events == (0..<1024).map { .text("\($0)你") } + [.finished(.stop)])
+    for try await event in session.events {
+        events.append(event)
+        await Task.yield()
+    }
+    #expect(events == (0..<fragmentCount).map { .text("\($0)你") } + [.finished(.stop)])
+    try await manager.unload(.chat)
     await manager.shutdown()
+}
+
+@Test(.timeLimit(.minutes(1)), arguments: [false, true])
+func pausedLongCloudReplyCanCancelOrShutdown(shutdown: Bool) async throws {
+    let manager = ModelManager()
+    let configuration = try config()
+    try await manager.register(
+        ModelRegistration(id: ModelID("paused-cloud"), capabilities: [.chat]) { context in
+            ProvidedCapabilities(
+                chat: try OpenAIChat(
+                    context: context, configuration: configuration,
+                    sessionConfiguration: {
+                        let settings = URLSessionConfiguration.ephemeral
+                        settings.protocolClasses = [LongReplyProtocol.self]
+                        return settings
+                    }))
+        }, defaults: [.chat])
+    let chat = try await manager.get(.chat)
+    let request = try ChatRequest(messages: [.init(role: .user, content: "reply-1024")])
+    let session = try await chat.chat(request)
+    defer { session.cancel() }
+    var iterator = session.events.makeAsyncIterator()
+    #expect(try await iterator.next() == .text("0你"))
+    // Stop consuming while the finite event queue fills.
+    for _ in 0..<100 { await Task.yield() }
+    if shutdown {
+        await manager.shutdown()
+        await #expect(throws: CapabilityError.sessionClosed) { try await chat.chat(request) }
+    } else {
+        session.cancel()
+        try await manager.unload(.chat)
+        let next = try await chat.chat(request)
+        var events: [ChatEvent] = []
+        for try await event in next.events { events.append(event) }
+        #expect(events == (0..<1024).map { .text("\($0)你") } + [.finished(.stop)])
+        await manager.shutdown()
+    }
+    await #expect(throws: CancellationError.self) { try await iterator.next() }
 }
 
 @Test func overlapCancellationAndShutdown() async throws {

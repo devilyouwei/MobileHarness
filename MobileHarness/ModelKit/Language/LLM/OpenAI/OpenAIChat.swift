@@ -32,7 +32,7 @@ public actor OpenAIChat: ChatCapability {
 
     public func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         let http = try configuration.request(request)
-        let limits = try StreamLimits(capacity: nil, maximumEventBytes: 65568)
+        let limits = try StreamLimits(capacity: 128, maximumEventBytes: 65568)
         let lease = try await resource.acquire()
         let control = RequestControl()
         let pair = InferenceSession<ChatEvent>.make(
@@ -63,13 +63,13 @@ public actor OpenAIChat: ChatCapability {
                     try Task.checkCancellation()
                     for event in try decoder.consume(byte) {
                         if case .text(let delta) = event { request.timing?.recordText(delta) }
-                        if case .finished = event { finish = event } else { try emitter.yield(event) }
+                        if case .finished = event { finish = event } else { try await emitter.yieldSuspending(event) }
                     }
                 }
                 guard let finish else { throw OpenAIChatError.truncatedStream }
                 try Task.checkCancellation()
+                try await emitter.yieldSuspending(finish)
                 await resource.release(lease.id)
-                try emitter.yield(finish)
                 emitter.finish()
             } catch {
                 control.cancelHTTP()
