@@ -114,7 +114,7 @@ let package = Package(
                 "Output/README.md",
                 "README.md",
                 "Runtime/README.md",
-            ]),
+            ], resources: [.process("Generation/FunctionToken.prompts.json")]),
         .target(
             name: "FunctionContracts", path: "MobileHarness/Actions/Contracts", exclude: ["README.md"]),
         .target(
@@ -165,6 +165,10 @@ let package = Package(
                 .process("Photographer/Photographer.agent.json"),
                 .process("Memory/Memory.agent.json"),
                 .process("ApplicationControl/ApplicationControl.agent.json"),
+                .process("Assistant/Assistant.prompts.json"),
+                .process("Photographer/Photographer.prompts.json"),
+                .process("Memory/Memory.prompts.json"),
+                .process("ApplicationControl/ApplicationControl.prompts.json"),
             ]),
         .target(
             name: "Storage", path: "MobileHarness/Storage",

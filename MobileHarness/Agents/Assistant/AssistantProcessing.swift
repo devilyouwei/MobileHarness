@@ -11,9 +11,11 @@ public struct AssistantContextState: AgentChatContextState {
         path == "System.Device.readEnvironment" ? .observation : .recordOnly
     }
     public static func buildChatMessages(system: String, user: String, conversation: StoredConversation)
-        -> [ChatMessage]
+        throws -> [ChatMessage]
     {
-        AgentChatContextBuilder.request(system: system, user: user, conversation: conversation, nativeHistory: false)
+        try AgentChatContextBuilder.request(
+            system: system, user: user, conversation: conversation, nativeHistory: false,
+            templates: AgentPrompts.load(named: configurationName))
     }
     public static let agentID = AgentID.assistant
     public static let configurationName = "Assistant"
@@ -29,8 +31,24 @@ public struct AssistantContextState: AgentChatContextState {
     public static let acceptsDirectedUserInput = true
     public static let commitDependentTargets: Set<AgentID> = [.memory]
     public static func systemPrompt(_ capabilities: CapabilityRegistry) throws -> String {
-        "You are a voice assistant on a phone. " + (try AssistantAgent.systemPrompt(capabilities: capabilities)) + "\n"
-            + AgentCapabilityCatalog.summary
+        guard capabilities.channels.contains("Speech") else { throw GenerationError.forbiddenChannel }
+        let templates = try AgentPrompts.load(named: configurationName)
+        let concurrent =
+            capabilities.actions.contains { $0.alias == "express" && $0.defaultChannel == "Display" }
+            && capabilities.actions.contains { $0.alias == "dance" && $0.defaultChannel == "Robot" }
+        let ordering: String
+        if let example = capabilities.actions.first?.documentation?.examples.first {
+            ordering = try templates.render("orderingExample", variables: ["actionExample": example])
+        } else {
+            ordering = ""
+        }
+        return try templates.render(
+            "system",
+            variables: [
+                "functionToken": try CapabilityContextBuilder.build(capabilities),
+                "concurrentExample": concurrent ? try templates.render("concurrentExample") : "",
+                "orderingExample": ordering, "delegation": try templates.render("delegation"),
+            ])
     }
     public var taskViews: [UUID: AgentTaskView]?
     public var history = ConversationArchive()
@@ -77,8 +95,8 @@ public struct AssistantContextBuilder: ContextBuilder {
         public let input: AgentInput
         public let state: AssistantContextState
         public let batch: SignalBatch
-        public func messages(system: String, user: String) -> [ChatMessage] {
-            AssistantContextState.buildChatMessages(system: system, user: user, conversation: state.history.current)
+        public func messages(system: String, user: String) throws -> [ChatMessage] {
+            try AssistantContextState.buildChatMessages(system: system, user: user, conversation: state.history.current)
         }
     }
     public init() {}
@@ -94,9 +112,10 @@ public typealias AssistantHistoryContext = AgentChatHistoryContext
 
 /// Legacy UI projection. Exact capability requests and native pairs are retained in modelRequests.
 public enum ConversationContextBuilder {
-    public static func request(system: String, user: String, conversation: StoredConversation) -> [ConversationMessage]
+    public static func request(system: String, user: String, conversation: StoredConversation) throws
+        -> [ConversationMessage]
     {
-        AssistantContextState.buildChatMessages(system: system, user: user, conversation: conversation).compactMap {
+        try AssistantContextState.buildChatMessages(system: system, user: user, conversation: conversation).compactMap {
             guard let role = ConversationMessage.Role(rawValue: $0.role.rawValue) else { return nil }
             return ConversationMessage(role: role, content: $0.content)
         }

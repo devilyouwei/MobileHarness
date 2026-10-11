@@ -13,7 +13,8 @@ public protocol AgentChatContextState: AgentContextState {
     static var commitDependentTargets: Set<AgentID> { get }
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition
-    static func buildChatMessages(system: String, user: String, conversation: StoredConversation) -> [ChatMessage]
+    static func buildChatMessages(system: String, user: String, conversation: StoredConversation) throws
+        -> [ChatMessage]
     static func decisionContextMessages(_ context: AgentContext<Self>, input: AgentInput) throws -> [ChatMessage]
     static func systemPrompt(_ capabilities: CapabilityRegistry) throws -> String
     static func actionFeedback(_ path: String) -> GenerationFeedbackPolicy
@@ -32,8 +33,8 @@ struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
         let state: State
         let batch: SignalBatch
         let conversation: StoredConversation
-        func messages(system: String, user: String) -> [ChatMessage] {
-            State.buildChatMessages(system: system, user: user, conversation: conversation)
+        func messages(system: String, user: String) throws -> [ChatMessage] {
+            try State.buildChatMessages(system: system, user: user, conversation: conversation)
         }
     }
     func build(state: AgentDecisionContext<State>, batch: SignalBatch) throws -> Request {
@@ -116,9 +117,11 @@ extension AgentChatContextState {
         capabilities
     }
     public static func buildChatMessages(system: String, user: String, conversation: StoredConversation)
-        -> [ChatMessage]
+        throws -> [ChatMessage]
     {
-        AgentChatContextBuilder.request(system: system, user: user, conversation: conversation)
+        try AgentChatContextBuilder.request(
+            system: system, user: user, conversation: conversation,
+            templates: AgentPrompts.load(named: configurationName))
     }
     public static var tracksDelegatedReplies: Bool { false }
     public static var requiresParentCommit: Bool { false }

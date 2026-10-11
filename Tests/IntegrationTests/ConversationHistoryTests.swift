@@ -327,7 +327,7 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
     #expect(record.tokenUsage?.generated == 20)
     #expect(record.toolDefinitions?.contains { $0.contains("runtimeInfo") } == true)
     let conversation = try await store.snapshot().current
-    let actionOnly = AssistantContextState.buildChatMessages(
+    let actionOnly = try AssistantContextState.buildChatMessages(
         system: "actions", user: "next", conversation: conversation)
     #expect(actionOnly.allSatisfy { $0.role != .tool && $0.toolCalls.isEmpty })
     #expect(actionOnly.contains { $0.content.contains("Historical execution observation: runtimeInfo") })
@@ -365,7 +365,7 @@ extension ConversationHistoryStore {
         -> ConversationRecord
     {
         let read = try await readCurrent()
-        let request = ConversationContextBuilder.request(system: system, user: user, conversation: read.current)
+        let request = try ConversationContextBuilder.request(system: system, user: user, conversation: read.current)
         return try await begin(id: id, user: user, request: request, expecting: read.token, model: model)
     }
 }

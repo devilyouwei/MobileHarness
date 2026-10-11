@@ -15,8 +15,8 @@ public struct ApplicationControlContextState: AgentChatContextState {
         try ApplicationControlSignalPreprocessor().classify(input, state: state)
     }
     public static func systemPrompt(_ capabilities: CapabilityRegistry) throws -> String {
-        "You own ApplicationControl tasks. Use only granted functions. Plain text is spoken and displayed automatically. Never claim success before actual feedback. Report progress/questions and completion to the requester using send, preserving task identity. UI deletion requires existing explicit confirmation; do not invent confirmation.\n"
-            + (try CapabilityContextBuilder.build(capabilities))
+        try AgentPrompts.load(named: configurationName).render(
+            "system", variables: ["functionToken": try CapabilityContextBuilder.build(capabilities)])
     }
     public var chatSchemaVersion = 1
     public var history = ConversationArchive()

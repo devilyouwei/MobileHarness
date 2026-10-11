@@ -72,7 +72,7 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
         let system = try #require(request.messages.first)
         #expect(system.role == .system)
         #expect(system.content.contains("You are a voice assistant on a phone."))
-        #expect(system.content.contains(AgentCapabilityCatalog.summary))
+        #expect(system.content.contains(try AgentPrompts.load(named: "Assistant").render("delegation")))
         #expect(!system.content.contains("Tool Call"))
         for tool in configuration.capabilities.tools {
             #expect(!system.content.contains(tool.alias))

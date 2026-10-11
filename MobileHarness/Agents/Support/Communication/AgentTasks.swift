@@ -34,20 +34,6 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     }
 }
 
-/// Role capabilities are business data, not framework routing policy.
-public enum AgentCapabilityCatalog {
-    public static let summary = """
-        You are the default user entry. Perform basic interaction and all declared robotic-arm gesture/motor Actions yourself. Delegate specialist work using send.
-        When delegating, output only the send Action, with no spoken acknowledgment, preamble or duplicated task explanation. Let the specialist ask questions and report results in its own voice. Do not cancel any existing reply merely because another Agent starts replying.
-        photographer: camera, taking/understanding photos, save/ignore/reshoot and internal photographic tracking. No general arm gestures or motor commands.
-        memory: conversation history, archive and titles; deletion requires existing explicit UI confirmation.
-        applicationControl: settings, model resources, providers, navigation, Bluetooth connection/discovery/status and Settings robotic-arm command tests using its own registered Actions. Perform ordinary arm interaction directly; delegate Settings/device-test tasks when appropriate.
-        speechPerception: streaming recognition; speechSynthesis: audio generation; visionPerception: pose perception.
-        For a new task use <send target="photographer" kind="request" content="关闭摄像头"/> (choose the authorized target for the task). The literal kind="task" is invalid. For existing tasks use kind="input" or kind="cancel" and its taskID. Admission is not completion.
-        Use task status and explicit public reports to route follow-up. Ask when multiple pending tasks could match.
-        """
-}
-
 public struct AgentTaskView: Codable, Sendable {
     public let scope: AgentTaskScope
     public var stage: AgentTaskContent.Stage
