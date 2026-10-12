@@ -6,11 +6,11 @@ Packet-independent 512-sample neural activity windows with request-local recurre
 
 ## Ownership and boundaries
 
-ModelKitSilero depends on ModelKit/ModelKitCoreML. SpeechPerception, rather than Gateway, owns onset/pre-roll/silence/turn policy. The adapter owns only scores and managed graph lifetime.
+ModelKitSilero depends on ModelKit/ModelKitCoreML. The consumer owns onset/pre-roll/silence/turn policy. The adapter owns only scores and managed graph lifetime.
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
@@ -28,6 +28,10 @@ One actor operation rejects reentrant process/reset/finish overlap. Ordered 16 k
 Cancel waits for active graph work before lease release; it cannot interrupt a running kernel. Local files are supplied by installed resource root; no runtime download or endpoint timer exists. HARNESS_TEST_SILERO=1 opts isolated tests into real artifacts, not production registration.
 
 ✅ Bounded window/recurrent scoring and joined cancellation are implemented.
+
+## Outstanding work
+
+❌ Physical acoustic accuracy and sustained ASR/VAD coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/Voice.md) defines host-level trials.
 
 ## Related design
 

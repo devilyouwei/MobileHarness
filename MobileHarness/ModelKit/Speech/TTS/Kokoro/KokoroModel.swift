@@ -1,6 +1,5 @@
 import Foundation
 import ModelKit
-import ModelKitFluidAudio
 
 /// Context-owned Core ML engine and local English/Mandarin frontends.
 actor KokoroModel {

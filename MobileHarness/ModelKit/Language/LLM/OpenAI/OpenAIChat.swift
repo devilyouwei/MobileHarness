@@ -45,6 +45,7 @@ public actor OpenAIChat: ChatCapability {
         let resource = resource
         let emitter = pair.emitter
         let task = Task {
+            defer { control.finish() }
             do {
                 try Task.checkCancellation()
                 request.timing?.start()
@@ -83,7 +84,7 @@ public actor OpenAIChat: ChatCapability {
                 }
             }
         }
-        control.install(task)
+        try control.install(task)
         await resource.setCancellation(lease.id) { [weak session = pair.session] in session?.cancel() }
         return pair.session
     }
@@ -99,16 +100,14 @@ final class NoRedirects: NSObject, URLSessionTaskDelegate {
 private final class RequestControl: Sendable {
     private struct State {
         var cancelled = false
-        var task: Task<Void, Never>?
         var http: URLSessionTask?
     }
     private let state = Mutex(State())
-    func install(_ task: Task<Void, Never>) {
-        let cancelled = state.withLock {
-            $0.task = task
-            return $0.cancelled
-        }
-        if cancelled { task.cancel() }
+    private let worker = InferenceTaskControl()
+    func install(_ task: Task<Void, Never>) throws { try worker.install(task) }
+    func finish() {
+        worker.finish()
+        state.withLock { $0.http = nil }
     }
     func installHTTP(_ task: URLSessionTask) {
         let cancelled = state.withLock {
@@ -119,11 +118,8 @@ private final class RequestControl: Sendable {
     }
     func cancelHTTP() { state.withLock { $0.http }?.cancel() }
     func cancel() {
-        let task = state.withLock {
-            $0.cancelled = true
-            return $0.task
-        }
-        task?.cancel()
+        worker.cancel()
+        state.withLock { $0.cancelled = true }
         cancelHTTP()
     }
 }

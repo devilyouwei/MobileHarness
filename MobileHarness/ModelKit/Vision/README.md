@@ -6,11 +6,11 @@ One-image model-independent pose requests/results with original upright pixel co
 
 ## Ownership and boundaries
 
-Core owns ImageFrame/native buffers. PoseCapability owns inference contract; YOLO adapter/backend owns preprocessing/decoding. PlatformKit owns camera I/O; VisionPerception owns frame cadence/gaze and Photographer owns motion decisions.
+Core owns ImageFrame/native buffers. PoseCapability owns inference contract; YOLO owns its image execution, preprocessing and decoding. Consumers own camera I/O, frame cadence, pose interpretation and motion decisions.
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR

@@ -1,7 +1,5 @@
 import Foundation
 import ModelKit
-import ModelKitFluidAudio
-import Synchronization
 
 #if canImport(CoreML)
     @available(iOS 27, macOS 27, *)
@@ -41,7 +39,7 @@ import Synchronization
             try Task.checkCancellation()
             guard worker == nil else { throw CapabilityError.inputBusy }
             let id = UUID()
-            let cancellation = KokoroCancellation()
+            let cancellation = InferenceTaskControl()
             let pair = InferenceSession<SynthesisEvent>.make(
                 context: request.context,
                 limits: try StreamLimits(capacity: 8, maximumEventBytes: 16_448),
@@ -76,7 +74,7 @@ import Synchronization
                 }
             }
             worker = (id, task)
-            cancellation.install(task)
+            try cancellation.install(task)
             return pair.session
         }
 
@@ -118,25 +116,5 @@ private actor KokoroPCMEmitter {
             sequence += 1
             samples += packet.count
         }
-    }
-}
-
-/// Cancellation reaches the worker synchronously, including cancellation before task installation.
-private final class KokoroCancellation: Sendable {
-    private let state = Mutex((task: Optional<Task<Void, Never>>.none, cancelled: false))
-    func install(_ task: Task<Void, Never>) {
-        let cancelled = state.withLock { value in
-            value.task = task
-            return value.cancelled
-        }
-        if cancelled { task.cancel() }
-    }
-    func finish() { state.withLock { $0.task = nil } }
-    func cancel() {
-        let task = state.withLock { value in
-            value.cancelled = true
-            return value.task
-        }
-        task?.cancel()
     }
 }

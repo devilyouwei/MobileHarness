@@ -78,7 +78,6 @@ private actor AnalyzerWorker {
     private let release: @Sendable () async -> Void
     private let inputs: (session: InferenceSession<AnalyzerInput>, emitter: InferenceEmitter<AnalyzerInput>)
     private var reader: Task<Void, Never>?
-    private var deadline: Task<Void, Never>?
     private var emitter: InferenceEmitter<TranscriptionEvent>?
     private var closed = false
     private var finishing = false
@@ -195,10 +194,6 @@ private actor AnalyzerWorker {
         guard !closed, !finishing else { throw CapabilityError.inputFinished }
         finishing = true
         inputs.emitter.finish()
-        deadline = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(25)) } catch { return }
-            await self?.failed(CapabilityError.unavailable("Apple recognition finalization timed out"))
-        }
         do {
             try await analyzer.finalizeAndFinishThroughEndOfInput()
             await reader?.value
@@ -224,7 +219,6 @@ private actor AnalyzerWorker {
         guard !closed else { return }
         closed = true
         inputs.session.cancel()
-        deadline?.cancel()
         inputs.emitter.finish()
         let analyzer = analyzer
         let release = release

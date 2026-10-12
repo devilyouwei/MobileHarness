@@ -6,11 +6,11 @@ Shared macOS/iOS multilingual 2240 ms Core ML export behind SpeechRecognitionCap
 
 ## Ownership and boundaries
 
-Depends on ModelKit/ModelKitFluidAudio. Shared immutable graphs are resource-owned; recurrent state is per session. Settings/Management provisions artifacts; inference never downloads or uses device-specific CoreAI speech graphs.
+Depends on ModelKit and FluidAudio; LocalNemotronEngine/LocalNemotronSession are owned and compiled here. Shared immutable graphs are resource-owned; recurrent state is per session. The host provisions artifacts through Management; inference uses the installed multilingual Core ML resource and never initiates a download.
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
@@ -31,6 +31,15 @@ Cancel joins the active SDK call, clears session and releases lease without fina
 
 ✅ Exact local-export validation and bounded multilingual streaming are implemented.
 
+## Outstanding work
+
+❌ Physical-device Chinese/English quality, end-to-end latency and sustained thermal/memory acceptance remains outstanding. [Provider evidence](../../../../../docs/Nemotron-Validation.md) is maintained separately.
+
 ## Related design
 
 [Parent design](../README.md)
+
+
+## Local Nemotron engine
+
+LocalNemotronEngine validates metadata/tokenizer and five compiled preprocessor/encoder/decoder/joint/decoder_joint graphs. The multilingual 2240 ms layout is shared on macOS/iOS; native mel/fused decoder state belongs to each session.

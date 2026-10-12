@@ -1,69 +1,123 @@
-# ModelKit — Independent Inference Capabilities
+# ModelKit — Independent Inference SDK
 
-## Summary
+## Purpose and boundaries
 
-Typed model requests/results and independent provider, residency, assembly and artifact-management targets.
+ModelKit supplies typed Language/Speech/Vision inference, model execution and model/artifact lifecycle. Core owns neutral values and concurrency mechanisms; capability domains own request/result contracts; concrete providers own algorithms and native integration; Management owns registration, residency, artifacts and default assembly.
 
-## Ownership and boundaries
-
-Base ModelKit has no project dependencies or Agent/UI/device/business policy. Consumers receive capabilities; Defaults chooses providers, Management owns model/artifact lifetime and backends own concrete execution. Calling Agents adapt transported native media; adapters own model-specific preprocessing.
+The entire SDK depends only on its own targets, approved third-party products and system frameworks. It has no dependency on another project module. Consumers own application tasks, history selection, device actions, capture/playback and presentation. Storage, download and quiescence implementations enter through ModelKit-owned protocols or closures.
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+Solid arrows show runtime calls or returned data; dashed arrows show injection. Current App and Agent consumers act as SDK clients. Host-provided protocol implementations do not create a reverse compilation dependency.
 
 ```mermaid
 flowchart LR
- App -->|Resource roots, assembly and diagnostics| ModelKit
- Agents -->|Typed inference| ModelKit
- ModelKit -->|Events and neutral errors| Agents
- ModelKit -->|Capability handles and status| App
- App -->|Catalog and required-file metadata| ModelKit
- ModelKit -->|Injected artifact storage protocol| App
+ Host[Host composition and lifecycle] -->|Configuration and model-resource operations| SDK[ModelKit interfaces]
+ Caller[Capability consumer] -->|Typed requests and input media| SDK
+ SDK -->|Events, results and neutral errors| Caller
+ SDK -->|Handles and lifecycle snapshots| Host
+ Host -.->|SDK-owned storage and download protocols, quiescence closure| SDK
+ SDK -->|Artifact operations through injected contracts| Adapters[Host-provided implementations]
 ```
 
-## Internal structure
+## Source ownership
+
+| Directory | Responsibilities and compilation |
+| --- | --- |
+| Support/Core | Neutral media, opaque requestID/scopeID, streams, resource leases, admission and worker cancellation; part of ModelKit |
+| Language, Speech, Vision contracts | Typed capability requests/results; part of ModelKit |
+| Support/Backends/CoreAI | Generic stateless graph/tensor runtime; ModelKitCoreAI |
+| Support/Backends/CoreML | Generic named tensor runtime; ModelKitCoreML |
+| Support/Management | Generic registration/lifecycle/artifacts in ModelKitRuntime; model registration and selection in ModelKitDefaults; disjoint explicit source lists |
+| Support/Management/HuggingFace | Injected download adapter; ModelKitHub |
+| Support/Speech/Apple | PCMCodec shared by Apple ASR/TTS in ModelKitAppleSpeech |
+| Language/LLM/Gemma4, OpenAI | Concrete chat algorithms/protocol adapters |
+| Speech/ASR, TTS, VAD provider directories | Concrete speech algorithms/native services |
+| Vision/YOLO | YOLO image layout, graph execution, tensor reading and pose decoding |
+
+Support is a source ownership group; each compiled target has its own boundary. Core plus capability-domain contracts form the base ModelKit target. Concrete providers own their tokenizer, prompts, recurrent/cache state and model-specific input/output rules.
+
+## Compilation dependencies
+
+Every arrow means the left target depends directly on the right target. All 15 production targets are shown; external frameworks/products are listed separately below. ModelKitCoreAI is available independently of the current provider integrations.
 
 ```mermaid
 flowchart TD
- Defaults --> Management
- Defaults --> Language
- Defaults --> Speech
- Defaults --> Vision
- Management --> Core
- Language --> Core
- Speech --> Core
- Vision --> Core
- Language --> Backends
- Speech --> Backends
- Vision --> Backends
+ ModelKitDefaults[ModelKitDefaults]
+ ModelKitRuntime[ModelKitRuntime]
+ ModelKitHub[ModelKitHub]
+ ModelKit[ModelKit: Core and capability contracts]
+ ModelKitCoreAI[ModelKitCoreAI]
+ ModelKitCoreML[ModelKitCoreML]
+ ModelKitGemma4[ModelKitGemma4]
+ ModelKitOpenAI[ModelKitOpenAI]
+ ModelKitAppleSpeech[ModelKitAppleSpeech: Apple ASR, TTS and PCM]
+ ModelKitNemotron[ModelKitNemotron]
+ ModelKitMossNano[ModelKitMossNano]
+ ModelKitKokoro[ModelKitKokoro]
+ ModelKitSilero[ModelKitSilero]
+ ModelKitEnergy[ModelKitEnergy]
+ ModelKitYOLOPose[ModelKitYOLOPose]
+ ModelKitDefaults --> ModelKit
+ ModelKitDefaults --> ModelKitRuntime
+ ModelKitDefaults --> ModelKitGemma4
+ ModelKitDefaults --> ModelKitOpenAI
+ ModelKitDefaults --> ModelKitAppleSpeech
+ ModelKitDefaults --> ModelKitNemotron
+ ModelKitDefaults --> ModelKitMossNano
+ ModelKitDefaults --> ModelKitSilero
+ ModelKitDefaults --> ModelKitEnergy
+ ModelKitDefaults --> ModelKitYOLOPose
+ ModelKitRuntime --> ModelKit
+ ModelKitHub --> ModelKitRuntime
+ ModelKitGemma4 --> ModelKit
+ ModelKitOpenAI --> ModelKit
+ ModelKitAppleSpeech --> ModelKit
+ ModelKitNemotron --> ModelKit
+ ModelKitMossNano --> ModelKit
+ ModelKitKokoro --> ModelKit
+ ModelKitSilero --> ModelKit
+ ModelKitSilero --> ModelKitCoreML
+ ModelKitEnergy --> ModelKit
+ ModelKitYOLOPose --> ModelKit
+ ModelKitYOLOPose --> ModelKitCoreML
 ```
 
-## Capability and ownership map
-
-| Capability | Implemented provider |
+| Target | Third-party products |
 | --- | --- |
-| Chat | Local Gemma 4 E2B QAT or explicitly configured Responses cloud |
-| Recognition | Enabled installed available Nemotron, otherwise Apple SpeechAnalyzer |
-| Synthesis | Enabled installed available MOSS Nano, otherwise Apple PCM TTS |
-| Voice activity | Installed available Silero, otherwise Energy, independent of ASR switch |
-| Pose | YOLO26n-Pose end-to-end Core ML |
-| Judgment | Validated candidate contract; no production provider |
+| ModelKitGemma4 | CoreAILM from coreai-models; Tokenizers from swift-transformers |
+| ModelKitNemotron, ModelKitKokoro | FluidAudio; each provider owns its integration |
+| ModelKitHub | HuggingFace from swift-huggingface |
 
-Custom ASR/TTS switches default off and are independent. Kokoro is isolated test-only, not registered by Defaults. Configured cloud supports images/native function data; local Gemma rejects both. ModelKit never dispatches model calls or selects Agent continuation. No fallback occurs after active inference failure.
+Other external dependencies are native concurrency, media, inference, filesystem and network frameworks. Runtime uses only ModelKit; concrete providers never depend on Runtime, Defaults or sibling providers. Defaults alone combines providers. Source/import allowlists, product/package ownership, target/product dependency closure and source confinement are enforced by [boundary checks](../../scripts/README.md).
 
-## Runtime contracts
+## Default capability bindings
 
-Defaults owns one process manager; consumers acquire typed stable handles. Acquisition/residency/availability are distinct. One inference lease per model rejects overlap without waiting. Loading coalesces bounded waiters; unload drains without replacing handle, shutdown cancels/joins and is terminal. releaseWhenIdle reacts to memory pressure without timers or deferred cancellation.
+| Capability | Selection |
+| --- | --- |
+| Chat | Gemma 4 E2B QAT on supported hardware, or explicitly configured Responses cloud |
+| Recognition | Enabled, installed and available Nemotron; otherwise Apple SpeechAnalyzer |
+| Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
+| Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
+| Pose | YOLO26n-Pose |
+| Judgment | Contract only; no default provider |
 
-InferenceSession is single-consumer with explicit event-byte/count policies. Default is 64 events/4096 bytes; adapter bounds differ. OpenAI uses 128 events and suspends production on a full queue; wire/request and per-event bounds remain independent. Gemma currently has 4096 events of 4096 bytes. Cancel/failure suppress buffered delivery; normal finish drains. Native kernels may delay joined cleanup.
+Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly provisioned optional provider without Defaults registration. Selection occurs before admission; failure during active inference never switches provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
 
-Artifacts are separate from residency: schema-v2 sources, bounded downloads, receipts, safe publication/deletion and maintenance fences. App supplies storage/backend adapters; ModelKit does not import Storage. Inference never downloads silently.
+## Lifecycle, streams and failures
 
-✅ Independent contracts/targets, managed provider identity and bounded explicit artifact lifecycle are implemented.
+Defaults owns one process manager. Consumers acquire stable typed handles; acquisition, resource residency and capability availability are distinct. Management owns registration/construction state and injects validated loading limits; Core owns resource residency and lease mechanics. One active inference per resource rejects overlap. Loading coalesces bounded waiters; unload drains active leases, shutdown cancels/joins and is terminal. Memory-pressure releaseWhenIdle evicts eligible idle resources.
 
-❌ Production judgment, embeddings, general video sessions and cross-model fairness/thermal scheduling are not implemented.
+InferenceSession has one consumer and explicit event-count/byte limits. Core's default is 64 events/4096 estimated bytes per event; each provider declares its own bounds. Gemma uses 4096 events/4096 bytes; OpenAI uses 128 events/65,568 bytes with producer backpressure. Normal completion drains accepted events; failure/cancellation suppresses buffered delivery. InferenceTaskControl owns one worker's cancellation state; providers join cleanup and release leases after native work exits. OpenAI separately owns HTTP cancellation.
+
+Artifacts have an independent schema-v2 catalog, bounded transfer state, validated installed receipts, safe publication/deletion and resource maintenance fences. The host supplies persistence/download adapters. Configuration, admission, native execution and cleanup failures remain observable; consumers choose recovery and presentation.
+
+## Coverage and platform constraints
+
+✅ Typed contracts, concrete providers, independent runtime/assembly targets, shared PCM conversion and explicit bounded lifecycles are implemented. SDK products use the root repository Package.swift; no separate publishing package exists.
+
+❌ Production judgment, embeddings, general video sessions and cross-model fairness/thermal scheduling are not implemented. Gemma requires CoreAI on supported OS/hardware; its third-party CoreAIShared dependency currently cannot resolve CoreAI in the simulator SDK. Runtime/device acceptance evidence belongs in docs.
 
 ## Related design
 
-[Parent design](../README.md) · [Backends](Backends/README.md) · [Core](Core/README.md) · [Defaults](Defaults/README.md) · [Language](Language/README.md) · [Management](Management/README.md) · [Speech](Speech/README.md) · [Vision](Vision/README.md)
+[Parent design](../README.md) · [Support](Support/README.md) · [Core](Support/Core/README.md) · [Backends](Support/Backends/README.md) · [Management](Support/Management/README.md) · [Language](Language/README.md) · [Speech](Speech/README.md) · [Vision](Vision/README.md)

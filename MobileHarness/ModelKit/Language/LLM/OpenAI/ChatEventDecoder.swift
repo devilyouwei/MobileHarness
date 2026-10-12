@@ -156,7 +156,16 @@ struct ChatEventDecoder {
             finished = true
             return events
         case "response.refusal.delta", "response.refusal.done": throw OpenAIChatError.unsupportedOutput
-        case "response.failed", "error": throw OpenAIChatError.invalidResponse
+        case "response.failed", "error":
+            let failure =
+                (object["response"] as? [String: Any])?["error"] as? [String: Any]
+                ?? object["error"] as? [String: Any] ?? object
+            if let code = failure["code"] as? String, !code.isEmpty, code.utf8.count <= 128,
+                code.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") })
+            {
+                throw OpenAIChatError.providerCode(code)
+            }
+            throw OpenAIChatError.invalidResponse
         case "response.created", "response.in_progress", "response.output_text.done",
             "response.content_part.added", "response.content_part.done", "response.function_call_arguments.done":
             return []

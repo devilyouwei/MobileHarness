@@ -6,11 +6,11 @@ Weight-free adaptive RMS windows and hysteresis behind VoiceActivityCapability.
 
 ## Ownership and boundaries
 
-ModelKitEnergy depends only on ModelKit. Request-local detector state supplies acoustic scores; Agent owns speech/endpoint interpretation. Managed session owns exclusive operation lease.
+ModelKitEnergy depends only on ModelKit. Request-local detector state supplies acoustic scores; The consumer owns speech/endpoint interpretation. Managed session owns exclusive operation lease.
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
@@ -27,6 +27,10 @@ Per process ≤16,000 samples; consume 512-sample RMS windows and retain fewer t
 No weights, request queue or voice/noise identity model exists. An active score cannot distinguish user speech from TV/noise. Overlap and invalid format/order fail explicitly.
 
 ✅ Bounded adaptive RMS detection is implemented.
+
+## Outstanding work
+
+No additional implementation work is declared for the documented RMS/hysteresis algorithm. It provides activity estimates; speech/noise discrimination is not an implemented classifier guarantee.
 
 ## Related design
 

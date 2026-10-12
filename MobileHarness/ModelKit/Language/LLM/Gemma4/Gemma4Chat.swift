@@ -1,12 +1,10 @@
 import Foundation
 import ModelKit
-import ModelKitCoreAI
-import Synchronization
 
 /// An optional local chat provider. Consumers depend on ChatCapability, not this type.
 @available(iOS 27, macOS 27, *)
 public actor Gemma4Chat: ChatCapability {
-    private let resource: ModelResource<CoreAILanguageEngine>
+    private let resource: ModelResource<GemmaLanguageEngine>
     private let root: URL
     private let contextLimit: Int
 
@@ -15,7 +13,7 @@ public actor Gemma4Chat: ChatCapability {
         contextLimit = 4096
         resource = try context.resource {
             try Self.requireHardware()
-            return try await CoreAILanguageEngine(directory: artifacts)
+            return try await GemmaLanguageEngine(directory: artifacts)
         }
     }
 
@@ -44,9 +42,9 @@ public actor Gemma4Chat: ChatCapability {
         try Task.checkCancellation()
         let lease = try await resource.acquire()
         do {
-            let tokens = try await lease.model.tokenize(
+            let tokens = await lease.model.tokenize(
                 request.messages.map {
-                    CoreAILanguageTurn(role: $0.role.rawValue, content: $0.content)
+                    GemmaLanguageTurn(role: $0.role.rawValue, content: $0.content)
                 })
             let maximumTokens = request.maximumOutputTokens ?? (contextLimit - tokens.count)
             guard !tokens.isEmpty, maximumTokens > 0, maximumTokens <= contextLimit,
@@ -56,7 +54,7 @@ public actor Gemma4Chat: ChatCapability {
                     "Prompt plus output budget exceeds 4096 tokens; shorten history explicitly")
             }
             try Task.checkCancellation()
-            let control = GenerationControl()
+            let control = InferenceTaskControl()
             let pair = InferenceSession<ChatEvent>.make(
                 context: request.context, limits: try StreamLimits(capacity: 4096, maximumEventBytes: 4096),
                 estimatedBytes: { $0.estimatedBytes },
@@ -67,6 +65,7 @@ public actor Gemma4Chat: ChatCapability {
             let resource = resource
             let emitter = pair.emitter
             let task = Task {
+                defer { control.finish() }
                 do {
                     request.timing?.start()
                     let generation = try await lease.model.generate(
@@ -90,7 +89,7 @@ public actor Gemma4Chat: ChatCapability {
                     emitter.fail(error)
                 }
             }
-            control.install(task)
+            try control.install(task)
             await resource.setCancellation(lease.id) { [weak session = pair.session] in session?.cancel() }
             return pair.session
         } catch {
@@ -120,28 +119,5 @@ public actor Gemma4Chat: ChatCapability {
         guard !request.messages.dropFirst().contains(where: { $0.role == .system }) else {
             throw CapabilityError.invalidRequest("System instructions must be the first message")
         }
-    }
-}
-
-/// Handles cancel-before-install without retaining the session or holding a lock while cancelling.
-private final class GenerationControl: Sendable {
-    private struct State {
-        var cancelled = false
-        var task: Task<Void, Never>?
-    }
-    private let state = Mutex(State())
-    func install(_ task: Task<Void, Never>) {
-        let cancelled = state.withLock { value in
-            value.task = task
-            return value.cancelled
-        }
-        if cancelled { task.cancel() }
-    }
-    func cancel() {
-        let task = state.withLock { value in
-            value.cancelled = true
-            return value.task
-        }
-        task?.cancel()
     }
 }

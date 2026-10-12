@@ -6,11 +6,11 @@ Ordered request-local acoustic activity scoring with explicit process/finish/res
 
 ## Ownership and boundaries
 
-Capability scores are model/acoustic estimates. SpeechPerception owns onset, pre-roll and silence endpoint decisions. This contract does not create a microphone, conversation or shared frame queue.
+Capability scores are model/acoustic estimates. Consumers own onset, pre-roll and silence endpoint decisions. This contract does not create a microphone, conversation or shared frame queue.
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
@@ -27,6 +27,10 @@ VoiceActivityScore validates nonnegative startSample, 1–16,000 sampleCount and
 Defaults independently selects installed available Silero or Energy. Energy's binary hysteresis is not a learned speech probability; loud background media/noise can be active. Native Apple detector is internal to ASR and supplies no assumed normal endpoint callback.
 
 ✅ Independent scored-session contract and two bounded providers are implemented.
+
+## Outstanding work
+
+No additional implementation work is declared for this scored-session contract. Physical acoustic discrimination and endpoint policy belong to consumer acceptance.
 
 ## Related design
 

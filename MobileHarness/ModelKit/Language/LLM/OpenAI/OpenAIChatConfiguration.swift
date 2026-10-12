@@ -86,14 +86,17 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         return ids.filter { seen.insert($0).inserted }
     }
 
-    static func toolNames(_ tools: [ChatToolDefinition]) -> [String: String] {
-        Dictionary(
-            uniqueKeysWithValues: tools.enumerated().map { index, tool in
-                let stem = tool.name.map { character in
+    static func toolNames(_ tools: [ChatToolDefinition], historical: [ChatToolCall] = []) -> [String: String] {
+        var names = tools.map(\.name)
+        var seen = Set(names)
+        names += historical.compactMap { seen.insert($0.name).inserted ? $0.name : nil }
+        return Dictionary(
+            uniqueKeysWithValues: names.enumerated().map { index, name in
+                let stem = name.map { character in
                     character.isASCII && (character.isLetter || character.isNumber || character == "_")
                         ? character : "_"
                 }
-                return (String(stem.prefix(48)) + "_" + String(index), tool.name)
+                return (String(stem.prefix(48)) + "_" + String(index), name)
             })
     }
 
@@ -108,7 +111,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        let names = Self.toolNames(chat.tools)
+        let names = Self.toolNames(chat.tools, historical: chat.messages.flatMap(\.toolCalls))
         var input: [[String: Any]] = []
         for message in chat.messages {
             if message.role == .tool {
@@ -133,7 +136,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
             }
             for call in message.toolCalls {
                 guard let name = names.first(where: { $0.value == call.name })?.key else {
-                    throw CapabilityError.invalidRequest("Undeclared transcript tool")
+                    throw CapabilityError.invalidRequest("Missing transcript tool name")
                 }
                 input.append([
                     "type": "function_call", "call_id": call.id, "name": name,
@@ -154,6 +157,8 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
                 else { throw CapabilityError.invalidRequest("Invalid tool declaration") }
                 function["name"] = name
                 function["type"] = "function"
+                // Preserve optional fields instead of implicit strict schema normalization.
+                function["strict"] = false
                 return function
             }
             body["tool_choice"] = "auto"
@@ -167,6 +172,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
 public enum OpenAIChatError: Error, Equatable, Sendable {
     case httpStatus(Int)
     case invalidResponse
+    case providerCode(String)
     case unsupportedOutput
     case truncatedStream
     case responseTooLarge

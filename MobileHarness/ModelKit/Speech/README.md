@@ -10,7 +10,7 @@ Consumers own microphone/playback/utterance endpoint policy. Speech adapters pro
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
@@ -22,24 +22,31 @@ flowchart LR
  VAD -->|Sample-aligned scores| Consumer
 ```
 
-## Internal structure
+## Provider implementation relationships
 
 ```mermaid
 flowchart LR
- ASR --> Shared
- TTS --> Shared
- VAD --> Scores[Direct score contract]
- Shared --> Apple[Apple PCM helpers]
+ AppleASR[ASR/Apple] --> PCM[Support/Speech/Apple: PCMCodec]
+ AppleTTS[TTS/Apple] --> PCM
+ Nemotron[ASR/Nemotron] --> NemotronEngine[LocalNemotronEngine and FluidAudio]
+ MOSS[TTS/MossNano] --> MossEngine[LocalMossEngine and model-owned graph pipeline]
+ Kokoro[TTS/Kokoro] --> KokoroEngine[LocalKokoroEngine, Mandarin frontend and FluidAudio]
+ Silero[VAD/Silero] --> CoreML[Support/Backends/CoreML]
+ Energy[VAD/Energy] --> RMS[Provider-local RMS and hysteresis]
 ```
 
 ## Composition
 
-ASR provides Nemotron/Apple; TTS provides MOSS/Apple plus isolated Kokoro; VAD provides Silero/Energy; Shared/Apple supplies codec helpers. Custom ASR/TTS preference is independent; VAD selection is independent of ASR. Missing/unavailable local speech selects system capability before admission, never after failed active inference.
+ASR provides Nemotron/Apple; TTS provides MOSS/Apple plus isolated Kokoro; VAD provides Silero/Energy; Support/Speech/Apple supplies codec helpers. Custom ASR/TTS preference is independent; VAD selection is independent of ASR. Missing/unavailable local speech selects system capability before admission, never after failed active inference.
 
-Apple's transcriber/detector share analyzer state; normal detector activity callbacks are not assumed usable, so Agent silence timing still uses separate VAD. Local graph resources are provisioned through Management, never during inference.
+Apple's transcriber/detector share analyzer state; normal detector activity callbacks are not assumed usable, so consumers use a separate VoiceActivityCapability for endpoint interpretation. Local graph resources are provisioned through Management, never during inference.
 
 ✅ Independent managed speech capabilities and shared codec adaptation are implemented.
 
+## Outstanding work
+
+No additional implementation work is declared for the current capability group. Provider-specific limitations and acceptance work are documented by ASR/TTS/VAD owners.
+
 ## Related design
 
-[Parent design](../README.md) · [ASR](ASR/README.md) · [Shared](Shared/README.md) · [TTS](TTS/README.md) · [VAD](VAD/README.md)
+[Parent design](../README.md) · [ASR](ASR/README.md) · [Shared support](../Support/Speech/README.md) · [TTS](TTS/README.md) · [VAD](VAD/README.md)

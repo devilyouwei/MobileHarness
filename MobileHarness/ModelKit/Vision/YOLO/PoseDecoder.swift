@@ -5,7 +5,7 @@ import ModelKitCoreML
 /// Pinned YOLO26 end-to-end output: [x1, y1, x2, y2, confidence, class, 17×(x,y,confidence)].
 /// The one-to-one head performs selection in the graph; do not apply legacy NMS again.
 enum PoseDecoder {
-    static func decode(_ tensor: CoreMLTensor, letterbox: CoreMLImageLayout) throws -> [PersonPose] {
+    static func decode(_ tensor: CoreMLTensor, letterbox: YOLOImageLayout) throws -> [PersonPose] {
         guard tensor.shape == [1, 300, 57], tensor.values.count == 300 * 57,
             tensor.values.allSatisfy(\.isFinite)
         else { throw CapabilityError.invalidRequest("Invalid YOLO26 end-to-end pose tensor") }

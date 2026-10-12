@@ -10,14 +10,14 @@ JudgeCapability extends Capability and returns InferenceSession<JudgeResult>. Co
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
- Caller --> Request[JudgeRequest]
- Request --> Provider[Injected JudgeCapability]
- Provider --> Result[JudgeResult validation]
- Result --> Caller
+ Caller --> Request[Validated JudgeRequest candidates]
+ Request --> Provider[Caller-supplied JudgeCapability]
+ Provider --> Result[Validated JudgeResult]
+ Result -->|Selected candidate or abstention| Caller
 ```
 
 ## Request and result validation

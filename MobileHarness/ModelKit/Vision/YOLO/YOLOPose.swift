@@ -6,7 +6,7 @@ import os
 public actor YOLOPose: PoseCapability {
     private let signposter = OSSignposter(subsystem: "dev.mobileharness.models", category: "Pose")
     private let url: URL
-    private let resource: ModelResource<CoreMLImageGraph>
+    private let resource: ModelResource<YOLOImageGraph>
     public init(context: ModelContext, artifacts: URL) throws {
         let compiled = artifacts.appendingPathComponent("yolo26n-pose.mlmodelc")
         let url =
@@ -18,7 +18,7 @@ public actor YOLOPose: PoseCapability {
             let current =
                 FileManager.default.fileExists(atPath: compiled.path)
                 ? compiled : artifacts.appendingPathComponent("yolo26n-pose.mlpackage")
-            return try CoreMLImageGraph(contentsOf: current)
+            return try YOLOImageGraph(contentsOf: current)
         }
     }
     public var availability: CapabilityAvailability {
@@ -28,7 +28,7 @@ public actor YOLOPose: PoseCapability {
     public func estimatePose(_ request: PoseRequest) async throws -> PoseResult {
         let lease = try await resource.acquire()
         let worker = Task {
-            let letterbox = try CoreMLImageLayout(
+            let letterbox = try YOLOImageLayout(
                 width: request.image.width, height: request.image.height,
                 visionScaleFit: request.image.native != nil)
             let output: CoreMLTensor

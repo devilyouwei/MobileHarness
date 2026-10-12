@@ -68,7 +68,6 @@ private final class SynthesisWorker {
     private let synthesizer = AVSpeechSynthesizer()
     private let utterance: AVSpeechUtterance
     private let emitter: InferenceEmitter<SynthesisEvent>
-    private var timeout: Task<Void, Never>?
     init(text: String, voice: AVSpeechSynthesisVoice, emitter: InferenceEmitter<SynthesisEvent>) {
         utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice
@@ -76,11 +75,6 @@ private final class SynthesisWorker {
     }
     func start() {
         synthesizer.write(utterance, toBufferCallback: Self.handler(emitter: emitter))
-        let emitter = emitter
-        timeout = Task {
-            do { try await Task.sleep(for: .seconds(30)) } catch { return }
-            emitter.fail(CapabilityError.unavailable("Apple speech synthesis timed out"))
-        }
     }
     nonisolated private static func handler(emitter: InferenceEmitter<SynthesisEvent>)
         -> @Sendable (AVAudioBuffer) -> Void
@@ -108,8 +102,6 @@ private final class SynthesisWorker {
         }
     }
     func stop() {
-        timeout?.cancel()
-        timeout = nil
         synthesizer.stopSpeaking(at: .immediate)
     }
 }

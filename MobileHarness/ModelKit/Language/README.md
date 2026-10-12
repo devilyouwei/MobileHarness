@@ -6,11 +6,11 @@ Provider-neutral conversation generation and candidate-based judgment, independe
 
 ## Ownership and boundaries
 
-Language owns request/result contracts. LLM adapters own provider encoding/tokenization; Agents own prompts, tasks, callable selection and observation continuation. No Signal routing, effect execution or UI exists here.
+Language owns request/result contracts. LLM adapters own provider encoding/tokenization; Consumers own prompts, tasks, callable selection and observation continuation. No Signal routing, effect execution or UI exists here.
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
@@ -23,9 +23,9 @@ flowchart LR
 
 ## Interfaces
 
-LLM defines context-bearing ChatRequest, messages/images/native function data, ChatEvent and optional caller-owned timing. Native calls are inert model data until an authorized Agent resolves them. Judgment defines unique candidates and bounded optional scores without selecting application actions.
+LLM defines context-bearing ChatRequest, messages/images/native function data, ChatEvent and optional caller-owned timing. Native calls are inert model data until an authorized consumer resolves them. Judgment defines unique candidates and bounded optional scores without selecting application actions.
 
-Adapters advertise native-call/image support explicitly and reject unsupported payloads before native work. Caller-owned history is authoritative. Decisions/continuations use new requests; the capability does not retain Agent task state.
+Adapters advertise native-call/image support explicitly and reject unsupported payloads before native work. Caller-owned history is authoritative. Decisions/continuations use new requests; the capability does not retain application task state.
 
 ✅ Conversation and judgment contracts are implemented.
 

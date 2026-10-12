@@ -10,7 +10,7 @@ SpeechRecognitionCapability opens request-local recognition; caller owns native 
 
 ## External relationships and data flow
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
 flowchart LR
@@ -24,9 +24,13 @@ flowchart LR
 
 Recognition input retains AudioFormat/InferenceContext and requested locale. Send preserves sequence/format and provider limits; finishInput closes input and drains final result; cancel stops/join-cleans without inventing a final transcript. Events carry segment/revision/context for consumers to reject stale updates. One provider operation rejects overlap; there is no shared request backlog here.
 
-Defaults selects enabled installed available Nemotron, otherwise modern Apple. Apple includes its native detector but external Silero/Energy owns usable acoustic scores for Agent endpoint timing. No active-failure system/cloud fallback exists.
+Defaults selects enabled installed available Nemotron, otherwise modern Apple. Apple includes its native detector but external Silero/Energy supplies acoustic scores for caller-owned endpoint timing. No active-failure system/cloud fallback exists.
 
 ✅ Streaming transcript contract and two providers are implemented.
+
+## Outstanding work
+
+No additional implementation work is declared for this streaming contract. Provider-specific native behavior and acceptance work are documented below.
 
 ## Related design
 

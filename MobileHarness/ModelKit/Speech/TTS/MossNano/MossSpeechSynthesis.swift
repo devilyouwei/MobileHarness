@@ -1,6 +1,5 @@
 import Foundation
 import ModelKit
-import ModelKitMossCoreML
 import Synchronization
 
 #if canImport(CoreML)
@@ -41,7 +40,7 @@ import Synchronization
             try Task.checkCancellation()
             guard worker == nil else { throw CapabilityError.inputBusy }
             let id = UUID()
-            let cancellation = MossCancellation()
+            let cancellation = InferenceTaskControl()
             let pair = InferenceSession<SynthesisEvent>.make(
                 context: request.context,
                 limits: try StreamLimits(capacity: 256, maximumEventBytes: 16_448),
@@ -83,7 +82,7 @@ import Synchronization
                 }
             }
             worker = (id, task)
-            cancellation.install(task)
+            try cancellation.install(task)
             return pair.session
         }
 
@@ -105,26 +104,6 @@ import Synchronization
         }
     }
 #endif
-
-/// Cancellation reaches the worker synchronously, including cancellation before task installation.
-private final class MossCancellation: Sendable {
-    private let state = Mutex((task: Optional<Task<Void, Never>>.none, cancelled: false))
-    func install(_ task: Task<Void, Never>) {
-        let cancelled = state.withLock { value in
-            value.task = task
-            return value.cancelled
-        }
-        if cancelled { task.cancel() }
-    }
-    func finish() { state.withLock { $0.task = nil } }
-    func cancel() {
-        let task = state.withLock { value in
-            value.cancelled = true
-            return value.task
-        }
-        task?.cancel()
-    }
-}
 
 @available(iOS 27, macOS 27, *)
 extension MossSpeechSynthesis {

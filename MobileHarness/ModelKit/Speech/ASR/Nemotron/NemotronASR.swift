@@ -1,6 +1,5 @@
 import Foundation
 import ModelKit
-import ModelKitFluidAudio
 
 /// Standalone streaming capability. Does not request microphone access, download, or register with a Gateway.
 @available(iOS 18, macOS 15, *)
