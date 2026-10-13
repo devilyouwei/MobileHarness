@@ -1,6 +1,6 @@
 # NexArm Actions
 
-✅ ADR0135: tracking approaches converge to the exact final encoder target within the existing 2-count/8-count-per-second settling region. The final write must be admitted before `accept` commits planner state; then the worker can become idle. This removes fractional-tail streaming without widening physical arrival tolerances or claiming a Tool's target publication means arrival. See [serial acceptance](../../../docs/NexArm_Physical_Acceptance.md) for scoped physical evidence.
+✅ ADR0142: live tracking sends one motors 1 and 4 packet per admitted target. ADR0135 still describes `NexArmJogPlanner.approach`: that function converges to the exact final encoder target within the existing 2-count/8-count-per-second settling region, and the final write must be admitted before `accept` commits planner state. Production tracking does not call it. See [serial acceptance](../../../docs/NexArm_Physical_Acceptance.md) for scoped physical evidence.
 
 ## Contract and ownership
 
@@ -40,6 +40,7 @@ Only NexArm/Support may import PlatformKit within Actions; PlatformKit owns its 
 | [Support/NexArmMotorProfiles.swift](Support/NexArmMotorProfiles.swift) | Central per-motor tolerances and empirical timing envelope |
 | [Support/NexArmRegistration.swift](Support/NexArmRegistration.swift) | Parameter-dependent resources and pre-admission budget |
 | [Support/NexArmJogPlanner.swift](Support/NexArmJogPlanner.swift) | Manual jog input, trajectory shaping and release policy |
+| [Support/NexArmAimCommand.swift](Support/NexArmAimCommand.swift) | One motors 1 and 4 packet per admitted tracking target |
 
 ## Motor operations and parameters
 
@@ -237,9 +238,9 @@ Decisions: [ADR0094](../../../docs/adr/0094-arrival-profiles-and-behavior-macros
 
 ✅ ADR0098: Execution values and services are imported from independent ActionRuntime; concrete Action domains and macro declarations remain in Actions. Published paths, parameters, bounds and completion behavior are unchanged.
 
-✅ Support/NexArmJointCommand maps tracking radians to five motor targets on the 2026-10-03 rest `[2047, 2087, 1984, 2045, 2048]`: shoulder lift extends with wrist pitch above 0.25 rad down to `reachLiftMinimum`, and the elbow levels the forearm (`forearmLevelSum` 4071) with a 40 count lead only while extending (`NexArmForearmLeveler`). `NexArmJogPlanner.approach` moves one of those counts with the manual-jog jerk limit, caps aim speed at 200 counts/s (100 for lift and elbow), and holds position for one step before reversing. Production tracking streams that step on the live Bluetooth loop and does not wait for arrival. ❌ Physical tracking acceptance with the phone mounted remains pending.
+✅ ADR0142: live tracking commands motors 1 and 4 only. `NexArmAimCommand` sends one synchronous packet when either logical count moves by at least 12, leads later packets by at most one target step over 0.2 s, and sets register speed to `distance / 0.2 * 2.2` clamped to 10…600 with acceleration 30. Motors 2, 3 and 5 are not written. The command returns when native admission accepts the packet, not when the arm arrives. `NexArmJointCommand` still maps radians onto the five-axis tracking rest for the diagnostic controller path, including shoulder/elbow reach. `NexArmJogPlanner.approach` remains for its tests and is not the live tracking path. ❌ Motor 4 at the tracking rest and phone-perception acceptance remain pending.
 
-✅ Tracking target publication returns before physical arrival; App streams accepted planner proposals under motors1–5 ownership. Direct controller aim has capacity-one admission and requires read-only recovery after an uncertain write. Mapping belongs to Support/NexArmJointCommand.swift; native encoding remains PlatformKit.
+✅ Tracking target publication returns before physical arrival. App admits one `NexArmAimCommand` packet for motors 1 and 4 under the motors1–4 worker. Direct controller aim has capacity-one admission and requires read-only recovery after an uncertain write. Mapping belongs to Support/NexArmJointCommand.swift; the live packet belongs to Support/NexArmAimCommand.swift; native encoding remains PlatformKit.
 
 ✅ Incremental tracking retains its speed/motion state in the Action controller; gestures, reset, arrival checks and five-motor/gripper boundaries keep their existing contracts.
 

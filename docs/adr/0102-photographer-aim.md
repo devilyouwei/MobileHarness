@@ -1,6 +1,6 @@
 # 0102 — Photographer aim on shared pose
 
-Status: the live camera session enables arm control, dispatches `Robot.aim`, and the foreground BLE sender writes one motors-1–5 packet. The write returns when the link accepts it. Wi-Fi stays closed. Physical tracking acceptance is still pending. ADR 0070 on main is the NexArm USB diagnostic and is a different decision.
+Status: the live camera session enables arm control and dispatches `Robot.aim`. ADR0142 supersedes the live four-motor stream described below: production tracking now sends one motors 1 and 4 packet per admitted target. Wi-Fi stays closed. Physical tracking acceptance is still pending. ADR 0070 on main is the NexArm USB diagnostic and is a different decision.
 
 ## Context
 

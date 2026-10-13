@@ -57,12 +57,10 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private var jogPlanner: NexArmJogPlanner?
     private struct AimGoal: Equatable, Sendable {
         var base: Int
-        var lift: Int
-        var elbow: Int
         var pitch: Int
     }
     private var aimGoal: AimGoal?
-    private var forearmLeveler = NexArmForearmLeveler()
+    private var aimCommand = NexArmAimCommand()
     private var followingAim = false
     private var controlRevision = UUID()
     private var manualRevision = UUID()
@@ -394,7 +392,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             if let failure = closed.failure { state.error = BluetoothPresentation.failure(failure) }
             state.jogging = false
             followingAim = false
-            forearmLeveler = NexArmForearmLeveler()
+            aimCommand.reset()
             if manualDisconnectPending {
                 reconnectEnabled = false
                 if !forgetRequested {
@@ -663,6 +661,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         manualRevision = UUID()
         motorInputs = Array(repeating: 0, count: 6)
         aimGoal = nil
+        if !followingAim { aimCommand.reset() }
         liveTask?.cancel()
         motion?.cancel()
         settingsPlayback?.cancel()
@@ -752,7 +751,11 @@ public final class BluetoothWorkflow: BluetoothControlling {
         cancelTestSequence()
         pendingArmAction = nil
         aimGoal = nil
-        if followingAim { liveTask?.cancel() }
+        if followingAim {
+            liveTask?.cancel()
+        } else {
+            aimCommand.reset()
+        }
         motorInputs[id - 1] = min(1, max(-1, value))
         startLiveControl()
     }
@@ -885,6 +888,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
         if aim != nil {
             aimGoal = nil
             aim?.cancel()
+        } else {
+            aimCommand.reset()
         }
         if let movement = motion { _ = await movement.result }
         await aim?.value
@@ -907,7 +912,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             try await $0.performGesture(gesture, repetitions: repetitions, speed: speed, acceleration: acceleration)
         }
     }
-    /// Keeps only the latest aim. The manual-control loop streams it; this returns without waiting for the arm.
+    /// Keeps only the latest aim. One motors 1 and 4 packet is sent per admitted target; this returns without waiting.
     public func aim(
         base: Double, pitch: Double, origin: NexArmControlOrigin? = nil,
         failed: @escaping @Sendable (NexArmControlFailure) async -> Void = { _ in }
@@ -923,11 +928,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
             throw NexArmExecutionError.controlNotReady
         }
         guard liveTask == nil || followingAim else { throw NexArmExecutionError.busy }
-        if !followingAim { forearmLeveler = NexArmForearmLeveler() }
         let positions = try NexArmJointCommand.positions(base: base, pitch: pitch)
-        aimGoal = AimGoal(
-            base: positions[0], lift: positions[1], elbow: forearmLeveler.elbow(forLift: positions[1]),
-            pitch: positions[3])
+        aimGoal = AimGoal(base: positions[0], pitch: positions[3])
         guard !followingAim else { return }
         let startup = startAimFollow(controller, origin: origin, failed: failed)
         let worker = liveTask
@@ -939,8 +941,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
             worker?.cancel()
         }
     }
-    /// Same 30 ms admission as a slider. Base, shoulder lift, elbow and wrist pitch move, one motor at a time in
-    /// turn; wrist roll and the gripper stay put. A newer aim replaces the previous one.
+    /// Polls the latest pan/tilt target. Motors 1 and 4 share one write; motors 2, 3 and 5 stay uncommanded.
+    /// A newer aim replaces an unsent target. The 30 ms pause only checks freshness and admission.
     private func startAimFollow(
         _ controller: NexArmActionController, origin: NexArmControlOrigin?,
         failed reportFailure: @escaping @Sendable (NexArmControlFailure) async -> Void
@@ -961,7 +963,6 @@ public final class BluetoothWorkflow: BluetoothControlling {
             defer { startup.continuation.finish() }
             let operation: @Sendable () async throws -> Void = { @MainActor [self] in
                 var session: UUID?
-                var nextAimIndex = 0
                 do {
                     if let movement = motion { _ = await movement.result }
                     try Task.checkCancellation()
@@ -975,6 +976,12 @@ public final class BluetoothWorkflow: BluetoothControlling {
                         jogPlanner = try NexArmJogPlanner(
                             positions: joints.count == 6 ? joints : NexArmGesture.referenceHomeJoints)
                     }
+                    if joints.count == 6 {
+                        try aimCommand.seed(base: joints[0], pitch: joints[3])
+                    } else {
+                        try aimCommand.seed(
+                            base: NexArmJointCommand.armHome[0], pitch: NexArmJointCommand.armHome[3])
+                    }
                     try Task.checkCancellation()
                     guard foreground, generation == connectedGeneration, revision == controlRevision,
                         state.controlReady
@@ -983,13 +990,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
                     startup.continuation.finish()
                     published = true
                     var idleSince: ContinuousClock.Instant?
-                    var lastTick = ContinuousClock.now.advanced(by: .milliseconds(-30))
                     while true {
                         let tickStart = ContinuousClock.now
-                        let duration = tickStart - lastTick
-                        let elapsed =
-                            Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
-                        lastTick = tickStart
                         try Task.checkCancellation()
                         guard await trackingInputAvailable() else { throw CancellationError() }
                         try Task.checkCancellation()
@@ -997,49 +999,24 @@ public final class BluetoothWorkflow: BluetoothControlling {
                             throw CancellationError()
                         }
                         guard let goal = aimGoal else { break }
-                        var resting = true
-                        // Base and wrist follow the image; shoulder and elbow are slower so the arm never sweeps.
-                        let steps: [(id: Int, target: Int, speed: Double)] = [
-                            (1, goal.base, NexArmJogPlanner.aimMaximumSpeed),
-                            (2, goal.lift, NexArmJogPlanner.aimReachSpeed),
-                            (3, goal.elbow, NexArmJogPlanner.aimReachSpeed),
-                            (4, goal.pitch, NexArmJogPlanner.aimMaximumSpeed),
-                        ]
-                        let startIndex = nextAimIndex
-                        for offset in 0..<steps.count {
-                            let index = (startIndex + offset) % steps.count
-                            let step = steps[index]
-                            guard
-                                let proposed = try jogPlanner?.approach(
-                                    id: step.id, target: step.target, elapsed: elapsed, speedLimit: step.speed)
-                            else { continue }
-                            resting = false
-                            guard let packet = proposed.packet else {
-                                jogPlanner?.accept(proposed)
-                                continue
-                            }
+                        if let proposed = try aimCommand.propose(base: goal.base, pitch: goal.pitch, at: tickStart) {
+                            idleSince = nil
                             try await validateAgentWriter(ResourceExecutionContext.held)
-                            if try await link.sendLive(packet, session: token) {
-                                jogPlanner?.accept(proposed)
-                                nextAimIndex = (index + 1) % steps.count
-                            } else {
-                                nextAimIndex = index
-                                break
+                            if try await link.sendLive(proposed.packet, session: token) {
+                                aimCommand.accept(proposed)
                             }
-                        }
-                        if resting {
+                        } else {
                             idleSince = idleSince ?? .now
                             if let idleSince, ContinuousClock.now - idleSince > .milliseconds(300) {
                                 settled = aimGoal
                                 break
                             }
-                        } else {
-                            idleSince = nil
                         }
                         try await Task.sleep(until: tickStart.advanced(by: .milliseconds(30)), clock: .continuous)
                     }
                 } catch {
                     failed = true
+                    aimCommand.reset()
                     startup.continuation.finish(throwing: error)
                     if revision == controlRevision { followingAim = false }
                     if published, !(error is CancellationError) {
@@ -1060,6 +1037,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 }
             } catch {
                 failed = true
+                aimCommand.reset()
                 startup.continuation.finish(throwing: error)
                 if published, !(error is CancellationError) {
                     await reportFailure(
@@ -1113,6 +1091,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         else {
             throw NexArmExecutionError.busy
         }
+        aimCommand.reset()
         guard state.phase == .connected, let controller else { throw NexArmExecutionError.disconnected }
         guard state.controlReady else {
             throw NexArmExecutionError.controlNotReady

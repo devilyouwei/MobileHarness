@@ -1,6 +1,6 @@
 # ADR0135 — Commit the final tracking count on native admission
 
-Status: accepted, 2026-10-05.
+Status: accepted, 2026-10-05. ADR0142 removes `approach` from production tracking. This record remains the planner's final-count rule for the function and its tests.
 
 ## Context
 

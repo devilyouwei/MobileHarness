@@ -84,6 +84,7 @@ public struct NexArmJogPlanner: Sendable {
     }
 
     /// One jerk-limited step toward an absolute count.
+    /// Production tracking uses `NexArmAimCommand` instead of this stream.
     /// Speed follows the remaining distance and stays at `speedLimit` (default `aimMaximumSpeed`).
     /// A direction change holds the current count for one step so the previous speed is not carried into the
     /// reverse move.

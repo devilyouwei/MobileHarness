@@ -28,11 +28,11 @@ flowchart LR
 
 ✅ NexArmJointCommand owns tracking rest/angle and speed policy; aim shares controller admission and motor ownership. Native encoding remains in PlatformKit. ❌ Tracking arrival is not measured.
 
-✅ The direct single-packet aim diagnostic rejects uncertain controllers until explicit read-only recoverState; it never replays a write. Production App BLE streaming uses the jog planner and native connection sessions instead; finite/manual execution failure does not leave a persistent admission latch.
+✅ The direct single-packet aim diagnostic rejects uncertain controllers until explicit read-only recoverState; it never replays a write. Production tracking uses `NexArmAimCommand` on the native live session (ADR0142); finite/manual execution failure does not leave a persistent admission latch.
 
 ✅ ADR0137: Ordinary passive-link reset uses `NexArmGesture.referenceHomeJoints` for motors1–5 (`[2048,2087,1198,1238,2048]`), independently of tracking/current feedback/prepared IK. Manual and Agent reset share this target without queries; explicit single-motor software homes remain honored. ❌ Restored phone posture has not been physically revalidated.
 
-✅ Tracking rest and reach: `NexArmJointCommand.armHome` is `[2047, 2087, 1984, 2045, 2048]`; `reachLift` maps wrist pitch to shoulder lift, and `NexArmForearmLeveler` adds the measured 40 count elbow lead only while extending. ✅ Production tracking steps through `NexArmJogPlanner.approach`. Speed follows the remaining count and stays at 200 counts/s (100 for lift and elbow). A direction change holds the current count for one step before reversing. The five-axis packet builder still sizes its test speed from the previous target. The diagnostic single-packet path retains explicit read-only recovery; App streaming does not use that path. Native encoding remains in PlatformKit.
+✅ Tracking rest and reach remain on `NexArmJointCommand`: `armHome` is `[2047, 2087, 1984, 2045, 2048]`; `reachLift` and `NexArmForearmLeveler` still describe the diagnostic five-axis packet. Live tracking does not command that reach. `NexArmAimCommand` writes motors 1 and 4 once per admitted target (ADR0142). `NexArmJogPlanner.approach` keeps its 200/100 counts/s shaping for tests only. Native encoding remains in PlatformKit.
 
 ✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, Actions-owned NexArmExecutionError owns its execution failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
 

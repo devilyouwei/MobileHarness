@@ -253,3 +253,25 @@ Repeated identical Tool calls still produced writes: after a worker settles and 
 ❌ The likely contribution of tiny incremental commands, low servo speeds and frequent reversals needs controlled tuning trials; no cause is established for YOLO noise, phone camera delay, BLE, load or firmware control loops. This test isolates explicit base Tool targets, not actual camera perception, wrist pitch tracking or shoulder extension. Roughly5Hz position telemetry cannot establish absence of high-frequency physical vibration. No torque, PID, calibration, firmware or gripper change, and no failure return-home/replay, was used. Logs: `/tmp/mobileharness-aim-preflight.log` and `/tmp/mobileharness-aim-stress.log`.
 
 Validation for this diagnostic: the opt-in physical test and changed-source formatting passed. `scripts/check.sh` passed boundary/provisioning/format checks but failed the existing `bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion` test (eight `result == nil` expectation failures and subsequent timeout; IntegrationTests reported 464 tests / 10 issues). This unrelated simulated test was not modified in this diagnostic. `scripts/build-ios.sh` was run with full Xcode and stopped at the external CoreAIShared simulator target because the simulator SDK cannot resolve CoreAI; no successful full simulator build is claimed. Logs: `/tmp/mobileharness-aim-check.log`, `/tmp/mobileharness-aim-ios.log`.
+
+## 2026-10-13 — BLE one-packet tracking comparison
+
+The user ran supervised CoreBluetooth trials from the Mac with the phone mounted. No firmware, calibration or torque change was made. The arm began near ordinary home, not the tracking rest, so motor 4 (about 1244, 801 counts from 2045) was not put through the step or speed matrix. Write mode and `maximumWriteValueLength` were not recorded. Passive samples stayed near 5 Hz. These figures motivated ADR0142; they are not a perception or endurance acceptance.
+
+| Send shape | Admitted / attempted | Interval p50 | Result |
+| --- | ---: | ---: | --- |
+| Motor 1, ±1 count for 5 s | 109 / 168 | 56 ms | Live admission accepts a single-count write |
+| Motors 1+4 synchronous, ±1 count for 5 s | 108 / 168 | 56 ms | Same admission as one motor |
+
+Motor 1, one command at speed 100 and acceleration 30, did not move for ±1 or ±2 counts. Steps of 3–10 counts were inconsistent (observed −4…+3). ±20 counts moved 19 counts. A 200-count move reached the ±8 count window in about 4.2 s at register speed 100, 2.2 s at 200, and 1.2 s at 400. Acceleration 10 and 100 at speed 200 stayed near 2.2 s. The speed-50 positive row (2.1 s) disagreed with its negative row and is not used.
+
+A motor-1 sine of ±98 counts, 6 s period, 3 cycles, targets every 200 ms:
+
+| Trial | Writes | RMS counts | User observation |
+| --- | ---: | ---: | --- |
+| A, production 30 ms stream | 519 | 32.8 | Hesitant |
+| B, one packet per target, acceleration 30 | 121 | 9.8 | Smooth, no visible stepping |
+| B2 / B3, acceleration 10 / 100 | 121 | 10.4 / 8.6 | Same as B |
+| C, 30 ms host interpolation | 385 | 25.2 | Smoother rating about 1.5; feedback loss stopped the trial |
+
+Trial D did not move: the first position query timed out. E was not run. ADR0142 uses B's one-packet shape, a 12-count dead zone from the small-step table, and a 2.2 speed scale from the 200-count timing. The scale itself was not in trial B.

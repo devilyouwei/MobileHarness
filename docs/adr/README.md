@@ -217,3 +217,5 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 
 
 - ✅ [ADR0141 — Resource control ownership](0141-resource-control-ownership.md): unlocked/locked(owner), one actual holding authority, revocable execution permits and automatic late cleanup release; no faulted/recover latch. ❌ Physical stop/native isolation acceptance remains pending.
+
+- ✅ [ADR0142 — One pan/tilt packet per tracking target](0142-nexarm-aim-one-shot.md): motors 1 and 4 share one admitted write; motors 2, 3 and 5 stay uncommanded. A 12-count dead zone, 0.2 s lead and 2.2 speed scale are the initial parameters. ❌ Motor 4 at the tracking rest, phone perception and endurance remain pending.

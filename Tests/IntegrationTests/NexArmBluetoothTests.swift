@@ -1606,7 +1606,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
 }
 
 @Test(.timeLimit(.minutes(1))) @MainActor
-func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
+func bluetoothAimSendsOnePanTiltPacketAndStopsWhenTheTargetHolds() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
@@ -1618,11 +1618,16 @@ func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
     await workflow.waitUntilIdle()
     await link.throttleLive()
     try await workflow.aim(base: 0.6, pitch: 0.5)
-    try await until { await link.liveCommands.count >= 20 }
+    try await until { await link.liveCommands.count >= 1 }
     await workflow.stopActions()
     let commands = await link.liveCommands
-    #expect(Set(commands.map(\.id)) == Set(UInt8(1)...UInt8(4)))
-    #expect(commands.allSatisfy { $0.isLiveControl })
+    let packet = try #require(commands.first)
+    let expected = try NexArmJointCommand.positions(base: 0.6, pitch: 0.5)
+    #expect(commands.count == 1)
+    #expect(packet.isSynchronousPositionWrite && packet.isLiveControl)
+    let addressed = try #require(packet.motorTargets)
+    #expect(addressed[1] == expected[0] && addressed[4] == expected[3])
+    #expect(Set(addressed.keys) == Set([1, 4]))
     #expect(workflow.state.controlReady)
     let count = commands.count
     try await Task.sleep(for: .milliseconds(100))
