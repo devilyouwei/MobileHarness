@@ -24,7 +24,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
         public let revision: Int
         public let taskID: UUID?
     }
-    public var version = 2
+    public var version = 3
     public var temporaryInputID: UUID?
     public var baseSkillIDs: [String]?
     public var loaded: [String] = []
@@ -61,11 +61,8 @@ public struct AgentTaskSkillState: Codable, Sendable {
         tasks[index].updatedAt = Date()
     }
     public mutating func initialize(fixed fixedCapabilities: CapabilityRegistry, baseSkills: [String]) throws {
+        guard version == 3 else { throw CommunicationError.invalidPayload }
         baseSkillIDs = baseSkills
-        if version == 1 {
-            recover()
-            version = 2
-        }
         if loaded.isEmpty { loaded = try base(fixed: fixedCapabilities) }
         _ = try registry(fixed: fixedCapabilities)
     }
@@ -237,7 +234,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
         temporaryInputID = nil
     }
     public func validate() throws {
-        guard [1, 2].contains(version), (baseSkillIDs?.count ?? 0) <= 16, loaded.count <= 16,
+        guard version == 3, (baseSkillIDs?.count ?? 0) <= 16, loaded.count <= 16,
             Set(loaded).count == loaded.count, tasks.count <= 256,
             events.count <= 256,
             recognitionBindings.count <= 32, inputBindings.count <= 256,

@@ -29,6 +29,7 @@ public struct MemoryContextState: AgentTaskContextState {
 
 public struct MemorySignalPreprocessor: SignalPreprocessor {
     public static let outputCapacity = 256
+    static let evidenceCapacity = 4096
 
     public init() {}
     public func classify(_ input: AgentInput, state: MemoryContextState) throws -> SignalDisposition {

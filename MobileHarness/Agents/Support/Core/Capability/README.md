@@ -60,3 +60,7 @@ CapabilityContextBuilder renders protocol and capability-description templates f
 
 
 ✅ 提示词精简已实现：目录按Channel分组，只显示Action别名、doc和参数类型/必填性；不重复path、Channel和必填/可选总表。真实注册与参数契约不变。
+
+## Isolated communication scopes
+
+✅ AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutable configuration by retaining only existing inputs, subscriptions, publications and sends whose contract is explicitly allowed. Revalidate the projected declaration against the injected schema catalog; preserve identity, version and function capabilities. Never add a source, target, grant or cached-resource mutation. Core owns only this neutral restriction; App chooses diagnostic contracts.

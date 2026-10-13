@@ -1,5 +1,7 @@
 # IntegrationTests
 
+✅ 已实现（2026-10-13）：AgentArchitectureTests 用有效、已达 8192 条上限的持久化 context 覆盖三个确定性角色首次输入收敛、淘汰计数、第二次输入继续服务及设置恢复函数输出；ResourcePreferencesTests 覆盖真实本地文档重开、根 Gateway 设置恢复和原语音配置保留；同时验证未显式选择保留策略时仍拒绝溢出。合成证据不包含用户记录或模型文件。
+
 Purpose: verify composed Agent, Gateway, Action, Tool, Storage and voice contracts with injected model/device substitutes. Design goals: exercise real boundaries and failure paths without presenting a simulator or test double as physical-device acceptance.
 
 ## Supervised serial App/Agent acceptance
@@ -854,3 +856,17 @@ Camera observation request coverage inspects the complete message list for the o
 ## Immediate post-reply listening
 
 ✅ VoiceTests verifies that an explicit terminal reply immediately emits an enabled/unpaused listening Action, preserving perception execution ownership and user-off behavior. Existing streaming PCM/native-drain/lease/cancellation checks remain. No physical microphone or acoustic latency claim.
+
+
+## Task history v2 and in-place compression
+
+✅ Implemented: Regression coverage for history v2: startup/terminal request ownership, stable in-place Task compression, same-input Task replacement, closure/failure/cancellation/recovery, ordinary/native pair preservation, fresh/boundary contexts, rejected persistence and old-schema rejection. No real-model/device acceptance is inferred.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：将旧聚合文档/逐delta耐久测试替换为会话文件与结束checkpoint测试，覆盖流式零写入、用户/回复各一次保存、取消/失败保存、崩溃丢未保存尾部、归档事务恢复、缺失current建立与损坏拒绝、索引读取不加载归档正文、原文完整字符串和Task压缩。
+
+## Isolated audio-detection startup coverage
+
+✅ SoundSourceTests reproduces unauthorized construction with the full SpeechPerception declaration in a single-Agent policy, then uses the production media.audio/sound.source restriction with only phone.microphone allowed. It verifies exact permissions, immutable original configuration, sole PCM recipient, real Gateway direction delivery and running lifecycle without model or presentation calls. This covers policy assembly with synthetic PCM; native microphone/device acceptance remains separate.

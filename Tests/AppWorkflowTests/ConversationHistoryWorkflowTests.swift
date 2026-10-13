@@ -11,7 +11,7 @@ import UI
     let input = UUID()
     let foreground = UUID()
     let taskData = try JSONSerialization.data(withJSONObject: [
-        "id": foreground.uuidString, "mode": "task", "goal": "帮我拍照", "date": 0,
+        "historyOrder": 1, "id": foreground.uuidString, "mode": "task", "goal": "帮我拍照", "date": 0,
         "status": "completed", "inputIDs": [input.uuidString], "skills": ["photography"],
     ])
     var skills = AgentTaskSkillState()
@@ -21,13 +21,15 @@ import UI
     let token = try await store.readCurrent().token
     _ = try await store.begin(id: input, user: "帮我拍照", request: [], expecting: token, model: "fixture")
     for text in ["帮我拍照", "拍照结果"] {
-        try await store.beginModelRequest(.init(id: UUID(), input: text, requestJSON: "[]"), for: input)
+        try await store.beginModelRequest(
+            .init(id: UUID(), input: text, requestJSON: "[]", historyTaskID: foreground), for: input)
         try await store.append("回复", to: input)
         try await store.finishModelRequest(input, reason: "stop")
     }
     try await store.finish(input, state: .completed)
     _ = try await store.startNew()
     context.state.history = try await store.snapshot()
+    context.state.reconcileTaskCompressions()
     let background = AgentTaskScope(
         requester: .assistant, executor: .photographer, sessionID: UUID(), execution: .background)
     try context.tasks.register(background)
@@ -43,6 +45,10 @@ import UI
     let delegated = try #require(snapshot.tasks.first { $0.id == background.id })
     #expect(delegated.execution == "background" && delegated.executor == "photographer" && delegated.turns.isEmpty)
     #expect(snapshot.archive.past.count == 1)
+    #expect(photo.compression?.sources.count == 2)
+    context.state.skillState?.tasks = []
+    let retired = try HistoryPresentationAdapter.assistantTasks(context)
+    #expect(retired.tasks.first(where: { $0.id == foreground })?.turns.count == 2)
 }
 
 @Test @MainActor func failedHistoryLoadDoesNotCreateAnEphemeralStore() async {
@@ -111,7 +117,7 @@ import UI
     let snapshot = try HistoryPresentationAdapter.presentationSnapshot(try await store.snapshot())
     let value = try #require(snapshot.current.turns.first?.modelRequests?.first)
     #expect(value.id == request.id && value.requestJSON == request.requestJSON)
-    #expect(value.fragments == ["observed"] && value.firstTokenAt == request.date.addingTimeInterval(0.25))
+    #expect(value.response == "observed" && value.firstTokenAt == request.date.addingTimeInterval(0.25))
     #expect(value.modelRequestStartedAt == request.date && value.firstTokenLatency == 0.25)
     #expect(ConversationHistoryPresentation.turns(snapshot.current).first?.request.last?.toolCallID == "provider")
 }
@@ -127,18 +133,20 @@ private enum HistoryPhotoFixtureError: Error { case failed }
     let request =
         "[{\"role\":\"user\",\"content\":\"photo\",\"imageReferences\":[{\"id\":\"\(photo.uuidString)\",\"mimeType\":\"image/jpeg\",\"byteCount\":1}]}]"
     let value: [String: Any] = [
-        "version": 1, "past": [],
+        "version": 2, "past": [],
         "current": [
-            "id": UUID().uuidString, "createdAt": 0,
+            "historyOrder": 1, "id": UUID().uuidString, "createdAt": 0, "taskCompressions": [],
             "turns": [
                 [
-                    "id": owner.uuidString, "date": 0, "user": "photo", "request": [], "model": "fixture",
+                    "historyOrder": 1, "id": owner.uuidString, "date": 0, "user": "photo", "request": [],
+                    "model": "fixture",
                     "temperature": 0.7,
-                    "fragments": [], "state": "completed",
+                    "response": "", "state": "completed",
                     "modelRequests": [
                         [
-                            "id": round.uuidString, "date": 0, "input": "photo", "requestJSON": request,
-                            "fragments": [], "toolCalls": [], "state": "completed",
+                            "historyOrder": 1, "id": round.uuidString, "date": 0, "input": "photo",
+                            "requestJSON": request,
+                            "response": "", "toolCalls": [], "state": "completed",
                         ]
                     ],
                 ]
@@ -246,4 +254,44 @@ private enum HistoryPhotoFixtureError: Error { case failed }
     await workflow.load()
     #expect(specialist.archive == nil && specialist.status != nil)
     #expect(assistant.archive != nil && assistant.status == nil)
+}
+
+@Test @MainActor func taskHistorySeparatesTwoTasksWithinOneInput() async throws {
+    let store = ConversationHistoryStore()
+    let input = UUID()
+    let taskA = UUID()
+    let taskB = UUID()
+    let token = try await store.readCurrent().token
+    _ = try await store.begin(id: input, user: "两个目标", request: [], expecting: token, model: "stub")
+    for id in [taskA, taskB] {
+        try await store.beginModelRequest(
+            .init(id: UUID(), input: "goal", requestJSON: "[]", historyTaskID: id), for: input)
+        try await store.append(id.uuidString, to: input)
+        try await store.finishModelRequest(input, reason: "stop")
+    }
+    try await store.finish(input, state: .completed)
+    var context = AgentContext(agentID: .assistant, scopeID: UUID(), state: AssistantContextState())
+    context.state.history = try await store.snapshot()
+    for id in [taskA, taskB] {
+        let request = try #require(
+            context.state.history.current.turns[0].modelRequests?.first { $0.historyTaskID == id })
+        context.state.history.current.taskCompressions.append(
+            .init(
+                taskID: id, goal: id.uuidString, status: .completed, reportedSummary: "done", failure: nil,
+                completedAt: Date(), sources: [.init(inputID: input, requestID: request.id)]))
+    }
+    let snapshot = try HistoryPresentationAdapter.assistantTasks(context)
+    #expect(snapshot.tasks.count == 2)
+    for task in snapshot.tasks {
+        #expect(task.turns.count == 1 && task.turns[0].historyTaskID == task.id)
+    }
+    let items = ConversationHistoryPresentation.timeline(snapshot.archive.current)
+    #expect(items.count == 2 && Set(items.map(\.id)) == [taskA, taskB])
+    for item in items {
+        guard case .task(let compression, let sources) = item else {
+            Issue.record("Expected expandable Task compression")
+            continue
+        }
+        #expect(sources.count == 1 && sources[0].id == compression.sources[0].requestID)
+    }
 }

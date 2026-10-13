@@ -346,71 +346,46 @@ private func completedConversation() async throws -> ConversationHistoryStore {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
-func archiveCommitsBeforeTitleAndRejectsOverlappingPageOperations() async throws {
+func archiveCommitsAndReturnsBeforeRootTitleCompletes() async throws {
     let store = try await completedConversation()
     let state = ConversationHistoryState()
     let chat = ControlledTitle()
     let session = UUID()
+    let mutations = HistoryMutationService(
+        store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) })
     let runtime = try intentRuntime(
-        sessionID: session,
-        presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
-        mutations: HistoryMutationService(
-            store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }))
-    let workflow = ConversationHistoryWorkflow(
-        state: state, prepare: {}, refresh: { try await runtime.refresh() },
-        deleteArchive: { try await runtime.deleteArchived($0) },
-        startNew: { try await runtime.startNew() }, summarize: { try await runtime.summarize($0) },
-        previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
-    await workflow.load()
-    let old = try #require(state.archive?.current.id)
+        sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
+        mutations: mutations)
     var started = chat.started.stream.makeAsyncIterator()
-    workflow.startNew()
+    try await runtime.startNew()
     await started.next()
-    #expect(state.isBusy)
     let during = try await store.snapshot()
-    #expect(during.current.turns.isEmpty && during.current.id != old)
-    #expect(during.past.first?.id == old && during.past.first?.summaryTitle == nil)
-    workflow.startNew()
-    workflow.delete(old)
+    let archived = try #require(during.past.first)
+    #expect(during.current.turns.isEmpty && archived.summaryTitle == nil)
+    // A new user input and another history refresh proceed while the title model is held.
+    let fresh = try await store.readCurrent()
+    _ = try await store.begin(id: UUID(), user: "new user", request: [], expecting: fresh.token, model: "fixture")
+    try await runtime.refresh()
     try await chat.finish("对话标题")
-    await workflow.waitUntilIdle()
-    let finished = try await store.snapshot()
-    #expect(!state.isBusy && finished.past.count == 1)
-    #expect(finished.past.first?.summaryTitle == "对话标题")
-    #expect(finished.past.first?.turns.first?.raw == "<wait>原始模型输出</wait>")
+    await mutations.waitForTitles()
+    #expect(try await store.conversation(archived.id).summaryTitle == "对话标题")
+    await mutations.shutdown()
+    await runtime.shutdown()
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
-func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry() async throws {
+func rootShutdownCancelsTitleAndPreservesArchiveRetryState() async throws {
     let store = try await completedConversation()
     let chat = ControlledTitle()
-    let state = ConversationHistoryState()
-    let session = UUID()
-    let runtime = try intentRuntime(
-        sessionID: session,
-        presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
-        mutations: HistoryMutationService(
-            store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }))
-    let workflow = ConversationHistoryWorkflow(
-        state: state, prepare: {}, refresh: { try await runtime.refresh() },
-        deleteArchive: { try await runtime.deleteArchived($0) },
-        startNew: { try await runtime.startNew() }, summarize: { try await runtime.summarize($0) },
-        previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
-    await workflow.load()
+    let mutations = HistoryMutationService(
+        store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) })
     var started = chat.started.stream.makeAsyncIterator()
-    workflow.startNew()
+    let id = try #require(try await mutations.startNew())
     await started.next()
-    workflow.cancel()
-    #expect(state.isBusy)  // Admission stays closed until the existing operation has cleaned up.
-    await workflow.waitUntilIdle()
-    let archived = try #require(try await store.snapshot().past.first)
-    #expect(!state.isBusy && archived.summaryTitle == nil && archived.titleError != nil)
+    await mutations.shutdown()
+    let archived = try await store.conversation(id)
+    #expect(archived.summaryTitle == nil && archived.titleError != nil)
     #expect(archived.turns.first?.user == "原始用户输入")
-    workflow.summarize(archived.id)
-    await started.next()
-    try await chat.finish("重新生成的标题")
-    await workflow.waitUntilIdle()
-    #expect(try await store.snapshot().past.first?.summaryTitle == "重新生成的标题")
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
@@ -485,31 +460,24 @@ func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws {
 private struct FailedArchivePresentation: HistoryPresentationCapability {
     func showHistory(invocation: any FunctionInput) async throws { throw CommunicationError.scopeClosed }
 }
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func archivePresentationFailureStopsTitleWithoutRollingBackTheCommit()
-    async throws
-{
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func archivePresentationFailureDoesNotCancelRootTitle() async throws {
     let store = try await completedConversation()
     let old = try await store.snapshot().current.id
-    let runtime = try intentRuntime(
-        sessionID: UUID(), presentation: FailedArchivePresentation(),
-        mutations: HistoryMutationService(
-            store: store,
-            summarizeTitle: { _ in
-                Issue.record("Failed initial presentation must abort before title")
-                return "Unexpected"
-            }))
+    let mutations = HistoryMutationService(store: store, summarizeTitle: { _ in "Completed title" })
+    let runtime = try intentRuntime(sessionID: UUID(), presentation: FailedArchivePresentation(), mutations: mutations)
     await #expect(throws: HistoryIntentFailure.self) { try await runtime.startNew() }
+    await mutations.waitForTitles()
     let snapshot = try await store.snapshot()
     #expect(snapshot.current.id != old && snapshot.past.first?.id == old)
-    #expect(snapshot.past.first?.summaryTitle == nil)
+    #expect(snapshot.past.first?.summaryTitle == "Completed title")
+    await mutations.shutdown()
+    await runtime.shutdown()
 }
 
 @Test(.actionCatalog) func titleInferenceAndRetryPersistenceFailuresPreserveBothCauses() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let document = try LocalDocumentStore<ConversationArchive>(
-        url: directory.appendingPathComponent("history.json"), maximumBytes: ConversationHistoryStore.maximumBytes)
-    let store = ConversationHistoryStore(document: document)
+    let store = ConversationHistoryStore(files: try ConversationFileStore(directory: directory, maximumBytes: 2048))
     let id = try await archivedHistory(store)
     let service = HistoryMutationService(
         store: store,
@@ -583,7 +551,9 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         source: "assistant", sessionID: session, inputID: input, decisionID: nil)
     let read = try await store.readCurrent()
     _ = try await store.begin(id: input, user: "帮我拍照", request: [], expecting: read.token, model: "fixture")
-    try await store.beginModelRequest(.init(id: UUID(), input: "帮我拍照", requestJSON: "[]"), for: input)
+    let historyTaskID = try #require(try await repository.snapshot().state.skillState?.activeTaskID)
+    try await store.beginModelRequest(
+        .init(id: UUID(), input: "帮我拍照", requestJSON: "[]", historyTaskID: historyTaskID), for: input)
     try await store.append("照片已拍摄，要保存吗？", to: input)
     try await store.finish(input, state: .completed)
     let state = ConversationHistoryState()
@@ -592,18 +562,21 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         call: ToolRequest(toolPath: "UI.HistoryPresentation.showHistory"),
         context: ActionExecutionContext(source: "memory", sessionID: session, inputID: UUID()))
     try await adapter.showHistory(invocation: invocation)
-    #expect(state.archive?.current.turns.first?.user == "帮我拍照")
-    #expect(state.archive?.current.turns.first?.raw == "照片已拍摄，要保存吗？")
+    #expect(state.archive?.current.turns.isEmpty == true && state.archive?.current.turnCount == 1)
+    #expect(state.archive?.current.latestUser == "帮我拍照")
     #expect(try HistoryPresentationAdapter.assistantTasks(await repository.snapshot()).tasks.first?.turns.count == 1)
     _ = try await agent.controlTask(
         "cancelTask", arguments: ["reason": "用户开始新对话"], source: "assistant", sessionID: session,
         inputID: UUID(), decisionID: nil)
     let archived = try #require(try await store.startNew())
     #expect(archived.turns.first?.id == input)
-    #expect(try await repository.snapshot().state.skillState?.tasks.last?.status == "cancelled")
+    #expect(archived.taskCompressions.first?.taskID == historyTaskID)
+    #expect(archived.taskCompressions.first?.status == .cancelled)
+    #expect(try await repository.snapshot().state.skillState?.tasks.isEmpty == true)
     #expect(try HistoryPresentationAdapter.assistantTasks(await repository.snapshot()).tasks.first?.turns.count == 1)
     try await adapter.showHistory(invocation: invocation)
     #expect(state.archive?.current.turns.isEmpty == true)
-    #expect(state.archive?.past.first?.turns.first?.raw == "照片已拍摄，要保存吗？")
+    #expect(state.archive?.past.first?.turns.isEmpty == true)
+    #expect(try await store.conversation(archived.id).turns.first?.raw == "照片已拍摄，要保存吗？")
     await agent.stop()
 }

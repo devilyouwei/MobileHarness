@@ -187,3 +187,13 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 
 
 ✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.
+
+
+## Task history indexing and in-place compression
+
+✅ Implemented: Assistant validates history schema v2 and projects request-owned task history through conversation compressions. Startup recovery marks unfinished work interrupted and produces terminal history evidence without replay. Camera and media policy remain unchanged.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：当前 history 仅含当前会话，历史归档不进入运行 context。恢复快照保存 Skill、任务及任务视图；恢复不保留运行队列/Signal/相机事实，不重放动作。状态校验不再编码完整历史检查容量。

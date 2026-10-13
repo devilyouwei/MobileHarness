@@ -118,7 +118,7 @@ let package = Package(
                 "Runtime/README.md",
             ], resources: [.process("Generation/FunctionTokenPrompts.json")]),
         .target(
-            name: "FunctionContracts", path: "MobileHarness/Actions/Contracts", exclude: ["README.md"]),
+            name: "FunctionContracts", path: "MobileHarness/Actions/Support/Contracts", exclude: ["README.md"]),
         .target(
             name: "ExecutionRuntime", dependencies: ["FunctionContracts"],
             path: "MobileHarness/Gateway/Runtime", exclude: ["README.md"]),
@@ -143,7 +143,8 @@ let package = Package(
             dependencies: ["FunctionContracts", "PlatformKit", "BehaviorDefinitions", "StorageChat", "Storage"],
             path: "MobileHarness/Actions",
             exclude: [
-                "Contracts", "Camera/README.md", "Camera/Support/README.md", "History/README.md",
+                "Support/Contracts", "Support/README.md", "Camera/README.md", "Camera/Support/README.md",
+                "History/README.md",
                 "History/Support/README.md", "NexArm/README.md", "NexArm/Support/README.md", "README.md",
                 "Speech/README.md", "Speech/Support/README.md",
                 "System/README.md", "System/Support/README.md", "UI/README.md", "UI/Support/README.md",

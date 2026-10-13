@@ -119,3 +119,7 @@ Voice and diagnostics use mutual cleanup barriers. AudioDetectionSession owns al
 ## Streaming TTS latency
 
 ✅ Playback is counted from admission through audio cleanup, then immediate listening restoration is joined if consent/session/policy permit. The joined restoration task does not inherit a cancelled playback caller; original playback failure is preserved, additional restoration failure is logged, and a standalone restoration failure is propagated. No idle acoustic task or fixed post-playback delay remains.
+
+## Isolated audio-detection communication
+
+✅ AudioDetectionScope restricts the loaded SpeechPerception declaration to media.audio and sound.source before constructing its single-Agent CommunicationPolicy. Only phone.microphone PCM is subscribed; conversational consent, reply occupancy and speech outputs are excluded. The same projected configuration constructs the Agent. This removes the absent Assistant publication dependency that previously threw CommunicationError.unauthorized during initialization, before microphone permission/capture. Existing cancellation, bounds and joined cleanup remain in force.

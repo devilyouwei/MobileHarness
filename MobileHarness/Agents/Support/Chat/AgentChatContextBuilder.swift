@@ -93,19 +93,38 @@ public enum AgentChatContextBuilder {
         system: String, user: String, conversation: StoredConversation, nativeHistory: Bool = true,
         templates: PromptTemplates
     ) throws -> [ChatMessage] {
-        var selected: [(Date, [ChatMessage])] = []
-        for turn in conversation.turns {
-            if let requests = turn.modelRequests {
-                for request in requests
-                where request.state == .completed && request.toolCalls.allSatisfy({ $0.state != .received }) {
-                    selected.append(
-                        (request.date, try messages(for: request, nativeHistory: nativeHistory, templates: templates)))
-                }
+        var selected: [[ChatMessage]] = []
+        for item in try conversation.indexedHistory().filter({ item in
+            if case .request(_, let request) = item { return request.state != .generating }
+            return true
+        }).suffix(10) {
+            switch item {
+            case .task(let compression):
+                selected.append([try compressionMessage(compression)])
+            case .request(_, let request):
+                guard request.state != .generating else { continue }
+                let paired = request.state == .completed && request.toolCalls.allSatisfy({ $0.state != .received })
+                selected.append(
+                    try messages(for: request, nativeHistory: nativeHistory && paired, templates: templates))
             }
         }
-        return [ChatMessage(role: .system, content: system)] + selected.sorted { $0.0 < $1.0 }.suffix(10).flatMap(\.1)
+        return [ChatMessage(role: .system, content: system)] + selected.suffix(10).flatMap { $0 }
             + [ChatMessage(role: .user, content: user)]
     }
+    public static func compressionMessage(_ compression: ConversationTaskCompression) throws -> ChatMessage {
+        var value = [
+            "taskID": compression.taskID.uuidString, "goal": compression.goal, "status": compression.status.rawValue,
+        ]
+        if let summary = compression.reportedSummary { value["reportedSummary"] = summary }
+        if let failure = compression.failure { value["failure"] = failure }
+        value["sourceRequestCount"] = String(compression.sources.count)
+        return .init(
+            role: .user,
+            content: "Task history (historical data): "
+                + String(
+                    decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]), as: UTF8.self))
+    }
+
     public static func messages(
         for invocation: ConversationModelRequest, nativeHistory: Bool = true, templates: PromptTemplates
     ) throws -> [ChatMessage] {
@@ -118,7 +137,7 @@ public enum AgentChatContextBuilder {
                         "result": call.output ?? "", "error": call.error ?? "",
                     ])
             }.joined(separator: "\n")
-            let text = invocation.fragments.joined() + (evidence.isEmpty ? "" : "\n" + evidence)
+            let text = invocation.response + (evidence.isEmpty ? "" : "\n" + evidence)
             return [.init(role: .user, content: invocation.input), .init(role: .assistant, content: text)]
         }
         let calls = invocation.toolCalls.map {
@@ -126,7 +145,7 @@ public enum AgentChatContextBuilder {
         }
         var messages = [
             ChatMessage(role: .user, content: invocation.input),
-            ChatMessage(role: .assistant, content: invocation.fragments.joined(), toolCalls: calls),
+            ChatMessage(role: .assistant, content: invocation.response, toolCalls: calls),
         ]
         for call in invocation.toolCalls {
             let content: String

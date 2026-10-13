@@ -74,7 +74,7 @@ flowchart LR
 
 ✅ The boundary check also prevents retired NexArm polling diagnostics and historical test algorithms from returning to production Actions.
 
-✅ Behavior boundary checks reject Actions/Tools dependencies on AgentCore, Gateway, UI, App or each other, and recognize Contracts as infrastructure rather than a callable domain.
+✅ Behavior boundary checks reject Actions/Tools dependencies on AgentCore, Gateway, UI, App or each other, and recognize Support as infrastructure rather than a callable domain.
 
 ✅ Boundary validation requires StorageAudio dependencies to be Storage only, and rejects other source imports including AgentCore.
 
@@ -292,3 +292,5 @@ verify-app-agent-resources.py verifies the exact Resources tree, independent Age
 ✅ Implemented: AppSpeechPlayback allowlist adds only Actions and ExecutionRuntime for canonical activation composition. Presentation remains UI/AgentCore/FunctionContracts; ModelKit and foundational-module dependency guards are unchanged.
 
 ✅ UI boundary audit permits only public QuartzCore in NativeCompanionSurface.swift and Metal/QuartzCore/Synchronization in MetalHaloRenderer.swift, confined to Components. UI target still has zero project dependencies and service/other-module imports remain rejected.
+
+✅ Architecture checks validate Actions/Support/Contracts as the independent contract leaf, require its exclusion from Actions compilation, and locate authoring macros in shared Support. Support is infrastructure rather than a seventh callable domain; shared helpers remain subject to business-layer import checks.

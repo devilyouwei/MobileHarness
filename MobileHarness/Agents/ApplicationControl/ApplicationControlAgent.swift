@@ -625,7 +625,7 @@ public actor ApplicationControlAgent: Agent {
         let categories = environment.keys.map(\.rawValue).sorted()
         try await contextRepository.recordSignal(
             input, disposition: disposition, admissionSequence: snapshot.revision + 1,
-            consumed: disposition != .feedback
+            consumed: disposition != .feedback, retainingLast: ApplicationControlSignalPreprocessor.evidenceCapacity
         ) { context in
             context.state.pendingCallIDs = callIDs
             context.state.environmentContracts = categories

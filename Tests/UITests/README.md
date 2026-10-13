@@ -82,7 +82,7 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 
 ✅ Interface timing regressions: a record created at20 with interface start20.1/arrival20.125 displays0.025 seconds from provider evidence. Arrival-only records show missing interface timing rather than a duration derived from record date.
 
-✅ First-token presentation regression verifies elapsed-only interface timing and empty timing for historical records lacking interface evidence. Native default-collapsed generation disclosure and role-only context headings require separate UI acceptance.
+✅ First-token presentation regression verifies elapsed-only interface timing and empty timing for historical records lacking interface evidence. Native rendering of direct generation metadata and role-only context headings requires separate UI acceptance.
 
 ✅ Task 日志满额时优先淘汰终态记录，保留活跃后台计数；验证筛选、100 条容量和真实保留的活跃行。
 
@@ -133,3 +133,17 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ `EyeGeometryTests.swift` samples both eyes for all 144 expression pairs at 17 transition fractions (4,896 contours), plus 408 frames after an interrupted clear-to-love transition. It verifies eight-cubic topology, continuous nonzero join tangents, finite in-bounds outlines, positive area and no sampled edge self-intersections. `ListeningMotionTests.swift` retains topology parity and the open/closed height distinction. Sampling is regression evidence, not a mathematical proof of every possible frame.
 
 ❌ Native frame pacing and physical visual acceptance remain separate from geometry regression and source-path previews.
+
+
+## Task history v2 and in-place compression
+
+✅ Implemented: History presentation regressions cover chronological Task summary insertion and raw source expansion under v2. UI value tests do not establish native navigation/rendering acceptance.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：新response字段、元数据计数和加载后的Task原位压缩展开。
+
+✅ HistoryRequestNavigation regression covers admission, ignored duplicate/different taps while presented, dismissal and reopening the same/different request. These pure state tests complement device compilation; native expansion layout and navigation gestures require separate acceptance.
+
+✅ JSON export regressions round-trip complete conversations/tasks/displayed requests, preserve exact malformed request JSON and output/native context evidence, reject non-finite values/size overflow, and replace formatted diagnostic report assertions. Native share-target file acceptance remains separate.

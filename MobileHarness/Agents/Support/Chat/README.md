@@ -25,8 +25,8 @@ flowchart LR
  Driver -->|Text queue| Text[Action-text consumer]
  Driver -->|Native-call queue| Native[Tool consumer]
  Driver -->|Usage and timing evidence| History[Conversation history]
- Text -->|Persist fragments, parse and resolve| Worker
- Native -->|Persist calls, parse and resolve| Worker
+ Text -->|Accumulate response in memory, parse and resolve| Worker
+ Native -->|Record calls in memory, parse and resolve| Worker
  Worker -->|Calls and sealed rounds| Gateway
  Gateway -->|Owner-directed feedback| Worker
 ```
@@ -46,7 +46,7 @@ The two consumers run independently within the driver's task group. Each request
 
 Each provider invocation selects fresh role-owned `decisionContextMessages` from a repository snapshot, appends them to an immutable request copy and stores that exact request. Initial delegated requests identify the active task, requester and executor. Continuations retain the decision's Chat binding.
 
-History selects the latest ten completed request blocks by date, excluding blocks with unresolved native calls. One conversation turn can contain several blocks. Assistant retains complete native call/result pairing for loaded Tool Skills. Default and local task histories are selected independently. The builder requires role templates explicitly and propagates rendering errors.
+History orders request blocks by monotonic historyOrder and replaces indexed terminal Task sources at their first position. It then selects the latest ten projected blocks (ordinary requests or Task summaries). Complete native pairs stay intact; failed/interrupted/unresolved requests use textual historical evidence rather than executable native pairs. Active Task entry/process and ordinary background survive within request capacity. The builder requires explicit role templates and propagates errors.
 
 Unknown/invalid invocations may produce bounded observation continuation. Successful send admission is completion evidence without business output. Persistence failure or uncertain delivery after validation ends the decision without re-delegating. A sealed round joins Action and Tool results before actual business output or failure starts another request.
 
@@ -177,7 +177,7 @@ AgentTaskSkillState 控制经过真实 Agent.Task Actions 和原子 repository t
 
 系统级触发矩阵、预算作用域、各层 limit、时间所有权及恢复缺口统一见 [总体设计第三部分](../../../README.md#react-continuation-and-agent-recovery)。预算按 input 的 decision chain 累计，不是整个多轮 Goal Task 的全程次数；ChatRequest 的整体边界独立于结果计数器。
 
-✅ Task 上下文收缩时机已修正：startTask 成功后保留进入前的普通对话、启动轮输出及完整调用/结果，只刷新当前 Skill/函数目录；后续任务输入继续携带普通对话背景和当前任务过程。仅旧 Task 关闭后收缩其原始过程为有界终态摘要；摘要在新 Task 中仍可作为历史背景，不能变成当前产物。完整持久化历史与不可变 taskID 保持不变；照片操作不再通过 Task 归属额外鉴权；同输入换任务先收缩已结束旧任务，再完整保留新任务入口。10 个历史请求块和64消息/64KiB/4图片容量保护仍独立生效。
+✅ Task 上下文收缩时机已修正：startTask 成功后保留进入前的普通对话、启动轮输出及完整调用/结果，只刷新当前 Skill/函数目录；后续任务输入继续携带普通对话背景和当前任务过程。仅旧 Task 关闭后收缩其原始过程为有界终态摘要；摘要在新 Task 中仍可作为历史背景，不能变成当前产物。完整持久化历史与不可变 taskID 保持不变；照片操作不再通过 Task 归属额外鉴权；同输入换任务先收缩已结束旧任务，再完整保留新任务入口。压缩替换后统一选择最近10个历史块，64消息/64KiB/4图片容量保护独立生效。
 
 ✅ 边界收尾补充：旧任务最后一轮也可能混有照片结果或原生调用；旧Task结束时整块移除这些旧执行/图像消息，仅投影最后一条真实Task控制回执。原生调用/结果共同移除；同Task续轮仍完整保留协议配对。
 
@@ -219,3 +219,15 @@ AgentTaskSkillState 控制经过真实 Agent.Task Actions 和原子 repository t
 ✅ AgentChatWorker.textSegmentation selects 20/60 Characters for the first emitted speech/caption segment and 60/120 thereafter. Synthesis admission still precedes audio-ID playback scheduling without awaiting full PCM.
 
 ✅ Host cancellation fences input admissions, joins the worker and matching directed routing/delegated Tasks, cancels active/waiting foreground state, then emits original active/queued cancellation terminals before resuming other work. Pause preserves the captured round identity and publishes agent.cancelled. Agent-internal errors never enter continuation; business result continuation remains independent.
+
+
+## Task history indexing and in-place compression
+
+✅ Implemented: Replace whole-turn Task filtering and tail Ended tasks injection with chronological per-request replacement. Startup request is assigned to the new Task atomically without changing decisionMetadata. Fresh and boundary-continuation contexts share projection; ordinary/active requests retain native pairs; terminal compressions occupy their first source position. Apply ten-block/64-message/64KiB limits after replacement.
+
+✅ Ordering: each admitted model request receives a monotonic historyOrder from the archive revision. Order the flattened timeline and compression sources by this value, not parent turn order or wall-clock timestamps; a continuation can interleave with later user inputs. History facade refreshes authoritative revisions and rejects stale commits.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：文本消费把 delta 累加成完整 response，内存记录后立即解析/发出函数；usage、timing、Tool 与结果证据均在内存。用户接纳和决策终态（完成、失败、取消、中断）才 checkpoint；ReACT中间请求不落盘。Task压缩仍按原位置替换，先选最近10个投影项再构造消息。

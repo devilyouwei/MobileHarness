@@ -1,4 +1,5 @@
 import AgentCore
+import AppWorkflows
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -177,14 +178,23 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
 }
 
 @Test(.actionCatalog) func soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants() async throws {
-    let configuration = try AgentConfigurations.load(named: "SpeechPerception")
+    let original = try AgentConfigurations.load(named: "SpeechPerception")
+    #expect(throws: CommunicationError.unauthorized) {
+        try CommunicationPolicy(
+            contracts: AgentContracts.communication, externalSources: ["user", "runtime", "phone.microphone"],
+            configurations: [original])
+    }
+    let configuration = try original.restrictingCommunication(
+        to: ["media.audio", "sound.source"], contracts: AgentContracts.communication)
+    #expect(configuration.communication.inputs.map(\.contract) == ["media.audio"])
+    #expect(configuration.communication.subscriptions.map(\.source) == ["phone.microphone"])
+    #expect(configuration.communication.publications == ["sound.source"])
+    #expect(configuration.communication.sends.isEmpty)
+    #expect(original.communication.subscriptions.contains { $0.source == "assistant" })
+    #expect(configuration.agentID == original.agentID && configuration.version == original.version)
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
-        configurations: try AgentConfigurations.all())
+        externalSources: ["phone.microphone"], configurations: [configuration])
     let manager = AgentManager()
     let session = UUID()
     let values = SoundPublications()
@@ -200,9 +210,23 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
         observedContracts: ["sound.source"],
         observeEvent: { input in
             if case .soundSource(let value)? = input.payload.perception { await values.append(value) }
-        }, sink: { _ in Issue.record("Diagnostic must not emit presentation output") })
-    try await speech.bind(output.messaging(for: .speechPerception))
+        },
+        sink: { envelope in
+            guard case .communication(let action) = envelope.output, action.message.contract == "sound.source" else {
+                Issue.record("Diagnostic must emit only sound-source communication")
+                return
+            }
+        })
     try await speech.start()
+    let consumer = try await output.consumer(for: speech)
+    let pump = Task {
+        try await IndependentOutputWorkflow.consumeSignals(speech.outputs) { envelope in
+            try await consumer.execute(envelope)
+        }
+    }
+    #expect(await manager.descriptors().map(\.id) == [.speechPerception])
+    let probe = try soundInput([0], session: session, sequence: 0, timestamp: 0, layout: .mono)
+    #expect(policy.destinations(for: probe) == [.speechPerception])
     _ = try await input.publish(
         soundInput(Array(repeating: 0, count: 1600), session: session, sequence: 0, timestamp: 0, layout: .mono))
     try await waitForSound { await values.values.count == 1 }
@@ -213,10 +237,9 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     #expect(await values.values.last?.direction?.y == 1)
     #expect(await speech.status().lifecycle == .running)
     await speech.stop()
-    var outputCount = 0
-    for await _ in fixtureOutputs(speech) { outputCount += 1 }
-    #expect(outputCount == 0)
+    try await pump.value
     await output.shutdown()
+    try await manager.remove(.speechPerception)
 }
 
 @Test(.actionCatalog) func soundSourceNonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR() async throws {

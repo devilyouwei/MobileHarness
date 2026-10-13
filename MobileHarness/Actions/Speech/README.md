@@ -1,54 +1,54 @@
-# Speech Playback and Listening Functions
+# Speech — 播放与聆听策略函数
 
-## Summary
+## 简介
 
-Canonical speech playback and resident listening-policy execution through typed App capabilities.
+提供 `Speech.Playback.speak` 与 `Speech.Listening.update`。前者播放已有音频句柄，后者传递可信聆听策略和启动反馈配置；本域不生成语音、不持有音频流，也不选择聆听策略。
 
-## Ownership and boundaries
-
-PlaybackActions owns speak validation; ListeningActions owns policy update. SpeechPerception alone selects listening; Chat roles request synthesis and emit playback. App owns PCM/device lifetime and native barriers; there is no inference or audio cache here.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
- Gateway -->|FunctionInput| Speech[Speech functions]
- Speech -->|audioID and trusted scope| Playback[App SpeechPlayback capability]
- Speech -->|Revisioned policy| Listening[App listening capability]
- Playback -->|Actual drain or failure| Speech
- Listening -->|Policy / joined activation report| Speech
+    Gateway -->|FunctionInput| S[Speech 函数]
+    S -->|完成或异常| Gateway
+    Host[App 播放与聆听端点] -.->|能力注入| S
+    S -->|音频句柄与策略配置| Host
+    Contracts[FunctionContracts] -.->|输入与预算类型| S
+    UIValues[Actions/UI 反馈类型] -.->|提示音与触觉请求| S
 ```
 
-## Playback and policy contracts
+SpeechPerception 的策略选择和音频生成在调用上游；本域只通过已注册函数接收请求。原生播放、捕获与会话寿命属于注入的 App 能力。
 
-Speech.Playback.speak requires one valid UUID audioID and rejects unknown parameters. The injected capability checks out owner-scoped PCM, awaits native playback and joins cleanup. Channel ordering is task-local; native playback admission and cleanup remain owned by the injected capability. Visible caption changes do not cancel another authorized reply.
+## 内部模块关系
 
-Speech.Listening.update is an internal finite Action granted only to actual SpeechPerception. Strict enabled/paused/revision and optional cue/volume/hapticStyle/hapticIntensity arguments reach the trusted native endpoint. A new wake joins model/permission readiness and the canonical feedback/capture composition, retaining actual child reports. Disable joins the previous pause admission; reply-policy pause remains a separately owned confirmed-utterance worker. Both user-off and policy pause stop native capture. Automatic resume waits for policy and playback plus a 350 ms acoustic tail, without repeating startup feedback.
+```mermaid
+flowchart LR
+    Namespace[SpeechActions] --> Playback[PlaybackActions.swift]
+    Namespace --> Listening[ListeningActions.swift]
+    Module[Support/SpeechModule] -->|绑定| Playback
+    Module -->|绑定| Listening
+    Playback --> Port1[SpeechPlaybackCapability]
+    Listening --> Feedback[ListeningFeedback]
+    Listening --> Port2[SpeechListeningCapability]
+    Feedback --> Port2
+```
 
-Synthesis is directed communication outside Channel eligibility. Producer timeout/failure passes through the audio handle and playback cleanup into the scheduled result; no implicit TTS retry or fabricated audible completion occurs.
+## 接口与关键技术
 
-✅ Explicit playback and resident listening functions are implemented.
+| 函数 | 解析与完成 | 静态 timeout |
+| --- | --- | --- |
+| speak | 只接受 audioID，最多 36 字节且可解析为 UUID；调用播放端点并等待它返回 | 300 秒 |
+| update | enabled/paused 严格为 true/false；revision 为正 UInt64；可选启动反馈参数 | 90 秒 |
 
-## Related design
+speak 将所有参数解析错误映射为 missingAudio，并在播放前后检查取消。端点契约要求播放排空与音频租约释放；入口不把音频存在或写入设备当作已播放完成。函数没有文本合成参数，也没有播放缓存。
 
-[Parent design](../README.md) · [Support](Support/README.md)
+update 拒绝未知键。cue 可选 wake/confirm/cancel/error/soft/save/discard（默认 wake），volume 为有限 0…1（默认 0.85），hapticStyle 可选 light/medium/heavy/rigid/soft（默认 heavy），hapticIntensity 为有限 0…1（默认 1）。解析结果包装为 ListeningFeedback，并连同真实 invocation 交给宿主。
 
-## Action-owned documentation and Skill instruction contract
+✅ update 的固定使用者是 SpeechPerception；实际 source/session/revision 准入由宿主验证，Actions 本身不解释权限。新启动的反馈与捕获由端点组合，子结果通过父 invocation 的报告端口保存。策略更新不等于每次都播放启动反馈。
 
-✅ 本域函数用 `@Action(doc:parameters:)` 维护说明与参数契约。所属模块注册自动生成声明投影；业务顺序和调用示例由 Skill Instructions.md 教学，不再登记 examples。
+## 生命周期与失败处理
 
-## Channel-owned Action ordering
+SpeechModule 必须注入播放能力，聆听能力可选；缺少聆听能力时 update 抛 listeningUnavailable。入口没有排队、后台 worker 或自动恢复循环，取消传递与清理由端点及执行层共同实现。
 
-✅ Function metadata and business attributes have no serialization key. Scheduled ordering belongs to [ChannelScheduler](../../Gateway/Output/Scheduling/README.md); resources/budgets and native capability admission remain explicit.
+聆听恢复、播放屏障、原生捕获和声学时序属于 App/SpeechPerception 的契约，不在本域设定固定恢复等待。端点返回可能表示策略接纳、加入启动完成或实际播放排空，应按对应接口解释；失败不触发这里的隐式语音重试。
 
-## Action timeout contract (2026-10-12)
-
-✅ Speech.Playback.speak has a static 300-second execution budget. Listening.update has a declared 90-second parent budget; readiness/capture children each use the shared 30-second default and cue/haptic children each use 5 seconds. Expiry cancels and joins owned work; no native readiness fallback fabricates success.
-
-
-✅ Implemented: Listening.update validates optional startup cue/volume/hapticStyle/hapticIntensity in addition to policy identity. Defaults mirror UI.Feedback. It awaits the first native startup and actual child report, while unchanged policy pause/resume never repeats feedback. Startup cancellation joins physical cleanup; failed prerequisites never admit capture. Internal root-only authorization stays unchanged.
-
-
-✅ Implemented: Listening optional cue metadata/validation accepts the expanded canonical seven-profile vocabulary; default wake and the existing activation order remain intact.
+[Actions 设计](../README.md) · [能力目录](Support/README.md) · [宿主语音生命周期](../../App/Lifecycle/README.md)

@@ -205,7 +205,7 @@ for source in KIT.rglob('*.swift'):
 # Consolidated source ownership must retain an acyclic, non-overlapping build map.
 targets = {t['name']: t for t in package['targets']}
 for target_name, path, dependencies in (
-    ('FunctionContracts', 'MobileHarness/Actions/Contracts', set()),
+    ('FunctionContracts', 'MobileHarness/Actions/Support/Contracts', set()),
     ('ExecutionRuntime', 'MobileHarness/Gateway/Runtime', {'FunctionContracts'}),
     ('CallRuntime', 'MobileHarness/Gateway/Output', {'FunctionContracts', 'ExecutionRuntime'}),
 ):
@@ -223,7 +223,7 @@ if {next(iter(d.values()))[0] for d in targets['FunctionContractTests'].get('dep
     errors.append('FunctionContractTests must prove contracts without execution/call dependencies')
 if {next(iter(d.values()))[0] for d in targets['Gateway'].get('dependencies', [])} != {'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}:
     errors.append('Gateway must depend only on AgentCore and the three isolated execution SDKs')
-if 'Contracts' not in targets['Actions'].get('exclude', []):
+if 'Support/Contracts' not in targets['Actions'].get('exclude', []):
     errors.append('Actions must exclude its independent FunctionContracts source target')
 if {next(iter(d.values()))[0] for d in targets['Actions'].get('dependencies', [])} != {'FunctionContracts', 'PlatformKit', 'BehaviorDefinitions', 'StorageChat', 'Storage'}:
     errors.append('Actions must not depend on Gateway, execution or call protocol targets')
@@ -380,7 +380,7 @@ for root, allowed in [
     ('App/Composition/Behaviors', {'Actions', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}),
 ]:
     for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
-        if root in {'Actions', 'Tools'} and source.relative_to(ROOT / 'MobileHarness' / root).parts[0] in {'Contracts', 'Compatibility'}:
+        if root in {'Actions', 'Tools'} and source.relative_to(ROOT / 'MobileHarness' / root).as_posix().startswith('Support/Contracts/'):
             continue  # Independent runtime imports are validated above, not as concrete domains.
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
             history_storage = (root == 'Actions' and source.relative_to(ROOT / 'MobileHarness/Actions').parts[0] == 'History' and imported == 'StorageChat')
@@ -420,12 +420,12 @@ for domain in ('UI', 'Speech', 'Camera', 'History', 'System', 'NexArm'):
     for source in (actions_root / domain).rglob('*.swift'):
         if re.search(r'\b(?:Tool\w*|ActionInvocation|ActionRequest|ActionBinding|CallProtocol|executionPolicy|directResultPolicy|protocols)\b', source.read_text()):
             errors.append(f'Business implementation consumes native wire request: {source.relative_to(ROOT)}')
-macro_source = (actions_root / 'ActionMacro.swift').read_text()
+macro_source = (actions_root / 'Support/ActionMacro.swift').read_text()
 if re.search(r'\b(?:protocols|executionPolicy|directResultPolicy|ActionBinding|Tool\w*)\b', macro_source):
     errors.append('@Action must describe callable functions without registration policies')
 if macro_source.count('public macro Action(') != 1:
     errors.append('@Action must have one protocol-independent metadata signature')
-function_contract = (actions_root / 'Contracts/ActionFunction.swift').read_text()
+function_contract = (actions_root / 'Support/Contracts/ActionFunction.swift').read_text()
 if re.search(r'\b(?:Tool\w*|ActionBinding|CallProtocol|protocols|executionPolicy|directResultPolicy)\b', function_contract):
     errors.append('Callable ActionFunction must remain independent of registration/runtime protocols')
 macro_implementation = (ROOT / 'Macros/BehaviorDefinitions/BehaviorDefinitionMacro.swift').read_text()
@@ -434,7 +434,7 @@ if 'ToolHandler' in macro_implementation or 'ToolCompletionHandler' in macro_imp
 if (actions_root / 'ToolMacro.swift').exists():
     errors.append('Retired @Tool macro must not be recreated')
 expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm'}
-domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Contracts', 'Compatibility'}
+domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support'}
 if domains != expected_domains:
     errors.append(f'Executable business domains must be classified explicitly: {domains}')
 for folder, directories, files in os.walk(actions_root):
@@ -795,8 +795,8 @@ if audio_context.exists() and re.findall(r'^import (\w+)', audio_context.read_te
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     if re.search(r'\b(?:ToolDefinition|ToolResource)\b', source.read_text()):
         errors.append(f'Retired protocol naming alias: {source.relative_to(ROOT)}')
-input_contract = (actions_root / 'Contracts/FunctionInput.swift').read_text()
-request_contract = (actions_root / 'Contracts/FunctionRequest.swift').read_text()
+input_contract = (actions_root / 'Support/Contracts/FunctionInput.swift').read_text()
+request_contract = (actions_root / 'Support/Contracts/FunctionRequest.swift').read_text()
 if 'public protocol FunctionInput: Sendable' not in input_contract or re.search(r'\b(?:channel|protocols|ActionRequest|ToolRequest)\b', request_contract):
     errors.append('Function contracts must expose standard input without call protocol or Channel')
 for source in actions_root.glob('*/Support/*Module.swift'):
@@ -1003,7 +1003,7 @@ if any(marker in settings_source + settings_view for marker in ('detailDevice', 
 if 'LabeledContent("通信"' in settings_view:
     raise SystemExit('Bluetooth communication issues belong to the combined connection status and current error.')
 tool_contract = (ROOT / 'MobileHarness/Gateway/Output/Protocols/ToolResponse.swift').read_text()
-if 'typealias FailureCode = ActionExecutionFailureCode' not in tool_contract or 'ActionExecutionFailureProviding' not in (actions_root / 'Contracts/ActionExecutionFailure.swift').read_text():
+if 'typealias FailureCode = ActionExecutionFailureCode' not in tool_contract or 'ActionExecutionFailureProviding' not in (actions_root / 'Support/Contracts/ActionExecutionFailure.swift').read_text():
     raise SystemExit('Tools require independent bounded producer failure codes.')
 print('Latest Bluetooth status and independent Tool failure codes pass.')
 

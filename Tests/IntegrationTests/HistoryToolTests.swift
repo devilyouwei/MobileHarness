@@ -22,7 +22,9 @@ private func historyTurn(_ store: ConversationHistoryStore, user: String, respon
     let read = try await store.readCurrent()
     let id = UUID()
     _ = try await store.begin(id: id, user: user, request: [], expecting: read.token, model: "fixture")
+    try await store.beginModelRequest(.init(id: UUID(), input: user, requestJSON: "[]"), for: id)
     try await store.append(response, to: id)
+    try await store.finishModelRequest(id, reason: "stop")
     try await store.finish(id, state: .completed)
 }
 

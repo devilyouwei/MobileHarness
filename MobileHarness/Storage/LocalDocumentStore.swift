@@ -13,7 +13,29 @@ public struct DocumentSnapshot<Value: Sendable>: Sendable {
 
 // Serializes compare-and-replace across store instances within this process.
 private enum DocumentFileAccess {
-    static let lock = NSLock()
+    private final class Entry: @unchecked Sendable {
+        weak var lock: NSLock?
+        init(_ lock: NSLock) { self.lock = lock }
+    }
+    // Mutable registry is protected by its own short-lived lock; file I/O uses a distinct lock.
+    private final class Registry: @unchecked Sendable {
+        let gate = NSLock()
+        var entries: [String: Entry] = [:]
+        func lock(for key: String) -> NSLock {
+            gate.withLock {
+                if let existing = entries[key]?.lock { return existing }
+                if entries.count >= 256 { entries = entries.filter { $0.value.lock != nil } }
+                let lock = NSLock()
+                entries[key] = Entry(lock)
+                return lock
+            }
+        }
+    }
+    private static let registry = Registry()
+    static func withLock<Result>(for url: URL, _ body: () throws -> Result) rethrows -> Result {
+        let lock = registry.lock(for: url.standardizedFileURL.path)
+        return try lock.withLock(body)
+    }
 }
 
 /// A bounded, write-through cache for one durable JSON document.
@@ -48,7 +70,7 @@ public actor LocalDocumentStore<Value: Codable & Sendable> {
 
     /// Disk wins on explicit refresh; a failed read never replaces the last valid cache.
     public func refresh() throws -> DocumentSnapshot<Value>? {
-        let result = try DocumentFileAccess.lock.withLock { try readDisk() }
+        let result = try DocumentFileAccess.withLock(for: url) { try readDisk() }
         cached = result
         loaded = true
         return result
@@ -65,7 +87,7 @@ public actor LocalDocumentStore<Value: Codable & Sendable> {
         let next = DocumentSnapshot(revision: UUID(), value: value)
         let data = try JSONEncoder().encode(Envelope(version: 1, revision: next.revision, value: value))
         guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
-        try DocumentFileAccess.lock.withLock {
+        try DocumentFileAccess.withLock(for: url) {
             guard try readDisk()?.revision == revision else { throw DocumentStorageError.conflict }
             try writeDisk(data)
         }
@@ -81,7 +103,7 @@ public actor LocalDocumentStore<Value: Codable & Sendable> {
         let next = DocumentSnapshot(revision: UUID(), value: value)
         let data = try JSONEncoder().encode(Envelope(version: 1, revision: next.revision, value: value))
         guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
-        try DocumentFileAccess.lock.withLock { try writeDisk(data) }
+        try DocumentFileAccess.withLock(for: url) { try writeDisk(data) }
         cached = next
         loaded = true
         return next

@@ -67,7 +67,7 @@ Local user settings now use Storage-backed cached persistence in the application
 
 - [ADR 0064 — App and UI boundaries](adr/0064-app-ui-boundaries.md): explicit composition, independently compiled pages and application workflows.
 
-✅ [ADR 0065](adr/0065-action-runtime-contracts.md) and the then-current Actions/Runtime directory (now split into [function contracts](../MobileHarness/Actions/Contracts/README.md) and [Gateway execution](../MobileHarness/Gateway/Runtime/README.md)) record the implemented Action contract stage and its limits. ❌ Ongoing activity owners, persistent resource enforcement and execution deadlines remain future work.
+✅ [ADR 0065](adr/0065-action-runtime-contracts.md) and the then-current Actions/Runtime directory (now split into [function contracts](../MobileHarness/Actions/Support/Contracts/README.md) and [Gateway execution](../MobileHarness/Gateway/Runtime/README.md)) record the implemented Action contract stage and its limits. ❌ Ongoing activity owners, persistent resource enforcement and execution deadlines remain future work.
 
 ## Action runtime stage 2
 
@@ -482,3 +482,35 @@ That quotation is archived source material, not the current application timer co
 Checked AgentChatWorker collect/observation recovery boundaries, result classification, round coordinator, Task controls, AgentTaskBudget, ChatRequest, XML/native parsing, Gateway closure/result delivery and OpenAI/Gemma limits against the current source. Added a central ownership/flow diagram, full trigger matrix, layered bounds and stop/gap sections. Budget is per admitted input and its continuation chain, not an entire multi-input foreground Goal Task. finishTask restores default scope before a possible remaining-goal continuation; cancelTask terminates its chain. Distinguish invocation cancellation from owner cancellation and transport retries from model requests.
 
 Reconciled Shared Chat/Core Runtime current descriptions and linked duplicate overall summaries to the central contract. Removed outdated total-execution/queue/feedback TTL and four-attempt delivery claims. Original overall three-Part structure and unrelated designs are preserved. No new directory or runtime implementation was added. Targeted verification is recorded in Validation-History.
+
+
+## 2026-10-13 — Actions README current-design reconciliation
+
+The 15 Actions directory READMEs are reconciled against current Swift implementations and the shared-source target map. Current technical documents describe title/summary, ownership, direct upstream/downstream interfaces, internal module relationships, algorithms, completion/cancellation and failure contracts. Dated implementation notes, prompt revisions, migrations and acceptance observations belong in docs instead of these contracts. No Swift behavior is changed.
+
+The earlier source-page UI control/grant audit is retained below as historical evidence. Current callable interfaces are described by Actions/UI/README.md; external Skill grants and host behavior have their own owners. Earlier build/test/device observations remain in Validation-History.md.
+
+### Retained UI control coverage audit
+
+
+An implemented canonical definition and an effective model grant are separate facts. Assistant loads ExpressionInteraction as a base Skill, exposing only express/setExpression by default. Photography requires its Skill and actual host/task admission. Business callers can use public functions with injected capabilities; canonical FunctionExecutor/ActionComposition execution additionally retains declared budgets/completion/reports. Direct calls do not bypass endpoint ownership or automatically provide Gateway scheduling/resources/Agent grants.
+
+| Surface | Current canonical control | Model exposure / limitation |
+| --- | --- | --- |
+| Eye expressions | UI.Expression.express / setExpression | Assistant base ExpressionInteraction; closed is supported, nonclosed finite effects reject while voice is off |
+| Short sound / haptic | UI.Feedback.playCue / vibrate | No Skill exposure; trusted business composition retains strict parameters and native busy/scope admission |
+| Task goal label | Agent.Task.startTask / finishTask / cancelTask | BasicSkill; root projects actual active Task goal. No independent label/toast mutation Action |
+| Capture / save / ignore | Camera.Capture.takePhoto / savePhoto / ignorePhoto | Photography Skill; appearance/departure/removal are joined host behavior, no separately model-configurable animation Action |
+| Listening halo / automatic eyes | Speech.Listening.update indirectly commits consent/generation | Speech.Listening.update remains internal. UI.Light.updateLight exists for business calls without Skill registration with x/y, initialOpacity, intensity and durationMS; no mic/eye effect |
+| Text notice | UI.Notice.showNotice / dismissNotice | No Skill exposure; transient business text separate from actual error history. Genuine Agent/App/system errors remain priority failure projections; Action failures stay panel-only |
+| Captions / voice state / gaze / pose | UI.Caption.*, UI.VoiceState.setVoiceState, UI.Gaze.moveEyes, UI.Pose.showPose | Canonical implementations exist; fixed perception/host bindings, not all exposed to Assistant model |
+| Navigation / history / resources | UI.Navigation.open, UI.HistoryPresentation.showHistory, UI.ResourcePresentation.* | Navigation appears in ApplicationControl Skill; history/resource presentations have role/scoped internal endpoints |
+| Spectrum / measured FPS / local controls | None for individual rendered values/disclosures/drafts | Native telemetry and local view state; log filtering, inspection, form drafts, scrolling and FPS disclosure are not model functions |
+
+✅ Independent notices and decorative lights are implemented through explicit typed host endpoints. Task goal display remains an actual-state projection, controlled through Agent.Task Actions. Local UI rendering values never import Actions or control native consent.
+
+
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation converts neutral Action requests into UI-owned values; AppPresentationWorkflow retains existing dependencies. No UI project dependencies or new directories.
+
+
+✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.

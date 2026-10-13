@@ -1,5 +1,13 @@
 # Project documentation
 
+[会话分文件与结束保存 v3 验证](Validation-History.md#2026-10-13--per-conversation-checkpoint-storage-v3) records memory-only streaming, independent archives, removed delta storage, failure/recovery coverage and separate physical acceptance limits.
+
+[Isolated audio-detection startup validation](Validation-History.md#2026-10-14--isolated-audio-detection-communication-startup) records the missing-publisher policy failure, restricted single-Agent configuration and synthetic versus native verification.
+
+[ApplicationControl 记录满额修复验证](Validation-History.md#2026-10-13--saturated-applicationcontrol-context-and-scopeclosed-recovery) records physical context counts, failure reproduction, explicit evidence retention and separate native acceptance.
+
+[Task历史v2原位压缩验证](Validation-History.md#2026-10-13--indexed-task-history-v2-and-inline-compression) records fresh storage, request ownership/indexed compression, backend/UI changes, passing full checks/device compilation and simulator/native acceptance limits.
+
 [Unified listening interruption validation](Validation-History.md#2026-10-13--unified-listening-interruption-and-terminal-cancellationagent-failures) records cancellation without incidents/ReACT, terminal Agent errors, full check/device build evidence and Simulator/physical acceptance limits.
 
 [历史记录收敛验证](Validation-History.md#2026-10-13--assistant-history-only-without-obsolete-record-compatibility) records Assistant 聊天记录/任务记录 ownership, removed compatibility, passing targeted/device checks and full-suite/simulator limitations.
@@ -60,6 +68,8 @@
 [Assistant Skills/task-mode migration](Agents-Skills-Task-Modes-Plan.md) records the implementation boundary, Assistant conversation/task history ownership and remaining device acceptance. [ADR0212](adr/0212-assistant-skills-task-modes.md) defines the current architecture.
 
 The [19-document Agents design audit](Validation-History.md#2026-10-11--agents-technical-design-alignment) records role/shared/Core diagram, table and contract checks against the latest source and prompt resources.
+
+[Actions current README audit](Validation-History.md#2026-10-13--actions-readme-current-design-audit) records reconciliation of all 15 directory documents, 30 direct/internal relationship graphs and source/link checks. Historical UI audit content is retained in Documentation-History.md.
 
 The [role-owned prompt validation](Validation-History.md#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance) records the separate role and Function Token resources, strict rendering and final packaging checks.
 

@@ -217,12 +217,12 @@ func generationRoundActualOutputControlsContinuationForAllThreeRoutes(_ route: S
     if hasValue {
         #expect(modelRequests[1].input.contains("actual-result"))
         #expect(!modelRequests[1].input.contains("已观察真实结果"))
-        #expect(modelRequests[1].fragments.joined() == "已观察真实结果。")
+        #expect(modelRequests[1].response == "已观察真实结果。")
         #expect(modelRequests[1].toolCalls.isEmpty)
         #expect(modelRequests[1].firstTokenAt != nil)
         let context = try JSONDecoder().decode([ChatMessage].self, from: Data(modelRequests[1].requestJSON.utf8))
         #expect(context == requests[1].messages)
-        #expect(record.raw == modelRequests.flatMap(\.fragments).joined())
+        #expect(record.raw == modelRequests.map(\.response).joined())
     }
     #expect(await harness.log.failures.isEmpty)
     let outputs = await harness.log.outputs

@@ -3,7 +3,15 @@ import Foundation
 public enum ConversationHistoryPresentation {
     public static func title(_ conversation: HistoryConversation) -> String {
         if conversation.archivedAt != nil { return conversation.summaryTitle ?? "待生成标题" }
-        return conversation.turns.last?.user ?? "新对话"
+        return conversation.latestUser ?? conversation.turns.last?.user ?? "新对话"
+    }
+    /// Export the page's original Codable value; preserve raw request strings and evidence.
+    public static func jsonData<Value: Encodable>(_ value: Value, maximumBytes: Int = 32 * 1024 * 1024) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(value)
+        guard maximumBytes > 0, data.count <= maximumBytes else { throw HistoryJSONExportError.capacityExceeded }
+        return data
     }
     /// Presentation peers preserve the original input's nested execution ownership on disk.
     public static func turns(_ conversation: HistoryConversation, inputIDs: Set<UUID>? = nil) -> [HistoryTurn] {
@@ -13,34 +21,58 @@ public enum ConversationHistoryPresentation {
                 project(
                     turn, id: request.id, date: request.date, input: request.input,
                     requestJSON: request.requestJSON, firstTokenAt: request.firstTokenAt,
-                    calls: request.toolCalls, usage: request.tokenUsage, fragments: request.fragments,
+                    calls: request.toolCalls, usage: request.tokenUsage, response: request.response,
                     state: request.state, reason: request.finishReason,
                     error: request.error ?? (index == (turn.modelRequests?.count ?? 0) - 1 ? turn.error : nil),
                     react: index > 0, modelRequestStartedAt: request.modelRequestStartedAt,
-                    firstTokenLatency: request.firstTokenLatency, decisionMetadata: request.decisionMetadata)
+                    firstTokenLatency: request.firstTokenLatency, decisionMetadata: request.decisionMetadata,
+                    historyTaskID: request.historyTaskID, historyOrder: request.historyOrder)
             }
-        }
+        }.sorted { ($0.historyOrder ?? 0) < ($1.historyOrder ?? 0) }
     }
 
     private static func project(
         _ parent: HistoryTurn, id: UUID, date: Date, input: String, requestJSON: String?, firstTokenAt: Date?,
-        calls: [HistoryToolCall]?, usage: HistoryTokenUsage?, fragments: [String], state: HistoryTurn.State,
+        calls: [HistoryToolCall]?, usage: HistoryTokenUsage?, response: String, state: HistoryTurn.State,
         reason: String?, error: String?, react: Bool,
         modelRequestStartedAt: Date? = nil, firstTokenLatency: Double? = nil,
-        decisionMetadata: HistoryDecisionMetadata? = nil
+        decisionMetadata: HistoryDecisionMetadata? = nil, historyTaskID: UUID? = nil, historyOrder: UInt64 = 0
     ) -> HistoryTurn {
         HistoryTurn(
-            id: id, date: date, user: input,
+            historyOrder: historyOrder, id: id, date: date, user: input,
             request: requestJSON.flatMap { try? JSONDecoder().decode([HistoryMessage].self, from: Data($0.utf8)) }
                 ?? [],
             model: parent.model, maximumOutputTokens: parent.maximumOutputTokens, temperature: parent.temperature,
             modelRequests: nil, firstTokenAt: firstTokenAt, requestJSON: requestJSON, ownerInputID: parent.id,
             isReACT: react,
             toolDefinitions: parent.toolDefinitions, toolCalls: calls, tokenUsage: usage,
-            fragments: fragments, state: state, finishReason: reason, error: error,
+            response: response, state: state, finishReason: reason, error: error,
             executionError: parent.executionError,
-            decisionMetadata: decisionMetadata, modelRequestStartedAt: modelRequestStartedAt,
+            historyTaskID: historyTaskID, decisionMetadata: decisionMetadata,
+            modelRequestStartedAt: modelRequestStartedAt,
             firstTokenLatency: firstTokenLatency)
+    }
+
+    public static func timeline(_ conversation: HistoryConversation) -> [HistoryTimelineItem] {
+        let requests = turns(conversation)
+        var replacements: [UUID: HistoryTaskCompression] = [:]
+        for compression in conversation.taskCompressions {
+            let owned = requests.filter { $0.historyTaskID == compression.taskID }
+            if !owned.isEmpty, owned.map(\.id) == compression.sources.map(\.requestID),
+                owned.map({ $0.ownerInputID ?? $0.id }) == compression.sources.map(\.inputID),
+                owned.allSatisfy({ $0.state != .generating })
+            {
+                replacements[compression.taskID] = compression
+            }
+        }
+        var emitted: Set<UUID> = []
+        return requests.compactMap { turn in
+            if let taskID = turn.historyTaskID, let compression = replacements[taskID] {
+                return emitted.insert(taskID).inserted
+                    ? .task(compression, sources: requests.filter { $0.historyTaskID == taskID }) : nil
+            }
+            return .request(turn)
+        }
     }
 
 }
@@ -76,58 +108,7 @@ extension HistoryTurn {
         guard let usage = tokenUsage else { return "Token 用量：" }
         return "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
     }
-    public var toolReport: String {
-        guard let calls = toolCalls, !calls.isEmpty else { return "" }
-        return calls.map { call in
-            """
-            Name: \(call.name)
-            Provider ID: \(call.providerID); runtime ID: \(call.id)
-            State: \(call.state.rawValue)
-            Input: \(call.argumentsJSON)
-            Output: \(call.output ?? "")
-            Error: \(call.error ?? "")
-            """
-        }.joined(separator: "\n\n")
-    }
-    public func diagnosticReport(interpretation: String = "") -> String {
-        let messages = requestJSON ?? request.map { "[\($0.role.rawValue)]\n\($0.content)" }.joined(separator: "\n\n")
-        return """
-            Model round: \(id.uuidString)
-            Owning input: \(ownerInputID ?? id)
-            ReACT: \(isReACT == true)
-            Model: \(model)
-            Date: \(date.ISO8601Format())
-            Model request started: \(modelRequestStartedAt.map { $0.ISO8601Format() } ?? "")
-            First token: \(firstTokenAt.map { $0.ISO8601Format() } ?? "")
-            \(firstTokenReport)
-            State: \(stateReport); finish: \(finishReason ?? "")
-            Temperature: \(temperature)
-            Tokens: \(tokenReport)
-            Generation error: \(error ?? "")
-            Execution error: \(executionError ?? "")
 
-            CURRENT INPUT
-            \(user)
-
-            ACTUAL REQUEST
-            \(messages)
-
-            ACTUAL TOOL DEFINITIONS
-            \((toolDefinitions ?? []).joined(separator: "\n\n"))
-
-            RAW MODEL TEXT
-            \(raw)
-
-            TOOL CALL INPUT / OUTPUT
-            \(toolReport)
-
-            RECEIVED FRAGMENTS (escaped)
-            \(fragments.enumerated().map { "\($0.offset + 1). \(String(reflecting: $0.element))" }.joined(separator: "\n"))
-
-            CURRENT PARSER PREVIEW (not execution evidence)
-            \(interpretation)
-            """
-    }
 }
 
 extension HistoryMessage {
@@ -146,3 +127,5 @@ extension HistoryTurn {
         return Array(request.flatMap(\.attachedImages).filter { seen.insert($0.id).inserted }.prefix(4))
     }
 }
+
+public enum HistoryJSONExportError: Error { case capacityExceeded }

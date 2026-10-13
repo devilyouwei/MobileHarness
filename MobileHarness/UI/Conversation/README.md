@@ -1,5 +1,7 @@
 # Conversation and Execution Presentation
 
+✅ 已实现（2026-10-13）：ConversationView 的根启动失败提示改为“应用准备失败”，因为准备过程包括 Agent 服务和配置恢复；继续显示实际错误，不将 scopeClosed 一概归为模型文件失败。
+
 ## Summary
 
 Render conversation phases/captions/eyes and bounded Action, Task and Agent log values.

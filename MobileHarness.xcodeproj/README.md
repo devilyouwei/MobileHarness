@@ -63,7 +63,7 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 
 ✅ Navigation no longer references unused permission/transport placeholders. Historical NexArm diagnostics are listed under root IntegrationTests; production compilation remains SwiftPM-owned.
 
-✅ Navigation includes Actions/Runtime/Contracts and Tools/Runtime/Contracts, Gateway translation/scheduling context and App workflow adapters. SwiftPM remains the single source compilation map.
+✅ Navigation includes Actions/Support/Contracts and Gateway runtime/protocol groups, Gateway translation/scheduling context and App workflow adapters. SwiftPM remains the single source compilation map.
 
 ✅ Photographer navigation and JSON are retained; SwiftPM owns compilation of Robot Tools and Action-side aim support.
 
@@ -99,9 +99,9 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 
 ## Gateway execution migration — ADR0161
 
-✅ Navigator references now match Actions/Contracts, Gateway/Runtime and Gateway/Output/Registration and Protocols. Package targets independently compile FunctionContracts, ExecutionRuntime and CallRuntime; shared sources are compiled once. Business endpoints use FunctionInput without Channel or calling protocol. ❌ Simulator CoreAI availability and physical acceptance remain separate.
+✅ Navigator references now match Actions/Support/Contracts, Gateway/Runtime and Gateway/Output/Registration and Protocols. Package targets independently compile FunctionContracts, ExecutionRuntime and CallRuntime; shared sources are compiled once. Business endpoints use FunctionInput without Channel or calling protocol. ❌ Simulator CoreAI availability and physical acceptance remain separate.
 
-✅ Actions navigator follows all six physical domain trees and Contracts; the obsolete ToolCall Entries/runtime group is removed. Gateway runtime and protocol groups are attached under their owning directories.
+✅ Actions navigator follows all six physical domain trees and shared Support (Contracts, ActionMacro and CapabilityModules); the obsolete ToolCall Entries/runtime group is removed. Gateway runtime and protocol groups are attached under their owning directories.
 
 ## ModelKit Support ownership
 
@@ -119,3 +119,5 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ App and simulator configurations use Config/AppInfo.plist to opt into ProMotion with public CADisableMinimumFrameDurationOnPhone; final bundle verification confirms the Boolean value. Native renderer requests device-supported high refresh for transitions, 60 Hz for settled flow, and pauses when off; requested FPS is not a guaranteed physical acceptance result.
 
 ✅ Implemented ProMotion packaging: Config/AppInfo.plist explicitly supplies CADisableMinimumFrameDurationOnPhone=true to both App targets. Generated standard/permission metadata remains enabled; remove the ineffective custom INFOPLIST_KEY setting and verify the final signed plist, not only build settings. No local signing edits.
+
+✅ Shared Actions file references are grouped under Support, with Contracts as its own child and macro/catalog utilities directly under Support. SwiftPM remains the only compiler of these shared sources.

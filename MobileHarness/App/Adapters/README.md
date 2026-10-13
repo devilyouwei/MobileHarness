@@ -55,7 +55,7 @@ Keychain adapters expose raw operations and existing accessibility identifiers. 
 
 NexArm reports are invocation-private and preserve every child outcome plus later exceptions. Continuous failures are separate execution diagnostics and do not rewrite completed Tool receipts or Bluetooth state. Speech errors are localized only after playback cleanup.
 
-History preview combines the producing role's effective function and communication catalogs and shared segmentation. It parses stored fragments and rejected calls without executing them or claiming task delivery.
+History preview combines the producing role's effective function and communication catalogs and shared segmentation. It parses the stored complete response string and rejected calls without executing them or claiming task delivery.
 
 ✅ Narrow typed adaptation, owner validation and neutral failure propagation are implemented.
 
@@ -96,3 +96,5 @@ History preview combines the producing role's effective function and communicati
 ✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
 
 ✅ VoiceOutputHandling.show is async; terminal cancellation/Agent failure joins matching input audio cleanup before output transport completes. RuntimePresentation forwards this lifecycle acknowledgment without admitting inference.
+
+✅ 已实现：HistoryAgentAdapter.preview 不再遍历 delta 分片，只向临时 GenerationTrace 提交一次完整 response；预览不执行函数，不声称复现历史分片到达时间。

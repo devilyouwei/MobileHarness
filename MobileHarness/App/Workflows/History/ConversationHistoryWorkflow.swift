@@ -15,6 +15,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     private let startNewArchive: @MainActor () async throws -> Void
     private let summarizeArchive: @MainActor (UUID) async throws -> Void
     private let previewOutput: @MainActor (HistoryTurn) -> String
+    private let readConversation: (@MainActor (UUID) async throws -> HistoryConversation)?
     private let readPhoto: @MainActor (UUID, UUID) async throws -> Data?
     private var photoReads: Set<UUID> = []
     private var loaded = false
@@ -26,6 +27,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         startNew: @escaping @MainActor () async throws -> Void,
         summarize: @escaping @MainActor (UUID) async throws -> Void,
         previewOutput: @escaping @MainActor (HistoryTurn) -> String,
+        readConversation: (@MainActor (UUID) async throws -> HistoryConversation)? = nil,
         readPhoto: @escaping @MainActor (UUID, UUID) async throws -> Data?
     ) {
         self.deleteArchive = deleteArchive
@@ -36,6 +38,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         self.summarizeArchive = summarize
         self.previewOutput = previewOutput
         self.readPhoto = readPhoto
+        self.readConversation = readConversation
     }
     public func load() async {
         guard !state.isBusy else { return }
@@ -44,10 +47,17 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         do {
             try await prepare()
             try Task.checkCancellation()
+            state.status = nil
             try await refresh()
             loaded = true
-            state.status = nil
         } catch { state.status = "历史读取失败：\(error)" }
+    }
+    public func loadConversation(_ id: UUID) async throws -> HistoryConversation {
+        guard let readConversation else { throw HistoryDetailError.unavailable }
+        let selected = try await readConversation(id)
+        guard selected.id == id else { throw HistoryDetailError.unavailable }
+        state.selectedConversation = selected
+        return selected
     }
     public func startNew() {
         perform { try await self.startNewArchive() }
@@ -76,7 +86,10 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     public func imageData(_ id: UUID, for turnID: UUID) async throws -> Data? {
         try Task.checkCancellation()
         guard let archive = state.archive else { throw HistoryImageLoadingError.invalidReference }
-        let turn = ([archive.current] + archive.past).lazy
+        let selected = state.selectedConversation.flatMap { conversation in
+            ([archive.current] + archive.past).contains(where: { $0.id == conversation.id }) ? conversation : nil
+        }
+        let turn = ([archive.current] + archive.past + [selected].compactMap { $0 }).lazy
             .flatMap { ConversationHistoryPresentation.turns($0) }.first { $0.id == turnID }
         guard let turn, turn.attachedImages.contains(where: { $0.id == id }) else {
             throw HistoryImageLoadingError.invalidReference

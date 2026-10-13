@@ -1,83 +1,70 @@
-# System Queries and Configuration Functions
+# System — 资源、Provider、设备与 Task 控制函数
 
-## Summary
+## 简介
 
-Strict callable model-resource, provider and device operations over injected neutral capabilities.
+提供系统事实查询、模型资源管理、私有云配置事务及中立 Task 控制转发。入口维护参数、预算与真实结果，原生工作通过注入能力完成。
 
-## Ownership and boundaries
-
-Entries own arguments, budgets and actual result encoding; Support owns preference/provider transaction policy. App supplies native/Keychain primitives; ModelKit supplies management via the injected adapter. No Agent, UI or call-protocol implementation is imported.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
- Gateway -->|FunctionInput| System[System entry functions]
- System --> Resources[Resource capability and preferences]
- System --> Provider[Private provider requests]
- System --> Device[Injected device capability]
- Resources --> Native[App native adapter]
- Provider --> Native
- Device --> Native
- System -->|Bounded result or producer error| Gateway
+    Gateway -->|FunctionInput| S[System 函数]
+    S -->|实际结果与失败| Gateway
+    Host[App 能力端点] -.->|资源设备与 Task 能力| S
+    S -->|原生操作和控制请求| Host
+    S -->|配置文档持久化| Storage
+    Contracts[FunctionContracts] -.->|输入与 TaskControlCapability| S
+    S -->|资源快照类型提供| UI[Actions/UI]
 ```
 
-## Function groups
+System 不导入 ModelKit、Agents、UI 或 Gateway 实现。它只调用中立端口；配置绑定、设备会话和 Task 状态由端点所属宿主负责。
 
-| Module | Functions and completion |
-| --- | --- |
-| ModelResources | snapshotResources, restoreSource, saveSource, configureSpeech, download, cancel, remove |
-| Provider | discoverModels, restoreSettings, saveSettings, readSettings |
-| Device | control, readStatus, readEnvironment |
-| Runtime | runtimeInfo: fixed informational sentence only |
+## 内部模块关系
 
-Unknown arguments reject; string booleans and UUID/request identity validate before effects. Resource commands/provider transactions use 60-second cooperative budgets. Download acknowledges native admission; cancel/remove join management cleanup. Source results are ≤2048 bytes; inventory/model lists ≤65,536 bytes. snapshotResources accepts no arguments and rejects partial/invalid inventory.
+```mermaid
+flowchart TB
+    Namespace[SystemActions] --> Resource[ModelResourcesActions]
+    Namespace --> Provider[ProviderActions]
+    Namespace --> Device[DeviceActions]
+    Namespace --> Task[TaskActions]
+    Namespace --> Runtime[RuntimeActions]
+    Resource --> ResourceSupport[Support 资源目录与偏好服务]
+    Provider --> ProviderSupport[Support Provider 目录暂存与事务]
+    Device --> DeviceSupport[Support/DeviceModule]
+    Task --> TaskSupport[Support/TaskControlModule]
+    Runtime --> RuntimeSupport[Support/SystemModule]
+```
 
-## Exposure and private data
+## 函数接口与完成语义
 
-Provider configuration uses opaque session-bound staged request IDs, never secret-bearing protocol values. readSettings returns only confirmed enabled/model summary without endpoint/key or binding mutation. discoverModels applies Actions-owned family eligibility to raw SDK IDs. Native errors become safe bounded producer codes; whole-list overflow fails rather than truncates.
+| 地址模块 | 函数 | 完成与静态预算 |
+| --- | --- | --- |
+| System.ModelResources | snapshotResources、restoreSource、saveSource、configureSpeech、download、cancel、remove | 全部 60 秒；下载是准入，取消/删除/绑定等待端点返回 |
+| System.Provider | discoverModels、restoreSettings、saveSettings | 60 秒；暂存请求的实际结果或 requestID |
+| System.Provider | readSettings | 默认 30 秒；已确认的启用状态和模型名 |
+| System.Device | control | 60 秒；accepted 操作回执，不等于连接成功或电机到位 |
+| System.Device | readStatus / readEnvironment | 默认 30 秒；原样有界事实字符串 |
+| System.Runtime | runtimeInfo | 默认 30 秒；固定文字“本地聊天与语音能力已配置” |
+| Agent.Task | loadSkills、releaseSkills、startTask、finishTask、cancelTask | 5 秒；宿主返回的 value completion |
 
-ApplicationControl grants current read facts, download/cancel and selected device operations. Model removal is not granted because native quiescence can join the calling runtime. Provider configuration changes remain private human-staged operations. Assistant 的配置 Skill 使用 readEnvironment Action 获取新事实；BasicSkill 中的 Task 控制使用 Action Call。
+TaskActions 属于 System 目录，但公开地址为 `Agent.Task`，这是显式的地址映射。它转发完整参数和 invocation，不在这里维护 Agent 状态或重复宿主的权限、参数及轮次验证。
 
-Device.control validates operation-specific arguments and returns accepted submission, not motor arrival. Native endpoint separately checks foreground/connection/worker admission. Late failures retain independent trusted results; environment facts are current observations, not completion evidence.
+## 参数、结果与私有数据
 
-✅ Resource/provider/device functions and safe factual queries are implemented.
+资源下载需要 id（最多 64 字节）、endpoint（最多 1024 字节）及严格 true/false 的 allowsCellular。source 保存同时接受 recognition/synthesis 严格布尔字符串；configureSpeech 只改变注入端点绑定，偏好持久化是另一项操作。source 编码上限 2048 字节，资源快照上限 65536 字节。
 
-❌ System.Runtime.runtimeInfo remains a fixed-text compatibility function; live health diagnostics are not implemented there.
+Provider 的发现、恢复、保存只传 requestID UUID；URL/密钥留在同会话私有暂存中。发现结果最多 2048 个模型 ID、每项最多 512 字节、编码最多 65536 字节；过滤策略在 Support。readSettings 不返回 URL/密钥，不执行联网可用性探测。
 
-## Related design
+Device.control 的模型声明提供 scan/stopScan/connect/reconnect/disconnect/forget/refresh；实际解析还支持 preset、motorVelocity、stopMotorControl、openPage、closePage、openSystemSettings 等可信操作。connect/reconnect 要求设备 UUID；motorVelocity 要求电机 1…6 和有限 −1…1 的 value；preset 使用封闭动作名。可选 fence 必须为 UUID。其余操作拒绝 id/value/action 混用，未知参数键拒绝。
 
-[Parent design](../README.md) · [Support](Support/README.md)
+readStatus/readEnvironment 不接收参数，分别限制 16384/65536 UTF-8 字节，内容由端点提供；入口不追加事实或证明物理完成。runtimeInfo 直接返回固定文字，当前不解析参数，也不是实时健康检查。
 
-✅ Task controls are canonical finite Actions with an injected TaskControlCapability. They authorize the real source/input/decision and commit Assistant Skill/task state; terminal controls complete only after the round barrier.
+Task 声明描述 JSON 数组 Skills、前台/后台 Task 字段和终态控制：foreground 使用 goal 及可选 skills/execution；target/businessContract/payload 为后台字段。finishTask 的 continueDecision 默认 false，仅为同一输入剩余新目标声明显式续轮。实际验证、提交、清理与结果屏障均在宿主端口实现。
 
-## Skill/task-mode contract
+## 生命周期与约束
 
-✅ Support/TaskControlModule exposes five finite state controls for loading/releasing Skills and starting/finishing/cancelling tasks through an injected neutral port. State ownership remains Assistant; System executes no independent agent loop.
+✅ 资源和 Provider 服务有独立准入及事务状态，见 Support。普通入口没有统一队列、原生设备 worker 或重试循环；异步异常和已经提交的结果按各端点契约返回。
 
+❌ runtimeInfo 没有实时诊断实现。声明参数与可信入口解析的开放范围不是同一个集合，不能据函数存在推断模型权限或原生能力可用。
 
-✅ 2026-10-11 correction: TaskControl functions are finite committed transactions returning a bounded value, not state/completed-only operations. Regression executes each through FunctionExecutor. Task reports move out of system instructions into data messages; include only same-session live declared background tasks or the exact current directed task, not legacy terminal delegation records. Completed local outcomes are selected only for the current input. Persistent/UI task history is retained.
-
-## Action-owned documentation and Skill instruction contract
-
-✅ 函数说明和参数契约放在本域函数的 `@Action(doc:parameters:)` 中；模块组合通过编译宏生成中立声明。业务示例属于使用该函数的 Skill Instructions.md，不属于函数注册。Agent.Task 控制的协议地址由 System/TaskActions 及 TaskControlModule 实现，复用同一宿主端口。
-
-## Channel-owned Action ordering
-
-✅ Function metadata and business attributes have no serialization key. Scheduled ordering belongs to [ChannelScheduler](../../Gateway/Output/Scheduling/README.md); resources/budgets and native capability admission remain explicit.
-
-## Task controls through Action Calls
-
-✅ BasicSkill 的五个 Task/Skill 控制函数使用 Control Channel Action Call；App 通过 ChannelScheduler 返回已提交状态。startTask/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，finishTask/cancelTask 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
-## Startup publication and foreground task regression
-
-✅ startTask 的函数 doc 和参数 doc 明确：前台任务只传 goal、可选 skills/execution，不传 target/businessContract/payload；后三项只属于 execution=background。确定性状态校验仍拒绝混用参数，不丢弃它们或伪造成功。
-
-
-✅ 提示词精简已实现：Task函数doc提供简短效果/结果，参数说明保留前后台字段边界；调用类型和5秒显式Action超时不变。
-
-❌ finishTask说明区分目标完成和用户明确切换而关闭；startTask明确现有前台任务关闭前拒绝。仅调整函数说明，不增加参数或改变Action类型。
-
-✅ Task关闭续轮修正：finishTask默认在收尾后结束当前决策，不重新提交已处理用户输入。仅显式continueDecision=true允许同一输入中尚未执行的新目标续轮；cancelTask始终结束。该可选参数在Action声明和Task状态中严格验证，默认false。跨边界模型回执使用实际终态/default目录，保留原始执行回执为历史证据。
+[Actions 设计](../README.md) · [System 服务实现](Support/README.md) · [共享契约](../Support/Contracts/README.md)

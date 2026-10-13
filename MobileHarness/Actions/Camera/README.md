@@ -1,55 +1,57 @@
-# Camera Functions
+# Camera — 相机与照片业务函数
 
-## Summary
+## 简介
 
-Seven camera/photo functions with strict arguments, honest native receipts and injected camera ownership.
+通过 CameraControlCapability 执行相机启闭、镜头选择、重试、拍摄及照片处置。入口负责参数与结果编码，App 端点负责原生相机、权限、媒体所有权和呈现生命周期。
 
-## Ownership and boundaries
-
-CaptureActions.swift owns callable bodies; CameraActions is the namespace. App CameraCoordinator owns capture/lease/permission/export; Photographer owns business selection. Functions take no additional camera.capture lease, which would conflict with the native capture owner.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
- Gateway -->|FunctionInput| Capture[CaptureActions]
- Capture -->|Typed CameraControlCapability| Host[App camera endpoint]
- Host -->|Actual receipt or error| Capture
- Capture -->|Value completion| Gateway
+    Gateway -->|FunctionInput| Camera[Camera 函数]
+    Camera -->|完成值或异常| Gateway
+    App -.->|注入 CameraControlCapability| Camera
+    Camera -->|相机和照片请求| App
+    Contracts[FunctionContracts] -.->|请求与定义类型| Camera
 ```
 
-## Function contract
+Camera 不导入平台相机或 UI 实现，也不自行创建捕获租约。注入端点负责运行准入；Action/Tool 协议及开放范围由宿主决定。
 
-| Camera.Capture function | Parameters | Completion |
+## 内部模块关系
+
+```mermaid
+flowchart LR
+    Namespace[CameraActions 命名空间] --> Entries[CaptureActions.swift]
+    Module[Support/CameraModule] -->|绑定工厂| Entries
+    Entries -->|类型化调用| Capability[CameraControlCapability]
+    Capability --> Receipts[命令与照片回执]
+    Entries -->|JSON 编码| Receipts
+    Errors[CameraControlError] --> Capability
+```
+
+## 接口与完成语义
+
+全部地址位于 `Camera.Capture`；模块包含七个函数。
+
+| 函数 | 实际入口参数 | 返回与预算 |
 | --- | --- | --- |
-| open / close | None | Native command receipt with operation and acknowledged enabled/facing state |
-| flip | Required facing=front/back | Target selection; healthy same-facing idempotence, disabled capture fails |
-| retry | None | Explicit native retry/permission path |
-| takePhoto | None | photoID/width/height/MIME after actual capture/presentation boundary |
-| savePhoto / ignorePhoto | Optional photoID UUID | Actual saved/ignored receipt, UUID and alreadySaved where applicable |
+| open / close | 无 | 注入启闭完成后返回 operation/enabled；默认 30 秒 |
+| flip | facing=front/back | 注入镜头切换完成后返回 operation/facing；默认 30 秒 |
+| retry | 无 | 等待端点重试完成，Void/completed；默认 30 秒 |
+| takePhoto | 无 | JSON：photoID、width、height、mimeType；15 秒 |
+| savePhoto | 可解析 photoID UUID | JSON：saved、photoID、alreadySaved、可选 feedbackIssues；60 秒 |
+| ignorePhoto | 可解析 photoID UUID | JSON：ignored、photoID、alreadySaved、可选 feedbackIssues；默认 30 秒 |
 
-Reject unknown parameters and malformed/oversized UUIDs before effects. Cancellation is checked before/after native work. Save has a 60-second cooperative budget; no camera command queue exists in the function domain. App rejects overlap and stale foreground/root/task ownership. open does not promise model readiness; close joins native/perception cleanup.
+✅ 每个入口拒绝未知键。UUID 字符串最多 36 字节；缺省照片参数被传为 nil。open/close/flip 在调用前后检查取消；拍摄与处置在调用前检查取消，原生工作及其取消清理由端点实现。
 
-Host binds scheduled Actions and fixed returning Tools; Photographer model declares Camera Actions only. Direct typed UI publication and conversational Photographer task selection use the same functions. Photo read authorization retains original source/session/input; no fabricated capture/album success is returned.
+❌ savePhoto/ignorePhoto 的声明将 photoID 标为必填，而函数体允许省略。调用者应使用实际拍摄回执中的明确 UUID；声明与直接调用解析的统一仍待实现。
 
-✅ Typed camera commands, capture and photo disposition are implemented.
+## 数据流与失败边界
 
-## Related design
+函数等待真实端点结果后编码回执，不推断模型就绪或物理效果。open/close 的 enabled 来自已完成的目标操作，flip 的 facing 来自已完成的目标选择；这些不是额外原生状态查询。照片像素和 JPEG 读取通过能力端口保留 source/session/input 所有权，不作为普通字符串参数传输。
 
-[Parent design](../README.md) · [Support](Support/README.md)
+生产端点检查前台、相机启用、操作重叠、照片身份与呈现状态。savePhoto 的相册导入、离场呈现和反馈由端点组合；已导入的照片不会因后续反馈失败被撤销。回执可携带反馈问题。重复保存明确的已保存 UUID 可返回 alreadySaved。ignorePhoto 处理当前预览，不表示删除相册照片。
 
-## Action-owned documentation and Skill instruction contract
+本域没有请求队列、缓存或常驻捕获任务。权限拒绝、忙、未启用、后台或照片不可用通过类型化错误传播；是否已经发生部分效果以端点的实际状态和回执为准。
 
-✅ 本域函数用 `@Action(doc:parameters:)` 维护说明与参数契约。所属模块注册自动生成声明投影；业务顺序和调用示例由 Skill Instructions.md 教学，不再登记 examples。
-
-## Channel-owned Action ordering
-
-✅ Function metadata and business attributes have no serialization key. Scheduled ordering belongs to [ChannelScheduler](../../Gateway/Output/Scheduling/README.md); resources/budgets and native capability admission remain explicit.
-
-
-✅ 提示词精简已实现：摄影函数doc保留实际效果、结果及独有边界，移除重复流程/调度教学；Photography集中编排，参数/执行/超时不变。
-
-
-✅ Implemented: savePhoto/ignorePhoto join host departure effects after native success. Actual saved/ignored receipts can carry optional feedbackIssues; errors in effects cannot undo album import. Explicit duplicate saved UUID is idempotent after UI removal. Permission/import failure retains the current photo.
+[Actions 设计](../README.md) · [能力与回执](Support/README.md) · [宿主相机生命周期](../../App/Lifecycle/README.md)

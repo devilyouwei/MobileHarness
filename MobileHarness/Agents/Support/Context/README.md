@@ -1,5 +1,7 @@
 # Atomic Agent Context Persistence
 
+✅ 已实现（2026-10-13）：确定性角色 ApplicationControl、Memory、Photographer 在 recordSignal 调用处选择 4096 条证据/消费批次的滚动保留策略。Repository 沿用调用者指定的 retainingLast 和原子提交；Core 的默认 8192 条拒绝溢出策略保持不变，Assistant 的任务/聊天记录没有隐式淘汰；其内存 Signal 证据和批次独立限于4096条，恢复快照不保存这些证据。
+
 ## Summary
 
 Owns structured task/Skill state, fixed-task result coordination and atomic AgentCore-to-Storage context adaptation.
@@ -63,3 +65,13 @@ The owner retains repository lifetime independently of pages. Repository waiters
 ✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
 
 ✅ TaskRecord optionally retains its real sessionID (additive Codable compatibility). Host close cancels matching active/waiting Task and temporary input Skills; legacy Tasks resolve session through recorded input work. roundCompleted accepts cancellation separately from failure and never manufactures a failure reason for cancellation.
+
+
+## Task history indexing and in-place compression
+
+✅ Implemented: Task terminal transition and indexed history compression commit atomically after execution barriers. Compression retains source request IDs/owning input IDs, goal, actual terminal status, reported summary and failure. Cancel/failure/recovery share this path. No TaskSkill v1 migration remains; invalid or absent compression never suppresses raw evidence.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：会话正文不再通过 Assistant 的通用 context 文件提交。Assistant 内存仓库承担原子版本与任务归属，小恢复快照由会话 checkpoint 捕获。保留其他角色持久化和4096条证据策略，删除重复历史全量序列化。

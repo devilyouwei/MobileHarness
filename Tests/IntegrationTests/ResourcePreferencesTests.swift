@@ -42,6 +42,43 @@ private actor PreferenceBindingFixture: ModelResourceCapability {
     func cancel(_ id: String) async throws {}
     func remove(_ id: String) async throws {}
 }
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func saturatedControlArchiveRestoresPreferencesAcrossRootGatewayAndPersistsRetention() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let seed = try saturatedEvidenceContext(agent: .applicationControl, state: ApplicationControlContextState())
+    let contextURL = root.appendingPathComponent("applicationControl.context.json")
+    let document = try LocalDocumentStore<AgentContext<ApplicationControlContextState>>(
+        url: contextURL, maximumBytes: 64 * 1024 * 1024)
+    try await document.save(seed, expecting: nil)
+    let repository = try AgentContextRepository.persistent(
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state, url: contextURL)
+    let preferences = try LocalDocumentStore<ModelResourcePreferences>(
+        url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
+    let saved = ModelResourcePreferences(
+        endpoint: "https://hf-mirror.com", useCustomRecognition: true, useCustomSynthesis: true)
+    try await preferences.save(saved, expecting: nil)
+    let installed = InstalledPreferenceFixture()
+    await installed.set(["nemotron", "moss-tts-nano"])
+    let binding = PreferenceBindingFixture()
+    let runtime = try resourceRuntime(
+        binding, preferences: preferencesService(preferences, installed: installed), suppliedContext: repository)
+    for _ in 0..<2 {
+        let result = try await runtime.preferences(.restoreSource)
+        let restored = try JSONDecoder().decode(ModelResourcePreferences.self, from: Data(result.utf8))
+        #expect(restored == saved)
+    }
+    #expect(await binding.calls == [[true, true], [true, true]])
+    #expect(await runtime.agent.status().lifecycle == .running)
+    await runtime.shutdown()
+    let reopened = try AgentContextRepository.persistent(
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state, url: contextURL)
+    let snapshot = try await reopened.snapshot()
+    #expect(snapshot.records.count == 4096 && snapshot.consumedBatches.count == 4096)
+    #expect((snapshot.evictedRecordCount ?? 0) >= 4097 && (snapshot.evictedBatchCount ?? 0) >= 4097)
+    #expect(try await preferences.refresh()?.value == saved)
+}
 @Test(.actionCatalog) func preferenceLegacyDocumentAndViewDraftRemainWireCompatible() throws {
     let raw = Data(#"{"endpoint":"https://hf-mirror.com","allowsCellular":false,"preferDownloadedSpeech":true}"#.utf8)
     let value = try JSONDecoder().decode(ModelResourcePreferences.self, from: raw)

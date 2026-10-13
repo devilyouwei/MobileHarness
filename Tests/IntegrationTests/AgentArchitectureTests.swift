@@ -18,6 +18,120 @@ private struct TaskFixtureState: AgentContextState {
     var receipts: [UUID] = []
     var reports: [AgentTaskSignal.Kind] = []
 }
+
+/// A decoded durable snapshot already at both Core evidence limits; no user data is used.
+func saturatedEvidenceContext<State: AgentContextState>(agent: AgentID, state: State) throws -> AgentContext<State> {
+    let seed = AgentContext(agentID: agent, scopeID: UUID(), state: state)
+    let records = try (0..<8192).map { _ in
+        try AgentContext<State>.Record(kind: "fixture.evidence")
+    }
+    let batches = try records.enumerated().map { index, record in
+        try SignalBatch(taskID: UUID(), signalIDs: [record.id], admissionSequence: UInt64(index + 1))
+    }
+    var wire = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(seed)) as? [String: Any])
+    wire["records"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(records))
+    wire["consumedBatches"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(batches))
+    let decoded = try JSONDecoder().decode(
+        AgentContext<State>.self, from: JSONSerialization.data(withJSONObject: wire))
+    try decoded.validate(agent: agent, scope: seed.scopeID)
+    return decoded
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func saturatedApplicationControlContextRetainsEvidenceAndKeepsSettingsAvailable() async throws {
+    let seed = try saturatedEvidenceContext(agent: .applicationControl, state: ApplicationControlContextState())
+    var defaultPolicy = seed
+    #expect(throws: CommunicationError.capacityExceeded) {
+        try defaultPolicy.append(.init(kind: "fixture.overflow"))
+    }
+    let context = AgentContextRepository(
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state,
+        persistence: .init(load: { seed }, commit: { _, _ in }))
+    let session = UUID()
+    let agent = try ApplicationControlAgent(sessionID: session, context: context)
+    try await agent.start()
+    try await agent.receive(
+        AppEnvironmentFact(category: .scene, sequence: 1, value: "active").input(sessionID: session))
+    let first = try await context.snapshot()
+    #expect(first.records.count == 4096 && first.consumedBatches.count == 4096)
+    #expect(first.evictedRecordCount == 4097 && first.evictedBatchCount == 4097)
+    #expect(first.records.first?.id == seed.records[4097].id)
+    #expect(first.state.environmentContracts == ["scene"])
+    try await agent.receive(ModelResourceIntent.restoreSource.input(sessionID: session))
+    var outputs = agent.outputs.makeAsyncIterator()
+    let output = try #require(await outputs.next())
+    guard case .toolCall(let call) = output.output else {
+        Issue.record("Expected model preferences restoration")
+        await agent.stop()
+        return
+    }
+    #expect(call.toolPath == "System.ModelResources.restoreSource")
+    let second = try await context.snapshot()
+    #expect(second.records.count == 4096 && second.consumedBatches.count == 4096)
+    #expect(second.evictedRecordCount == 4098 && second.evictedBatchCount == 4098)
+    #expect(second.state.pendingCallIDs == [call.id])
+    #expect(await agent.status().lifecycle == .running)
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func saturatedMemoryContextKeepsHistoryRefreshAvailable() async throws {
+    let seed = try saturatedEvidenceContext(agent: .memory, state: MemoryContextState())
+    let context = AgentContextRepository(
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state,
+        persistence: .init(load: { seed }, commit: { _, _ in }))
+    let session = UUID()
+    let agent = try MemoryAgent(sessionID: session, context: context)
+    try await agent.start()
+    var outputs = agent.outputs.makeAsyncIterator()
+    for _ in 0..<2 {
+        try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session))
+        let output = try #require(await outputs.next())
+        guard case .toolCall(let call) = output.output else {
+            Issue.record("Expected history presentation")
+            await agent.stop()
+            return
+        }
+        #expect(call.toolPath == "UI.HistoryPresentation.showHistory")
+    }
+    let snapshot = try await context.snapshot()
+    #expect(snapshot.records.count == 4096 && snapshot.consumedBatches.count == 4096)
+    #expect(snapshot.evictedRecordCount == 4098 && snapshot.evictedBatchCount == 4098)
+    #expect(snapshot.state.pendingRequestIDs.isEmpty)
+    #expect(await agent.status().lifecycle == .running)
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func saturatedPhotographerContextPreservesAdmittedCameraRequest() async throws {
+    let seed = try saturatedEvidenceContext(agent: .photographer, state: PhotographerContextState())
+    let context = AgentContextRepository(
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state,
+        persistence: .init(load: { seed }, commit: { _, _ in }))
+    let session = UUID()
+    let agent = try PhotographerAgent(sessionID: session, context: context)
+    try await agent.start()
+    let intent = PhotographerCameraIntent(.open)
+    try await agent.receive(intent.input(sessionID: session))
+    var outputs = agent.outputs.makeAsyncIterator()
+    let output = try #require(await outputs.next())
+    guard case .toolCall(let call) = output.output else {
+        Issue.record("Expected admitted camera call")
+        await agent.stop()
+        return
+    }
+    #expect(call.toolPath == "Camera.Capture.open" && call.id == intent.requestID)
+    let first = try await context.snapshot()
+    #expect(first.records.count == 4096 && first.consumedBatches.count == 4096)
+    #expect(first.evictedRecordCount == 4097 && first.evictedBatchCount == 4097)
+    #expect(first.state.cameraRequestID == intent.requestID)
+    try await agent.receive(PhotographerCameraIntent(.cancel, requestID: intent.requestID).input(sessionID: session))
+    let second = try await context.snapshot()
+    #expect(second.evictedRecordCount == 4098 && second.evictedBatchCount == 4098)
+    #expect(second.state.cameraRequestID == nil)
+    #expect(await agent.status().lifecycle == .running)
+    await agent.stop()
+}
 private actor TaskFixtureChat: ChatCapability {
     let availability: CapabilityAvailability = .available
     private(set) var requests: [ChatRequest] = []

@@ -233,3 +233,13 @@ ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed 
 ## Streaming TTS latency
 
 ✅ Canonical activation/cue tests remain. Reply-policy and PCM drain/lease/cancellation regressions belong to IntegrationTests. There is no playback acoustic-tail helper or associated test suite.
+
+
+## Task history v2 and in-place compression
+
+✅ Implemented: History adapter regressions cover exact per-request Task membership, compressed archived Task retention, chronology and expandable raw source projection. Existing bounded image-read and cancellation contracts remain.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：历史详情按ID加载、元数据列表、取消保存与标题任务不阻塞新会话。

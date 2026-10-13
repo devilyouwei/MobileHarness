@@ -115,7 +115,8 @@ private enum AudioDetectionError: LocalizedError {
         recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
         update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void
     ) throws {
-        let configuration = try AgentConfigurations.load(named: "SpeechPerception")
+        let configuration = try AgentConfigurations.load(named: "SpeechPerception").restrictingCommunication(
+            to: ["media.audio", "sound.source"], contracts: AgentContracts.communication)
         policy = try CommunicationPolicy(
             contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
             configurations: [configuration])

@@ -73,6 +73,7 @@ extension PhotographerContextState {
 
 public struct PhotographerSignalPreprocessor: SignalPreprocessor {
     public static let outputCapacity = 256
+    static let evidenceCapacity = 4096
 
     public init() {}
     public func classify(_ input: AgentInput, state: PhotographerContextState) throws -> SignalDisposition {

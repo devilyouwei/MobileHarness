@@ -46,7 +46,7 @@ flowchart TD
 | AppContainer.swift | Managed capability handles, model preparation, voice/diagnostic construction, memory warnings and retained interaction lifetime |
 | Behaviors | Frozen business catalog and explicit protocol projections |
 
-ModelKitDefaults is the process-wide registration/manager owner. CurrentChatCapability resolves the configured binding per request; each role receives its own context repository. History reads the Assistant repository rather than creating a writable copy. Camera and history share the bounded CapturedPhotoStore. Audio ownership uses StorageAudio.
+ModelKitDefaults is the process-wide registration/manager owner. CurrentChatCapability resolves the configured binding per request; each role receives its own context repository. History reads the current Assistant memory repository and separate archive files through the shared history facade. Camera and history share the bounded CapturedPhotoStore. Audio ownership uses StorageAudio.
 
 ## Resource and endpoint wiring
 
@@ -121,3 +121,15 @@ Preparation errors propagate before admitting dependent work. Interactive scene 
 
 
 ✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+
+
+## Task history v2 and in-place compression
+
+✅ Implemented: ApplicationRuntime uses current.json with independent archives and a pure-memory Assistant context. Old assistant.context.json and assistant.history-v2.context.json are unused; no import or migration.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：ApplicationRuntime 构造纯内存 assistantContext，连接新 ConversationFileStore（current.json/index.json/独立归档）及恢复闭包。Assistant 当前状态与会话以相同捕获快照保存，所有归档不载入 context。
+
+✅ AppAssembly 同步注入按会话ID的历史详情读取闭包；任务页只有显式打开时才遍历归档任务，普通列表不加载正文。

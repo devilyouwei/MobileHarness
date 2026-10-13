@@ -235,7 +235,8 @@ MobileHarness/
 │   ├── Input/                   # External/internal admission and delivery
 │   └── Output/                  # Validation, routing, scheduling, results/resources
 ├── Actions/
-│   ├── Contracts/               # FunctionContracts: protocol-neutral function interfaces
+│   ├── Support/                 # Shared macro declarations and production catalog composition
+│   │   └── Contracts/           # FunctionContracts: independent protocol-neutral interfaces
 │   ├── NexArm/
 │   ├── Speech/
 │   ├── History/
@@ -288,10 +289,10 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `Agents/Support/Core/` | AgentCore | None |
 | `Agents/` excluding `Support/Core/` | Agents | AgentCore, ModelKit, PlatformKit, Storage, StorageChat, StorageAudio, FunctionContracts |
 | `Gateway/` excluding Runtime/Registration/Protocols | Gateway | AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime |
-| `Actions/Contracts/` | FunctionContracts | None |
+| `Actions/Support/Contracts/` | FunctionContracts | None |
 | `Gateway/Runtime/` | ExecutionRuntime | FunctionContracts |
 | `Gateway/Output/Registration/` and `Protocols/` | CallRuntime | FunctionContracts, ExecutionRuntime |
-| `Actions/` excluding `Contracts/` | Actions | FunctionContracts, PlatformKit, BehaviorDefinitions, StorageChat, Storage |
+| `Actions/` excluding `Support/Contracts/` | Actions | FunctionContracts, PlatformKit, BehaviorDefinitions, StorageChat, Storage |
 | `Storage/` core | Storage | None |
 | `Storage/Chat/` | StorageChat | Storage |
 | `Storage/Audio/` | StorageAudio | Storage |
@@ -348,7 +349,7 @@ This section is an architectural directory. It describes why each module exists 
 | [AgentCore](Agents/Support/Core/README.md) | Define Agent identity, input/output, capability, communication and lifecycle contracts. | Stable independent vocabulary; no concrete cognition or host services. | Organization of the nervous system. |
 | [Gateway](Gateway/README.md) | Validate input/output, route messages, schedule Actions and coordinate results/resources. | Coordination only; no inference or domain behavior implementation. | Neural pathways and motor coordination. |
 | [Actions](Actions/README.md) | Implement callable UI, speech, camera, history, system and NexArm behavior. | Owns business parameters and completion policy; knows no calling protocol and consumes foundational/injected capabilities. | Learned behavior. |
-| [FunctionContracts](Actions/Contracts/README.md) | Define standard function inputs, outputs and constraints. | No runtime, Channel or calling protocol dependency. | Shared function contracts. |
+| [FunctionContracts](Actions/Support/Contracts/README.md) | Define standard function inputs, outputs and constraints. | No runtime, Channel or calling protocol dependency. | Shared function contracts. |
 | [ExecutionRuntime](Gateway/Runtime/README.md) | Store and execute canonical functions. | Depends only on FunctionContracts; joined deadlines and cancellation. | Shared execution machinery. |
 | [CallRuntime](Gateway/Output/Registration/README.md) | Bind and adapt scheduled/native calls. | Depends on FunctionContracts and ExecutionRuntime; no AgentCore. | Calling protocol views. |
 | [ModelKit](ModelKit/README.md) | Expose typed speech, language and vision processing capabilities. | Base SDK knows neither Agent policy nor device I/O; engines live in adapters/backends. | Recognition and generation machinery. |
@@ -362,7 +363,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **Agents.** Assistant owns all user conversation, dynamic bundled Skills, one foreground goal-based Task and ReACT. Photographer owns deterministic camera/tracking workflows; Memory owns history/title transactions; ApplicationControl owns configuration/device/environment transactions. Media Agents retain VAD/ASR, synthesis and visual inference. Resources catalog contains v7 Agent fixed-function declarations and v1 Skill configuration. Functions remain in Actions; neutral metadata is supplied through FunctionContracts. Effective catalogs are frozen per model request and checked by Gateway. Independent background work can still use directed send; ordinary photography stays in Assistant.
 
-**Behavior.** Actions owns protocol-neutral callable functions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
+**Behavior.** Actions owns protocol-neutral callable functions. ✅ Shared contracts live in Actions/Support/Contracts; ActionMacro and CapabilityModules live directly in Actions/Support. FunctionContracts remains an independent target, while the macro declarations and catalog composition compile in Actions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
 **Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates reusable mechanisms from Chat and Audio domains. ModelKit, PlatformKit and StorageAudio own their separate capability/storage contracts.
 
@@ -939,6 +940,8 @@ Model finish reasons (`stop`, `toolCalls`, `lengthLimit`) record provider termin
 
 #### Context, evidence and Task boundaries
 
+History v2 explicitly separates immutable request-start decisionMetadata from request historyTaskID. The startTask-producing request is assigned to the new Task in the same transaction. Terminal Task status and a conversation-owned compression (stable input/request source IDs, goal, reported summary and real failure) commit together after barriers. Model, UI and query projections replace only those indexed sources at their first historyOrder; current/ordinary/raw execution evidence remains durable. New inputs and same-input Task-boundary continuations share this projection. App exclusively opens assistant.history-v2.context.json; previous Assistant contexts are unused without decoding/import/migration. Compression is derived from existing finish/cancel summary plus host terminal facts, without extra inference.
+
 Continuation retains the original input/session, request options, cumulative budget and selected ChatCapability, then rejoins FIFO behind admitted inputs. Resumption rebuilds the effective Skill system prompt/native definitions, refreshes facts/task reports and incorporates eligible intervening completed requests. Facts remain user-role data before the current input or the complete native-call/result group. A request catalog is immutable during its invocation; `loadSkills`/`startTask` can expose new functions only in later requests.
 
 The next request includes assistant output, every native call/result pair, qualifying Action observations and optional owned photo attachments. Failed Agent attempts retain error text, partial output and actual call/effect evidence in history and terminate the chain. No automatic effect replay occurs; the model chooses a new authorized action, asks the user or stops. History preserves the failed input and allows a fresh user input; journals store derived `requiresReasoning` rather than configurable policy.
@@ -1385,7 +1388,7 @@ After joining a failed original resource worker, eligible host admission/dispatc
 
 `System.Device.control` validates operation-specific fields before native invocation; submission is acceptance, while late finite/jog/tracking outcomes remain independent. ApplicationControl retains sequenced environment categories and accepts facts/feedback while paused without starting model work. App samples device/camera capability facts once per second while foreground and publishes scene/navigation changes separately. `runtimeInfo` retains the fixed behavior described in the [function inventory](#canonical-functions-and-protocol-bindings).
 
-Assistant, Photographer, Memory and ApplicationControl have independent durable contexts. HistoryPresentationAdapter reads the Assistant repository and converts one immutable snapshot into UI-owned values. Fixed specialists retain transaction/task state without a chat schema. Streaming perception/synthesis evidence has no conversation archive UI.
+Assistant owns an in-memory context and conversation checkpoints; Photographer, Memory and ApplicationControl have independent durable contexts. HistoryPresentationAdapter reads the Assistant repository and converts one immutable snapshot into UI-owned values. Fixed specialists retain transaction/task state without a chat schema. Streaming perception/synthesis evidence has no conversation archive UI.
 
 历史记录 exposes only Assistant 聊天记录 and 任务记录. Assistant supports current/archive navigation and confirmed mutations. Task records project persisted foreground input membership and registered background-task state; continuation and later inputs stay grouped across archives. Missing task dates remain absent.
 
@@ -1417,11 +1420,11 @@ Parser preview uses the exact persisted Assistant request catalog and shared par
 
 History images are authorized metadata references, up to four per context. Reads validate selected producer/input association before accessing CapturedPhotoStore. UI page reads cancel with their owner, permit at most 4 MiB each and prepare 320-pixel thumbnails/2048-pixel full preview. Missing files return absent; wrong ownership/corrupt length fails visibly.
 
-Storage uses atomic, revision-checked documents (64 KiB by default; Agent contexts explicitly use 64 MiB). File storage confines paths, rejects descendant symlinks and validates reservations/free space before non-overwriting publication. Current histories use the [atomic context contract](#composition-startup-and-lifetime); StorageChat supplies bounded transactional history values. Cross-process writers, cross-device sync and semantic retrieval remain absent. See [Storage](Storage/README.md) for the underlying mechanisms.
+Storage uses atomic, revision-checked documents (64 KiB by default; Agent contexts explicitly use 64 MiB). File storage confines paths, rejects descendant symlinks and validates reservations/free space before non-overwriting publication. Current history uses StorageChat current/individual-archive checkpoints; the Assistant context is memory-only. Cross-process writers, cross-device sync and semantic retrieval remain absent. See [Storage](Storage/README.md) for the underlying mechanisms.
 
 ### Settings audio detection
 
-音频识别 includes an explicit 10-second microphone/spatial diagnostic. PlatformKit exposes native input/capability/fallback facts; App Lifecycle owns an isolated capture and source-only SpeechPerception session through both Gateways; AppDiagnosticWorkflow owns admission, freshness/deadline monitoring and joined cleanup; UI owns simple result presentation. Actual received layout distinguishes four-channel capture from mono fallback. The diagnostic session performs no model warmup and starts no conversation, Photographer consumer or robot action. Retry becomes available only after endpoint/monitor cleanup joins and the operation slot is released.
+音频识别 includes an explicit 10-second microphone/spatial diagnostic. PlatformKit exposes native input/capability/fallback facts; App Lifecycle owns an isolated capture and source-only SpeechPerception session through both Gateways; AppDiagnosticWorkflow owns admission, freshness/deadline monitoring and joined cleanup; UI owns simple result presentation. Actual received layout distinguishes four-channel capture from mono fallback. The diagnostic session performs no model warmup and starts no conversation, Photographer consumer or robot action. ✅ Its loaded communication declaration is restricted to media.audio and sound.source so the single-Agent scope has no Assistant reply-activity subscription dependency. Retry becomes available only after endpoint/monitor cleanup joins and the operation slot is released.
 
 ### PlatformKit versus ModelKit
 
@@ -2008,3 +2011,13 @@ flowchart LR
 ## Streaming TTS latency
 
 ✅ Apple initial PCM, smaller first text segments and fenced native synthesizer reuse remain implemented. SpeechPerception owns listening policy; App resumes capture immediately after playback/lease cleanup and policy release, with no fixed post-reply wait. Native acknowledgments, consent, session/revision fences and confirmed-utterance barriers remain.
+
+
+## Task history indexing and in-place compression
+
+✅ Implemented: Task history v3 uses request-owned historyTaskID, conversation-owned indexed terminal compressions and one chronological projection shared by fresh inputs/Task-boundary continuations. App starts a fresh Assistant memory repository and uses current.json plus per-conversation archives; old contexts are never imported. UI shows inline expandable Task summaries and exact request membership.
+
+
+## 会话存储性能重构 v3
+
+✅ 会话存储 v3：Assistant 的当前会话与恢复快照独立存为 current.json，每个归档为 conversation-<稳定会话ID>.json；小 index.json 仅保存列表元数据。生成及任务状态在内存中更新，用户输入结束与整条 Assistant 决策终态才提交快照；取消收尾保存由根所有者持有。崩溃允许丢失未保存回复，不重放任何设备动作。旧 Assistant context/history 不读取、不导入。

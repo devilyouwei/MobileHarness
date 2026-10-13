@@ -69,7 +69,7 @@ Skill 加载验证依赖、canonical 函数、别名、Channel 后整体提交�
 
 startTask 的 goal 为必填；skills 为可选 JSON ID 数组，execution 缺省 foreground。后台还需要 target、businessContract、payload，校验目标声明后通过通信 Action/send 提交。一个前台任务；最多 16 个非终态后台任务，Registry 保留 256 条记录。投递确认、取消确认和最终结果严格区分。父任务结束不自动取消后台工作。后台消息不触发前台推理、抢占或播放。生产后台契约暂未声明，公共路径由合成执行者验证。
 
-Skill 所有权分为 base、decision、task。默认决策链结束释放临时能力；startTask 转移同链加载的能力并原子添加指定 Skill；任务等待用户保持能力。任务结束经过执行/回复清理恢复基础能力。不提供任务栈。v1 状态迁至 v2 时中断未结束任务，旧 mode 只保留在历史 TaskRecord/请求证据中。
+Skill 所有权分为 base、decision、task。默认决策链结束释放临时能力；startTask 转移同链加载的能力并原子添加指定 Skill；任务等待用户保持能力。任务结束经过执行/回复清理恢复基础能力。不提供任务栈。只接受当前格式，不导入旧 Task 或会话状态。
 
 
 ✅ Resource-path contract: pure Agent and Skill assets move to MobileHarness/Resources/{Agents,Skills} with Catalog.json. Agents retains loading and policy ownership. Package sources remain limited to Agents; explicit copies exclude unrelated app/model assets. Bundle catalog lookup establishes the runtime root without repeating Resources. Regression covers flat and Resources-containing Bundle lookup plus missing catalog failure; final packaging checks compare indexed asset bytes. Device acceptance is recorded separately.
@@ -138,3 +138,16 @@ flowchart LR
 ## Streaming TTS latency
 
 ✅ Shared Chat owns first-segment speech policy (20 Han / 60 other Characters, subsequent 60/120); Generation keeps generic segmentation state. Directed synthesis, identities, FIFO and rejection bounds stay unchanged.
+
+
+## Task history v2 and in-place compression
+
+✅ Implemented: Agents own request history membership and terminal compression policy; StorageChat supplies neutral records only. Task closure builds an indexed compression from reported finish summary and actual terminal status/failure in the same repository transaction. No additional inference or compatibility migration is added.
+
+
+✅ 确定性角色 ApplicationControl、Memory、Photographer 显式选择最近 4096 条 Signal 证据和消费批次的滚动保留并持久化淘汰计数，避免根服务运行累计记录到 8192 条后终止。业务关联和任务独立保存；策略由角色拥有，Assistant 聊天/Task 历史和 Core 默认溢出拒绝策略不受此策略影响。
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：Assistant context 改为纯内存，当前聊天经同一内存 context 事务更新；持久化由会话结束 checkpoint 捕获会话和小型恢复状态，不保留历史 Signal 证据。Skill/任务恢复只标记中断，不重放。移除逐delta持久化屏障。

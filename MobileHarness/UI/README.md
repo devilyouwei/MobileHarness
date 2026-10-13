@@ -88,3 +88,21 @@ Native visual acceptance is recorded in [validation history](../../docs/Validati
 
 
 ✅ ExecutionIssue 已增加可选 userMessage 展示值，日志 message 不变；首页 visibleNotice 优先使用宿主提供的 userMessage，错误 toast 的身份、去重、到期和日志面板保持现有行为。UI 不解析语音 SDK 错误。
+
+
+## Task history v2 and in-place compression
+
+✅ Implemented: UI exposes passive indexed history compressions and a chronological timeline. Task summaries expand to original model request details; UI never chooses persistence or constructs business summaries.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：历史列表使用元数据计数和标题，正文详情异步按ID加载；删除 delta/fragments UI 字段，使用完整 response。
+
+✅ Settings renders task metadata and requests as independent cells in a contiguous timeline with increased internal padding and native separators, without per-item Section margins or task headings. Only ordinary timeline requests/task metadata have distinct icons; expanded task requests omit icons and place the orange ReACT badge after bottom status. One page-local request destination and immediate expansion remain implemented. Native layout/gesture acceptance remains pending.
+
+✅ First-level boundaries span the full card, while Task source text/internal separators align to the primary icon-adjacent text column. Native simulator screenshots verify collapsed/expanded static layout using real UI code and synthetic data independently of unavailable model runtime dependencies; gestures and model/storage acceptance remain separate.
+
+✅ Settings history detail uses User Request / Assistant Response / Tasks and Skills / Prompts / Action Execution / Generation Meta headings. Share exports the Codable value shown by each page as public.json with a stable .json filename, preserving raw fields. Native transfer requests perform bounded encoding on demand; no formatted diagnostic-text export remains. Native share-target acceptance remains separate.
+
+✅ Function Catalog belongs to Tasks and Skills; Parsed Output and Generation Meta contents are shown directly without their disclosure wrapper rows or expansion state. JSON sharing and single-level navigation retain their existing contracts.

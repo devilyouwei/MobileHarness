@@ -1,68 +1,73 @@
-# System Values, Staging and Transactions
+# System Support — 资源值、私有暂存与配置事务
 
-## Summary
+## 简介
 
-Explicit catalogs and neutral resource/provider/device policy with bounded private request staging and atomic persistence.
+提供 System 的五个目录、资源事实与偏好、Provider 私有请求暂存/事务/凭据文档，以及设备控制值。业务规则属于本目录，文件一致性和原生服务由 Storage 与注入端点负责。
 
-## Ownership and boundaries
-
-Catalogs do not own protocol registration. Services own transaction meaning; Storage owns file primitives, injected App callbacks own SDK/native/Keychain work. Model capability binding is not performed by preference persistence itself.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
- Entries[System entry functions] --> Modules[System, Provider, Device and ModelResources modules]
- Modules --> Preferences[ModelResourcePreferencesService]
- Modules --> Requests[Provider request staging]
- Requests --> Transaction[ProviderSettingsService]
- Preferences --> Storage
- Transaction --> Store[ProviderSettingsStore]
- Store --> Storage
- Store --> Keys[Injected credential primitives]
- Transaction --> Native[Injected prepare, barrier and apply]
+    Entries[System 函数入口] -->|目录与业务服务| S[System/Support]
+    Host[App 组合与原生能力] -.->|校验绑定凭据和设备端点| S
+    S -->|原生效果与状态请求| Host
+    S -->|文档读写| Storage
+    UI[Actions/UI] -->|资源事实和呈现分类| S
+    Catalog[Actions 共用目录组合] -->|目录构造| S
+    Contracts[FunctionContracts] -.->|目录与控制端口类型| S
 ```
 
-## Resource preferences and inventory
+## 内部模块关系
 
-Preferences use a 4096-byte revision-checked document and legacy decoding. One mutation rejects overlap. Restore reconciles networking/missing-model flags; save validates current prerequisites before commit. Typed source/recognition/synthesis errors retain exact producer codes. Binding happens as a separate selected function; committed source survives later binding failure.
+```mermaid
+flowchart TB
+    ResourceModule[ModelResourcesModule] --> Inventory[ModelResourceInventory]
+    ResourceModule --> Preferences[ModelResourcePreferencesService]
+    ProviderModule --> Discovery[ProviderDiscoveryRequests]
+    Discovery --> Models[ProviderModelList]
+    ProviderModule --> Requests[ProviderSettingsRequests]
+    Requests --> Service[ProviderSettingsService]
+    Service --> Store[ProviderSettingsStore]
+    Store --> Credentials[ProviderCredentialStorage 接口]
+    DeviceModule --> Device[DeviceControlRequest / Capability]
+    TaskControlModule --> Task[TaskControlCapability 接口]
+    SystemModule --> Info[runtimeInfo 工厂]
+```
 
-Inventory permits 64 unique items/65,536 UTF-8 bytes. ID/name/revision/license/failure limits are 64/256/512/512/1024 bytes; counters are nonnegative. Whole-result validation rejects invalid/duplicate/oversized state. The callable computes installedGroups: Nemotron recognition, MOSS synthesis, Gemma language and YOLO vision; Silero is optional. Native adapter returns raw neutral facts only. read(using:) shares cancellation/read/validation between query and presentation.
+## 目录与值接口
 
-## Private provider staging
+✅ ModelResourcesModule、ProviderModule、DeviceModule、TaskControlModule、SystemModule 各绑定其实际函数。目录不选择调用协议或模型权限。TaskControlModule 只注入中立端口，SystemModule 只提供固定信息函数。
 
-Discovery staging retains at most 32 unclaimed/completed requests, ten-second claim deadline, session validation and explicit discard. Configuration URL/key is private bounded data; claim consumes once before SDK await. Settings staging retains 32 staged/active/completed slots with the same unclaimed deadline, operation/session checks and private result take/discard. Active work belongs to invoking execution; no background query queue exists.
+DeviceControlRequest 保存 operation、可选 id/value/action/fence；它的构造器不校验操作组合，校验位于 DeviceActions。DeviceControlCapability 接收标准输入，并提供状态/环境字符串；默认 readEnvironment 明确抛 unavailable。
 
-ProviderModelList validates at most 2048 IDs of ≤512 bytes, eligibility/dedup/order and ≤65,536-byte encoding. It is a heuristic application policy, not provider protocol capability discovery. ProviderModule binds four canonical functions; there is no duplicate discovery catalog.
+## 资源快照与偏好
 
-## Provider transaction and credentials
+ModelResourceInventory 是 version=1 的 Codable 值。read 从 capability 获得原始事实，并以 installed 项推导 installedGroups：recognition=nemotron、synthesis=moss-tts-nano、language=gemma4-e2b、vision=yolo26n-pose。Silero 不在这些必需集合中。
 
-ProviderSettingsService excludes/coalesces its transaction: validate/prepare before barrier/write, persist before apply, and join rollback on failed application before endChange. Preserve primary and rollback causes safely. Last-confirmed values remain after failure; explicit restore reconciles ambiguous result delivery without replaying save.
+快照最多 64 个唯一 ID、编码最多 65536 字节；ID/name/revision/license/failure 分别限 64/256/512/512/1024 UTF-8 字节，字节计数非负。active 对应 queued/downloading/verifying/deleting，progress 对总量做有界计算。decode 校验版本、条目和大小；installedGroups 的一致性推导发生于构造读取路径，validate 不重新计算已解码集合。
 
-ProviderSettingsStore owns v1 document and credential-reference schema. Injected Keychain insert/read/delete primitives retain native service/accessibility. Verify legacy migration and replacement before deleting prior credentials; protocol results contain only opaque request identity or secret-free summary. Raw SDK messages/keys never enter history or errors.
+ModelResourcePreferencesService 是 actor，惰性获取注入的 LocalDocumentStore，通过 changing 标志拒绝重叠 restore/save。restore 校验存储值并依据已安装资源关闭不可用自定义语音选项；只有联网/语音开关变化时才回写，单独 endpoint 规范化不触发写入。save 先校验源与已安装前提，再以预期 revision 保存。偏好结果编码上限 2048 字节；文档存储容量由注入 store 配置。
 
-DeviceControlRequest validates finite known operation categories and operation-specific bounded string fields; unsupported presets/motor mixtures reject. The capability returns current facts and actual native acknowledgment rather than selecting business retry.
+偏好解码支持 preferDownloadedSpeech 字段映射到两个独立开关；新编码只写当前字段。持久化不负责模型绑定，已提交偏好不会因另一项绑定失败自动撤销。
 
-✅ Bounded private staging, atomic preference/provider policy and neutral inventory are implemented.
+## Provider 请求暂存与容量
 
-## Related design
+ProviderDiscoveryConfiguration 不可 Codable，保存 URL/key 私有值。ProviderDiscoveryRequests 是 actor：stage 校验 URL/key 最大 2048/4096 字节，为待领取请求设置 10 秒期限；领取前核对 sessionID，领取时移除待领取项，再执行注入发现工作。完成结果由相同会话读取或 discard；错误转换为安全 Provider 分类。
 
-[Parent design](../README.md)
+stage 以待领取项加 completed 项少于 32 作为准入条件。❌ 发现中的请求已经移出 entries，未占用容量槽，所以此条件不是待领取/执行中/完成的总量硬上限；并发总量控制仍需宿主约束。
 
-✅ TaskControlModule assembles finite Agent.Task functions over an injected neutral TaskControlCapability; it contains no Agent state or decision policy.
+ProviderSettingsRequests 是 MainActor 所有者，共最多 32 个 staged/executing/completed 条目。未领取期限为 10 秒；session、操作种类、阶段与期限必须匹配才能执行。active 不能被 discard，完成值可 result/take，take 移除记录；执行失败移除记录。没有自动过期 worker，过期待领取项在 stage 时过滤。
 
-## Skill/task-mode contract
+ProviderModelList 对至多 2048 个非空、最多 512 字节的 ID 进行应用聊天模型族过滤、保序去重；发现暂存端点先拒绝原始重复 ID，编码拒绝超量或超 65536 字节结果。该启发式不证明远端模型的协议兼容性。
 
-✅ TaskControlModule implements real canonical Agent.Task functions. Model and trusted fixed callers reuse the same injected TaskControlCapability; permission/session/round validation belongs to the host and Gateway.
+## Provider 事务与凭据
 
-## 泛化 Task 与独立 Skill
+ProviderSettingsService 在 MainActor 上拥有 saved/restored/changing、一个共享 restoration Task 和至多 32 个恢复等待者。并发 restore 加入同一个恢复任务；恢复读取持久化后调用 prepare 返回的 apply，成功才设置已确认状态。调用者不各自创建恢复工作，单个等待者取消不等同于取消共享恢复任务。
 
-✅ TaskControlModule exposes loadSkills/releaseSkills/startTask/finishTask/cancelTask; model and trusted fixed callers share implementations. Backend send orchestration and persistence remain in Agents, not in this adapter.
+save 排斥其它更改和在途恢复：校验选项，prepare 获得 apply，加入 beginChange 屏障，持久化后应用，最终 endChange。应用失败时用独立 Task 加入持久化旧值回滚；回滚失败同时保留两个安全原因。此回滚是文档回滚，不保证原生状态能撤销。summary 仅在 restored 后返回 cloudEnabled/selectedCloudModel。
 
-✅ 2026-10-11 correction: TaskControl functions are finite committed transactions returning a bounded value, not state/completed-only operations. Regression executes each through FunctionExecutor. Task reports move out of system instructions into data messages; include only same-session live declared background tasks or the exact current directed task, not legacy terminal delegation records. Completed local outcomes are selected only for the current input. Persistent/UI task history is retained.
+ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1 的配置文档和 credentialID 引用。ProviderCredentialStorage 注入原生凭据读写；原文 key 不存入配置文档。迁移旧凭据时，先提交新文档，再重新读取并核对，成功后移除旧记录。
 
-## Action-owned documentation and Skill instruction contract
+替换时先写新凭据，再按 revision 保存文档；文档失败时尽力删除新凭据，提交成功后尽力删除旧凭据。凭据清理是 best effort，可能留下无引用记录，不将已提交配置改判为未提交。原生凭据策略及原始网络错误不进入协议结果；安全失败码与有界摘要由 ProviderSettingsError 提供。
 
-✅ 本目录 CapabilityModule 的 `@ActionCatalog` 从实际 `*Definition` 注册调用（含本类型的本地 helper）生成静态 declarations。添加已有域函数只需修改所属实现及本地依赖绑定，不再同步公共元数据列表。声明投影不捕获设备、处理器或运行会话。
+[System 入口与参数](../README.md) · [Storage 文档一致性](../../../Storage/README.md) · [共享契约](../../Support/Contracts/README.md)

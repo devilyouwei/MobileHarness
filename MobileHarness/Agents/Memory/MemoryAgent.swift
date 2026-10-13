@@ -192,7 +192,7 @@ public actor MemoryAgent: Agent {
         if case .replaceLatest = disposition { return }
         try await contextRepository.recordSignal(
             input, disposition: disposition, admissionSequence: snapshot.revision + 1,
-            consumed: disposition != .feedback
+            consumed: disposition != .feedback, retainingLast: MemorySignalPreprocessor.evidenceCapacity
         ) { context in
             context.state.pendingRequestIDs = pending
         }

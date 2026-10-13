@@ -1,61 +1,99 @@
-# NexArm Planning and Feedback Execution
+# NexArm Support — 计划、反馈执行与渐进运动规划
 
-## Summary
+## 简介
 
-Owns bounded gesture plans, native-link controller, motor completion and jog/tracking shaping below stateless entries.
+拥有有限动作几何、连接内 IK 表、电机执行状态、反馈完成算法、资源/预算元数据，以及手动和跟踪目标整形。原生编码、硬件范围和链路接口由 PlatformKit 提供。
 
-## Ownership and boundaries
-
-PlatformKit supplies packet encoding/hardware bounds/transport facts. App supplies link/foreground/connection lifetime and shared resource policy. Helpers and diagnostics do not grant model permission or create another Channel queue.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
- Entries[Gesture, Motion and Tracking functions] --> Catalog[NexArm modules and registration]
- Catalog --> Plan[Simple or composite plans]
- Plan --> Controller[NexArmActionController]
- Controller --> Link[Injected PlatformKit link]
- Link -->|Fresh timestamped feedback| Controller
- Controller --> Outcomes[Motor results and execution error]
- App[Manual and tracking worker] --> Planner[NexArmJogPlanner]
- Planner --> Link
+    Entries[NexArm 函数入口] -->|请求与元数据| S[NexArm/Support]
+    App -->|计划执行和渐进提案| S
+    App -.->|注入连接内链路| S
+    S -->|结果及失败状态| App
+    S -->|编码和观察接口| PlatformKit
+    PlatformKit -->|新鲜测量与发送准入| S
+    Catalog[Actions 共用目录组合] -->|构造目录| S
+    Contracts[FunctionContracts] -.->|预算资源与结果| S
 ```
 
-## Internal implementation
+## 内部模块关系
 
-| Source group | Responsibility |
+```mermaid
+flowchart TB
+    Module[NexArmModule / 部分目录视图] --> Types[NexArmTypes / AimTypes]
+    Module --> Registration[NexArmRegistration]
+    Registration --> Profiles[NexArmMotorProfiles]
+    Controller[NexArmActionController] --> Geometry[SimpleActions / CompositeActions / ArmPlan]
+    Geometry --> Plan[NexArmMotionPlan]
+    Controller --> Plan
+    Controller --> Tracker[NexArmSegmentTracker]
+    Tracker --> Profiles
+    Controller --> Results[MotorCompletion / MotorResult / Errors]
+    Controller --> Joint[NexArmJointCommand / ForearmLeveler]
+    Jog[NexArmJogPlanner] --> Native[原生电机协议接口]
+    Joint --> Native
+```
+
+JogPlanner 与 JointCommand/ForearmLeveler 由宿主组合使用，分别负责渐进提案与跟踪目标；两者独立使用原生电机协议。
+
+## 目录、值与连接所有权
+
+NexArmModule 绑定 gesture、base、tracking 三组工厂；NexArmGestureModule、NexArmBaseModule、NexArmTrackingModule 是复用同一工厂的部分目录视图。NexArmTypes 定义 GestureRequest、业务参数错误和报告代码，AimTypes 定义跟踪参数错误。
+
+NexArmActionController 是每条连接的 actor：保存 busy、lockedMotors、IK 缓存、软件 motorHomes、实测 cachedJoints/cachedPose、逐电机结果及 revision、兼容状态和失败状态。不在控制器内排队；忙时明确拒绝。连接终止时宿主应释放该控制器。receivePassiveFeedback 只解码测量，不发探测或运动。
+
+兼容策略有三种：passiveBLE 直接使用已建立的原生协议；strictFirmware 校验指定固件回包，仅对特定内部版本读取空结果最多读四次；nexArmBLEProtocol 校验两次姿态/关节样本及稳定性。这些读取不能证明物理运动空间安全。
+
+## 几何、归位与计划约束
+
+| 源码 | 算法与边界 |
 | --- | --- |
-| NexArmTypes / AimTypes / CapabilityModules / Module | Typed values, errors and explicit catalogs |
-| SimpleActions / CompositeActions | Motor-only head gestures, arm geometry/home and bounded IK preparation |
-| ActionController / MotionPlan / MotorExecution | Native admission, shared segment feedback/stability and motor outcomes |
-| MotorProfiles / Registration | Tolerance, empirical timeout and parameter-dependent resource/budget resolvers |
-| JogPlanner / JointCommand | Manual trajectories, tracking rest/reach and native packet construction through SDK |
+| NexArmSimpleActions | nod 电机 4、shakeHead 电机 5；中心帧加每轮五个扫动帧，振幅分别 380/500 count |
+| NexArmCompositeActions | 有限 XYZ/姿态配方，前后包含 home；NexArmArmPlan 把几何经设备 IK 编译为只含电机 1…5 的写入 |
+| NexArmMotionPlan | 1…20 步，锁定集合非空且位于 1…6；每步目标在集合内，全部目标并集必须等于锁定集合 |
+| NexArmMotorProfiles | 电机容差和基于原生速度/加速度值的经验预算 |
+| NexArmRegistration | 调用前资源集合和整体动态预算解析 |
+| NexArmJogPlanner / JointCommand | 手动速度整形、渐进跟踪和关节目标映射 |
 
-Domain entry parameters, arrival formulas and report vocabulary are specified in the parent design. One controller serializes physical operations even for disjoint motor composition. Passive BLE compatibility starts from native subscription state without unsolicited probes; missing IK is resolved only for an explicit preset. Finite production failures release their slot without a permanent admission latch.
+普通 passiveBLE 整臂归位使用参考 count `[2048,2087,1198,1238,2048]`；显式软件 motorHomes 用于单电机 reset。其它归位路径可由设备 IK 的 home `[200,0,200,0,0,0]` 解析。跟踪 rest 独立为 `[2047,2087,1984,2045,2048]`，不等同于普通 home。
 
-## Jog and tracking state
+IK 表最多 64 个几何键，检查回包地址/命令/长度、请求姿态及五个关节范围。几何 CMD8 只是待编译意图；实际运动发送使用单电机 CMD3 或同时电机组 CMD131，不将夹爪带入整臂配方。计划 frame.milliseconds 限 1…10000，作为帧信息保留；反馈执行器不以名义帧时间强制等待到位。
 
-Jog period is 30 ms, dead zone 4%, squared input and speed/acceleration/jerk ceilings 600/1800/12000 counts-based units; finite look-ahead 60 ms. Identical proposals do not resend. State advances only on native accept. Release discards future velocity and retains last finite target, without reset.
+## 逐电机反馈完成算法
 
-Tracking approach uses 200 counts/s, 100 for lift/elbow, and holds a count for one step on direction reversal. Near-target low-speed final 1–2 counts remain pending until accepted; planner completion is not physical arrival. JointCommand keeps ordinary home distinct from tracking rest; ForearmLeveler uses 40-count extension lead and six-count hysteresis. Native encoding/hardware limits remain SDK-owned.
+execute 为一个有限计划持有观察 session 和 lockedMotors，逐段发送并跟踪每个电机。发送前可读取已有最新反馈作为预算起点，但只有 sample 时间不早于本次发送起点、且 sequence/time 更新的反馈能完成新运动。
 
-## Failure and cleanup
+默认电机 1…6 容差依次为 16/20/56/32/16/24 count。NexArmSegmentTracker 优先判定截止时间内的到位样本；未到位时，以稳定锚点、两 count 默认偏差、至少两个新鲜样本和稳定时间判定 unreached。移动重新建立锚点，静默不能累计稳定区间。
 
-Manual recipes use the same performPlan segment executor as scheduled functions; App's cancellable child owns replacement/join. ActionFunction resource union and inherited permit fence composed Agent writes. Report sinks are invocation-private; original error and child outcomes survive. No duplicate encoder/executor, compensating move or accepted-write replay exists.
+```text
+ramp = 0.4 * sqrt(30 / acceleration)
+expected = distance / speed + ramp + 0.2
+motionTimeout = 3 * expected + 1.2
+stableOffTarget = max(0.6, 8 / speed + ramp)
+```
 
-✅ Bounded planning, shared feedback execution and acceptance-fenced jog state are implemented.
+distance 来自已取得的位置；未知时取目标到合法区间两端的最大距离。时间单位为秒，转换为毫秒时向上取整。这是实现中的经验预算，不将寄存器加速度解释成已标定的物理单位。
 
-## Related design
+观察/未准入重试间隔为 20 毫秒，单段发送准入上限一秒。默认反馈缺口上限两秒，丢失或断连后将后续段标为未启动并禁止继续写入。普通目标未到位或电机 deadline 到期不丢掉结果，继续后续段。NexArmMotorCompletion 可指定合法容差、稳定/反馈时间和 timeout，实际稳定窗口取策略与估计的较大值。
 
-[Parent design](../README.md)
+## 状态、失败与清理
 
-## Action-owned documentation and Skill instruction contract
+NexArmMotorResult 保存 step/motor/target/observed/failure/started；最多 20 步乘六电机的结果量由计划边界推导。控制器保留最早真实执行异常，并加入观察会话关闭后返回；cancelled 停止后续发送，剩余叶子记为未启动取消。
 
-✅ 本目录 CapabilityModule 的 `@ActionCatalog` 从实际 `*Definition` 注册调用（含本类型的本地 helper）生成静态 declarations。添加已有域函数只需修改所属实现及本地依赖绑定，不再同步公共元数据列表。声明投影不捕获设备、处理器或运行会话。
+失败分为 targetNotReached、timedOut、feedbackLost、disconnected、sendingFailed、admissionFailed、feedbackFailed、cancelled。发送返回未准入时可在一秒窗口内重新提议，已经接纳的运动不自动重放。unreachedSegments、lastFailure、motionFailure 保留诊断分类；它们不是自动重连指令。
 
-## Action timeout contract (2026-10-12)
+有限 execute 开始时重置 faulted，不把旧失败永久封锁为新的运动准入。独立 aim/readState/verifyCompatibility 路径对 faulted 有限制；recoverState 是只读测量恢复，加入稳定样本检查后清除该状态，不重发运动。
 
-✅ NexArmRegistration 使用共享预算组合算法和动作帧数，避免单独维护段数公式；MotorProfiles 的未接入 plan 预算方法删除，实际电机 deadline 仍由 ActionController 逐段用实时位置计算。
+## 手动与跟踪渐进规划
+
+JogPlanner 保存六个位置/速度/加速度/最后已提交 count。周期 30 毫秒，输入死区 4%，死区外平方映射；上限为 600 count/s、1800 count/s²、12000 count/s³。单次积分 dt 最多 60 毫秒，有限目标采用 60 毫秒前视，相同目标不重复发送。提案由 accept 提交；stop 保留最后有限目标并清零后续速度，不生成回零动作。
+
+approach 仅允许电机 1…5，默认跟踪上限 200 count/s；供肩/肘使用的 aimReachSpeed 为 100。反向且仍有明显速度时先提议保持当前位置并清零速度；最后 1…2 count 只有在 accept 后才视为完成，避免未准入目标被误认为已经提交。
+
+JointCommand 将 base/pitch 按 `4096/(2π)` 映射到跟踪 rest。pitch 超过 0.25 弧度开始伸出，至 0.7 达到 shoulder_lift 最小 1150；elbow 用固定肩肘和保持前臂水平。ForearmLeveler 用 40 count lead 与六 count 滞回补偿伸出方向，目标受电机范围夹取。五轴包的速度由相邻目标距离及 200 毫秒名义值选取，上限 700；该名义值不是到位等待。
+
+✅ 这些组件只提供有限计划、提案与接纳状态。长期跟踪 worker、资源接管、写入公平性、连接恢复及手动替换/加入清理由 App 负责，不能用 planner 完成替代真实到位。
+
+[入口、资源与完成](../README.md) · [原生链路接口](../../../PlatformKit/Connectivity/NexArm/README.md) · [共享契约](../../Support/Contracts/README.md)

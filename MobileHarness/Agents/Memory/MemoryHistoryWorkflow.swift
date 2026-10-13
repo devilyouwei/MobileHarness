@@ -53,18 +53,11 @@ struct MemoryHistoryWorkflow {
                 let record = try? JSONSerialization.jsonObject(with: Data(result.value.utf8)) as? [String: Any],
                 record.count == 1, let archived = record["archived"]
             else { throw CommunicationError.invalidPayload }
-            if archived is NSNull {
-                outputs.append(StepOutput(output: .toolCall(try Self.presentation.call([:])), input: active.input))
-                outputs.append(StepOutput(output: .control("history.finished"), input: active.input))
-            } else {
-                guard let rawID = archived as? String, let id = UUID(uuidString: rawID) else {
-                    throw CommunicationError.invalidPayload
-                }
-                let call = try Self.title.call(["id": id.uuidString])
-                pending = (active.input, call.id, .title)
-                outputs.append(StepOutput(output: .toolCall(try Self.presentation.call([:])), input: active.input))
-                outputs.append(StepOutput(output: .toolCall(call), input: active.input))
+            guard archived is NSNull || (archived as? String).flatMap(UUID.init(uuidString:)) != nil else {
+                throw CommunicationError.invalidPayload
             }
+            outputs.append(StepOutput(output: .toolCall(try Self.presentation.call([:])), input: active.input))
+            outputs.append(StepOutput(output: .control("history.finished"), input: active.input))
         case .title:
             outputs.append(StepOutput(output: .toolCall(try Self.presentation.call([:])), input: active.input))
             outputs.append(

@@ -83,6 +83,7 @@ func resourceRuntime(
     device: any DeviceControlCapability = UnusedDeviceControl(),
     camera: any CameraControlCapability = UnusedCameraControl(),
     sessionID: UUID = UUID(), manager: AgentManager = AgentManager(), suppliedInput: InputGateway? = nil,
+    suppliedContext: AgentContextRepository<ApplicationControlContextState>? = nil,
     outputSink: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in }
 ) throws -> ApplicationControlIntentRuntime {
     let session = sessionID
@@ -109,7 +110,7 @@ func resourceRuntime(
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: outputSink)
     return ApplicationControlIntentRuntime(
         sessionID: session, manager: manager, input: input, output: output,
-        agent: try ApplicationControlAgent(sessionID: session))
+        agent: try ApplicationControlAgent(sessionID: session, context: suppliedContext))
 }
 @Test(.actionCatalog) func modelResourceCommandsCrossGatewaysAndRecoverAfterNativeFailure() async throws {
     let fixture = ResourceFixture()

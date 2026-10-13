@@ -77,3 +77,13 @@ Photo reads require exact owner or authorized source/input for archived referenc
 ✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
 
 ❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+
+## Task history indexing and in-place compression
+
+✅ Implemented: StorageChat history v3 deliberately breaks old history encoding; it retains original execution evidence plus separate conversation-owned compression records. No old-format decoder/import or business summary generation exists in Storage.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：LocalDocumentStore 改为按文件隔离 compare-and-replace 锁。StorageChat 使用 current/独立归档/元数据索引和单个归档事务标记；current 缺失可以原子建立，损坏或读写失败明确传播。

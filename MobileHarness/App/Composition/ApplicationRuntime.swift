@@ -44,6 +44,7 @@ final class ApplicationRuntime {
         }
     }
 
+    private var titleMutations: HistoryMutationService?
     func shutdown() async {
         skillObservation?.cancel()
         await skillObservation?.value
@@ -53,6 +54,7 @@ final class ApplicationRuntime {
         await interaction.shutdown()
         await photographerIntents.shutdown()
         await historyIntents.shutdown()
+        await titleMutations?.shutdown()
         await applicationControlIntents.shutdown()
         await manager.stopAll()
         await output.shutdown()
@@ -148,13 +150,11 @@ final class ApplicationRuntime {
         attributes.isExcludedFromBackup = true
         try directory.setResourceValues(attributes)
         self.contextDirectory = directory
-        let assistantContext = try AgentContextRepository.persistent(
-            agent: .assistant,
-            scope: Self.contextScope, state: AssistantContextState(),
-            url: directory.appendingPathComponent("assistant.context.json"), protection: .afterFirstUnlock)
+        let assistantContext = AgentContextRepository(
+            agent: .assistant, scope: Self.contextScope, state: AssistantContextState())
         self.assistantContext = assistantContext
-        conversations = AssistantHistoryContext.store(
-            repository: assistantContext)
+        let historyStore = try AssistantConversationStorage.store(repository: assistantContext, directory: directory)
+        conversations = historyStore
         let providerSettings = ProviderSettingsRequests(
             service: ProviderSettingsService(
                 store: ProviderSettingsStore(credentials: SettingsCredentialAdapter()), runtime: providerSettingsRuntime
@@ -173,7 +173,11 @@ final class ApplicationRuntime {
         let photographerContext = try Self.context(directory, .photographer, PhotographerContextState())
         let memoryContext = try Self.context(directory, .memory, MemoryContextState())
         historyReaders = [
-            "assistant.tasks": { try HistoryPresentationAdapter.assistantTasks(await assistantContext.snapshot()) }
+            "assistant.tasks": {
+                let history = try await historyStore.snapshot()
+                return try HistoryPresentationAdapter.assistantTasks(
+                    await assistantContext.snapshot(), history: history)
+            }
         ]
         let applicationControlAgent = try ApplicationControlAgent(
             sessionID: applicationControlSessionID,
@@ -283,11 +287,23 @@ final class ApplicationRuntime {
         device.input = input
         device.activity = activity
         let robot = NexArmBehaviorAdapter(bluetooth: bluetooth, activity: activity)
+        let mutations = HistoryMutationService(
+            store: conversations, summarizeTitle: summarizeTitle,
+            archiveChanged: { message in
+                do {
+                    let presentation = try await HistoryPresentationAdapter.listPresentation(historyStore)
+                    await MainActor.run {
+                        historyState.archive = presentation
+                        historyState.status = message
+                    }
+                } catch { await MainActor.run { historyState.status = "历史刷新失败：\(error)" } }
+            })
+        titleMutations = mutations
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation,
             historyPresentation: historyPresentation, camera: presentation,
             history: HistoryQueryService(store: conversations),
-            historyMutations: HistoryMutationService(store: conversations, summarizeTitle: summarizeTitle),
+            historyMutations: mutations,
             modelResources: modelResources, resourcePreferences: resourcePreferences,
             resourceInventory: resourceInventory,
             resourcePresentation: ResourcePresentationAdapter(

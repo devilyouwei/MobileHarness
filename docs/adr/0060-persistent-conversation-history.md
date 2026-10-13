@@ -2,7 +2,7 @@
 
 > Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
 
-Status: implemented, 2026-09-28. Supersedes Assistant's session-scoped eight-message/1600-character history and the standalone raw-output test page. It does not change wait execution semantics.
+Status: historical persistence policy superseded by the 2026-10-13 conversation-file/checkpoint redesign (see Validation-History). Fragment-level durability and the aggregate file no longer apply. Originally implemented, 2026-09-28. Supersedes Assistant's session-scoped eight-message/1600-character history and the standalone raw-output test page. It does not change wait execution semantics.
 
 ## Decision
 

@@ -304,6 +304,10 @@ final class AppAssembly {
                 guard let self else { throw CancellationError() }
                 try await self.runtime().historyIntents.summarize(id)
             }, previewOutput: HistoryAgentAdapter.preview,
+            readConversation: { [weak self] id in
+                guard let self else { throw CancellationError() }
+                return try HistoryPresentationAdapter.conversation(await self.runtime().conversations.conversation(id))
+            },
             readPhoto: { [weak self] id, inputID in
                 guard let self else { throw CancellationError() }
                 return try await self.capturedPhotos.readForInput(id, source: "assistant", input: inputID)
@@ -337,6 +341,11 @@ final class AppAssembly {
                     state.tasks = snapshot.tasks
                 }, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
                 previewOutput: { HistoryAgentAdapter.preview($0) },
+                readConversation: { [weak self] id in
+                    guard let self else { throw CancellationError() }
+                    return try HistoryPresentationAdapter.conversation(
+                        await self.runtime().conversations.conversation(id))
+                },
                 readPhoto: { [weak self] photo, input in
                     guard let self else { throw CancellationError() }
                     return try await self.capturedPhotos.readForInput(

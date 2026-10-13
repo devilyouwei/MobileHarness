@@ -18,6 +18,8 @@ UI 数据操作直接提交可信事务；导航、展开和筛选留在 UI。As
 
 ## 生命周期、容量与失败
 
+✅ 已实现（2026-10-13 scopeClosed 修复）：ApplicationControlAgent.prepareSignal 明确选择最近 4096 条 Signal 证据及消费批次，超限从最旧记录淘汰并累计淘汰计数。已有 8192 条有效 context 在首次新输入的原子提交中收敛，不清空模型配置或任务状态。pending 调用、任务和环境当前值由独立状态持有，证据不是待执行队列；保留现有写入失败传播和终止语义。容量饱和不应终止服务或关闭根设置通信 scope。
+
 设置页机械臂测试仍保留自身注册。环境 publish 单向、目标拒绝不影响发送者；有确认的 send 仅用于真正独立的后台事务。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
 
 ## 函数权限与注册
@@ -154,3 +156,6 @@ Directed input schemas and static subscriptions are distinct; admission also val
 ❌ 历史记录页面板块重新设计及原生 UI/真机验收。
 
 ✅ Skill scope review: application-control exposes seven navigation/status/System entries only. Removing robot model bindings does not remove trusted device-operation or settings Action implementations.
+
+
+✅ scopeClosed 修复验证：真实手机的原 8192 条 context 在修复版启动后自动收敛为 4096 条，restoreSource 与后续 Tool 结果成功；满额持久化回归和完整串行测试通过。❌ 模型推理/原生页面显示及声学效果仍是独立验收。详见 [验证记录](../../../docs/Validation-History.md#2026-10-13--saturated-applicationcontrol-context-and-scopeclosed-recovery)。

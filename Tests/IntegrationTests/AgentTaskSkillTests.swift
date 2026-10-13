@@ -417,7 +417,9 @@ private func photographyAcceptance(
             to: URL(fileURLWithPath: "/tmp/mh-live-photography-evidence.json"), options: .atomic)
     }
     if rejectFirst {
-        #expect(failures.count == 1 && failures[0].contains("unknownCapability"))
+        #expect(
+            failures.count == 1 && failures[0].contains("unknownCapability"),
+            Comment(rawValue: failures.joined(separator: "\n")))
     } else {
         #expect(failures == [], Comment(rawValue: failures.joined(separator: "\n")))
     }
@@ -512,12 +514,12 @@ private func photographyAcceptance(
         }
         let queried = try await store.snapshot()
         let queryRequests = try #require(queried.current.turns.last?.modelRequests)
-        #expect(queryRequests.contains { $0.fragments.joined().contains("<loadSkills") })
+        #expect(queryRequests.contains { $0.response.contains("<loadSkills") })
         #expect(
             queryRequests.contains { $0.toolCalls.contains { $0.name == "History.list" && $0.state == .completed } })
         #expect(try await context.snapshot().state.skillState?.loaded.contains("history-query") == false)
         #expect(await effects.failures == [])
-        #expect(requests.contains { $0.fragments.joined().contains("<startTask") })
+        #expect(requests.contains { $0.response.contains("<startTask") })
         #expect(requests.contains { $0.decisionMetadata?.skills["photography"] != nil })
         if run == 0 {
             for (offset, command) in ["机械臂点一次头，不用说话。", "先说你好，再挥手一次。", "关闭摄像头。"].enumerated() {
@@ -565,7 +567,7 @@ private func photographyAcceptance(
         #expect(requests.count == (rejectFirst ? 4 : 3))
         let start = rejectFirst ? 1 : 0
         #expect(requests[0].decisionMetadata?.mode == "default")
-        #expect(requests[start].fragments.joined().contains("<startTask"))
+        #expect(requests[start].response.contains("<startTask"))
         #expect(requests[0].toolCalls.isEmpty)
         #expect(
             requests[start + 1].decisionMetadata?.taskID == active
@@ -589,10 +591,10 @@ private func photographyAcceptance(
             let history = try await store.snapshot()
             #expect(history.current.turns.count == 3)
             let allRequests = await stub.requests
-            #expect(allRequests[5].messages.contains { $0.content.contains("Ended tasks") })
+            #expect(allRequests[5].messages.contains { $0.content.contains("Task history") })
             #expect(!allRequests[5].messages.contains { $0.content.contains(photo.uuidString) })
             #expect(!allRequests[6].messages.contains { $0.content.contains(photo.uuidString) })
-            #expect(allRequests[6].messages.contains { $0.content.contains("Ended tasks") })
+            #expect(allRequests[6].messages.contains { $0.content.contains("Task history") })
             #expect(history.current.turns.first?.modelRequests?.count == 3)
             #expect(history.current.turns.first?.modelRequests?.last?.requestJSON.contains(photo.uuidString) == true)
 
@@ -753,8 +755,10 @@ private func photographyAcceptance(
     old.version = 1
     let fixedCapabilities = try AssistantAgent.runtimeCapabilities(
         AgentConfigurations.load(named: "Assistant").capabilities)
-    try old.initialize(fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
-    #expect(old.version == 2 && old.mode == "default")
+    #expect(throws: CommunicationError.invalidPayload) {
+        try old.initialize(fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
+    }
+    #expect(old.version == 1)
     let legacyScope: [String: Any] = [
         "id": UUID().uuidString, "requester": "assistant", "executor": "memory", "sessionID": session.uuidString,
     ]
@@ -1124,7 +1128,9 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
             let request = ConversationModelRequest(
                 id: UUID(), input: "fixture input", requestJSON: "[]",
                 decisionMetadata: .init(
-                    taskID: taskID, mode: taskID == nil ? "default" : "task", skills: [:], catalogJSON: "{}"))
+                    taskID: taskID, mode: taskID == nil ? "default" : "task", skills: [:], catalogJSON: "{}"),
+                historyTaskID: taskID
+                    ?? (output == "OLD_ENTRY" ? oldTaskID : (output.hasPrefix("<startTask") ? newTaskID : nil)))
             try await store.beginModelRequest(request, for: inputID)
             try await store.append(output, to: inputID)
             if nativePair {
@@ -1149,9 +1155,10 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
     var state = AssistantContextState()
     state.skillState = skills
     state.history = try await store.snapshot()
+    state.reconcileTaskCompressions()
     let encoder = JSONEncoder()
     encoder.outputFormatting = .sortedKeys
-    let originalHistory = try encoder.encode(state.history)
+    let originalHistory = try encoder.encode(state.history.current.turns)
     let input = AgentInput(sessionID: UUID(), payload: .text("保存当前照片"))
     func projected(_ value: AssistantContextState) throws -> [ChatMessage] {
         let snapshot = AgentContext(agentID: .assistant, scopeID: UUID(), state: value)
@@ -1164,7 +1171,7 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
     #expect(active.contains { $0.role == .assistant && $0.content.hasPrefix("<startTask") })
     #expect(active.contains { $0.content == "CURRENT_TASK_RAW" })
     #expect(!active.contains { $0.content.contains("OLD_ENTRY") || $0.content.contains("OLD_PHOTO_RAW") })
-    #expect(active.contains { $0.content.contains("Ended tasks") && $0.content.contains("旧照片已保存") })
+    #expect(active.contains { $0.content.contains("Task history") && $0.content.contains("旧照片已保存") })
     let paired = try #require(active.firstIndex { !$0.toolCalls.isEmpty })
     #expect(active[paired].toolCalls.first?.id == "background-query")
     #expect(active[paired + 1].role == .tool && active[paired + 1].toolCallID == "background-query")
@@ -1173,9 +1180,119 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
         "finishTask", arguments: ["summary": "新照片已保存"], inputID: newInputID, fixed: config.capabilities)
     try skills.roundCompleted(failed: false, fixed: config.capabilities)
     state.skillState = skills
+    state.reconcileTaskCompressions()
     let closed = try projected(state)
     #expect(closed.contains { $0.content == "普通对话背景" })
     #expect(!closed.contains { $0.content.contains("CURRENT_TASK_RAW") || $0.content.contains("<startTask") })
-    #expect(closed.contains { $0.content.contains("Ended tasks") && $0.content.contains("新照片已保存") })
-    #expect(try encoder.encode(state.history) == originalHistory)
+    #expect(closed.contains { $0.content.contains("Task history") && $0.content.contains("新照片已保存") })
+    #expect(try encoder.encode(state.history.current.turns) == originalHistory)
+}
+
+@Test(.actionCatalog) func historyTaskAssignmentRefreshesStoreAndRejectsStaleAdmission() async throws {
+    let context = AgentContextRepository(agent: .assistant, scope: UUID(), state: AssistantContextState())
+    let store = AgentChatHistoryContext.store(repository: context)
+    let input = UUID()
+    let request = UUID()
+    let task = UUID()
+    let token = try await store.readCurrent().token
+    _ = try await store.begin(id: input, user: "start goal", request: [], expecting: token, model: "stub")
+    try await store.beginModelRequest(
+        .init(
+            id: request, input: "start goal", requestJSON: "[]",
+            decisionMetadata: .init(taskID: nil, mode: "default", skills: [:], catalogJSON: "{}")), for: input)
+    let stale = try await store.readCurrent().token
+    try await context.update { try $0.state.history.assignHistoryTask(task, inputID: input, requestID: request) }
+    await #expect(throws: ConversationHistoryError.conflict) {
+        _ = try await store.begin(id: UUID(), user: "stale", request: [], expecting: stale, model: "stub")
+    }
+    try await store.append("started", to: input)
+    try await store.finish(input, state: .completed)
+    let saved = try #require(try await store.snapshot().current.turns.first?.modelRequests?.first)
+    #expect(saved.historyTaskID == task && saved.decisionMetadata?.taskID == nil)
+    #expect(saved.decisionMetadata?.mode == "default" && saved.response == "started")
+    #expect(try await context.snapshot().state.history.current.turns.first?.modelRequests?.first?.historyTaskID == task)
+}
+
+@Test(.actionCatalog, arguments: ["completed", "failed", "cancelled", "interrupted"])
+func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) async throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: config.capabilities, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    _ = try skills.control("startTask", arguments: ["goal": "目标"], inputID: UUID(), fixed: config.capabilities)
+    let task = try #require(skills.activeTaskID)
+    skills.tasks[0].status = status
+    skills.tasks[0].summary = "用户选择了第一张"
+    skills.tasks[0].failure = status == "failed" ? "真实执行失败" : nil
+    skills.activeTaskID = nil
+    let store = ConversationHistoryStore()
+    func add(_ text: String, taskID: UUID? = nil) async throws -> UUID {
+        let input = UUID()
+        let token = try await store.readCurrent().token
+        _ = try await store.begin(id: input, user: text, request: [], expecting: token, model: "stub")
+        try await store.beginModelRequest(
+            .init(id: UUID(), input: text, requestJSON: "[]", historyTaskID: taskID), for: input)
+        try await store.append(text + " output", to: input)
+        try await store.finish(input, state: .completed)
+        return input
+    }
+    _ = try await add("聊天A")
+    _ = try await add("任务入口", taskID: task)
+    _ = try await add("独立对话")
+    _ = try await add("任务结束", taskID: task)
+    _ = try await add("聊天B")
+    var state = AssistantContextState()
+    state.history = try await store.snapshot()
+    state.skillState = skills
+    let evidenceEncoder = JSONEncoder()
+    evidenceEncoder.outputFormatting = .sortedKeys
+    let before = try evidenceEncoder.encode(state.history.current.turns)
+    state.reconcileTaskCompressions()
+    state.reconcileTaskCompressions()
+    let compression = try #require(state.history.current.taskCompressions.first)
+    #expect(state.history.current.taskCompressions.count == 1 && compression.sources.count == 2)
+    #expect(compression.status.rawValue == status && compression.failure == skills.tasks[0].failure)
+    #expect(try evidenceEncoder.encode(state.history.current.turns) == before)
+    let messages = try AgentChatContextBuilder.request(
+        system: "system", user: "next", conversation: state.history.current,
+        templates: AgentPrompts.load(named: "Assistant"))
+    let texts = messages.map(\.content)
+    let summary = try #require(texts.firstIndex { $0.contains("Task history") })
+    #expect(texts[summary - 1] == "聊天A output" && texts[summary + 1] == "独立对话")
+    #expect(texts[summary].contains("用户选择了第一张"))
+    #expect(!texts.contains("任务入口 output") && !texts.contains("任务结束 output"))
+    let rawRequests = state.history.current.turns.flatMap { $0.modelRequests ?? [] }
+    #expect(rawRequests.count == 5)
+}
+
+@Test(.actionCatalog) func terminalCompressionAndTaskStateRollBackTogetherOnWriteFailure() async throws {
+    struct WriteFailure: Error {}
+    let fixed = try AgentConfigurations.load(named: "Assistant").capabilities
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    let input = UUID()
+    _ = try skills.control("startTask", arguments: ["goal": "goal"], inputID: input, fixed: fixed)
+    let task = try #require(skills.activeTaskID)
+    _ = try skills.control("finishTask", arguments: ["summary": "done"], inputID: input, fixed: fixed)
+    let store = ConversationHistoryStore()
+    _ = try await store.begin(id: input, user: "goal", request: [], expecting: store.readCurrent().token, model: "stub")
+    try await store.beginModelRequest(
+        .init(id: UUID(), input: "goal", requestJSON: "[]", historyTaskID: task), for: input)
+    try await store.append("done", to: input)
+    try await store.finish(input, state: .completed)
+    var state = AssistantContextState()
+    state.skillState = skills
+    state.history = try await store.snapshot()
+    let repository = AgentContextRepository(
+        agent: .assistant, scope: UUID(), state: state,
+        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }))
+    await #expect(throws: WriteFailure.self) {
+        try await repository.update {
+            try $0.state.skillState?.roundCompleted(failed: false, fixed: fixed)
+            $0.state.reconcileTaskCompressions()
+        }
+    }
+    let retained = try await repository.snapshot().state
+    #expect(retained.skillState?.activeTaskID == task && retained.skillState?.tasks.first?.status == "finishing")
+    #expect(retained.history.current.taskCompressions.isEmpty)
+    #expect(retained.history.current.turns.first?.raw == "done")
 }

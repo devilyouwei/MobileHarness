@@ -285,7 +285,7 @@
                     .position(x: geometry.size.width / 2, y: geometry.size.height * 0.40)
                     VStack(spacing: 16) {
                         if let error {
-                            Text("模型准备失败：" + error).font(.callout)
+                            Text("应用准备失败：" + error).font(.callout)
                             Button("重新加载", action: retry)
                         } else {
                             ProgressView().tint(.white)

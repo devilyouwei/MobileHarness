@@ -111,3 +111,13 @@ Healthy camera flips retain the native session/lease and acknowledge input repla
 ## Streaming TTS latency
 
 ✅ VoiceSessionCoordinator joins playback/lease cleanup and immediate policy-permitted listening restoration. There is no post-playback timer; failures remain explicit and user-off/session fences prevent reopening capture.
+
+
+## Task history v2 and in-place compression
+
+✅ Implemented: App uses a fresh assistant.history-v2.context.json repository and adapts the new history schema to passive UI. Historical Task membership uses historyTaskID rather than all requests under inputIDs.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：组合层注入会话文件仓库与 Assistant 恢复编解码闭包，旧 Assistant 文件不参与启动。历史工作流按需加载单会话，列表读索引。

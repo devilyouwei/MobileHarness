@@ -75,14 +75,11 @@ public struct AssistantContextState: AgentChatContextState {
     public func validateContextState() throws {
         try validateChatState()
         try skillState?.validate()
-        guard history.version == 1, history.current.turns.count <= 256, history.past.count <= 64,
-            history.past.allSatisfy({ $0.turns.count <= 256 }),
-            try JSONEncoder().encode(history).count <= ConversationHistoryStore.maximumBytes
-        else { throw CommunicationError.invalidPayload }
     }
     public mutating func recoverInterruptedWork() {
         recoverChatState()
         skillState?.recover()
+        reconcileTaskCompressions()
         cameraState = nil
     }
 
@@ -211,5 +208,53 @@ public enum ConversationContextBuilder {
             guard let role = ConversationMessage.Role(rawValue: $0.role.rawValue) else { return nil }
             return ConversationMessage(role: role, content: $0.content)
         }
+    }
+}
+
+private struct AssistantConversationRecovery: Codable, Sendable {
+    let skills: AgentTaskSkillState?
+    let tasks: AgentTaskRegistry
+    let views: [UUID: AgentTaskView]?
+}
+
+/// One live context; disk contains only a conversation and its bounded recovery checkpoint.
+public enum AssistantConversationStorage {
+    public static func store(repository: AgentContextRepository<AssistantContextState>, directory: URL) throws
+        -> ConversationHistoryStore
+    {
+        let files = try ConversationFileStore(directory: directory)
+        return ConversationHistoryStore(
+            contextIdentity: repository.scopeID, files: files,
+            capture: {
+                let snapshot = try await repository.snapshot()
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                let data = try encoder.encode(
+                    AssistantConversationRecovery(
+                        skills: snapshot.state.skillState, tasks: snapshot.tasks, views: snapshot.state.taskViews))
+                return ConversationFileSnapshot(
+                    conversation: snapshot.state.history.current, recovery: data,
+                    revision: snapshot.state.history.revision)
+            },
+            canArchive: {
+                guard try await repository.snapshot().state.skillState?.activeTaskID == nil else {
+                    throw CommunicationError.scopeClosed
+                }
+            },
+            restore: { history, data in
+                let recovery = try data.map { try JSONDecoder().decode(AssistantConversationRecovery.self, from: $0) }
+                try await repository.update { context in
+                    context.state.history = history
+                    if let recovery {
+                        context.state.skillState = recovery.skills
+                        context.state.taskViews = recovery.views
+                        context.tasks = recovery.tasks
+                        context.tasks.recover()
+                        context.state.recoverInterruptedWork()
+                    }
+                }
+            },
+            contextLoad: { try await repository.snapshot().state.history },
+            contextCommit: { history in try await AgentChatHistoryContext.commit(history, to: repository) })
     }
 }

@@ -32,7 +32,7 @@ Reviewed all current non-document source changes, including newly untracked asse
 
 | Owner | Latest change placement |
 | --- | --- |
-| Actions/Contracts | Neutral ActionDeclaration/ActionParameter values and TaskControlCapability; concrete metadata belongs to each @Action, no Agent policy |
+| Actions/Support/Contracts | Neutral ActionDeclaration/ActionParameter values and TaskControlCapability; concrete metadata belongs to each @Action, no Agent policy |
 | Actions/System/Support | TaskControlModule, matching existing injected System transaction modules |
 | Agents/Support root | AgentConfigurations and AgentSkillLoader: immutable resources/catalog composition |
 | Agents/Support/Communication | Message values, contract catalog and input validation only |
@@ -64,3 +64,8 @@ No new module/directory/dependency. Type-only AgentSkillState -> AgentTaskSkillS
 ## Camera availability correction (2026-10-13)
 
 ✅ Task organizes continuing goals/history; it is not an extra authorization prerequisite for registered camera functions. Assistant no longer validates capture/save/discard against Task/photo owner state or registers captured photos into that state. Capture-only requests can use temporary photography loading and return after confirmed capture. App supplies actual current photo facts and returned image evidence. [Validation evidence](Validation-History.md#2026-10-13--registered-camera-functions-without-task-authorization-and-friendly-recognition-toast) separates fixtures/compilation from device acceptance.
+
+
+## 2026-10-13 — Task history v2
+
+✅ Implemented: intentionally abandon old history compatibility. Persist request-level Task membership and separate conversation-owned source-indexed terminal compressions. Keep complete raw evidence; replace only the model/UI/query projection at the original position. Start a new Assistant context file, remove tail summaries and whole-turn filtering, update backend queries and expandable UI. Compression is deterministic from the model-reported finish summary and actual terminal facts; no extra model request or asynchronous queue. Validate tests/full check/iOS build separately from live and native acceptance.

@@ -4,23 +4,51 @@ import StorageChat
 
 /// Archive-only mutation validation; persistence remains an atomic Storage transaction.
 public struct HistoryMutationService: HistoryMutationCapability {
+    private let jobs = HistoryTitleJobs()
+    private let archiveChanged: @Sendable (String?) async -> Void
     private let store: ConversationHistoryStore
     private let summarizeTitle: @Sendable (StoredConversation) async throws -> String
     public init(
-        store: ConversationHistoryStore, summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String
+        store: ConversationHistoryStore,
+        summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String,
+        archiveChanged: @escaping @Sendable (String?) async -> Void = { _ in }
     ) {
+        self.archiveChanged = archiveChanged
         self.store = store
         self.summarizeTitle = summarizeTitle
     }
     public func startNew() async throws -> UUID? {
         try Task.checkCancellation()
-        return try await store.startNew()?.id
+        guard let archived = try await store.startNew() else { return nil }
+        let accepted = await jobs.start {
+            do {
+                try await generateTitle(archived.id)
+                await archiveChanged(nil)
+            } catch { await archiveChanged("标题生成失败：\(error)") }
+        }
+        if !accepted {
+            try await store.setTitle(nil, error: "Title worker busy; retry explicitly", for: archived.id)
+        }
+        return archived.id
     }
+    public func waitForTitles() async { await jobs.wait() }
+    public func shutdown() async { await jobs.stop() }
     public func summarizeArchived(_ id: UUID) async throws {
+        guard await jobs.beginManual() else { throw ConversationHistoryError.busy }
+        do {
+            try await generateTitle(id)
+            await jobs.endManual()
+        } catch {
+            await jobs.endManual()
+            throw error
+        }
+    }
+    private func generateTitle(_ id: UUID) async throws {
         try Task.checkCancellation()
-        let snapshot = try await store.snapshot()
+        let snapshot = try await store.readCurrent()
         guard snapshot.current.id != id else { throw HistoryQueryError.currentConversation }
-        guard let conversation = snapshot.past.first(where: { $0.id == id }) else {
+        let conversation: StoredConversation
+        do { conversation = try await store.conversation(id) } catch ConversationHistoryError.missingTurn {
             throw HistoryQueryError.missingConversation
         }
         do {
@@ -52,11 +80,43 @@ public struct HistoryMutationService: HistoryMutationCapability {
     }
     public func deleteArchived(_ id: UUID) async throws {
         try Task.checkCancellation()
-        let snapshot = try await store.snapshot()
+        let snapshot = try await store.readCurrent()
         guard snapshot.current.id != id else { throw HistoryQueryError.currentConversation }
-        guard snapshot.past.contains(where: { $0.id == id }) else { throw HistoryQueryError.missingConversation }
+        do { _ = try await store.conversation(id) } catch ConversationHistoryError.missingTurn {
+            throw HistoryQueryError.missingConversation
+        }
         try Task.checkCancellation()
         try await store.deleteArchived(id)
     }
 
+}
+
+/// Exactly one root-owned title job; overflow is persisted as retryable title failure.
+private actor HistoryTitleJobs {
+    private var task: Task<Void, Never>?
+    private var closed = false
+    private var manual = false
+    func start(_ operation: @escaping @Sendable () async -> Void) -> Bool {
+        guard !closed, task == nil, !manual else { return false }
+        task = Task {
+            await operation()
+            completed()
+        }
+        return true
+    }
+    func beginManual() -> Bool {
+        guard !closed, task == nil, !manual else { return false }
+        manual = true
+        return true
+    }
+    func endManual() { manual = false }
+    private func completed() { task = nil }
+    func wait() async { await task?.value }
+    func stop() async {
+        closed = true
+        let active = task
+        active?.cancel()
+        await active?.value
+        task = nil
+    }
 }

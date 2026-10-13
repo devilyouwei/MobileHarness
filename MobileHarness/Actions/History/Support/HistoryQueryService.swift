@@ -43,6 +43,9 @@ public struct HistoryQueryService: HistoryQueryCapability {
     private struct Turn: Encodable {
         let id: UUID
         let state: ConversationRecord.State
+        let kind: String
+        let taskID: UUID?
+        let inputID: UUID?
         let user: Text
         let response: Text
     }
@@ -64,35 +67,46 @@ public struct HistoryQueryService: HistoryQueryCapability {
             throw ActionArguments.ValidationError.invalidValue("pagination")
         }
         try Task.checkCancellation()
-        let snapshot = try await store.snapshot()
+        let records = try await store.listConversations()
         try Task.checkCancellation()
-        let records = [snapshot.current] + snapshot.past
         let entries = records.dropFirst(offset).prefix(limit).map {
             Entry(
                 id: $0.id, archived: $0.archivedAt != nil, createdAt: $0.createdAt, archivedAt: $0.archivedAt,
                 summaryTitle: $0.summaryTitle.map { Text($0, maximumBytes: 40) },
-                latestUser: $0.turns.last.map { Text($0.user, maximumBytes: 40) }, turnCount: $0.turns.count)
+                latestUser: ($0.latestUser ?? $0.turns.last?.user).map { Text($0, maximumBytes: 40) },
+                turnCount: $0.turnCount ?? $0.turns.count)
         }
         let next = offset + entries.count
         return try encode(Page(items: entries, total: records.count, nextOffset: next < records.count ? next : nil))
     }
     public func read(id: UUID, offset: Int, limit: Int) async throws -> String {
-        guard (0...256).contains(offset), (1...2).contains(limit) else {
+        guard (0...1_000_000).contains(offset), (1...2).contains(limit) else {
             throw ActionArguments.ValidationError.invalidValue("pagination")
         }
         try Task.checkCancellation()
-        let snapshot = try await store.snapshot()
-        try Task.checkCancellation()
-        guard let record = ([snapshot.current] + snapshot.past).first(where: { $0.id == id }) else {
+        let record: StoredConversation
+        do { record = try await store.conversation(id) } catch ConversationHistoryError.missingTurn {
             throw HistoryQueryError.missingConversation
         }
-        let turns = record.turns.dropFirst(offset).prefix(limit).map {
-            Turn(
-                id: $0.id, state: $0.state, user: Text($0.user, maximumBytes: 80),
-                response: Text($0.raw, maximumBytes: 160))
+        try Task.checkCancellation()
+        let items = try record.indexedHistory()
+        let turns = items.dropFirst(offset).prefix(limit).map { item -> Turn in
+            switch item {
+            case .request(let input, let request):
+                return Turn(
+                    id: request.id, state: request.state, kind: "request", taskID: request.historyTaskID,
+                    inputID: input.id,
+                    user: Text(request.input, maximumBytes: 80),
+                    response: Text(request.response, maximumBytes: 160))
+            case .task(let compression):
+                let text = [compression.reportedSummary, compression.failure].compactMap { $0 }.joined(separator: "\n")
+                return Turn(
+                    id: compression.taskID, state: compression.status, kind: "task", taskID: compression.taskID,
+                    inputID: nil,
+                    user: Text(compression.goal, maximumBytes: 80), response: Text(text, maximumBytes: 160))
+            }
         }
         let next = offset + turns.count
-        return try encode(
-            Page(items: turns, total: record.turns.count, nextOffset: next < record.turns.count ? next : nil))
+        return try encode(Page(items: turns, total: items.count, nextOffset: next < items.count ? next : nil))
     }
 }

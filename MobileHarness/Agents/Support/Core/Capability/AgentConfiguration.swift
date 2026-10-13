@@ -15,6 +15,29 @@ public struct AgentConfiguration: Sendable {
     public let agentID: AgentID
     public let capabilities: CapabilityRegistry
 
+    /// Derive a smaller communication scope without adding authority or mutating the original configuration.
+    public func restrictingCommunication(
+        to allowed: Set<String>, contracts: CommunicationContracts = .standard
+    ) throws -> AgentConfiguration {
+        let declaration = CommunicationDeclaration(
+            inputs: communication.inputs.filter { allowed.contains($0.contract) },
+            subscriptions: communication.subscriptions.filter { allowed.contains($0.contract) },
+            publications: communication.publications.filter { allowed.contains($0) },
+            sends: communication.sends.filter { allowed.contains($0.contract) })
+        try declaration.validate(contracts: contracts)
+        return AgentConfiguration(
+            version: version, communication: declaration, agentID: agentID, capabilities: capabilities)
+    }
+
+    private init(
+        version: Int, communication: CommunicationDeclaration, agentID: AgentID, capabilities: CapabilityRegistry
+    ) {
+        self.version = version
+        self.communication = communication
+        self.agentID = agentID
+        self.capabilities = capabilities
+    }
+
     public init(contracts: CommunicationContracts = .standard, data: Data) throws {
         guard !data.isEmpty, data.count <= 65_536 else { throw AgentConfigurationError.invalidFormat }
         let raw: Any

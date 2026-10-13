@@ -1,93 +1,84 @@
-# Actions — Canonical Business Functions
+# Actions — 协议中立的业务函数
 
-## Summary
+## 简介
 
-Protocol-neutral business operations, queries and finite composition with explicit injected capabilities.
+Actions 定义应用的业务操作与查询：参数校验、函数说明、资源需求、执行预算和完成语义。每个业务函数通过注入能力执行真实效果，同一实现可供宿主的 Action Call、Tool Call 或可信业务组合使用。
 
-## Ownership and boundaries
+## 职责与边界
 
-Agents chooses behavior; Gateway validates and executes. Actions owns arguments, semantics, intrinsic resources/budgets and producer reports. It depends on FunctionContracts, the macro plugin, PlatformKit, Storage and StorageChat; device imports within Actions are confined to NexArm/Support.
+✅ 六个业务域和共享 Support 构成当前实现。业务域入口使用 `FunctionInput`，不读取 Channel、Agent 权限或调用协议。Gateway 负责授权、调度、资源仲裁与结果传递；App 负责注入能力、原生服务及其生命周期。
 
-## External relationships and data flow
+`Package.swift` 将 `Support/Contracts` 单独编译为无项目依赖的 FunctionContracts；其余 Swift 源码编译为 Actions。Actions 的项目依赖为 FunctionContracts、PlatformKit、BehaviorDefinitions、Storage、StorageChat。PlatformKit 导入限于 NexArm/Support，StorageChat 导入限于 History，Storage 导入限于 System 的持久化服务。Actions 不导入 Agents、Gateway、UI 或 App 的实现。
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 上下游关系（一级）
 
-```mermaid
-flowchart LR
- Gateway -->|FunctionInput and inherited authority| Actions
- App -.->|Host capability endpoints| Actions
- Actions -->|Native encoding and feedback SDK| PlatformKit
- Actions -->|Documents and conversation query| Storage
- Actions -->|Injected presentation or native primitive| App
- Actions -->|Canonical completion or report| Gateway
-```
-
-## Internal structure
+图中实线表示直接调用或结果流，虚线表示注入或声明使用；它们不等同于编译依赖。
 
 ```mermaid
 flowchart LR
- Catalog[CapabilityModules] --> Camera
- Catalog --> History
- Catalog --> NexArm
- Catalog --> Speech
- Catalog --> System
- Catalog --> UI
- Camera --> Contracts
- History --> Contracts
- NexArm --> Contracts
- Speech --> Contracts
- System --> Contracts
- UI --> Contracts
+    Host[App 组合与能力端点] -.->|注入实现能力| A[Actions]
+    A -->|类型化效果请求| Host
+    Gateway -->|标准函数输入| A
+    A -->|完成值和报告| Gateway
+    A -->|机械臂编码与反馈接口| PlatformKit
+    A -->|配置文档持久化| Storage
+    A -->|共享会话仓库| StorageChat
+    Contracts[FunctionContracts] -.->|输入与约束类型| A
+    Macros[BehaviorDefinitions] -.->|编译期宏实现| A
 ```
 
-## Definition and registration
+## 内部模块关系
 
-ActionFunction describes a canonical domain/module/function, display name, kind, completion, resource requirements and execution budget. @Action generates the function factory, not Agent permissions or protocol policy. CapabilityModules composes explicit domain catalogs; App freezes them and chooses Action/Tool projections.
+```mermaid
+flowchart TB
+    Shared[Support 宏与目录组合] --> Camera
+    Shared --> History
+    Shared --> NexArm
+    Shared --> Speech
+    Shared --> System
+    Shared --> Presentation[UI 业务域]
+    Camera --> C[Support/Contracts]
+    History --> C
+    NexArm --> C
+    Speech --> C
+    System --> C
+    Presentation --> C
+    Speech -->|聆听反馈请求类型| Presentation
+    Presentation -->|资源快照类型与读取| System
+```
 
-A function may serve multiple Agents and both host protocols. Role JSON/code defines model/internal grants separately. Standard FunctionInput carries neutral request plus trusted opaque execution context/report sink; handlers import no Gateway or Agent implementation. Pure definition constraints cannot be weakened by a binding.
+| 目录 | 责任 | 主要实现 |
+| --- | --- | --- |
+| [Support](Support/README.md) | 共用协议、作者接口与生产目录组合 | `@Action`、`@ActionCatalog`、CapabilityModules |
+| [Camera](Camera/README.md) | 相机命令、拍摄与照片处置 | CameraControlCapability |
+| [History](History/README.md) | 会话分页预览、归档、标题与删除 | 查询/修改服务与 StorageChat |
+| [NexArm](NexArm/README.md) | 单电机、有限动作与跟踪目标 | 计划、反馈执行器与运动规划 |
+| [Speech](Speech/README.md) | 已生成音频播放、聆听策略应用 | 播放/聆听能力 |
+| [System](System/README.md) | 资源、云服务、设备与 Task 控制 | 私有请求暂存与持久化事务 |
+| [UI](UI/README.md) | 表情、文字、状态、反馈与呈现请求 | 类型化呈现能力与中立数据 |
 
-## Effect and failure contracts
+每个业务域的入口文件承载函数体；域内 Support 承载值类型、能力协议、目录与算法。六个域处于同一个 Actions 编译目标，Speech 使用 UI 的反馈类型，UI 使用 System 的资源数据；这些是当前源码内部关系。
 
-Validate unknown/missing/value arguments and cancellation before effects. Return only actual completion; submission acknowledgment, UI state commitment, drained playback and motor arrival are different boundaries. Shared executor retains child reports and later exceptions. Ordinary leaf failure does not authorize replay or cancel unrelated Channel work.
+## 定义、组合与执行数据流
 
-Support subdirectories own domain values/catalogs/capabilities and meaningful algorithms. Entry files own callable bodies; namespace enums provide used names without duplicate forwarding implementations. Native/session ownership remains with injected App/PlatformKit services.
+1. `@Action` 从入口函数生成声明和 definition 工厂。地址为 `Domain.Module.function`；函数名来自 Swift 方法，title 是显示名。
+2. 域目录将 definition 工厂与能力端点绑定。`@ActionCatalog` 从本类型内的工厂调用生成静态 declarations。
+3. `CapabilityModules` 组合域目录。宿主通过 `CapabilityCatalog` 校验、冻结函数集合，再选择调用协议与开放范围。
+4. 执行方传入 `FunctionInput`。入口解析字符串参数，调用注入能力，返回实际完成值，或向报告端口记录子结果。
 
-✅ Canonical definitions, explicit catalogs and standard business inputs/outcomes are implemented.
+函数声明不授予权限，也不保证某个 Skill 开放该函数。标准输入只携带解析后的地址、参数、关联上下文、executionID 与报告端口。宿主注册和业务效果使用同一份函数资源及预算定义。
 
-## Related design
+## 关键技术
 
-[Parent design](../README.md) · [Camera](Camera/README.md) · [Contracts](Contracts/README.md) · [History](History/README.md) · [NexArm](NexArm/README.md) · [Speech](Speech/README.md) · [System](System/README.md) · [UI](UI/README.md)
+- 参数的传输值统一为字符串；整数、有限数值、布尔、枚举、UUID 和 JSON 的业务约束由入口或注入端口解析。大多数入口拒绝未知键；个别入口的实际差异见所属域文档。
+- `ActionFunction` 的动态预算优先于静态 timeout；缺省静态预算为 30 秒。资源解析器最多返回八个资源。执行与清理机制位于 Gateway，估计耗时不构成最低等待时间。
+- 完成语义由业务定义：状态接纳、动画恢复、音频排空、命令准入和电机到位分别属于不同边界。定义存在不等于发生了效果。
+- `ActionReport` 保留逐叶结果和独立执行失败；纯取消与真实失败区分，混合失败不能被取消掩盖。记录的成功效果不会因后续异常而自动撤销。
 
-## Skill/task-mode contract
+## 生命周期与约束
 
-✅ Canonical metadata lives beside each owning @Action; neutral FunctionContracts carries its compiled declaration projection; pure Skills reference it. Agent.Task controls are real System/Support functions injected through TaskControlCapability, without importing Agents.
+本模块没有统一的请求队列或应用会话所有者。普通入口依赖调用者的任务生命周期；NexArm 控制器和配置服务拥有各自明确的状态及准入规则。长期播放、捕获、跟踪、页面状态和连接寿命属于注入宿主。
 
-## Action-owned documentation and Skill instruction contract
+直接调用函数体不自动获得 Gateway 的权限、Channel 排序、资源租约或超时机制。需要这些机制的调用方必须通过对应执行接口；端点仍独立验证其运行所有权。
 
-✅ 本域函数用 `@Action(doc:parameters:)` 维护说明与参数契约。所属模块注册自动生成声明投影；业务顺序和调用示例由 Skill Instructions.md 教学，不再登记 examples。
-
-### 新增函数标准
-
-在所属业务目录新增/修改函数，使用 `@Action` 声明地址、title、doc、parameters 与执行边界。在同域 CapabilityModule 的 definitions 中绑定实现依赖；`@ActionCatalog` 从该模块实际 factory 调用生成 declarations，无须修改公共函数元数据列表。新增整个业务域才需要修改 CapabilityModules 的模块组合。模型开放的函数必须写明确的 doc、必填/可选参数和约束；枚举参数用 ActionParameter.values 同时生成原生 Tool enum。字符串仍是两种调用协议的传输类型，实际值由 Action 验证。
-
-Skill.json 引用 canonical path 并选择 Action/Tool、别名和 Channel；Instructions.md 教授业务步骤和示例。公共目录只保留结构定义，不保存具体业务函数文档。App 在任何 Agent 配置读取前安装 immutable declarations；重复安装相同目录允许，替换或重复路径明确失败，不能改变在途请求。
-
-## Channel-owned Action ordering
-
-✅ Function metadata and business attributes have no serialization key. Scheduled ordering belongs to [ChannelScheduler](../Gateway/Output/Scheduling/README.md); resources/budgets and native capability admission remain explicit.
-
-## Action timeout contract (2026-10-12)
-
-✅ ActionMacro 将动态预算参数统一命名为 dynamicTimeout，与静态 timeout 对应。默认超时由基础 FunctionContracts 持有，不依赖调用方；业务域可显式扩大或缩短。动态预算异常直接失败，不能以默认值掩盖。
-
-
-✅ Implemented: UI domain adds two feedback functions and neutral request/capability values. Speech.Listening.update remains the internal policy entry but awaits native activation and returns actual child report. Device ownership stays in App/PlatformKit, finite composition stays in App using the shared ExecutionRuntime tree; no Actions→UI/Gateway dependency.
-
-
-✅ Implemented: UI feedback adds save/discard profiles; camera save/ignore receipts may include bounded feedbackIssues independent of actual committed disposition. Canonical definitions remain reused; no new domain, directory or native dependency.
-
-
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation converts neutral Action requests into UI-owned values; AppPresentationWorkflow retains existing dependencies. No UI project dependencies or new directories.
-
-
-✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.
+[整体技术设计](../README.md) · [函数协议](Support/Contracts/README.md) · [Gateway 执行](../Gateway/Runtime/README.md)

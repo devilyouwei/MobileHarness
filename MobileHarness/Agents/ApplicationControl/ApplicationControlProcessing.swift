@@ -33,6 +33,7 @@ public struct ApplicationControlContextState: AgentTaskContextState {
 public struct ApplicationControlSignalPreprocessor: SignalPreprocessor {
     public static let inputCapacity = 32
     public static let outputCapacity = 256
+    static let evidenceCapacity = 4096
 
     public init() {}
     public func classify(_ input: AgentInput, state: ApplicationControlContextState) throws -> SignalDisposition {

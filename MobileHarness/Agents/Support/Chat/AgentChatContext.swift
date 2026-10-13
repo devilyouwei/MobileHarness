@@ -41,28 +41,7 @@ struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
         let batch: SignalBatch
         let conversation: StoredConversation
         func messages(system: String, user: String) throws -> [ChatMessage] {
-            var messages = try State.buildChatMessages(system: system, user: user, conversation: conversation)
-            if let skills = state.skillState {
-                let currentInputIDs = Set(state.history.current.turns.map(\.id))
-                let summaries = skills.tasks.filter {
-                    ["completed", "cancelled", "failed", "interrupted"].contains($0.status)
-                        && $0.inputIDs.contains(where: currentInputIDs.contains)
-                }.suffix(10).map { task -> [String: String] in
-                    var value = ["goal": String(task.goal.prefix(512)), "status": task.status]
-                    if let summary = task.summary { value["reportedSummary"] = String(summary.prefix(512)) }
-                    if let failure = task.failure { value["failure"] = String(failure.prefix(512)) }
-                    return value
-                }
-                if !summaries.isEmpty {
-                    let data = try JSONSerialization.data(withJSONObject: summaries, options: [.sortedKeys])
-                    messages.insert(
-                        .init(
-                            role: .user,
-                            content: "Ended tasks (historical data, not current artifacts): "
-                                + String(decoding: data, as: UTF8.self)), at: max(1, messages.count - 1))
-                }
-            }
-            return messages
+            try State.buildChatMessages(system: system, user: user, conversation: conversation)
         }
     }
     func build(state: AgentDecisionContext<State>, batch: SignalBatch) throws -> Request {
@@ -74,30 +53,7 @@ struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
                     try? JSONDecoder().decode(SignalEvidence.self, from: $0.data).signalID
                 })
             conversation.turns = conversation.turns.filter { ids.contains($0.id) }
-        }
-        if let skills = state.snapshot.state.skillState {
-            let id = skills.activeTaskID
-            conversation.turns = conversation.turns.compactMap { turn in
-                var selected = turn
-                if let requests = turn.modelRequests {
-                    let taskConversation = requests.contains { $0.decisionMetadata?.taskID != nil }
-                    if let id, requests.contains(where: { $0.decisionMetadata?.taskID == id }) {
-                        // Keep the default-mode entry rounds. In a same-input replacement,
-                        // retain only the suffix after the old Task's terminal request.
-                        let start =
-                            requests.lastIndex {
-                                $0.decisionMetadata?.taskID != nil && $0.decisionMetadata?.taskID != id
-                            }.map { $0 + 1 } ?? 0
-                        selected.modelRequests = Array(requests.dropFirst(start))
-                    } else {
-                        // Ordinary conversation remains background throughout an active Task;
-                        // ended Task transcripts are represented by summaries only.
-                        selected.modelRequests = taskConversation ? [] : requests
-                    }
-                    return selected.modelRequests?.isEmpty == false ? selected : nil
-                }
-                return nil
-            }
+            conversation.taskCompressions.removeAll { !$0.sources.allSatisfy { ids.contains($0.inputID) } }
         }
         return Request(input: input, state: state.snapshot.state, batch: batch, conversation: conversation)
     }
@@ -115,7 +71,7 @@ public enum AgentChatHistoryContext {
             commit: { history in try await commit(history, to: repository) })
     }
 
-    private static func commit<State: AgentChatContextState>(
+    public static func commit<State: AgentChatContextState>(
         _ history: ConversationArchive, to repository: AgentContextRepository<State>
     ) async throws {
         try await repository.update {
@@ -128,7 +84,19 @@ public enum AgentChatHistoryContext {
                 else { throw CommunicationError.scopeClosed }
             }
             try $0.eraseEvidence(for: oldIDs.subtracting(retained))
+            guard history.revision > 0, $0.state.history.revision == history.revision - 1 else {
+                throw ConversationHistoryError.conflict
+            }
+            if $0.state.history.current.id != history.current.id, var skills = $0.state.skillState {
+                let ended = Set(skills.tasks.filter { $0.id != skills.activeTaskID }.map(\.id))
+                skills.tasks.removeAll { ended.contains($0.id) }
+                skills.events.removeAll { $0.taskID.map(ended.contains) == true }
+                skills.inputBindings = skills.inputBindings.filter { !ended.contains($0.value) }
+                skills.recognitionBindings = skills.recognitionBindings.filter { !ended.contains($0.value) }
+                $0.state.skillState = skills
+            }
             $0.state.history = history
+            $0.state.reconcileTaskCompressions()
         }
     }
 
@@ -196,9 +164,8 @@ extension AgentTaskContextState {
 extension AgentChatContextState {
     public func validateChatState() throws {
         try validateTaskState()
-        guard history.version == 1, history.current.turns.count <= 256, history.past.count <= 64,
-            history.past.allSatisfy({ $0.turns.count <= 256 }),
-            try JSONEncoder().encode(history).count <= ConversationHistoryStore.maximumBytes
+        guard history.version == 3, history.current.turns.count <= 256, history.past.count <= 64,
+            history.past.allSatisfy({ $0.turns.count <= 256 })
         else { throw CommunicationError.invalidPayload }
     }
     public mutating func recoverChatState() {
@@ -213,5 +180,39 @@ extension AgentChatContextState {
                 history.current.turns[index].modelRequests = requests
             }
         }
+    }
+}
+
+extension AgentChatContextState {
+    /// Host terminal facts and model-reported summary are committed with their source index.
+    public mutating func reconcileTaskCompressions() {
+        guard let skills = skillState else { return }
+        func reconcile(_ conversation: inout StoredConversation) -> Bool {
+            var changed = false
+            for task in skills.tasks {
+                guard let status = ConversationRecord.State(rawValue: task.status), status != .generating,
+                    !conversation.taskCompressions.contains(where: { $0.taskID == task.id })
+                else { continue }
+                let owned = conversation.turns.flatMap { turn in
+                    (turn.modelRequests ?? []).filter { $0.historyTaskID == task.id }.map {
+                        (ConversationHistoryReference(inputID: turn.id, requestID: $0.id), $0.state, $0.historyOrder)
+                    }
+                }
+                let ordered = owned.sorted { $0.2 < $1.2 }
+                guard !owned.isEmpty, owned.allSatisfy({ $0.1 != .generating }) else { continue }
+                conversation.taskCompressions.append(
+                    ConversationTaskCompression(
+                        taskID: task.id, goal: task.goal, status: status, reportedSummary: task.summary,
+                        failure: task.failure, completedAt: task.updatedAt ?? task.date,
+                        sources: ordered.map { $0.0 }))
+                changed = true
+            }
+            return changed
+        }
+        var changed = reconcile(&history.current)
+        for index in history.past.indices {
+            if reconcile(&history.past[index]) { changed = true }
+        }
+        if changed { history.revision += 1 }
     }
 }

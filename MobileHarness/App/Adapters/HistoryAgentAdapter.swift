@@ -48,7 +48,7 @@ enum HistoryAgentAdapter {
             var trace = try GenerationTrace(
                 capabilities: modelCapabilities,
                 textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
-            for delta in turn.fragments { try trace.append(delta) }
+            try trace.append(turn.response)
             if turn.finishReason != nil { trace.finish() }
             var depth = 0
             let lines = trace.events.enumerated().map { index, event in

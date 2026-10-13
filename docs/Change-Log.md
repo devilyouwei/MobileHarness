@@ -1,5 +1,43 @@
 # Documentation and architecture change history
 
+## 2026-10-14 — Function Catalog placement and direct detail contents
+
+- Return the request's decision-snapshot Function Catalog to Tasks and Skills; retain actual messages/declarations under Prompts.
+- Remove Parsed Output and Metadata disclosure wrapper rows, show their original contents directly in Action Execution/Generation Meta and delete the obsolete metadata expansion state. Native JSON export and request navigation retain their existing contracts.
+
+## 2026-10-14 — English history detail headings and JSON sharing
+
+- Use User Request / Assistant Response / Tasks and Skills / Prompts / Action Execution / Generation Meta headings. Keep actual Tool results and execution errors separate from explicitly labelled parse-only preview, consolidate Task identities/Skills and sent declarations, and retain collapsed generation metadata.
+- Share loaded conversation, task or displayed request values as public.json with stable .json filenames. On-demand bounded native transfer encoding preserves raw request/response/evidence fields; delete the formatted diagnostic-text/report implementation. No history backend or storage format changes.
+
+## 2026-10-14 — Hierarchical history separators and native preview
+
+- Refine separators by hierarchy: conversation/task boundaries span both card edges; task-internal lines and icon-free source text start at the 52-point primary text column. The last source restores a full-width task boundary; expansion wording follows the task text column.
+- Compile the actual UI page/state/presentation sources with synthetic history fixtures as an isolated native simulator preview. Capture collapsed and expanded screens; this is static layout evidence, not a successful full application/CoreAI build or real-model/device acceptance. Physical installation awaits the user's review.
+
+## 2026-10-14 — History separator alignment
+
+- User screenshot shows an extra first-row top line and separators that follow text indentation differently for icon/no-icon rows. Hide timeline Section outer boundaries and row top edges; retain shared bottom separators aligned explicitly to row-content edges with uniform horizontal insets for metadata, expansion and request cells.
+
+## 2026-10-14 — Contiguous history layout correction
+
+- User physical screenshots rejected the separate-card gaps and redundant task Section title. Replace per-item Sections with one contiguous timeline, retaining independent cells/native separators and increasing only internal request padding.
+- Keep conversation/task icons on top-level items; omit icons from expanded task requests. Preserve orange ReACT text and move its badge after the bottom date/status. Single-destination navigation and immediate expansion are retained.
+
+## 2026-10-14 — History task layout and single request navigation
+
+- Conversation/task rows have distinct icons and task goals use blue. Task metadata and expanded original requests occupy separate native List cells/Sections with spacing and separators; expansion suppresses implicit cell-content animation.
+- Replace multiple nested NavigationLinks inside one compression cell with plain request Buttons and one page-local navigationDestination. Active selection rejects duplicate taps; native dismissal clears the presentation flag and allows reopening while preserving expansion. No persistence/backend contract changes. Validation and remaining native acceptance are recorded in [validation history](Validation-History.md#2026-10-14--history-task-layout-and-single-request-navigation).
+
+## 2026-10-14 — Isolated audio-detection communication startup
+
+- Fix Settings audio detection failing before microphone startup with CommunicationError.unauthorized: restrict SpeechPerception communication to existing media.audio/sound.source rights, excluding the absent Assistant reply-activity dependency. Preserve full conversational configuration and native cleanup.
+- Replace the broad-policy/test-only bridge in the diagnostic regression with the real single-Agent policy, bound Gateway consumer and production signal pump. Reproduce the original unauthorized assembly and verify mono/spatial observations without ASR/VAD/presentation calls.
+
+## 2026-10-13 — Task历史原位压缩与新存储格式
+
+✅ 新历史格式将请求开始时的决策快照与历史Task归属分开；启动请求、任务过程和关闭请求按稳定ID索引，终态压缩独立持久化。上下文和历史查询按请求顺序原位替换，UI可展开原始记录；同一输入中的多个Task分别归属。生产切换到新的Assistant上下文文件，旧数据不导入，移除旧Task状态升级、末尾汇总及已结束Task的整turn过滤。完整检查、设备SDK编译和资源校验通过；模拟器限制及原生验收边界见[验证记录](Validation-History.md#2026-10-13--indexed-task-history-v2-and-inline-compression)。
+
 ## 2026-10-13 — Immediate listening after reply
 
 ✅ Removed the 350 ms playback guard and its helper/tests. SpeechPerception retains policy and App retains physical capture ownership; listening restoration joins native playback/lease cleanup as soon as policy permits, with explicit error/cancellation handling. This supersedes the idle-tail portion of the earlier TTS optimization; PCM/segmentation/synthesizer changes remain. Nine focused regressions, 96 App workflow tests and the unsigned iOS device build pass; full-suite sound-source failures and the simulator dependency limitation are recorded in [validation](Validation-History.md#2026-10-13--immediate-listening-after-reply-without-an-acoustic-timer).
@@ -595,3 +633,24 @@ Per user-approved clarification, AgentActionCompletion business-output classific
 - A recognized hold retains warm output ownership across Agent intent delivery. The canonical Listening cue/haptic Actions reuse prepared PCM/native output resources, avoiding cold graph/session setup after the light starts; native cue-start still releases the haptic. No extra confirmation playback or vibration path is introduced.
 - Aborted press, stop and shutdown cancel/retire warmup; output preparation failure performs explicit rollback. Unconsumed warm resources are released only while no native capture/playback owner is active. Platform queues and PCM bounds remain unchanged.
 - Normal activation begins at 0.85 visibility. Its existing Metal pulse temporarily composites above the eyes for 0.9 seconds, then returns to the original settled stacking, so the source cannot be hidden by opening eyes. Reduced-motion/static and the existing exit curve remain unchanged.
+
+## 2026-10-13 — Actions shared Support organization
+
+✅ Grouped the existing neutral contracts under Actions/Support/Contracts and shared macro/catalog utilities under Actions/Support. Preserved six domain owners and the independent FunctionContracts compilation boundary; aligned current design, package paths, Xcode navigation and architecture checks. [Validation](Validation-History.md#2026-10-13--actions-shared-support-organization) records passing full checks and the existing CoreAI Simulator build limitation.
+
+
+## 2026-10-13 — Actions current technical documentation
+
+Rewrote all 15 Actions READMEs from current implementations, with direct upstream/downstream and internal relationship graphs, interfaces, key algorithms and completion/failure boundaries. Removed dated modification/acceptance appendices from technical documents and retained the earlier UI audit in Documentation-History.md. [Validation](Validation-History.md#2026-10-13--actions-readme-current-design-audit) records source consistency, link/diagram-structure/diff checks and the documentation-only scope.
+
+
+## 2026-10-13 — Deterministic Agent evidence retention and startup failure label
+
+- Physical ApplicationControl context contained 8192 records / 5047 consumed batches; fresh Assistant history v2 contained zero turns. Signal append without an explicit retention policy exhausted the Core limit, terminated ApplicationControl and closed the common settings transport. This explains the scopeClosed failure independently of chat schema compatibility.
+- ApplicationControl, Memory and Photographer now retain the latest 4096 evidence records/batches, count evictions and converge valid saturated documents on their next atomic input commit. Business state, model preferences, model files and Assistant raw/indexed history are not reset. Startup UI says application preparation failed, because preparation also restores Agent-backed settings.
+- Regression coverage includes saturated context admission, subsequent requests, native call selection, root settings/Gateway restoration, persisted retention after reopen and original speech preference preservation. Device/native acceptance is recorded separately in Validation-History.
+
+
+## 2026-10-13 — Per-conversation checkpoint storage v3
+
+Replace Assistant aggregate context persistence with current.json, independent conversation-ID archives, a metadata index and recoverable rotation. Delta boundaries are removed; complete response strings and execution evidence update memory, with user admission and decision terminal checkpoints. Explicit close/cancellation saves changed recovery state; crash may lose unsaved output. Archived bodies load only on selection, including archive Task browsing. Shared prompt/request text is deduplicated on disk; file locks are isolated per path. Title work is root-owned and independent of new-conversation/page completion. No old format decoder/import remains. Earlier Task indexing and exact native call/result evidence remain intact.

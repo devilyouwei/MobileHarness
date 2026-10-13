@@ -302,7 +302,7 @@ public actor PhotographerAgent: Agent {
         if case .replaceLatest = disposition { return }
         try await contextRepository.recordSignal(
             input, disposition: disposition, admissionSequence: snapshot.revision + 1,
-            consumed: disposition != .feedback
+            consumed: disposition != .feedback, retainingLast: PhotographerSignalPreprocessor.evidenceCapacity
         ) { context in
             context.state.cameraRequestID = cameraRequestID
         }

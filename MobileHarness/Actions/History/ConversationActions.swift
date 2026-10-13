@@ -74,14 +74,14 @@ extension HistoryActions {
     @Action(
         domain: "History", module: "Conversation", title: "read",
         doc:
-            "Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0.",
+            "Read a conversation by an ID returned by History.list. Request blocks and compressed Tasks are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0.",
         parameters: [
             .init(
                 "id", type: .string, required: true, description: "Conversation UUID from History.list", constraints: ""
             ),
             .init(
                 "offset", type: .string, required: true,
-                description: "Decimal integer from 0 through 256, encoded as a string.", constraints: ""),
+                description: "Decimal integer from 0 through 1000000, encoded as a string.", constraints: ""),
             .init(
                 "limit", type: .string, required: true,
                 description: "Decimal integer from 1 through 2, encoded as a string.", constraints: ""),
@@ -94,7 +94,7 @@ extension HistoryActions {
         try arguments.validateAllowedKeys(["id", "offset", "limit"])
         let rawID = try arguments.requiredString("id", maximumUTF8Bytes: 36)
         guard let id = UUID(uuidString: rawID) else { throw ActionArguments.ValidationError.invalidValue("id") }
-        let offset = try arguments.requiredInt("offset", range: 0...256)
+        let offset = try arguments.requiredInt("offset", range: 0...1_000_000)
         let limit = try arguments.requiredInt("limit", range: 1...2)
         let result = try await history.read(id: id, offset: offset, limit: limit)
         try Task.checkCancellation()

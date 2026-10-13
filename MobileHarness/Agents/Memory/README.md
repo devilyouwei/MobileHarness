@@ -18,7 +18,9 @@ UI 历史事务经固定函数执行；归档提交后才生成标题，失败�
 
 ## 生命周期、容量与失败
 
-标题独立注入 ChatCapability，采样最多 32 轮，每段 80 Characters，输出最多 64 tokens，30 秒超时。标题必须单行非空、≤80 Characters，拒绝动作和原生调用。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
+✅ 已实现（2026-10-13）：MemoryAgent.prepareSignal 明确保留最近 4096 条 Signal 证据及消费批次，最旧证据淘汰计数持久化；已满的有效 context 首次新输入即可收敛。调用关联、任务、历史文档独立保存，证据淘汰不删除聊天或取消已接纳事务；真实写入失败继续传播。
+
+标题独立注入 ChatCapability，抽取最多 32 轮历史，每段 80 Characters，输出最多 64 tokens，30 秒超时。标题必须单行非空、≤80 Characters，拒绝动作和原生调用。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
 
 ## 函数权限与注册
 
@@ -104,3 +106,8 @@ Directed input schemas and static subscriptions are distinct; admission also val
 ## Cloud title thinking policy
 
 ✅ Implemented: title generation retains the existing two-message request, 64-token budget, 30-second joined deadline and explicit rejection of incomplete/empty titles. The shared [cloud request encoder](../../ModelKit/Language/LLM/OpenAI/README.md#non-thinking-request-policy) disables provider thinking before execution, preventing supported models from spending the title budget on reasoning. Memory does not own vendor-specific fields or retry with a larger budget. Existing archive/title persistence and failure presentation remain unchanged; opt-in synthetic provider evidence is recorded separately from native UI/device acceptance.
+
+
+## 会话存储性能重构 v3
+
+✅ 已实现：新会话归档/创建成功后即可完成新会话请求；标题生成在根持有的单个有界任务中进行，失败不撤销新会话，保存 titleError 并允许重试。
